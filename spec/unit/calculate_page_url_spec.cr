@@ -8,6 +8,10 @@ module Hwaro::Core::Build
       calculate_page_url(page)
     end
 
+    def test_raise_on_permalink_errors(pages : Array(Models::Page))
+      raise_on_permalink_errors!(pages)
+    end
+
     def test_set_config(config : Models::Config)
       @config = config
     end
@@ -403,17 +407,46 @@ describe Hwaro::Core::Build::Builder do
         page.url.should eq("/posts/")
       end
 
-      it "raises a classified content error for a dateless page under a date pattern" do
+      it "defers the dateless-page error: fallback URL at parse, raise only for publishing pages" do
+        builder = Hwaro::Core::Build::Builder.new
+        config = Hwaro::Models::Config.new
+        config.permalinks = {"posts" => ":year/:slug"}
+        builder.test_set_config(config)
+
+        # The parse fan-out runs before cascades/draft filtering, so URL
+        # calculation must not abort the build — it parks the error and
+        # falls back to the directory URL.
+        page = Hwaro::Models::Page.new("posts/undated.md")
+        builder.test_calculate_page_url(page)
+        page.url.should eq("/posts/undated/")
+        page.permalink_error.not_nil!.should contain("requires a date, but the page has none")
+
+        # A page that publishes still fails the build, classified.
+        ex = expect_raises(Hwaro::HwaroError, /requires a date, but the page has none/) do
+          builder.test_raise_on_permalink_errors([page])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+
+        # A headless page never publishes the URL — no error.
+        page.render = false
+        builder.test_raise_on_permalink_errors([page])
+      end
+
+      it "clears a stale permalink error once the page gains a date" do
         builder = Hwaro::Core::Build::Builder.new
         config = Hwaro::Models::Config.new
         config.permalinks = {"posts" => ":year/:slug"}
         builder.test_set_config(config)
 
         page = Hwaro::Models::Page.new("posts/undated.md")
-        ex = expect_raises(Hwaro::HwaroError, /requires a date, but the page has none/) do
-          builder.test_calculate_page_url(page)
-        end
-        ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+        builder.test_calculate_page_url(page)
+        page.permalink_error.should_not be_nil
+
+        page.date = Time.utc(2026, 3, 5)
+        builder.test_calculate_page_url(page)
+        page.permalink_error.should be_nil
+        page.url.should eq("/2026/undated/")
+        builder.test_raise_on_permalink_errors([page])
       end
     end
 

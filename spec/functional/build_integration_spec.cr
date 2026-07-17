@@ -90,6 +90,47 @@ describe "Build Integration: URL generation" do
       body.should contain("Body A")
     end
   end
+
+  it "a dateless draft or headless page under a date-token pattern does not abort the build" do
+    config = <<-TOML
+      title = "Test"
+      base_url = "http://localhost"
+
+      [permalinks]
+      "posts" = "/:year/:slug/"
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "posts/wip.md"    => "---\ntitle: WIP\ndraft: true\n---\nDraft, no date",
+        "posts/data.md"   => "---\ntitle: Data\nrender: false\n---\nHeadless, no date",
+        "posts/public.md" => "---\ntitle: Public\ndate: 2026-03-05\n---\nDated",
+      },
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+    ) do
+      File.exists?("public/2026/public/index.html").should be_true
+    end
+  end
+
+  it "a dateless PUBLISHED page under a date-token pattern still fails the build" do
+    config = <<-TOML
+      title = "Test"
+      base_url = "http://localhost"
+
+      [permalinks]
+      "posts" = "/:year/:slug/"
+      TOML
+
+    ex = expect_raises(Hwaro::HwaroError, /requires a date, but the page has none/) do
+      build_site(
+        config,
+        content_files: {"posts/undated.md" => "---\ntitle: Undated\n---\nNo date"},
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+    ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+  end
 end
 
 # ---------------------------------------------------------------------------

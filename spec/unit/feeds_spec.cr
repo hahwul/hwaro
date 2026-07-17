@@ -917,6 +917,37 @@ describe Hwaro::Content::Seo::Feeds do
       end
     end
 
+    it "keeps the path-sort-first page when two pages collide on one URL (matches the written output)" do
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "rss"
+      config.feeds.filename = "rss.xml"
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+
+      winner = Hwaro::Models::Page.new("posts/2025/foo.md")
+      winner.title = "Winner (written to disk)"
+      winner.url = "/foo/"
+      winner.render = true
+      winner.raw_content = "a"
+
+      loser = Hwaro::Models::Page.new("posts/2026/foo.md")
+      loser.title = "Loser (suppressed on disk)"
+      loser.url = "/foo/"
+      loser.render = true
+      loser.raw_content = "b"
+
+      Dir.mktmpdir do |output_dir|
+        # Later-path page listed FIRST: the dedupe must pick by path sort
+        # (compute_output_url_winners' rule), not by input order.
+        Hwaro::Content::Seo::Feeds.generate([loser, winner], config, output_dir)
+
+        content = File.read(File.join(output_dir, "rss.xml"))
+        content.should contain("Winner (written to disk)")
+        content.should_not contain("Loser (suppressed on disk)")
+      end
+    end
+
     it "generates Atom feed when type is atom" do
       config = Hwaro::Models::Config.new
       config.feeds.enabled = true

@@ -40,9 +40,20 @@ module Hwaro
           if config.feeds.enabled
             site_pages = pages.reject { |p| p.draft || p.unpublished || !p.render || p.is_a?(Models::Section) }
 
-            # Deduplicate by URL (keep last occurrence, matching build behavior)
-            seen_urls = Set(String).new
-            site_pages = site_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse!
+            # Deduplicate by URL, keeping the page the build actually wrote:
+            # output collisions resolve to the source-path-sort-first page
+            # (render.cr#compute_output_url_winners), so the feed must
+            # advertise that page's content — not whichever colliding page
+            # happened to come last.
+            url_winners = {} of String => Models::Page
+            site_pages.each do |p|
+              if prev = url_winners[p.url]?
+                url_winners[p.url] = p if p.path < prev.path
+              else
+                url_winners[p.url] = p
+              end
+            end
+            site_pages = site_pages.select { |p| url_winners[p.url].same?(p) }
 
             # Filter by section if configured for main feed
             if !config.feeds.sections.empty?

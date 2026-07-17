@@ -139,7 +139,7 @@ Notes:
 
 - Tokens must be whole path segments; unknown tokens fail the config load.
 - Patterns apply to leaf pages only. Section `_index` and bundle `index` pages skip pattern rules (they keep their directory URL, or a later plain remap rule).
-- A page without a `date` that matches a pattern using `:year`/`:month`/`:day` fails the build — add a date, set an explicit `path` in front matter, or drop the date tokens.
+- A page without a `date` that matches a pattern using `:year`/`:month`/`:day` fails the build — add a date, set an explicit `path` in front matter, or drop the date tokens. Pages that never publish are exempt: drafts (without `--drafts`), expired/future-dated pages, and headless `render: false` pages don't block the build.
 - An explicit `path` in front matter always wins over any permalink rule.
 - An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page — declare it last, since first-match ordering means it would shadow any rule after it.
 - For non-default languages the `/lang/` prefix comes first: `/ko/2026/03/05/hello/`.

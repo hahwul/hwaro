@@ -469,12 +469,6 @@ module Hwaro
             return true
           end
 
-          # Re-render <!-- more --> summaries for the re-parsed pages with the
-          # body pipeline (parse_single_page reset summary_html to nil); the
-          # listing pages re-rendered below read it.
-          render_page_summaries(changed_pages, site, templates, highlight,
-            link_targets: (site.pages + site.sections).as(Array(Models::Page)))
-
           # Re-claim output URLs: the edit may have introduced or resolved a
           # slug/alias collision, and a stale winner map would keep
           # suppressing (or racing) writes for the rest of the serve session.
@@ -505,6 +499,23 @@ module Hwaro
             changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
           end
           excluded_paths = excluded_pages.map(&.path).to_set
+
+          # Date-token permalink errors deferred by the lenient parse (see
+          # ParseContent#calculate_page_url): now that cascades and the
+          # exclusion pass ran, a surviving renderable page must fail the
+          # rebuild — same contract as the full parse phase. The serve
+          # watcher surfaces this via the overlay and escalates the next
+          # rebuild through @rebuild_failed.
+          raise_on_permalink_errors!(changed_pages)
+
+          # Re-render <!-- more --> summaries for the re-parsed pages with the
+          # body pipeline (parse_single_page reset summary_html to nil); the
+          # listing pages re-rendered below read it. Runs AFTER the exclusion
+          # pass so a page just flipped to draft can't feed its summary's
+          # broken @/ links into the strict-mode accumulator (the full build
+          # renders summaries post-filter too).
+          render_page_summaries(changed_pages, site, templates, highlight,
+            link_targets: (site.pages + site.sections).as(Array(Models::Page)))
 
           # Run taxonomy update on ALL re-parsed pages (including the excluded
           # ones — their OLD entries must be removed; excluded_paths keeps
@@ -772,6 +783,9 @@ module Hwaro
             changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
           end
           excluded_paths = excluded_pages.map(&.path).to_set
+
+          # Deferred permalink errors — mirrors run_incremental.
+          raise_on_permalink_errors!(changed_pages)
 
           # Update all derived relationships before full re-render (removal
           # runs for every re-parsed page; excluded pages' new terms are not
@@ -1107,11 +1121,14 @@ module Hwaro
                     process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
                   end
           # Strict [links] broken_internal = "error": this pass continues the
-          # initial fast-start build (whose priority fan-out already raised
-          # for its own subset and left the accumulator empty), so don't
-          # clear here — just surface what the deferred pages collected. The
-          # server's fast-start fiber rescues this and routes it into the
-          # error overlay via notify_build_error; the server keeps running.
+          # initial fast-start build, so don't clear here. If the priority
+          # fan-out already raised, its entries are still in the accumulator
+          # (raising never clears) and get re-reported alongside whatever the
+          # deferred pages collected — acceptable: those links are still
+          # broken, and @rebuild_failed escalates the next watch rebuild to a
+          # full build, which clears at entry. The server's fast-start fiber
+          # rescues this and routes it into the error overlay via
+          # notify_build_error; the server keeps running.
           raise_on_broken_internal_links!
 
           # Refresh feeds / sitemap / search now that every page has rendered

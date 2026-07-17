@@ -1248,26 +1248,6 @@ module Hwaro
         @languages.values.sort_by!(&.weight)
       end
 
-      # Resolve a content directory through the configured `permalinks` rules.
-      #
-      # Returns the remapped directory (relative to the site root) for the first
-      # rule whose source matches `directory_path` exactly or as a parent prefix;
-      # the matched prefix is replaced and any deeper path is preserved. An empty
-      # target maps the matched tree to the site root (so `pages/contact` under
-      # `"pages" => ""` becomes `contact`, not `/contact`). Returns
-      # `directory_path` unchanged when no rule matches.
-      def resolve_permalink_dir(directory_path : String) : String
-        permalinks.each do |source, target|
-          if directory_path == source
-            return target
-          elsif directory_path.starts_with?("#{source}/")
-            rest = directory_path[(source.size + 1)..]
-            return target.empty? ? rest : "#{target}/#{rest}"
-          end
-        end
-        directory_path
-      end
-
       # Load and parse a `config.toml` into a populated `Config`.
       #
       # Raises `Hwaro::HwaroError(HWARO_E_CONFIG)` directly at the source for
@@ -1978,23 +1958,20 @@ module Hwaro
 
         s.each do |k, v|
           if target = v.as_s?
-            if Utils::PermalinkResolver.pattern?(target)
-              # Token patterns (e.g. "/:year/:month/:slug/") rebuild whole
-              # URLs at resolve time. Validate tokens up front so a typo'd
-              # `:tokne` fails the config load instead of emitting literal
-              # `:tokne` path segments, and only normalize the OUTER slashes
-              # — the interior pattern structure must survive verbatim.
-              Utils::PermalinkResolver.validate_pattern!(k, target)
-              config.permalinks[k.strip("/")] = target.strip("/")
-            else
-              # Strip surrounding slashes from BOTH the source key and the target.
-              # resolve_permalink_dir matches against slash-free directory paths
-              # and interpolates the target as `/#{effective_dir}/`, so a key or
-              # target written with leading/trailing slashes (e.g. `"/blog/"`)
-              # would otherwise silently never match (source) or produce
-              # double-slash URLs like `http://host//blog//p/` (target).
-              config.permalinks[k.strip("/")] = target.strip("/")
-            end
+            # Token patterns (e.g. "/:year/:month/:slug/") rebuild whole
+            # URLs at resolve time. Validate tokens up front so a typo'd
+            # `:tokne` fails the config load instead of emitting literal
+            # `:tokne` path segments.
+            Utils::PermalinkResolver.validate_pattern!(k, target) if Utils::PermalinkResolver.pattern?(target)
+            # Strip surrounding slashes from BOTH the source key and the
+            # target — only the OUTER slashes; interior structure (pattern
+            # or remap) must survive verbatim. The resolver matches against
+            # slash-free directory paths and interpolates the target as
+            # `/#{effective_dir}/`, so a key or target written with
+            # leading/trailing slashes (e.g. `"/blog/"`) would otherwise
+            # silently never match (source) or produce double-slash URLs
+            # like `http://host//blog//p/` (target).
+            config.permalinks[k.strip("/")] = target.strip("/")
           end
         end
       end

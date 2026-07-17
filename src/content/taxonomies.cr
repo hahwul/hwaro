@@ -269,9 +269,12 @@ module Hwaro
       end
 
       # Sort every term's page list per its taxonomy's sort_by/reverse
-      # (date-desc for taxonomies not in the config, matching the render
-      # phase's rebuild_taxonomies).
-      private def self.sort_taxonomy_pages(taxonomies : Hash(String, Hash(String, Array(Models::Page))), config : Models::Config)
+      # (date-desc for taxonomies not in the config). ONE implementation
+      # serves both the generator (populate_taxonomies) and the render
+      # phase's rebuild_taxonomies (transform.cr) — per-term ordering
+      # drifting between the written pages and get_taxonomy is exactly the
+      # bug class this shared helper prevents.
+      def self.sort_taxonomy_pages(taxonomies : Hash(String, Hash(String, Array(Models::Page))), config : Models::Config)
         tax_configs = config.taxonomies.index_by(&.name)
         taxonomies.each do |name, terms|
           cfg = tax_configs[name]?
@@ -497,14 +500,10 @@ module Hwaro
         Hwaro::Utils::FileSafe.mkdir_p(feed_output_dir)
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"
 
-        feed_pages = pages.sort { |a, b| Utils::SortUtils.compare_by_date(a, b) }
-
-        if site.config.feeds.limit > 0
-          feed_pages = feed_pages.first(site.config.feeds.limit)
-        end
-
+        # No caller-side sort/limit: process_feed itself sorts date-desc
+        # (SortUtils.compare_by_date) and applies feeds.limit.
         Content::Seo::Feeds.process_feed(
-          feed_pages,
+          pages,
           site.config,
           feed_output_dir,
           "",

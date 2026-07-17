@@ -50,6 +50,8 @@ module Hwaro
         end
       end
 
+      DATE_TOKEN_HINT = "Add a date to the page's front matter, set an explicit `path`, or remove date tokens from the pattern."
+
       # Compute the canonical site-relative URL for a content file.
       #
       # Precedence: explicit `path` front matter (custom_path) wins outright;
@@ -58,6 +60,11 @@ module Hwaro
       # matching `[permalinks]` rule applies (pattern expansion for leaf
       # pages, directory remap otherwise), and the result is normalized to a
       # leading- and trailing-slash directory URL.
+      #
+      # A date-token pattern on a dateless page raises HWARO_E_CONTENT.
+      # Callers that can't yet know whether the page will publish (the parse
+      # fan-out runs before cascades and draft/expiry filtering) use
+      # `resolve_url_lenient` and defer the error to after filtering.
       def resolve_url(
         relative_path : String,
         config : Models::Config?,
@@ -68,6 +75,33 @@ module Hwaro
         date : Time?,
         title : String,
       ) : String
+        url, error = resolve_url_lenient(relative_path, config,
+          slug: slug, custom_path: custom_path, language: language, date: date, title: title)
+        if error
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONTENT,
+            message: error,
+            hint: DATE_TOKEN_HINT,
+          )
+        end
+        url
+      end
+
+      # Like `resolve_url`, but a date-token pattern on a dateless page
+      # falls back to the default directory URL and REPORTS the problem in
+      # the second tuple slot instead of raising — so a draft or headless
+      # page the build is about to discard can't abort the whole build over
+      # a URL it never publishes.
+      def resolve_url_lenient(
+        relative_path : String,
+        config : Models::Config?,
+        *,
+        slug : String?,
+        custom_path : String?,
+        language : String?,
+        date : Time?,
+        title : String,
+      ) : {String, String?}
         stem = Path[relative_path].stem
 
         # Remove language suffix from stem (e.g. "hello-world.ko" -> "hello-world")
@@ -90,9 +124,10 @@ module Hwaro
         if custom_path
           url = "#{lang_prefix}/#{custom_path.lchop("/")}"
           url += "/" unless url.ends_with?("/")
-          return url
+          return {url, nil}
         end
 
+        error = nil
         rule = match_permalink_rule(config, directory_path, is_index)
 
         if rule && pattern?(rule[:target])
@@ -100,25 +135,32 @@ module Hwaro
             rule[:key], rule[:target], relative_path, directory_path, clean_stem,
             slug: slug, date: date, title: title,
           )
-          return path.empty? ? "#{lang_prefix}/" : "#{lang_prefix}/#{path}/"
+          if path
+            return {path.empty? ? "#{lang_prefix}/" : "#{lang_prefix}/#{path}/", nil}
+          end
+          # Date token, no date: report and fall back to the un-remapped
+          # directory URL (the pattern target has no directory to remap to).
+          error = "#{relative_path} matches [permalinks] rule \"#{rule[:key]}\" (pattern '#{rule[:target]}') which requires a date, but the page has none."
+          rule = nil
         end
 
         effective_dir = rule ? remap_directory(rule[:target], rule[:rest]) : directory_path
 
-        if is_index
-          if effective_dir == "." || effective_dir.empty?
-            lang_prefix.empty? ? "/" : "#{lang_prefix}/"
-          else
-            "#{lang_prefix}/#{effective_dir}/"
-          end
-        else
-          leaf = slug || clean_stem
-          if effective_dir == "." || effective_dir.empty?
-            "#{lang_prefix}/#{leaf}/"
-          else
-            "#{lang_prefix}/#{effective_dir}/#{leaf}/"
-          end
-        end
+        url = if is_index
+                if effective_dir == "." || effective_dir.empty?
+                  lang_prefix.empty? ? "/" : "#{lang_prefix}/"
+                else
+                  "#{lang_prefix}/#{effective_dir}/"
+                end
+              else
+                leaf = slug || clean_stem
+                if effective_dir == "." || effective_dir.empty?
+                  "#{lang_prefix}/#{leaf}/"
+                else
+                  "#{lang_prefix}/#{effective_dir}/#{leaf}/"
+                end
+              end
+        {url, error}
       end
 
       # First `[permalinks]` rule whose source matches `directory_path`
@@ -130,7 +172,7 @@ module Hwaro
       # An empty source (`""` or `"/"` in config.toml) acts as a catch-all
       # for PATTERN rules only — it matches every page, including root-level
       # ones. Empty-source plain remaps stay inert as they always have been
-      # (`resolve_permalink_dir` never matched them), so no legacy config
+      # (the pre-resolver remap logic never matched them), so no legacy config
       # changes meaning.
       private def match_permalink_rule(config : Models::Config?, directory_path : String, is_index : Bool)
         return unless config
@@ -153,15 +195,16 @@ module Hwaro
       end
 
       # Replace the matched source prefix with the remap target, preserving
-      # any deeper path (mirrors Config#resolve_permalink_dir semantics).
+      # any deeper path (the original directory-remap semantics).
       private def remap_directory(target : String, rest : String) : String
         return target if rest.empty?
         target.empty? ? rest : "#{target}/#{rest}"
       end
 
       # Expand a token pattern into a slash-joined URL path (no surrounding
-      # slashes). An empty `:section` (root-level page) collapses instead of
-      # emitting a `//` segment.
+      # slashes), or nil when the pattern needs a date the page doesn't have
+      # (the caller owns whether that's an error). An empty `:section`
+      # (root-level page) collapses instead of emitting a `//` segment.
       private def expand_pattern(
         rule_key : String,
         pattern : String,
@@ -172,7 +215,7 @@ module Hwaro
         slug : String?,
         date : Time?,
         title : String,
-      ) : String
+      ) : String?
         segments = [] of String
 
         pattern.split('/').each do |segment|
@@ -185,11 +228,7 @@ module Hwaro
 
           case token = segment.lchop(':')
           when "year", "month", "day"
-            page_date = date || raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_CONTENT,
-              message: "#{relative_path} matches [permalinks] rule \"#{rule_key}\" (pattern '#{pattern}') which requires a date, but the page has none.",
-              hint: "Add a date to the page's front matter, set an explicit `path`, or remove date tokens from the pattern.",
-            )
+            page_date = date || return
             segments << case token
             when "year"  then page_date.to_s("%Y")
             when "month" then page_date.to_s("%m")

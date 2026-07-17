@@ -264,17 +264,10 @@ module Hwaro::Core::Build::Phases::Transform
       end
     end
 
-    # Sort pages in taxonomies in-place (per-taxonomy sort_by/reverse,
-    # default date-desc for unconfigured names)
-    tax_configs = site.config.taxonomies.index_by(&.name)
-    site.taxonomies.each do |name, terms|
-      cfg = tax_configs[name]?
-      sort_by = cfg.try(&.sort_by) || "date"
-      reverse = cfg.try(&.reverse) || false
-      terms.each_key do |term|
-        terms[term] = Utils::SortUtils.sort_pages(terms[term], sort_by, reverse)
-      end
-    end
+    # Sort pages in taxonomies in-place — the same helper the generator
+    # uses, so per-term ordering can't drift between the written pages
+    # and the render phase's get_taxonomy view.
+    Content::Taxonomies.sort_taxonomy_pages(site.taxonomies, site.config)
   end
 
   # Yield each {name, term} a page carries via a taxonomy whose terms live on
