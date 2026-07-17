@@ -184,7 +184,11 @@ copy = true
 
 The markup contract: each opted-in block's `<pre>` gets a
 `data-copy="true"` attribute, and `{{ highlight_js }}` injects a small
-inline, dependency-free runtime (works in both server and client mode)
+inline, dependency-free runtime (works in both server and client mode).
+With `copy = true` the runtime ships site-wide; with the global default
+off, pages whose body contains an opted-in block get it appended to
+their own `{{ highlight_js }}` — pages without one stay JavaScript-free.
+The runtime
 that wraps each `pre[data-copy]` in a `<div class="code-wrapper">` —
 reusing an existing `.code-block` wrapper (named fences) as the anchor
 instead — appends a `<button class="code-copy-btn">`, and copies the

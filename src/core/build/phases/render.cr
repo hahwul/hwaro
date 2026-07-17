@@ -1721,10 +1721,13 @@ module Hwaro::Core::Build::Phases::Render
       end
       slug_map = Utils::TextUtils.disambiguated_slugs(written_terms)
       term_slug_values = {} of String => Crinja::Value
-      # Term order matches the taxonomy's `terms_sort_by` (same rule the
-      # written index page uses): "name" = alphabetical (also the default
-      # for unconfigured taxonomy names), "count" = page count descending,
-      # name-ascending tiebreak.
+      # Term order matches the taxonomy's `terms_sort_by` as the ROOT index
+      # page applies it: "name" = alphabetical (also the default for
+      # unconfigured taxonomy names), "count" = page count descending,
+      # name-ascending tiebreak. Counts here are site-wide (all languages,
+      # like the root index); per-language index pages sort by their own
+      # language-filtered counts and may order differently — get_taxonomy
+      # is a site-wide view, so the root rule is the right parity target.
       tax_cfg = config.taxonomies.find { |t| t.name == name }
       sorted_term_names = if tax_cfg.try(&.terms_sort_by) == "count"
                             terms.keys.sort! do |a, b|
@@ -2409,6 +2412,22 @@ module Hwaro::Core::Build::Phases::Render
     # that don't already exist when we reverse the direction below.
     gv = global_vars || build_global_vars(site)
     gv.each { |k, v| vars[k] = v unless vars.has_key?(k) }
+
+    # Per-fence copy opt-in (`{copy=true}`) with the global `[highlight]
+    # copy` default off: the site-wide `highlight_js` (computed once in
+    # build_global_vars) ships no copy runtime, so a page whose rendered
+    # body carries an opted-in block appends it here — after the merge, so
+    # the page-level value wins. The probe can't false-positive on fenced
+    # documentation examples: the escape pipeline turns their `"` into
+    # `&quot;`. With the global flag ON the runtime is already in `gv`.
+    if config.highlight.enabled && !config.highlight.copy && content.includes?(%(data-copy="true"))
+      snippet = Models::HighlightConfig::COPY_SNIPPET
+      base_js = vars["highlight_js"]?.try(&.raw).as?(String) || ""
+      js = base_js.empty? ? snippet : "#{base_js}\n#{snippet}"
+      vars["highlight_js"] = Crinja::Value.new(js)
+      base_css = vars["highlight_css"]?.try(&.raw).as?(String) || ""
+      vars["highlight_tags"] = Crinja::Value.new(base_css.empty? ? js : "#{base_css}\n#{js}")
+    end
 
     vars
   end

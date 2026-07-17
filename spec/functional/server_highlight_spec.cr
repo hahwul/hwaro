@@ -365,6 +365,55 @@ describe "Fence options — server mode" do
     reset_highlight_mode
   end
 
+  it "per-fence {copy=true} with the global default off ships the runtime only on opted-in pages" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+
+      [highlight]
+      enabled = true
+      mode = "server"
+      TOML
+
+    opted = <<-MD
+      +++
+      title = "Opted"
+      +++
+      ```python {copy=true}
+      pass
+      ```
+      MD
+
+    plain = <<-MD
+      +++
+      title = "Plain"
+      +++
+      ```python
+      pass
+      ```
+      MD
+
+    build_site(
+      config,
+      content_files: {"opted.md" => opted, "plain.md" => plain},
+      template_files: {"page.html" => HIGHLIGHT_TEMPLATE},
+      highlight: true,
+    ) do
+      # The opted-in page gets the runtime appended to its own
+      # {{ highlight_js }} — the site-wide value ships nothing.
+      opted_html = File.read("public/opted/index.html")
+      opted_html.should contain(%(<pre data-copy="true">))
+      opted_html.scan("code-copy-btn").size.should be > 0
+
+      # Pages without an opted-in fence stay JavaScript-free.
+      plain_html = File.read("public/plain/index.html")
+      plain_html.should_not contain("data-copy")
+      plain_html.should_not contain("code-copy-btn")
+    end
+  ensure
+    reset_highlight_mode
+  end
+
   it "the global [highlight] line_numbers default wraps a bare fence, and a per-block override opts out" do
     config = <<-TOML
       title = "Test Site"

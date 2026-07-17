@@ -623,6 +623,18 @@ describe "copy button marker (data-copy)" do
     reset_fence_options_state
   end
 
+  it "never marks fences when highlighting is disabled (no runtime ever ships)" do
+    Hwaro::Content::Processors::SyntaxHighlighter.default_copy = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python\npass\n```", highlight: false)
+    html.should_not contain("data-copy")
+    per_fence = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {copy=true}\npass\n```", highlight: false)
+    per_fence.should_not contain("data-copy")
+  ensure
+    reset_fence_options_state
+  end
+
   it "is byte-identical to stock output when the feature is fully off" do
     content = "```python\npass\n```"
     baseline = Hwaro::Content::Processors::SyntaxHighlighter.render(content, highlight: true)

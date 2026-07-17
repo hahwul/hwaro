@@ -61,7 +61,7 @@ All values are Crinja `Value`s and — like every other hwaro template — **alr
 | `lang` | The fence's language token, escaped (`python` in `` ```python ``). Empty string for a fence with no language |
 | `options` | The raw Zola/Pandoc-style `{...}` options block after the language (see [Syntax Highlighting](/features/syntax-highlighting/)), or any trailing info-string text when there's no `{...}` block. Escaped |
 | `code` | The fence body, HTML-escaped |
-| `highlighted` | The server-mode syntax-highlighted body (hljs-class spans), or an empty string when `[highlight] mode` isn't `"server"`, highlighting is off, or the language has no lexer |
+| `highlighted` | The server-mode syntax-highlighted body (hljs-class spans), or an empty string when `[highlight] mode` isn't `"server"`, highlighting is off, or the language has no lexer. A `{hide_lines=…}` fence option is already applied — hidden lines never reach the template (nor `code`) in server mode |
 | `name` | The parsed `{name=...}`/`{title=...}` filename label, escaped. Empty string when absent |
 | `copy` | `"true"` when the copy button applies to this block (`[highlight] copy` / per-fence `{copy=...}`, never for mermaid), empty string otherwise. The template decides what markup to emit for it |
 

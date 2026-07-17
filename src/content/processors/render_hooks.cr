@@ -40,7 +40,7 @@ module Hwaro
         # build. Constructed once per `load_templates` call (Initialize
         # phase, and again on every `serve` template reload) and read-only
         # for the rest of the build — parallel render workers only ever
-        # read `link`/`image`/`heading`/`codeblock`/`fingerprint`.
+        # read the per-hook entries (HOOK_NAMES) and `fingerprint`.
         class Registry
           getter link : HookEntry?
           getter image : HookEntry?
@@ -350,7 +350,10 @@ module Hwaro
             vars["header_html"] = Crinja::Value.new(header_html)
             vars["body_html"] = Crinja::Value.new(body_html)
             result = render_hook_template("hooks/render-table", hook, SALT_TABLE, vars) { html }
-            result.gsub(/\n[ \t]*\n(?:[ \t]*\n)*/, "\n")
+            # `\r?` so a hook template saved with CRLF line endings still has
+            # its blank lines collapsed — markd treats a stray `\r\n\r\n`
+            # exactly like `\n\n` (HTML block ends, remainder re-escapes).
+            result.gsub(/\r?\n(?:[ \t]*\r?\n)+/, "\n")
           end
 
           private def render_hook_template(template_key : String, hook : HookEntry, salt : UInt64, vars : Hash(String, Crinja::Value), & : -> String) : String
