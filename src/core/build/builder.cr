@@ -1094,6 +1094,7 @@ module Hwaro
 
             relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)
+            next if @config.try(&.sass_source?(relative))
             dest_path = File.join(output_dir, relative)
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
@@ -1101,6 +1102,18 @@ module Hwaro
             copied += 1
           end
           Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
+        end
+
+        # Recompile all SCSS entries into the output directory. Used by
+        # serve mode when a `.scss` source changes — such files publish as
+        # compiled `.css`, never verbatim. No-ops unless [sass] is enabled.
+        def recompile_sass(output_dir : String)
+          config = @config
+          return unless config && config.sass.enabled
+
+          compiler = Assets::SassCompiler.new(config.sass, config.static)
+          count = compiler.compile_all(output_dir)
+          Logger.outcome("compiled", "#{count} sass #{count == 1 ? "file" : "files"}") if count > 0
         end
 
         # Republish non-Markdown content assets (images, etc.) to the output
@@ -1156,7 +1169,13 @@ module Hwaro
           site = @site
           removed_paths.each do |path|
             if path.starts_with?("static/")
-              dest = File.join(output_dir, path.lchop("static/"))
+              relative = path.lchop("static/")
+              # SCSS sources publish as compiled `.css`, never verbatim — the
+              # stale artifact of a removed entry is the compiled sibling.
+              if @config.try(&.sass_source?(relative))
+                relative = relative.sub(/\.scss\z/, ".css")
+              end
+              dest = File.join(output_dir, relative)
               outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
             elsif path.starts_with?("content/")
               if path.downcase.ends_with?(".md")

@@ -9,6 +9,7 @@ require "../utils/css_minifier"
 require "../utils/js_minifier"
 require "../utils/logger"
 require "../models/config"
+require "./sass_compiler"
 
 module Hwaro
   module Assets
@@ -17,7 +18,11 @@ module Hwaro
       # e.g. "main.css" => "/assets/main.a1b2c3d4.css"
       getter manifest : Hash(String, String)
 
-      def initialize(@config : Models::AssetsConfig, @base_url : String)
+      # `sass_enabled` mirrors `[sass].enabled`: `.scss` bundle entries
+      # compile through the built-in compiler only when the feature is on;
+      # otherwise they concatenate verbatim (pre-Sass behavior, and the
+      # escape hatch for sources outside the supported subset).
+      def initialize(@config : Models::AssetsConfig, @base_url : String, @sass_enabled : Bool = false)
         @manifest = {} of String => String
       end
 
@@ -49,13 +54,25 @@ module Hwaro
               next
             end
             io << "\n" if i > 0
-            io << File.read(source)
+            content = File.read(source)
+            # `.scss` bundle entries compile before concatenation when the
+            # built-in Sass feature is on; verbatim otherwise.
+            if @sass_enabled && file.ends_with?(".scss")
+              content = SassCompiler.compile_source(content, source)
+            end
+            io << content
           end
         end
 
         if contents.empty?
           Logger.warn "Asset pipeline: bundle '#{bundle.name}' produced empty output"
           return
+        end
+
+        # A `.scss`-named bundle would publish with a non-CSS extension and
+        # skip the extension-keyed minifier — almost certainly a mistake.
+        if bundle.name.ends_with?(".scss")
+          Logger.warn "Asset pipeline: bundle '#{bundle.name}' keeps the .scss extension in output — name the bundle '#{bundle.name.sub(/\.scss\z/, ".css")}' to serve it as CSS."
         end
 
         # Minify if enabled

@@ -220,6 +220,8 @@ module Hwaro
         "build", "deployment", "permalinks", "auto_includes",
         # Asset pipeline (many prefer manual or external bundlers)
         "assets",
+        # Built-in Sass compilation (opt-in)
+        "sass",
         # Useful but not essential to nag about
         "related", "series", "pagination",
         # Navigation menus — many sites hardcode nav in the theme instead

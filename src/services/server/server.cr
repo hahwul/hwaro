@@ -1095,6 +1095,15 @@ module Hwaro
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        # SCSS sources never publish verbatim — when one changed, recompile
+        # the entries instead. A partial edit must rebuild every entry that
+        # imports it, and there is no dependency graph, so the whole tree
+        # recompiles (cheap at static-site scale). Compile errors raise and
+        # reach the watcher rescue → browser overlay. The predicate is the
+        # same one the copy paths use, so the gate can't drift.
+        if (config = @builder.config) && changeset.modified_static.any? { |p| config.sass_source?(p) }
+          @builder.recompile_sass(output_dir)
+        end
       end
 
       private def copy_content_files(changeset : ChangeSet, build_options : Config::Options::BuildOptions)

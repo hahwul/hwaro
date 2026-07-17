@@ -29,7 +29,7 @@ hooks.post = ["npm run minify", "npx pagefind --site public"]
 Pre-build hooks run **before** any content processing begins. They are ideal for:
 
 - Installing dependencies
-- Compiling assets (TypeScript, Sass, etc.)
+- Compiling assets (TypeScript, Tailwind/PostCSS, etc. — SCSS has a [built-in compiler](/features/sass/))
 - Running data fetching scripts
 - Preprocessing content
 

@@ -32,7 +32,7 @@ module Hwaro
           config = ctx.config
           return unless config && config.assets.enabled
 
-          pipeline = Assets::Pipeline.new(config.assets, config.base_url)
+          pipeline = Assets::Pipeline.new(config.assets, config.base_url, config.sass.enabled)
           pipeline.process(ctx.output_dir)
 
           @@manifest_mutex.synchronize { @@manifest = pipeline.manifest }
