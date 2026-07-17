@@ -604,48 +604,18 @@ module Hwaro::Core::Build::Phases::ParseContent
     Utils::DigestUtils.update_length_prefixed(digest, value)
   end
 
+  # Canonical URL computation is shared with PlatformConfig alias generation
+  # via Utils::PermalinkResolver so build URLs and generated platform
+  # redirects can never drift apart.
   private def calculate_page_url(page : Models::Page)
-    relative_path = page.path
-    config = @config
-
-    # Apply permalinks mapping
-    directory_path = Path[relative_path].dirname.to_s
-    effective_dir = config ? config.resolve_permalink_dir(directory_path) : directory_path
-
-    # For multilingual sites, include language prefix for non-default languages
-    lang_prefix = if page.language && config && page.language != config.default_language
-                    "/#{page.language}"
-                  else
-                    ""
-                  end
-
-    if custom_path = page.custom_path
-      custom = custom_path.lchop("/")
-      page.url = "#{lang_prefix}/#{custom}"
-      page.url += "/" unless page.url.ends_with?("/")
-    elsif page.is_index
-      if effective_dir == "." || effective_dir.empty?
-        page.url = lang_prefix.empty? ? "/" : "#{lang_prefix}/"
-      else
-        page.url = "#{lang_prefix}/#{effective_dir}/"
-      end
-    else
-      stem = Path[relative_path].stem
-
-      # Remove language suffix from stem (e.g., "hello-world.ko" -> "hello-world")
-      clean_stem = if page.language
-                     stem.chomp(".#{page.language}")
-                   else
-                     stem
-                   end
-
-      leaf = page.slug || clean_stem
-
-      if effective_dir == "." || effective_dir.empty?
-        page.url = "#{lang_prefix}/#{leaf}/"
-      else
-        page.url = "#{lang_prefix}/#{effective_dir}/#{leaf}/"
-      end
-    end
+    page.url = Utils::PermalinkResolver.resolve_url(
+      page.path,
+      @config,
+      slug: page.slug,
+      custom_path: page.custom_path,
+      language: page.language,
+      date: page.date,
+      title: page.title,
+    )
   end
 end

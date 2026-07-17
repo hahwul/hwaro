@@ -1894,6 +1894,29 @@ describe Hwaro::Models::Config do
       config.permalinks.has_key?("/posts").should be_false
       config.permalinks["posts"].should eq("blog")
     end
+
+    it "preserves the interior of token patterns and only trims outer slashes" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [permalinks]
+        "posts" = "/:year/:month/:day/:slug/"
+        TOML
+
+      config.permalinks["posts"].should eq(":year/:month/:day/:slug")
+    end
+
+    it "raises a classified config error for a pattern with an unknown token" do
+      ex = expect_raises(Hwaro::HwaroError, /Unknown token ':tokne'/) do
+        load_config(<<-TOML)
+          title = "Test"
+
+          [permalinks]
+          "posts" = "/:year/:tokne/"
+          TOML
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
   end
 
   # ---------------------------------------------------------------------------
