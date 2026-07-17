@@ -87,6 +87,14 @@ describe "Hwaro::Assets::Sass mixins" do
     css.should contain(%q{content: "dark";})
   end
 
+  it "treats hyphens and underscores as equivalent in mixin and parameter names" do
+    css = compile(<<-'SCSS')
+    @mixin drop-shadow($shadow-size: 2px) { box-shadow: 0 $shadow-size; }
+    .a { @include drop_shadow($shadow_size: 5px); }
+    SCSS
+    css.should contain("box-shadow: 0 5px;")
+  end
+
   it "errors on undefined mixins" do
     expect_raises(Hwaro::Assets::Sass::SyntaxError, /undefined mixin: "nope"/) do
       compile(".a { @include nope; }")

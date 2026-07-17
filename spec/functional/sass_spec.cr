@@ -96,6 +96,31 @@ describe "Sass build integration" do
     end
   end
 
+  it "concatenates bundle .scss entries verbatim when [sass] is disabled" do
+    config = <<-TOML
+    title = "Bundle Verbatim"
+    base_url = "https://example.com"
+
+    [assets]
+    enabled = true
+    minify = false
+    fingerprint = false
+
+    [[assets.bundles]]
+    name = "main.css"
+    files = ["css/style.scss"]
+    TOML
+    build_site(
+      config,
+      content_files: {"index.md" => INDEX_MD},
+      template_files: {"index.html" => PAGE_TEMPLATE, "page.html" => PAGE_TEMPLATE},
+      static_files: {"css/style.scss" => "$c: blue;\n.a { color: $c; }"},
+    ) do
+      bundle = File.read("public/assets/main.css")
+      bundle.should contain("$c: blue;") # raw passthrough, no compilation
+    end
+  end
+
   it "recompiles all entries when a partial changes (serve recompile path)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
@@ -117,6 +142,11 @@ describe "Sass build integration" do
         File.write("static/css/_vars.scss", "$primary: #222222;")
         builder.recompile_sass("public")
         File.read("public/css/style.css").should contain("#222222")
+
+        # A removed entry's stale artifact is the compiled sibling, not the
+        # never-published raw source.
+        stale = builder.stale_outputs_for_removed(["static/css/style.scss"], "public")
+        stale.should contain(File.join("public", "css", "style.css"))
       end
     end
   end

@@ -30,13 +30,14 @@ describe Hwaro::Models::SassConfig do
   end
 
   describe "#sass_source?" do
-    it "matches .scss paths only while enabled" do
+    it "matches lowercase .scss paths only while enabled" do
       config = Hwaro::Models::Config.new
       config.sass_source?("css/style.scss").should be_false
 
       config.sass.enabled = true
       config.sass_source?("css/style.scss").should be_true
-      config.sass_source?("css/STYLE.SCSS").should be_true
+      # Other casings publish verbatim, matching the compiler's glob.
+      config.sass_source?("css/STYLE.SCSS").should be_false
       config.sass_source?("css/style.css").should be_false
     end
   end

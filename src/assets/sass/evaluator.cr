@@ -130,7 +130,7 @@ module Hwaro
           parents = @parent_selectors
           result = [] of String
           parts.each do |part|
-            _, has_amp = substitute_parent(part, nil)
+            has_amp = contains_parent_ref?(part)
             if parents.nil?
               if has_amp
                 error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
@@ -138,8 +138,7 @@ module Hwaro
               result << part
             elsif has_amp
               parents.each do |parent|
-                substituted, _ = substitute_parent(part, parent)
-                result << substituted
+                result << substitute_parent(part, parent)
               end
             else
               parents.each { |parent| result << "#{parent} #{part}" }
@@ -148,13 +147,42 @@ module Hwaro
           result
         end
 
-        # Replaces top-level `&` with the parent selector; `&` inside
-        # quoted strings and attribute brackets is literal. With a nil
-        # replacement the input is returned unchanged (detection only).
-        private def substitute_parent(selector : String, replacement : String?) : {String, Bool}
-          found = false
+        # True when the selector contains a `&` outside quoted strings and
+        # attribute brackets — a scan-only twin of substitute_parent.
+        private def contains_parent_ref?(selector : String) : Bool
           chars = selector.chars
-          out = String.build do |io|
+          i = 0
+          while i < chars.size
+            case c = chars[i]
+            when '"', '\''
+              quote = c
+              i += 1
+              while i < chars.size
+                sc = chars[i]
+                if sc == '\\'
+                  i += 1
+                elsif sc == quote
+                  break
+                end
+                i += 1
+              end
+            when '['
+              while i < chars.size && chars[i] != ']'
+                i += 1
+              end
+            when '&'
+              return true
+            end
+            i += 1
+          end
+          false
+        end
+
+        # Replaces top-level `&` with the parent selector; `&` inside
+        # quoted strings and attribute brackets is literal.
+        private def substitute_parent(selector : String, replacement : String) : String
+          chars = selector.chars
+          String.build do |io|
             i = 0
             while i < chars.size
               c = chars[i]
@@ -183,15 +211,13 @@ module Hwaro
                 end
                 io << ']' if i < chars.size
               when '&'
-                found = true
-                io << (replacement || "&")
+                io << replacement
               else
                 io << c
               end
               i += 1
             end
           end
-          {out, found}
         end
 
         private def eval_declaration(node : Ast::DeclarationNode) : Nil
@@ -253,11 +279,13 @@ module Hwaro
             @current_rule = nil
             @parent_selectors = nil
             @in_keyframes = true
-          elsif rule = saved_rule
+          elsif (rule = saved_rule) && conditional_group?(node.name)
             # Conditional at-rule nested in a style rule: bubble the
             # at-rule out and re-wrap the declarations in the rule's
             # selector (`.a { @media (x) { color } }` →
-            # `@media (x) { .a { color } }`).
+            # `@media (x) { .a { color } }`). Descriptor at-rules
+            # (@font-face, @page, @property, ...) never take a selector
+            # wrapper — their declarations belong to the at-rule itself.
             synthetic = Css::Rule.new(rule.selectors)
             at.children << synthetic
             @current_rule = synthetic
@@ -277,6 +305,14 @@ module Hwaro
 
         private def keyframes?(name : String) : Bool
           name == "keyframes" || name.ends_with?("-keyframes")
+        end
+
+        # Grouping at-rules whose bodies contain style rules — these get a
+        # synthetic selector wrapper when bubbled out of a rule.
+        CONDITIONAL_GROUP_AT_RULES = %w[media supports container layer document scope]
+
+        private def conditional_group?(name : String) : Bool
+          CONDITIONAL_GROUP_AT_RULES.includes?(name)
         end
 
         # ---------------------------------------------------------------
@@ -321,7 +357,7 @@ module Hwaro
           if ns = node.namespace
             mod = @env.module?(ns)
             error_at(node.line, node.column, "there is no module namespace \"#{ns}\"") unless mod
-            mod.mixins[node.name]? ||
+            mod.mixins[Sass.normalize_ident(node.name)]? ||
               error_at(node.line, node.column, "undefined mixin: \"#{ns}.#{node.name}\"")
           else
             @env.lookup_mixin(node.name) ||
@@ -331,13 +367,15 @@ module Hwaro
 
         private def bind_arguments(node : Ast::IncludeNode, closure : MixinClosure, call_env : Environment) : Nil
           params = closure.node.params
+          param_names = params.map { |p| Sass.normalize_ident(p.name) }
           positional = [] of String
           kwargs = {} of String => String
 
           node.args.each do |arg|
             value = resolve_value(arg.value) # evaluated in the caller's scope
             if name = arg.name
-              unless params.any? { |p| p.name == name }
+              name = Sass.normalize_ident(name)
+              unless param_names.includes?(name)
                 error_at(node.line, node.column, "no parameter named $#{name} in mixin #{node.name}")
               end
               if kwargs.has_key?(name)
@@ -358,13 +396,14 @@ module Hwaro
           end
 
           params.each_with_index do |param, i|
+            param_name = param_names[i]
             value =
               if i < positional.size
-                if kwargs.has_key?(param.name)
+                if kwargs.has_key?(param_name)
                   error_at(node.line, node.column, "$#{param.name} was passed both by position and by name")
                 end
                 positional[i]
-              elsif kw = kwargs[param.name]?
+              elsif kw = kwargs[param_name]?
                 kw
               elsif default = param.default
                 # Defaults see earlier parameters (dart-sass semantics).
@@ -378,7 +417,7 @@ module Hwaro
               else
                 error_at(node.line, node.column, "missing argument $#{param.name} for mixin #{node.name}")
               end
-            call_env.variables[param.name] = value
+            call_env.variables[param_name] = value
           end
         end
 
@@ -540,7 +579,7 @@ module Hwaro
           if ns = ref.namespace
             mod = @env.module?(ns)
             error_at(ref.line, ref.column, "there is no module namespace \"#{ns}\"") unless mod
-            mod.variables[ref.name]? ||
+            mod.variables[Sass.normalize_ident(ref.name)]? ||
               error_at(ref.line, ref.column, "undefined variable: \"#{ns}.$#{ref.name}\"")
           else
             @env.lookup_var(ref.name) ||

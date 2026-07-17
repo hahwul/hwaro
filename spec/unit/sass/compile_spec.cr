@@ -45,6 +45,16 @@ describe Hwaro::Assets::Sass do
       css.should contain(".b {\n  color: blue;")
     end
 
+    it "treats hyphens and underscores as equivalent in identifiers" do
+      css = compile(<<-'SCSS')
+      $brand-color: #123;
+      .a { color: $brand_color; }
+      .b { color: $brand-color; }
+      SCSS
+      css.should contain(".a {\n  color: #123;")
+      css.should contain(".b {\n  color: #123;")
+    end
+
     it "errors on undefined variables with a location" do
       ex = expect_raises(Hwaro::Assets::Sass::SyntaxError, /undefined variable: "\$missing"/) do
         compile(".a { color: $missing; }", path: "y.scss")
@@ -219,6 +229,19 @@ describe Hwaro::Assets::Sass do
       css.should contain("@import url(theme.css);")
       css.should contain(%q{@import "https://example.com/x.css";})
       css.should contain(%q{@import "print.css" print;})
+    end
+
+    it "does not mis-unquote non-string @import arguments" do
+      # `"a" + "b"` has matching first/last quotes but is not one string —
+      # it must pass through instead of becoming an ImportNode for `a" + "b`.
+      css = compile(%q{@import "a" + "b";})
+      css.should contain(%q{@import "a" + "b";})
+    end
+
+    it "does not wrap descriptor at-rules nested in rules with a selector" do
+      css = compile(".a { @font-face { font-family: X; src: url(x.woff2); } }")
+      css.should contain("@font-face {\n  font-family: X;")
+      css.should_not contain("@font-face {\n  .a")
     end
 
     # =========================================================================

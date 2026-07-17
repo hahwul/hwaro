@@ -1099,8 +1099,9 @@ module Hwaro
         # the entries instead. A partial edit must rebuild every entry that
         # imports it, and there is no dependency graph, so the whole tree
         # recompiles (cheap at static-site scale). Compile errors raise and
-        # reach the watcher rescue → browser overlay.
-        if changeset.modified_static.any? { |p| p.downcase.ends_with?(".scss") }
+        # reach the watcher rescue → browser overlay. The predicate is the
+        # same one the copy paths use, so the gate can't drift.
+        if (config = @builder.config) && changeset.modified_static.any? { |p| config.sass_source?(p) }
           @builder.recompile_sass(output_dir)
         end
       end

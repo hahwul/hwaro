@@ -271,11 +271,27 @@ module Hwaro
             url.starts_with?("//") || url.ends_with?(".css")
         end
 
+        # True only for a single closed string literal — `"a" + "b"` has
+        # matching first/last quotes but is NOT one string and must fall
+        # through to plain-CSS passthrough instead of being mis-unquoted.
         private def quoted_string?(text : String) : Bool
           return false if text.size < 2
           quote = text[0]
           return false unless quote == '"' || quote == '\''
-          text[-1] == quote
+          chars = text.chars
+          i = 1
+          while i < chars.size
+            case chars[i]
+            when '\\'
+              i += 2
+            when quote
+              # The first unescaped closing quote must be the final char.
+              return i == chars.size - 1
+            else
+              i += 1
+            end
+          end
+          false
         end
 
         private def parse_mixin(line : Int32, column : Int32) : Ast::Node

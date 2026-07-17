@@ -53,20 +53,6 @@ module Hwaro
           def empty? : Bool
             @pieces.all? { |p| p.is_a?(String) && p.blank? }
           end
-
-          # Literal source text with variable references restored — used for
-          # custom property values, where Sass leaves `$var` untouched.
-          def to_literal : String
-            String.build do |io|
-              @pieces.each do |piece|
-                case piece
-                in String then io << piece
-                in VarRef then io << piece.lexeme
-                in Interp then io << piece # unreachable in literal contexts
-                end
-              end
-            end
-          end
         end
 
         abstract class Node

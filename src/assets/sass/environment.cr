@@ -10,6 +10,14 @@ require "./ast"
 module Hwaro
   module Assets
     module Sass
+      # Sass treats `-` and `_` as interchangeable in identifiers
+      # (variables, mixins, namespaces — not selectors). All identifier
+      # storage and lookup normalizes to the hyphen form so
+      # `$brand-color` and `$brand_color` resolve to the same variable.
+      def self.normalize_ident(name : String) : String
+        name.tr("_", "-")
+      end
+
       # Mixins close over their definition environment (dart-sass
       # semantics); `path` keeps error locations pointing at the file the
       # mixin was defined in, not the include site.
@@ -48,6 +56,7 @@ module Hwaro
         end
 
         def lookup_var(name : String) : String?
+          name = Sass.normalize_ident(name)
           env : Environment? = self
           while env
             if value = env.variables[name]?
@@ -65,6 +74,7 @@ module Hwaro
         #   name is updated; failing that, the name is declared here —
         #   which shadows a root/global variable rather than mutating it.
         def assign_var(name : String, value : String, default : Bool, global : Bool) : Nil
+          name = Sass.normalize_ident(name)
           if global
             return if default && root.variables.has_key?(name)
             root.variables[name] = value
@@ -83,6 +93,7 @@ module Hwaro
         end
 
         def lookup_mixin(name : String) : MixinClosure?
+          name = Sass.normalize_ident(name)
           env : Environment? = self
           while env
             if closure = env.mixins[name]?
@@ -94,10 +105,11 @@ module Hwaro
         end
 
         def declare_mixin(name : String, closure : MixinClosure) : Nil
-          @mixins[name] = closure
+          @mixins[Sass.normalize_ident(name)] = closure
         end
 
         def declare_module(namespace : String, mod : SassModule) : Bool
+          namespace = Sass.normalize_ident(namespace)
           scope = root
           return false if scope.modules.has_key?(namespace)
           scope.modules[namespace] = mod
@@ -105,7 +117,7 @@ module Hwaro
         end
 
         def module?(namespace : String) : SassModule?
-          root.modules[namespace]?
+          root.modules[Sass.normalize_ident(namespace)]?
         end
       end
     end

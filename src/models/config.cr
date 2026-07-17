@@ -1257,9 +1257,11 @@ module Hwaro
 
       # True when built-in Sass compilation is on and `relative_path` is an
       # SCSS source — such files compile to `.css` instead of publishing
-      # verbatim through the static copy.
+      # verbatim through the static copy. The extension must be lowercase
+      # `.scss`, matching what the compiler's glob picks up — other casings
+      # keep publishing verbatim.
       def sass_source?(relative_path : String) : Bool
-        sass.enabled && relative_path.downcase.ends_with?(".scss")
+        sass.enabled && relative_path.ends_with?(".scss")
       end
 
       def self.load(config_path : String = "config.toml", env : String? = nil) : Config

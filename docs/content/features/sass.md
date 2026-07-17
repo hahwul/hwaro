@@ -50,7 +50,7 @@ Every non-partial `*.scss` compiles to a sibling `.css` in the output (`static/c
 - **Entries** — `*.scss` files whose name does not start with `_` compile to a sibling `.css` at the same relative path in the output.
 - **Partials** — `_*.scss` files never compile standalone and never publish; they are only reachable via `@use`/`@import`.
 - **Raw sources are not published** — while `[sass]` is enabled, `.scss` files are excluded from the verbatim static copy.
-- **Bundles** — `[[assets.bundles]]` `files` entries may name `.scss` files; they compile before concatenation and then flow through the normal minify → fingerprint pipeline. (This works even with `[sass]` disabled — naming a `.scss` file in a bundle is explicit intent.)
+- **Bundles** — `[[assets.bundles]]` `files` entries may name `.scss` files; while `[sass]` is enabled they compile before concatenation and then flow through the normal minify → fingerprint pipeline. With `[sass]` disabled, bundle entries concatenate verbatim (the escape hatch for pre-compiled or out-of-subset sources).
 - **Watch** — `hwaro serve` recompiles on `.scss` changes. Editing a partial recompiles every entry (there is no dependency graph — whole-tree recompilation is fast at static-site scale). Compile errors appear in the browser error overlay.
 
 ## Configuration
@@ -96,6 +96,9 @@ Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @if is not supported 
 - `&` substitution is textual — `&__elem` concatenates without validating the compound selector.
 - Custom property values are verbatim: `$var` stays literal, only `#{...}` interpolates (dart-sass semantics), but leading/trailing whitespace is trimmed.
 - `@import` of the same file re-emits its CSS each time (classic Sass behavior); `@use` loads once.
+- Declarations placed *after* a nested rule merge into the parent's single output block (`.a { color: red; .b {} color: blue; }` emits one `.a` block); dart-sass splits them in source order. Avoid relying on cascade order between a parent's trailing declarations and its nested rules.
+- Values are substituted as text: interpolating a variable whose value contains an unbalanced quote character can confuse downstream whitespace/quote handling. Keep quote characters inside quoted strings.
+- Only lowercase `.scss` extensions are treated as Sass sources; other casings publish verbatim like any static file.
 
 ## Errors
 

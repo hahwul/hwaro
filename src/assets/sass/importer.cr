@@ -8,12 +8,14 @@
 # inside the project root.
 
 require "./errors"
+require "../../utils/path_utils"
 
 module Hwaro
   module Assets
     module Sass
       module Loader
         abstract def read(path : String) : String?
+        abstract def exists?(path : String) : Bool
       end
 
       class FileLoader
@@ -22,6 +24,10 @@ module Hwaro
         def read(path : String) : String?
           return nil unless File.file?(path)
           File.read(path)
+        end
+
+        def exists?(path : String) : Bool
+          File.file?(path)
         end
       end
 
@@ -39,6 +45,10 @@ module Hwaro
 
         def read(path : String) : String?
           @files[path]?
+        end
+
+        def exists?(path : String) : Bool
+          @files.has_key?(path)
         end
       end
 
@@ -96,20 +106,28 @@ module Hwaro
                                  url : String, path : String, line : Int32, column : Int32) : {String, String}?
           partial_path = guard(File.expand_path(partial, base_dir), url, path, line, column)
           plain_path = guard(File.expand_path(plain, base_dir), url, path, line, column)
-          partial_src = @loader.read(partial_path)
-          plain_src = @loader.read(plain_path)
-          if partial_src && plain_src
+          if @loader.exists?(partial_path) && @loader.exists?(plain_path)
             raise SyntaxError.new(
               "ambiguous import \"#{url}\": both #{display_path(partial_path)} and #{display_path(plain_path)} exist",
               path, line, column)
           end
-          return {partial_path, partial_src} if partial_src
-          return {plain_path, plain_src} if plain_src
+          if src = @loader.read(partial_path)
+            return {partial_path, src}
+          end
+          if src = @loader.read(plain_path)
+            return {plain_path, src}
+          end
           nil
         end
 
         private def guard(expanded : String, url : String, path : String, line : Int32, column : Int32) : String
           unless expanded == @root || expanded.starts_with?(@root + File::SEPARATOR)
+            raise SyntaxError.new("import \"#{url}\" resolves outside the project directory", path, line, column)
+          end
+          # A symlinked source whose target escapes the project would leak
+          # outside content into compiled CSS — same policy as the static
+          # copy's symlink guard.
+          if File.exists?(expanded) && !Hwaro::Utils::PathUtils.resolves_within?(expanded, @root)
             raise SyntaxError.new("import \"#{url}\" resolves outside the project directory", path, line, column)
           end
           expanded

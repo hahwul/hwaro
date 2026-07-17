@@ -1169,7 +1169,13 @@ module Hwaro
           site = @site
           removed_paths.each do |path|
             if path.starts_with?("static/")
-              dest = File.join(output_dir, path.lchop("static/"))
+              relative = path.lchop("static/")
+              # SCSS sources publish as compiled `.css`, never verbatim — the
+              # stale artifact of a removed entry is the compiled sibling.
+              if @config.try(&.sass_source?(relative))
+                relative = relative.sub(/\.scss\z/, ".css")
+              end
+              dest = File.join(output_dir, relative)
               outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
             elsif path.starts_with?("content/")
               if path.downcase.ends_with?(".md")

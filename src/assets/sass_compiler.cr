@@ -29,8 +29,7 @@ module Hwaro
 
         count = 0
         glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
-        Dir.glob(File.join(@source_dir, "**", "*"), match: glob_match) do |src_path|
-          next unless src_path.downcase.ends_with?(".scss")
+        Dir.glob(File.join(@source_dir, "**", "*.scss"), match: glob_match) do |src_path|
           next unless File.file?(src_path)
           next if File.basename(src_path).starts_with?("_")
 
