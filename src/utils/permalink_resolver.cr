@@ -133,7 +133,7 @@ module Hwaro
       # (`resolve_permalink_dir` never matched them), so no legacy config
       # changes meaning.
       private def match_permalink_rule(config : Models::Config?, directory_path : String, is_index : Bool)
-        return nil unless config
+        return unless config
 
         config.permalinks.each do |source, target|
           rest = if source.empty?

@@ -117,7 +117,7 @@ describe Hwaro::Content::Seo::Feeds do
       untitled = feed_page(path: "posts/untitled.md", url: "/posts/untitled/", title: "", date: nil)
       untitled.content = "<p>Untitled body</p>"
 
-      template = <<-'JINJA'
+      template = <<-JINJA
         {%- for p in pages -%}
         title={{ p.title }}
         url={{ p.url }}

@@ -1464,7 +1464,7 @@ module Hwaro
         # parallel fibers. create_fresh_crinja_env carries the snapshot
         # template loader, so `{% include %}` inside a feed template works.
         def feed_template_renderer : Content::Seo::Feeds::Renderer?
-          return nil unless feed_template_present?
+          return unless feed_template_present?
 
           ->(source : String, context : Hash(String, Crinja::Value)) do
             env = create_fresh_crinja_env
