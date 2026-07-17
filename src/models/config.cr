@@ -1361,8 +1361,8 @@ module Hwaro
         title description base_url default_language
         amp assets auto_includes build content deployment doctor feeds
         highlight image_processing languages llms markdown menus og outputs
-        pagination permalinks plugins pwa related robots search series serve
-        sitemap static taxonomies
+        pagination permalinks plugins pwa related robots sass search series
+        serve sitemap static taxonomies
       ]
 
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
