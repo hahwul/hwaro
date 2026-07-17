@@ -449,6 +449,7 @@ module Hwaro
             # RSS/Atom Feeds
             # =============================================================================
             # Generates RSS or Atom feed for content syndication
+            # (templates/rss.xml.jinja or atom.xml.jinja overrides the built-in markup)
 
             # [feeds]
             # enabled = true
@@ -465,6 +466,7 @@ module Hwaro
             # RSS/Atom Feeds
             # =============================================================================
             # Generates RSS or Atom feed for content syndication
+            # (templates/rss.xml.jinja or atom.xml.jinja overrides the built-in markup)
 
             [feeds]
             enabled = true

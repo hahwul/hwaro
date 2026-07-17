@@ -10,6 +10,10 @@ additionally render sibling non-HTML files — a JSON representation of a post,
 an XML feed-like listing for a section, a plain-text export, and so on. HTML
 rendering is unaffected; extra formats are strictly additive.
 
+Looking to customize the site's RSS/Atom feed markup instead? That's a
+[custom feed template](/features/seo/#custom-feed-templates)
+(`templates/rss.xml.jinja`), not an output format.
+
 ## Configuration
 
 ```toml
