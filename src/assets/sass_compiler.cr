@@ -36,6 +36,15 @@ module Hwaro
           relative = Path[src_path].relative_to(@source_dir).to_s
           next if @static_config.excluded?(relative)
 
+          # A hand-written sibling `.css` and this compiled output land on
+          # the same path: full builds copy the raw file first and clobber it
+          # here, while a serve session re-copies the raw file OVER the
+          # compiled one on edit — warn so the mixed state isn't silent.
+          raw_sibling = src_path.sub(/\.scss\z/i, ".css")
+          if File.exists?(raw_sibling)
+            Logger.warn "  Sass: #{relative} compiles to #{relative.sub(/\.scss\z/i, ".css")}, which also exists as a static source — remove one of the two."
+          end
+
           css = SassCompiler.compile_source(File.read(src_path), src_path)
           css = Utils::CssMinifier.minify(css) if @config.minify
 
@@ -58,6 +67,16 @@ module Hwaro
           Hwaro::Errors::HWARO_E_CONTENT,
           "Sass: #{ex.location}: #{ex.message}",
           hint: "Fix the SCSS source at the location above. The supported subset and its limits are documented in features/sass."
+        )
+      rescue ex : File::Error
+        # Import resolution stats/reads real files; anything the OS refuses
+        # beyond "missing" (symlink loops → ELOOP, permissions) must still
+        # come out classified, not as a bare File::Error the hook manager
+        # downgrades to a generic abort.
+        raise Hwaro::HwaroError.new(
+          Hwaro::Errors::HWARO_E_CONTENT,
+          "Sass: #{path}: filesystem error while resolving imports: #{ex.message}",
+          hint: "Check for broken or looping symlinks and unreadable files under the imported paths."
         )
       end
     end

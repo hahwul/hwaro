@@ -63,6 +63,7 @@ module Hwaro
 
         def initialize(source : String, path : String)
           @s = Scanner.new(source, path)
+          @block_depth = 0
         end
 
         def self.parse(source : String, path : String) : Ast::Stylesheet
@@ -144,15 +145,26 @@ module Hwaro
           nodes
         end
 
+        # Far beyond any real stylesheet's nesting; parse recursion past this
+        # must error instead of overflowing the stack — a stack overflow is
+        # unrescuable and would kill `hwaro serve` outright.
+        MAX_BLOCK_DEPTH = 256
+
         # Consumes "{ ... }" (cursor on the opening brace).
         private def parse_block : Array(Ast::Node)
           open_line = @s.line
           open_col = @s.column
+          @block_depth += 1
+          if @block_depth > MAX_BLOCK_DEPTH
+            @s.error("blocks nested more than #{MAX_BLOCK_DEPTH} levels deep", open_line, open_col)
+          end
           @s.advance # '{'
           nodes = parse_statements(top_level: false)
           @s.error("unterminated block", open_line, open_col) if @s.eof?
           @s.advance # '}'
           nodes
+        ensure
+          @block_depth -= 1
         end
 
         private def parse_var_decl : Ast::Node
@@ -324,7 +336,7 @@ module Hwaro
             default = nil
             if @s.peek == ':'
               @s.advance
-              scan = read_template(stops: ",)", value_vars: true, depth_relative_stops: true)
+              scan = read_template(stops: ",)", value_vars: true)
               default = trim_template(scan.template)
             end
             params << Ast::Param.new(name, default)
@@ -395,7 +407,7 @@ module Hwaro
                 @s.advance # ':'
               end
             end
-            scan = read_template(stops: ",)", value_vars: true, depth_relative_stops: true)
+            scan = read_template(stops: ",)", value_vars: true)
             value = trim_template(scan.template)
             @s.error("expected argument value") if value.empty?
             args << Ast::Arg.new(kwarg, value)
@@ -466,10 +478,10 @@ module Hwaro
         # terminator is not consumed; nil terminator = EOF). Handles quoted
         # strings, url(...) spans, comments (dropped, replaced by a space),
         # `#{...}` interpolation, and — when `value_vars` — `$var` and
-        # `ns.$var` references. With `depth_relative_stops` the caller has
-        # already consumed an opening paren, so a `)` stop is expected at
-        # depth 0 rather than being an unmatched-paren error.
-        private def read_template(stops : String, value_vars : Bool, depth_relative_stops : Bool = false) : TemplateScan
+        # `ns.$var` references. A `)` listed in `stops` terminates at depth 0
+        # before the unmatched-paren check, so callers that already consumed
+        # an opening paren (arg/param lists) need no special casing.
+        private def read_template(stops : String, value_vars : Bool) : TemplateScan
           start_line = @s.line
           start_col = @s.column
           pieces = [] of Ast::Piece

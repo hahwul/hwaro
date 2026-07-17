@@ -332,6 +332,14 @@ module Hwaro
 
           content =
             if body = node.body
+              # dart-sass parity: passing a block to a mixin whose body never
+              # reaches `@content` is an error — silently discarding the
+              # block's styles (the alternative) loses user CSS on a typo'd
+              # or refactored mixin with no signal at all.
+              unless accepts_content?(closure.node.body)
+                error_at(node.line, node.column,
+                  "mixin #{node.name} doesn't accept a content block (no @content in its body)")
+              end
               ContentBlock.new(body, @env, @content, @path)
             end
 
@@ -416,6 +424,28 @@ module Hwaro
                 error_at(node.line, node.column, "missing argument $#{param.name} for mixin #{node.name}")
               end
             call_env.variables[param_name] = value
+          end
+        end
+
+        # True when the mixin body can reach `@content`: a lexically nested
+        # `@content` anywhere except inside a nested `@mixin` definition
+        # (whose `@content` belongs to that inner mixin — dart-sass scoping).
+        # Include bodies DO count: `@mixin a { @include b { @content } }`
+        # passes a's content through b.
+        private def accepts_content?(nodes : Array(Ast::Node)) : Bool
+          nodes.any? do |node|
+            case node
+            when Ast::ContentNode
+              true
+            when Ast::RuleNode
+              accepts_content?(node.children)
+            when Ast::IncludeNode
+              node.body.try { |b| accepts_content?(b) } || false
+            when Ast::RawAtRuleNode
+              node.children.try { |c| accepts_content?(c) } || false
+            else
+              false
+            end
           end
         end
 
@@ -567,10 +597,37 @@ module Hwaro
                 end
                 io << lookup_var_ref(piece)
               in Ast::Interp
-                io << resolve_template(piece.inner, allow_vars: true)
+                io << unquote_interp(resolve_template(piece.inner, allow_vars: true))
               end
             end
           end
+        end
+
+        # dart-sass semantics: `#{...}` substitutes the UNQUOTED value of a
+        # string — `$q: "x"` interpolates as `x`, never `"x"` (a quoted
+        # substitution terminates the surrounding string early and ships
+        # invalid CSS, e.g. `content: "say "x""`). Only a result that is one
+        # complete quoted string unquotes; anything else — already unquoted,
+        # or multiple tokens like `"a" "b"` — passes through verbatim.
+        private def unquote_interp(text : String) : String
+          return text if text.size < 2
+          quote = text[0]
+          return text unless quote == '"' || quote == '\''
+          return text unless text[-1] == quote
+          inner = text[1..-2]
+          i = 0
+          while i < inner.size
+            c = inner[i]
+            if c == '\\'
+              i += 2
+              next
+            end
+            # An unescaped same-quote char inside means this is not ONE
+            # quoted string ("a" + "b" territory) — leave it alone.
+            return text if c == quote
+            i += 1
+          end
+          inner
         end
 
         private def lookup_var_ref(ref : Ast::VarRef) : String
