@@ -261,6 +261,29 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
       end
     end
 
+    it "applies hide_lines to highlighted AND code under server mode" do
+      previous = SyntaxHighlighter.server_mode?
+      SyntaxHighlighter.server_mode = true
+      begin
+        hooks = make_hooks(codeblock: "H=<<<{{ highlighted }}>>> C=<<<{{ code }}>>>")
+        html = SyntaxHighlighter.render(
+          "```python {hide_lines=\"2\"}\nkeep_one()\nsecret()\nkeep_two()\n```",
+          highlight: true, hooks: hooks)
+        html.should_not contain("secret")
+        html.should contain("keep_one")
+        html.should contain("keep_two")
+      ensure
+        SyntaxHighlighter.server_mode = previous
+      end
+    end
+
+    it "keeps hidden lines in client mode (hide_lines is server-only, matching the stock path)" do
+      hooks = make_hooks(codeblock: "C=<<<{{ code }}>>>")
+      html = SyntaxHighlighter.render(
+        "```python {hide_lines=\"2\"}\na()\nsecret()\n```", highlight: true, hooks: hooks)
+      html.should contain("secret")
+    end
+
     it "bypasses the hook for a mermaid fence when mermaid is enabled" do
       hooks = make_hooks(codeblock: "CB[{{ lang }}]", mermaid_bypass: true)
       html = SyntaxHighlighter.render("```mermaid\ngraph TD;\n```", hooks: hooks)
@@ -352,6 +375,14 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
       html.should_not match(/\n[ \t]*\n/)
       html.should contain("<table>")
       # No escaped leftovers — the whole table stayed one html block.
+      html.should_not contain("&lt;table&gt;")
+    end
+
+    it "collapses blank lines in a CRLF-saved hook template too" do
+      hooks = make_hooks(table: "<div>\r\n\r\n{{ html }}\r\n\r\n\r\n</div>")
+      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html.should_not match(/\r?\n[ \t\r]*\r?\n/)
+      html.should contain("<table>")
       html.should_not contain("&lt;table&gt;")
     end
 

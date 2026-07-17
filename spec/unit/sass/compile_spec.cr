@@ -129,6 +129,40 @@ describe Hwaro::Assets::Sass do
       end
     end
 
+    it "unquotes quoted string values inside interpolation (dart-sass parity)" do
+      css = compile(<<-'SCSS')
+        $q: "x";
+        .a { content: "say #{$q} suffix"; }
+        SCSS
+      css.should contain(%q(content: "say x suffix";))
+    end
+
+    it "unquotes a quoted selector string interpolated as a selector" do
+      css = compile(<<-'SCSS')
+        $s: ".a, .b";
+        #{$s} { color: red; }
+        SCSS
+      css.should_not contain(%q("))
+      css.should contain("color: red;")
+    end
+
+    it "does not unquote multi-token interpolation results" do
+      # Only ONE complete quoted string unquotes; a space-separated list of
+      # strings passes through verbatim (the subset boundary).
+      css = compile(<<-'SCSS')
+        $pair: "a" "b";
+        .x { font-family: #{$pair}; }
+        SCSS
+      css.should contain(%q(font-family: "a" "b";))
+    end
+
+    it "errors on pathological block nesting instead of overflowing the stack" do
+      scss = ".a{" * 300 + "color:red;" + "}" * 300
+      expect_raises(Hwaro::Assets::Sass::SyntaxError, /nested more than/) do
+        compile(scss)
+      end
+    end
+
     # =========================================================================
     # At-rule bubbling
     # =========================================================================

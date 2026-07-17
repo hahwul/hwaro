@@ -148,4 +148,25 @@ describe "Hwaro::Assets::Sass imports" do
       css.should contain(".a {")
     end
   end
+
+  describe "byte-order marks" do
+    it "strips a UTF-8 BOM from imported partials" do
+      # Without the strip, U+FEFF counts as an identifier char and embeds
+      # invisibly into the partial's first selector (`\u{FEFF}.from-bom`),
+      # which then never matches in any browser.
+      css = compile_with({
+        "sass/_bom.scss" => "\u{FEFF}.from-bom { color: red; }",
+        "sass/main.scss" => ".before { margin: 0; }\n@import \"bom\";",
+      }, "sass/main.scss")
+      css.should contain("\n.from-bom {")
+      css.should_not contain('\u{FEFF}')
+    end
+
+    it "strips a UTF-8 BOM from the entry file" do
+      css = compile_with({
+        "sass/main.scss" => "\u{FEFF}.a { color: red; }",
+      }, "sass/main.scss")
+      css.should start_with(".a {")
+    end
+  end
 end

@@ -72,6 +72,33 @@ describe "Hwaro::Assets::Sass mixins" do
     css.should contain(".a {\n  color: red;\n}")
   end
 
+  it "errors when a block is passed to a mixin without @content (dart-sass parity)" do
+    ex = expect_raises(Hwaro::Assets::Sass::SyntaxError, /doesn't accept a content block/) do
+      compile(<<-SCSS)
+        @mixin m { color: red; }
+        .x { @include m { border: 1px; } }
+        SCSS
+    end
+    ex.message.to_s.should contain("mixin m")
+  end
+
+  it "accepts a block when @content sits behind a nested include" do
+    css = compile(<<-SCSS)
+      @mixin inner { @content; }
+      @mixin outer { @include inner { @content; } }
+      .x { @include outer { color: red; } }
+      SCSS
+    css.should contain(".x {\n  color: red;")
+  end
+
+  it "accepts a block when @content is nested inside rules and at-rules" do
+    css = compile(<<-SCSS)
+      @mixin respond { @media (min-width: 600px) { .wrap { @content; } } }
+      .x { @include respond { color: red; } }
+      SCSS
+    css.should contain("color: red;")
+  end
+
   it "closes over the definition environment" do
     css = compile(<<-'SCSS')
       $theme: dark;

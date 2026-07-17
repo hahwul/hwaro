@@ -9,13 +9,22 @@
 - Markdown render hooks for blockquotes and tables: `templates/hooks/render-blockquote.html` (`text`) and `templates/hooks/render-table.html` (`html`, `header_html`, `body_html`). GitHub-style `> [!NOTE]` blockquotes keep the admonition pipeline while `[markdown] admonitions = true`; the codeblock hook gains `copy`
 - Taxonomy sorting: per-taxonomy `sort_by` (`date`/`title`/`weight`) and `reverse` order the pages within each term (section semantics — date is newest-first, `reverse` flips), `terms_sort_by` (`name`/`count`) orders the terms list. Term feeds stay reverse-chronological regardless
 
-- Hugo-style token permalinks: `[permalinks]` values may contain `:year`/`:month`/`:day`/`:slug`/`:title`/`:section`/`:filename` segments that rebuild the whole URL for leaf pages (`"posts" = "/:year/:month/:day/:slug/"`); plain values keep the existing directory-remap semantics, unknown tokens fail the config load, and a dateless page under a date-token pattern fails the build with a fix-it hint
+- Hugo-style token permalinks: `[permalinks]` values may contain `:year`/`:month`/`:day`/`:slug`/`:title`/`:section`/`:filename` segments that rebuild the whole URL for leaf pages (`"posts" = "/:year/:month/:day/:slug/"`); plain values keep the existing directory-remap semantics, unknown tokens fail the config load, and a dateless page under a date-token pattern fails the build with a fix-it hint (pages that never publish — filtered drafts, expired/future, `render: false` — are exempt)
 - `[links] broken_internal = "error"` fails the build (exit code 5) with one aggregated list of every unresolved `@/` internal link — `source.md → @/target (reason)` per line; the default `"warn"` keeps today's log-and-continue behavior
 - Custom feed templates: `templates/rss.xml.jinja` / `atom.xml.jinja` override the built-in feed markup for all feed kinds (main, per-section, per-language, per-taxonomy-term) with a precomputed context (absolute encoded URLs, RFC 822/3339 dates, summaries, absolutized HTML); the built-in output remains the fallback when no template exists, and feed-template edits refresh feeds on warm `--cache` builds and `serve` re-renders
 
 ### Changed
 - **Breaking:** `[highlight] mode` now defaults to `"server"` — code blocks are highlighted at build time (Tartrazine, same `hljs-*` classes, theme CSS keeps working) and `{{ highlight_js }}` renders empty by default. Set `mode = "client"` to restore browser-side Highlight.js; all pages re-render once after upgrading
 - `get_taxonomy().items` is now name-sorted (alphabetical) by default instead of unspecified insertion order; set `terms_sort_by = "count"` for count-descending
+
+### Fixed
+- Copy button: per-fence `{copy=true}` with the global `[highlight] copy` default off now works — the runtime is appended to `{{ highlight_js }}` only on pages that contain an opted-in block; `data-copy` is no longer stamped when highlighting is disabled
+- `{hide_lines=…}` is honored on the `render-codeblock` hook path: hidden lines are removed from both `highlighted` and `code` before the template sees them (server mode)
+- Table render hooks saved with CRLF line endings no longer break the emitted HTML block (blank-line collapse handles `\r\n`)
+- Sass: `#{...}` interpolation unquotes string values (dart-sass parity) instead of shipping embedded quotes as invalid CSS; passing a block to a mixin without `@content` is a located error instead of silently dropping the block's styles; a UTF-8 BOM in an imported partial no longer corrupts its first selector; pathological block nesting fails with a located error instead of a process-killing stack overflow; symlink-loop/permission errors during import resolution surface as classified content errors; a `foo.scss`/`foo.css` name collision under `static/` warns instead of silently overwriting
+- Token permalinks: a dateless draft / `render: false` page matching a date-token pattern no longer aborts the build — the error now fires only for pages that actually publish (full builds and serve rebuilds alike)
+- Feeds advertise the same page the build writes when two pages collide on one URL (path-sort-first winner, matching `compute_output_url_winners`)
+- `[links] broken_internal = "error"` now also catches broken `@/` links that ship via `render: false` pages' `<!-- more -->` summaries embedded in listings
 
 ## v0.17.1
 

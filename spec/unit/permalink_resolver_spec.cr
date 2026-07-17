@@ -180,6 +180,38 @@ describe Hwaro::Utils::PermalinkResolver do
     end
   end
 
+  describe ".resolve_url_lenient" do
+    it "falls back to the directory URL and reports when a date token has no date" do
+      config = config_with({"posts" => ":year/:month/:slug"})
+      url, error = Hwaro::Utils::PermalinkResolver.resolve_url_lenient(
+        "posts/undated.md", config,
+        slug: nil, custom_path: nil, language: nil, date: nil, title: "",
+      )
+      url.should eq("/posts/undated/")
+      error.not_nil!.should contain("requires a date, but the page has none")
+    end
+
+    it "returns no error when the date is present" do
+      config = config_with({"posts" => ":year/:slug"})
+      url, error = Hwaro::Utils::PermalinkResolver.resolve_url_lenient(
+        "posts/x.md", config,
+        slug: nil, custom_path: nil, language: nil, date: Time.utc(2026, 3, 5), title: "",
+      )
+      url.should eq("/2026/x/")
+      error.should be_nil
+    end
+
+    it "still raises for unknown tokens (config errors are never deferred)" do
+      config = config_with({"posts" => ":bogus/:slug"})
+      expect_raises(Hwaro::HwaroError, /Unknown token ':bogus'/) do
+        Hwaro::Utils::PermalinkResolver.resolve_url_lenient(
+          "posts/x.md", config,
+          slug: nil, custom_path: nil, language: nil, date: nil, title: "",
+        )
+      end
+    end
+  end
+
   describe ".resolve_url with plain remaps" do
     it "keeps directory-remap semantics for plain targets" do
       config = config_with({"old/posts" => "archive"})

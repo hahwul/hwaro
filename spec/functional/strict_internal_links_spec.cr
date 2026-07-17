@@ -54,6 +54,38 @@ describe "Strict internal links: error mode" do
     message.scan("page.md → @/nonexistent.md (page not found)").size.should eq(1)
   end
 
+  it "catches a broken link that only ships via a render:false page's summary" do
+    # The headless page never enters the render fan-out, but its
+    # <!-- more --> summary is embedded by listings — the strict pass must
+    # see the summary render too.
+    ex = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        STRICT_LINKS_CONFIG,
+        content_files: {
+          "posts/data.md" => "---\ntitle: Data\nrender: false\n---\nIntro [x](@/gone.md)\n<!-- more -->\nrest",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+    ex.message.not_nil!.should contain("posts/data.md → @/gone.md (page not found)")
+  end
+
+  it "reports a broken summary link once for pages that also render" do
+    ex = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        STRICT_LINKS_CONFIG,
+        content_files: {
+          "page.md" => "---\ntitle: Page\n---\nIntro [x](@/gone.md)\n<!-- more -->\nbody",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+
+    message = ex.message.not_nil!
+    message.should contain("1 broken internal link")
+    message.scan("page.md → @/gone.md (page not found)").size.should eq(1)
+  end
+
   # The fast-start deferred fan-out is the one render pass that runs outside
   # the Render phase — it must surface strict-mode offenders too, or a
   # broken link in a non-priority page silently ships during `serve

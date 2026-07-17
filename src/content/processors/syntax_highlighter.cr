@@ -515,6 +515,24 @@ module Hwaro
           end
         end
 
+        # Removes `hide_lines` lines from an already highlighted (or escaped)
+        # body WITHOUT adding the per-line wrapper spans — the render-hook
+        # path hands templates plain `highlighted`/`code` strings, but the
+        # redaction promise ("hidden lines are removed from the output")
+        # must hold before the text reaches any template. split_lines
+        # re-opens token spans across line boundaries, so dropping whole
+        # lines keeps the remaining markup balanced.
+        def drop_hidden(body : String, opts : FenceOptions::Options) : String
+          return body if opts.hide_lines.empty?
+          lines = split_lines(body)
+          String.build do |io|
+            lines.each_with_index do |line, i|
+              next if opts.hidden?(i + 1)
+              io << line << '\n'
+            end
+          end
+        end
+
         # True when `bytes[pos...]` starts with the literal ASCII `needle`.
         private def match_at?(bytes : Bytes, pos : Int32, needle : String) : Bool
           needle_bytes = needle.to_slice
@@ -625,8 +643,10 @@ module Hwaro
           # `js_tag` targets `pre[data-copy]` regardless of who colored the
           # code). Never on mermaid fences: `postprocess_mermaid`'s regex
           # anchors on the bare `<pre><code class="language-mermaid...`
-          # shape, so any attribute on <pre> would break the rewrite.
-          if effective_copy(opts) && lang.try(&.downcase) != "mermaid"
+          # shape, so any attribute on <pre> would break the rewrite. Gated
+          # on `[highlight] enabled` like `js_tag` is — a disabled section
+          # must not stamp attributes no runtime will ever act on.
+          if @highlight_enabled && effective_copy(opts) && lang.try(&.downcase) != "mermaid"
             pre_tag_attrs ||= {} of String => String
             pre_tag_attrs["data-copy"] = "true"
           end
@@ -877,13 +897,27 @@ module Hwaro
 
           highlighted = (@highlight_enabled && @server_mode && lang) ? (ServerHighlighter.highlight(node.text, lang) || "") : ""
 
-          copy_active = effective_copy(opts) && lang.try(&.downcase) != "mermaid"
+          # `hide_lines` redaction (server mode only, matching the stock
+          # path): both the highlighted body AND the raw `code` fallback the
+          # template receives must drop the hidden lines — a hook template
+          # must never be handed content the fence asked to omit.
+          code_text = node.text
+          if @highlight_enabled && @server_mode && (o = opts) && !o.hide_lines.empty?
+            highlighted = LineWrapper.drop_hidden(highlighted, o) unless highlighted.empty?
+            code_text = String.build do |io|
+              node.text.each_line(chomp: false).with_index do |line, i|
+                io << line unless o.hidden?(i + 1)
+              end
+            end
+          end
+
+          copy_active = @highlight_enabled && effective_copy(opts) && lang.try(&.downcase) != "mermaid"
 
           newline
           literal(@hooks.render_codeblock(
             lang: lang ? escape(lang) : "",
             options: escape(options_str),
-            code: escape(node.text),
+            code: escape(code_text),
             highlighted: highlighted,
             name: opts.try(&.name).try { |n| escape(n) } || "",
             copy: copy_active ? "true" : "",

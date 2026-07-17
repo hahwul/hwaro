@@ -101,7 +101,22 @@ module Hwaro::Core::Build::Phases::ParseContent
         link_targets.each { |p| map[p.path] ||= p }
         map
       end)
-      html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
+      if site.config.links.broken_internal == "error"
+        # Strict mode must see summary links too: a `render: false` page
+        # never reaches the body render pass, yet its summary ships inside
+        # every listing that embeds `{{ p.summary }}`. Entries use the same
+        # "path → @/target (reason)" shape as the body pass, so pages that
+        # DO render report each link once (raise_… sort-uniqs).
+        misses = [] of {String, String}
+        html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url, misses: misses)
+        unless misses.empty?
+          @broken_links_mutex.synchronize do
+            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+          end
+        end
+      else
+        html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
+      end
       html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url)
 
       page.summary_html = html
@@ -210,6 +225,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     if total_removed > 0
       ctx.invalidate_all_pages_cache
     end
+
+    # Deferred date-token permalink errors: only pages that survived the
+    # filters above can publish a URL, so only they can fail the build.
+    raise_on_permalink_errors!(ctx.pages)
 
     # The skipped total feeds the receipt's "parse … N skipped" emphasis; the
     # per-reason breakdown stays available under --verbose. Parse errors remain
@@ -607,8 +626,15 @@ module Hwaro::Core::Build::Phases::ParseContent
   # Canonical URL computation is shared with PlatformConfig alias generation
   # via Utils::PermalinkResolver so build URLs and generated platform
   # redirects can never drift apart.
+  #
+  # Lenient on missing dates: this runs inside the parse fan-out, BEFORE
+  # cascades apply and draft/expiry filtering runs, so whether the page
+  # will publish at all isn't knowable yet. The error is parked on the
+  # page and raised after filtering (raise_on_permalink_errors!) — a WIP
+  # draft or headless data page must not abort every build over a URL it
+  # never publishes.
   private def calculate_page_url(page : Models::Page)
-    page.url = Utils::PermalinkResolver.resolve_url(
+    url, error = Utils::PermalinkResolver.resolve_url_lenient(
       page.path,
       @config,
       slug: page.slug,
@@ -616,6 +642,26 @@ module Hwaro::Core::Build::Phases::ParseContent
       language: page.language,
       date: page.date,
       title: page.title,
+    )
+    page.url = url
+    page.permalink_error = error
+  end
+
+  # Fails the build for every SURVIVING page whose permalink couldn't be
+  # resolved (see calculate_page_url): filtered-out drafts/expired/future
+  # pages and headless `render: false` pages write no output, so their
+  # fallback URL is harmless; anything else would publish a URL that
+  # ignores the configured pattern — that stays a hard error, aggregated
+  # so one build surfaces every offender.
+  private def raise_on_permalink_errors!(pages : Array(Models::Page))
+    offenders = pages.compact_map { |p| p.permalink_error if p.render }
+    return if offenders.empty?
+
+    offenders.sort!.uniq!
+    raise Hwaro::HwaroError.new(
+      code: Hwaro::Errors::HWARO_E_CONTENT,
+      message: offenders.join("\n"),
+      hint: Utils::PermalinkResolver::DATE_TOKEN_HINT,
     )
   end
 end

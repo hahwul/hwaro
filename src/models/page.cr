@@ -105,6 +105,14 @@ module Hwaro
       # Whether parsing (front-matter / markdown) failed for this page
       property parse_failed : Bool
 
+      # Deferred [permalinks] error from the parse fan-out (a date-token
+      # pattern matched a dateless page). Whether it's fatal isn't knowable
+      # until cascades and draft/expiry filtering ran: a page filtered out
+      # of the build (or a headless `render: false` page) never publishes
+      # the URL, so only surviving renderable pages raise — see
+      # ParseContent#raise_on_permalink_errors!.
+      property permalink_error : String?
+
       # True when the page is outside its publication window at build time
       # (future `date` or past `expires`). Such pages only survive the parse
       # filter under --include-future / --include-expired — preview flags —

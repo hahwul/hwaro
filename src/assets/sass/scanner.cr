@@ -20,7 +20,11 @@ module Hwaro
         getter column : Int32
 
         def initialize(source : String, @path : String)
-          @chars = source.chars
+          # A UTF-8 BOM is not content (dart-sass strips it too). Without
+          # this, U+FEFF falls into the `ord > 0x7F` ident charset below and
+          # a BOM'd partial embeds an invisible char into the first selector
+          # it contributes mid-sheet.
+          @chars = source.lchop('\u{FEFF}').chars
           @pos = 0
           @line = 1
           @column = 1
