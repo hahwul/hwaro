@@ -57,9 +57,28 @@ module Hwaro
 
           def serialize(nodes : Array(Node)) : String
             out = String.build do |io|
-              write_nodes(io, nodes, 0)
+              write_nodes(io, hoist_statements(nodes), 0)
             end
             out.empty? ? out : out.chomp + "\n"
+          end
+
+          # Plain-CSS `@import` (and `@charset`) are only honoured before any
+          # style rule — a browser ignores one that appears later. Partials
+          # routinely put an `@import url(fonts…)` in a file pulled in after
+          # other rules, which would silently never load. Lift them back to
+          # the top, preserving relative order (a stable partition).
+          private def hoist_statements(nodes : Array(Node)) : Array(Node)
+            return nodes unless nodes.any? { |n| hoistable?(n) }
+            hoisted = [] of Node
+            rest = [] of Node
+            nodes.each { |n| (hoistable?(n) ? hoisted : rest) << n }
+            hoisted + rest
+          end
+
+          private def hoistable?(node : Node) : Bool
+            return false unless node.is_a?(Raw)
+            text = node.text.lstrip
+            text.starts_with?("@import") || text.starts_with?("@charset")
           end
 
           # Empty rules and empty at-rule blocks are omitted (dart-sass
@@ -69,6 +88,11 @@ module Hwaro
             when Rule
               !node.items.empty?
             when AtRule
+              # An empty `@layer` block is not dead code: it declares
+              # cascade order up front, which is the standard idiom.
+              # Dropping it reorders layer precedence and silently changes
+              # which rule wins.
+              return true if node.name == "layer"
               !node.items.empty? || node.children.any? { |c| emit?(c) }
             else
               true

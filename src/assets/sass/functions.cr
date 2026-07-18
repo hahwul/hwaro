@@ -27,6 +27,14 @@ module Hwaro
         # Argument helpers
         # ---------------------------------------------------------------
 
+        private def self.ascii_upcase(text : String) : String
+          text.gsub { |c| c.ascii_lowercase? ? c.upcase : c }
+        end
+
+        private def self.ascii_downcase(text : String) : String
+          text.gsub { |c| c.ascii_uppercase? ? c.downcase : c }
+        end
+
         private def self.no_kwargs!(name : String, kwargs : Hash(String, Value)) : Nil
           return if kwargs.empty?
           raise SoftEvalError.new("#{name}() does not support keyword arguments")
@@ -141,7 +149,9 @@ module Hwaro
             no_kwargs!("math.round", kwargs)
             arity!("round", args, 1)
             n = number!("round", args[0])
-            Number.new(n.value.round.to_f, n.unit)
+            # Sass rounds halves away from zero; Crystal's default is
+            # banker's rounding, which sends round(2.5) to 2.
+            Number.new(n.value.round(mode: :ties_away).to_f, n.unit)
           end,
           "ceil" => Fn.new do |args, kwargs|
             no_kwargs!("math.ceil", kwargs)
@@ -165,22 +175,31 @@ module Hwaro
             no_kwargs!("math.min", kwargs)
             arity!("min", args, 1, Int32::MAX)
             numbers = args.map { |a| number!("min", a) }
-            unit = same_units!("min", numbers)
-            Number.new(numbers.min_of(&.value), unit)
+            same_units!("min", numbers) # unit-compatibility check only
+            # Return the winning operand as-is. Stamping the first non-empty
+            # unit seen across all args onto the winner fabricates a unit
+            # the result never had: `min(1, 2px)` is `1`, not `1px`.
+            winner = numbers.min_by(&.value)
+            Number.new(winner.value, winner.unit)
           end,
           "max" => Fn.new do |args, kwargs|
             no_kwargs!("math.max", kwargs)
             arity!("max", args, 1, Int32::MAX)
             numbers = args.map { |a| number!("max", a) }
-            unit = same_units!("max", numbers)
-            Number.new(numbers.max_of(&.value), unit)
+            same_units!("max", numbers) # unit-compatibility check only
+            winner = numbers.max_by(&.value)
+            Number.new(winner.value, winner.unit)
           end,
           "clamp" => Fn.new do |args, kwargs|
             no_kwargs!("math.clamp", kwargs)
             arity!("math.clamp", args, 3)
             numbers = args.map { |a| number!("math.clamp", a) }
-            unit = same_units!("math.clamp", numbers)
-            Number.new(numbers[1].value.clamp(numbers[0].value, numbers[2].value), unit)
+            same_units!("math.clamp", numbers) # unit-compatibility check only
+            # As with min/max, the result is whichever operand wins, unit
+            # included — not the value re-stamped with a scanned unit.
+            low, mid, high = numbers[0], numbers[1], numbers[2]
+            winner = mid.value < low.value ? low : (mid.value > high.value ? high : mid)
+            Number.new(winner.value, winner.unit)
           end,
           "pow" => Fn.new do |args, kwargs|
             no_kwargs!("math.pow", kwargs)
@@ -273,13 +292,14 @@ module Hwaro
             no_kwargs!("string.to-upper-case", kwargs)
             arity!("to-upper-case", args, 1)
             s = string!("to-upper-case", args[0])
-            Str.new(s.text.upcase, quoted: s.quoted, quote_char: s.quote_char)
+            # Sass maps ASCII only; Crystal's `upcase` is Unicode-aware.
+            Str.new(ascii_upcase(s.text), quoted: s.quoted, quote_char: s.quote_char)
           end,
           "to-lower-case" => Fn.new do |args, kwargs|
             no_kwargs!("string.to-lower-case", kwargs)
             arity!("to-lower-case", args, 1)
             s = string!("to-lower-case", args[0])
-            Str.new(s.text.downcase, quoted: s.quoted, quote_char: s.quote_char)
+            Str.new(ascii_downcase(s.text), quoted: s.quoted, quote_char: s.quote_char)
           end,
         }
 
@@ -337,7 +357,19 @@ module Hwaro
             no_kwargs!("list.join", kwargs)
             arity!("join", args, 2, 3)
             base = args[0]
-            sep = base.is_a?(ListV) ? base.sep : ListV::Sep::Space
+            # `$separator: auto` takes $list1's separator, else $list2's,
+            # else space. A scalar or a 0/1-element list carries no
+            # meaningful separator, so committing to Space there turns the
+            # accumulate-into-an-empty-list idiom into a space list.
+            other = args[1]
+            sep =
+              if base.is_a?(ListV) && base.items.size > 1
+                base.sep
+              elsif other.is_a?(ListV) && other.items.size > 1
+                other.sep
+              else
+                ListV::Sep::Space
+              end
             bracketed = base.is_a?(ListV) && base.bracketed
             ListV.new(list_of(base) + list_of(args[1]), sep_from(args[2]?, sep), bracketed)
           end,
@@ -470,14 +502,7 @@ module Hwaro
         end
 
         def self.inspect_value(value : Value) : String
-          case value
-          when NullV
-            "null"
-          when ListV
-            value.items.empty? ? "()" : value.to_css
-          else
-            value.to_css
-          end
+          value.inspect_css
         end
 
         # ---------------------------------------------------------------

@@ -800,6 +800,21 @@ module Hwaro
 
           if scan.terminator == '{'
             if (colon = scan.first_decl_colon) && blank_after?(scan.template, colon)
+              cp_name = trim_template(split_at(scan.template, colon)[0])
+              if cp_name.pieces[0]?.as?(String).try(&.starts_with?("--"))
+                # `--x: { ... }` is a custom property whose value happens to
+                # be a brace block — legal CSS, since custom-property values
+                # are an almost free-form token stream. Only the
+                # `font: { family: x }` nested-property shape is unsupported,
+                # so `--` names must not be swept up by that check. The block
+                # is kept fully verbatim.
+                raw = read_raw_block
+                @s.skip_ws { }
+                @s.advance if @s.peek == ';'
+                return Ast::DeclarationNode.new(
+                  cp_name, Ast::TextTemplate.new(Array(Ast::Piece){raw}, line, column),
+                  false, true, line, column)
+              end
               @s.error("nested properties are not supported", line, column)
             end
             selector = trim_template(scan.template)
@@ -841,6 +856,39 @@ module Hwaro
         # `ns.$var` references. A `)` listed in `stops` terminates at depth 0
         # before the unmatched-paren check, so callers that already consumed
         # an opening paren (arg/param lists) need no special casing.
+        # Reads a balanced `{ ... }` run verbatim, braces included, with the
+        # cursor on the opening brace. Quoted strings and comments are
+        # consumed as units so a `}` inside them does not close the block.
+        private def read_raw_block : String
+          start_line = @s.line
+          start_col = @s.column
+          depth = 0
+          String.build do |io|
+            loop do
+              c = @s.peek
+              @s.error("unterminated block", start_line, start_col) unless c
+              case c
+              when '"', '\'' then io << @s.read_quoted
+              when '/'
+                if @s.peek(1) == '*'
+                  io << @s.read_loud_comment
+                else
+                  io << @s.advance
+                end
+              when '{'
+                depth += 1
+                io << @s.advance
+              when '}'
+                depth -= 1
+                io << @s.advance
+                break if depth == 0
+              else
+                io << @s.advance
+              end
+            end
+          end
+        end
+
         private def read_template(stops : String, value_vars : Bool) : TemplateScan
           start_line = @s.line
           start_col = @s.column
@@ -858,6 +906,12 @@ module Hwaro
             end
 
             case c
+            when '\\'
+              # An escaped character is never structural. `.a\}b`, `.a\;b`
+              # and `url(a\)b.png)` are valid CSS, and their escaped
+              # delimiter must not close the block/declaration/span.
+              buf << @s.advance
+              buf << @s.advance unless @s.eof?
             when '"', '\''
               read_string_into(buf, pieces)
             when '/'
@@ -881,7 +935,11 @@ module Hwaro
                 buf << @s.advance
               end
             when '$'
-              if value_vars
+              # Only a `$` that starts a real identifier is a variable
+              # sigil. Bare `$` is ordinary text — notably the `$=`
+              # "ends with" attribute operator (`a[href$=".pdf"]`), which
+              # would otherwise hard-fail on plain CSS.
+              if value_vars && @s.ident_start?(@s.peek(1))
                 var_line = @s.line
                 var_col = @s.column
                 @s.advance
@@ -974,6 +1032,9 @@ module Hwaro
           loop do
             c = @s.peek || @s.error("unterminated url(", start_line, start_col)
             case c
+            when '\\'
+              buf << @s.advance
+              buf << @s.advance unless @s.eof?
             when ')'
               buf << @s.advance
               break

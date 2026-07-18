@@ -1933,10 +1933,15 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     if has_auto_includes
+      # `.scss` sources are digested too when Sass is on: the compiled
+      # `.css` is not in the source tree, so without them an SCSS-only
+      # edit would leave `?v=` unchanged and serve stale CSS from caches.
+      # Partials count — they change the output of the entry importing them.
+      pattern = config.sass.enabled ? "*.{css,js,scss}" : "*.{css,js}"
       config.auto_includes.dirs.each do |dir|
         static_dir = File.join("static", dir)
         next unless Dir.exists?(static_dir)
-        Dir.glob(File.join(static_dir, "**", "*.{css,js}")).sort.each do |file|
+        Dir.glob(File.join(static_dir, "**", pattern)).sort.each do |file|
           digest_file(digest, file)
         end
       end

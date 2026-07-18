@@ -133,6 +133,7 @@ Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not suppor
 - 단위 산술은 동일 단위이거나 한쪽이 단위 없는 경우만 지원합니다. `px`↔`in` 변환 테이블은 없습니다.
 - *값* 위치의 `and`/`or`는 실제 불리언에만 동작합니다 — `font-family: Franklin and Marshall`은 텍스트로 남습니다. 조건식에서는 Sass의 완전한 truthiness를 따릅니다.
 - 전역 `min()`/`max()`/`round()`/`abs()`는 모든 인자가 정적으로 비교 가능한 숫자일 때만 평가됩니다. CSS 형태(`min(5vw, 100px)`, `round(up, 101px, 10px)`)는 그대로 통과합니다.
+- 내장 함수는 위치 인자만 받습니다. 키워드 호출(`list.append($l, x, $separator: comma)`)은 평가되지 않고 원문 그대로 남습니다 — 사용자 정의 `@mixin`/`@function`의 키워드 인자는 정상 동작합니다.
 - `if()`는 두 분기를 모두 즉시 평가합니다(부수 효과가 없으므로, 선택되지 않은 분기의 `@error`로만 관찰 가능합니다).
 - at-규칙 서두와 값 안의 변수는 직접 치환됩니다(`@media (min-width: $bp)` 동작). 셀렉터와 속성 이름에는 `#{...}` 보간이 필요합니다(dart-sass와 동일).
 - at-규칙 서두에서는 `(feature: value)` 구간 안에서만 표현식이 평가됩니다. 쿼리 구조 자체는 원문 그대로 유지됩니다.

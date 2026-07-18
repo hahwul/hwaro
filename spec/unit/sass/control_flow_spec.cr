@@ -135,10 +135,17 @@ describe "Sass control flow" do
     css.should_not contain(".y")
   end
 
-  it "errors when iterating null" do
-    expect_raises(Hwaro::Assets::Sass::SyntaxError, /may not iterate over null/) do
-      compile("@each $x in null { .a { width: $x; } }")
-    end
+  it "iterates null once, as a single-item list" do
+    # dart-sass parity: null is a one-element list, not an error. The
+    # `$list: null !default` + `@each` guard is a normal idiom, and
+    # rejecting it failed the whole build.
+    css = compile(<<-'SCSS')
+      @each $x in null { .icon-#{$x} { c: d; } }
+      SCSS
+    css.should contain(".icon- {")
+    # The body runs exactly once, with $x bound to null — so a rule whose
+    # only declaration is that null value drops out entirely.
+    compile("@each $x in null { .a { width: $x; } }").should eq("")
   end
 
   # ===========================================================================

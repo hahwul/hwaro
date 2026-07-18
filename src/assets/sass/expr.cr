@@ -580,9 +580,9 @@ module Hwaro
         # ---------------------------------------------------------------
 
         # Grammar, loosest first:
-        #   comma-list > slash-list > space-list > or > and > not >
-        #   equality > relational > additive > multiplicative > unary >
-        #   concat/primary
+        #   comma-list > slash-list > space-list > or > and >
+        #   equality > relational > additive > multiplicative >
+        #   unary (-, +, not) > concat/primary
         # :nodoc:
         class Parser
           def initialize(@toks : Array(Tok))
@@ -690,21 +690,12 @@ module Hwaro
           end
 
           private def parse_and : Node
-            left = parse_not
+            left = parse_equality
             while (tok = peek) && tok.kind.ident? && tok.text == "and"
               @pos += 1
-              left = Binary.new(:and, left, parse_not)
+              left = Binary.new(:and, left, parse_equality)
             end
             left
-          end
-
-          private def parse_not : Node
-            if (tok = peek) && tok.kind.ident? && tok.text == "not"
-              @pos += 1
-              Unary.new(:not, parse_not)
-            else
-              parse_equality
-            end
           end
 
           private def parse_equality : Node
@@ -778,8 +769,15 @@ module Hwaro
             left
           end
 
+          # `not` is a unary operator binding tighter than every binary
+          # operator except concatenation — `not 1 == 2` is `(not 1) == 2`,
+          # not `not (1 == 2)`. Parsing it between `and` and `==` inverted
+          # the result of any `not` applied to a comparison.
           private def parse_unary : Node
-            if accept(TokKind::Minus)
+            if (tok = peek) && tok.kind.ident? && tok.text == "not"
+              @pos += 1
+              Unary.new(:not, parse_unary)
+            elsif accept(TokKind::Minus)
               Unary.new(:minus, parse_unary)
             elsif accept(TokKind::Plus)
               Unary.new(:plus, parse_unary)

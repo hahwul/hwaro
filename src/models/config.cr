@@ -277,10 +277,14 @@ module Hwaro
     class AutoIncludesConfig
       property enabled : Bool
       property dirs : Array(String)
+      # Set from [sass]; compiled SCSS outputs are invisible to the
+      # source-tree scan in `collect_tags` without it.
+      property sass_enabled : Bool
 
       def initialize
         @enabled = false
         @dirs = [] of String
+        @sass_enabled = false
       end
 
       # Generate CSS link tags for files in configured directories
@@ -307,7 +311,20 @@ module Hwaro
           static_dir = File.join("static", dir)
           next unless Dir.exists?(static_dir)
 
-          Dir.glob(File.join(static_dir, "**", "*.#{extension}")).sort.each do |file|
+          files = Dir.glob(File.join(static_dir, "**", "*.#{extension}"))
+          if extension == "css" && @sass_enabled
+            # Compiled SCSS is written to the output tree, not `static/`,
+            # so project each entry onto the `.css` it will produce.
+            # Partials never produce output; a hand-written sibling of the
+            # same name is already in `files`.
+            Dir.glob(File.join(static_dir, "**", "*.scss")).each do |scss|
+              next if File.basename(scss).starts_with?("_")
+              compiled = scss.sub(/\.scss\z/, ".css")
+              files << compiled unless files.includes?(compiled)
+            end
+          end
+
+          files.sort.each do |file|
             relative_path = file.sub(/^static\/?/, "/")
             tags << yield(HTML.escape("#{base_url}#{relative_path}#{suffix}"))
           end
@@ -2003,10 +2020,13 @@ module Hwaro
       end
 
       private def self.load_sass(config : Config)
-        return unless s = config.raw["sass"]?.try(&.as_h?)
-
-        config.sass.enabled = bool_value(s["enabled"]?, config.sass.enabled)
-        config.sass.minify = bool_value(s["minify"]?, config.sass.minify)
+        if s = config.raw["sass"]?.try(&.as_h?)
+          config.sass.enabled = bool_value(s["enabled"]?, config.sass.enabled)
+          config.sass.minify = bool_value(s["minify"]?, config.sass.minify)
+        end
+        # [auto_includes] enumerates the *source* tree, so it has to know
+        # whether `.scss` entries will become sibling `.css` outputs.
+        config.auto_includes.sass_enabled = config.sass.enabled
       end
 
       private def self.load_amp(config : Config)
