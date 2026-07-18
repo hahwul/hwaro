@@ -152,9 +152,49 @@ describe "Hwaro::Assets::Sass mixins" do
     end
   end
 
-  it "rejects variadic parameters" do
-    expect_raises(Hwaro::Assets::Sass::SyntaxError, /variadic parameters/) do
-      compile("@mixin m($args...) { width: 0; }")
+  it "packs extra arguments into a variadic parameter" do
+    css = compile(<<-SCSS)
+      @mixin shadows($first, $rest...) {
+        box-shadow: $rest;
+        text-shadow: $first;
+      }
+      .x { @include shadows(0 0 1px red, 0 0 2px blue, 0 0 3px green); }
+      SCSS
+    css.should contain("box-shadow: 0 0 2px blue, 0 0 3px green;")
+    css.should contain("text-shadow: 0 0 1px red;")
+  end
+
+  it "binds an empty variadic parameter as an empty list" do
+    css = compile(<<-SCSS)
+      @mixin m($rest...) { width: length($rest); }
+      .x { @include m; }
+      SCSS
+    css.should contain("width: 0;")
+  end
+
+  it "spreads a list argument into positional parameters" do
+    css = compile(<<-SCSS)
+      $pair: 4px, 8px;
+      @mixin gaps($a, $b) { margin: $a; padding: $b; }
+      .x { @include gaps($pair...); }
+      SCSS
+    css.should contain("margin: 4px;")
+    css.should contain("padding: 8px;")
+  end
+
+  it "spreads a map argument into keyword parameters" do
+    css = compile(<<-SCSS)
+      $cfg: (b: 8px, a: 4px);
+      @mixin gaps($a, $b) { margin: $a; padding: $b; }
+      .x { @include gaps($cfg...); }
+      SCSS
+    css.should contain("margin: 4px;")
+    css.should contain("padding: 8px;")
+  end
+
+  it "errors when a variadic parameter is not last" do
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /must be last/) do
+      compile("@mixin m($args..., $tail) { width: 0; }")
     end
   end
 

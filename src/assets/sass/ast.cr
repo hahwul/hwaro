@@ -102,7 +102,7 @@ module Hwaro
           end
         end
 
-        record Param, name : String, default : TextTemplate?
+        record Param, name : String, default : TextTemplate?, variadic : Bool = false
 
         class MixinDefNode < Node
           getter name : String
@@ -114,7 +114,7 @@ module Hwaro
           end
         end
 
-        record Arg, name : String?, value : TextTemplate
+        record Arg, name : String?, value : TextTemplate, spread : Bool = false
 
         class IncludeNode < Node
           getter name : String
@@ -130,13 +130,117 @@ module Hwaro
         class ContentNode < Node
         end
 
-        # `@use "url"` / `@use "url" as ns` / `@use "url" as *`.
+        # One `$name: value` entry of `@use ... with (...)`.
+        record UseConfig, name : String, value : TextTemplate, default : Bool
+
+        # `@use "url"` / `@use "url" as ns` / `@use "url" as *`, with an
+        # optional `with (...)` configuration.
         # namespace: nil = default (basename), "*" = merge into globals.
         class UseNode < Node
           getter url : String
           getter namespace : String?
+          getter config : Array(UseConfig)
 
-          def initialize(@url, @namespace, line, column)
+          def initialize(@url, @namespace, line, column, @config = [] of UseConfig)
+            super(line, column)
+          end
+        end
+
+        # `@forward "url"` with optional `show`/`hide` filters and an
+        # `as prefix-*` member prefix. Visibility names keep their `$`
+        # marker for variables ("$brand"), bare names cover mixins and
+        # functions.
+        class ForwardNode < Node
+          getter url : String
+          getter shown : Set(String)?
+          getter hidden : Set(String)?
+          getter prefix : String?
+
+          def initialize(@url, @shown, @hidden, @prefix, line, column)
+            super(line, column)
+          end
+        end
+
+        # One branch of an @if/@else-if/@else chain; `condition` is nil
+        # for the final @else.
+        record IfBranch, condition : TextTemplate?, body : Array(Node)
+
+        class IfNode < Node
+          getter branches : Array(IfBranch)
+
+          def initialize(@branches, line, column)
+            super(line, column)
+          end
+        end
+
+        class EachNode < Node
+          getter vars : Array(String)
+          getter list : TextTemplate
+          getter body : Array(Node)
+
+          def initialize(@vars, @list, @body, line, column)
+            super(line, column)
+          end
+        end
+
+        class ForNode < Node
+          getter var : String
+          getter from : TextTemplate
+          getter to : TextTemplate
+          # true for `to` (exclusive), false for `through` (inclusive).
+          getter exclusive : Bool
+          getter body : Array(Node)
+
+          def initialize(@var, @from, @to, @exclusive, @body, line, column)
+            super(line, column)
+          end
+        end
+
+        class WhileNode < Node
+          getter condition : TextTemplate
+          getter body : Array(Node)
+
+          def initialize(@condition, @body, line, column)
+            super(line, column)
+          end
+        end
+
+        class FunctionDefNode < Node
+          getter name : String
+          getter params : Array(Param)
+          getter body : Array(Node)
+
+          def initialize(@name, @params, @body, line, column)
+            super(line, column)
+          end
+        end
+
+        class ReturnNode < Node
+          getter value : TextTemplate
+
+          def initialize(@value, line, column)
+            super(line, column)
+          end
+        end
+
+        # @debug / @warn / @error.
+        class MessageNode < Node
+          getter kind : Symbol
+          getter value : TextTemplate
+
+          def initialize(@kind, @value, line, column)
+            super(line, column)
+          end
+        end
+
+        # `@at-root { ... }` / `@at-root .sel { ... }` — evaluates its
+        # body outside the current style-rule nesting (but inside any
+        # surrounding at-rule).
+        class AtRootNode < Node
+          getter selector : TextTemplate?
+          getter children : Array(Node)
+
+          def initialize(@selector, @children, line, column)
             super(line, column)
           end
         end

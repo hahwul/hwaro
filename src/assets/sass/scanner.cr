@@ -34,6 +34,20 @@ module Hwaro
           @pos >= @chars.size
         end
 
+        # Snapshot/rewind for bounded lookahead (the parser peeks past
+        # whitespace and comments for `@else` chains).
+        record Snapshot, pos : Int32, line : Int32, column : Int32
+
+        def snapshot : Snapshot
+          Snapshot.new(@pos, @line, @column)
+        end
+
+        def restore(snap : Snapshot) : Nil
+          @pos = snap.pos
+          @line = snap.line
+          @column = snap.column
+        end
+
         def peek(offset : Int32 = 0) : Char?
           idx = @pos + offset
           idx < @chars.size ? @chars[idx] : nil

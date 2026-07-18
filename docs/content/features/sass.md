@@ -69,33 +69,78 @@ Hwaro implements a practical SCSS subset — the features hand-written site styl
 | `$variables` | ✅ with `!default` / `!global`, lexical scoping and shadowing |
 | Nested rules | ✅ including selector lists (cartesian combination) |
 | `&` parent selector | ✅ `&:hover`, `&.mod`, BEM `&__elem` / `&--mod` |
-| `#{...}` interpolation | ✅ selectors, property names, values, at-rule preludes, strings, `url()` |
-| Partials + `@use` | ✅ namespaces (`colors.$primary`), `as x`, `as *`, load-once |
+| `#{...}` interpolation | ✅ selectors, property names, values, at-rule preludes, strings, `url()` — full expressions inside |
+| Partials + `@use` | ✅ namespaces (`colors.$primary`), `as x`, `as *`, load-once, `with (...)` configuration |
+| `@forward` | ✅ `show` / `hide` filters, `as prefix-*` |
 | `@import` (Sass files) | ✅ classic global-merge semantics; plain-CSS forms pass through |
-| `@mixin` / `@include` | ✅ default values, keyword arguments, `@content` blocks |
-| `@media` / `@supports` in rules | ✅ bubbled out of nesting automatically |
+| `@mixin` / `@include` | ✅ default values, keyword arguments, variadic `$args...`, spreads, `@content` blocks |
+| `@function` / `@return` | ✅ user functions callable in values, defaults/keywords/variadic, recursion |
+| Control flow | ✅ `@if` / `@else if` / `@else`, `@each` (with destructuring), `@for` (`through`/`to`, descending), `@while` |
+| SassScript expressions | ✅ arithmetic (`+ - * %`), comparisons, `and`/`or`/`not`, strings, lists, maps — see deviations for `/` |
+| Built-in functions | ✅ `sass:math`, `sass:string`, `sass:list`, `sass:map`, `sass:meta` subset + legacy global names (`map-get`, `nth`, `if()`, …) |
+| `@debug` / `@warn` / `@error` | ✅ `@error` fails the build with a located message |
+| `@at-root` | ✅ selector and block forms (no `with:`/`without:` queries) |
+| `@media` / `@supports` in rules | ✅ bubbled out of nesting automatically; feature values evaluate expressions |
 | `@keyframes`, `@font-face`, custom properties | ✅ pass through correctly |
 | Plain CSS | ✅ any valid `.css` compiles to itself (whitespace-normalized) |
 
-Unknown functions (`calc()`, `var()`, `rgba()`, `clamp()`, `color-mix()`, …) pass through untouched.
+Unknown functions (`calc()`, `var()`, `rgba()`, `clamp()`, `color-mix()`, …) pass through untouched — arguments still evaluate (`translate($x * 2, -50%)` works).
+
+```scss
+@use "sass:math";
+$breakpoints: (sm: 640px, md: 768px, lg: 1024px);
+
+@function rem($px, $base: 16px) { @return math.div($px, $base) * 1rem; }
+
+@mixin respond($name) {
+  @if not map-has-key($breakpoints, $name) { @error "unknown breakpoint #{$name}"; }
+  @media (min-width: map-get($breakpoints, $name)) { @content; }
+}
+
+@each $name, $bp in $breakpoints {
+  .container-#{$name} { max-width: $bp - 24px; }
+}
+@for $i from 1 through 12 {
+  .col-#{$i} { width: math.percentage(math.div($i, 12)); }
+}
+.hero {
+  font-size: rem(28px);
+  @include respond(md) { font-size: rem(40px); }
+}
+```
 
 ### Not supported (yet)
 
-Control flow (`@if`/`@else`/`@each`/`@for`/`@while`), SassScript arithmetic and comparison operators, built-in function modules (`math.*`, `color.*`, string/list/map functions), `@function`, `@extend`, `@forward`, `@use ... with (...)`, variadic arguments (`$args...`), `@content(args)` / `using`, nested properties (`font: { family: ... }`), the indented `.sass` syntax, and source maps.
+`@extend`, color values and `color.*` functions, unit conversion (`px`↔`cm`), `@at-root (with: ...)` queries, `@forward ... with (...)`, `@content(args)` / `using`, `math.random` / `unique-id()` (builds must stay deterministic), nested properties (`font: { family: ... }`), the indented `.sass` syntax, and source maps.
 
 **Unsupported directives fail the build with a located error** — Hwaro never emits silently broken CSS:
 
 ```
-Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @if is not supported by hwaro's Sass subset (yet)
+Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not supported by hwaro's Sass subset (yet)
 ```
+
+### Expression semantics
+
+The compiler's first duty is the plain-CSS guarantee, so expressions follow a two-tier policy:
+
+- **Value contexts are lenient.** A declaration or variable value is evaluated only when it visibly computes something — an operator between numbers, a call to a known function. Anything else, and anything that *fails* to evaluate (`$a + 2em` with incompatible units, `min(100% - 10px, 20rem)`), keeps its verbatim text exactly as before. Existing stylesheets compile byte-identically.
+- **New syntax is strict.** `@if`/`@while` conditions, `@each`/`@for` headers, `@return`, and `@use ... with` report every failure as a located build error.
 
 ### Deviations from dart-sass
 
+- `/` is **never** division — `font: 12px/1.5` and `grid-area: 1 / 2` stay verbatim. Use `math.div()` (this matches dart-sass 2.0, which removed slash-division).
+- Values are stored as CSS text between evaluations; types are re-derived on use. An unquoted string that *looks* like a list (`"a, b"` unquoted) is treated as one.
+- Unit arithmetic requires identical units or one unitless side; there is no `px`↔`in` conversion table.
+- `and`/`or` in *value* positions only operate on real booleans — `font-family: Franklin and Marshall` stays text. Conditions have full Sass truthiness.
+- Global `min()`/`max()`/`round()`/`abs()` evaluate only when all arguments are statically comparable numbers; CSS forms (`min(5vw, 100px)`, `round(up, 101px, 10px)`) pass through.
+- `if()` evaluates both branches eagerly (no side effects exist, so this is observable only via `@error` in the untaken branch).
 - Variables in at-rule preludes and values substitute directly (`@media (min-width: $bp)` works); selectors and property names require `#{...}` interpolation (same as dart-sass).
+- At-rule preludes evaluate expressions only inside `(feature: value)` spans; the query structure itself stays verbatim.
 - `@media` nested inside `@media` emits literally nested blocks (dart-sass merges the conditions).
 - `&` substitution is textual — `&__elem` concatenates without validating the compound selector.
 - Custom property values are verbatim: `$var` stays literal, only `#{...}` interpolates (dart-sass semantics), but leading/trailing whitespace is trimmed.
 - `@import` of the same file re-emits its CSS each time (classic Sass behavior); `@use` loads once.
+- Configuring a module that itself uses `@forward` (`@use "lib" with (...)`) is an error rather than silently ignored.
 - Declarations placed *after* a nested rule merge into the parent's single output block (`.a { color: red; .b {} color: blue; }` emits one `.a` block); dart-sass splits them in source order. Avoid relying on cascade order between a parent's trailing declarations and its nested rules.
 - Values are substituted as text: interpolating a variable whose value contains an unbalanced quote character can confuse downstream whitespace/quote handling. Keep quote characters inside quoted strings.
 - Only lowercase `.scss` extensions are treated as Sass sources; other casings publish verbatim like any static file.
