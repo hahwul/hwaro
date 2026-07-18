@@ -38,51 +38,87 @@ module Hwaro::Core::Build::Phases::Transform
   # section index → section pages → subsection index → subsection pages → ...
   # This enables cross-section navigation following the natural reading order.
   private def link_page_navigation(ctx : Lifecycle::BuildContext)
+    default_lang = ctx.site.try(&.config.default_language) || ""
+    build_reading_orders(ctx.sections, ctx.pages, default_lang).each do |flat_list|
+      flat_list.each_with_index do |page, idx|
+        page.lower = idx > 0 ? flat_list[idx - 1] : nil
+        page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
+      end
+    end
+  end
+
+  # Build the flat reading order used for prev/next, one list per language.
+  # `section` is language-blind (`posts/_index.md` and `posts/_index.ko.md`
+  # both have section "posts"), so a single global list interleaved
+  # languages — an English page's "next" was its own translation. Each
+  # language links as a self-contained chain, matching how ancestors
+  # (build_subsections) and section listings (Site#pages_for_section) are
+  # already scoped. Single-language sites (language nil everywhere) collapse
+  # to one partition and keep the previous order exactly.
+  private def build_reading_orders(
+    sections : Array(Models::Section),
+    pages : Array(Models::Page),
+    default_lang : String,
+  ) : Array(Array(Models::Page))
+    sections_by_lang = sections.group_by { |s| s.language || default_lang }
+    pages_by_lang = pages.group_by { |p| p.language || default_lang }
+
+    (sections_by_lang.keys | pages_by_lang.keys).map do |lang|
+      build_language_reading_order(
+        sections_by_lang[lang]? || [] of Models::Section,
+        pages_by_lang[lang]? || [] of Models::Page,
+        lang, default_lang)
+    end
+  end
+
+  private def build_language_reading_order(
+    sections : Array(Models::Section),
+    pages : Array(Models::Page),
+    lang : String,
+    default_lang : String,
+  ) : Array(Models::Page)
     # Build sections lookup
     sections_by_path = {} of String => Models::Section
-    ctx.sections.each { |s| sections_by_path[s.section] = s }
+    sections.each { |s| sections_by_path[s.section] = s }
 
-    # Group pages by section. `ctx.pages` only contains regular pages and
+    # Group pages by section. `pages` only contains regular pages and
     # page-bundle leaves (`index.md`) — section indexes (`_index.md`) live
-    # in `ctx.sections` and are interleaved separately by
+    # in `sections` and are interleaved separately by
     # `flatten_section_tree`. Page bundles set `is_index = true` for URL
     # generation, but for navigation they're ordinary pages within their
     # parent section.
     pages_by_section = {} of String => Array(Models::Page)
-    ctx.pages.each do |page|
+    pages.each do |page|
       section = page.section
       pages_by_section[section] ||= [] of Models::Page
       pages_by_section[section] << page
     end
 
     # Sort pages within each section using the section's sort_by setting
-    pages_by_section.each do |section_name, pages|
+    pages_by_section.each do |section_name, section_pages|
       section = sections_by_path[section_name]?
       sort_by = section.try(&.sort_by) || "date"
       reverse = section.try(&.reverse) || false
-      sorted = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
+      sorted = Utils::SortUtils.sort_pages(section_pages, sort_by, reverse)
       pages_by_section[section_name] = sorted
     end
 
     # Find top-level sections (no parent) and sort by weight (path tiebreaker
     # so equal weights keep a stable, deterministic reading order).
-    top_sections = ctx.sections.select { |s| !s.section.includes?("/") }
+    top_sections = sections.select { |s| !s.section.includes?("/") }
     top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     # Recursively flatten sections into reading order
     flat_list = [] of Models::Page
-    flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)
+    flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list, lang, default_lang)
 
     # Add any orphan pages not belonging to any section, leading with the
-    # site root index so prev/next starts at the homepage.
+    # site root index so prev/next starts at the homepage. Pages whose
+    # section has no `_index` in this language land here too, in source
+    # order — better a tail entry than absence from the chain.
     section_names = sections_by_path.keys.to_set
-    append_orphan_pages(ctx.pages, section_names, flat_list)
-
-    # Link lower (previous) and higher (next) across the entire flat list
-    flat_list.each_with_index do |page, idx|
-      page.lower = idx > 0 ? flat_list[idx - 1] : nil
-      page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
-    end
+    append_orphan_pages(pages, section_names, flat_list)
+    flat_list
   end
 
   # Weight-then-path ordering shared by the cold build's navigation link and
@@ -130,6 +166,8 @@ module Hwaro::Core::Build::Phases::Transform
     sections_by_path : Hash(String, Models::Section),
     pages_by_section : Hash(String, Array(Models::Page)),
     result : Array(Models::Page),
+    lang : String,
+    default_lang : String,
   )
     sections.each do |section|
       # Add section index page if it renders
@@ -140,10 +178,14 @@ module Hwaro::Core::Build::Phases::Transform
         pages.each { |p| result << p }
       end
 
-      # Recurse into subsections (sorted by weight)
+      # Recurse into subsections (sorted by weight). Subsection links may
+      # cross languages — build_subsections attaches a translated subsection
+      # to the default-language parent when its own language has no parent
+      # `_index` — so keep only this language's subtree.
       if section.subsections.size > 0
-        sorted_subsections = section.subsections.sort_by(&.weight)
-        flatten_section_tree(sorted_subsections, sections_by_path, pages_by_section, result)
+        same_lang = section.subsections.select { |sub| (sub.language || default_lang) == lang }
+        sorted_subsections = same_lang.sort_by(&.weight)
+        flatten_section_tree(sorted_subsections, sections_by_path, pages_by_section, result, lang, default_lang)
       end
     end
   end
@@ -393,48 +435,32 @@ module Hwaro::Core::Build::Phases::Transform
     site : Models::Site,
     affected_sections : Set(String),
   ) : Set(Models::Page)
-    # Build a BuildContext-compatible structure for reuse
-    sections_by_path = {} of String => Models::Section
-    site.sections.each { |s| sections_by_path[s.section] = s }
-
-    pages_by_section = {} of String => Array(Models::Page)
-    site.pages.each do |page|
-      section = page.section
-      pages_by_section[section] ||= [] of Models::Page
-      pages_by_section[section] << page
-    end
-
-    pages_by_section.each do |section_name, pages|
-      section = sections_by_path[section_name]?
-      sort_by = section.try(&.sort_by) || "date"
-      reverse = section.try(&.reverse) || false
-      pages_by_section[section_name] = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
-    end
-
-    top_sections = site.sections.select { |s| !s.section.includes?("/") }
-    top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
-
-    flat_list = [] of Models::Page
-    flatten_section_tree(top_sections, sections_by_path, pages_by_section, flat_list)
-
-    section_names = sections_by_path.keys.to_set
-    append_orphan_pages(site.pages, section_names, flat_list)
+    # Same per-language partitioning as the cold build's
+    # link_page_navigation — both MUST produce identical orders, or
+    # serve-mode incremental rebuilds flip prev/next links.
+    flat_lists = build_reading_orders(site.sections, site.pages, site.config.default_language)
 
     # Snapshot the old prev/next before re-linking so we can report exactly which
     # pages had a neighbor change (compared by file path — unique per page).
     old = {} of String => {String?, String?}
-    flat_list.each { |p| old[p.path] = {p.lower.try(&.path), p.higher.try(&.path)} }
+    flat_lists.each do |flat_list|
+      flat_list.each { |p| old[p.path] = {p.lower.try(&.path), p.higher.try(&.path)} }
+    end
 
-    flat_list.each_with_index do |page, idx|
-      page.lower = idx > 0 ? flat_list[idx - 1] : nil
-      page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
+    flat_lists.each do |flat_list|
+      flat_list.each_with_index do |page, idx|
+        page.lower = idx > 0 ? flat_list[idx - 1] : nil
+        page.higher = idx < flat_list.size - 1 ? flat_list[idx + 1] : nil
+      end
     end
 
     changed = Set(Models::Page).new
-    flat_list.each do |page|
-      prev = old[page.path]
-      if page.lower.try(&.path) != prev[0] || page.higher.try(&.path) != prev[1]
-        changed << page
+    flat_lists.each do |flat_list|
+      flat_list.each do |page|
+        prev = old[page.path]
+        if page.lower.try(&.path) != prev[0] || page.higher.try(&.path) != prev[1]
+          changed << page
+        end
       end
     end
     changed

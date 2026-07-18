@@ -237,6 +237,58 @@ describe Hwaro::Core::Build::Phases::Transform do
       chapter.lower.should eq(home)
       lesson.higher.should be_nil
     end
+
+    it "links each language as its own prev/next chain (multilingual)" do
+      # docs/_index.md and docs/_index.ko.md share section "docs"; a
+      # language-blind flat list interleaved both languages, so an English
+      # page's "next" was its own Korean translation.
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      site = Hwaro::Models::Site.new(config)
+      ctx.site = site
+
+      en_index = make_section("docs/_index.md", "docs")
+      en_index.is_index = true
+      en_index.sort_by = "weight"
+      ko_index = make_section("docs/_index.ko.md", "docs")
+      ko_index.is_index = true
+      ko_index.sort_by = "weight"
+      ko_index.language = "ko"
+
+      en_a = make_page("docs/a.md", "docs")
+      en_a.weight = 1
+      en_b = make_page("docs/b.md", "docs")
+      en_b.weight = 2
+      ko_a = make_page("docs/a.ko.md", "docs")
+      ko_a.weight = 1
+      ko_a.language = "ko"
+      ko_b = make_page("docs/b.ko.md", "docs")
+      ko_b.weight = 2
+      ko_b.language = "ko"
+
+      ctx.sections = [en_index, ko_index]
+      ctx.pages = [en_a, ko_a, en_b, ko_b]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_set_transform_site(site)
+      builder.test_link_page_navigation(ctx)
+
+      # English chain: index → a → b, never touching a Korean page
+      en_index.higher.should eq(en_a)
+      en_a.lower.should eq(en_index)
+      en_a.higher.should eq(en_b)
+      en_b.higher.should be_nil
+
+      # Korean chain, independent of the English one
+      ko_index.lower.should be_nil
+      ko_index.higher.should eq(ko_a)
+      ko_a.lower.should eq(ko_index)
+      ko_a.higher.should eq(ko_b)
+      ko_b.higher.should be_nil
+    end
   end
 
   describe "#populate_taxonomies / #rebuild_taxonomies" do
