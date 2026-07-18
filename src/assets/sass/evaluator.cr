@@ -32,6 +32,9 @@ module Hwaro
         MAX_INCLUDE_DEPTH    =     100
         MAX_CALL_DEPTH       =     100
         MAX_WHILE_ITERATIONS = 100_000
+        # `&` slots per selector beyond which the parent cross-product is
+        # not expanded (it grows as parents**slots).
+        MAX_PARENT_REF_SLOTS = 4
 
         # Unwinds a @function body at @return. :nodoc:
         class ReturnSignal < Exception
@@ -77,7 +80,6 @@ module Hwaro
           @path = path
           @loaded_modules = {} of String => SassModule
           @load_stack = [] of String
-          @module_css = [] of Css::Node
           @in_function = false
           @call_depth = 0
           @forward_variables = {} of String => String
@@ -93,7 +95,7 @@ module Hwaro
 
         def evaluate(sheet : Ast::Stylesheet) : Array(Css::Node)
           eval_nodes(sheet.children)
-          @module_css + @sink
+          @sink
         end
 
         private def eval_nodes(nodes : Array(Ast::Node)) : Nil
@@ -187,15 +189,15 @@ module Hwaro
           parents = @parent_selectors
           result = [] of String
           parts.each do |part|
-            has_amp = contains_parent_ref?(part)
+            amps = count_parent_refs(part)
             if parents.nil?
-              if has_amp
+              if amps > 0
                 error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
               end
               result << part
-            elsif has_amp
-              parents.each do |parent|
-                result << substitute_parent(part, parent)
+            elsif amps > 0
+              parent_combinations(parents, amps).each do |combo|
+                result << substitute_parent(part, combo)
               end
             else
               parents.each { |parent| result << "#{parent} #{part}" }
@@ -204,10 +206,31 @@ module Hwaro
           result
         end
 
-        # True when the selector contains a `&` outside quoted strings and
-        # attribute brackets — a scan-only twin of substitute_parent.
-        private def contains_parent_ref?(selector : String) : Bool
+        private def template_has_parent_ref?(template : Ast::TextTemplate) : Bool
+          template.pieces.any? { |piece| piece.is_a?(String) && piece.includes?('&') }
+        end
+
+        # Every assignment of `parents` to `slots` independent `&` slots,
+        # leftmost varying slowest (dart-sass order). Bounded because the
+        # count is exponential in the number of `&` in one selector.
+        private def parent_combinations(parents : Array(String), slots : Int32) : Array(Array(String))
+          return [parents.dup] if slots > MAX_PARENT_REF_SLOTS
+          combos = [[] of String]
+          slots.times do
+            grown = [] of Array(String)
+            combos.each do |combo|
+              parents.each { |parent| grown << combo + [parent] }
+            end
+            combos = grown
+          end
+          combos
+        end
+
+        # Counts `&` occurrences outside quoted strings and attribute
+        # brackets — a scan-only twin of substitute_parent.
+        private def count_parent_refs(selector : String) : Int32
           chars = selector.chars
+          count = 0
           i = 0
           while i < chars.size
             case c = chars[i]
@@ -228,16 +251,19 @@ module Hwaro
                 i += 1
               end
             when '&'
-              return true
+              count += 1
             end
             i += 1
           end
-          false
+          count
         end
 
-        # Replaces top-level `&` with the parent selector; `&` inside
-        # quoted strings and attribute brackets is literal.
-        private def substitute_parent(selector : String, replacement : String) : String
+        # Replaces top-level `&` with `replacements`, consumed left to
+        # right — each occurrence resolves independently, so `& + &` over
+        # a parent list yields every pairing. `&` inside quoted strings and
+        # attribute brackets is literal.
+        private def substitute_parent(selector : String, replacements : Array(String)) : String
+          slot = 0
           chars = selector.chars
           String.build do |io|
             i = 0
@@ -268,7 +294,8 @@ module Hwaro
                 end
                 io << ']' if i < chars.size
               when '&'
-                io << replacement
+                io << (replacements[slot]? || replacements.last)
+                slot += 1
               else
                 io << c
               end
@@ -279,15 +306,18 @@ module Hwaro
 
         private def eval_declaration(node : Ast::DeclarationNode) : Nil
           name = collapse_ws(resolve_template(node.name, allow_vars: false))
+          null_value = false
           value =
             if node.custom_property
               resolve_template(node.value, allow_vars: true).strip
             else
-              resolve_value(node.value)
+              resolved = resolve_decl_value(node.value)
+              null_value = resolved.null_value
+              resolved.text
             end
           # A null (or computed-empty) value omits the declaration
           # (dart-sass semantics). Custom properties stay verbatim.
-          if !node.custom_property && (value == "null" || value.empty?) && !node.important
+          if !node.custom_property && (null_value || value.empty?) && !node.important
             return
           end
           decl = Css::Decl.new(name, value, node.important)
@@ -369,12 +399,20 @@ module Hwaro
           name == "keyframes" || name.ends_with?("-keyframes")
         end
 
-        # Grouping at-rules whose bodies contain style rules — these get a
-        # synthetic selector wrapper when bubbled out of a rule.
-        CONDITIONAL_GROUP_AT_RULES = %w[media supports container layer document scope]
+        # At-rules whose body is a descriptor block: the declarations belong
+        # to the at-rule itself, so bubbling one out of a style rule must
+        # NOT wrap them in the parent selector.
+        #
+        # This is a denylist on purpose. Everything else — @media,
+        # @supports, @layer, @container, @starting-style, and any at-rule
+        # newer than this compiler — is a grouping at-rule and keeps the
+        # selector. An allowlist silently dropped the selector for anything
+        # it hadn't heard of, emitting a selector-less declaration that
+        # browsers discard.
+        DESCRIPTOR_AT_RULES = %w[font-face page property counter-style font-palette-values viewport]
 
         private def conditional_group?(name : String) : Bool
-          CONDITIONAL_GROUP_AT_RULES.includes?(name)
+          !DESCRIPTOR_AT_RULES.includes?(name)
         end
 
         # ---------------------------------------------------------------
@@ -631,7 +669,10 @@ module Hwaro
             when MapV
               value.entries.map { |e| ListV.new([e.key, e.value], ListV::Sep::Space).as(Value) }
             when NullV
-              error_at(node.line, node.column, "@each may not iterate over null")
+              # dart-sass iterates null once, as a single-item list. The
+              # `$list: null !default` + `@each` guard is a normal idiom;
+              # refusing it failed the whole build.
+              [value]
             else
               [value]
             end
@@ -745,9 +786,24 @@ module Hwaro
           @parent_selectors = nil
           begin
             if selector = node.selector
+              # `&` in an `@at-root` selector still refers to the enclosing
+              # rule (`.parent { @at-root .child & { } }` → `.child
+              # .parent`). Expose the parents only when the selector
+              # actually uses `&` — otherwise `@at-root .child` would be
+              # nested under them, the opposite of what @at-root means.
+              @parent_selectors = saved_parents if template_has_parent_ref?(selector)
               eval_rule(Ast::RuleNode.new(selector, node.children, node.line, node.column))
             else
-              scoped { eval_nodes(node.children) }
+              # A plain block scope, not `scoped`: `@at-root` is not a
+              # flow-control rule, so assignments inside it must not write
+              # through to the enclosing scope the way `@if`/`@while` do.
+              saved_env = @env
+              @env = Environment.new(saved_env)
+              begin
+                eval_nodes(node.children)
+              ensure
+                @env = saved_env
+              end
             end
           ensure
             @current_rule = saved_rule
@@ -882,9 +938,9 @@ module Hwaro
             eval_nodes(sheet.children)
             # Own root members win over forwarded ones on name collisions.
             mod = SassModule.new(
-              @forward_variables.merge(module_env.variables),
-              @forward_mixins.merge(module_env.mixins),
-              @forward_functions.merge(module_env.functions))
+              export_members(@forward_variables.merge(module_env.variables)),
+              export_members(@forward_mixins.merge(module_env.mixins)),
+              export_members(@forward_functions.merge(module_env.functions)))
           ensure
             @load_stack.pop
             @env = saved_env
@@ -901,8 +957,13 @@ module Hwaro
           end
 
           @loaded_modules[canonical] = mod
-          # A module's CSS is emitted once, before the code that uses it.
-          @module_css.concat(module_sink)
+          # A module's CSS is emitted once, spliced in where the `@use` was
+          # reached — which is before the code that uses it, since `@use`
+          # precedes the using file's own rules. Collecting it into a
+          # document-wide buffer instead would hoist it above rules that ran
+          # *earlier* (e.g. when the `@use` is reached through an `@import`),
+          # flipping the cascade winner between equal-specificity selectors.
+          @sink.concat(module_sink)
           mod
         end
 
@@ -980,9 +1041,36 @@ module Hwaro
           case ns = node.namespace
           when "*"
             scope = @env.root
-            mod.variables.each { |name, value| scope.variables[name] = value }
-            mod.mixins.each { |name, closure| scope.mixins[name] = closure }
-            mod.functions.each { |name, fn| scope.functions[name] = fn }
+            # `as *` dumps members into the global scope, so a name already
+            # bound to something else is a genuine ambiguity — silently
+            # overwriting it loses whichever definition lost the race.
+            # Re-registering the *same* module (the classic-@import merge
+            # can reach one file from several places) rebinds identical
+            # values and is not a collision.
+            mod.variables.each do |name, value|
+              existing = scope.variables[name]?
+              if existing && existing != value
+                error_at(node.line, node.column,
+                  "$#{name} is defined both here and in \"#{node.url}\"")
+              end
+              scope.variables[name] = value
+            end
+            mod.mixins.each do |name, closure|
+              existing = scope.mixins[name]?
+              if existing && existing != closure
+                error_at(node.line, node.column,
+                  "mixin #{name} is defined both here and in \"#{node.url}\"")
+              end
+              scope.mixins[name] = closure
+            end
+            mod.functions.each do |name, fn|
+              existing = scope.functions[name]?
+              if existing && existing != fn
+                error_at(node.line, node.column,
+                  "function #{name} is defined both here and in \"#{node.url}\"")
+              end
+              scope.functions[name] = fn
+            end
           else
             ns ||= default_namespace(node.url)
             unless @env.declare_module(ns, mod)
@@ -993,6 +1081,14 @@ module Hwaro
               end
             end
           end
+        end
+
+        # Members whose name starts with `-` or `_` are private to their
+        # module and must never cross a module boundary — that prefix is
+        # the only mechanism a partial has to keep helpers off its public
+        # surface. `normalize_ident` has already folded `_` to `-`.
+        private def export_members(members : Hash(String, V)) : Hash(String, V) forall V
+          members.reject { |name, _| name.starts_with?("-") }
         end
 
         private def default_namespace(url : String) : String
@@ -1049,6 +1145,28 @@ module Hwaro
             end
           end
           collapse_ws(resolve_template(template, allow_vars: true))
+        end
+
+        # Declaration-value flavour of `resolve_value`: serializes as CSS
+        # rather than as storage text, and reports whether the value was a
+        # real null. The text can't carry that on its own — `inspect(null)`
+        # legitimately yields the string "null", which must be emitted,
+        # while a null-valued variable must omit the declaration.
+        private def resolve_decl_value(template : Ast::TextTemplate) : ResolvedValue
+          if node = Expr.parse(template)
+            if Expr.computes?(node, self)
+              begin
+                value = Expr::Evaluator.new(self).eval(node)
+                return ResolvedValue.new(value.to_css, value.is_a?(NullV))
+              rescue SoftEvalError
+                # fall through to the verbatim path
+              end
+            end
+          end
+          # The verbatim path only has text, where a stored null reads back
+          # as "null" (see `value_storage`).
+          text = collapse_ws(resolve_template(template, allow_vars: true))
+          ResolvedValue.new(text, text == "null")
         end
 
         # Same lenient policy for `#{...}` bodies, minus the whitespace
@@ -1174,15 +1292,12 @@ module Hwaro
         # declaration. Null and the empty list keep parseable spellings
         # so they survive the string round-trip.
         private def value_storage(value : Value) : String
-          case value
-          when NullV
-            "null"
-          when ListV
-            value.items.empty? ? "()" : value.to_css
-          else
-            value.to_css
-          end
+          value.inspect_css
         end
+
+        # Text to emit for a declaration value, plus whether it was a real
+        # null (see `resolve_decl_value`).
+        private record ResolvedValue, text : String, null_value : Bool
 
         # ---------------------------------------------------------------
         # Expr::Host — services for expression evaluation
@@ -1243,8 +1358,9 @@ module Hwaro
         end
 
         private def resolve_template(template : Ast::TextTemplate, allow_vars : Bool) : String
+          pieces = template.pieces
           String.build do |io|
-            template.pieces.each do |piece|
+            pieces.each_with_index do |piece, idx|
               case piece
               in String
                 io << piece
@@ -1253,12 +1369,35 @@ module Hwaro
                   error_at(piece.line, piece.column,
                     "variables aren't allowed here (use \#{#{piece.lexeme}} interpolation)")
                 end
-                io << lookup_var_ref(piece)
+                if keyword_label?(pieces, idx)
+                  io << piece.lexeme
+                else
+                  # A null variable substitutes as nothing. Storage spells
+                  # it "null" (see `value_storage`), and that spelling must
+                  # not leak into a selector or value as literal text — the
+                  # optional-modifier idiom `.btn#{$mod}` with `$mod: null`
+                  # has to yield `.btn`, not `.btnnull`.
+                  var_text = lookup_var_ref(piece)
+                  io << var_text unless var_text == "null"
+                end
               in Ast::Interp
                 io << unquote_interp(resolve_interp(piece.inner))
               end
             end
           end
+        end
+
+        # True when this `$name` is a keyword-argument label (`f($x: 1)`)
+        # rather than a variable reference. The typed path binds it as a
+        # kwarg; when that path declines — unknown function, or a builtin
+        # that doesn't take keyword arguments — the verbatim fallback has
+        # to reproduce the label as written. Substituting instead either
+        # emits garbage (`str-slice("ab", 99: 2)` when a variable of that
+        # name happens to exist) or raises a bogus "undefined variable"
+        # for a name the author never used as a variable.
+        private def keyword_label?(pieces : Array(Ast::Piece), idx : Int32) : Bool
+          nxt = pieces[idx + 1]?
+          nxt.is_a?(String) && nxt.lstrip.starts_with?(':')
         end
 
         # dart-sass semantics: `#{...}` substitutes the UNQUOTED value of a

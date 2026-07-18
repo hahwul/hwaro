@@ -133,6 +133,7 @@ The compiler's first duty is the plain-CSS guarantee, so expressions follow a tw
 - Unit arithmetic requires identical units or one unitless side; there is no `px`↔`in` conversion table.
 - `and`/`or` in *value* positions only operate on real booleans — `font-family: Franklin and Marshall` stays text. Conditions have full Sass truthiness.
 - Global `min()`/`max()`/`round()`/`abs()` evaluate only when all arguments are statically comparable numbers; CSS forms (`min(5vw, 100px)`, `round(up, 101px, 10px)`) pass through.
+- Built-in functions take positional arguments only. A keyword call (`list.append($l, x, $separator: comma)`) doesn't evaluate and keeps its verbatim text — user-defined `@mixin`/`@function` keyword arguments work normally.
 - `if()` evaluates both branches eagerly (no side effects exist, so this is observable only via `@error` in the untaken branch).
 - Variables in at-rule preludes and values substitute directly (`@media (min-width: $bp)` works); selectors and property names require `#{...}` interpolation (same as dart-sass).
 - At-rule preludes evaluate expressions only inside `(feature: value)` spans; the query structure itself stays verbatim.

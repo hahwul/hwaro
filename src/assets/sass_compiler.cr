@@ -75,7 +75,10 @@ module Hwaro
         # downgrades to a generic abort.
         raise Hwaro::HwaroError.new(
           Hwaro::Errors::HWARO_E_CONTENT,
-          "Sass: #{path}: filesystem error while resolving imports: #{ex.message}",
+          # `ex.message` embeds the absolute path it tried to open; keep the
+          # report relative to the project like every other Sass error.
+          "Sass: #{path}: filesystem error while resolving imports: " \
+          "#{ex.message.try(&.sub(Dir.current + "/", ""))}",
           hint: "Check for broken or looping symlinks and unreadable files under the imported paths."
         )
       end

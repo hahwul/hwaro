@@ -22,8 +22,18 @@ module Hwaro
       end
 
       abstract class Value
-        # CSS text for this value (what lands in output / string storage).
+        # CSS text for this value (what lands in output).
         abstract def to_css : String
+
+        # Round-trippable text for this value — the spelling that
+        # `Expr.coerce` can parse back into an equal value. This is what
+        # variable storage and `meta.inspect` need, and it is NOT the same
+        # as `to_css`: CSS output drops nulls from lists and never
+        # parenthesizes a sublist, both of which destroy structure.
+        # Mirrors dart-sass's `inspect` vs `toCssString` split.
+        def inspect_css : String
+          to_css
+        end
 
         def truthy? : Bool
           true
@@ -56,21 +66,34 @@ module Hwaro
 
         # dart-sass-style number formatting: integers without a decimal
         # point, floats rounded to 10 digits with trailing zeros trimmed.
+        #
+        # Never routes through `Float64#to_s`, which switches to exponent
+        # form outside roughly [1e-4, 1e16). CSS has no exponent syntax and
+        # no Infinity/NaN literals, so `3.33333e-5px` is not a number a
+        # browser can read — it drops the whole declaration. Small values
+        # are reachable from ordinary ratio math (opacity, scale).
         def self.format(value : Float64) : String
+          unless value.finite?
+            return "calc(NaN)" if value.nan?
+            return value > 0 ? "calc(infinity)" : "calc(-infinity)"
+          end
           rounded = value.round(10)
           rounded = 0.0 if rounded == 0 # avoid "-0"
-          if rounded == rounded.trunc && rounded.abs < 1e15
-            rounded.to_i64.to_s
-          else
-            s = rounded.to_s
-            s
-          end
+          return rounded.to_i64.to_s if rounded == rounded.trunc && rounded.abs < 1e15
+
+          s = sprintf("%.10f", rounded)
+          s = s.rstrip('0').rstrip('.') if s.includes?('.')
+          s
         end
 
         def eq?(other : Value) : Bool
           return false unless other.is_a?(Number)
-          return false unless compatible_unit?(other)
-          value == other.value
+          # Equality needs units to actually match — `1px == 1` is false.
+          # `compatible_unit?` (one side unitless adopts the other's unit)
+          # is the right rule for arithmetic and comparison, but using it
+          # here silently picks the wrong `@if` branch and collides map
+          # keys that differ only by unit.
+          unit == other.unit && value == other.value
         end
 
         # v1 unit model: identical units or one side unitless. No
@@ -135,6 +158,11 @@ module Hwaro
           ""
         end
 
+        # Null vanishes in CSS output but must survive storage as a value.
+        def inspect_css : String
+          "null"
+        end
+
         def truthy? : Bool
           false
         end
@@ -169,6 +197,24 @@ module Hwaro
           @bracketed ? "[#{inner}]" : inner
         end
 
+        # Unlike `to_css`: keeps null members (they are real elements, so
+        # dropping them changes `length`) and parenthesizes unbracketed
+        # sublists so nesting survives a storage round-trip.
+        def inspect_css : String
+          return "()" if @items.empty?
+          joiner =
+            case @sep
+            in Sep::Space then " "
+            in Sep::Comma then ", "
+            in Sep::Slash then " / "
+            end
+          inner = @items.map do |item|
+            text = item.inspect_css
+            item.is_a?(ListV) && !item.bracketed ? "(#{text})" : text
+          end.join(joiner)
+          @bracketed ? "[#{inner}]" : inner
+        end
+
         def eq?(other : Value) : Bool
           return false unless other.is_a?(ListV)
           return false unless sep == other.sep && bracketed == other.bracketed
@@ -189,6 +235,19 @@ module Hwaro
 
         def to_css : String
           "(" + @entries.map { |e| "#{e.key.to_css}: #{e.value.to_css}" }.join(", ") + ")"
+        end
+
+        # Entry values go through `inspect_css` so a comma list or nested
+        # map stays parseable as one entry — with `to_css` the commas of a
+        # nested list merge into the map's own separator and the text no
+        # longer re-parses as a map.
+        def inspect_css : String
+          "(" + @entries.map do |e|
+            value = e.value
+            text = value.inspect_css
+            text = "(#{text})" if value.is_a?(ListV) && !value.bracketed && value.sep == ListV::Sep::Comma
+            "#{e.key.inspect_css}: #{text}"
+          end.join(", ") + ")"
         end
 
         def []?(key : Value) : Value?
