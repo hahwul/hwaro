@@ -2,26 +2,45 @@
 #
 # Handles variable scoping, selector nesting and `&` resolution,
 # conditional at-rule bubbling (@media/@supports inside rules), mixin
-# expansion with @content, and @use/@import module loading. Values are
-# verbatim strings after substitution; unknown functions (calc, var,
-# rgba, ...) pass through untouched — that property is what makes valid
-# plain CSS compile to itself.
+# expansion with @content, control flow (@if/@each/@for/@while),
+# @function/@return, and @use/@import/@forward module loading.
 #
-# Extension seams for the full language: `eval_node`'s dispatch gains
-# arms for @if/@each/@for nodes; richer value types and a function
-# registry slot into the template-resolution path.
+# Values are stored as verbatim strings after substitution and coerced
+# into typed values only where expressions demand it: declaration and
+# variable values go through the *lenient* expression path (compute when
+# the tree contains operators or known functions, otherwise — and on any
+# failure — fall back to the legacy verbatim text, keeping plain-CSS
+# passthrough byte-identical). Control-flow headers, @return, and
+# @use ... with are *strict*: failures surface as located SyntaxErrors.
 
 require "./ast"
 require "./environment"
 require "./css"
 require "./importer"
 require "./parser"
+require "./value"
+require "./expr"
+require "./functions"
+require "../../utils/logger"
 
 module Hwaro
   module Assets
     module Sass
       class Evaluator
-        MAX_INCLUDE_DEPTH = 100
+        include Expr::Host
+
+        MAX_INCLUDE_DEPTH    =     100
+        MAX_CALL_DEPTH       =     100
+        MAX_WHILE_ITERATIONS = 100_000
+
+        # Unwinds a @function body at @return. :nodoc:
+        class ReturnSignal < Exception
+          getter value : Value
+
+          def initialize(@value)
+            super("@return")
+          end
+        end
 
         # A `{ ... }` block passed to `@include`; evaluated at `@content`
         # with the caller's variable scope (dart-sass lexical semantics).
@@ -59,6 +78,11 @@ module Hwaro
           @loaded_modules = {} of String => SassModule
           @load_stack = [] of String
           @module_css = [] of Css::Node
+          @in_function = false
+          @call_depth = 0
+          @forward_variables = {} of String => String
+          @forward_mixins = {} of String => MixinClosure
+          @forward_functions = {} of String => SassFn
         end
 
         # Registers the entry file's canonical path so a self-import cycle
@@ -77,11 +101,27 @@ module Hwaro
         end
 
         private def eval_node(node : Ast::Node) : Nil
+          if @in_function
+            case node
+            when Ast::VarDeclNode, Ast::IfNode, Ast::EachNode, Ast::ForNode,
+                 Ast::WhileNode, Ast::ReturnNode, Ast::MessageNode,
+                 Ast::FunctionDefNode
+              # allowed in @function bodies
+            when Ast::CommentNode
+              return # never emits CSS from inside a function
+            else
+              error_at(node.line, node.column,
+                "@function bodies may only contain variable declarations, control flow, and @return")
+            end
+          end
+
           case node
           when Ast::VarDeclNode
             @env.assign_var(node.name, resolve_value(node.value), node.default, node.global)
           when Ast::MixinDefNode
             @env.declare_mixin(node.name, MixinClosure.new(node, @env, @path))
+          when Ast::FunctionDefNode
+            @env.declare_function(node.name, FunctionClosure.new(node, @env, @path))
           when Ast::RuleNode
             eval_rule(node)
           when Ast::DeclarationNode
@@ -90,10 +130,27 @@ module Hwaro
             eval_include(node)
           when Ast::ContentNode
             eval_content
+          when Ast::IfNode
+            eval_if(node)
+          when Ast::EachNode
+            eval_each(node)
+          when Ast::ForNode
+            eval_for(node)
+          when Ast::WhileNode
+            eval_while(node)
+          when Ast::ReturnNode
+            error_at(node.line, node.column, "@return may only be used within a @function") unless @in_function
+            raise ReturnSignal.new(eval_expr!(node.value))
+          when Ast::MessageNode
+            eval_message(node)
+          when Ast::AtRootNode
+            eval_at_root(node)
           when Ast::UseNode
             eval_use(node)
           when Ast::ImportNode
             eval_import(node)
+          when Ast::ForwardNode
+            eval_forward(node)
           when Ast::RawAtRuleNode
             eval_at_rule(node)
           when Ast::CommentNode
@@ -228,6 +285,11 @@ module Hwaro
             else
               resolve_value(node.value)
             end
+          # A null (or computed-empty) value omits the declaration
+          # (dart-sass semantics). Custom properties stay verbatim.
+          if !node.custom_property && (value == "null" || value.empty?) && !node.important
+            return
+          end
           decl = Css::Decl.new(name, value, node.important)
           if rule = @current_rule
             rule.items << decl
@@ -253,7 +315,7 @@ module Hwaro
         # ---------------------------------------------------------------
 
         private def eval_at_rule(node : Ast::RawAtRuleNode) : Nil
-          prelude = collapse_ws(resolve_template(node.prelude, allow_vars: true))
+          prelude = resolve_prelude(node.prelude)
 
           children = node.children
           unless children
@@ -328,7 +390,9 @@ module Hwaro
           end
 
           call_env = Environment.new(closure.env)
-          bind_arguments(node, closure, call_env)
+          positional, kwargs = collect_args(node.args, "mixin #{node.name}", node.line, node.column)
+          bind_params(closure.node.params, positional, kwargs, call_env,
+            "mixin #{node.name}", node.line, node.column)
 
           content =
             if body = node.body
@@ -371,42 +435,94 @@ module Hwaro
           end
         end
 
-        private def bind_arguments(node : Ast::IncludeNode, closure : MixinClosure, call_env : Environment) : Nil
-          params = closure.node.params
-          param_names = params.map { |p| Sass.normalize_ident(p.name) }
+        # Resolves call-site arguments (in the caller's scope) into
+        # positional strings and keyword strings; `$value...` spreads
+        # lists into positionals and maps into keywords.
+        private def collect_args(args : Array(Ast::Arg), what : String,
+                                 line : Int32, column : Int32) : {Array(String), Hash(String, String)}
           positional = [] of String
           kwargs = {} of String => String
 
-          node.args.each do |arg|
+          args.each do |arg|
             value = resolve_value(arg.value) # evaluated in the caller's scope
-            if name = arg.name
+            if arg.spread
+              spread_into(value, positional, kwargs, line, column)
+            elsif name = arg.name
               name = Sass.normalize_ident(name)
-              unless param_names.includes?(name)
-                error_at(node.line, node.column, "no parameter named $#{name} in mixin #{node.name}")
-              end
               if kwargs.has_key?(name)
-                error_at(node.line, node.column, "duplicate argument $#{name}")
+                error_at(line, column, "duplicate argument $#{name}")
               end
               kwargs[name] = value
             else
               unless kwargs.empty?
-                error_at(node.line, node.column, "positional arguments must precede keyword arguments")
+                error_at(line, column, "positional arguments must precede keyword arguments")
               end
               positional << value
             end
           end
+          {positional, kwargs}
+        end
 
-          if positional.size > params.size
-            error_at(node.line, node.column,
-              "mixin #{node.name} takes #{params.size} argument(s) but #{positional.size} were passed")
+        private def spread_into(value : String, positional : Array(String),
+                                kwargs : Hash(String, String), line : Int32, column : Int32) : Nil
+          spread = Expr.coerce(value)
+          case spread
+          when MapV
+            spread.entries.each do |entry|
+              key = entry.key
+              unless key.is_a?(Str)
+                error_at(line, column, "map keys in a spread argument must be strings")
+              end
+              kwargs[Sass.normalize_ident(key.text)] = value_storage(entry.value)
+            end
+          when ListV
+            unless kwargs.empty?
+              error_at(line, column, "positional arguments must precede keyword arguments")
+            end
+            spread.items.each { |item| positional << value_storage(item) }
+          else
+            unless kwargs.empty?
+              error_at(line, column, "positional arguments must precede keyword arguments")
+            end
+            positional << value
+          end
+        end
+
+        # Binds arguments to parameters (shared by mixins and functions).
+        # `soft: true` raises SoftEvalError instead of located errors —
+        # function calls happen inside expression evaluation, where
+        # lenient contexts fall back and strict contexts add locations.
+        private def bind_params(params : Array(Ast::Param), positional : Array(String),
+                                kwargs : Hash(String, String), call_env : Environment,
+                                what : String, line : Int32, column : Int32,
+                                soft : Bool = false) : Nil
+          param_names = params.map { |p| Sass.normalize_ident(p.name) }
+          variadic = params.last?.try(&.variadic) || false
+          fixed = variadic ? params.size - 1 : params.size
+
+          kwargs.each_key do |name|
+            unless param_names.includes?(name)
+              bind_error("no parameter named $#{name} in #{what}", soft, line, column)
+            end
+          end
+          if variadic && kwargs.has_key?(param_names.last)
+            bind_error("variadic parameter $#{params.last.name} can't be passed by name", soft, line, column)
+          end
+          if positional.size > fixed && !variadic
+            bind_error("#{what} takes #{fixed} argument(s) but #{positional.size} were passed", soft, line, column)
           end
 
           params.each_with_index do |param, i|
             param_name = param_names[i]
+            if param.variadic
+              rest = positional.size > fixed ? positional[fixed..] : [] of String
+              call_env.variables[param_name] = rest.empty? ? "()" : rest.join(", ")
+              next
+            end
             value =
               if i < positional.size
                 if kwargs.has_key?(param_name)
-                  error_at(node.line, node.column, "$#{param.name} was passed both by position and by name")
+                  bind_error("$#{param.name} was passed both by position and by name", soft, line, column)
                 end
                 positional[i]
               elsif kw = kwargs[param_name]?
@@ -421,10 +537,15 @@ module Hwaro
                   @env = saved
                 end
               else
-                error_at(node.line, node.column, "missing argument $#{param.name} for mixin #{node.name}")
+                bind_error("missing argument $#{param.name} for #{what}", soft, line, column)
               end
             call_env.variables[param_name] = value
           end
+        end
+
+        private def bind_error(message : String, soft : Bool, line : Int32, column : Int32) : NoReturn
+          raise SoftEvalError.new(message) if soft
+          error_at(line, column, message)
         end
 
         # True when the mixin body can reach `@content`: a lexically nested
@@ -443,6 +564,12 @@ module Hwaro
               node.body.try { |b| accepts_content?(b) } || false
             when Ast::RawAtRuleNode
               node.children.try { |c| accepts_content?(c) } || false
+            when Ast::IfNode
+              node.branches.any? { |branch| accepts_content?(branch.body) }
+            when Ast::EachNode, Ast::ForNode, Ast::WhileNode
+              accepts_content?(node.body)
+            when Ast::AtRootNode
+              accepts_content?(node.children)
             else
               false
             end
@@ -469,59 +596,384 @@ module Hwaro
         end
 
         # ---------------------------------------------------------------
+        # Control flow
+        # ---------------------------------------------------------------
+
+        # Flow-control bodies introduce a transparent variable scope:
+        # new declarations stay local, but assignments to outer names —
+        # globals included — write through (dart-sass flow-control
+        # scoping; loop counters depend on it).
+        private def scoped(& : -> Nil) : Nil
+          saved = @env
+          @env = Environment.new(saved, flow_control: true)
+          begin
+            yield
+          ensure
+            @env = saved
+          end
+        end
+
+        private def eval_if(node : Ast::IfNode) : Nil
+          node.branches.each do |branch|
+            condition = branch.condition
+            next unless condition.nil? || eval_expr!(condition).truthy?
+            scoped { eval_nodes(branch.body) }
+            break
+          end
+        end
+
+        private def eval_each(node : Ast::EachNode) : Nil
+          value = eval_expr!(node.list)
+          items =
+            case value
+            when ListV
+              value.items
+            when MapV
+              value.entries.map { |e| ListV.new([e.key, e.value], ListV::Sep::Space).as(Value) }
+            when NullV
+              error_at(node.line, node.column, "@each may not iterate over null")
+            else
+              [value]
+            end
+          items.each do |item|
+            scoped do
+              bind_each_vars(node.vars, item)
+              eval_nodes(node.body)
+            end
+          end
+        end
+
+        private def bind_each_vars(vars : Array(String), item : Value) : Nil
+          if vars.size == 1
+            @env.variables[Sass.normalize_ident(vars[0])] = value_storage(item)
+            return
+          end
+          parts =
+            case item
+            when ListV then item.items
+            else            [item]
+            end
+          vars.each_with_index do |name, i|
+            @env.variables[Sass.normalize_ident(name)] = value_storage(parts[i]? || NullV.new)
+          end
+        end
+
+        private def eval_for(node : Ast::ForNode) : Nil
+          from_n = for_bound(node.from, node)
+          to_n = for_bound(node.to, node)
+          unless from_n.compatible_unit?(to_n)
+            error_at(node.line, node.column,
+              "@for range has incompatible units: #{from_n.to_css} and #{to_n.to_css}")
+          end
+          unit = from_n.result_unit(to_n)
+          from_i = int_bound(from_n, node)
+          to_i = int_bound(to_n, node)
+          name = Sass.normalize_ident(node.var)
+
+          iterate = ->(i : Int32) do
+            scoped do
+              @env.variables[name] = Number.format(i.to_f) + unit
+              eval_nodes(node.body)
+            end
+          end
+
+          if from_i <= to_i
+            last = node.exclusive ? to_i - 1 : to_i
+            from_i.upto(last) { |i| iterate.call(i) }
+          else
+            # dart-sass iterates downward when from > to.
+            last = node.exclusive ? to_i + 1 : to_i
+            from_i.downto(last) { |i| iterate.call(i) }
+          end
+        end
+
+        private def for_bound(template : Ast::TextTemplate, node : Ast::ForNode) : Number
+          value = eval_expr!(template)
+          case value
+          when Number
+            value
+          else
+            error_at(node.line, node.column, "@for bounds must be numbers, got #{value.to_css.inspect}")
+          end
+        end
+
+        private def int_bound(bound : Number, node : Ast::ForNode) : Int32
+          bound.int_value("@for range")
+        rescue ex : SoftEvalError
+          error_at(node.line, node.column, ex.message || "invalid @for range")
+        end
+
+        private def eval_while(node : Ast::WhileNode) : Nil
+          iterations = 0
+          while eval_expr!(node.condition).truthy?
+            iterations += 1
+            if iterations > MAX_WHILE_ITERATIONS
+              error_at(node.line, node.column,
+                "@while exceeded #{MAX_WHILE_ITERATIONS} iterations (infinite loop?)")
+            end
+            scoped { eval_nodes(node.body) }
+          end
+        end
+
+        private def eval_message(node : Ast::MessageNode) : Nil
+          text = message_text(node.value)
+          location = "#{@path}:#{node.line}:#{node.column}"
+          case node.kind
+          when :debug
+            Logger.debug "Sass: #{location}: DEBUG: #{text}"
+          when :warn
+            Logger.warn "Sass: #{location}: WARNING: #{text}"
+          else
+            error_at(node.line, node.column, text)
+          end
+        end
+
+        private def message_text(template : Ast::TextTemplate) : String
+          value = Expr::Evaluator.new(self, strict: true).eval(Expr.parse!(template))
+          value.is_a?(Str) ? value.text : Builtins.inspect_value(value)
+        rescue SoftEvalError
+          resolve_value(template)
+        end
+
+        # `@at-root` re-evaluates its body outside style-rule nesting but
+        # inside any surrounding at-rule (the flat sink makes that the
+        # natural behavior).
+        private def eval_at_root(node : Ast::AtRootNode) : Nil
+          saved_rule = @current_rule
+          saved_parents = @parent_selectors
+          @current_rule = nil
+          @parent_selectors = nil
+          begin
+            if selector = node.selector
+              eval_rule(Ast::RuleNode.new(selector, node.children, node.line, node.column))
+            else
+              scoped { eval_nodes(node.children) }
+            end
+          ensure
+            @current_rule = saved_rule
+            @parent_selectors = saved_parents
+          end
+        end
+
+        # ---------------------------------------------------------------
+        # Functions
+        # ---------------------------------------------------------------
+
+        # Strict expression evaluation for control-flow contexts: every
+        # failure is a located error.
+        private def eval_expr!(template : Ast::TextTemplate) : Value
+          node = Expr.parse!(template)
+          Expr::Evaluator.new(self, strict: true).eval(node)
+        rescue ex : SoftEvalError
+          error_at(template.line, template.column, ex.message || "invalid expression")
+        end
+
+        # Calls a user @function body. Binding/arity failures raise
+        # SoftEvalError so lenient value contexts fall back and strict
+        # contexts report a located error.
+        private def call_user_function(closure : FunctionClosure, name : String,
+                                       args : Array(Value), kwargs : Hash(String, Value)) : Value
+          @call_depth += 1
+          if @call_depth > MAX_CALL_DEPTH
+            @call_depth -= 1
+            raise SoftEvalError.new("too much recursion in function #{name}")
+          end
+          begin
+            call_env = Environment.new(closure.env)
+            positional = args.map { |a| value_storage(a) }
+            kw = {} of String => String
+            kwargs.each { |k, v| kw[k] = value_storage(v) }
+            bind_params(closure.node.params, positional, kw, call_env,
+              "function #{name}", closure.node.line, closure.node.column, soft: true)
+
+            saved_env = @env
+            saved_path = @path
+            saved_in_function = @in_function
+            @env = call_env
+            @path = closure.path
+            @in_function = true
+            begin
+              eval_nodes(closure.node.body)
+              raise SoftEvalError.new("function #{name} finished without @return")
+            rescue ex : ReturnSignal
+              ex.value
+            ensure
+              @env = saved_env
+              @path = saved_path
+              @in_function = saved_in_function
+            end
+          ensure
+            @call_depth -= 1
+          end
+        end
+
+        # ---------------------------------------------------------------
         # @use / @import
         # ---------------------------------------------------------------
 
         private def eval_use(node : Ast::UseNode) : Nil
-          canonical, source = @importer.load(node.url, @path, @path, node.line, node.column)
-
-          mod = @loaded_modules[canonical]?
-          unless mod
-            check_cycle(canonical, node.line, node.column)
-            display = @importer.display_path(canonical)
-            sheet = Parser.parse(source, display)
-
-            saved_env = @env
-            saved_sink = @sink
-            saved_rule = @current_rule
-            saved_at = @current_at
-            saved_parents = @parent_selectors
-            saved_content = @content
-            saved_keyframes = @in_keyframes
-            saved_path = @path
-
-            module_env = Environment.new
-            module_sink = [] of Css::Node
-            @env = module_env
-            @sink = module_sink
-            @current_rule = nil
-            @current_at = nil
-            @parent_selectors = nil
-            @content = nil
-            @in_keyframes = false
-            @path = display
-            @load_stack << canonical
-            begin
-              eval_nodes(sheet.children)
-            ensure
-              @load_stack.pop
-              @env = saved_env
-              @sink = saved_sink
-              @current_rule = saved_rule
-              @current_at = saved_at
-              @parent_selectors = saved_parents
-              @content = saved_content
-              @in_keyframes = saved_keyframes
-              @path = saved_path
+          config = {} of String => String
+          node.config.each do |entry|
+            name = Sass.normalize_ident(entry.name)
+            if config.has_key?(name)
+              error_at(node.line, node.column, "duplicate configuration $#{entry.name}")
             end
+            # Evaluated in the caller's scope, before the module loads.
+            config[name] = resolve_value(entry.value)
+          end
+          mod = load_module(node.url, node.line, node.column, config)
+          register_module(node, mod)
+        end
 
-            mod = SassModule.new(module_env.variables, module_env.mixins)
-            @loaded_modules[canonical] = mod
-            # A module's CSS is emitted once, before the code that uses it.
-            @module_css.concat(module_sink)
+        # Loads (or returns the cached) module for a @use/@forward url.
+        # `sass:` urls resolve to the built-in modules.
+        private def load_module(url : String, line : Int32, column : Int32,
+                                config : Hash(String, String)) : SassModule
+          if url.starts_with?("sass:")
+            name = url.lchop("sass:")
+            mod = BUILTIN_MODULES[name]?
+            error_at(line, column, "unknown built-in module \"sass:#{name}\"") unless mod
+            error_at(line, column, "built-in modules can't be configured") unless config.empty?
+            return mod
           end
 
-          register_module(node, mod)
+          canonical, source = @importer.load(url, @path, @path, line, column)
+          if mod = @loaded_modules[canonical]?
+            unless config.empty?
+              error_at(line, column,
+                "#{@importer.display_path(canonical)} was already loaded and can't be configured a second time")
+            end
+            return mod
+          end
+
+          check_cycle(canonical, line, column)
+          display = @importer.display_path(canonical)
+          sheet = Parser.parse(source, display)
+          validate_configurable(sheet, config, url, line, column) unless config.empty?
+
+          saved_env = @env
+          saved_sink = @sink
+          saved_rule = @current_rule
+          saved_at = @current_at
+          saved_parents = @parent_selectors
+          saved_content = @content
+          saved_keyframes = @in_keyframes
+          saved_path = @path
+          saved_fwd_vars = @forward_variables
+          saved_fwd_mixins = @forward_mixins
+          saved_fwd_fns = @forward_functions
+
+          module_env = Environment.new
+          config.each { |name, value| module_env.variables[name] = value }
+          module_sink = [] of Css::Node
+          @env = module_env
+          @sink = module_sink
+          @current_rule = nil
+          @current_at = nil
+          @parent_selectors = nil
+          @content = nil
+          @in_keyframes = false
+          @path = display
+          @forward_variables = {} of String => String
+          @forward_mixins = {} of String => MixinClosure
+          @forward_functions = {} of String => SassFn
+          @load_stack << canonical
+          begin
+            eval_nodes(sheet.children)
+            # Own root members win over forwarded ones on name collisions.
+            mod = SassModule.new(
+              @forward_variables.merge(module_env.variables),
+              @forward_mixins.merge(module_env.mixins),
+              @forward_functions.merge(module_env.functions))
+          ensure
+            @load_stack.pop
+            @env = saved_env
+            @sink = saved_sink
+            @current_rule = saved_rule
+            @current_at = saved_at
+            @parent_selectors = saved_parents
+            @content = saved_content
+            @in_keyframes = saved_keyframes
+            @path = saved_path
+            @forward_variables = saved_fwd_vars
+            @forward_mixins = saved_fwd_mixins
+            @forward_functions = saved_fwd_fns
+          end
+
+          @loaded_modules[canonical] = mod
+          # A module's CSS is emitted once, before the code that uses it.
+          @module_css.concat(module_sink)
+          mod
+        end
+
+        # `@use ... with (...)` can only configure variables the module
+        # itself declares with `!default`; modules that @forward are a
+        # clear error rather than a silently ignored configuration.
+        private def validate_configurable(sheet : Ast::Stylesheet, config : Hash(String, String),
+                                          url : String, line : Int32, column : Int32) : Nil
+          if sheet.children.any?(Ast::ForwardNode)
+            error_at(line, column,
+              "configuring \"#{url}\" is not supported because it uses @forward")
+          end
+          defaults = Set(String).new
+          collect_default_decls(sheet.children, defaults)
+          config.each_key do |name|
+            unless defaults.includes?(name)
+              error_at(line, column,
+                "$#{name} is not declared with !default in \"#{url}\" and can't be configured")
+            end
+          end
+        end
+
+        private def collect_default_decls(nodes : Array(Ast::Node), set : Set(String)) : Nil
+          nodes.each do |node|
+            case node
+            when Ast::VarDeclNode
+              set << Sass.normalize_ident(node.name) if node.default
+            when Ast::IfNode
+              node.branches.each { |branch| collect_default_decls(branch.body, set) }
+            when Ast::EachNode
+              collect_default_decls(node.body, set)
+            when Ast::ForNode
+              collect_default_decls(node.body, set)
+            when Ast::WhileNode
+              collect_default_decls(node.body, set)
+            end
+          end
+        end
+
+        # @forward: load the module (emitting its CSS once) and stage its
+        # members — filtered by show/hide, optionally prefixed — as the
+        # current module's re-exports. Members do NOT enter local scope.
+        # show/hide match the *prefixed* names (dart-sass semantics).
+        private def eval_forward(node : Ast::ForwardNode) : Nil
+          mod = load_module(node.url, node.line, node.column, {} of String => String)
+          prefix = node.prefix
+          mod.variables.each do |name, value|
+            exported = prefix ? prefix + name : name
+            next unless forward_visible?(node, "$" + exported)
+            @forward_variables[exported] = value
+          end
+          mod.mixins.each do |name, closure|
+            exported = prefix ? prefix + name : name
+            next unless forward_visible?(node, exported)
+            @forward_mixins[exported] = closure
+          end
+          mod.functions.each do |name, fn|
+            exported = prefix ? prefix + name : name
+            next unless forward_visible?(node, exported)
+            @forward_functions[exported] = fn
+          end
+        end
+
+        private def forward_visible?(node : Ast::ForwardNode, marker_name : String) : Bool
+          if shown = node.shown
+            shown.includes?(marker_name)
+          elsif hidden = node.hidden
+            !hidden.includes?(marker_name)
+          else
+            true
+          end
         end
 
         private def register_module(node : Ast::UseNode, mod : SassModule) : Nil
@@ -530,6 +982,7 @@ module Hwaro
             scope = @env.root
             mod.variables.each { |name, value| scope.variables[name] = value }
             mod.mixins.each { |name, closure| scope.mixins[name] = closure }
+            mod.functions.each { |name, fn| scope.functions[name] = fn }
           else
             ns ||= default_namespace(node.url)
             unless @env.declare_module(ns, mod)
@@ -543,6 +996,7 @@ module Hwaro
         end
 
         private def default_namespace(url : String) : String
+          return url.lchop("sass:") if url.starts_with?("sass:")
           base = File.basename(url)
           base = base.chomp(".scss").lchop("_")
           if base == "index"
@@ -580,8 +1034,212 @@ module Hwaro
         # Template resolution
         # ---------------------------------------------------------------
 
+        # Lenient value resolution: when the template parses as an
+        # expression that actually computes (operators / known function
+        # calls), evaluate it; otherwise — and on any soft failure — the
+        # legacy verbatim path keeps output byte-identical.
         private def resolve_value(template : Ast::TextTemplate) : String
+          if node = Expr.parse(template)
+            if Expr.computes?(node, self)
+              begin
+                return value_storage(Expr::Evaluator.new(self).eval(node))
+              rescue SoftEvalError
+                # fall through to the verbatim path
+              end
+            end
+          end
           collapse_ws(resolve_template(template, allow_vars: true))
+        end
+
+        # Same lenient policy for `#{...}` bodies, minus the whitespace
+        # collapsing (interpolation output is spliced into surrounding
+        # text exactly as today when nothing computes).
+        private def resolve_interp(template : Ast::TextTemplate) : String
+          if node = Expr.parse(template)
+            if Expr.computes?(node, self)
+              begin
+                return Expr::Evaluator.new(self).eval(node).to_css
+              rescue SoftEvalError
+                # fall through to the verbatim path
+              end
+            end
+          end
+          resolve_template(template, allow_vars: true)
+        end
+
+        # At-rule preludes evaluate expressions only inside feature
+        # values — the `(feature: VALUE)` spans of @media/@supports —
+        # so `@media (min-width: map-get($bp, md))` and breakpoint
+        # arithmetic work (dart-sass parity) while the query structure
+        # itself stays verbatim.
+        private def resolve_prelude(template : Ast::TextTemplate) : String
+          segments = [] of {Bool, Ast::TextTemplate} # {is_value, sub-template}
+          current = [] of Ast::Piece
+          buf = String::Builder.new
+          buf_size = 0
+          in_value = false
+          value_depth = 0
+          depth = 0
+
+          template.pieces.each do |piece|
+            unless piece.is_a?(String)
+              if buf_size > 0
+                current << buf.to_s
+                buf = String::Builder.new
+                buf_size = 0
+              end
+              current << piece
+              next
+            end
+            chars = piece.chars
+            i = 0
+            while i < chars.size
+              c = chars[i]
+              case c
+              when '"', '\''
+                quote = c
+                buf << c
+                buf_size += 1
+                i += 1
+                while i < chars.size
+                  sc = chars[i]
+                  buf << sc
+                  buf_size += 1
+                  if sc == '\\' && i + 1 < chars.size
+                    i += 1
+                    buf << chars[i]
+                    buf_size += 1
+                  elsif sc == quote
+                    break
+                  end
+                  i += 1
+                end
+              when '('
+                depth += 1
+                buf << c
+                buf_size += 1
+              when ')'
+                if in_value && depth == value_depth
+                  # Close the value span before this paren.
+                  if buf_size > 0
+                    current << buf.to_s
+                    buf = String::Builder.new
+                    buf_size = 0
+                  end
+                  segments << {true, Ast::TextTemplate.new(current, template.line, template.column)}
+                  current = [] of Ast::Piece
+                  in_value = false
+                end
+                depth -= 1
+                buf << c
+                buf_size += 1
+              when ':'
+                buf << c
+                buf_size += 1
+                if !in_value && depth >= 1
+                  # Keep the whitespace after ':' on the verbatim side so
+                  # original spacing survives when nothing computes.
+                  while i + 1 < chars.size && chars[i + 1].ascii_whitespace?
+                    i += 1
+                    buf << chars[i]
+                    buf_size += 1
+                  end
+                  current << buf.to_s if buf_size > 0
+                  buf = String::Builder.new
+                  buf_size = 0
+                  segments << {false, Ast::TextTemplate.new(current, template.line, template.column)}
+                  current = [] of Ast::Piece
+                  in_value = true
+                  value_depth = depth
+                end
+              else
+                buf << c
+                buf_size += 1
+              end
+              i += 1
+            end
+          end
+          current << buf.to_s if buf_size > 0
+          segments << {false, Ast::TextTemplate.new(current, template.line, template.column)} unless current.empty?
+
+          text = String.build do |io|
+            segments.each do |is_value, sub|
+              io << (is_value ? resolve_value(sub) : resolve_template(sub, allow_vars: true))
+            end
+          end
+          collapse_ws(text)
+        end
+
+        # Serializes a computed value for storage in a variable or a
+        # declaration. Null and the empty list keep parseable spellings
+        # so they survive the string round-trip.
+        private def value_storage(value : Value) : String
+          case value
+          when NullV
+            "null"
+          when ListV
+            value.items.empty? ? "()" : value.to_css
+          else
+            value.to_css
+          end
+        end
+
+        # ---------------------------------------------------------------
+        # Expr::Host — services for expression evaluation
+        # ---------------------------------------------------------------
+
+        # :nodoc:
+        def expr_var(name : String, ns : String?) : String
+          if ns
+            mod = @env.module?(ns)
+            raise SoftEvalError.new("there is no module namespace \"#{ns}\"") unless mod
+            mod.variables[Sass.normalize_ident(name)]? ||
+              raise SoftEvalError.new("undefined variable: \"#{ns}.$#{name}\"")
+          else
+            @env.lookup_var(name) ||
+              raise SoftEvalError.new("undefined variable: \"$#{name}\"")
+          end
+        end
+
+        # :nodoc:
+        def expr_call(ns : String?, name : String, args : Array(Value),
+                      kwargs : Hash(String, Value)) : Value?
+          norm = Sass.normalize_ident(name)
+          if ns
+            mod = @env.module?(ns)
+            raise SoftEvalError.new("there is no module namespace \"#{ns}\"") unless mod
+            fn = mod.functions[norm]? ||
+                 raise SoftEvalError.new("undefined function: \"#{ns}.#{name}\"")
+            invoke_fn(fn, name, args, kwargs)
+          elsif fn = @env.lookup_function(norm)
+            invoke_fn(fn, name, args, kwargs)
+          elsif builtin = Builtins::GLOBAL_FNS[norm]?
+            builtin.call(args, kwargs)
+          end
+        end
+
+        private def invoke_fn(fn : SassFn, name : String, args : Array(Value),
+                              kwargs : Hash(String, Value)) : Value
+          case fn
+          in FunctionClosure
+            call_user_function(fn, name, args, kwargs)
+          in Builtins::Fn
+            fn.call(args, kwargs)
+          end
+        end
+
+        # :nodoc:
+        def expr_known_fn?(ns : String?, name : String) : Bool
+          # Namespaced calls always count as computing — a missing module
+          # or function then soft-fails (lenient: verbatim, strict: loud).
+          return true if ns
+          norm = Sass.normalize_ident(name)
+          !@env.lookup_function(norm).nil? || Builtins::GLOBAL_FNS.has_key?(norm)
+        end
+
+        # :nodoc:
+        def expr_interp(template : Ast::TextTemplate) : String
+          unquote_interp(resolve_interp(template))
         end
 
         private def resolve_template(template : Ast::TextTemplate, allow_vars : Bool) : String
@@ -597,7 +1255,7 @@ module Hwaro
                 end
                 io << lookup_var_ref(piece)
               in Ast::Interp
-                io << unquote_interp(resolve_template(piece.inner, allow_vars: true))
+                io << unquote_interp(resolve_interp(piece.inner))
               end
             end
           end

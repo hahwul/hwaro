@@ -1,12 +1,21 @@
 # Built-in pure-Crystal SCSS compiler (practical subset).
 #
 # Supported: `$variables` (with !default/!global), nested rules with `&`,
-# partials via @use (namespaces) / @import (classic merge), @mixin /
-# @include with defaults, keyword args and @content, `#{...}`
-# interpolation, and @media/@supports bubbling through nesting. Valid
-# plain CSS compiles to itself (whitespace-normalized). Unsupported Sass
-# directives (@if/@each/@function/@extend/...) fail loudly with a located
-# error — never silent garbage output.
+# partials via @use (namespaces, `with (...)` configuration) / @forward /
+# @import (classic merge), @mixin / @include with defaults, keyword and
+# variadic args and @content, @function / @return, control flow
+# (@if/@else/@each/@for/@while), @debug/@warn/@error, @at-root, `#{...}`
+# interpolation, @media/@supports bubbling through nesting, SassScript
+# expressions (arithmetic, comparisons, string/list/map values), and a
+# curated built-in function set (`sass:math`, `sass:string`, `sass:list`,
+# `sass:map`, `sass:meta` + the legacy global names).
+#
+# Two invariants shape the design:
+# - Valid plain CSS compiles to itself (whitespace-normalized): value
+#   contexts are *lenient* — expressions only evaluate when they visibly
+#   compute something, and any failure falls back to verbatim text.
+# - New syntax fails loudly: control-flow headers, @return, and
+#   @use ... with surface every problem as a located error.
 #
 # See docs/content/features/sass.md for the full support matrix and the
 # documented deviations from dart-sass.

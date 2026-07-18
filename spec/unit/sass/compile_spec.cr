@@ -281,18 +281,16 @@ describe Hwaro::Assets::Sass do
     # =========================================================================
     # Unsupported directives fail loudly
     # =========================================================================
-    %w[if each for while function extend forward at-root].each do |directive|
-      it "rejects @#{directive} with a located error" do
-        ex = expect_raises(Hwaro::Assets::Sass::SyntaxError, /@#{directive} is not supported/) do
-          compile("@#{directive} x { color: red; }", path: "d.scss")
-        end
-        ex.location.should eq("d.scss:1:1")
+    it "rejects @extend with a located error" do
+      ex = expect_raises(Hwaro::Assets::Sass::SyntaxError, /@extend is not supported/) do
+        compile(".a { @extend .b; }", path: "d.scss")
       end
+      ex.location.should eq("d.scss:1:6")
     end
 
-    it "rejects @use with configuration" do
-      expect_raises(Hwaro::Assets::Sass::SyntaxError, /with \(\.\.\.\) configuration is not supported/) do
-        compile(%q(@use "x" with ($a: 1);))
+    it "rejects a floating @else" do
+      expect_raises(Hwaro::Assets::Sass::SyntaxError, /@else without a preceding @if/) do
+        compile("@else { color: red; }")
       end
     end
 
