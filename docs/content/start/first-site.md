@@ -142,9 +142,33 @@ hwaro build
 
 Deploy the `public/` directory to any static host. See [Deploy to GitHub Pages](/deploy/github-pages/) for a quick setup.
 
+## Optional: Build with an AI Agent
+
+If you work with Claude Code, Cursor, Codex, or another skill-aware agent, Hwaro
+ships two [Agent Skills](/integrations/skills/) that teach it how to drive the
+project you just created:
+
+| Skill | What it does |
+|-------|--------------|
+| `hwaro` | Runs the CLI properly — `init`, `new`, `serve`, `build`, `doctor`, and the content tools — using the `--json` output contract and `HWARO_E_*` exit codes instead of guessing from text. |
+| `hwaro-design` | Designs and rethemes the site inside Hwaro's Crinja templates and `light-dark()` design tokens, under an anti-slop discipline that avoids generic AI-looking layouts. |
+
+Install both with one command:
+
+```bash
+npx skills add hahwul/hwaro
+```
+
+Then ask the agent something like *"add a projects section to this Hwaro site"*
+or *"retheme this blog to a warm dark palette"* — it loads the matching skill on
+its own. See [Agent Skills](/integrations/skills/) for manual install paths and
+per-agent directories, and [AGENTS.md](/start/tools/agents-md/) to record
+project-specific conventions the agent should follow first.
+
 ## Next Steps
 
 - [CLI Commands](/start/cli/) — All available commands
 - [Configuration](/start/config/) — Full config reference
 - [Writing Content](/writing/) — Pages, sections, taxonomies
+- [Agent Skills](/integrations/skills/) — Let an AI agent build and design the site
 - [Deploy](/deploy/) — Hosting and deployment guides
