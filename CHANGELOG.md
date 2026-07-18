@@ -18,6 +18,7 @@
 - `get_taxonomy().items` is now name-sorted (alphabetical) by default instead of unspecified insertion order; set `terms_sort_by = "count"` for count-descending
 
 ### Fixed
+- Multilingual prev/next: the flat reading order behind `page.lower`/`page.higher` is built per language, so previous/next links never cross into another language's tree (an English page's "next" could previously be its own translation); cold builds and serve-mode incremental relinks share the same partitioning. A language whose section `_index.<lang>.md` is missing falls back to appending that language's pages after its chain
 - Copy button: per-fence `{copy=true}` with the global `[highlight] copy` default off now works — the runtime is appended to `{{ highlight_js }}` only on pages that contain an opted-in block; `data-copy` is no longer stamped when highlighting is disabled
 - `{hide_lines=…}` is honored on the `render-codeblock` hook path: hidden lines are removed from both `highlighted` and `code` before the template sees them (server mode)
 - Table render hooks saved with CRLF line endings no longer break the emitted HTML block (blank-line collapse handles `\r\n`)
