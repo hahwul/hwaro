@@ -10,7 +10,7 @@
     {% endif %}
     {{ content }}
     {% if section.pages_count > 0 %}
-    <h2>In this section</h2>
+    <h2>{{ "section.in_this_section" | t }}</h2>
     <div class="card-grid">
       {% for p in section.pages %}
       <a class="card{% if p.is_index %} card--section{% endif %}" href="{{ base_url }}{{ p.url }}">

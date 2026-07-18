@@ -1,20 +1,78 @@
 // Hwaro docs search — ⌘K command palette. Styles live in css/05-components.css.
 (function () {
-  var SECTION_NAMES = {
-    start: "Start",
-    writing: "Writing",
-    templates: "Templates",
-    features: "Features",
-    deploy: "Deploy",
+  // The palette follows the page language: Korean pages search only Korean
+  // index entries (search.json rows carry a `lang` field) and render the
+  // UI strings below in Korean.
+  var DOC_LANG = (document.documentElement.lang || "en").split("-")[0];
+
+  var I18N = {
+    en: {
+      sections: {
+        start: "Start",
+        writing: "Writing",
+        templates: "Templates",
+        features: "Features",
+        deploy: "Deploy",
+        integrations: "Integrations",
+      },
+      fallbackSection: "Docs",
+      quickLinks: [
+        { title: "Start", description: "Install Hwaro and build your first site", url: "/start/" },
+        { title: "Writing", description: "Pages, sections, taxonomies, and shortcodes", url: "/writing/" },
+        { title: "Templates", description: "Template syntax, data model, and functions", url: "/templates/" },
+        { title: "Features", description: "Search, SEO, builds, and platform features", url: "/features/" },
+        { title: "Deploy", description: "Ship your site to GitHub Pages, Netlify, and more", url: "/deploy/" },
+      ],
+      searchLabel: "Search documentation",
+      placeholder: "Search documentation…",
+      close: "Close search",
+      jumpTo: "Jump to",
+      loading: "Loading search index…",
+      hintNavigate: "navigate",
+      hintOpen: "open",
+      hintClose: "close",
+      noResults: function (query) {
+        return 'No results for <span class="search-empty-query">&ldquo;' + query + '&rdquo;</span>';
+      },
+      count: function (n) {
+        return n === 1 ? "1 result" : n + " results";
+      },
+    },
+    ko: {
+      sections: {
+        start: "시작하기",
+        writing: "콘텐츠 작성",
+        templates: "템플릿",
+        features: "기능",
+        deploy: "배포",
+        integrations: "연동",
+      },
+      fallbackSection: "문서",
+      quickLinks: [
+        { title: "시작하기", description: "Hwaro 설치와 첫 사이트 만들기", url: "/ko/start/" },
+        { title: "콘텐츠 작성", description: "페이지, 섹션, 택소노미, 숏코드", url: "/ko/writing/" },
+        { title: "템플릿", description: "템플릿 문법, 데이터 모델, 함수", url: "/ko/templates/" },
+        { title: "기능", description: "검색, SEO, 빌드와 플랫폼 기능", url: "/ko/features/" },
+        { title: "배포", description: "GitHub Pages, Netlify 등으로 배포", url: "/ko/deploy/" },
+      ],
+      searchLabel: "문서 검색",
+      placeholder: "문서 검색…",
+      close: "검색 닫기",
+      jumpTo: "바로 가기",
+      loading: "검색 인덱스를 불러오는 중…",
+      hintNavigate: "이동",
+      hintOpen: "열기",
+      hintClose: "닫기",
+      noResults: function (query) {
+        return '<span class="search-empty-query">&ldquo;' + query + '&rdquo;</span>에 대한 결과가 없습니다';
+      },
+      count: function (n) {
+        return "결과 " + n + "개";
+      },
+    },
   };
 
-  var QUICK_LINKS = [
-    { title: "Start", description: "Install Hwaro and build your first site", url: "/start/" },
-    { title: "Writing", description: "Pages, sections, taxonomies, and shortcodes", url: "/writing/" },
-    { title: "Templates", description: "Template syntax, data model, and functions", url: "/templates/" },
-    { title: "Features", description: "Search, SEO, builds, and platform features", url: "/features/" },
-    { title: "Deploy", description: "Ship your site to GitHub Pages, Netlify, and more", url: "/deploy/" },
-  ];
+  var L = I18N[DOC_LANG] || I18N.en;
 
   var ICONS = {
     search:
@@ -44,6 +102,11 @@
           return response.json();
         })
         .then(function (data) {
+          // Scope results to the page language (entries without a lang
+          // field belong to the default language).
+          data = data.filter(function (item) {
+            return (item.lang || "en") === DOC_LANG;
+          });
           fuse = new Fuse(data, {
             keys: ["title", "content", "description"],
             threshold: 0.3,
@@ -78,17 +141,17 @@
   searchModal.id = "search-modal";
   searchModal.innerHTML =
     '<div class="search-overlay"></div>' +
-    '<div class="search-dialog" role="dialog" aria-modal="true" aria-label="Search documentation">' +
+    '<div class="search-dialog" role="dialog" aria-modal="true" aria-label="' + L.searchLabel + '">' +
     '<div class="search-head">' +
     ICONS.search +
-    '<input type="text" id="search-input" placeholder="Search documentation…" autocomplete="off" spellcheck="false" aria-label="Search documentation">' +
-    '<button class="search-esc" type="button" aria-label="Close search">esc</button>' +
+    '<input type="text" id="search-input" placeholder="' + L.placeholder + '" autocomplete="off" spellcheck="false" aria-label="' + L.searchLabel + '">' +
+    '<button class="search-esc" type="button" aria-label="' + L.close + '">esc</button>' +
     "</div>" +
     '<div id="search-results" class="search-body"></div>' +
     '<div class="search-foot">' +
-    '<span class="search-foot-hint"><kbd>↑</kbd><kbd>↓</kbd>navigate</span>' +
-    '<span class="search-foot-hint"><kbd>↵</kbd>open</span>' +
-    '<span class="search-foot-hint"><kbd>esc</kbd>close</span>' +
+    '<span class="search-foot-hint"><kbd>↑</kbd><kbd>↓</kbd>' + L.hintNavigate + "</span>" +
+    '<span class="search-foot-hint"><kbd>↵</kbd>' + L.hintOpen + "</span>" +
+    '<span class="search-foot-hint"><kbd>esc</kbd>' + L.hintClose + "</span>" +
     '<span class="search-foot-count" id="search-count"></span>' +
     "</div>" +
     "</div>";
@@ -106,7 +169,7 @@
   document.querySelectorAll(".search-trigger").forEach(function (btn) {
     btn.setAttribute(
       "aria-label",
-      "Search documentation (" + (isMac ? "⌘K" : "Ctrl+K") + ")"
+      L.searchLabel + " (" + (isMac ? "⌘K" : "Ctrl+K") + ")"
     );
     btn.addEventListener("click", showSearch);
   });
@@ -188,8 +251,8 @@
   function renderQuickLinks() {
     resultsEl.innerHTML =
       '<div class="search-group">' +
-      '<div class="search-group-label">Jump to</div>' +
-      QUICK_LINKS.map(function (link) {
+      '<div class="search-group-label">' + L.jumpTo + "</div>" +
+      L.quickLinks.map(function (link) {
         return resultRow(link.url, ICONS.arrow, escapeHtml(link.title), escapeHtml(link.description));
       }).join("") +
       "</div>";
@@ -207,7 +270,7 @@
     }
 
     if (!fuse) {
-      resultsEl.innerHTML = '<div class="search-empty">Loading search index…</div>';
+      resultsEl.innerHTML = '<div class="search-empty">' + L.loading + "</div>";
       countEl.textContent = "";
       return;
     }
@@ -216,19 +279,20 @@
 
     if (results.length === 0) {
       resultsEl.innerHTML =
-        '<div class="search-empty">No results for <span class="search-empty-query">&ldquo;' +
-        escapeHtml(query) +
-        '&rdquo;</span></div>';
-      countEl.textContent = "0 results";
+        '<div class="search-empty">' + L.noResults(escapeHtml(query)) + "</div>";
+      countEl.textContent = L.count(0);
       return;
     }
 
-    // Group by top-level section, preserving rank order
+    // Group by top-level section, preserving rank order. Non-default
+    // language URLs carry the language prefix (/ko/start/…), so the
+    // section segment sits one step further in.
     var groups = [];
     var byName = {};
     results.forEach(function (result) {
-      var key = (result.item.url.split("/")[1] || "").toLowerCase();
-      var name = SECTION_NAMES[key] || "Docs";
+      var parts = result.item.url.split("/");
+      var key = ((parts[1] === DOC_LANG ? parts[2] : parts[1]) || "").toLowerCase();
+      var name = L.sections[key] || L.fallbackSection;
       if (!byName[name]) {
         byName[name] = [];
         groups.push({ name: name, items: byName[name] });
@@ -246,7 +310,7 @@
         );
       })
       .join("");
-    countEl.textContent = results.length === 1 ? "1 result" : results.length + " results";
+    countEl.textContent = L.count(results.length);
     selectedIndex = 0;
     applySelection(false);
   }

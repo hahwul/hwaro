@@ -2,34 +2,34 @@
   <div class="site-footer-grid">
     <div class="site-footer-brand">
       <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
-      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+      <p class="site-footer-tag">{{ "footer.tagline" | t }}</p>
     </div>
     <div class="site-footer-col">
-      <h2>Docs</h2>
+      <h2>{{ "footer.docs" | t }}</h2>
       <ul>
-        <li><a href="{{ base_url }}/start/">Start</a></li>
-        <li><a href="{{ base_url }}/writing/">Writing</a></li>
-        <li><a href="{{ base_url }}/templates/">Templates</a></li>
-        <li><a href="{{ base_url }}/features/">Features</a></li>
-        <li><a href="{{ base_url }}/deploy/">Deploy</a></li>
+        <li><a href="{{ base_url }}{{ lang_prefix }}/start/">{{ "nav.start" | t }}</a></li>
+        <li><a href="{{ base_url }}{{ lang_prefix }}/writing/">{{ "nav.writing" | t }}</a></li>
+        <li><a href="{{ base_url }}{{ lang_prefix }}/templates/">{{ "nav.templates" | t }}</a></li>
+        <li><a href="{{ base_url }}{{ lang_prefix }}/features/">{{ "nav.features" | t }}</a></li>
+        <li><a href="{{ base_url }}{{ lang_prefix }}/deploy/">{{ "nav.deploy" | t }}</a></li>
       </ul>
     </div>
     <div class="site-footer-col">
-      <h2>Project</h2>
+      <h2>{{ "footer.project" | t }}</h2>
       <ul>
         <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
-        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
-        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
-        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">{{ "footer.releases" | t }}</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">{{ "nav.examples" | t }}</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">{{ "footer.benchmark" | t }}</a></li>
       </ul>
     </div>
     <div class="site-footer-col">
-      <h2>Resources</h2>
+      <h2>{{ "footer.resources" | t }}</h2>
       <ul>
-        <li><a href="{{ base_url }}/integrations/skills/">Agent Skills</a></li>
+        <li><a href="{{ base_url }}{{ lang_prefix }}/integrations/skills/">{{ "footer.skills" | t }}</a></li>
         <li><a href="{{ base_url }}/llms.txt">llms.txt</a></li>
-        <li><a href="{{ base_url }}/sitemap.xml">Sitemap</a></li>
-        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+        <li><a href="{{ base_url }}/sitemap.xml">{{ "footer.sitemap" | t }}</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">{{ "footer.license" | t }}</a></li>
       </ul>
     </div>
   </div>

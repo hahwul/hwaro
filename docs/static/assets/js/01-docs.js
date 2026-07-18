@@ -194,12 +194,32 @@
     });
   }
 
+  // Language switcher: close the <details> dropdown on outside click / Escape
+  function initLangSwitch() {
+    var switches = document.querySelectorAll('.lang-switch');
+    if (switches.length === 0) return;
+
+    function closeAll(except) {
+      switches.forEach(function(el) {
+        if (el !== except) el.removeAttribute('open');
+      });
+    }
+
+    document.addEventListener('click', function(e) {
+      closeAll(e.target.closest('.lang-switch'));
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeAll(null);
+    });
+  }
+
   function init() {
     initThemeToggle();
     addHeadingAnchors();
     addCodeCopyButtons();
     initTocScrollSpy();
     initMobileMenu();
+    initLangSwitch();
   }
 
   // Initialize on DOM ready

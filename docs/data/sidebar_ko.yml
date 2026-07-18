@@ -1,0 +1,143 @@
+# Korean sidebar. Mirrors data/sidebar.yml — keep structure, order, and
+# URLs in sync (same paths with the /ko/ prefix). Titles must match the
+# `title` front matter of the corresponding .ko.md pages.
+- title: 시작하기
+  section: start
+  items:
+    - title: 개요
+      url: /ko/start/
+    - title: 설치
+      url: /ko/start/installation/
+    - title: 첫 사이트 만들기
+      url: /ko/start/first-site/
+    - title: CLI
+      url: /ko/start/cli/
+    - title: 설정
+      url: /ko/start/config/
+    - title: 도구와 자동 완성
+      url: /ko/start/tools/
+- title: 콘텐츠 작성
+  section: writing
+  items:
+    - title: 개요
+      url: /ko/writing/
+    - title: 페이지
+      url: /ko/writing/pages/
+    - title: 섹션
+      url: /ko/writing/sections/
+    - title: 택소노미
+      url: /ko/writing/taxonomies/
+    - title: 숏코드
+      url: /ko/writing/shortcodes/
+    - title: 아키타입
+      url: /ko/writing/archetypes/
+- title: 템플릿
+  section: templates
+  items:
+    - title: 개요
+      url: /ko/templates/
+    - title: 문법
+      url: /ko/templates/syntax/
+    - title: 데이터 모델
+      url: /ko/templates/data-model/
+    - title: 함수
+      url: /ko/templates/functions/
+    - title: 필터
+      url: /ko/templates/filters/
+    - title: 렌더 훅
+      url: /ko/templates/render-hooks/
+- title: 기능
+  section: features
+  items:
+    - title: 개요
+      url: /ko/features/
+    - title: SEO와 검색 노출
+      items:
+        - title: SEO
+          url: /ko/features/seo/
+        - title: 구조화된 데이터
+          url: /ko/features/structured-data/
+        - title: 자동 OG 이미지
+          url: /ko/features/og-images/
+        - title: LLMs.txt
+          url: /ko/features/llms-txt/
+    - title: 콘텐츠
+      items:
+        - title: 검색
+          url: /ko/features/search/
+        - title: 페이지네이션
+          url: /ko/features/pagination/
+        - title: 구문 강조
+          url: /ko/features/syntax-highlighting/
+        - title: 마크다운 확장
+          url: /ko/features/markdown-extensions/
+        - title: 시리즈
+          url: /ko/features/series/
+        - title: 관련 글
+          url: /ko/features/related-posts/
+        - title: 메뉴
+          url: /ko/features/menus/
+        - title: 출력 포맷
+          url: /ko/features/output-formats/
+    - title: 빌드와 성능
+      items:
+        - title: 증분 빌드
+          url: /ko/features/incremental-build/
+        - title: 스트리밍 빌드
+          url: /ko/features/streaming-build/
+        - title: 빌드 훅
+          url: /ko/features/build-hooks/
+        - title: 에셋 파이프라인
+          url: /ko/features/asset-pipeline/
+        - title: 캐시 버스팅
+          url: /ko/features/cache-busting/
+    - title: 파일과 환경
+      items:
+        - title: 환경 변수
+          url: /ko/features/env-variables/
+        - title: 환경별 설정
+          url: /ko/features/env-config/
+        - title: 자동 인클루드
+          url: /ko/features/auto-includes/
+        - title: 콘텐츠 파일
+          url: /ko/features/content-files/
+    - title: 플랫폼
+      items:
+        - title: 다국어
+          url: /ko/features/multilingual/
+        - title: 이미지 처리
+          url: /ko/features/image-processing/
+        - title: PWA
+          url: /ko/features/pwa/
+        - title: AMP
+          url: /ko/features/amp/
+        - title: 배포 명령
+          url: /ko/features/deployment/
+- title: 배포
+  section: deploy
+  items:
+    - title: 개요
+      url: /ko/deploy/
+    - title: 설정
+      url: /ko/deploy/config/
+    - title: GitHub Pages
+      url: /ko/deploy/github-pages/
+    - title: GitLab CI
+      url: /ko/deploy/gitlab-ci/
+    - title: Netlify
+      url: /ko/deploy/netlify/
+    - title: Vercel
+      url: /ko/deploy/vercel/
+    - title: Cloudflare Pages
+      url: /ko/deploy/cloudflare-pages/
+    - title: Codeberg Pages
+      url: /ko/deploy/codeberg-pages/
+    - title: Docker
+      url: /ko/deploy/docker/
+- title: 연동
+  section: integrations
+  items:
+    - title: 개요
+      url: /ko/integrations/
+    - title: 에이전트 스킬
+      url: /ko/integrations/skills/

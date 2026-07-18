@@ -3,13 +3,13 @@
 <div class="docs-container">
   <main class="error-page">
     <h1 class="error-code">404</h1>
-    <p>The page you are looking for doesn't exist or has been moved.</p>
+    <p>{{ "error.not_found" | t }}</p>
     <a href="{{ base_url }}/" class="error-home">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M8 1L1 8l7 7" />
         <path d="M1 8h14" />
       </svg>
-      Back to home
+      {{ "error.back_home" | t }}
     </a>
   </main>
 </div>
