@@ -1,14 +1,15 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="{{ page.language }}" data-theme="dark">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="description" content="{{ page.description }}" />
         <title>
-            {{ site.title }} - Fast & Lightweight Static Site Generator
+            {{ site.title }} - {{ "landing.title_tag" | t }}
         </title>
         {{ og_all_tags }}
         {{ canonical_tag }}
+        {{ hreflang_tags }}
         <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
         <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
         <link rel="shortcut icon" href="/icons/favicon.ico" />
@@ -30,8 +31,22 @@
                 <img src="/hwaro-wide.webp" alt="Hwaro" />
             </a>
             <nav>
-                <a href="{{ base_url }}/start/">Docs</a>
-                <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a>
+                <a href="{{ base_url }}{{ lang_prefix }}/start/">{{ "nav.docs" | t }}</a>
+                <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">{{ "nav.examples" | t }}</a>
+                {% if page.translations %}
+                <details class="lang-switch">
+                    <summary class="lang-switch-btn" aria-label="{{ "header.language_aria" | t }}">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+                        <span class="lang-switch-code">{{ page.language | upper }}</span>
+                        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+                    </summary>
+                    <ul class="lang-switch-menu">
+                        {% for tr in page.translations %}
+                        <li><a href="{{ base_url }}{{ tr.url }}" lang="{{ tr.code }}" hreflang="{{ tr.code }}"{% if tr.is_current %} class="current" aria-current="true"{% endif %}>{% if tr.code == "ko" %}한국어{% else %}English{% endif %}</a></li>
+                        {% endfor %}
+                    </ul>
+                </details>
+                {% endif %}
                 <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
                     <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -50,21 +65,19 @@
                 </div>
                 <div class="hero-content">
                     <h1>
-                        Fast by default.<br />
-                        <span class="highlight">Yours by design.</span>
+                        {{ "landing.hero_title_1" | t }}<br />
+                        <span class="highlight">{{ "landing.hero_title_2" | t }}</span>
                     </h1>
                     <p class="hero-sub">
-                        A static site generator built with Crystal.
-                        No themes, no lock-in. Your content, your
-                        structure, your speed.
+                        {{ "landing.hero_sub" | t }}
                     </p>
                     <div class="hero-actions">
-                        <a href="{{ base_url }}/start/" class="btn btn-primary">Get started</a>
+                        <a href="{{ base_url }}{{ lang_prefix }}/start/" class="btn btn-primary">{{ "landing.get_started" | t }}</a>
                         <button type="button" class="hero-install" id="hero-install" data-command="brew install hahwul/hwaro/hwaro">
                             <code>$ brew install hahwul/hwaro/hwaro</code>
                             <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                             <svg class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5 11-11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            <span class="visually-hidden">Copy install command</span>
+                            <span class="visually-hidden">{{ "landing.copy_install" | t }}</span>
                         </button>
                     </div>
                 </div>
@@ -76,11 +89,16 @@
             <section class="speed reveal" id="speed">
                 <div class="lp-wrap">
                     <div class="speed-header">
-                        <h2>1,000 pages. Under a second.</h2>
+                        <h2>{{ "landing.speed_title" | t }}</h2>
                         <p>
+                            {% if page.language == "ko" %}
+                            공개 <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">SSG 벤치마크</a>의
+                            minimal 워크로드(순수 마크다운 → HTML) 기준 콜드 빌드 중앙값입니다.
+                            {% else %}
                             Median cold build on the open
                             <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">SSG benchmark</a>,
                             minimal workload: pure markdown to HTML.
+                            {% endif %}
                         </p>
                     </div>
 
@@ -91,30 +109,30 @@
                         <div
                             class="speed-track"
                             role="img"
-                            aria-label="A full 1,000-page build finishes in 0.44 seconds"
+                            aria-label="{{ "landing.speed_aria" | t }}"
                         >
                             <span class="speed-fill"></span>
                         </div>
                         <p class="speed-caption">
-                            <span>The bar fills in real time: 443&nbsp;ms, one full rebuild.</span>
-                            <button type="button" class="speed-replay">&#8635; replay</button>
+                            <span>{{ "landing.speed_caption" | t }}</span>
+                            <button type="button" class="speed-replay">&#8635; {{ "landing.replay" | t }}</button>
                         </p>
                     </div>
 
                     <ul class="speed-modes">
                         <li>
                             <span class="mode-name">minimal</span>
-                            <span class="mode-desc">markdown to HTML</span>
+                            <span class="mode-desc">{{ "landing.mode_minimal" | t }}</span>
                             <span class="mode-time">0.44s</span>
                         </li>
                         <li>
                             <span class="mode-name">blog</span>
-                            <span class="mode-desc">tags, pagination, feeds</span>
+                            <span class="mode-desc">{{ "landing.mode_blog" | t }}</span>
                             <span class="mode-time">0.59s</span>
                         </li>
                         <li>
                             <span class="mode-name">heavy</span>
-                            <span class="mode-desc">plus syntax highlighting</span>
+                            <span class="mode-desc">{{ "landing.mode_heavy" | t }}</span>
                             <span class="mode-time">1.50s</span>
                         </li>
                     </ul>
@@ -127,16 +145,14 @@
             <section class="bento reveal" id="features">
                 <div class="lp-wrap">
                     <div class="section-header">
-                        <h2>Everything built in.</h2>
-                        <p>No plugins to hunt down. Enable a feature in config.toml and build.</p>
+                        <h2>{{ "landing.features_title" | t }}</h2>
+                        <p>{{ "landing.features_sub" | t }}</p>
                     </div>
                     <div class="bento-grid">
                         <article class="bento-cell cell-seo">
                             <h3>built_in_seo</h3>
                             <p>
-                                Sitemaps, feeds, OpenGraph, JSON-LD, and
-                                llms.txt. Social card images render at build
-                                time, in nineteen styles.
+                                {{ "landing.seo_desc" | t }}
                             </p>
                             <div class="og-fan" aria-hidden="true">
                                 {% set fan = resize_image(path="/images/og-style-examples/style-terminal.png", width=640) %}
@@ -150,14 +166,12 @@
                         <article class="bento-cell cell-fast">
                             <h3>blazing_fast</h3>
                             <p>
-                                Parallel rendering, incremental builds, and a
-                                streaming mode for very large sites. Thousands
-                                of pages in seconds.
+                                {{ "landing.fast_desc" | t }}
                             </p>
                         </article>
                         <article class="bento-cell cell-markdown">
                             <h3>markdown_first</h3>
-                            <p>TOML front matter, footnotes, task lists, math, and Mermaid.</p>
+                            <p>{{ "landing.markdown_desc" | t }}</p>
                             <pre aria-hidden="true"><code class="hljs"><span class="hljs-section">+++</span>
 <span class="hljs-attr">title</span> = <span class="hljs-string">"Hello"</span>
 <span class="hljs-attr">tags</span> = [<span class="hljs-string">"crystal"</span>]
@@ -167,24 +181,19 @@
                         <article class="bento-cell cell-templates">
                             <h3>flexible_templates</h3>
                             <p>
-                                Jinja2 templating with inheritance, filters,
-                                functions, and shortcodes. No theme lock-in:
-                                build your own.
+                                {{ "landing.templates_desc" | t }}
                             </p>
                         </article>
                         <article class="bento-cell cell-taxonomies">
                             <h3>taxonomies</h3>
                             <p>
-                                Tags, categories, and custom taxonomies with
-                                automatic index pages and pagination.
+                                {{ "landing.taxonomies_desc" | t }}
                             </p>
                         </article>
                         <article class="bento-cell cell-extensible">
                             <h3>extensible</h3>
                             <p>
-                                Build hooks, asset pipeline, image processing,
-                                multilingual support, PWA, and AMP. All in one
-                                binary.
+                                {{ "landing.extensible_desc" | t }}
                             </p>
                         </article>
                     </div>
@@ -197,20 +206,19 @@
             <section class="scaffolds reveal" id="scaffolds">
                 <div class="lp-wrap">
                     <div class="section-header">
-                        <h2>Start from a scaffold</h2>
+                        <h2>{{ "landing.scaffolds_title" | t }}</h2>
                         <p>
-                            Five complete starting points, one shared token
-                            system that adapts to light and dark on its own.
+                            {{ "landing.scaffolds_sub" | t }}
                         </p>
                     </div>
                 </div>
                 <div class="scaffold-rail" tabindex="0">
                     {% set scaffolds = [
-                        ["docs", "documentation with sidebar and search"],
-                        ["blog", "posts, tags, and feeds"],
-                        ["book", "chaptered long-form writing"],
-                        ["simple", "landing pages and small sites"],
-                        ["bare", "an empty, unopinionated start"]
+                        ["docs", "landing.scaffold_docs" | t],
+                        ["blog", "landing.scaffold_blog" | t],
+                        ["book", "landing.scaffold_book" | t],
+                        ["simple", "landing.scaffold_simple" | t],
+                        ["bare", "landing.scaffold_bare" | t]
                     ] %}
                     {% for s in scaffolds %}
                     {% set shot = resize_image(path="/images/scaffolds/scaffold-" ~ s[0] ~ ".png", width=640) %}
@@ -239,17 +247,24 @@
             <section class="ogband reveal" id="og-styles">
                 <div class="lp-wrap">
                     <div class="section-header">
-                        <h2>Social cards, drawn at build time</h2>
+                        <h2>{{ "landing.og_title" | t }}</h2>
                         <p>
+                            {% if page.language == "ko" %}
+                            브라우저나 외부 서비스 없이 모든 페이지에 Open Graph
+                            이미지가 만들어집니다. 19가지 스타일은
+                            <a href="{{ base_url }}/ko/features/og-images/">자동 OG 이미지</a>
+                            문서에서 확인할 수 있습니다.
+                            {% else %}
                             Every page gets an Open Graph image without a
                             browser or an external service.
                             <a href="{{ base_url }}/features/og-images/">Auto OG Images</a>
                             covers all nineteen styles.
+                            {% endif %}
                         </p>
                     </div>
                 </div>
                 {% set og_styles = ["terminal", "minimal", "gradient", "brutalist", "bauhaus", "editorial", "halftone", "grid", "dots", "waves", "diagonal", "split", "framed", "hero", "monument", "artistic", "band", "surreal", "default"] %}
-                <div class="og-marquee" aria-label="Nineteen generated Open Graph image styles">
+                <div class="og-marquee" aria-label="{{ "landing.og_aria" | t }}">
                     <div class="og-track">
                         {% for s in og_styles %}
                         {% set card = resize_image(path="/images/og-style-examples/style-" ~ s ~ ".png", width=640) %}
@@ -269,11 +284,16 @@
             <section class="showcase reveal" id="showcase">
                 <div class="lp-wrap">
                     <div class="section-header">
-                        <h2>Built with Hwaro</h2>
+                        <h2>{{ "landing.showcase_title" | t }}</h2>
                         <p>
+                            {% if page.language == "ko" %}
+                            <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제 갤러리</a>의
+                            사이트들. 전부 실제 빌드 결과물입니다.
+                            {% else %}
                             Sites from the
                             <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">examples gallery</a>,
                             each one a real build.
+                            {% endif %}
                         </p>
                     </div>
                     <div class="showcase-grid">
@@ -315,10 +335,10 @@
                  ============================================================ -->
             <section class="get-started reveal" id="install-hwaro">
                 <div class="lp-wrap">
-                    <h2>Start building.</h2>
-                    <p>One command to install. A few minutes to your first build.</p>
+                    <h2>{{ "landing.closer_title" | t }}</h2>
+                    <p>{{ "landing.closer_sub" | t }}</p>
                     <div class="install" id="install">
-                        <div class="install-tabs" role="tablist" aria-label="Installation method">
+                        <div class="install-tabs" role="tablist" aria-label="{{ "landing.install_method" | t }}">
                             <button type="button" role="tab" aria-selected="true" data-command="brew install hahwul/hwaro/hwaro">Homebrew</button>
                             <button type="button" role="tab" aria-selected="false" data-command="sudo snap install hwaro">Snap</button>
                             <button type="button" role="tab" aria-selected="false" data-command="yay -S hwaro">AUR</button>
@@ -326,16 +346,16 @@
                         </div>
                         <div class="install-cmd">
                             <code id="install-command">brew install hahwul/hwaro/hwaro</code>
-                            <button type="button" class="install-copy" id="install-copy" aria-label="Copy command">
+                            <button type="button" class="install-copy" id="install-copy" aria-label="{{ "landing.copy_command" | t }}">
                                 <svg class="copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                 <svg class="check-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5 11-11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
                         </div>
                         <p class="install-more">
-                            <a href="{{ base_url }}/start/installation/">DEB, RPM, APK, and source builds &rarr;</a>
+                            <a href="{{ base_url }}{{ lang_prefix }}/start/installation/">{{ "landing.install_more" | t }} &rarr;</a>
                         </p>
                     </div>
-                    <a href="{{ base_url }}/start/" class="btn btn-primary">Get started</a>
+                    <a href="{{ base_url }}{{ lang_prefix }}/start/" class="btn btn-primary">{{ "landing.get_started" | t }}</a>
                 </div>
             </section>
 

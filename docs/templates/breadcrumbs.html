@@ -1,6 +1,6 @@
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <ol>
-    <li><a href="{{ base_url }}/">Home</a></li>
+    <li><a href="{{ base_url }}{{ lang_prefix }}/">{{ "breadcrumbs.home" | t }}</a></li>
     {% for a in page.ancestors %}{% if a.url != page.url %}
     <li><a href="{{ base_url }}{{ a.url }}">{{ a.title }}</a></li>
     {% endif %}{% endfor %}

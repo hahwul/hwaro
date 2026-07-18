@@ -1,5 +1,6 @@
 <aside class="docs-sidebar">
-  {% for group in site.data.sidebar %}
+  {% if page.language == "ko" %}{% set sidebar_groups = site.data.sidebar_ko %}{% else %}{% set sidebar_groups = site.data.sidebar %}{% endif %}
+  {% for group in sidebar_groups %}
   <details class="sidebar-section"{% if page.section | split(pat="/") | first == group.section %} open{% endif %}>
     <summary class="sidebar-title">
       <span class="sidebar-title-text">{{ group.title }}</span>

@@ -1,0 +1,84 @@
+# UI strings for the docs chrome (templates use {{ "key" | t }}).
+# Keep keys in sync with i18n/ko.toml.
+
+[nav]
+start = "Start"
+writing = "Writing"
+templates = "Templates"
+features = "Features"
+deploy = "Deploy"
+integrations = "Integrations"
+examples = "Examples"
+docs = "Docs"
+
+[header]
+search = "Search"
+search_aria = "Search documentation"
+menu_aria = "Open navigation menu"
+language_aria = "Change language"
+
+[breadcrumbs]
+home = "Home"
+
+[prevnext]
+previous = "Previous"
+next = "Next"
+
+[section]
+in_this_section = "In this section"
+
+[toc]
+on_this_page = "On this page"
+
+[footer]
+tagline = "Fast, lightweight static site generator built with Crystal."
+docs = "Docs"
+project = "Project"
+resources = "Resources"
+releases = "Releases"
+benchmark = "Benchmark"
+sitemap = "Sitemap"
+license = "MIT License"
+skills = "Agent Skills"
+
+[error]
+not_found = "The page you are looking for doesn't exist or has been moved."
+back_home = "Back to home"
+
+[landing]
+title_tag = "Fast & Lightweight Static Site Generator"
+hero_title_1 = "Fast by default."
+hero_title_2 = "Yours by design."
+hero_sub = "A static site generator built with Crystal. No themes, no lock-in. Your content, your structure, your speed."
+get_started = "Get started"
+copy_install = "Copy install command"
+speed_title = "1,000 pages. Under a second."
+speed_aria = "A full 1,000-page build finishes in 0.44 seconds"
+speed_caption = "The bar fills in real time: 443&nbsp;ms, one full rebuild."
+replay = "replay"
+mode_minimal = "markdown to HTML"
+mode_blog = "tags, pagination, feeds"
+mode_heavy = "plus syntax highlighting"
+features_title = "Everything built in."
+features_sub = "No plugins to hunt down. Enable a feature in config.toml and build."
+seo_desc = "Sitemaps, feeds, OpenGraph, JSON-LD, and llms.txt. Social card images render at build time, in nineteen styles."
+fast_desc = "Parallel rendering, incremental builds, and a streaming mode for very large sites. Thousands of pages in seconds."
+markdown_desc = "TOML front matter, footnotes, task lists, math, and Mermaid."
+templates_desc = "Jinja2 templating with inheritance, filters, functions, and shortcodes. No theme lock-in: build your own."
+taxonomies_desc = "Tags, categories, and custom taxonomies with automatic index pages and pagination."
+extensible_desc = "Build hooks, asset pipeline, image processing, multilingual support, PWA, and AMP. All in one binary."
+scaffolds_title = "Start from a scaffold"
+scaffolds_sub = "Five complete starting points, one shared token system that adapts to light and dark on its own."
+scaffold_docs = "documentation with sidebar and search"
+scaffold_blog = "posts, tags, and feeds"
+scaffold_book = "chaptered long-form writing"
+scaffold_simple = "landing pages and small sites"
+scaffold_bare = "an empty, unopinionated start"
+og_title = "Social cards, drawn at build time"
+og_aria = "Nineteen generated Open Graph image styles"
+showcase_title = "Built with Hwaro"
+closer_title = "Start building."
+closer_sub = "One command to install. A few minutes to your first build."
+install_method = "Installation method"
+copy_command = "Copy command"
+install_more = "DEB, RPM, APK, and source builds"

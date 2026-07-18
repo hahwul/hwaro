@@ -105,6 +105,13 @@
     padding: 0.35rem 0.5rem;
 }
 
+/* The landing nav's generous link padding would bloat the language menu —
+   restore the compact dropdown rows from 03-layout.css. */
+.landing-header nav .lang-switch-menu a {
+    font-size: 0.82rem;
+    padding: 0.4rem 0.6rem;
+}
+
 /* =============================================================================
    Buttons
    ============================================================================= */

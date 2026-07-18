@@ -1,0 +1,84 @@
+# 문서 UI 문자열 (템플릿에서 {{ "key" | t }}로 사용).
+# i18n/en.toml과 키를 맞춰 유지합니다.
+
+[nav]
+start = "시작하기"
+writing = "콘텐츠 작성"
+templates = "템플릿"
+features = "기능"
+deploy = "배포"
+integrations = "연동"
+examples = "예제"
+docs = "문서"
+
+[header]
+search = "검색"
+search_aria = "문서 검색"
+menu_aria = "탐색 메뉴 열기"
+language_aria = "언어 변경"
+
+[breadcrumbs]
+home = "홈"
+
+[prevnext]
+previous = "이전"
+next = "다음"
+
+[section]
+in_this_section = "이 섹션의 문서"
+
+[toc]
+on_this_page = "목차"
+
+[footer]
+tagline = "Crystal로 만든 빠르고 가벼운 정적 사이트 생성기."
+docs = "문서"
+project = "프로젝트"
+resources = "리소스"
+releases = "릴리스"
+benchmark = "벤치마크"
+sitemap = "사이트맵"
+license = "MIT 라이선스"
+skills = "에이전트 스킬"
+
+[error]
+not_found = "찾으시는 페이지가 없거나 이동되었습니다."
+back_home = "홈으로 돌아가기"
+
+[landing]
+title_tag = "빠르고 가벼운 정적 사이트 생성기"
+hero_title_1 = "속도는 기본."
+hero_title_2 = "디자인은 온전히 내 것."
+hero_sub = "Crystal로 만든 정적 사이트 생성기. 테마 없이, 종속 없이. 내 콘텐츠와 구조, 속도 그대로."
+get_started = "시작하기"
+copy_install = "설치 명령 복사"
+speed_title = "1,000페이지, 1초 안에."
+speed_aria = "1,000페이지 전체 빌드가 0.44초에 끝납니다"
+speed_caption = "막대는 실제 측정 시간과 같은 443ms 동안 채워집니다 — 전체 재빌드 한 번의 시간입니다."
+replay = "다시 재생"
+mode_minimal = "마크다운 → HTML"
+mode_blog = "태그, 페이지네이션, 피드"
+mode_heavy = "구문 강조까지"
+features_title = "필요한 건 전부 내장."
+features_sub = "플러그인을 찾아 헤맬 필요가 없습니다. config.toml에서 켜고 빌드하면 됩니다."
+seo_desc = "사이트맵, 피드, OpenGraph, JSON-LD, llms.txt까지. 소셜 카드 이미지는 빌드 시점에 19가지 스타일로 렌더링됩니다."
+fast_desc = "병렬 렌더링, 증분 빌드, 초대형 사이트를 위한 스트리밍 모드. 수천 페이지도 몇 초면 끝납니다."
+markdown_desc = "TOML 프론트 매터, 각주, 체크리스트, 수식, Mermaid를 지원합니다."
+templates_desc = "상속, 필터, 함수, 숏코드를 갖춘 Jinja2 템플릿. 테마에 갇히지 않고 직접 만듭니다."
+taxonomies_desc = "태그, 카테고리, 커스텀 택소노미와 자동 생성되는 색인 페이지, 페이지네이션."
+extensible_desc = "빌드 훅, 에셋 파이프라인, 이미지 처리, 다국어, PWA, AMP까지. 바이너리 하나에 전부."
+scaffolds_title = "스캐폴드에서 시작"
+scaffolds_sub = "다섯 가지 완성된 출발점이 토큰 시스템 하나를 공유하고, 라이트와 다크에 알아서 맞춰집니다."
+scaffold_docs = "사이드바와 검색을 갖춘 문서 사이트"
+scaffold_blog = "글, 태그, 피드"
+scaffold_book = "챕터로 엮는 긴 글"
+scaffold_simple = "랜딩 페이지와 작은 사이트"
+scaffold_bare = "아무것도 정하지 않은 빈 시작점"
+og_title = "빌드 타임에 그리는 소셜 카드"
+og_aria = "자동 생성된 19가지 Open Graph 이미지 스타일"
+showcase_title = "Hwaro로 만든 사이트"
+closer_title = "이제 만들어 보세요."
+closer_sub = "설치는 명령 한 줄. 첫 빌드까지는 몇 분이면 충분합니다."
+install_method = "설치 방법"
+copy_command = "명령 복사"
+install_more = "DEB, RPM, APK, 소스 빌드"
