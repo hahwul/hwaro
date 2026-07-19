@@ -38,6 +38,11 @@ Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins —
 | markdownify | Render Markdown | {{ text \| markdownify }} |
 | xml_escape | XML escape | {{ text \| xml_escape }} |
 
+`markdownify` follows the site's [`[markdown]`](/features/markdown-extensions/)
+settings for safe mode and `smart_punctuation`, so its output matches how the
+same text renders in page bodies. The rest of the extension pipeline
+(footnotes, definition lists, containers, …) is not applied.
+
 ## Array Filters
 
 | Filter | Description | Example |

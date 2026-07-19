@@ -7,6 +7,17 @@ toc = true
 
 모든 사이트 설정은 프로젝트 루트의 `config.toml`에 있습니다.
 
+최상위 키에 오타가 있으면 조용히 무시하지 않고 경고합니다. `[markdonw]`나
+`titel = "…"` 같은 오타는 아무 안내 없이 기능을 꺼버리기 때문입니다. 실제
+키와 비슷하면 다음처럼 후보를 함께 알려줍니다.
+
+```
+Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean 'markdown'?
+```
+
+이 검사는 최상위 키만 대상으로 하며, 섹션 안에 중첩된 키는 각 섹션의
+로더가 검증합니다.
+
 ## 사이트 설정
 
 ```toml
@@ -178,6 +189,12 @@ feed = true
 | feed | bool | false | 택소노미 항목마다 RSS 피드 생성 |
 | sitemap | bool | true | 택소노미 페이지를 사이트맵에 포함 |
 | paginate_by | int | — | 택소노미 항목 페이지의 페이지당 글 수 |
+| sort_by | string | "date" | 항목 안 페이지 정렬 기준: `"date"`(최신순), `"title"`, `"weight"` |
+| reverse | bool | false | `sort_by`가 만든 순서를 뒤집음 |
+| terms_sort_by | string | "name" | 택소노미 인덱스의 항목 목록 정렬: `"name"` 또는 `"count"` |
+
+항목 피드는 `sort_by`와 무관하게 항상 최신순을 유지합니다. 전체 정렬
+규칙은 [택소노미](/ko/writing/taxonomies/#정렬)를 참고합니다.
 
 ## 메뉴
 

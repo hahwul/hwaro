@@ -7,6 +7,17 @@ toc = true
 
 All site configuration lives in `config.toml` at the project root.
 
+Unknown top-level keys are reported instead of silently ignored — a typo'd
+`[markdonw]` or `titel = "…"` would otherwise disable a feature with no
+feedback. Hwaro warns with a suggestion when one is close to a real key:
+
+```
+Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean 'markdown'?
+```
+
+The check covers top-level keys only; keys nested inside a section are
+validated by that section's own loader.
+
 ## Site Settings
 
 ```toml
@@ -178,6 +189,12 @@ feed = true
 | feed | bool | false | Generate RSS feed for each term |
 | sitemap | bool | true | Include taxonomy pages in sitemap |
 | paginate_by | int | — | Items per page on term pages |
+| sort_by | string | "date" | Order of pages within a term: `"date"` (newest first), `"title"`, or `"weight"` |
+| reverse | bool | false | Flip whichever order `sort_by` produced |
+| terms_sort_by | string | "name" | Order of the terms list on the taxonomy index: `"name"` or `"count"` |
+
+Term feeds stay reverse-chronological regardless of `sort_by`. See
+[Taxonomies](/writing/taxonomies/#sorting) for the full sorting rules.
 
 ## Menus
 
