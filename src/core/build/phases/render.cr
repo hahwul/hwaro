@@ -1952,8 +1952,8 @@ module Hwaro::Core::Build::Phases::Render
         Dir.glob(File.join("static", "**", "*.scss")).sort.each do |file|
           relative = Path[file].relative_to("static").to_s
           next if config.auto_includes.dirs.any? { |dir|
-            relative == dir || relative.starts_with?("#{dir}/")
-          }
+                    relative == dir || relative.starts_with?("#{dir}/")
+                  }
           digest_file(digest, file)
         end
       end

@@ -359,7 +359,7 @@ module Hwaro
           date: date,
           title: title,
         )
-        return nil if error
+        return if error
         url
       end
     end

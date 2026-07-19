@@ -247,7 +247,7 @@ module Hwaro
           candidate = url_path.empty? ? output_dir : File.join(output_dir, url_path)
           unless Utils::OutputGuard.within_output_dir?(candidate, output_dir)
             Logger.warn "Skipping feed output outside output directory: #{url}"
-            return nil
+            return
           end
           Hwaro::Utils::FileSafe.mkdir_p(candidate)
           candidate
