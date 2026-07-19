@@ -1,8 +1,9 @@
 ---
 name: Homebrew tap Publish
-# Manual-only: publish the prebuilt formula to the Homebrew tap on demand.
-# The release binaries must already exist on the GitHub release for the given
-# version. Trigger this after "Build and Release Binaries" has finished.
+# Publishes the prebuilt formula to the Homebrew tap. Runs automatically once
+# "Build and Release Binaries" succeeds for a release (that workflow produces
+# the assets this one checksums), and can also be dispatched manually to
+# re-publish or backfill a version.
 on:
   workflow_dispatch:
     inputs:
@@ -10,22 +11,35 @@ on:
         description: "Version to publish (e.g. 0.17.0)"
         required: true
         type: string
+  workflow_run:
+    workflows: ["Build and Release Binaries"]
+    types: [completed]
 permissions:
   contents: read
 jobs:
   publish-formula:
     name: Publish prebuilt formula to tap
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'release')
     runs-on: ubuntu-latest
     steps:
       - name: Resolve version
         id: ver
         # Pass event data via env (never interpolate ${{ }} straight into the
-        # script body) so a crafted input can't inject shell.
+        # script body) so a crafted input can't inject shell. On workflow_run
+        # the release tag arrives as head_branch (e.g. "v0.18.0").
         env:
           DISPATCH_VERSION: ${{ github.event.inputs.version }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           # Strip a leading 'v' if present.
-          VERSION="${DISPATCH_VERSION#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${DISPATCH_VERSION#v}"
+          else
+            VERSION="${RUN_TAG#v}"
+          fi
           if [ -z "$VERSION" ]; then
             echo "::error::version input is empty"; exit 1
           fi
