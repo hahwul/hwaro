@@ -38,6 +38,11 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터 — `upper`, `lower`, `join`, `map`
 | markdownify | 마크다운 렌더링 | {{ text \| markdownify }} |
 | xml_escape | XML 이스케이프 | {{ text \| xml_escape }} |
 
+`markdownify`는 사이트의 [`[markdown]`](/ko/features/markdown-extensions/)
+설정 중 safe 모드와 `smart_punctuation`을 따르므로, 같은 텍스트가 페이지
+본문에서 렌더링되는 결과와 일치합니다. 나머지 확장 파이프라인(각주, 정의
+목록, 컨테이너 등)은 적용되지 않습니다.
+
 ## 배열 필터
 
 | 필터 | 설명 | 예시 |

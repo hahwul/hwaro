@@ -132,6 +132,12 @@ toc = true
 | name | String |
 | items | Array<Term> |
 
+`items`의 순서는 해당 택소노미의
+[`terms_sort_by`](/ko/writing/taxonomies/#정렬)를 따릅니다. `"name"`(기본값,
+가나다순) 또는 `"count"`(페이지 수 내림차순, 동수일 때 이름 오름차순)입니다.
+개수는 모든 언어를 합산한 사이트 전체 기준으로, 루트 택소노미 인덱스
+페이지와 동일합니다.
+
 **Term 속성:**
 
 | 속성 | 타입 |

@@ -132,6 +132,12 @@ Access taxonomy terms and their pages:
 | name | String |
 | items | Array<Term> |
 
+`items` is ordered by the taxonomy's
+[`terms_sort_by`](/writing/taxonomies/#sorting): `"name"` (the default —
+alphabetical) or `"count"` (page count descending, name-ascending
+tiebreak). Counts are site-wide across every language, matching the root
+taxonomy index page.
+
 **Term Properties:**
 
 | Property | Type |
