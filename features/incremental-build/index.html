@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Only rebuild changed files for faster builds on large sites">
+  <title>Incremental Build - Hwaro</title>
+  <meta property="og:title" content="Incremental Build">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/features/incremental-build/">
+  <meta property="og:description" content="Only rebuild changed files for faster builds on large sites">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-incremental-build.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Incremental Build">
+  <meta name="twitter:description" content="Only rebuild changed files for faster builds on large sites">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-incremental-build.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/features/incremental-build/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/incremental-build/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/incremental-build/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/incremental-build/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/" class="active">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+    
+    <li aria-current="page">Incremental Build</li>
+  </ol>
+</nav>
+    <h1>Incremental Build</h1>
+    <p>Incremental build tracks file checksums and dependency changes to skip unchanged pages, significantly reducing rebuild times for large sites.</p>
+<pre><code class="language-bash hljs">hwaro build --cache
+</code></pre>
+<h2 id="when-to-use">When to Use</h2>
+<p>Incremental builds are most effective when:</p>
+<ul>
+<li>Your site has many pages but you typically change only a few at a time</li>
+<li>You want faster edit-build-preview cycles</li>
+<li>You're working on content rather than templates or config</li>
+</ul>
+<h2 id="usage">Usage</h2>
+<h3 id="enable-caching">Enable caching</h3>
+<pre><code class="language-bash hljs">hwaro build --cache
+</code></pre>
+<p>On the first run, Hwaro builds every page and saves checksums to <code>.hwaro_cache.json</code>. On subsequent builds, only changed files are re-processed.</p>
+<h3 id="force-a-full-rebuild">Force a full rebuild</h3>
+<pre><code class="language-bash hljs">hwaro build --cache --full
+</code></pre>
+<p>The <code>--full</code> flag clears the cache and rebuilds every page from scratch. The new cache is saved afterward, so the next build without <code>--full</code> will be incremental again.</p>
+<h2 id="how-it-works">How It Works</h2>
+<h3 id="change-detection">Change detection</h3>
+<p>Each cached entry tracks:</p>
+<ul>
+<li><strong>File modification time (mtime)</strong> — fast first check</li>
+<li><strong>Content checksum (MD5)</strong> — verifies actual change when mtime differs, catching false positives from file touches</li>
+</ul>
+<p>When mtime hasn't changed, the file is considered unchanged without reading its content. When mtime differs, Hwaro computes and compares the content hash to confirm the change is real.</p>
+<h3 id="dependency-invalidation">Dependency invalidation</h3>
+<p>Beyond per-file checksums, Hwaro tracks what each page actually depends on:</p>
+<ul>
+<li><strong>Template closure</strong> — the page's template plus everything it transitively
+<code>extends</code>, <code>include</code>s, or <code>import</code>s, plus any shortcode templates the page
+content invokes. Each page's cache entry stores a fingerprint of this
+closure, so editing <code>partials/footer.html</code> only rebuilds the pages whose
+template chain renders that partial.</li>
+<li><strong>Cascade fingerprint</strong> — the merged section <code>[cascade]</code> values applied to
+the page, so editing a parent <code>_index.md</code> cascade rebuilds its descendants.</li>
+<li><strong>Config checksum</strong> — a hash of the effective merged config. A config
+change invalidates <strong>all</strong> entries.</li>
+<li><strong>Render hooks</strong> — a fingerprint of every configured <code>templates/hooks/render-*</code>
+template (see <a href="/templates/render-hooks/">Render Hooks</a>) is folded into every
+page's template closure. Since a hook isn't reached via a page's
+<code>{% include %}</code>/<code>{% extends %}</code> graph, editing one re-renders <strong>every</strong>
+page rather than a narrowed set.</li>
+</ul>
+<p>Template dependency tracking requires every template reference to be a string
+literal. If any template uses a dynamic reference (<code>{% include some_var %}</code>),
+Hwaro falls back to whole-site invalidation: any template change rebuilds
+every page. You can also opt out explicitly:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>build<span class="hljs-punctuation">]</span>
+template_deps <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>  <span class="hljs-comment"># any template change rebuilds every page</span>
+</code></pre>
+<h3 id="what-gets-skipped">What gets skipped</h3>
+<p>When a page is unchanged and its dependencies haven't changed:</p>
+<ul>
+<li>Content parsing is still performed (to build navigation, taxonomies, etc.)</li>
+<li><strong>Rendering and writing are skipped</strong> — the existing output file is reused</li>
+<li>SEO files (sitemap, feeds, etc.) are always regenerated</li>
+</ul>
+<h3 id="serve-mode">Serve mode</h3>
+<p>The development server (<code>hwaro serve</code>) uses a more targeted incremental strategy:</p>
+<table>
+<thead>
+<tr>
+<th>Change Type</th>
+<th>Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Content files only</td>
+<td>Re-parse and re-render only affected pages + neighbors</td>
+</tr>
+<tr>
+<td>Template files only</td>
+<td>Re-render only pages whose template closure includes an edited template (all pages when tracking is off, the graph has dynamic references, or the edited file is under <code>templates/hooks/</code>)</td>
+</tr>
+<tr>
+<td>Config file</td>
+<td>Full rebuild</td>
+</tr>
+<tr>
+<td>Static files only</td>
+<td>Copy only changed files</td>
+</tr>
+</tbody>
+</table>
+<h2 id="cache-file">Cache File</h2>
+<p>The cache is stored in <code>.hwaro_cache.json</code> at the project root. This file contains:</p>
+<ul>
+<li><strong>Metadata</strong> — template and config checksums from the last build</li>
+<li><strong>Entries</strong> — per-file records with path, mtime, content hash, and output path</li>
+</ul>
+<p>Add <code>.hwaro_cache.json</code> to your <code>.gitignore</code>:</p>
+<pre><code class="language-gitignore hljs">.hwaro_cache.json
+</code></pre>
+<h2 id="flag-reference">Flag Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cache</code></td>
+<td>Enable incremental build caching</td>
+</tr>
+<tr>
+<td><code>--full</code></td>
+<td>Force a complete rebuild (clears and repopulates the cache)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># First build — creates cache</span>
+hwaro build --cache
+
+<span class="hljs-comment"># Edit a few files, then rebuild — only changed pages are re-rendered</span>
+hwaro build --cache
+
+<span class="hljs-comment"># Something seems off — force a clean rebuild</span>
+hwaro build --cache --full
+
+<span class="hljs-comment"># Combine with other flags</span>
+hwaro build --cache --minify --parallel
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/cli/">CLI Reference</a> — Full list of build flags</li>
+<li><a href="/features/streaming-build/">Streaming Build</a> — Reduce memory usage for large sites</li>
+<li><a href="/features/build-hooks/">Build Hooks</a> — Run custom commands before/after builds</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/features/incremental-build/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">증분 빌드</span>
+    <span class="pn-desc">변경된 파일만 다시 빌드해 대규모 사이트의 빌드 속도를 높입니다</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/streaming-build/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">스트리밍 빌드</span>
+    <span class="pn-desc">페이지를 배치 단위로 처리해 메모리 사용량을 줄입니다</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#when-to-use">When to Use</a></li><li><a href="#usage">Usage</a><ul><li><a href="#enable-caching">Enable caching</a></li><li><a href="#force-a-full-rebuild">Force a full rebuild</a></li></ul></li><li><a href="#how-it-works">How It Works</a><ul><li><a href="#change-detection">Change detection</a></li><li><a href="#dependency-invalidation">Dependency invalidation</a></li><li><a href="#what-gets-skipped">What gets skipped</a></li><li><a href="#serve-mode">Serve mode</a></li></ul></li><li><a href="#cache-file">Cache File</a></li><li><a href="#flag-reference">Flag Reference</a></li><li><a href="#examples">Examples</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

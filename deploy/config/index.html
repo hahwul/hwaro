@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Configure deployment targets, matchers, and options">
+  <title>Deploy Configuration - Hwaro</title>
+  <meta property="og:title" content="Deploy Configuration">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/deploy/config/">
+  <meta property="og:description" content="Configure deployment targets, matchers, and options">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/deploy-config.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Deploy Configuration">
+  <meta name="twitter:description" content="Configure deployment targets, matchers, and options">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/deploy-config.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/deploy/config/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/config/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/config/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="deploy">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/" class="active">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/deploy/config/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/config/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/" class="active">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+    
+    <li aria-current="page">Deploy Configuration</li>
+  </ol>
+</nav>
+    <h1>Deploy Configuration</h1>
+    <p>Configure deployment targets for the <code>hwaro deploy</code> command in <code>config.toml</code>.</p>
+<h2 id="global-options">Global Options</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">]</span>
+target <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;prod&quot;</span>
+source_dir <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;public&quot;</span>
+confirm <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+dry_run <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+max_deletes <span class="hljs-punctuation">=</span> <span class="hljs-number">256</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>target</td>
+<td>string</td>
+<td>—</td>
+<td>Default target name to deploy to</td>
+</tr>
+<tr>
+<td>source_dir</td>
+<td>string</td>
+<td>&quot;public&quot;</td>
+<td>Directory containing the built site</td>
+</tr>
+<tr>
+<td>confirm</td>
+<td>bool</td>
+<td>false</td>
+<td>Prompt for confirmation before deploying</td>
+</tr>
+<tr>
+<td>dry_run</td>
+<td>bool</td>
+<td>false</td>
+<td>Show what would be deployed without making changes</td>
+</tr>
+<tr>
+<td>force</td>
+<td>bool</td>
+<td>false</td>
+<td>Force deployment even if no changes detected</td>
+</tr>
+<tr>
+<td>max_deletes</td>
+<td>int</td>
+<td>256</td>
+<td>Safety limit on file deletions (any negative value disables the limit)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="targets">Targets</h2>
+<p>Define one or more deployment targets:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;prod&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;file:///var/www/mysite&quot;</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;s3&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;s3://my-bucket&quot;</span>
+<span class="hljs-comment"># Auto-generates: aws s3 sync {source}/ s3://my-bucket --delete</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;custom&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;s3://my-bucket&quot;</span>
+command <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;aws s3 sync {source}/ {url} --delete --exclude &#39;.git/*&#39;&quot;</span>
+<span class="hljs-comment"># Custom command overrides auto-generation</span>
+</code></pre>
+<p><strong>Auto-generated commands by URL scheme:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Scheme</th>
+<th>Command</th>
+<th>Requires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file://</code></td>
+<td>Built-in directory sync</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>s3://</code></td>
+<td><code>aws s3 sync {source}/ {url} --delete</code></td>
+<td>AWS CLI</td>
+</tr>
+<tr>
+<td><code>gs://</code></td>
+<td><code>gsutil -m rsync -r -d {source}/ {url}</code></td>
+<td>Google Cloud SDK</td>
+</tr>
+<tr>
+<td><code>az://</code></td>
+<td><code>az storage blob sync --source {source} --container &lt;container&gt; [--destination &lt;path&gt;]</code></td>
+<td>Azure CLI</td>
+</tr>
+</tbody>
+</table>
+<p>For <code>az://container/sub/dir</code> URLs the path becomes the <code>--destination</code> prefix inside the container.</p>
+<p>If a <code>command</code> field is set, it always takes priority over auto-generation.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>string</td>
+<td>—</td>
+<td>Target identifier</td>
+</tr>
+<tr>
+<td>url</td>
+<td>string</td>
+<td>—</td>
+<td>Destination URL (<code>file://</code>, <code>s3://</code>, <code>gs://</code>, <code>az://</code>)</td>
+</tr>
+<tr>
+<td>include</td>
+<td>string</td>
+<td>—</td>
+<td>Glob pattern for files to include</td>
+</tr>
+<tr>
+<td>exclude</td>
+<td>string</td>
+<td>—</td>
+<td>Glob pattern for files to exclude</td>
+</tr>
+<tr>
+<td>strip_index_html</td>
+<td>bool</td>
+<td>false</td>
+<td>Remove <code>index.html</code> from URLs</td>
+</tr>
+<tr>
+<td>command</td>
+<td>string</td>
+<td>—</td>
+<td>Custom command (overrides auto-generation)</td>
+</tr>
+</tbody>
+</table>
+<p>Custom commands support placeholders:</p>
+<table>
+<thead>
+<tr>
+<th>Placeholder</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{source}</code></td>
+<td>Source directory (default: <code>public</code>)</td>
+</tr>
+<tr>
+<td><code>{url}</code></td>
+<td>Target URL</td>
+</tr>
+<tr>
+<td><code>{target}</code></td>
+<td>Target name</td>
+</tr>
+</tbody>
+</table>
+<h2 id="matchers">Matchers</h2>
+<p>Configure per-file deployment settings using pattern matchers:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>matchers<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+pattern <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;^.+\\.html$&quot;</span>
+force <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pattern</td>
+<td>string</td>
+<td>—</td>
+<td>Regex pattern to match file paths</td>
+</tr>
+<tr>
+<td>force</td>
+<td>bool</td>
+<td>false</td>
+<td>Always copy matched files, even when identical at the destination</td>
+</tr>
+<tr>
+<td>cache_control</td>
+<td>string</td>
+<td>—</td>
+<td>Reserved — not applied by the built-in sync (see below)</td>
+</tr>
+<tr>
+<td>content_type</td>
+<td>string</td>
+<td>—</td>
+<td>Reserved — not applied by the built-in sync (see below)</td>
+</tr>
+<tr>
+<td>gzip</td>
+<td>bool</td>
+<td>false</td>
+<td>Reserved — not applied by the built-in sync (see below)</td>
+</tr>
+</tbody>
+</table>
+<p>The built-in sync copies files and runs external CLIs; it does not talk to
+an object-store API, so it can only honor <code>force</code>. Setting <code>cache_control</code>,
+<code>content_type</code>, or <code>gzip</code> prints a warning — configure headers and
+compression at your host or CDN instead.</p>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/cli/">CLI Reference</a> — All deploy command-line options</li>
+<li><a href="/features/deployment/">Features: Deployment</a> — Quick overview</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/deploy/config/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">배포 설정</span>
+    <span class="pn-desc">배포 타깃, 매처, 옵션 설정</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/deploy/github-pages/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">GitHub Pages</span>
+    <span class="pn-desc">Hwaro 사이트를 GitHub Pages에 배포</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#global-options">Global Options</a></li><li><a href="#targets">Targets</a></li><li><a href="#matchers">Matchers</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

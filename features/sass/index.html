@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Built-in SCSS compilation — pure Crystal, no external tools">
+  <title>Sass/SCSS - Hwaro</title>
+  <meta property="og:title" content="Sass/SCSS">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/features/sass/">
+  <meta property="og:description" content="Built-in SCSS compilation — pure Crystal, no external tools">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-sass.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sass/SCSS">
+  <meta name="twitter:description" content="Built-in SCSS compilation — pure Crystal, no external tools">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-sass.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/features/sass/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/sass/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/sass/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/sass/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/sass/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+    
+    <li aria-current="page">Sass/SCSS</li>
+  </ol>
+</nav>
+    <h1>Sass/SCSS</h1>
+    <p>Hwaro compiles SCSS at build time with a built-in, pure-Crystal compiler. There is no dart-sass binary to install, no npm toolchain, and no C library — consistent with Hwaro's zero-external-dependency philosophy.</p>
+<h2 id="quick-start">Quick Start</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>sass<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<p>Put SCSS files under <code>static/</code>:</p>
+<pre><code>static/
+├── css/
+│   ├── _variables.scss   # partial — never published
+│   ├── _mixins.scss      # partial — never published
+│   └── style.scss        # entry — compiles to /css/style.css
+</code></pre>
+<pre><code class="language-scss hljs">// static/css/style.scss
+@use &quot;variables&quot;;
+@use &quot;mixins&quot;;
+
+.card {
+  color: variables.$primary;
+  &amp;:hover { color: variables.$accent; }
+
+  @include mixins.respond(768px) {
+    padding: 2rem;
+  }
+}
+</code></pre>
+<p>Every non-partial <code>*.scss</code> compiles to a sibling <code>.css</code> in the output (<code>static/css/style.scss</code> → <code>/css/style.css</code>), so stylesheets keep stable URLs:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;{{ url_for(path=&quot;</span>/<span class="hljs-attr">css</span>/<span class="hljs-attr">style</span>.<span class="hljs-attr">css</span>&quot;) }}&quot;<span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="rules">Rules</h2>
+<ul>
+<li><strong>Entries</strong> — <code>*.scss</code> files whose name does not start with <code>_</code> compile to a sibling <code>.css</code> at the same relative path in the output.</li>
+<li><strong>Partials</strong> — <code>_*.scss</code> files never compile standalone and never publish; they are only reachable via <code>@use</code>/<code>@import</code>.</li>
+<li><strong>Raw sources are not published</strong> — while <code>[sass]</code> is enabled, <code>.scss</code> files are excluded from the verbatim static copy.</li>
+<li><strong>Bundles</strong> — <code>[[assets.bundles]]</code> <code>files</code> entries may name <code>.scss</code> files; while <code>[sass]</code> is enabled they compile before concatenation and then flow through the normal minify → fingerprint pipeline. With <code>[sass]</code> disabled, bundle entries concatenate verbatim (the escape hatch for pre-compiled or out-of-subset sources).</li>
+<li><strong>Watch</strong> — <code>hwaro serve</code> recompiles on <code>.scss</code> changes. Editing a partial recompiles every entry (there is no dependency graph — whole-tree recompilation is fast at static-site scale). Compile errors appear in the browser error overlay.</li>
+</ul>
+<h2 id="configuration">Configuration</h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Enable SCSS compilation</td>
+</tr>
+<tr>
+<td><code>minify</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Minify compiled CSS (same minifier as the asset pipeline)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="supported-subset">Supported Subset</h2>
+<p>Hwaro implements a practical SCSS subset — the features hand-written site stylesheets actually use:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$variables</code></td>
+<td>✅ with <code>!default</code> / <code>!global</code>, lexical scoping and shadowing</td>
+</tr>
+<tr>
+<td>Nested rules</td>
+<td>✅ including selector lists (cartesian combination)</td>
+</tr>
+<tr>
+<td><code>&amp;</code> parent selector</td>
+<td>✅ <code>&amp;:hover</code>, <code>&amp;.mod</code>, BEM <code>&amp;__elem</code> / <code>&amp;--mod</code></td>
+</tr>
+<tr>
+<td><code>#{...}</code> interpolation</td>
+<td>✅ selectors, property names, values, at-rule preludes, strings, <code>url()</code> — full expressions inside</td>
+</tr>
+<tr>
+<td>Partials + <code>@use</code></td>
+<td>✅ namespaces (<code>colors.$primary</code>), <code>as x</code>, <code>as *</code>, load-once, <code>with (...)</code> configuration</td>
+</tr>
+<tr>
+<td><code>@forward</code></td>
+<td>✅ <code>show</code> / <code>hide</code> filters, <code>as prefix-*</code></td>
+</tr>
+<tr>
+<td><code>@import</code> (Sass files)</td>
+<td>✅ classic global-merge semantics; plain-CSS forms pass through</td>
+</tr>
+<tr>
+<td><code>@mixin</code> / <code>@include</code></td>
+<td>✅ default values, keyword arguments, variadic <code>$args...</code>, spreads, <code>@content</code> blocks</td>
+</tr>
+<tr>
+<td><code>@function</code> / <code>@return</code></td>
+<td>✅ user functions callable in values, defaults/keywords/variadic, recursion</td>
+</tr>
+<tr>
+<td>Control flow</td>
+<td>✅ <code>@if</code> / <code>@else if</code> / <code>@else</code>, <code>@each</code> (with destructuring), <code>@for</code> (<code>through</code>/<code>to</code>, descending), <code>@while</code></td>
+</tr>
+<tr>
+<td>SassScript expressions</td>
+<td>✅ arithmetic (<code>+ - * %</code>), comparisons, <code>and</code>/<code>or</code>/<code>not</code>, strings, lists, maps — see deviations for <code>/</code></td>
+</tr>
+<tr>
+<td>Built-in functions</td>
+<td>✅ <code>sass:math</code>, <code>sass:string</code>, <code>sass:list</code>, <code>sass:map</code>, <code>sass:meta</code> subset + legacy global names (<code>map-get</code>, <code>nth</code>, <code>if()</code>, …)</td>
+</tr>
+<tr>
+<td><code>@debug</code> / <code>@warn</code> / <code>@error</code></td>
+<td>✅ <code>@error</code> fails the build with a located message</td>
+</tr>
+<tr>
+<td><code>@at-root</code></td>
+<td>✅ selector and block forms (no <code>with:</code>/<code>without:</code> queries)</td>
+</tr>
+<tr>
+<td><code>@media</code> / <code>@supports</code> in rules</td>
+<td>✅ bubbled out of nesting automatically; feature values evaluate expressions</td>
+</tr>
+<tr>
+<td><code>@keyframes</code>, <code>@font-face</code>, custom properties</td>
+<td>✅ pass through correctly</td>
+</tr>
+<tr>
+<td>Plain CSS</td>
+<td>✅ any valid <code>.css</code> compiles to itself (whitespace-normalized)</td>
+</tr>
+</tbody>
+</table>
+<p>Unknown functions (<code>calc()</code>, <code>var()</code>, <code>rgba()</code>, <code>clamp()</code>, <code>color-mix()</code>, …) pass through untouched — arguments still evaluate (<code>translate($x * 2, -50%)</code> works).</p>
+<pre><code class="language-scss hljs">@use &quot;sass:math&quot;;
+$breakpoints: (sm: 640px, md: 768px, lg: 1024px);
+
+@function rem($px, $base: 16px) { @return math.div($px, $base) * 1rem; }
+
+@mixin respond($name) {
+  @if not map-has-key($breakpoints, $name) { @error &quot;unknown breakpoint #{$name}&quot;; }
+  @media (min-width: map-get($breakpoints, $name)) { @content; }
+}
+
+@each $name, $bp in $breakpoints {
+  .container-#{$name} { max-width: $bp - 24px; }
+}
+@for $i from 1 through 12 {
+  .col-#{$i} { width: math.percentage(math.div($i, 12)); }
+}
+.hero {
+  font-size: rem(28px);
+  @include respond(md) { font-size: rem(40px); }
+}
+</code></pre>
+<h3 id="not-supported-yet">Not supported (yet)</h3>
+<p><code>@extend</code>, color values and <code>color.*</code> functions, unit conversion (<code>px</code>↔<code>cm</code>), <code>@at-root (with: ...)</code> queries, <code>@forward ... with (...)</code>, <code>@content(args)</code> / <code>using</code>, <code>math.random</code> / <code>unique-id()</code> (builds must stay deterministic), nested properties (<code>font: { family: ... }</code>), the indented <code>.sass</code> syntax, and source maps.</p>
+<p><strong>Unsupported directives fail the build with a located error</strong> — Hwaro never emits silently broken CSS:</p>
+<pre><code>Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not supported by hwaro's Sass subset (yet)
+</code></pre>
+<h3 id="expression-semantics">Expression semantics</h3>
+<p>The compiler's first duty is the plain-CSS guarantee, so expressions follow a two-tier policy:</p>
+<ul>
+<li><strong>Value contexts are lenient.</strong> A declaration or variable value is evaluated only when it visibly computes something — an operator between numbers, a call to a known function. Anything else, and anything that <em>fails</em> to evaluate (<code>$a + 2em</code> with incompatible units, <code>min(100% - 10px, 20rem)</code>), keeps its verbatim text exactly as before. Existing stylesheets compile byte-identically.</li>
+<li><strong>New syntax is strict.</strong> <code>@if</code>/<code>@while</code> conditions, <code>@each</code>/<code>@for</code> headers, <code>@return</code>, and <code>@use ... with</code> report every failure as a located build error.</li>
+</ul>
+<h3 id="deviations-from-dart-sass">Deviations from dart-sass</h3>
+<ul>
+<li><code>/</code> is <strong>never</strong> division — <code>font: 12px/1.5</code> and <code>grid-area: 1 / 2</code> stay verbatim. Use <code>math.div()</code> (this matches dart-sass 2.0, which removed slash-division).</li>
+<li>Values are stored as CSS text between evaluations; types are re-derived on use. An unquoted string that <em>looks</em> like a list (<code>&quot;a, b&quot;</code> unquoted) is treated as one.</li>
+<li>Unit arithmetic requires identical units or one unitless side; there is no <code>px</code>↔<code>in</code> conversion table.</li>
+<li><code>and</code>/<code>or</code> in <em>value</em> positions only operate on real booleans — <code>font-family: Franklin and Marshall</code> stays text. Conditions have full Sass truthiness.</li>
+<li>Global <code>min()</code>/<code>max()</code>/<code>round()</code>/<code>abs()</code> evaluate only when all arguments are statically comparable numbers; CSS forms (<code>min(5vw, 100px)</code>, <code>round(up, 101px, 10px)</code>) pass through.</li>
+<li>Built-in functions take positional arguments only. A keyword call (<code>list.append($l, x, $separator: comma)</code>) doesn't evaluate and keeps its verbatim text — user-defined <code>@mixin</code>/<code>@function</code> keyword arguments work normally.</li>
+<li><code>if()</code> evaluates both branches eagerly (no side effects exist, so this is observable only via <code>@error</code> in the untaken branch).</li>
+<li>Variables in at-rule preludes and values substitute directly (<code>@media (min-width: $bp)</code> works); selectors and property names require <code>#{...}</code> interpolation (same as dart-sass).</li>
+<li>At-rule preludes evaluate expressions only inside <code>(feature: value)</code> spans; the query structure itself stays verbatim.</li>
+<li><code>@media</code> nested inside <code>@media</code> emits literally nested blocks (dart-sass merges the conditions).</li>
+<li><code>&amp;</code> substitution is textual — <code>&amp;__elem</code> concatenates without validating the compound selector.</li>
+<li>Custom property values are verbatim: <code>$var</code> stays literal, only <code>#{...}</code> interpolates (dart-sass semantics), but leading/trailing whitespace is trimmed.</li>
+<li><code>@import</code> of the same file re-emits its CSS each time (classic Sass behavior); <code>@use</code> loads once.</li>
+<li>Configuring a module that itself uses <code>@forward</code> (<code>@use &quot;lib&quot; with (...)</code>) is an error rather than silently ignored.</li>
+<li>Declarations placed <em>after</em> a nested rule merge into the parent's single output block (<code>.a { color: red; .b {} color: blue; }</code> emits one <code>.a</code> block); dart-sass splits them in source order. Avoid relying on cascade order between a parent's trailing declarations and its nested rules.</li>
+<li>Values are substituted as text: interpolating a variable whose value contains an unbalanced quote character can confuse downstream whitespace/quote handling. Keep quote characters inside quoted strings.</li>
+<li>Only lowercase <code>.scss</code> extensions are treated as Sass sources; other casings publish verbatim like any static file.</li>
+</ul>
+<h2 id="errors">Errors</h2>
+<p>Compile failures are classified content errors (exit code 5) with <code>path:line:column</code> locations:</p>
+<pre><code>Error [HWARO_E_CONTENT]: Sass: static/css/_mixins.scss:7:12: undefined variable: &quot;$primry&quot;
+</code></pre>
+<p>During <code>hwaro serve</code>, errors show in the browser overlay and the previous output stays on disk.</p>
+<h2 id="interplay-with-other-features">Interplay with Other Features</h2>
+<ul>
+<li><strong>Asset pipeline</strong> — compiled standalone entries keep stable (non-fingerprinted) URLs and resolve through <code>asset()</code>'s passthrough. For fingerprinting, reference the <code>.scss</code> file from a bundle instead.</li>
+<li><strong>Build hooks</strong> — Tailwind/PostCSS and full dart-sass projects can still run through <code>[build] hooks.pre</code> and point Hwaro at the compiled output.</li>
+<li><strong>Cache</strong> — Sass recompiles on every full build (it does not participate in the incremental page cache). Deleting an entry <code>.scss</code> leaves its previously compiled <code>.css</code> in a stale output dir; clean builds remove it.</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/features/sass/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">Sass/SCSS</span>
+    <span class="pn-desc">순수 Crystal로 구현된 내장 SCSS 컴파일 — 외부 도구가 필요 없습니다</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/asset-pipeline/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">에셋 파이프라인</span>
+    <span class="pn-desc">내장 CSS/JS 번들링, 압축, 핑거프린트</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#quick-start">Quick Start</a></li><li><a href="#rules">Rules</a></li><li><a href="#configuration">Configuration</a></li><li><a href="#supported-subset">Supported Subset</a><ul><li><a href="#not-supported-yet">Not supported (yet)</a></li><li><a href="#expression-semantics">Expression semantics</a></li><li><a href="#deviations-from-dart-sass">Deviations from dart-sass</a></li></ul></li><li><a href="#errors">Errors</a></li><li><a href="#interplay-with-other-features">Interplay with Other Features</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

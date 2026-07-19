@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Optional markdown extensions beyond standard CommonMark">
+  <title>Markdown Extensions - Hwaro</title>
+  <meta property="og:title" content="Markdown Extensions">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/features/markdown-extensions/">
+  <meta property="og:description" content="Optional markdown extensions beyond standard CommonMark">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-markdown-extensions.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Markdown Extensions">
+  <meta name="twitter:description" content="Optional markdown extensions beyond standard CommonMark">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-markdown-extensions.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/features/markdown-extensions/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/markdown-extensions/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/" class="active">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+    
+    <li aria-current="page">Markdown Extensions</li>
+  </ol>
+</nav>
+    <h1>Markdown Extensions</h1>
+    <p>Hwaro supports optional markdown extensions beyond standard CommonMark. Each extension can be toggled in <code>config.toml</code> (see the table below for defaults).</p>
+<h2 id="configuration">Configuration</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+task_lists <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+definition_lists <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+footnotes <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+math <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+math_engine <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;katex&quot;</span>
+mermaid <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>task_lists</td>
+<td>bool</td>
+<td>true</td>
+<td>Checkbox lists (<code>- [ ]</code> / <code>- [x]</code>)</td>
+</tr>
+<tr>
+<td>definition_lists</td>
+<td>bool</td>
+<td>true</td>
+<td>Definition lists (<code>Term\n: Definition</code>)</td>
+</tr>
+<tr>
+<td>footnotes</td>
+<td>bool</td>
+<td>true</td>
+<td>Footnotes (<code>[^1]</code>)</td>
+</tr>
+<tr>
+<td>math</td>
+<td>bool</td>
+<td>false</td>
+<td>Math expressions (<code>$...$</code> and <code>$$...$$</code>)</td>
+</tr>
+<tr>
+<td>math_engine</td>
+<td>string</td>
+<td>&quot;katex&quot;</td>
+<td>Math rendering engine (<code>&quot;katex&quot;</code> or <code>&quot;mathjax&quot;</code>)</td>
+</tr>
+<tr>
+<td>mermaid</td>
+<td>bool</td>
+<td>false</td>
+<td>Mermaid diagram blocks</td>
+</tr>
+<tr>
+<td>admonitions</td>
+<td>bool</td>
+<td>true</td>
+<td>GitHub-style <code>&gt; [!NOTE]</code> blockquotes become admonition blocks</td>
+</tr>
+<tr>
+<td>heading_ids</td>
+<td>bool</td>
+<td>true</td>
+<td>Custom heading IDs (<code>## Heading {#custom-id}</code>)</td>
+</tr>
+<tr>
+<td>ins</td>
+<td>bool</td>
+<td>false</td>
+<td>Inserted text (<code>++text++</code> → <code>&lt;ins&gt;text&lt;/ins&gt;</code>)</td>
+</tr>
+<tr>
+<td>mark</td>
+<td>bool</td>
+<td>false</td>
+<td>Highlighted text (<code>==text==</code> → <code>&lt;mark&gt;text&lt;/mark&gt;</code>)</td>
+</tr>
+<tr>
+<td>sub</td>
+<td>bool</td>
+<td>false</td>
+<td>Subscript (<code>~text~</code> → <code>&lt;sub&gt;text&lt;/sub&gt;</code>)</td>
+</tr>
+<tr>
+<td>sup</td>
+<td>bool</td>
+<td>false</td>
+<td>Superscript (<code>^text^</code> → <code>&lt;sup&gt;text&lt;/sup&gt;</code>)</td>
+</tr>
+<tr>
+<td>attributes</td>
+<td>bool</td>
+<td>false</td>
+<td>Generalized <code>{#id .class key=val}</code> blocks on headings and inline images</td>
+</tr>
+<tr>
+<td>safe</td>
+<td>bool</td>
+<td>false</td>
+<td>Strip raw HTML from output (replaced with comments)</td>
+</tr>
+<tr>
+<td>lazy_loading</td>
+<td>bool</td>
+<td>false</td>
+<td>Add <code>loading=&quot;lazy&quot;</code> to <code>&lt;img&gt;</code> tags</td>
+</tr>
+<tr>
+<td>emoji</td>
+<td>bool</td>
+<td>false</td>
+<td>Convert emoji shortcodes (e.g. <code>:smile:</code>) to emoji characters</td>
+</tr>
+<tr>
+<td>smart_punctuation</td>
+<td>bool</td>
+<td>false</td>
+<td>Typographic quotes/dashes/ellipses</td>
+</tr>
+<tr>
+<td>containers</td>
+<td>bool</td>
+<td>false</td>
+<td><code>:::note Title</code> … <code>:::</code> custom containers</td>
+</tr>
+<tr>
+<td>task_list_classes</td>
+<td>bool</td>
+<td>false</td>
+<td>GFM classes on task-list markup</td>
+</tr>
+<tr>
+<td>insert_anchor_links</td>
+<td>string</td>
+<td>&quot;none&quot;</td>
+<td>Site-wide heading anchor links (<code>&quot;none&quot;</code>/<code>&quot;left&quot;</code>/<code>&quot;right&quot;</code>)</td>
+</tr>
+<tr>
+<td>external_links_target_blank</td>
+<td>bool</td>
+<td>false</td>
+<td><code>target=&quot;_blank&quot; rel=&quot;noopener&quot;</code> on absolute http(s) links</td>
+</tr>
+<tr>
+<td>external_links_no_follow</td>
+<td>bool</td>
+<td>false</td>
+<td><code>rel=&quot;nofollow&quot;</code> on absolute http(s) links</td>
+</tr>
+<tr>
+<td>external_links_no_referrer</td>
+<td>bool</td>
+<td>false</td>
+<td><code>rel=&quot;noreferrer&quot;</code> on absolute http(s) links</td>
+</tr>
+</tbody>
+</table>
+<h2 id="task-lists">Task Lists</h2>
+<p>Render checkboxes in lists.</p>
+<h3 id="syntax">Syntax</h3>
+<pre><code class="language-markdown hljs"><span class="hljs-keyword">- </span><span class="hljs-keyword">[x]</span> Completed task
+<span class="hljs-keyword">- </span><span class="hljs-keyword">[ ]</span> Incomplete task
+<span class="hljs-keyword">- </span><span class="hljs-keyword">[X]</span> Also completed (case-insensitive)
+</code></pre>
+<h3 id="output">Output</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">ul</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">input</span> <span class="hljs-attr">type</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;checkbox&quot;</span> <span class="hljs-attr">checked</span> <span class="hljs-attr">disabled</span><span class="hljs-punctuation">&gt;</span> Completed task<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">input</span> <span class="hljs-attr">type</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;checkbox&quot;</span> <span class="hljs-attr">disabled</span><span class="hljs-punctuation">&gt;</span> Incomplete task<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">input</span> <span class="hljs-attr">type</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;checkbox&quot;</span> <span class="hljs-attr">checked</span> <span class="hljs-attr">disabled</span><span class="hljs-punctuation">&gt;</span> Also completed<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">ul</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="definition-lists">Definition Lists</h2>
+<p>Render terms with their definitions using <code>&lt;dl&gt;</code>, <code>&lt;dt&gt;</code>, and <code>&lt;dd&gt;</code> elements.</p>
+<h3 id="syntax-1">Syntax</h3>
+<pre><code class="language-markdown hljs">Crystal
+: A compiled language with Ruby-like syntax
+
+Go
+: A statically typed, compiled language by Google
+</code></pre>
+<h3 id="output-1">Output</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">dl</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>Crystal<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>A compiled language with Ruby-like syntax<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>Go<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>A statically typed, compiled language by Google<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dl</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="footnotes">Footnotes</h2>
+<p>Add footnote references and definitions.</p>
+<h3 id="syntax-2">Syntax</h3>
+<pre><code class="language-markdown hljs">This is a statement[^1] with multiple references[^note].
+
+[<span class="hljs-symbol">^1</span>]: <span class="hljs-attr">First footnote content.</span>
+[<span class="hljs-symbol">^note</span>]: <span class="hljs-attr">Named footnote content.</span>
+</code></pre>
+<h3 id="output-2">Output</h3>
+<p>References become superscript links:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>This is a statement<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sup</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-ref&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fn-1&quot;</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fnref-1&quot;</span><span class="hljs-punctuation">&gt;</span>[1]<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span>
+with multiple references<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sup</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-ref&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fn-note&quot;</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fnref-note&quot;</span><span class="hljs-punctuation">&gt;</span>[2]<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span>.<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>A footnotes section is appended at the end:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">section</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnotes&quot;</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">hr</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">ol</span><span class="hljs-punctuation">&gt;</span>
+    <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fn-1&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>First footnote content. <span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fnref-1&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-backref&quot;</span><span class="hljs-punctuation">&gt;</span>↩<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+    <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fn-note&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>Named footnote content. <span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fnref-note&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-backref&quot;</span><span class="hljs-punctuation">&gt;</span>↩<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">ol</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">section</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="math">Math</h2>
+<p>Render mathematical expressions. Requires a client-side math library (KaTeX or MathJax).</p>
+<h3 id="syntax-3">Syntax</h3>
+<p>Inline math with single <code>$</code>:</p>
+<pre><code class="language-markdown hljs">The equation $E = mc^2$ is well known.
+</code></pre>
+<p>Display math with double <code>$$</code>:</p>
+<pre><code class="language-markdown hljs">$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$
+</code></pre>
+<h3 id="output-3">Output</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>The equation <span class="hljs-punctuation">&lt;</span><span class="hljs-name">span</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;math math-inline&quot;</span><span class="hljs-punctuation">&gt;</span>\(E = mc^2\)<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">span</span><span class="hljs-punctuation">&gt;</span> is well known.<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>
+
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;math math-display&quot;</span><span class="hljs-punctuation">&gt;</span>\[\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}\]<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="client-side-setup">Client-Side Setup</h3>
+<h4 id="katex">KaTeX</h4>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-built_in">document</span><span class="hljs-punctuation">.</span>addEventListener<span class="hljs-punctuation">(</span><span class="hljs-string">&quot;DOMContentLoaded&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-keyword">function</span><span class="hljs-punctuation">(</span><span class="hljs-punctuation">)</span> <span class="hljs-punctuation">{</span>
+    renderMathInElement<span class="hljs-punctuation">(</span><span class="hljs-built_in">document</span><span class="hljs-punctuation">.</span>body<span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h4 id="mathjax">MathJax</h4>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+  MathJax <span class="hljs-operator">=</span> <span class="hljs-punctuation">{</span> tex<span class="hljs-operator">:</span> <span class="hljs-punctuation">{</span> inlineMath<span class="hljs-operator">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span><span class="hljs-string">&#39;\\(&#39;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&#39;\\)&#39;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span> displayMath<span class="hljs-operator">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span><span class="hljs-string">&#39;\\[&#39;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&#39;\\]&#39;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">}</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="mermaid-diagrams">Mermaid Diagrams</h2>
+<p>Render Mermaid diagram blocks as <code>&lt;div class=&quot;mermaid&quot;&gt;</code> elements.</p>
+<p>This is the one exception to <a href="/templates/render-hooks/">render hooks</a>' &quot;always applies&quot; rule: with <code>mermaid = true</code>, a <code>```mermaid</code> fence always goes through this pipeline instead of a <code>render-codeblock.html</code> hook, even if one is configured. Set <code>mermaid = false</code> to have a codeblock hook own mermaid fences like any other language.</p>
+<h3 id="syntax-4">Syntax</h3>
+<pre><code class="language-markdown hljs"><span class="hljs-string">```</span><span class="hljs-symbol">mermaid</span>
+graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
+<span class="hljs-string">```</span>
+</code></pre>
+<h3 id="output-4">Output</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;mermaid&quot;</span><span class="hljs-punctuation">&gt;</span>
+graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="client-side-setup-1">Client-Side Setup</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>mermaid<span class="hljs-punctuation">.</span>initialize<span class="hljs-punctuation">(</span><span class="hljs-punctuation">{</span> startOnLoad<span class="hljs-operator">:</span> <span class="hljs-literal">true</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="inline-markup-ins-mark-sub-sup">Inline Markup (ins, mark, sub, sup)</h2>
+<p>Four opt-in inline styles, each behind its own flag — off by default, so
+turning one on never affects the others.</p>
+<h3 id="syntax-5">Syntax</h3>
+<pre><code class="language-markdown hljs">++Inserted text++ and ==highlighted text==.
+Formula: x~2~ + y^2^ = z~n~
+</code></pre>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+ins <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+mark <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+sub <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+sup <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<h3 id="output-5">Output</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">ins</span><span class="hljs-punctuation">&gt;</span>Inserted text<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">ins</span><span class="hljs-punctuation">&gt;</span> and <span class="hljs-punctuation">&lt;</span><span class="hljs-name">mark</span><span class="hljs-punctuation">&gt;</span>highlighted text<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">mark</span><span class="hljs-punctuation">&gt;</span>.
+Formula: x<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span>2<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span> + y<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span>2<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span> = z<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span>n<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="limitations">Limitations</h3>
+<ul>
+<li><strong>No backslash escape.</strong> None of the four delimiters supports
+CommonMark-style <code>\</code>-escaping to suppress the transform, and results
+from trying are inconsistent — a backslash can leave broken, escaped-tag
+output behind instead of either the literal delimiter or the styled
+result. Use a code span (<code>`++literal++`</code>) whenever you need the
+syntax to show up as text.</li>
+<li><strong>Delimiter hazards:</strong> <code>++</code>/<code>==</code>/<code>~</code>/<code>^</code> all require non-whitespace on
+both sides of the content to activate, so arithmetic-like text (<code>a ~ b</code>,
+<code>x ^ y</code>, <code>a == b</code> with spaces) is left alone. A single <code>~</code> and <code>^</code> are
+deliberately disjoint from strikethrough's <code>~~</code> and normal <code>**</code>/<code>__</code>
+emphasis, so <code>~~del~~</code> and <code>~sub~</code> on the same line both work — but a
+page with lots of literal <code>~</code>/<code>^</code>/<code>==</code>/<code>++</code> (shell prompts, C/C++
+snippets, XOR-heavy code) should keep those in code spans or fenced code
+blocks either way, since sub/sup/ins/mark only ever apply outside them.</li>
+<li><code>sup</code> will not mangle a footnote reference (<code>[^1]</code>) even when <code>footnotes</code>
+is also enabled.</li>
+</ul>
+<h2 id="attributes-id-class-keyval">Attributes (<code>{#id .class key=val}</code>)</h2>
+<p>A pandoc-style attribute block on a heading or inline image — a
+generalization of the <a href="/writing/pages/#custom-heading-ids">custom heading ID</a>
+shorthand that also sets classes and arbitrary attributes, and extends to
+images.</p>
+<h3 id="syntax-6">Syntax</h3>
+<pre><code class="language-markdown hljs"><span class="hljs-section">## Section Title {#section-title .highlight data-index=3}</span>
+
+![<span class="hljs-name">A diagram</span>](<span class="hljs-attr">diagram.png</span>){.responsive width=800}
+</code></pre>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+attributes <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<h3 id="output-6">Output</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">h2</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;section-title&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;highlight&quot;</span> <span class="hljs-attr">data-index</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;3&quot;</span><span class="hljs-punctuation">&gt;</span>Section Title<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">h2</span><span class="hljs-punctuation">&gt;</span>
+
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">img</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;diagram.png&quot;</span> <span class="hljs-attr">alt</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;A diagram&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;responsive&quot;</span> <span class="hljs-attr">width</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;800&quot;</span> <span class="hljs-punctuation">/</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>Tokens are whitespace-separated (commas are not separators): <code>#id</code> sets
+the id, <code>.class</code> adds a class (repeatable), and <code>key=value</code> / <code>key=&quot;quoted value&quot;</code> sets any other attribute. <code>id=value</code> and <code>class=value</code> are
+accepted as aliases for <code>#value</code> / <code>.value</code>. Any single invalid token
+invalidates the whole block, leaving the source <code>{...}</code> untouched.</p>
+<h3 id="limitations-1">Limitations</h3>
+<ul>
+<li><strong>v1 scope is headings and inline images only</strong> — attribute blocks after
+other elements (paragraphs, links, code spans, list items) are not
+supported and are left as literal text.</li>
+<li>A plain <code>## Heading {#id}</code> (no other tokens) is still handled by the
+narrower <code>heading_ids</code> mechanism even when <code>attributes</code> is also on, so
+turning <code>attributes</code> on doesn't change existing <code>{#id}</code>-only headings.</li>
+<li><strong>Safe mode drops the block</strong>: with <code>markdown.safe = true</code>, <code>{...}</code>
+attribute blocks are stripped from the output (like <code>heading_ids</code>) —
+no attributes are applied.</li>
+</ul>
+<h2 id="smart-punctuation">Smart Punctuation</h2>
+<p>With <code>smart_punctuation = true</code>, straight quotes, double/triple dashes,
+and three dots become their typographic forms:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&quot;quoted&quot;</code> / <code>&#39;quoted&#39;</code></td>
+<td>“quoted” / ‘quoted’</td>
+</tr>
+<tr>
+<td><code>--</code></td>
+<td>– (en dash)</td>
+</tr>
+<tr>
+<td><code>---</code></td>
+<td>— (em dash)</td>
+</tr>
+<tr>
+<td><code>...</code></td>
+<td>… (ellipsis)</td>
+</tr>
+</tbody>
+</table>
+<p>Code spans, code blocks, raw HTML, and math bodies are never rewritten.
+Table cells, definition bodies, and footnote bodies are pre-rendered
+HTML, so smart punctuation does not apply inside them. The <code>markdownify</code>
+template filter follows the site's setting.</p>
+<h2 id="custom-containers">Custom Containers</h2>
+<p>With <code>containers = true</code>, fenced <code>:::</code> blocks render with the same
+markup (and CSS) as admonitions:</p>
+<pre><code class="language-markdown hljs">:::note Optional Title
+Any <span class="hljs-strong">**markdown**</span> body — code fences and task lists included.
+:::
+</code></pre>
+<p>The title defaults to the capitalized type. Longer runs nest
+(<code>::::outer</code> … <code>:::inner</code> … <code>:::</code> … <code>::::</code>), a bare <code>:::</code> closes the
+innermost open container, and unclosed containers auto-close at the end
+of the page. <code>:::</code> lines inside code fences stay literal. Not supported
+with <code>safe = true</code> (the raw wrapper would be stripped).</p>
+<h2 id="task-list-classes">Task List Classes</h2>
+<p>With <code>task_list_classes = true</code>, task-list markup gets GFM's classes so
+GitHub-targeted CSS applies as-is: <code>&lt;li class=&quot;task-list-item&quot;&gt;</code>,
+<code>class=&quot;task-list-item-checkbox&quot;</code> on the checkbox, and
+<code>class=&quot;contains-task-list&quot;</code> on every list that directly contains a
+task item. Off by default so existing sites keep byte-identical output.</p>
+<h2 id="heading-anchor-links">Heading Anchor Links</h2>
+<p><code>insert_anchor_links = &quot;left&quot;</code> (or <code>&quot;right&quot;</code>) adds a <code>🔗</code> anchor link
+to every heading site-wide — before or after the heading text. Page
+front matter <code>insert_anchor_links = true/false</code> overrides the site
+setting per page. Customize the markup entirely with a
+<a href="/templates/render-hooks/">render-heading hook</a>.</p>
+<h2 id="external-link-policy">External Link Policy</h2>
+<p>Three flags apply a site-wide policy to absolute <code>http(s)://</code> links in
+rendered markdown (including table cells and footnotes):</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+external_links_target_blank <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span> <span class="hljs-comment"># target=&quot;_blank&quot; + rel=&quot;noopener&quot;</span>
+external_links_no_follow <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>    <span class="hljs-comment"># rel=&quot;nofollow&quot;</span>
+external_links_no_referrer <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>  <span class="hljs-comment"># rel=&quot;noreferrer&quot;</span>
+</code></pre>
+<p>Links that already carry a <code>target=</code> keep it, and <code>rel</code> tokens merge
+into an existing <code>rel</code> attribute without duplicating — so a
+render-link hook's explicit choices win. The policy applies to every
+absolute http(s) link, including ones pointing at your own domain.</p>
+<h2 id="multi-line-footnotes-and-definitions">Multi-line Footnotes and Definitions</h2>
+<p>Footnote definitions collect 4-space (or tab) indented continuation
+lines, including blank-line-separated paragraphs:</p>
+<pre><code class="language-markdown hljs">[<span class="hljs-symbol">^1</span>]: <span class="hljs-attr">First paragraph of the note,</span>
+    soft-wrapped onto a second line.
+
+    Second paragraph of the same note.
+</code></pre>
+<p>Definition list bodies soft-wrap the same way (indented lines join the
+same <code>&lt;dd&gt;</code>). Unindented (lazy) continuation, block elements inside
+footnote bodies, and multi-paragraph <code>&lt;dd&gt;</code> are not supported.</p>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/config/">Configuration</a> — Markdown configuration options</li>
+<li><a href="/features/syntax-highlighting/">Syntax Highlighting</a> — Code block highlighting</li>
+<li><a href="/templates/render-hooks/">Render Hooks</a> — Override how links, images, headings, and code blocks render</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/features/markdown-extensions/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">마크다운 확장</span>
+    <span class="pn-desc">표준 CommonMark를 넘어서는 선택적 마크다운 확장</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/series/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">시리즈</span>
+    <span class="pn-desc">글을 순서 있는 시리즈로 묶어 차례대로 읽게 하기</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#configuration">Configuration</a></li><li><a href="#task-lists">Task Lists</a><ul><li><a href="#syntax">Syntax</a></li><li><a href="#output">Output</a></li></ul></li><li><a href="#definition-lists">Definition Lists</a><ul><li><a href="#syntax-1">Syntax</a></li><li><a href="#output-1">Output</a></li></ul></li><li><a href="#footnotes">Footnotes</a><ul><li><a href="#syntax-2">Syntax</a></li><li><a href="#output-2">Output</a></li></ul></li><li><a href="#math">Math</a><ul><li><a href="#syntax-3">Syntax</a></li><li><a href="#output-3">Output</a></li><li><a href="#client-side-setup">Client-Side Setup</a><ul><li><a href="#katex">KaTeX</a></li><li><a href="#mathjax">MathJax</a></li></ul></li></ul></li><li><a href="#mermaid-diagrams">Mermaid Diagrams</a><ul><li><a href="#syntax-4">Syntax</a></li><li><a href="#output-4">Output</a></li><li><a href="#client-side-setup-1">Client-Side Setup</a></li></ul></li><li><a href="#inline-markup-ins-mark-sub-sup">Inline Markup (ins, mark, sub, sup)</a><ul><li><a href="#syntax-5">Syntax</a></li><li><a href="#output-5">Output</a></li><li><a href="#limitations">Limitations</a></li></ul></li><li><a href="#attributes-id-class-keyval">Attributes ({#id .class key=val})</a><ul><li><a href="#syntax-6">Syntax</a></li><li><a href="#output-6">Output</a></li><li><a href="#limitations-1">Limitations</a></li></ul></li><li><a href="#smart-punctuation">Smart Punctuation</a></li><li><a href="#custom-containers">Custom Containers</a></li><li><a href="#task-list-classes">Task List Classes</a></li><li><a href="#heading-anchor-links">Heading Anchor Links</a></li><li><a href="#external-link-policy">External Link Policy</a></li><li><a href="#multi-line-footnotes-and-definitions">Multi-line Footnotes and Definitions</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="번역 연결과 hreflang 태그를 갖춘 다국어 사이트 구축">
+  <title>다국어 - Hwaro</title>
+  <meta property="og:title" content="다국어">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/multilingual/">
+  <meta property="og:description" content="번역 연결과 hreflang 태그를 갖춘 다국어 사이트 구축">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-multilingual.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="다국어">
+  <meta name="twitter:description" content="번역 연결과 hreflang 태그를 갖춘 다국어 사이트 구축">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-multilingual.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/multilingual/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/multilingual/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/multilingual/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/multilingual/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/" class="active">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">다국어</li>
+  </ol>
+</nav>
+    <h1>다국어</h1>
+    <p>Hwaro는 자동 번역 연결, 언어별 URL, SEO용 hreflang 태그를 갖춘 다국어 사이트 구축을 지원합니다.</p>
+<h2 id="설정">설정</h2>
+<p><code>config.toml</code>에서 다국어 지원을 활성화합니다:</p>
+<pre><code class="language-toml hljs">default_language <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;en&quot;</span>
+
+<span class="hljs-punctuation">[</span>languages<span class="hljs-punctuation">.</span>en<span class="hljs-punctuation">]</span>
+language_name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;English&quot;</span>
+weight <span class="hljs-punctuation">=</span> <span class="hljs-number">1</span>
+
+<span class="hljs-punctuation">[</span>languages<span class="hljs-punctuation">.</span>ko<span class="hljs-punctuation">]</span>
+language_name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;한국어&quot;</span>
+weight <span class="hljs-punctuation">=</span> <span class="hljs-number">2</span>
+generate_feed <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+build_search_index <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+taxonomies <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;tags&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;categories&quot;</span><span class="hljs-punctuation">]</span>
+
+<span class="hljs-punctuation">[</span>languages<span class="hljs-punctuation">.</span>ja<span class="hljs-punctuation">]</span>
+language_name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;日本語&quot;</span>
+weight <span class="hljs-punctuation">=</span> <span class="hljs-number">3</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default_language</td>
+<td>string</td>
+<td>&quot;en&quot;</td>
+<td>기본 언어 코드</td>
+</tr>
+<tr>
+<td>language_name</td>
+<td>string</td>
+<td>—</td>
+<td>사람이 읽는 언어 이름</td>
+</tr>
+<tr>
+<td>weight</td>
+<td>int</td>
+<td>0</td>
+<td>정렬 순서(낮을수록 앞)</td>
+</tr>
+<tr>
+<td>generate_feed</td>
+<td>bool</td>
+<td>true</td>
+<td>해당 언어의 RSS/Atom 피드 생성 여부</td>
+</tr>
+<tr>
+<td>build_search_index</td>
+<td>bool</td>
+<td>true</td>
+<td>검색 인덱스 포함 여부</td>
+</tr>
+<tr>
+<td>taxonomies</td>
+<td>array</td>
+<td>[]</td>
+<td>해당 언어의 택소노미</td>
+</tr>
+</tbody>
+</table>
+<h2 id="콘텐츠-구조">콘텐츠 구조</h2>
+<p>파일 이름에 언어 접미사를 붙여 번역을 만듭니다:</p>
+<pre><code>content/
+├── posts/
+│   ├── hello.md         # Default language (en)
+│   ├── hello.ko.md      # Korean translation
+│   └── hello.ja.md      # Japanese translation
+├── about.md             # Default language (en)
+├── about.ko.md          # Korean translation
+└── index.md             # Homepage (default)
+</code></pre>
+<h3 id="url-매핑">URL 매핑</h3>
+<table>
+<thead>
+<tr>
+<th>파일</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>content/about.md</td>
+<td>/about/</td>
+</tr>
+<tr>
+<td>content/about.ko.md</td>
+<td>/ko/about/</td>
+</tr>
+<tr>
+<td>content/about.ja.md</td>
+<td>/ja/about/</td>
+</tr>
+<tr>
+<td>content/posts/hello.md</td>
+<td>/posts/hello/</td>
+</tr>
+<tr>
+<td>content/posts/hello.ko.md</td>
+<td>/ko/posts/hello/</td>
+</tr>
+</tbody>
+</table>
+<p>기본 언어 페이지는 루트 경로로 서비스되고, 비기본 언어 페이지에는 언어 코드 접두사가 붙습니다.</p>
+<h3 id="섹션-번역">섹션 번역</h3>
+<p>섹션 인덱스 파일에도 언어 접미사를 쓸 수 있습니다:</p>
+<pre><code>content/
+└── blog/
+    ├── _index.md         # /blog/
+    ├── _index.ko.md      # /ko/blog/
+    └── post.md
+</code></pre>
+<h2 id="번역-연결">번역 연결</h2>
+<p>Hwaro는 파일 이름을 기준으로 번역된 페이지를 자동으로 연결합니다. 언어 접미사를 뺀 기본 이름이 같은 페이지들은 서로의 번역으로 간주됩니다.</p>
+<p>예를 들어 <code>hello.md</code>, <code>hello.ko.md</code>, <code>hello.ja.md</code>는 모두 번역 관계로 연결됩니다.</p>
+<h3 id="템플릿-변수">템플릿 변수</h3>
+<p>템플릿에서 번역 데이터에 접근합니다:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.translations</span> <span class="hljs-meta">%}</span>
+&lt;nav class=&quot;language-switcher&quot;&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">t</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.translations</span> <span class="hljs-meta">%}</span>
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">t</span><span class="hljs-variable">.is_current</span> <span class="hljs-meta">%}</span>
+      &lt;span class=&quot;active&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.code</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">upper</span> <span class="hljs-meta">}}</span>&lt;/span&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>
+      &lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.code</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">upper</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/nav&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h3 id="번역-속성">번역 속성</h3>
+<table>
+<thead>
+<tr>
+<th>속성</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>code</td>
+<td>String</td>
+<td>언어 코드 (예: &quot;en&quot;, &quot;ko&quot;)</td>
+</tr>
+<tr>
+<td>url</td>
+<td>String</td>
+<td>번역된 페이지의 URL</td>
+</tr>
+<tr>
+<td>title</td>
+<td>String</td>
+<td>번역된 페이지의 제목</td>
+</tr>
+<tr>
+<td>is_current</td>
+<td>Bool</td>
+<td>현재 페이지의 언어인지 여부</td>
+</tr>
+<tr>
+<td>is_default</td>
+<td>Bool</td>
+<td>기본 언어인지 여부</td>
+</tr>
+</tbody>
+</table>
+<h2 id="seo-태그">SEO 태그</h2>
+<h3 id="캐노니컬-url">캐노니컬 URL</h3>
+<p>Hwaro는 다국어 페이지의 캐노니컬 링크 태그를 생성합니다:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">canonical_tag</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+</code></pre>
+<p>출력:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;canonical&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/about/&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="hreflang-태그">hreflang 태그</h3>
+<p>번역이 있는 페이지에는 대체 언어 링크 태그가 자동으로 생성됩니다:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">hreflang_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+</code></pre>
+<p>출력:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;alternate&quot;</span> <span class="hljs-attr">hreflang</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;en&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/about/&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;alternate&quot;</span> <span class="hljs-attr">hreflang</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;ko&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/ko/about/&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;alternate&quot;</span> <span class="hljs-attr">hreflang</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;ja&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/ja/about/&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="seo-태그-결합">SEO 태그 결합</h3>
+<p>캐노니컬 태그와 hreflang 태그를 함께 넣습니다:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">canonical_tag</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">hreflang_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">og_all_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+</code></pre>
+<h2 id="페이지-언어">페이지 언어</h2>
+<p>템플릿에서 현재 페이지의 언어에 접근합니다:</p>
+<pre><code class="language-jinja hljs">&lt;html lang=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-meta">}}</span>&quot;&gt;
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;ko&quot;</span> <span class="hljs-meta">%}</span>
+&lt;p&gt;한국어 콘텐츠&lt;/p&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="다국어-스캐폴드">다국어 스캐폴드</h2>
+<p>다국어를 지원하는 새 사이트를 만듭니다:</p>
+<pre><code class="language-bash hljs">hwaro init mysite --include-multilingual en,ko,ja
+</code></pre>
+<p>지정한 언어별로 설정과 샘플 콘텐츠 파일이 생성됩니다.</p>
+<h2 id="템플릿-예시">템플릿 예시</h2>
+<h3 id="언어-전환-드롭다운">언어 전환 (드롭다운)</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.translations</span> <span class="hljs-meta">%}</span>
+&lt;div class=&quot;lang-dropdown&quot;&gt;
+  &lt;button&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">upper</span> <span class="hljs-meta">}}</span> ▾&lt;/button&gt;
+  &lt;ul&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">t</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.translations</span> <span class="hljs-meta">%}</span>
+    &lt;li&gt;
+      &lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">t</span><span class="hljs-variable">.is_current</span> <span class="hljs-meta">%}</span> class=&quot;current&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;
+        <span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.code</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">upper</span> <span class="hljs-meta">}}</span>
+      &lt;/a&gt;
+    &lt;/li&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+  &lt;/ul&gt;
+&lt;/div&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h3 id="언어별-내비게이션">언어별 내비게이션</h3>
+<pre><code class="language-jinja hljs">&lt;nav&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;ko&quot;</span> <span class="hljs-meta">%}</span>
+    &lt;a href=&quot;/ko/&quot;&gt;홈&lt;/a&gt;
+    &lt;a href=&quot;/ko/blog/&quot;&gt;블로그&lt;/a&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">elif</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;ja&quot;</span> <span class="hljs-meta">%}</span>
+    &lt;a href=&quot;/ja/&quot;&gt;ホーム&lt;/a&gt;
+    &lt;a href=&quot;/ja/blog/&quot;&gt;ブログ&lt;/a&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>
+    &lt;a href=&quot;/&quot;&gt;Home&lt;/a&gt;
+    &lt;a href=&quot;/blog/&quot;&gt;Blog&lt;/a&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+&lt;/nav&gt;
+</code></pre>
+<h3 id="i18n을-적용한-베이스-템플릿">i18n을 적용한 베이스 템플릿</h3>
+<pre><code class="language-jinja hljs">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">default</span><span class="hljs-operator">(</span><span class="hljs-variable">value</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;en&#39;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;utf-8&quot;&gt;
+  &lt;title&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span> - <span class="hljs-meta">{{</span> <span class="hljs-variable">site</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/title&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">canonical_tag</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">hreflang_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">og_all_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+&lt;body&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.translations</span> <span class="hljs-meta">%}</span>
+  &lt;nav class=&quot;i18n&quot;&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">t</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.translations</span> <span class="hljs-meta">%}</span>
+      <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">t</span><span class="hljs-variable">.is_current</span> <span class="hljs-meta">%}</span>
+        &lt;strong&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.code</span> <span class="hljs-meta">}}</span>&lt;/strong&gt;
+      <span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>
+        &lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">t</span><span class="hljs-variable">.code</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+      <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+  &lt;/nav&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+  &lt;main&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">block</span> <span class="hljs-variable">content</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">endblock</span> <span class="hljs-meta">%}</span>
+  &lt;/main&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<h2 id="i18n-번역-파일">i18n 번역 파일</h2>
+<p>내비게이션 레이블, 버튼 텍스트 같은 UI 문자열은 <code>i18n/</code> 디렉터리에 언어별 TOML 파일을 두어 번역할 수 있습니다.</p>
+<h3 id="파일-구조">파일 구조</h3>
+<p>언어마다 TOML 파일을 하나씩 만듭니다:</p>
+<pre><code>i18n/
+├── en.toml
+├── ko.toml
+└── ja.toml
+</code></pre>
+<h3 id="번역-파일-형식">번역 파일 형식</h3>
+<pre><code class="language-toml hljs"><span class="hljs-comment"># i18n/en.toml</span>
+<span class="hljs-punctuation">[</span>nav<span class="hljs-punctuation">]</span>
+home <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Home&quot;</span>
+blog <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Blog&quot;</span>
+about <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;About&quot;</span>
+
+<span class="hljs-punctuation">[</span>common<span class="hljs-punctuation">]</span>
+read_more <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Read more&quot;</span>
+back <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Back&quot;</span>
+</code></pre>
+<pre><code class="language-toml hljs"><span class="hljs-comment"># i18n/ko.toml</span>
+<span class="hljs-punctuation">[</span>nav<span class="hljs-punctuation">]</span>
+home <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;홈&quot;</span>
+blog <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;블로그&quot;</span>
+about <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;소개&quot;</span>
+
+<span class="hljs-punctuation">[</span>common<span class="hljs-punctuation">]</span>
+read_more <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;더 읽기&quot;</span>
+back <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;뒤로&quot;</span>
+</code></pre>
+<p>중첩된 TOML 섹션은 점으로 구분한 키로 평탄화됩니다 (예: <code>nav.home</code>, <code>common.read_more</code>).</p>
+<h3 id="템플릿-사용">템플릿 사용</h3>
+<p><code>t</code> 필터로 키를 번역합니다:</p>
+<pre><code class="language-jinja hljs">&lt;nav&gt;
+  &lt;a href=&quot;/&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;nav.home&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+  &lt;a href=&quot;/blog/&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;nav.blog&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+  &lt;a href=&quot;/about/&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;nav.about&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+&lt;/nav&gt;
+
+&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;common.read_more&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+</code></pre>
+<h3 id="폴백-동작">폴백 동작</h3>
+<ol>
+<li>현재 페이지 언어에서 키를 찾습니다</li>
+<li>없으면 기본 언어(<code>default_language</code>)로 폴백합니다</li>
+<li>그래도 없으면 키 자체를 반환합니다 (예: <code>&quot;nav.home&quot;</code>)</li>
+</ol>
+<h3 id="복수형-처리">복수형 처리</h3>
+<p>개수에 따라 달라지는 문자열에는 <code>pluralize</code> 필터를 사용합니다:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">post_count</span> <span class="hljs-meta">}}</span> <span class="hljs-meta">{{</span> <span class="hljs-variable">post_count</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">pluralize</span><span class="hljs-operator">(</span><span class="hljs-variable">singular</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;post&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">plural</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;posts&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<h2 id="언어별-피드">언어별 피드</h2>
+<p>다국어 사이트에서는 Hwaro가 언어별로 별도의 RSS/Atom 피드를 자동 생성합니다:</p>
+<table>
+<thead>
+<tr>
+<th>언어</th>
+<th>피드 경로</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>기본 언어 (예: <code>en</code>)</td>
+<td><code>/rss.xml</code></td>
+<td>기본 언어 페이지만 (설정으로 변경 가능)</td>
+</tr>
+<tr>
+<td>비기본 언어 (예: <code>ko</code>)</td>
+<td><code>/ko/rss.xml</code></td>
+<td>한국어 페이지만</td>
+</tr>
+<tr>
+<td>비기본 언어 (예: <code>ja</code>)</td>
+<td><code>/ja/rss.xml</code></td>
+<td>일본어 페이지만</td>
+</tr>
+</tbody>
+</table>
+<p>기본적으로 메인 사이트 피드(<code>/rss.xml</code> 또는 <code>/atom.xml</code>)에는 <strong>기본 언어 페이지만</strong> 포함됩니다. 이 동작은 <code>default_language_only</code> 옵션으로 바꿀 수 있습니다. <code>generate_feed = true</code>인 비기본 언어는 이 설정과 무관하게 각자의 언어 접두사 아래에 자체 피드를 갖습니다.</p>
+<h3 id="설정-1">설정</h3>
+<h4 id="메인-피드-언어-제어">메인 피드 언어 제어</h4>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>feeds<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+default_language_only <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>   <span class="hljs-comment"># true(기본값): 메인 피드에 기본 언어만 포함</span>
+                               <span class="hljs-comment"># false: 메인 피드에 모든 언어 포함</span>
+</code></pre>
+<h4 id="언어별-피드-제어">언어별 피드 제어</h4>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>languages<span class="hljs-punctuation">.</span>ko<span class="hljs-punctuation">]</span>
+language_name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;한국어&quot;</span>
+generate_feed <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>    <span class="hljs-comment"># Generates /ko/rss.xml (default: true)</span>
+
+<span class="hljs-punctuation">[</span>languages<span class="hljs-punctuation">.</span>ja<span class="hljs-punctuation">]</span>
+language_name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;日本語&quot;</span>
+generate_feed <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>   <span class="hljs-comment"># No /ja/rss.xml will be generated</span>
+</code></pre>
+<p>언어 피드는 전역 <code>[feeds]</code> 설정의 <code>sections</code>, <code>limit</code>, <code>truncate</code>, <code>full_content</code> 값을 그대로 사용합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>feeds<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+type <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;rss&quot;</span>           <span class="hljs-comment"># 또는 &quot;atom&quot;</span>
+limit <span class="hljs-punctuation">=</span> <span class="hljs-number">20</span>
+truncate <span class="hljs-punctuation">=</span> <span class="hljs-number">0</span>
+full_content <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>    <span class="hljs-comment"># false = 설명/요약만 포함</span>
+sections <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span>          <span class="hljs-comment"># 비워 두면 모든 섹션</span>
+default_language_only <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<h3 id="피드-세부-사항">피드 세부 사항</h3>
+<ul>
+<li><strong>RSS 피드</strong>에는 <code>&lt;language&gt;</code> 태그가 포함됩니다 (예: <code>&lt;language&gt;ko&lt;/language&gt;</code>)</li>
+<li><strong>Atom 피드</strong>에는 <code>xml:lang</code> 속성이 포함됩니다 (예: <code>&lt;feed xmlns=&quot;...&quot; xml:lang=&quot;ko&quot;&gt;</code>)</li>
+<li>피드 제목에 언어 이름이 붙습니다: <code>&quot;My Site (한국어)&quot;</code></li>
+<li>자기 참조 링크는 해당 언어 경로를 가리킵니다 (예: <code>https://example.com/ko/rss.xml</code>)</li>
+<li>초안 페이지와 섹션 인덱스 페이지는 제외됩니다</li>
+<li>언어 피드는 메인 피드의 <code>enabled</code> 설정과 무관하게 생성됩니다</li>
+</ul>
+<h3 id="템플릿-링크">템플릿 링크</h3>
+<p>템플릿에 언어별 피드 링크를 추가합니다:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Main feed (default language) #}</span>
+&lt;link rel=&quot;alternate&quot; type=&quot;application/rss+xml&quot;
+      href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span>/rss.xml&quot;
+      title=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">site</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&quot;&gt;
+
+<span class="hljs-comment">{# Language-specific feed #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-keyword">and</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-punctuation">!</span><span class="hljs-operator">=</span> <span class="hljs-string">&quot;en&quot;</span> <span class="hljs-meta">%}</span>
+&lt;link rel=&quot;alternate&quot; type=&quot;application/rss+xml&quot;
+      href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span>/<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-meta">}}</span>/rss.xml&quot;
+      title=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">site</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span> (<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.language</span> <span class="hljs-meta">}}</span>)&quot;&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/start/config/">설정</a> — 전체 설정 레퍼런스</li>
+<li><a href="/ko/features/seo/">SEO</a> — 피드, 캐노니컬, hreflang 등 SEO 기능</li>
+<li><a href="/ko/templates/data-model/">데이터 모델</a> — 번역 링크 속성</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/content-files/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Content Files</span>
+    <span class="pn-desc">Publish non-Markdown files from the content directory</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/features/multilingual/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">Multilingual</span>
+    <span class="pn-desc">Build multilingual sites with translation linking and hreflang tags</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#설정">설정</a></li><li><a href="#콘텐츠-구조">콘텐츠 구조</a><ul><li><a href="#url-매핑">URL 매핑</a></li><li><a href="#섹션-번역">섹션 번역</a></li></ul></li><li><a href="#번역-연결">번역 연결</a><ul><li><a href="#템플릿-변수">템플릿 변수</a></li><li><a href="#번역-속성">번역 속성</a></li></ul></li><li><a href="#seo-태그">SEO 태그</a><ul><li><a href="#캐노니컬-url">캐노니컬 URL</a></li><li><a href="#hreflang-태그">hreflang 태그</a></li><li><a href="#seo-태그-결합">SEO 태그 결합</a></li></ul></li><li><a href="#페이지-언어">페이지 언어</a></li><li><a href="#다국어-스캐폴드">다국어 스캐폴드</a></li><li><a href="#템플릿-예시">템플릿 예시</a><ul><li><a href="#언어-전환-드롭다운">언어 전환 (드롭다운)</a></li><li><a href="#언어별-내비게이션">언어별 내비게이션</a></li><li><a href="#i18n을-적용한-베이스-템플릿">i18n을 적용한 베이스 템플릿</a></li></ul></li><li><a href="#i18n-번역-파일">i18n 번역 파일</a><ul><li><a href="#파일-구조">파일 구조</a></li><li><a href="#번역-파일-형식">번역 파일 형식</a></li><li><a href="#템플릿-사용">템플릿 사용</a></li><li><a href="#폴백-동작">폴백 동작</a></li><li><a href="#복수형-처리">복수형 처리</a></li></ul></li><li><a href="#언어별-피드">언어별 피드</a><ul><li><a href="#설정-1">설정</a><ul><li><a href="#메인-피드-언어-제어">메인 피드 언어 제어</a></li><li><a href="#언어별-피드-제어">언어별 피드 제어</a></li></ul></li><li><a href="#피드-세부-사항">피드 세부 사항</a></li><li><a href="#템플릿-링크">템플릿 링크</a></li></ul></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

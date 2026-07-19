@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Automatic syntax highlighting for code blocks">
+  <title>Syntax Highlighting - Hwaro</title>
+  <meta property="og:title" content="Syntax Highlighting">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/features/syntax-highlighting/">
+  <meta property="og:description" content="Automatic syntax highlighting for code blocks">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-syntax-highlighting.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Syntax Highlighting">
+  <meta name="twitter:description" content="Automatic syntax highlighting for code blocks">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-syntax-highlighting.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/features/syntax-highlighting/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/syntax-highlighting/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/" class="active">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main no-toc">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+    
+    <li aria-current="page">Syntax Highlighting</li>
+  </ol>
+</nav>
+    <h1>Syntax Highlighting</h1>
+    <p>Code blocks in Markdown are automatically syntax highlighted.</p>
+<h2 id="usage">Usage</h2>
+<p>Use fenced code blocks with a language identifier:</p>
+<pre><code class="language-markdown hljs"><span class="hljs-string">```</span><span class="hljs-symbol">javascript</span>
+<span class="hljs-keyword">function</span> greet<span class="hljs-punctuation">(</span>name<span class="hljs-punctuation">)</span> <span class="hljs-punctuation">{</span>
+  console<span class="hljs-punctuation">.</span>log<span class="hljs-punctuation">(</span><span class="hljs-string">`</span><span class="hljs-string">Hello, </span><span class="hljs-subst">${</span>name<span class="hljs-subst">}</span><span class="hljs-string">!</span><span class="hljs-string">`</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+<span class="hljs-punctuation">}</span>
+<span class="hljs-string">```</span>
+</code></pre>
+<h2 id="supported-languages">Supported Languages</h2>
+<p>Common languages:</p>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Identifiers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JavaScript</td>
+<td>javascript, js</td>
+</tr>
+<tr>
+<td>TypeScript</td>
+<td>typescript, ts</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>python, py</td>
+</tr>
+<tr>
+<td>Ruby</td>
+<td>ruby, rb</td>
+</tr>
+<tr>
+<td>Go</td>
+<td>go, golang</td>
+</tr>
+<tr>
+<td>Rust</td>
+<td>rust, rs</td>
+</tr>
+<tr>
+<td>Crystal</td>
+<td>crystal, cr</td>
+</tr>
+<tr>
+<td>HTML</td>
+<td>html</td>
+</tr>
+<tr>
+<td>CSS</td>
+<td>css</td>
+</tr>
+<tr>
+<td>JSON</td>
+<td>json</td>
+</tr>
+<tr>
+<td>YAML</td>
+<td>yaml, yml</td>
+</tr>
+<tr>
+<td>TOML</td>
+<td>toml</td>
+</tr>
+<tr>
+<td>Markdown</td>
+<td>markdown, md</td>
+</tr>
+<tr>
+<td>Shell</td>
+<td>bash, sh, shell</td>
+</tr>
+<tr>
+<td>SQL</td>
+<td>sql</td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration">Configuration</h2>
+<p>Configure in <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>highlight<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+theme <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;github-dark&quot;</span>
+use_cdn <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+mode <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;server&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>true</td>
+<td>Enable syntax highlighting</td>
+</tr>
+<tr>
+<td>theme</td>
+<td>string</td>
+<td>&quot;github&quot;</td>
+<td>Highlight.js theme name</td>
+</tr>
+<tr>
+<td>use_cdn</td>
+<td>bool</td>
+<td>true</td>
+<td>Load assets from CDN (false = local files)</td>
+</tr>
+<tr>
+<td>mode</td>
+<td>string</td>
+<td>&quot;server&quot;</td>
+<td><code>&quot;server&quot;</code> highlights at build time; <code>&quot;client&quot;</code> highlights in the browser via Highlight.js</td>
+</tr>
+<tr>
+<td>line_numbers</td>
+<td>bool</td>
+<td>false</td>
+<td>Add line numbers to every fenced code block by default (see below)</td>
+</tr>
+<tr>
+<td>copy</td>
+<td>bool</td>
+<td>false</td>
+<td>Add a copy-to-clipboard button to fenced code blocks (see below)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="server-side-highlighting-default">Server-Side Highlighting (Default)</h2>
+<p>With <code>mode = &quot;server&quot;</code> (the default), code blocks are highlighted during
+the build — no JavaScript ships to the browser, and code is colored even
+with JavaScript disabled.</p>
+<p>The build-time highlighter emits Highlight.js-compatible CSS classes, so
+every theme above keeps working unchanged: <code>{{ highlight_css }}</code> still
+injects the theme stylesheet, while <code>{{ highlight_js }}</code> becomes empty.</p>
+<p>Over 250 languages are supported (via <a href="https://github.com/ralsina/tartrazine">Tartrazine</a>
+lexers, ported from Pygments/Chroma). Code blocks in languages without a
+lexer fall back to plain, unhighlighted output.</p>
+<h2 id="client-side-highlighting">Client-Side Highlighting</h2>
+<p>Set <code>mode = &quot;client&quot;</code> to highlight in the browser with Highlight.js
+instead:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>highlight<span class="hljs-punctuation">]</span>
+mode <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;client&quot;</span>
+theme <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;github-dark&quot;</span>
+</code></pre>
+<p>In client mode <code>{{ highlight_js }}</code> injects the Highlight.js script (from
+the CDN or your local assets, see below), and code blocks ship as plain
+<code>&lt;pre&gt;&lt;code class=&quot;language-...&quot;&gt;</code> markup for the browser to colorize.</p>
+<h2 id="line-numbers-and-highlighted-lines">Line Numbers and Highlighted Lines</h2>
+<p>A fenced code block's language can be followed by an options block —
+<code>{...}</code> — to add line numbers and/or highlight specific lines:</p>
+<pre><code class="language-markdown hljs">```python {linenos=true, hl_lines=&quot;2-4 7&quot;, linenostart=5}
+def main():
+    setup()
+    run()
+    teardown()
+    return 0
+```
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>linenos</code></td>
+<td><code>true</code> / <code>false</code></td>
+<td>Show a line-number gutter. Overrides the <code>[highlight] line_numbers</code> default for this block.</td>
+</tr>
+<tr>
+<td><code>hl_lines</code></td>
+<td>e.g. <code>&quot;2-4 7&quot;</code></td>
+<td>Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block&#39;s own <strong>physical</strong> 1-based lines, never shifted by <code>linenostart</code>.</td>
+</tr>
+<tr>
+<td><code>linenostart</code></td>
+<td>e.g. <code>5</code></td>
+<td>First displayed line number (default <code>1</code>). Only affects the numbers shown — it does not change which physical lines <code>hl_lines</code> highlights.</td>
+</tr>
+<tr>
+<td><code>hide_lines</code></td>
+<td>e.g. <code>&quot;1 9-12&quot;</code></td>
+<td>Omit these lines from the rendered output (server mode only — see below). Same syntax and physical-line semantics as <code>hl_lines</code>.</td>
+</tr>
+<tr>
+<td><code>copy</code></td>
+<td><code>true</code> / <code>false</code></td>
+<td>Show a copy-to-clipboard button on this block. Overrides the <code>[highlight] copy</code> default. Ignored on <code>mermaid</code> fences.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>e.g. <code>&quot;main.cr&quot;</code></td>
+<td>Filename/title label rendered above the block (<code>title=</code> is accepted as an alias). Ignored on <code>mermaid</code> fences.</td>
+</tr>
+</tbody>
+</table>
+<p>A named block is wrapped for styling (the <code>&lt;pre&gt;</code> inside is unchanged):</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;code-block&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;code-filename&quot;</span><span class="hljs-punctuation">&gt;</span>main.cr<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">pre</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">code</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;language-crystal hljs&quot;</span><span class="hljs-punctuation">&gt;</span>…<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">code</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">pre</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>Scaffolded sites ship matching <code>.code-block</code> / <code>.code-filename</code> styles;
+bring your own CSS otherwise.</p>
+<p>The block accepts a couple of equivalent forms: <code>python {linenos=true}</code>,
+<code>python{linenos=true}</code> (no space), or <code>{linenos=true}</code> alone (no
+language). A malformed or unrecognized options block (e.g. <code>{oops}</code>) is
+left as literal text in the language token, exactly as if fence options
+didn't exist.</p>
+<p>Setting <code>[highlight] line_numbers = true</code> turns line numbers on for
+<em>every</em> fenced code block with a language — a per-block <code>{linenos=false}</code>
+opts back out.</p>
+<p>Hidden lines keep consuming their physical line numbers, so with
+<code>linenos=true</code> the gutter shows a <strong>gap</strong> where lines were elided —
+unlike Zola, which renumbers the remaining lines. This keeps the
+documented invariant that <code>hl_lines</code> and <code>linenostart</code> always target the
+block's physical lines, hidden or not (highlighting a hidden line is
+simply a no-op).</p>
+<p>Only <code>mode = &quot;server&quot;</code> actually removes hidden lines from the HTML. In
+client mode <code>hide_lines</code> is presentational-only metadata (an inert
+<code>data-hide-lines</code> attribute) — the lines remain in the page source. Do
+<strong>not</strong> use <code>hide_lines</code> to redact secrets in client mode.</p>
+<p><strong>Server vs client mode:</strong></p>
+<ul>
+<li><code>mode = &quot;server&quot;</code> (default) renders the full result at build time: each
+line is wrapped in its own element, so line numbers and highlighted
+lines appear with no JavaScript.</li>
+<li><code>mode = &quot;client&quot;</code> does not re-render the body — instead the
+<code>&lt;pre&gt;</code> tag gets <code>data-linenos=&quot;true&quot;</code>, <code>data-linenostart=&quot;N&quot;</code> (when
+greater than 1), <code>data-hl-lines=&quot;2-4 7&quot;</code>, and/or
+<code>data-hide-lines=&quot;1 9-12&quot;</code> attributes, so a client-side script or
+custom CSS can act on them. Hwaro ships no such script for client
+mode; full rendering (and actual line hiding) requires
+<code>mode = &quot;server&quot;</code>.</li>
+</ul>
+<p>Scaffold sites style the server-mode markup out of the box. For a
+non-scaffold site, or a custom theme, add:</p>
+<pre><code class="language-css hljs"><span class="hljs-name">pre</span> <span class="hljs-name">code</span> <span class="hljs-punctuation">.</span><span class="hljs-title class_">line</span><span class="hljs-punctuation">.</span><span class="hljs-title class_">hl</span> <span class="hljs-punctuation">{</span> <span class="hljs-keyword">display</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">inline-block</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">width</span><span class="hljs-punctuation">:</span> <span class="hljs-number">100</span><span class="hljs-type">%</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">background</span><span class="hljs-punctuation">:</span> <span class="hljs-title function_">color-mix</span><span class="hljs-punctuation">(</span>in srgb<span class="hljs-punctuation">,</span> <span class="hljs-title function_">var</span><span class="hljs-punctuation">(</span><span class="hljs-operator">-</span><span class="hljs-operator">-</span>code<span class="hljs-operator">-</span>keyword<span class="hljs-punctuation">)</span> <span class="hljs-number">12</span><span class="hljs-type">%</span><span class="hljs-punctuation">,</span> <span class="hljs-literal">transparent</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span> <span class="hljs-punctuation">}</span>
+<span class="hljs-name">pre</span> <span class="hljs-name">code</span> <span class="hljs-punctuation">.</span><span class="hljs-title class_">ln</span> <span class="hljs-punctuation">{</span> <span class="hljs-keyword">user-select</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">none</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">-webkit-</span><span class="hljs-keyword">user-select</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">none</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">opacity</span><span class="hljs-punctuation">:</span> <span class="hljs-number">.45</span><span class="hljs-punctuation">;</span> <span class="hljs-punctuation">}</span>
+</code></pre>
+<p>(Swap <code>var(--code-keyword)</code> for any color that fits your theme if you
+aren't using the Hwaro Ember token system.)</p>
+<h2 id="copy-button">Copy Button</h2>
+<p><code>[highlight] copy = true</code> adds a copy-to-clipboard button to every fenced
+code block; a per-fence <code>{copy=false}</code> (or <code>{copy=true}</code> with the global
+default off) overrides it:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>highlight<span class="hljs-punctuation">]</span>
+copy <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<p>The markup contract: each opted-in block's <code>&lt;pre&gt;</code> gets a
+<code>data-copy=&quot;true&quot;</code> attribute, and <code>{{ highlight_js }}</code> injects a small
+inline, dependency-free runtime (works in both server and client mode).
+With <code>copy = true</code> the runtime ships site-wide; with the global default
+off, pages whose body contains an opted-in block get it appended to
+their own <code>{{ highlight_js }}</code> — pages without one stay JavaScript-free.
+The runtime
+that wraps each <code>pre[data-copy]</code> in a <code>&lt;div class=&quot;code-wrapper&quot;&gt;</code> —
+reusing an existing <code>.code-block</code> wrapper (named fences) as the anchor
+instead — appends a <code>&lt;button class=&quot;code-copy-btn&quot;&gt;</code>, and copies the
+code's text on click (server-mode <code>.ln</code> line-number gutters are stripped
+from the copied text). The inline styles are theme-neutral
+(currentColor, hover-reveal); scaffolded sites override them with
+token-based styles.</p>
+<p><code>mermaid</code> fences never get the attribute — their <code>&lt;pre&gt;</code> shape is owned
+by the Mermaid pipeline.</p>
+<p>New scaffolded sites enable <code>copy = true</code> out of the box.</p>
+<h2 id="themes">Themes</h2>
+<p>Hwaro uses <a href="https://highlightjs.org/">Highlight.js</a> themes. Any valid Highlight.js theme name works. Popular choices:</p>
+<ul>
+<li><code>github</code> — Light GitHub style (default)</li>
+<li><code>github-dark</code> — Dark GitHub style</li>
+<li><code>github-dark-dimmed</code> — Dimmed dark GitHub style</li>
+<li><code>monokai</code> — Classic dark theme</li>
+<li><code>dracula</code> — Dark purple theme</li>
+<li><code>solarized-dark</code> — Solarized dark</li>
+<li><code>solarized-light</code> — Solarized light</li>
+<li><code>nord</code> — Arctic color palette</li>
+<li><code>tokyo-night-dark</code> — Tokyo Night dark</li>
+</ul>
+<p>Browse all available themes at <a href="https://highlightjs.org/demo">highlightjs.org/demo</a>.</p>
+<h2 id="cdn-vs-local">CDN vs Local</h2>
+<p>When <code>use_cdn = true</code> (default), assets are loaded from cdnjs:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>When <code>use_cdn = false</code>, assets are loaded from local paths:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/assets/css/highlight/github-dark.min.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/assets/js/highlight.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>You must provide the local files yourself when using <code>use_cdn = false</code>.
+In the default server mode only the theme stylesheet is referenced — the
+<code>&lt;script&gt;</code> tags above appear only with <code>mode = &quot;client&quot;</code>.</p>
+<h2 id="template-integration">Template Integration</h2>
+<p>Include highlighting assets in templates:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_css</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+&lt;body&gt;
+  ...
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_js</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/body&gt;
+</code></pre>
+<p>Or combined:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+</code></pre>
+<h2 id="build-options">Build Options</h2>
+<p>Disable highlighting for faster builds:</p>
+<pre><code class="language-bash hljs">hwaro build --skip-highlighting
+</code></pre>
+<h2 id="plain-text-blocks">Plain Text Blocks</h2>
+<p>For no highlighting, omit the language or use <code>text</code>:</p>
+<pre><code class="language-markdown hljs"><span class="hljs-string">```</span><span class="hljs-symbol">text</span>
+Plain text content
+No highlighting applied
+<span class="hljs-string">```</span>
+</code></pre>
+<h2 id="inline-code">Inline Code</h2>
+<p>Inline code uses backticks and is not highlighted:</p>
+<pre><code class="language-markdown hljs">Use the <span class="hljs-string">`console.log()`</span> function.
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/features/markdown-extensions/">Markdown Extensions</a> — Code blocks and language support</li>
+<li><a href="/start/config/">Configuration</a> — Highlight config reference</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">구문 강조</span>
+    <span class="pn-desc">코드 블록 자동 구문 강조</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/markdown-extensions/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">마크다운 확장</span>
+    <span class="pn-desc">표준 CommonMark를 넘어서는 선택적 마크다운 확장</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

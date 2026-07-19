@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Drop-in SKILL.md files for Claude Code, Cursor, OpenCode, Codex, and other skill-aware agents.">
+  <title>Agent Skills - Hwaro</title>
+  <meta property="og:title" content="Agent Skills">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/integrations/skills/">
+  <meta property="og:description" content="Drop-in SKILL.md files for Claude Code, Cursor, OpenCode, Codex, and other skill-aware agents.">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/integrations-skills.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Agent Skills">
+  <meta name="twitter:description" content="Drop-in SKILL.md files for Claude Code, Cursor, OpenCode, Codex, and other skill-aware agents.">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/integrations-skills.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/integrations/skills/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/integrations/skills/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/integrations/skills/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="integrations">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/" class="active">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/" class="active">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/integrations/">Integrations</a></li>
+    
+    <li aria-current="page">Agent Skills</li>
+  </ol>
+</nav>
+    <h1>Agent Skills</h1>
+    <p>Hwaro ships two <a href="https://github.com/hahwul/hwaro/tree/main/skills">Agent Skills</a>
+— self-contained <code>SKILL.md</code> files that teach a skill-aware AI agent how to work
+with Hwaro. Once installed, the agent loads the relevant skill automatically
+when it detects a Hwaro task.</p>
+<table>
+<thead>
+<tr>
+<th>Skill</th>
+<th>What it teaches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>hwaro</code></strong></td>
+<td>Operating the CLI — scaffolding (<code>init</code>), content (<code>new</code>), preview (<code>serve</code>), production builds (<code>build</code>), and the <code>doctor</code>/<code>tool</code>/<code>deploy</code> subcommands. Emphasizes the agent-safe output contract: <code>--json</code>, <code>--quiet</code>, <code>NO_COLOR</code>, and the classified <code>HWARO_E_*</code> error/exit codes, plus safe <code>config.toml</code> and Crinja template edits.</td>
+</tr>
+<tr>
+<td><strong><code>hwaro-design</code></strong></td>
+<td>Designing and restyling a site. It <strong>reads your brief, declares a one-line Design Read, and sets three design dials</strong> (asking questions only when your intent is genuinely ambiguous), then produces distinctive, production-grade design within Hwaro&#39;s Crinja templates and CSS-variable token system — under a strict anti-slop discipline and a mechanical pre-flight check that filter out generic AI aesthetics.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="install-with-npx-skills">Install with <code>npx skills</code></h2>
+<p>The <a href="https://www.npmjs.com/package/skills"><code>skills</code> CLI</a> is the easiest way to
+install and keep skills up to date. Adding the repo installs <strong>both</strong> Hwaro
+skills (<code>hwaro</code> and <code>hwaro-design</code>).</p>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># Add to the current project — prompts you to pick the agent (.claude/skills, .cursor/, …)</span>
+npx skills add hahwul/hwaro
+
+<span class="hljs-comment"># Install globally for every project</span>
+npx skills add hahwul/hwaro -g
+
+<span class="hljs-comment"># Target a specific agent (e.g. Claude Code)</span>
+npx skills add hahwul/hwaro -a claude-code
+
+<span class="hljs-comment"># Non-interactive — good for CI</span>
+npx skills add hahwul/hwaro -g -a claude-code -y
+</code></pre>
+<p>Update or remove later by skill name:</p>
+<pre><code class="language-bash hljs">npx skills update hwaro hwaro-design
+npx skills remove hwaro hwaro-design
+</code></pre>
+<h2 id="install-manually">Install manually</h2>
+<p>If you would rather not use <code>npx</code>, copy the files straight from the repository.
+For <strong>Claude Code</strong> the target path is <code>~/.claude/skills/&lt;name&gt;/SKILL.md</code>:</p>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># hwaro — the CLI skill</span>
+mkdir -p ~/.claude/skills/hwaro
+curl -o ~/.claude/skills/hwaro/SKILL.md <span class="hljs-string">\
+</span><span class="hljs-string"></span>  https://raw.githubusercontent.com/hahwul/hwaro/main/skills/hwaro/SKILL.md
+
+<span class="hljs-comment"># hwaro-design — the design skill</span>
+mkdir -p ~/.claude/skills/hwaro-design
+curl -o ~/.claude/skills/hwaro-design/SKILL.md <span class="hljs-string">\
+</span><span class="hljs-string"></span>  https://raw.githubusercontent.com/hahwul/hwaro/main/skills/hwaro-design/SKILL.md
+</code></pre>
+<p>Other agents use different skill directories (for example <code>.cursor/</code> or a
+project-local <code>skills/</code> folder) — check your agent's documentation for the
+correct location.</p>
+<h2 id="what-the-skills-cover">What the skills cover</h2>
+<h3 id="hwaro-driving-the-cli"><code>hwaro</code> — driving the CLI</h3>
+<ul>
+<li><strong>When it triggers:</strong> any Hwaro task, or a directory with <code>config.toml</code> plus
+<code>content/</code> and <code>templates/</code>.</li>
+<li><strong>Output contract:</strong> prefer <code>--json</code> and branch on the classified exit codes
+(<code>HWARO_E_USAGE</code>, <code>HWARO_E_CONFIG</code>, <code>HWARO_E_TEMPLATE</code>, <code>HWARO_E_CONTENT</code>, …)
+instead of scraping human-readable text.</li>
+<li><strong>Workflows:</strong> <code>init</code> scaffolds, <code>new</code> + archetypes, the <code>serve</code> live-reload
+dev loop, production <code>build</code> (<code>--minify</code>, <code>--cache</code>, <code>--base-url</code>, env
+overrides), <code>doctor</code> / <code>tool validate</code> / <code>tool check-links</code>, content tools,
+<code>tool platform</code>, and <code>deploy</code>.</li>
+<li><strong>Safe edits:</strong> TOML config rules and Crinja template gotchas (<code>| safe</code>, nil
+guards, <code>url_for</code>/<code>asset</code> for URLs), plus a verify-by-exit-code loop.</li>
+</ul>
+<h3 id="hwaro-design-designing-the-site"><code>hwaro-design</code> — designing the site</h3>
+<ul>
+<li><strong>Design Read first:</strong> reads your brief and declares a one-line design
+direction plus three dials (<code>DESIGN_VARIANCE</code> / <code>MOTION_INTENSITY</code> /
+<code>VISUAL_DENSITY</code>) before writing any CSS. It asks a short, focused question
+round only when your intent is genuinely ambiguous — and runs a full taste
+interview only when you ask for one — so the result reflects <strong>your</strong> taste
+rather than a default.</li>
+<li><strong>Anti-slop discipline:</strong> an extensive list of hard bans on the signatures of
+AI-generated design — em-dashes in page copy, eyebrow-label overuse, repeated
+section layouts, hero-overflow, fake screenshots built from <code>&lt;div&gt;</code>s,
+AI-purple gradients, decorative dots and locale strips, &quot;Jane Doe&quot; demo
+content — plus layout, copy-density, and imagery rules, all enforced by a
+mechanical pre-flight checklist before anything is declared done.</li>
+<li><strong>Hwaro mechanics:</strong> Crinja template structure, the three CSS-delivery options
+(inline, <code>[auto_includes]</code>, the <code>[assets]</code> pipeline), the shared <code>light-dark()</code>
+design-token vocabulary all built-in scaffolds theme through (light and dark
+come automatically; retheme by overriding the token pairs), responsive images
+via <code>resize_image</code>, and static-site motion via CSS scroll-driven animations
+and <code>IntersectionObserver</code> — no framework required.</li>
+</ul>
+<h2 id="prerequisite">Prerequisite</h2>
+<p>Install the Hwaro CLI so the agent can actually run builds and previews — see
+<a href="/start/installation/">Installation</a>. A skill is only as useful as the binary it
+drives.</p>
+<p>The <code>hwaro</code> skill complements your project's <code>AGENTS.md</code>: the skill is portable
+guidance that travels with the agent across any Hwaro project, while <code>AGENTS.md</code>
+(generated by <a href="/start/tools/agents-md/"><code>hwaro tool agents-md</code></a>) carries
+project-specific conventions. Agents should read <code>AGENTS.md</code> first — it can
+override the skill's defaults.</p>
+<h2 id="authoring-tips">Authoring tips</h2>
+<p>Both skills live under <a href="https://github.com/hahwul/hwaro/tree/main/skills"><code>skills/</code></a>
+in the Hwaro repository. When contributing:</p>
+<ul>
+<li>Write for <strong>agent interaction patterns</strong> — what to run, when, and how to
+recover — rather than duplicating the full CLI/template reference (link to
+these docs instead).</li>
+<li>Keep the <code>description</code> front matter precise: it is what the agent reads to
+decide <em>when</em> to load the skill.</li>
+<li>Open a pull request on <a href="https://github.com/hahwul/hwaro">GitHub</a>.</li>
+</ul>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/cli/">CLI Reference</a> — every command and flag the <code>hwaro</code> skill drives.</li>
+<li><a href="/start/tools/agents-md/">AGENTS.md</a> — per-project instructions for AI agents.</li>
+<li><a href="/templates/">Templates</a> — the data model, functions, and filters the design skill builds on.</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/integrations/skills/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">에이전트 스킬</span>
+    <span class="pn-desc">Claude Code, Cursor, OpenCode, Codex 등 스킬 지원 에이전트에 바로 설치하는 SKILL.md 파일</span>
+  </a>
+  
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#install-with-npx-skills">Install with npx skills</a></li><li><a href="#install-manually">Install manually</a></li><li><a href="#what-the-skills-cover">What the skills cover</a><ul><li><a href="#hwaro-driving-the-cli">hwaro — driving the CLI</a></li><li><a href="#hwaro-design-designing-the-site">hwaro-design — designing the site</a></li></ul></li><li><a href="#prerequisite">Prerequisite</a></li><li><a href="#authoring-tips">Authoring tips</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="코드 블록 자동 구문 강조">
+  <title>구문 강조 - Hwaro</title>
+  <meta property="og:title" content="구문 강조">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">
+  <meta property="og:description" content="코드 블록 자동 구문 강조">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-syntax-highlighting.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="구문 강조">
+  <meta name="twitter:description" content="코드 블록 자동 구문 강조">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-syntax-highlighting.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/syntax-highlighting/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/" class="active">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main no-toc">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">구문 강조</li>
+  </ol>
+</nav>
+    <h1>구문 강조</h1>
+    <p>마크다운의 코드 블록은 자동으로 구문 강조됩니다.</p>
+<h2 id="사용법">사용법</h2>
+<p>언어 식별자를 붙인 펜스 코드 블록을 사용합니다.</p>
+<pre><code class="language-markdown hljs"><span class="hljs-string">```</span><span class="hljs-symbol">javascript</span>
+<span class="hljs-keyword">function</span> greet<span class="hljs-punctuation">(</span>name<span class="hljs-punctuation">)</span> <span class="hljs-punctuation">{</span>
+  console<span class="hljs-punctuation">.</span>log<span class="hljs-punctuation">(</span><span class="hljs-string">`</span><span class="hljs-string">Hello, </span><span class="hljs-subst">${</span>name<span class="hljs-subst">}</span><span class="hljs-string">!</span><span class="hljs-string">`</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+<span class="hljs-punctuation">}</span>
+<span class="hljs-string">```</span>
+</code></pre>
+<h2 id="지원-언어">지원 언어</h2>
+<p>자주 쓰는 언어:</p>
+<table>
+<thead>
+<tr>
+<th>언어</th>
+<th>식별자</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JavaScript</td>
+<td>javascript, js</td>
+</tr>
+<tr>
+<td>TypeScript</td>
+<td>typescript, ts</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>python, py</td>
+</tr>
+<tr>
+<td>Ruby</td>
+<td>ruby, rb</td>
+</tr>
+<tr>
+<td>Go</td>
+<td>go, golang</td>
+</tr>
+<tr>
+<td>Rust</td>
+<td>rust, rs</td>
+</tr>
+<tr>
+<td>Crystal</td>
+<td>crystal, cr</td>
+</tr>
+<tr>
+<td>HTML</td>
+<td>html</td>
+</tr>
+<tr>
+<td>CSS</td>
+<td>css</td>
+</tr>
+<tr>
+<td>JSON</td>
+<td>json</td>
+</tr>
+<tr>
+<td>YAML</td>
+<td>yaml, yml</td>
+</tr>
+<tr>
+<td>TOML</td>
+<td>toml</td>
+</tr>
+<tr>
+<td>Markdown</td>
+<td>markdown, md</td>
+</tr>
+<tr>
+<td>Shell</td>
+<td>bash, sh, shell</td>
+</tr>
+<tr>
+<td>SQL</td>
+<td>sql</td>
+</tr>
+</tbody>
+</table>
+<h2 id="설정">설정</h2>
+<p><code>config.toml</code>에서 설정합니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>highlight<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+theme <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;github-dark&quot;</span>
+use_cdn <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+mode <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;server&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>true</td>
+<td>구문 강조 활성화</td>
+</tr>
+<tr>
+<td>theme</td>
+<td>string</td>
+<td>&quot;github&quot;</td>
+<td>Highlight.js 테마 이름</td>
+</tr>
+<tr>
+<td>use_cdn</td>
+<td>bool</td>
+<td>true</td>
+<td>에셋을 CDN에서 로드(false = 로컬 파일)</td>
+</tr>
+<tr>
+<td>mode</td>
+<td>string</td>
+<td>&quot;server&quot;</td>
+<td><code>&quot;server&quot;</code>는 빌드 시점에 강조, <code>&quot;client&quot;</code>는 브라우저에서 Highlight.js로 강조</td>
+</tr>
+<tr>
+<td>line_numbers</td>
+<td>bool</td>
+<td>false</td>
+<td>모든 펜스 코드 블록에 기본으로 줄 번호 추가(아래 참고)</td>
+</tr>
+<tr>
+<td>copy</td>
+<td>bool</td>
+<td>false</td>
+<td>펜스 코드 블록에 클립보드 복사 버튼 추가(아래 참고)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="서버-사이드-강조기본값">서버 사이드 강조(기본값)</h2>
+<p><code>mode = &quot;server&quot;</code>(기본값)에서는 빌드 중에 코드 블록이 강조됩니다 — 브라우저로 JavaScript가 전송되지 않고, JavaScript를 꺼 놓아도 코드에 색이 입혀집니다.</p>
+<p>빌드 시점 하이라이터는 Highlight.js 호환 CSS 클래스를 출력하므로, 아래의 모든 테마가 그대로 동작합니다. <code>{{ highlight_css }}</code>는 여전히 테마 스타일시트를 주입하고, <code>{{ highlight_js }}</code>는 빈 값이 됩니다.</p>
+<p>250개가 넘는 언어를 지원합니다(Pygments/Chroma에서 포팅된 <a href="https://github.com/ralsina/tartrazine">Tartrazine</a> 렉서 사용). 렉서가 없는 언어의 코드 블록은 강조 없는 일반 출력으로 대체됩니다.</p>
+<h2 id="클라이언트-사이드-강조">클라이언트 사이드 강조</h2>
+<p><code>mode = &quot;client&quot;</code>로 설정하면 대신 브라우저에서 Highlight.js로 강조합니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>highlight<span class="hljs-punctuation">]</span>
+mode <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;client&quot;</span>
+theme <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;github-dark&quot;</span>
+</code></pre>
+<p>클라이언트 모드에서는 <code>{{ highlight_js }}</code>가 Highlight.js 스크립트를 주입하고(CDN 또는 로컬 에셋에서 — 아래 참고), 코드 블록은 브라우저가 색을 입힐 수 있도록 일반 <code>&lt;pre&gt;&lt;code class=&quot;language-...&quot;&gt;</code> 마크업으로 출력됩니다.</p>
+<h2 id="줄-번호와-줄-강조">줄 번호와 줄 강조</h2>
+<p>펜스 코드 블록의 언어 뒤에 옵션 블록 <code>{...}</code>을 붙여 줄 번호를 넣거나 특정 줄을 강조할 수 있습니다.</p>
+<pre><code class="language-markdown hljs">```python {linenos=true, hl_lines=&quot;2-4 7&quot;, linenostart=5}
+def main():
+    setup()
+    run()
+    teardown()
+    return 0
+```
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>옵션</th>
+<th>값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>linenos</code></td>
+<td><code>true</code> / <code>false</code></td>
+<td>줄 번호 거터 표시. 이 블록에 한해 <code>[highlight] line_numbers</code> 기본값을 덮어씀</td>
+</tr>
+<tr>
+<td><code>hl_lines</code></td>
+<td>예: <code>&quot;2-4 7&quot;</code></td>
+<td>지정한 줄을 강조 — 공백/쉼표로 구분한 줄 번호나 범위. 항상 블록 자체의 <strong>물리적</strong> 1-기반 줄 번호이며 <code>linenostart</code>의 영향을 받지 않음</td>
+</tr>
+<tr>
+<td><code>linenostart</code></td>
+<td>예: <code>5</code></td>
+<td>표시되는 첫 줄 번호(기본 <code>1</code>). 화면에 보이는 번호만 바꿀 뿐, <code>hl_lines</code>가 강조하는 물리적 줄은 바뀌지 않음</td>
+</tr>
+<tr>
+<td><code>hide_lines</code></td>
+<td>예: <code>&quot;1 9-12&quot;</code></td>
+<td>지정한 줄을 렌더링 출력에서 제외(서버 모드 전용 — 아래 참고). 문법과 물리적 줄 의미는 <code>hl_lines</code>와 동일</td>
+</tr>
+<tr>
+<td><code>copy</code></td>
+<td><code>true</code> / <code>false</code></td>
+<td>이 블록에 복사 버튼 표시. <code>[highlight] copy</code> 기본값을 덮어씀. <code>mermaid</code> 펜스에서는 무시됨</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>예: <code>&quot;main.cr&quot;</code></td>
+<td>블록 위에 렌더링되는 파일명/제목 라벨(<code>title=</code>도 별칭으로 허용). <code>mermaid</code> 펜스에서는 무시됨</td>
+</tr>
+</tbody>
+</table>
+<p>이름이 붙은 블록은 스타일링을 위해 래핑됩니다(내부의 <code>&lt;pre&gt;</code>는 그대로).</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;code-block&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;code-filename&quot;</span><span class="hljs-punctuation">&gt;</span>main.cr<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">pre</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">code</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;language-crystal hljs&quot;</span><span class="hljs-punctuation">&gt;</span>…<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">code</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">pre</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>스캐폴드로 만든 사이트에는 이에 맞는 <code>.code-block</code> / <code>.code-filename</code> 스타일이 포함되어 있습니다. 그 외에는 직접 CSS를 준비해야 합니다.</p>
+<p>옵션 블록은 몇 가지 동등한 형태를 허용합니다. <code>python {linenos=true}</code>, <code>python{linenos=true}</code>(공백 없음), 언어 없이 <code>{linenos=true}</code>만 쓰는 형태 모두 가능합니다. 형식이 잘못됐거나 인식할 수 없는 옵션 블록(예: <code>{oops}</code>)은 펜스 옵션이 없는 것처럼 언어 토큰의 리터럴 텍스트로 남습니다.</p>
+<p><code>[highlight] line_numbers = true</code>를 설정하면 언어가 지정된 <em>모든</em> 펜스 코드 블록에 줄 번호가 켜집니다. 블록별 <code>{linenos=false}</code>로 다시 끌 수 있습니다.</p>
+<p>숨긴 줄도 물리적 줄 번호는 그대로 차지하므로, <code>linenos=true</code>일 때 거터에는 줄이 생략된 자리에 <strong>번호 공백</strong>이 생깁니다. 남은 줄의 번호를 다시 매기는 Zola와는 다른 동작입니다. 덕분에 <code>hl_lines</code>와 <code>linenostart</code>가 숨김 여부와 무관하게 항상 블록의 물리적 줄을 가리킨다는 문서화된 불변 조건이 유지됩니다(숨긴 줄을 강조하는 것은 그저 아무 효과가 없을 뿐입니다).</p>
+<p>숨긴 줄을 HTML에서 실제로 제거하는 것은 <code>mode = &quot;server&quot;</code>뿐입니다. 클라이언트 모드의 <code>hide_lines</code>는 표시용 메타데이터(비활성 <code>data-hide-lines</code> 속성)일 뿐이며, 해당 줄은 페이지 소스에 그대로 남습니다. 클라이언트 모드에서 비밀 값을 가리는 용도로 <code>hide_lines</code>를 사용하면 <strong>안 됩니다</strong>.</p>
+<p><strong>서버 모드와 클라이언트 모드:</strong></p>
+<ul>
+<li><code>mode = &quot;server&quot;</code>(기본값)는 빌드 시점에 결과를 완전히 렌더링합니다. 각 줄이 자체 요소로 래핑되므로 줄 번호와 줄 강조가 JavaScript 없이 표시됩니다.</li>
+<li><code>mode = &quot;client&quot;</code>는 본문을 다시 렌더링하지 않습니다. 대신 <code>&lt;pre&gt;</code> 태그에 <code>data-linenos=&quot;true&quot;</code>, <code>data-linenostart=&quot;N&quot;</code>(1보다 클 때), <code>data-hl-lines=&quot;2-4 7&quot;</code>, <code>data-hide-lines=&quot;1 9-12&quot;</code> 속성이 붙어서 클라이언트 스크립트나 커스텀 CSS가 이를 활용할 수 있습니다. Hwaro는 클라이언트 모드용 스크립트를 제공하지 않습니다. 완전한 렌더링(과 실제 줄 숨김)에는 <code>mode = &quot;server&quot;</code>가 필요합니다.</li>
+</ul>
+<p>스캐폴드 사이트는 서버 모드 마크업 스타일을 기본으로 제공합니다. 스캐폴드가 아닌 사이트나 커스텀 테마에서는 다음을 추가합니다.</p>
+<pre><code class="language-css hljs"><span class="hljs-name">pre</span> <span class="hljs-name">code</span> <span class="hljs-punctuation">.</span><span class="hljs-title class_">line</span><span class="hljs-punctuation">.</span><span class="hljs-title class_">hl</span> <span class="hljs-punctuation">{</span> <span class="hljs-keyword">display</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">inline-block</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">width</span><span class="hljs-punctuation">:</span> <span class="hljs-number">100</span><span class="hljs-type">%</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">background</span><span class="hljs-punctuation">:</span> <span class="hljs-title function_">color-mix</span><span class="hljs-punctuation">(</span>in srgb<span class="hljs-punctuation">,</span> <span class="hljs-title function_">var</span><span class="hljs-punctuation">(</span><span class="hljs-operator">-</span><span class="hljs-operator">-</span>code<span class="hljs-operator">-</span>keyword<span class="hljs-punctuation">)</span> <span class="hljs-number">12</span><span class="hljs-type">%</span><span class="hljs-punctuation">,</span> <span class="hljs-literal">transparent</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span> <span class="hljs-punctuation">}</span>
+<span class="hljs-name">pre</span> <span class="hljs-name">code</span> <span class="hljs-punctuation">.</span><span class="hljs-title class_">ln</span> <span class="hljs-punctuation">{</span> <span class="hljs-keyword">user-select</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">none</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">-webkit-</span><span class="hljs-keyword">user-select</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">none</span><span class="hljs-punctuation">;</span> <span class="hljs-keyword">opacity</span><span class="hljs-punctuation">:</span> <span class="hljs-number">.45</span><span class="hljs-punctuation">;</span> <span class="hljs-punctuation">}</span>
+</code></pre>
+<p>(Hwaro Ember 토큰 시스템을 쓰지 않는다면 <code>var(--code-keyword)</code>를 테마에 맞는 아무 색으로 바꾸면 됩니다.)</p>
+<h2 id="복사-버튼">복사 버튼</h2>
+<p><code>[highlight] copy = true</code>는 모든 펜스 코드 블록에 클립보드 복사 버튼을 추가합니다. 펜스별 <code>{copy=false}</code>(또는 전역 기본값이 꺼진 상태의 <code>{copy=true}</code>)가 이를 덮어씁니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>highlight<span class="hljs-punctuation">]</span>
+copy <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<p>마크업 계약은 이렇습니다. 옵트인한 각 블록의 <code>&lt;pre&gt;</code>에 <code>data-copy=&quot;true&quot;</code> 속성이 붙고, <code>{{ highlight_js }}</code>가 의존성 없는 작은 인라인 런타임을 주입합니다(서버·클라이언트 모드 모두 동작). <code>copy = true</code>이면 런타임이 사이트 전체에 포함되고, 전역 기본값이 꺼져 있으면 옵트인 블록이 본문에 있는 페이지에만 해당 페이지의 <code>{{ highlight_js }}</code>에 덧붙습니다 — 없는 페이지는 JavaScript가 없는 상태를 유지합니다. 런타임은 각 <code>pre[data-copy]</code>를 <code>&lt;div class=&quot;code-wrapper&quot;&gt;</code>로 감싸고(이름 붙은 펜스처럼 기존 <code>.code-block</code> 래퍼가 있으면 그것을 앵커로 재사용), <code>&lt;button class=&quot;code-copy-btn&quot;&gt;</code>을 덧붙인 뒤, 클릭 시 코드 텍스트를 복사합니다(서버 모드의 <code>.ln</code> 줄 번호 거터는 복사되는 텍스트에서 제거됩니다). 인라인 스타일은 테마 중립적(currentColor, 호버 시 표시)이며, 스캐폴드 사이트는 토큰 기반 스타일로 이를 덮어씁니다.</p>
+<p><code>mermaid</code> 펜스에는 이 속성이 절대 붙지 않습니다 — 그 <code>&lt;pre&gt;</code> 구조는 Mermaid 파이프라인이 소유합니다.</p>
+<p>새로 스캐폴드한 사이트는 <code>copy = true</code>가 기본으로 켜져 있습니다.</p>
+<h2 id="테마">테마</h2>
+<p>Hwaro는 <a href="https://highlightjs.org/">Highlight.js</a> 테마를 사용합니다. 유효한 Highlight.js 테마 이름이면 무엇이든 동작합니다. 많이 쓰는 테마:</p>
+<ul>
+<li><code>github</code> — 밝은 GitHub 스타일(기본값)</li>
+<li><code>github-dark</code> — 어두운 GitHub 스타일</li>
+<li><code>github-dark-dimmed</code> — 톤을 낮춘 어두운 GitHub 스타일</li>
+<li><code>monokai</code> — 클래식 다크 테마</li>
+<li><code>dracula</code> — 어두운 보라색 테마</li>
+<li><code>solarized-dark</code> — Solarized 다크</li>
+<li><code>solarized-light</code> — Solarized 라이트</li>
+<li><code>nord</code> — 북극 색 팔레트</li>
+<li><code>tokyo-night-dark</code> — Tokyo Night 다크</li>
+</ul>
+<p>전체 테마 목록은 <a href="https://highlightjs.org/demo">highlightjs.org/demo</a>에서 볼 수 있습니다.</p>
+<h2 id="cdn과-로컬">CDN과 로컬</h2>
+<p><code>use_cdn = true</code>(기본값)이면 에셋을 cdnjs에서 로드합니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p><code>use_cdn = false</code>이면 로컬 경로에서 로드합니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/assets/css/highlight/github-dark.min.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/assets/js/highlight.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p><code>use_cdn = false</code>를 쓸 때는 로컬 파일을 직접 준비해야 합니다. 기본값인 서버 모드에서는 테마 스타일시트만 참조됩니다 — 위의 <code>&lt;script&gt;</code> 태그는 <code>mode = &quot;client&quot;</code>일 때만 나타납니다.</p>
+<h2 id="템플릿-연동">템플릿 연동</h2>
+<p>템플릿에 강조 에셋을 포함합니다.</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_css</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+&lt;body&gt;
+  ...
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_js</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/body&gt;
+</code></pre>
+<p>또는 한 번에:</p>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+</code></pre>
+<h2 id="빌드-옵션">빌드 옵션</h2>
+<p>빌드 속도를 높이려면 강조를 비활성화합니다.</p>
+<pre><code class="language-bash hljs">hwaro build --skip-highlighting
+</code></pre>
+<h2 id="일반-텍스트-블록">일반 텍스트 블록</h2>
+<p>강조하지 않으려면 언어를 생략하거나 <code>text</code>를 사용합니다.</p>
+<pre><code class="language-markdown hljs"><span class="hljs-string">```</span><span class="hljs-symbol">text</span>
+Plain text content
+No highlighting applied
+<span class="hljs-string">```</span>
+</code></pre>
+<h2 id="인라인-코드">인라인 코드</h2>
+<p>인라인 코드는 백틱을 사용하며 강조되지 않습니다.</p>
+<pre><code class="language-markdown hljs">Use the <span class="hljs-string">`console.log()`</span> function.
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/features/markdown-extensions/">마크다운 확장</a> — 코드 블록과 언어 지원</li>
+<li><a href="/ko/start/config/">설정</a> — 강조 설정 레퍼런스</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/pagination/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Pagination</span>
+    <span class="pn-desc">Split large content lists into multiple pages</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/features/syntax-highlighting/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">Syntax Highlighting</span>
+    <span class="pn-desc">Automatic syntax highlighting for code blocks</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Site configuration reference for config.toml">
+  <title>Configuration - Hwaro</title>
+  <meta property="og:title" content="Configuration">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/start/config/">
+  <meta property="og:description" content="Site configuration reference for config.toml">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/start-config.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Configuration">
+  <meta name="twitter:description" content="Site configuration reference for config.toml">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/start-config.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/start/config/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/config/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/config/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="start">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/" class="active">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/start/config/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/start/config/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/" class="active">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+    
+    <li aria-current="page">Configuration</li>
+  </ol>
+</nav>
+    <h1>Configuration</h1>
+    <p>All site configuration lives in <code>config.toml</code> at the project root.</p>
+<p>Unknown top-level keys are reported instead of silently ignored — a typo'd
+<code>[markdonw]</code> or <code>titel = &quot;…&quot;</code> would otherwise disable a feature with no
+feedback. Hwaro warns with a suggestion when one is close to a real key:</p>
+<pre><code>Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean 'markdown'?
+</code></pre>
+<p>The check covers top-level keys only; keys nested inside a section are
+validated by that section's own loader.</p>
+<h2 id="site-settings">Site Settings</h2>
+<pre><code class="language-toml hljs">title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;My Site&quot;</span>
+description <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Site description for SEO&quot;</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://example.com&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>title</td>
+<td>string</td>
+<td>Site title</td>
+</tr>
+<tr>
+<td>description</td>
+<td>string</td>
+<td>Site description</td>
+</tr>
+<tr>
+<td>base_url</td>
+<td>string</td>
+<td>Production URL (no trailing slash)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="environment-variables">Environment Variables</h2>
+<p>You can reference environment variables in <code>config.toml</code>. Values are substituted before TOML parsing.</p>
+<pre><code class="language-toml hljs">base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;${SITE_URL}&quot;</span>
+title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;$SITE_TITLE&quot;</span>
+description <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;${SITE_DESC:-My awesome site}&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>${VAR}</code></td>
+<td>Substitute with env var value</td>
+</tr>
+<tr>
+<td><code>$VAR</code></td>
+<td>Same as above (bare form)</td>
+</tr>
+<tr>
+<td><code>${VAR:-default}</code></td>
+<td>Use <code>default</code> if <code>VAR</code> is unset or empty</td>
+</tr>
+</tbody>
+</table>
+<p>Missing variables without defaults are left as-is and produce a build warning. See <a href="/features/env-variables/">Environment Variables</a> for template usage.</p>
+<h2 id="build-options">Build Options</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>build<span class="hljs-punctuation">]</span>
+output_dir <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;public&quot;</span>
+drafts <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+parallel <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+cache <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+hooks<span class="hljs-punctuation">.</span>pre <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;npm install&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;npx tsc&quot;</span><span class="hljs-punctuation">]</span>
+hooks<span class="hljs-punctuation">.</span>post <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;npm run minify&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>output_dir</td>
+<td>string</td>
+<td>&quot;public&quot;</td>
+<td>Output directory</td>
+</tr>
+<tr>
+<td>drafts</td>
+<td>bool</td>
+<td>false</td>
+<td>Include draft content</td>
+</tr>
+<tr>
+<td>parallel</td>
+<td>bool</td>
+<td>true</td>
+<td>Parallel processing</td>
+</tr>
+<tr>
+<td>cache</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable build caching</td>
+</tr>
+<tr>
+<td>hooks.pre</td>
+<td>array</td>
+<td>[]</td>
+<td>Commands to run before build</td>
+</tr>
+<tr>
+<td>hooks.post</td>
+<td>array</td>
+<td>[]</td>
+<td>Commands to run after build</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/features/build-hooks/">Build Hooks</a> for error handling and use cases.</p>
+<h2 id="markdown">Markdown</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+safe <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+lazy_loading <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+emoji <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+footnotes <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+task_lists <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+definition_lists <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+mermaid <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+math <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+math_engine <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;katex&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>safe</td>
+<td>bool</td>
+<td>false</td>
+<td>Strip raw HTML from markdown</td>
+</tr>
+<tr>
+<td>lazy_loading</td>
+<td>bool</td>
+<td>false</td>
+<td>Automatically add <code>loading=&quot;lazy&quot;</code> to images</td>
+</tr>
+<tr>
+<td>emoji</td>
+<td>bool</td>
+<td>false</td>
+<td>Convert emoji shortcodes (e.g. <code>:smile:</code>) to emoji characters</td>
+</tr>
+<tr>
+<td>footnotes</td>
+<td>bool</td>
+<td>true</td>
+<td>Enable footnote syntax (<code>[^1]</code>)</td>
+</tr>
+<tr>
+<td>task_lists</td>
+<td>bool</td>
+<td>true</td>
+<td>Enable task list syntax (<code>- [ ]</code> / <code>- [x]</code>)</td>
+</tr>
+<tr>
+<td>task_list_classes</td>
+<td>bool</td>
+<td>false</td>
+<td>Add GFM classes (<code>task-list-item</code>, <code>contains-task-list</code>) to task-list markup</td>
+</tr>
+<tr>
+<td>definition_lists</td>
+<td>bool</td>
+<td>true</td>
+<td>Enable definition list syntax (<code>Term\n: Definition</code>)</td>
+</tr>
+<tr>
+<td>mermaid</td>
+<td>bool</td>
+<td>false</td>
+<td>Render <code> </code>`<code>mermaid </code> blocks as <code>&lt;div class=&quot;mermaid&quot;&gt;</code></td>
+</tr>
+<tr>
+<td>math</td>
+<td>bool</td>
+<td>false</td>
+<td>Enable math syntax (<code>$...$</code> and <code>$$...$$</code>)</td>
+</tr>
+<tr>
+<td>math_engine</td>
+<td>string</td>
+<td>&quot;katex&quot;</td>
+<td>Math rendering engine (<code>&quot;katex&quot;</code> or <code>&quot;mathjax&quot;</code>)</td>
+</tr>
+<tr>
+<td>smart_punctuation</td>
+<td>bool</td>
+<td>false</td>
+<td>Typographic quotes/dashes/ellipses (<code>&quot;x&quot;</code> → “x”, <code>--</code> → –, <code>...</code> → …)</td>
+</tr>
+<tr>
+<td>containers</td>
+<td>bool</td>
+<td>false</td>
+<td><code>:::note Title</code> … <code>:::</code> custom containers (admonition markup)</td>
+</tr>
+<tr>
+<td>insert_anchor_links</td>
+<td>string</td>
+<td>&quot;none&quot;</td>
+<td>Site-wide heading anchor links: <code>&quot;none&quot;</code>, <code>&quot;left&quot;</code>, or <code>&quot;right&quot;</code> (page front matter overrides)</td>
+</tr>
+<tr>
+<td>external_links_target_blank</td>
+<td>bool</td>
+<td>false</td>
+<td>Add <code>target=&quot;_blank&quot; rel=&quot;noopener&quot;</code> to absolute http(s) links</td>
+</tr>
+<tr>
+<td>external_links_no_follow</td>
+<td>bool</td>
+<td>false</td>
+<td>Add <code>rel=&quot;nofollow&quot;</code> to absolute http(s) links</td>
+</tr>
+<tr>
+<td>external_links_no_referrer</td>
+<td>bool</td>
+<td>false</td>
+<td>Add <code>rel=&quot;noreferrer&quot;</code> to absolute http(s) links</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/features/markdown-extensions/">Markdown Extensions</a> for syntax details and examples.</p>
+<h2 id="permalinks">Permalinks</h2>
+<p>Rewrite content directory paths to custom URL paths. Useful for site restructuring without breaking links.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>permalinks<span class="hljs-punctuation">]</span>
+<span class="hljs-string">&quot;old/posts&quot;</span> <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;posts&quot;</span>
+<span class="hljs-string">&quot;2023/drafts&quot;</span> <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;archive/2023&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Source (Directory)</th>
+<th>Target (URL Path)</th>
+<th>Example Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content/old/posts/a.md</code></td>
+<td><code>posts/</code></td>
+<td><code>/old/posts/a/</code> -&gt; <code>/posts/a/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Rules are evaluated in declaration order and the <strong>first</strong> source that matches the page's directory (exactly or as a parent prefix) wins — later rules are never consulted for that page. Declare specific prefixes before broad ones (<code>&quot;posts/tech&quot;</code> before <code>&quot;posts&quot;</code>), or the broad rule shadows the specific one. This applies to token patterns too, and especially to the <code>&quot;&quot;</code> catch-all: put it <strong>last</strong>, after every other rule.</p>
+<h3 id="token-patterns">Token patterns</h3>
+<p>A target containing <code>:token</code> segments is a Hugo-style pattern that rebuilds the whole URL instead of remapping the directory:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>permalinks<span class="hljs-punctuation">]</span>
+<span class="hljs-string">&quot;posts&quot;</span> <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/:year/:month/:day/:slug/&quot;</span>
+</code></pre>
+<p>With <code>content/posts/hello.md</code> dated <code>2026-03-05</code>, the page is published at <code>/2026/03/05/hello/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Expands to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>:year</code></td>
+<td>Page date year (<code>2026</code>)</td>
+</tr>
+<tr>
+<td><code>:month</code></td>
+<td>Page date month, zero-padded (<code>03</code>)</td>
+</tr>
+<tr>
+<td><code>:day</code></td>
+<td>Page date day, zero-padded (<code>05</code>)</td>
+</tr>
+<tr>
+<td><code>:slug</code></td>
+<td>Front-matter <code>slug</code>, or the filename stem when unset</td>
+</tr>
+<tr>
+<td><code>:title</code></td>
+<td>Slugified front-matter <code>title</code> (falls back to <code>:slug</code> when it slugifies to nothing)</td>
+</tr>
+<tr>
+<td><code>:section</code></td>
+<td>The page&#39;s section path (<code>posts/tech</code>); empty for root pages, collapsing the segment</td>
+</tr>
+<tr>
+<td><code>:filename</code></td>
+<td>The filename stem, ignoring any <code>slug</code> override</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li>Tokens must be whole path segments; unknown tokens fail the config load.</li>
+<li>Patterns apply to leaf pages only. Section <code>_index</code> and bundle <code>index</code> pages skip pattern rules (they keep their directory URL, or a later plain remap rule).</li>
+<li>A page without a <code>date</code> that matches a pattern using <code>:year</code>/<code>:month</code>/<code>:day</code> fails the build — add a date, set an explicit <code>path</code> in front matter, or drop the date tokens. Pages that never publish are exempt: drafts (without <code>--drafts</code>), expired/future-dated pages, and headless <code>render: false</code> pages don't block the build.</li>
+<li>An explicit <code>path</code> in front matter always wins over any permalink rule.</li>
+<li>An empty source key (<code>&quot;&quot;</code> or <code>&quot;/&quot;</code>) makes a pattern rule a catch-all for every page — declare it last, since first-match ordering means it would shadow any rule after it.</li>
+<li>For non-default languages the <code>/lang/</code> prefix comes first: <code>/ko/2026/03/05/hello/</code>.</li>
+</ul>
+<h2 id="links">Links</h2>
+<p>Control how unresolved <code>@/path.md</code> internal links are treated during the build.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>links<span class="hljs-punctuation">]</span>
+broken_internal <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;error&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>broken_internal</td>
+<td>string</td>
+<td>&quot;warn&quot;</td>
+<td><code>&quot;warn&quot;</code> logs each unresolved <code>@/</code> link and keeps the raw markup; <code>&quot;error&quot;</code> fails the build (exit code 5) with one aggregated list of every offender</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="/writing/pages/#internal-links">Internal Links</a> for the <code>@/</code> link syntax and the <code>--cache</code> caveat in strict mode.</p>
+<h2 id="taxonomies">Taxonomies</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>taxonomies<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;tags&quot;</span>
+feed <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+paginate_by <span class="hljs-punctuation">=</span> <span class="hljs-number">10</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>taxonomies<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;categories&quot;</span>
+feed <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>string</td>
+<td>—</td>
+<td>Taxonomy name (used in front matter)</td>
+</tr>
+<tr>
+<td>feed</td>
+<td>bool</td>
+<td>false</td>
+<td>Generate RSS feed for each term</td>
+</tr>
+<tr>
+<td>sitemap</td>
+<td>bool</td>
+<td>true</td>
+<td>Include taxonomy pages in sitemap</td>
+</tr>
+<tr>
+<td>paginate_by</td>
+<td>int</td>
+<td>—</td>
+<td>Items per page on term pages</td>
+</tr>
+<tr>
+<td>sort_by</td>
+<td>string</td>
+<td>&quot;date&quot;</td>
+<td>Order of pages within a term: <code>&quot;date&quot;</code> (newest first), <code>&quot;title&quot;</code>, or <code>&quot;weight&quot;</code></td>
+</tr>
+<tr>
+<td>reverse</td>
+<td>bool</td>
+<td>false</td>
+<td>Flip whichever order <code>sort_by</code> produced</td>
+</tr>
+<tr>
+<td>terms_sort_by</td>
+<td>string</td>
+<td>&quot;name&quot;</td>
+<td>Order of the terms list on the taxonomy index: <code>&quot;name&quot;</code> or <code>&quot;count&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Term feeds stay reverse-chronological regardless of <code>sort_by</code>. See
+<a href="/writing/taxonomies/#sorting">Taxonomies</a> for the full sorting rules.</p>
+<h2 id="menus">Menus</h2>
+<p>Named navigation menus, rendered in templates via <code>site.menus</code> / <code>get_menu()</code>.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>menus<span class="hljs-punctuation">.</span>main<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Posts&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/posts/&quot;</span>
+weight <span class="hljs-punctuation">=</span> <span class="hljs-number">1</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>menus<span class="hljs-punctuation">.</span>main<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;About&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/about/&quot;</span>
+weight <span class="hljs-punctuation">=</span> <span class="hljs-number">2</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>string</td>
+<td>—</td>
+<td><strong>Required.</strong> Entry skipped (with a warning) if missing.</td>
+</tr>
+<tr>
+<td>url</td>
+<td>string</td>
+<td>&quot;&quot;</td>
+<td>Root-relative or absolute <code>http(s)://</code>/<code>//</code> URL.</td>
+</tr>
+<tr>
+<td>weight</td>
+<td>int</td>
+<td>0</td>
+<td>Sort order within the menu.</td>
+</tr>
+<tr>
+<td>identifier</td>
+<td>string</td>
+<td><code>name</code></td>
+<td>Unique key other entries reference via <code>parent</code>.</td>
+</tr>
+<tr>
+<td>parent</td>
+<td>string</td>
+<td>none</td>
+<td>Nest this entry under another entry&#39;s <code>identifier</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Pages/sections can also join a menu from their own front matter (<code>menus = [&quot;main&quot;]</code>) without touching this file. A <code>[languages.&lt;code&gt;]</code> block with no menus table inherits this global set; declaring <code>[[languages.&lt;code&gt;.menus.&lt;name&gt;]]</code> replaces it for that language. See <a href="/features/menus/">Menus</a> for the full reference (hierarchy, per-language behavior, <code>active_path</code> styling).</p>
+<h2 id="static-files">Static Files</h2>
+<p>Everything under <code>static/</code> is copied verbatim into the site root, preserving its directory structure — <code>static/css/app.css</code> is served at <code>/css/app.css</code>. Hidden entries are included too, so <code>static/.well-known/security.txt</code> is published at <code>/.well-known/security.txt</code>. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>static<span class="hljs-punctuation">]</span>
+use_default_excludes <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>              <span class="hljs-comment"># filter built-in cruft (default)</span>
+exclude <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;*.bak&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;drafts/**&quot;</span><span class="hljs-punctuation">]</span>         <span class="hljs-comment"># extra patterns to skip</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>use_default_excludes</td>
+<td>bool</td>
+<td>true</td>
+<td>Filter the built-in cruft denylist (<code>.DS_Store</code>, <code>Thumbs.db</code>, <code>desktop.ini</code>, <code>.git</code>, vim swap files, …)</td>
+</tr>
+<tr>
+<td>exclude</td>
+<td>array</td>
+<td>[]</td>
+<td>Extra patterns to skip. A glob like <code>*.bak</code> matches at any depth, <code>drafts/**</code> scopes a subtree, and a literal name is anchored to an exact file or directory (<code>drafts</code> drops <code>drafts/…</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The built-in denylist only removes cruft — legitimate dot-paths such as <code>.well-known/</code> and <code>.domains</code> are <strong>never</strong> filtered and are always published, identically for cold and <code>--cache</code>/incremental builds. Set <code>use_default_excludes = false</code> to disable the built-in filtering entirely.</p>
+<h2 id="development-server">Development Server</h2>
+<p>Options for <code>hwaro serve</code> only — they never affect <code>hwaro build</code> output.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>serve<span class="hljs-punctuation">]</span>
+fast <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>                          <span class="hljs-comment"># always serve in fast dev mode</span>
+
+<span class="hljs-punctuation">[</span>serve<span class="hljs-punctuation">.</span>headers<span class="hljs-punctuation">]</span>
+X-Frame-Options <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;SAMEORIGIN&quot;</span>
+Cache-Control <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;no-store&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fast</td>
+<td>bool</td>
+<td>false</td>
+<td>Serve as if <code>--fast</code> was passed (skips OG image generation and image processing); explicit CLI skip flags still apply</td>
+</tr>
+<tr>
+<td>headers</td>
+<td>table</td>
+<td>{}</td>
+<td>Custom HTTP response headers added to every dev-server response; CLI <code>--header</code> values win on duplicate keys</td>
+</tr>
+</tbody>
+</table>
+<p>See the <a href="/start/cli/#serve">serve command</a> for the matching CLI flags.</p>
+<h2 id="feature-configuration-reference">Feature Configuration Reference</h2>
+<p>Each feature has its own documentation with full configuration details. Below is a quick reference of all <code>config.toml</code> sections.</p>
+<table>
+<thead>
+<tr>
+<th>Config Section</th>
+<th>Documentation</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[feeds]</code></td>
+<td><a href="/features/seo/">SEO</a></td>
+<td>RSS/Atom feed generation</td>
+</tr>
+<tr>
+<td><code>[sitemap]</code></td>
+<td><a href="/features/seo/">SEO</a></td>
+<td>Sitemap XML generation</td>
+</tr>
+<tr>
+<td><code>[robots]</code></td>
+<td><a href="/features/seo/">SEO</a></td>
+<td>Robots.txt generation</td>
+</tr>
+<tr>
+<td><code>[og]</code></td>
+<td><a href="/features/seo/">SEO</a></td>
+<td>OpenGraph &amp; Twitter Card meta tags</td>
+</tr>
+<tr>
+<td><code>[og.auto_image]</code></td>
+<td><a href="/features/og-images/">Auto OG Images</a></td>
+<td>Auto-generate OG preview images (including <code>lazy_generate</code> for fast dev server)</td>
+</tr>
+<tr>
+<td><code>[search]</code></td>
+<td><a href="/features/search/">Search</a></td>
+<td>Client-side search index</td>
+</tr>
+<tr>
+<td><code>[highlight]</code></td>
+<td><a href="/features/syntax-highlighting/">Syntax Highlighting</a></td>
+<td>Code syntax highlighting</td>
+</tr>
+<tr>
+<td><code>[pagination]</code></td>
+<td><a href="/features/pagination/">Pagination</a></td>
+<td>Section pagination</td>
+</tr>
+<tr>
+<td><code>[auto_includes]</code></td>
+<td><a href="/features/auto-includes/">Auto Includes</a></td>
+<td>Auto-include CSS/JS files</td>
+</tr>
+<tr>
+<td><code>[assets]</code></td>
+<td><a href="/features/asset-pipeline/">Asset Pipeline</a></td>
+<td>CSS/JS minification &amp; fingerprinting</td>
+</tr>
+<tr>
+<td><code>[sass]</code></td>
+<td><a href="/features/sass/">Sass/SCSS</a></td>
+<td>Built-in SCSS compilation (pure Crystal)</td>
+</tr>
+<tr>
+<td><code>[image_processing]</code></td>
+<td><a href="/features/image-processing/">Image Processing</a></td>
+<td>Image resizing &amp; LQIP</td>
+</tr>
+<tr>
+<td><code>[image_processing.lqip]</code></td>
+<td><a href="/features/image-processing/#lqip-low-quality-image-placeholders">Image Processing</a></td>
+<td>Base64 blur-up placeholders</td>
+</tr>
+<tr>
+<td><code>[content.files]</code></td>
+<td><a href="/features/content-files/">Content Files</a></td>
+<td>Publish non-Markdown files</td>
+</tr>
+<tr>
+<td><code>[static]</code></td>
+<td><a href="#static-files">Static Files</a></td>
+<td>Filter cruft / exclude paths from the <code>static/</code> copy</td>
+</tr>
+<tr>
+<td><code>[serve]</code></td>
+<td><a href="#development-server">Development Server</a></td>
+<td>Dev-server response headers &amp; fast mode</td>
+</tr>
+<tr>
+<td><code>[links]</code></td>
+<td><a href="#links">Links</a></td>
+<td>Broken internal <code>@/</code> link handling (warn or fail the build)</td>
+</tr>
+<tr>
+<td><code>[series]</code></td>
+<td><a href="/features/series/">Series</a></td>
+<td>Group posts into ordered series</td>
+</tr>
+<tr>
+<td><code>[related]</code></td>
+<td><a href="/features/related-posts/">Related Posts</a></td>
+<td>Related content recommendations</td>
+</tr>
+<tr>
+<td><code>[llms]</code></td>
+<td><a href="/features/llms-txt/">LLMs.txt</a></td>
+<td>AI/LLM crawler instructions</td>
+</tr>
+<tr>
+<td><code>[pwa]</code></td>
+<td><a href="/features/pwa/">PWA</a></td>
+<td>Progressive Web App support</td>
+</tr>
+<tr>
+<td><code>[amp]</code></td>
+<td><a href="/features/amp/">AMP</a></td>
+<td>Accelerated Mobile Pages</td>
+</tr>
+<tr>
+<td><code>[deployment]</code></td>
+<td><a href="/deploy/">Deploy</a></td>
+<td>Deploy targets configuration</td>
+</tr>
+<tr>
+<td><code>[doctor]</code></td>
+<td><a href="/start/tools/doctor/">Doctor</a></td>
+<td>Suppress known diagnostic issues</td>
+</tr>
+<tr>
+<td><code>languages.*</code></td>
+<td><a href="/features/multilingual/">Multilingual</a></td>
+<td>Multi-language support</td>
+</tr>
+<tr>
+<td><code>[[menus.*]]</code></td>
+<td><a href="/features/menus/">Menus</a></td>
+<td>Named navigation menus</td>
+</tr>
+</tbody>
+</table>
+<h2 id="plugins">Plugins</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>plugins<span class="hljs-punctuation">]</span>
+processors <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;markdown&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<h2 id="full-example">Full Example</h2>
+<p>A complete <code>config.toml</code> with all core sections. Copy and adjust to your needs.</p>
+<pre><code class="language-toml hljs">title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;My Blog&quot;</span>
+description <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;A blog about programming&quot;</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://myblog.com&quot;</span>
+default_language <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;en&quot;</span>
+
+<span class="hljs-punctuation">[</span>build<span class="hljs-punctuation">]</span>
+output_dir <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;public&quot;</span>
+drafts <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+parallel <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+cache <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+hooks<span class="hljs-punctuation">.</span>pre <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;npm ci&quot;</span><span class="hljs-punctuation">]</span>
+hooks<span class="hljs-punctuation">.</span>post <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;npm run optimize&quot;</span><span class="hljs-punctuation">]</span>
+
+<span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+safe <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+lazy_loading <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+emoji <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+footnotes <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+task_lists <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span>permalinks<span class="hljs-punctuation">]</span>
+<span class="hljs-string">&quot;old/posts&quot;</span> <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;posts&quot;</span>
+<span class="hljs-string">&quot;posts&quot;</span> <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/:year/:month/:day/:slug/&quot;</span>
+
+<span class="hljs-punctuation">[</span>plugins<span class="hljs-punctuation">]</span>
+processors <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;markdown&quot;</span><span class="hljs-punctuation">]</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>taxonomies<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;tags&quot;</span>
+feed <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>taxonomies<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;categories&quot;</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>menus<span class="hljs-punctuation">.</span>main<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Posts&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/posts/&quot;</span>
+
+<span class="hljs-comment"># Feature sections — see Feature Configuration Reference above</span>
+<span class="hljs-comment"># [feeds], [sitemap], [robots], [og], [search], [highlight],</span>
+<span class="hljs-comment"># [pagination], [auto_includes], [assets], [sass], [image_processing],</span>
+<span class="hljs-comment"># [series], [related], [llms], [pwa], [amp], [deployment], etc.</span>
+</code></pre>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/start/cli/">CLI</a> — Command-line options that override config</li>
+<li><a href="/features/env-config/">Environment-Specific Config</a> — Per-environment overrides (<code>config.production.toml</code>)</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/start/config/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">설정</span>
+    <span class="pn-desc">config.toml 사이트 설정 레퍼런스</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/start/tools/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">Tools & Completion</span>
+    <span class="pn-desc">Utility tools for content management and shell completion</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#site-settings">Site Settings</a></li><li><a href="#environment-variables">Environment Variables</a></li><li><a href="#build-options">Build Options</a></li><li><a href="#markdown">Markdown</a></li><li><a href="#permalinks">Permalinks</a><ul><li><a href="#token-patterns">Token patterns</a></li></ul></li><li><a href="#links">Links</a></li><li><a href="#taxonomies">Taxonomies</a></li><li><a href="#menus">Menus</a></li><li><a href="#static-files">Static Files</a></li><li><a href="#development-server">Development Server</a></li><li><a href="#feature-configuration-reference">Feature Configuration Reference</a></li><li><a href="#plugins">Plugins</a></li><li><a href="#full-example">Full Example</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

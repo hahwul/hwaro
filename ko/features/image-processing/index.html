@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="빌드 시 자동 이미지 리사이즈, LQIP 플레이스홀더, 대표 색상 추출">
+  <title>이미지 처리 - Hwaro</title>
+  <meta property="og:title" content="이미지 처리">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/image-processing/">
+  <meta property="og:description" content="빌드 시 자동 이미지 리사이즈, LQIP 플레이스홀더, 대표 색상 추출">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-image-processing.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="이미지 처리">
+  <meta name="twitter:description" content="빌드 시 자동 이미지 리사이즈, LQIP 플레이스홀더, 대표 색상 추출">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-image-processing.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/image-processing/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/image-processing/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/image-processing/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/image-processing/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/" class="active">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">이미지 처리</li>
+  </ol>
+</nav>
+    <h1>이미지 처리</h1>
+    <p>Hwaro는 빌드 중에 리사이즈된 이미지 변형을 자동으로 생성할 수 있습니다. 반응형 이미지, 썸네일, 성능 최적화에 유용합니다. 외부 도구는 필요 없습니다 — 이미지 처리는 <a href="https://github.com/nothings/stb">stb</a> 라이브러리 기반으로 바이너리에 내장되어 있습니다.</p>
+<h2 id="지원-포맷">지원 포맷</h2>
+<table>
+<thead>
+<tr>
+<th>포맷</th>
+<th>읽기</th>
+<th>쓰기</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JPEG (.jpg, .jpeg)</td>
+<td>가능</td>
+<td>가능</td>
+</tr>
+<tr>
+<td>PNG (.png)</td>
+<td>가능</td>
+<td>가능</td>
+</tr>
+<tr>
+<td>BMP (.bmp)</td>
+<td>가능</td>
+<td>가능</td>
+</tr>
+</tbody>
+</table>
+<h2 id="설정">설정</h2>
+<p><code>config.toml</code>에서 이미지 처리를 활성화합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>image_processing<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+widths <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-number">320</span><span class="hljs-punctuation">,</span> <span class="hljs-number">640</span><span class="hljs-punctuation">,</span> <span class="hljs-number">1024</span><span class="hljs-punctuation">,</span> <span class="hljs-number">1280</span><span class="hljs-punctuation">]</span>
+quality <span class="hljs-punctuation">=</span> <span class="hljs-number">85</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>이미지 리사이즈 활성화</td>
+</tr>
+<tr>
+<td>widths</td>
+<td>array</td>
+<td>[]</td>
+<td>생성할 대상 너비(픽셀)</td>
+</tr>
+<tr>
+<td>quality</td>
+<td>int</td>
+<td>85</td>
+<td>JPEG 출력 품질 (1-100)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="lqip-저화질-이미지-플레이스홀더">LQIP (저화질 이미지 플레이스홀더)</h3>
+<p>LQIP를 활성화하면 빌드 시점에 작은 base64 인코딩 플레이스홀더 이미지를 만들고 대표 색상을 추출합니다. CLS(Cumulative Layout Shift)를 없애고, 원본 이미지가 로드되는 동안 즉시 시각적 피드백을 보여줍니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>image_processing<span class="hljs-punctuation">.</span>lqip<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+width <span class="hljs-punctuation">=</span> <span class="hljs-number">32</span>
+quality <span class="hljs-punctuation">=</span> <span class="hljs-number">20</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>LQIP 생성 활성화</td>
+</tr>
+<tr>
+<td>width</td>
+<td>int</td>
+<td>32</td>
+<td>플레이스홀더 이미지 너비(픽셀, 8-128)</td>
+</tr>
+<tr>
+<td>quality</td>
+<td>int</td>
+<td>20</td>
+<td>플레이스홀더 JPEG 품질 (1-100, 낮을수록 작음)</td>
+</tr>
+</tbody>
+</table>
+<p>너비 32, 품질 20이면 이미지당 보통 400-800바이트 정도의 base64 문자열이 나옵니다 — HTML에 바로 인라인해도 될 만큼 작습니다.</p>
+<h2 id="동작-방식">동작 방식</h2>
+<ol>
+<li>빌드 중 Hwaro는 세 위치의 이미지를 스캔합니다:
+<ul>
+<li><strong>페이지 번들 에셋</strong> (<code>index.md</code>와 함께 둔 이미지)</li>
+<li><strong>콘텐츠 파일</strong> (<code>[content.files]</code> 설정으로 게시되는 이미지)</li>
+<li><strong>정적 파일</strong> (<code>static/</code> 디렉터리의 이미지)</li>
+</ul>
+</li>
+<li>각 이미지마다 설정된 모든 너비의 리사이즈 변형을 생성합니다</li>
+<li>종횡비는 항상 유지됩니다</li>
+<li>대상 너비가 원본보다 크면 업스케일 없이 원본을 그대로 복사합니다</li>
+<li>원본 이미지는 한 번만 디코딩한 뒤 모든 너비로 리사이즈합니다 (효율적)</li>
+</ol>
+<h2 id="출력-파일-이름">출력 파일 이름</h2>
+<p>리사이즈된 이미지에는 <code>{name}_{width}w.{ext}</code> 규칙으로 이름이 붙습니다. 예를 들어 <code>static/hwaro.png</code>라면:</p>
+<pre><code>static/hwaro.png
+  -&gt; public/hwaro_320w.png
+  -&gt; public/hwaro_640w.png
+  -&gt; public/hwaro_1024w.png
+  -&gt; public/hwaro_1280w.png
+</code></pre>
+<h2 id="템플릿에서-사용">템플릿에서 사용</h2>
+<p><code>resize_image()</code> 함수로 리사이즈 변형의 URL을 얻습니다:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">6</span><span class="hljs-number">4</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot; width=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.width</span> <span class="hljs-meta">}}</span>&quot;&gt;
+</code></pre>
+<p><code>srcset</code>을 사용하는 반응형 이미지:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">sm</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">3</span><span class="hljs-number">2</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">md</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">6</span><span class="hljs-number">4</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">lg</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">0</span><span class="hljs-number">2</span><span class="hljs-number">4</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img
+  src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">md</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+  srcset=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">sm</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 320w, <span class="hljs-meta">{{</span> <span class="hljs-variable">md</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 640w, <span class="hljs-meta">{{</span> <span class="hljs-variable">lg</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 1024w&quot;
+  sizes=&quot;(max-width: 640px) 320px, (max-width: 1024px) 640px, 1024px&quot;
+  alt=&quot;Hwaro logo&quot;
+&gt;
+</code></pre>
+<p>이 함수는 가장 가까운 너비를 선택합니다. <code>width=500</code>을 요청했는데 설정된 너비가 <code>[320, 640, 1024]</code>라면 640px 변형(요청값 이상 중 가장 작은 너비)을 반환합니다. 충분히 큰 변형이 없으면 가장 큰 변형으로 폴백합니다.</p>
+<h3 id="lqip-플레이스홀더-사용">LQIP 플레이스홀더 사용</h3>
+<p>LQIP가 활성화되면 <code>resize_image()</code>가 두 속성을 추가로 반환합니다: <code>lqip</code>(base64 데이터 URI)와 <code>dominant_color</code>(16진수 색상 문자열)입니다. 블러업(blur-up) 효과나 단색 플레이스홀더에 사용합니다:</p>
+<p><strong>블러업 효과:</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">0</span><span class="hljs-number">2</span><span class="hljs-number">4</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img
+  src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+  style=&quot;background-image: url(<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.lqip</span> <span class="hljs-meta">}}</span>); background-size: cover;&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Hero image&quot;
+&gt;
+</code></pre>
+<p><strong>대표 색상 플레이스홀더:</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">0</span><span class="hljs-number">2</span><span class="hljs-number">4</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img
+  src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+  style=&quot;background-color: <span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.dominant_color</span> <span class="hljs-meta">}}</span>&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Hero image&quot;
+&gt;
+</code></pre>
+<p><strong>결합 방식 (색상 → 블러 → 원본 이미지 순서):</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">0</span><span class="hljs-number">2</span><span class="hljs-number">4</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;div style=&quot;background-color: <span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.dominant_color</span> <span class="hljs-meta">}}</span>&quot;&gt;
+  &lt;img
+    src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+    style=&quot;background-image: url(<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.lqip</span> <span class="hljs-meta">}}</span>); background-size: cover;&quot;
+    loading=&quot;lazy&quot;
+    alt=&quot;Hero image&quot;
+  &gt;
+&lt;/div&gt;
+</code></pre>
+<p>LQIP가 비활성화 상태면 <code>lqip</code>와 <code>dominant_color</code>는 빈 문자열을 반환하므로 템플릿을 고치지 않아도 됩니다.</p>
+<h2 id="라이브-데모">라이브 데모</h2>
+<h3 id="리사이즈-데모">리사이즈 데모</h3>
+<p>이 문서 사이트는 <code>widths = [128, 256, 512]</code>와 LQIP를 켠 상태로 이미지 처리를 사용합니다. 아래 이미지들은 <code>static/hwaro.png</code>에서 자동 생성된 리사이즈 변형입니다:</p>
+<p><strong>원본</strong> (<code>hwaro.png</code>):</p>
+<img srcset="/hwaro_128w.png 128w, /hwaro_256w.png 256w, /hwaro_512w.png 512w" sizes="100vw" src="/hwaro.png" alt="Hwaro 로고 - 원본" style="max-width:256px">
+<p><strong>128px</strong> (<code>hwaro_128w.png</code>):</p>
+<img src="/hwaro_128w.png" alt="Hwaro 로고 - 가로 128px">
+<p><strong>256px</strong> (<code>hwaro_256w.png</code>):</p>
+<img src="/hwaro_256w.png" alt="Hwaro 로고 - 가로 256px">
+<p><strong>512px</strong> (<code>hwaro_512w.png</code>):</p>
+<img src="/hwaro_512w.png" alt="Hwaro 로고 - 가로 512px">
+<p>이 파일들은 빌드 시점에 생성됩니다 — 런타임 리사이즈나 외부 서비스가 필요 없습니다. 템플릿에서는 <code>resize_image()</code>로 참조합니다:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">2</span><span class="hljs-number">5</span><span class="hljs-number">6</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;
+<span class="hljs-comment">{# renders as: &lt;img src=&quot;/hwaro_256w.png&quot;&gt; #}</span>
+</code></pre>
+<h3 id="lqip-데모">LQIP 데모</h3>
+<p><code>resize_image()</code> 함수는 LQIP 데이터도 제공합니다. <code>hwaro.png</code>의 실제 출력은 다음과 같습니다:</p>
+
+<div class="lqip-demo">
+  <div class="lqip-demo__section">
+    <strong>Dominant color:</strong>
+    <span style="display:inline-block;width:1.2em;height:1.2em;vertical-align:middle;border-radius:3px;background:#703434;border:1px solid var(--border)"></span>
+    <code>#703434</code>
+  </div>
+  
+  <div class="lqip-demo__section">
+    <strong>LQIP placeholder</strong> (the tiny base64 image, shown at 256px):
+    <div style="margin-top:0.5rem">
+      <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEACgcHiMeGSgjISMtKygwPGRBPDc3PHtYXUlkkYCZlo+AjIqgtObDoKrarYqMyP/L2u71////m8H////6/+b9//gBKy0tPDU8dkFBdviljKX4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+P/AABEIACAAIAMBIgACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AM0WjsAysuDyM05LNw4LFSO49qmZilmGU4IUUkEr79spJ3fdOOKnU1tG4yS0Zm+TaFHQd6jNo6gszLgcnFTXDSodyuAvoQKcrF7MsxySpoCyuPRQ9uisMgqKd5a5U4+7wPaq63SRqEYElRjK8g077ZH6N+VA7omeNZBhxkdajCGO0ZTjIU9Kb9sj9G/KmtdJIpRQQWGMtwBQDaP/2Q==" alt="LQIP placeholder" style="width:256px;border-radius:8px;border:1px solid var(--border);image-rendering:pixelated">
+    </div>
+  </div>
+  <div class="lqip-demo__section">
+    <strong>Blur-up effect</strong> (LQIP as background, full image on top):
+    <div style="margin-top:0.5rem">
+      <img src="https://hwaro.hahwul.com/hwaro_256w.png" alt="Full image with LQIP background" style="max-width:256px;border-radius:8px;border:1px solid var(--border);background-image:url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEACgcHiMeGSgjISMtKygwPGRBPDc3PHtYXUlkkYCZlo+AjIqgtObDoKrarYqMyP/L2u71////m8H////6/+b9//gBKy0tPDU8dkFBdviljKX4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+P/AABEIACAAIAMBIgACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AM0WjsAysuDyM05LNw4LFSO49qmZilmGU4IUUkEr79spJ3fdOOKnU1tG4yS0Zm+TaFHQd6jNo6gszLgcnFTXDSodyuAvoQKcrF7MsxySpoCyuPRQ9uisMgqKd5a5U4+7wPaq63SRqEYElRjK8g077ZH6N+VA7omeNZBhxkdajCGO0ZTjIU9Kb9sj9G/KmtdJIpRQQWGMtwBQDaP/2Q==);background-size:cover" loading="lazy">
+    </div>
+  </div>
+  
+</div>
+<h2 id="성능">성능</h2>
+<ul>
+<li><strong>단일 디코드</strong>: 원본 이미지를 한 번만 디코딩해 메모리에서 모든 대상 너비로 리사이즈</li>
+<li><strong>병렬 처리</strong>: 워커 풀로 여러 이미지를 동시에 처리</li>
+<li><strong>업스케일 없음</strong>: 대상 너비보다 작은 이미지는 그대로 복사</li>
+<li><strong>효율적인 LQIP</strong>: LQIP 썸네일은 원본 해상도가 아니라 가장 작은 리사이즈 변형에서 생성하고, 대표 색상도 그 썸네일에서 계산</li>
+</ul>
+<h2 id="간단한-예시">간단한 예시</h2>
+<p>사이트에 <code>static/hwaro.png</code>(Hwaro 로고)가 있고 이를 반응형 이미지로 표시하려는 경우입니다:</p>
+<p><strong>config.toml:</strong></p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>image_processing<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+widths <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-number">128</span><span class="hljs-punctuation">,</span> <span class="hljs-number">256</span><span class="hljs-punctuation">,</span> <span class="hljs-number">512</span><span class="hljs-punctuation">]</span>
+quality <span class="hljs-punctuation">=</span> <span class="hljs-number">90</span>
+
+<span class="hljs-punctuation">[</span>image_processing<span class="hljs-punctuation">.</span>lqip<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+width <span class="hljs-punctuation">=</span> <span class="hljs-number">32</span>
+quality <span class="hljs-punctuation">=</span> <span class="hljs-number">20</span>
+</code></pre>
+<p><strong>템플릿:</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">logo_sm</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">2</span><span class="hljs-number">8</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">logo_md</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">2</span><span class="hljs-number">5</span><span class="hljs-number">6</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">logo_lg</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/hwaro.png&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">5</span><span class="hljs-number">1</span><span class="hljs-number">2</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img
+  src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">logo_md</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+  srcset=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">logo_sm</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 128w, <span class="hljs-meta">{{</span> <span class="hljs-variable">logo_md</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 256w, <span class="hljs-meta">{{</span> <span class="hljs-variable">logo_lg</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 512w&quot;
+  sizes=&quot;(max-width: 480px) 128px, (max-width: 768px) 256px, 512px&quot;
+  style=&quot;background-color: <span class="hljs-meta">{{</span> <span class="hljs-variable">logo_md</span><span class="hljs-variable">.dominant_color</span> <span class="hljs-meta">}}</span>&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Hwaro&quot;
+&gt;
+</code></pre>
+<p><strong>빌드 출력:</strong></p>
+<pre><code>public/
+  hwaro.png           (original, copied by static files)
+  hwaro_128w.png      (128px wide)
+  hwaro_256w.png      (256px wide)
+  hwaro_512w.png      (512px wide)
+</code></pre>
+<h2 id="블로그-글-이미지">블로그 글 이미지</h2>
+<p>프론트 매터에 히어로 이미지를 지정한 블로그 글이라면:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>image_processing<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+widths <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-number">320</span><span class="hljs-punctuation">,</span> <span class="hljs-number">640</span><span class="hljs-punctuation">,</span> <span class="hljs-number">1024</span><span class="hljs-punctuation">]</span>
+quality <span class="hljs-punctuation">=</span> <span class="hljs-number">85</span>
+
+<span class="hljs-punctuation">[</span>image_processing<span class="hljs-punctuation">.</span>lqip<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span>content<span class="hljs-punctuation">.</span>files<span class="hljs-punctuation">]</span>
+allow_extensions <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;jpg&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;jpeg&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;png&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.image</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">hero</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-variable">page</span><span class="hljs-variable">.image</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">0</span><span class="hljs-number">2</span><span class="hljs-number">4</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">thumb</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-variable">page</span><span class="hljs-variable">.image</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">3</span><span class="hljs-number">2</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+  &lt;picture&gt;
+    &lt;source media=&quot;(min-width: 768px)&quot; srcset=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">hero</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;
+    &lt;img
+      src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">thumb</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+      style=&quot;background-color: <span class="hljs-meta">{{</span> <span class="hljs-variable">thumb</span><span class="hljs-variable">.dominant_color</span> <span class="hljs-meta">}}</span>&quot;
+      loading=&quot;lazy&quot;
+      alt=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&quot;
+    &gt;
+  &lt;/picture&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/features/content-files/">콘텐츠 파일</a> — content/의 마크다운 이외 파일 게시</li>
+<li><a href="/ko/features/og-images/">자동 OG 이미지</a> — 자동 생성되는 Open Graph 미리보기 이미지</li>
+<li><a href="/ko/templates/functions/">함수</a> — 템플릿 함수 레퍼런스</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/multilingual/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Multilingual</span>
+    <span class="pn-desc">Build multilingual sites with translation linking and hreflang tags</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/features/image-processing/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">Image Processing</span>
+    <span class="pn-desc">Automatic image resizing, LQIP placeholders, and dominant color extraction during build</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#지원-포맷">지원 포맷</a></li><li><a href="#설정">설정</a><ul><li><a href="#lqip-저화질-이미지-플레이스홀더">LQIP (저화질 이미지 플레이스홀더)</a></li></ul></li><li><a href="#동작-방식">동작 방식</a></li><li><a href="#출력-파일-이름">출력 파일 이름</a></li><li><a href="#템플릿에서-사용">템플릿에서 사용</a><ul><li><a href="#lqip-플레이스홀더-사용">LQIP 플레이스홀더 사용</a></li></ul></li><li><a href="#라이브-데모">라이브 데모</a><ul><li><a href="#리사이즈-데모">리사이즈 데모</a></li><li><a href="#lqip-데모">LQIP 데모</a></li></ul></li><li><a href="#성능">성능</a></li><li><a href="#간단한-예시">간단한 예시</a></li><li><a href="#블로그-글-이미지">블로그 글 이미지</a></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="5분 만에 첫 Hwaro 사이트 만들기">
+  <title>첫 사이트 만들기 - Hwaro</title>
+  <meta property="og:title" content="첫 사이트 만들기">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/start/first-site/">
+  <meta property="og:description" content="5분 만에 첫 Hwaro 사이트 만들기">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-start-first-site.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="첫 사이트 만들기">
+  <meta name="twitter:description" content="5분 만에 첫 Hwaro 사이트 만들기">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-start-first-site.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/start/first-site/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/first-site/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/first-site/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="start">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/" class="active">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/start/first-site/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/start/first-site/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/" class="active">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+    
+    <li aria-current="page">첫 사이트 만들기</li>
+  </ol>
+</nav>
+    <h1>첫 사이트 만들기</h1>
+    <p>5분 만에 첫 Hwaro 사이트를 만듭니다.</p>
+<h2 id="1-프로젝트-생성">1. 프로젝트 생성</h2>
+<pre><code class="language-bash hljs">hwaro init my-site --scaffold blog
+<span class="hljs-built_in">cd</span> my-site
+</code></pre>
+<p>내장 스캐폴드:</p>
+<table>
+<thead>
+<tr>
+<th>스캐폴드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>simple</code></td>
+<td>랜딩 페이지, 소규모 사이트 (기본값)</td>
+</tr>
+<tr>
+<td><code>bare</code></td>
+<td>시맨틱 HTML만 있는 최소 구조</td>
+</tr>
+<tr>
+<td><code>blog</code></td>
+<td>태그, 읽기 시간, 이전/다음 글 이동이 있는 포스트</td>
+</tr>
+<tr>
+<td><code>docs</code></td>
+<td>사이드바와 이전/다음 페이지 이동이 있는 문서</td>
+</tr>
+<tr>
+<td><code>book</code></td>
+<td>챕터, 이전/다음 이동, 키보드 단축키가 있는 책</td>
+</tr>
+</tbody>
+</table>
+<p>모든 스캐폴드는 CSS <code>light-dark()</code> 쌍 위에 만든 하나의 디자인 토큰 시스템을
+공유하므로, 별도 설정 없이 읽는 사람의 OS 색상 모드를 그대로 따라갑니다 —
+라이트면 라이트, 다크면 다크. 스타일이 있는 스캐폴드에는 헤더에 테마 전환
+버튼도 들어 있습니다. auto → light → dark 순으로 순환하고, 선택을
+<code>localStorage</code>에 저장하며, 첫 페인트 전에 적용하기 때문에 화면이 번쩍이지
+않습니다. 한 가지 모드로 고정하려면(다크 전용 사이트 등) 생성된
+<code>css/style.css</code> 끝에 <code>:root { color-scheme: dark; }</code>를 추가합니다.</p>
+<p>스캐폴드에는 절제된 모던 레이어도 들어 있습니다. 반투명 고정 헤더, 페이지
+사이의 네이티브 크로스 문서 뷰 전환, 그리고 (블로그 글과 책 페이지의) CSS
+전용 읽기 진행 표시선입니다. 모두 구형 브라우저에서는 자연스럽게 꺼지고,
+모든 애니메이션은 <code>prefers-reduced-motion</code>을 존중합니다.</p>
+<div class="preview-gallery">
+<a class="preview-item" href="/images/scaffolds/scaffold-simple.png" target="_blank" rel="noopener"><img srcset="/images/scaffolds/scaffold-simple_128w.png 128w, /images/scaffolds/scaffold-simple_256w.png 256w, /images/scaffolds/scaffold-simple_512w.png 512w, /images/scaffolds/scaffold-simple_640w.png 640w" sizes="100vw" src="/images/scaffolds/scaffold-simple.png" alt="simple 스캐폴드" width="1280" height="800" loading="lazy"><div class="preview-label"><code>simple</code> — 랜딩 페이지, 소규모 사이트</div></a>
+<a class="preview-item" href="/images/scaffolds/scaffold-bare.png" target="_blank" rel="noopener"><img srcset="/images/scaffolds/scaffold-bare_128w.png 128w, /images/scaffolds/scaffold-bare_256w.png 256w, /images/scaffolds/scaffold-bare_512w.png 512w, /images/scaffolds/scaffold-bare_640w.png 640w" sizes="100vw" src="/images/scaffolds/scaffold-bare.png" alt="bare 스캐폴드" width="1280" height="800" loading="lazy"><div class="preview-label"><code>bare</code> — 시맨틱 HTML만 있는 최소 구조</div></a>
+<a class="preview-item" href="/images/scaffolds/scaffold-blog.png" target="_blank" rel="noopener"><img srcset="/images/scaffolds/scaffold-blog_128w.png 128w, /images/scaffolds/scaffold-blog_256w.png 256w, /images/scaffolds/scaffold-blog_512w.png 512w, /images/scaffolds/scaffold-blog_640w.png 640w" sizes="100vw" src="/images/scaffolds/scaffold-blog.png" alt="blog 스캐폴드" width="1280" height="800" loading="lazy"><div class="preview-label"><code>blog</code> — 태그와 카테고리가 있는 포스트</div></a>
+<a class="preview-item" href="/images/scaffolds/scaffold-docs.png" target="_blank" rel="noopener"><img srcset="/images/scaffolds/scaffold-docs_128w.png 128w, /images/scaffolds/scaffold-docs_256w.png 256w, /images/scaffolds/scaffold-docs_512w.png 512w, /images/scaffolds/scaffold-docs_640w.png 640w" sizes="100vw" src="/images/scaffolds/scaffold-docs.png" alt="docs 스캐폴드" width="1280" height="800" loading="lazy"><div class="preview-label"><code>docs</code> — 사이드바가 있는 문서</div></a>
+<a class="preview-item" href="/images/scaffolds/scaffold-book.png" target="_blank" rel="noopener"><img srcset="/images/scaffolds/scaffold-book_128w.png 128w, /images/scaffolds/scaffold-book_256w.png 256w, /images/scaffolds/scaffold-book_512w.png 512w, /images/scaffolds/scaffold-book_640w.png 640w" sizes="100vw" src="/images/scaffolds/scaffold-book.png" alt="book 스캐폴드" width="1280" height="800" loading="lazy"><div class="preview-label"><code>book</code> — 챕터가 있는 책</div></a>
+</div>
+<style>
+.preview-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+/* Each preview reads as a tiny browser window: chrome bar with three
+   dots, the shot, then a caption strip. Items are links to the
+   full-size capture. */
+.preview-gallery .preview-item {
+  position: relative;
+  display: block;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  text-decoration: none;
+  cursor: zoom-in;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.preview-gallery .preview-item::before {
+  content: "";
+  display: block;
+  height: 26px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--hair);
+}
+.preview-gallery .preview-item::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hair-strong);
+  box-shadow: 13px 0 0 var(--hair-strong), 26px 0 0 var(--hair-strong);
+}
+.preview-gallery .preview-item:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--glow-ember);
+  transform: translateY(-2px);
+}
+.preview-gallery .preview-item img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+.preview-gallery .preview-item .preview-label {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--hair);
+  background: var(--surface-1);
+}
+.preview-gallery .preview-item .preview-label code {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--primary-light);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+}
+@media (max-width: 600px) {
+  .preview-gallery {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-gallery .preview-item {
+    transition: none;
+  }
+}
+</style>
+<blockquote>
+<p><strong>팁:</strong> 더 완성된 출발점이 필요하면 바로 쓸 수 있는 보일러플레이트 모음인 <a href="https://examples.hwaro.hahwul.com/">Hwaro Examples</a>를 살펴보세요.</p>
+</blockquote>
+<h2 id="2-개발-서버-시작">2. 개발 서버 시작</h2>
+<pre><code class="language-bash hljs">hwaro serve
+</code></pre>
+<p><code>http://localhost:3000</code>을 엽니다. 변경 사항은 자동으로 다시 로드됩니다.</p>
+<h2 id="3-프로젝트-구조">3. 프로젝트 구조</h2>
+<pre><code>my-site/
+├── config.toml      # Site configuration
+├── content/         # Markdown content
+│   ├── index.md     # Homepage
+│   └── blog/        # Blog section
+│       ├── _index.md
+│       └── hello.md
+├── templates/       # Jinja2 templates
+├── static/          # Static files (CSS, JS, images)
+└── public/          # Generated output
+</code></pre>
+<h2 id="4-설정-수정">4. 설정 수정</h2>
+<p><code>config.toml</code>을 엽니다:</p>
+<pre><code class="language-toml hljs">title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;My Site&quot;</span>
+description <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;A site built with Hwaro&quot;</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://example.com&quot;</span>
+</code></pre>
+<h2 id="5-페이지-만들기">5. 페이지 만들기</h2>
+<pre><code class="language-bash hljs">hwaro new content/about.md
+</code></pre>
+<blockquote>
+<p><strong>팁:</strong> 인자 없이 <code>hwaro new</code>를 실행하면 대화형 위저드가 열립니다.
+경로를 추천해 주고 제목, 설명, 태그 등을 대신 받아 줍니다.</p>
+</blockquote>
+<p><code>content/about.md</code>를 수정합니다:</p>
+<pre><code class="language-markdown hljs">+++
+title = &quot;About&quot;
++++
+
+Welcome to my site!
+</code></pre>
+<p><code>http://localhost:3000/about/</code>에서 확인합니다.</p>
+<h2 id="6-섹션-만들기">6. 섹션 만들기</h2>
+<p>섹션은 관련 콘텐츠를 묶는 단위입니다. 블로그 섹션을 만들어 봅니다:</p>
+<pre><code class="language-bash hljs">mkdir -p content/blog
+</code></pre>
+<p><code>content/blog/_index.md</code>를 만듭니다:</p>
+<pre><code class="language-markdown hljs">+++
+title = &quot;Blog&quot;
+sort_by = &quot;date&quot;
++++
+
+My blog posts.
+</code></pre>
+<p><code>content/blog/first-post.md</code>를 만듭니다:</p>
+<pre><code class="language-markdown hljs">+++
+title = &quot;My First Post&quot;
+date = &quot;2024-01-15&quot;
+tags = [&quot;hello&quot;]
++++
+
+Hello, world!
+</code></pre>
+<p><code>http://localhost:3000/blog/</code>에서 확인합니다.</p>
+<h2 id="7-프로덕션-빌드">7. 프로덕션 빌드</h2>
+<pre><code class="language-bash hljs">hwaro build
+</code></pre>
+<p><code>public/</code> 디렉터리를 아무 정적 호스트에나 배포하면 됩니다. 간단한 설정 방법은 <a href="/ko/deploy/github-pages/">GitHub Pages</a> 배포 가이드에 있습니다.</p>
+<h2 id="선택-ai-에이전트와-함께-만들기">선택: AI 에이전트와 함께 만들기</h2>
+<p>Claude Code, Cursor, Codex 같은 스킬 지원 에이전트를 쓴다면, Hwaro가 제공하는
+두 개의 <a href="/ko/integrations/skills/">에이전트 스킬</a>로 방금 만든 프로젝트를 다루는
+방법을 에이전트에게 가르칠 수 있습니다:</p>
+<table>
+<thead>
+<tr>
+<th>스킬</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hwaro</code></td>
+<td>CLI를 제대로 실행 — 텍스트 출력을 추측하는 대신 <code>--json</code> 출력 규약과 <code>HWARO_E_*</code> 종료 코드를 사용해 <code>init</code>, <code>new</code>, <code>serve</code>, <code>build</code>, <code>doctor</code>와 콘텐츠 도구를 다룸</td>
+</tr>
+<tr>
+<td><code>hwaro-design</code></td>
+<td>Hwaro의 Crinja 템플릿과 <code>light-dark()</code> 디자인 토큰 안에서 사이트를 디자인하고 리테마 — 전형적인 AI 느낌의 레이아웃을 피하는 안티슬롭 원칙 적용</td>
+</tr>
+</tbody>
+</table>
+<p>명령 하나로 둘 다 설치합니다:</p>
+<pre><code class="language-bash hljs">npx skills add hahwul/hwaro
+</code></pre>
+<p>이후 <em>&quot;이 Hwaro 사이트에 projects 섹션을 추가해 줘&quot;</em> 나 <em>&quot;이 블로그를 따뜻한
+다크 팔레트로 리테마해 줘&quot;</em> 처럼 요청하면 에이전트가 알아서 맞는 스킬을
+불러옵니다. 수동 설치 경로와 에이전트별 디렉터리는
+<a href="/ko/integrations/skills/">에이전트 스킬</a>을, 에이전트가 먼저 따라야 할
+프로젝트별 규칙을 기록해 두려면 <a href="/ko/start/tools/agents-md/">agents-md</a>를
+참고합니다.</p>
+<h2 id="다음-단계">다음 단계</h2>
+<ul>
+<li><a href="/ko/start/cli/">CLI</a> — 사용 가능한 모든 명령</li>
+<li><a href="/ko/start/config/">설정</a> — 전체 설정 레퍼런스</li>
+<li><a href="/ko/writing/">콘텐츠 작성</a> — 페이지, 섹션, 택소노미</li>
+<li><a href="/ko/integrations/skills/">에이전트 스킬</a> — AI 에이전트에게 사이트 제작과 디자인 맡기기</li>
+<li><a href="/ko/deploy/">배포</a> — 호스팅과 배포 가이드</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/start/installation/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Installation</span>
+    <span class="pn-desc">Install Hwaro from source or pre-built binary</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/start/first-site/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">First Site</span>
+    <span class="pn-desc">Create your first Hwaro site in 5 minutes</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#1-프로젝트-생성">1. 프로젝트 생성</a></li><li><a href="#2-개발-서버-시작">2. 개발 서버 시작</a></li><li><a href="#3-프로젝트-구조">3. 프로젝트 구조</a></li><li><a href="#4-설정-수정">4. 설정 수정</a></li><li><a href="#5-페이지-만들기">5. 페이지 만들기</a></li><li><a href="#6-섹션-만들기">6. 섹션 만들기</a></li><li><a href="#7-프로덕션-빌드">7. 프로덕션 빌드</a></li><li><a href="#선택-ai-에이전트와-함께-만들기">선택: AI 에이전트와 함께 만들기</a></li><li><a href="#다음-단계">다음 단계</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

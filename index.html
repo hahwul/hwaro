@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Hwaro is a fast static site generator built with Crystal" />
+        <title>
+            Hwaro - Fast & Lightweight Static Site Generator
+        </title>
+        <meta property="og:title" content="Hwaro Documentation">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://hwaro.hahwul.com/">
+  <meta property="og:description" content="Hwaro is a fast static site generator built with Crystal">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/hwaro-documentation.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Hwaro Documentation">
+  <meta name="twitter:description" content="Hwaro is a fast static site generator built with Crystal">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/hwaro-documentation.png">
+        <link rel="canonical" href="https://hwaro.hahwul.com/">
+        <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/">
+        <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+        <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+        <link rel="shortcut icon" href="/icons/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="manifest" href="/icons/site.webmanifest" />
+        <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+        <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+        <link rel="preload" href="/images/landing/cover.jpg" as="image" fetchpriority="high">
+        <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+        <!-- Progressive enhancement: scroll reveals only apply with JS, so a
+             no-JS visitor sees every section at full opacity. -->
+        <script>
+            document.documentElement.classList.add("js");
+        </script>
+    </head>
+    <body class="landing-body">
+        <header class="landing-header">
+            <a href="https://hwaro.hahwul.com/" class="logo">
+                <img src="/hwaro-wide.webp" alt="Hwaro" />
+            </a>
+            <nav>
+                <a href="https://hwaro.hahwul.com/start/">Docs</a>
+                <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a>
+                
+                <details class="lang-switch">
+                    <summary class="lang-switch-btn" aria-label="Change language">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+                        <span class="lang-switch-code">EN</span>
+                        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+                    </summary>
+                    <ul class="lang-switch-menu">
+                        
+                        <li><a href="https://hwaro.hahwul.com/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+                        
+                        <li><a href="https://hwaro.hahwul.com/ko/" lang="ko" hreflang="ko">한국어</a></li>
+                        
+                    </ul>
+                </details>
+                
+                <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                </a>
+            </nav>
+        </header>
+
+        <main class="landing">
+            <!-- ============================================================
+                 HERO - immersive: brazier art + embers behind centered copy
+                 ============================================================ -->
+            <section class="hero">
+                <div class="hero-bg" aria-hidden="true">
+                    <canvas id="ember-canvas"></canvas>
+                </div>
+                <div class="hero-content">
+                    <h1>
+                        Fast by default.<br />
+                        <span class="highlight">Yours by design.</span>
+                    </h1>
+                    <p class="hero-sub">
+                        A static site generator built with Crystal. No themes, no lock-in. Your content, your structure, your speed.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="https://hwaro.hahwul.com/start/" class="btn btn-primary">Get started</a>
+                        <button type="button" class="hero-install" id="hero-install" data-command="brew install hahwul/hwaro/hwaro">
+                            <code>$ brew install hahwul/hwaro/hwaro</code>
+                            <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                            <svg class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5 11-11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span class="visually-hidden">Copy install command</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 SPEED - the measured build, replayed in real time
+                 ============================================================ -->
+            <section class="speed reveal" id="speed">
+                <div class="lp-wrap">
+                    <div class="speed-header">
+                        <h2>1,000 pages. Under a second.</h2>
+                        <p>
+                            
+                            Median cold build on the open
+                            <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">SSG benchmark</a>,
+                            minimal workload: pure markdown to HTML.
+                            
+                        </p>
+                    </div>
+
+                    <div class="speed-stage">
+                        <p class="speed-figure" aria-hidden="true">
+                            <span class="speed-number">0.00</span><span class="speed-unit">s</span>
+                        </p>
+                        <div
+                            class="speed-track"
+                            role="img"
+                            aria-label="A full 1,000-page build finishes in 0.44 seconds"
+                        >
+                            <span class="speed-fill"></span>
+                        </div>
+                        <p class="speed-caption">
+                            <span>The bar fills in real time: 443&nbsp;ms, one full rebuild.</span>
+                            <button type="button" class="speed-replay">&#8635; replay</button>
+                        </p>
+                    </div>
+
+                    <ul class="speed-modes">
+                        <li>
+                            <span class="mode-name">minimal</span>
+                            <span class="mode-desc">markdown to HTML</span>
+                            <span class="mode-time">0.44s</span>
+                        </li>
+                        <li>
+                            <span class="mode-name">blog</span>
+                            <span class="mode-desc">tags, pagination, feeds</span>
+                            <span class="mode-time">0.59s</span>
+                        </li>
+                        <li>
+                            <span class="mode-name">heavy</span>
+                            <span class="mode-desc">plus syntax highlighting</span>
+                            <span class="mode-time">1.50s</span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 FEATURES - bento, six cells, no holes
+                 ============================================================ -->
+            <section class="bento reveal" id="features">
+                <div class="lp-wrap">
+                    <div class="section-header">
+                        <h2>Everything built in.</h2>
+                        <p>No plugins to hunt down. Enable a feature in config.toml and build.</p>
+                    </div>
+                    <div class="bento-grid">
+                        <article class="bento-cell cell-seo">
+                            <h3>built_in_seo</h3>
+                            <p>
+                                Sitemaps, feeds, OpenGraph, JSON-LD, and llms.txt. Social card images render at build time, in nineteen styles.
+                            </p>
+                            <div class="og-fan" aria-hidden="true">
+                                
+                                <img src="https://hwaro.hahwul.com/images/og-style-examples/style-terminal_640w.png" alt="" width="640" height="336" loading="lazy" decoding="async" />
+                                
+                                <img src="https://hwaro.hahwul.com/images/og-style-examples/style-bauhaus_640w.png" alt="" width="640" height="336" loading="lazy" decoding="async" />
+                                
+                                <img src="https://hwaro.hahwul.com/images/og-style-examples/style-editorial_640w.png" alt="" width="640" height="336" loading="lazy" decoding="async" />
+                            </div>
+                        </article>
+                        <article class="bento-cell cell-fast">
+                            <h3>blazing_fast</h3>
+                            <p>
+                                Parallel rendering, incremental builds, and a streaming mode for very large sites. Thousands of pages in seconds.
+                            </p>
+                        </article>
+                        <article class="bento-cell cell-markdown">
+                            <h3>markdown_first</h3>
+                            <p>TOML front matter, footnotes, task lists, math, and Mermaid.</p>
+                            <pre aria-hidden="true"><code class="hljs"><span class="hljs-section">+++</span>
+<span class="hljs-attr">title</span> = <span class="hljs-string">"Hello"</span>
+<span class="hljs-attr">tags</span> = [<span class="hljs-string">"crystal"</span>]
+<span class="hljs-attr">toc</span> = <span class="hljs-literal">true</span>
+<span class="hljs-section">+++</span></code></pre>
+                        </article>
+                        <article class="bento-cell cell-templates">
+                            <h3>flexible_templates</h3>
+                            <p>
+                                Jinja2 templating with inheritance, filters, functions, and shortcodes. No theme lock-in: build your own.
+                            </p>
+                        </article>
+                        <article class="bento-cell cell-taxonomies">
+                            <h3>taxonomies</h3>
+                            <p>
+                                Tags, categories, and custom taxonomies with automatic index pages and pagination.
+                            </p>
+                        </article>
+                        <article class="bento-cell cell-extensible">
+                            <h3>extensible</h3>
+                            <p>
+                                Build hooks, asset pipeline, image processing, multilingual support, PWA, and AMP. All in one binary.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 SCAFFOLDS - five starting points, scroll-snap rail
+                 ============================================================ -->
+            <section class="scaffolds reveal" id="scaffolds">
+                <div class="lp-wrap">
+                    <div class="section-header">
+                        <h2>Start from a scaffold</h2>
+                        <p>
+                            Five complete starting points, one shared token system that adapts to light and dark on its own.
+                        </p>
+                    </div>
+                </div>
+                <div class="scaffold-rail" tabindex="0">
+                    
+                    
+                    
+                    <figure class="scaffold-card">
+                        <img
+                            src="https://hwaro.hahwul.com/images/scaffolds/scaffold-docs_640w.png"
+                            alt="The docs scaffold rendered in a browser"
+                            width="640"
+                            height="400"
+                            loading="lazy"
+                            decoding="async"
+                            style="background-color: #f4f1ed"
+                        />
+                        <figcaption>
+                            <code>hwaro init my-site --scaffold docs</code>
+                            <span>documentation with sidebar and search</span>
+                        </figcaption>
+                    </figure>
+                    
+                    
+                    <figure class="scaffold-card">
+                        <img
+                            src="https://hwaro.hahwul.com/images/scaffolds/scaffold-blog_640w.png"
+                            alt="The blog scaffold rendered in a browser"
+                            width="640"
+                            height="400"
+                            loading="lazy"
+                            decoding="async"
+                            style="background-color: #f7f5f0"
+                        />
+                        <figcaption>
+                            <code>hwaro init my-site --scaffold blog</code>
+                            <span>posts, tags, and feeds</span>
+                        </figcaption>
+                    </figure>
+                    
+                    
+                    <figure class="scaffold-card">
+                        <img
+                            src="https://hwaro.hahwul.com/images/scaffolds/scaffold-book_640w.png"
+                            alt="The book scaffold rendered in a browser"
+                            width="640"
+                            height="400"
+                            loading="lazy"
+                            decoding="async"
+                            style="background-color: #f5f2ee"
+                        />
+                        <figcaption>
+                            <code>hwaro init my-site --scaffold book</code>
+                            <span>chaptered long-form writing</span>
+                        </figcaption>
+                    </figure>
+                    
+                    
+                    <figure class="scaffold-card">
+                        <img
+                            src="https://hwaro.hahwul.com/images/scaffolds/scaffold-simple_640w.png"
+                            alt="The simple scaffold rendered in a browser"
+                            width="640"
+                            height="400"
+                            loading="lazy"
+                            decoding="async"
+                            style="background-color: #f6f3ef"
+                        />
+                        <figcaption>
+                            <code>hwaro init my-site --scaffold simple</code>
+                            <span>landing pages and small sites</span>
+                        </figcaption>
+                    </figure>
+                    
+                    
+                    <figure class="scaffold-card">
+                        <img
+                            src="https://hwaro.hahwul.com/images/scaffolds/scaffold-bare_640w.png"
+                            alt="The bare scaffold rendered in a browser"
+                            width="640"
+                            height="400"
+                            loading="lazy"
+                            decoding="async"
+                            style="background-color: #fdfdfe"
+                        />
+                        <figcaption>
+                            <code>hwaro init my-site --scaffold bare</code>
+                            <span>an empty, unopinionated start</span>
+                        </figcaption>
+                    </figure>
+                    
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 OG STYLES - one slow marquee of real build output
+                 ============================================================ -->
+            <section class="ogband reveal" id="og-styles">
+                <div class="lp-wrap">
+                    <div class="section-header">
+                        <h2>Social cards, drawn at build time</h2>
+                        <p>
+                            
+                            Every page gets an Open Graph image without a
+                            browser or an external service.
+                            <a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a>
+                            covers all nineteen styles.
+                            
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="og-marquee" aria-label="Nineteen generated Open Graph image styles">
+                    <div class="og-track">
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-terminal_640w.png" alt="OG image style: terminal" width="640" height="336" loading="lazy" decoding="async" style="background-color: #161d26" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-minimal_640w.png" alt="OG image style: minimal" width="640" height="336" loading="lazy" decoding="async" style="background-color: #111114" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-gradient_640w.png" alt="OG image style: gradient" width="640" height="336" loading="lazy" decoding="async" style="background-color: #341a20" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-brutalist_640w.png" alt="OG image style: brutalist" width="640" height="336" loading="lazy" decoding="async" style="background-color: #e5dacf" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-bauhaus_640w.png" alt="OG image style: bauhaus" width="640" height="336" loading="lazy" decoding="async" style="background-color: #d9c0c0" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-editorial_640w.png" alt="OG image style: editorial" width="640" height="336" loading="lazy" decoding="async" style="background-color: #15151c" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-halftone_640w.png" alt="OG image style: halftone" width="640" height="336" loading="lazy" decoding="async" style="background-color: #1e1119" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-grid_640w.png" alt="OG image style: grid" width="640" height="336" loading="lazy" decoding="async" style="background-color: #131215" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-dots_640w.png" alt="OG image style: dots" width="640" height="336" loading="lazy" decoding="async" style="background-color: #101619" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-waves_640w.png" alt="OG image style: waves" width="640" height="336" loading="lazy" decoding="async" style="background-color: #122638" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-diagonal_640w.png" alt="OG image style: diagonal" width="640" height="336" loading="lazy" decoding="async" style="background-color: #18120f" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-split_640w.png" alt="OG image style: split" width="640" height="336" loading="lazy" decoding="async" style="background-color: #61263a" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-framed_640w.png" alt="OG image style: framed" width="640" height="336" loading="lazy" decoding="async" style="background-color: #15151c" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-hero_640w.png" alt="OG image style: hero" width="640" height="336" loading="lazy" decoding="async" style="background-color: #2a121a" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-monument_640w.png" alt="OG image style: monument" width="640" height="336" loading="lazy" decoding="async" style="background-color: #111113" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-artistic_640w.png" alt="OG image style: artistic" width="640" height="336" loading="lazy" decoding="async" style="background-color: #8d907c" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-band_640w.png" alt="OG image style: band" width="640" height="336" loading="lazy" decoding="async" style="background-color: #5a4e23" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-surreal_640w.png" alt="OG image style: surreal" width="640" height="336" loading="lazy" decoding="async" style="background-color: #2f3630" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-default_640w.png" alt="OG image style: default" width="640" height="336" loading="lazy" decoding="async" style="background-color: #181310" />
+                        
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-terminal_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #161d26" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-minimal_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #111114" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-gradient_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #341a20" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-brutalist_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #e5dacf" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-bauhaus_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #d9c0c0" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-editorial_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #15151c" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-halftone_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #1e1119" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-grid_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #131215" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-dots_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #101619" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-waves_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #122638" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-diagonal_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #18120f" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-split_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #61263a" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-framed_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #15151c" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-hero_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #2a121a" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-monument_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #111113" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-artistic_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #8d907c" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-band_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #5a4e23" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-surreal_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #2f3630" />
+                        
+                        
+                        <img src="https://hwaro.hahwul.com/images/og-style-examples/style-default_640w.png" alt="" aria-hidden="true" width="640" height="336" loading="lazy" decoding="async" style="background-color: #181310" />
+                        
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 SHOWCASE - real sites from the examples gallery
+                 ============================================================ -->
+            <section class="showcase reveal" id="showcase">
+                <div class="lp-wrap">
+                    <div class="section-header">
+                        <h2>Built with Hwaro</h2>
+                        <p>
+                            
+                            Sites from the
+                            <a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">examples gallery</a>,
+                            each one a real build.
+                            
+                        </p>
+                    </div>
+                    <div class="showcase-grid">
+                        
+                        
+                        <a
+                            href="https://hahwul.github.io/hwaro-examples/seoulnight/"
+                            class="showcase-card"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <span class="showcase-preview">
+                                <img
+                                    src="https://examples.hwaro.hahwul.com/screenshots/seoulnight.png"
+                                    alt="Screenshot of the seoulnight example site"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </span>
+                            <span class="showcase-info">
+                                <span class="showcase-name">seoulnight</span>
+                                <span class="showcase-tag">landing</span>
+                            </span>
+                        </a>
+                        
+                        <a
+                            href="https://hahwul.github.io/hwaro-examples/burin/"
+                            class="showcase-card"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <span class="showcase-preview">
+                                <img
+                                    src="https://examples.hwaro.hahwul.com/screenshots/burin.png"
+                                    alt="Screenshot of the burin example site"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </span>
+                            <span class="showcase-info">
+                                <span class="showcase-name">burin</span>
+                                <span class="showcase-tag">portfolio</span>
+                            </span>
+                        </a>
+                        
+                        <a
+                            href="https://hahwul.github.io/hwaro-examples/jasper/"
+                            class="showcase-card"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <span class="showcase-preview">
+                                <img
+                                    src="https://examples.hwaro.hahwul.com/screenshots/jasper.png"
+                                    alt="Screenshot of the jasper example site"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </span>
+                            <span class="showcase-info">
+                                <span class="showcase-name">jasper</span>
+                                <span class="showcase-tag">docs</span>
+                            </span>
+                        </a>
+                        
+                        <a
+                            href="https://hahwul.github.io/hwaro-examples/gloaming/"
+                            class="showcase-card"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <span class="showcase-preview">
+                                <img
+                                    src="https://examples.hwaro.hahwul.com/screenshots/gloaming.png"
+                                    alt="Screenshot of the gloaming example site"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </span>
+                            <span class="showcase-info">
+                                <span class="showcase-name">gloaming</span>
+                                <span class="showcase-tag">blog</span>
+                            </span>
+                        </a>
+                        
+                        <a
+                            href="https://hahwul.github.io/hwaro-examples/starship/"
+                            class="showcase-card"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <span class="showcase-preview">
+                                <img
+                                    src="https://examples.hwaro.hahwul.com/screenshots/starship.png"
+                                    alt="Screenshot of the starship example site"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </span>
+                            <span class="showcase-info">
+                                <span class="showcase-name">starship</span>
+                                <span class="showcase-tag">wiki</span>
+                            </span>
+                        </a>
+                        
+                        <a
+                            href="https://hahwul.github.io/hwaro-examples/dansaekhwa/"
+                            class="showcase-card"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <span class="showcase-preview">
+                                <img
+                                    src="https://examples.hwaro.hahwul.com/screenshots/dansaekhwa.png"
+                                    alt="Screenshot of the dansaekhwa example site"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </span>
+                            <span class="showcase-info">
+                                <span class="showcase-name">dansaekhwa</span>
+                                <span class="showcase-tag">gallery</span>
+                            </span>
+                        </a>
+                        
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 CLOSER - install and go
+                 ============================================================ -->
+            <section class="get-started reveal" id="install-hwaro">
+                <div class="lp-wrap">
+                    <h2>Start building.</h2>
+                    <p>One command to install. A few minutes to your first build.</p>
+                    <div class="install" id="install">
+                        <div class="install-tabs" role="tablist" aria-label="Installation method">
+                            <button type="button" role="tab" aria-selected="true" data-command="brew install hahwul/hwaro/hwaro">Homebrew</button>
+                            <button type="button" role="tab" aria-selected="false" data-command="sudo snap install hwaro">Snap</button>
+                            <button type="button" role="tab" aria-selected="false" data-command="yay -S hwaro">AUR</button>
+                            <button type="button" role="tab" aria-selected="false" data-command="nix profile install github:hahwul/hwaro">Nix</button>
+                        </div>
+                        <div class="install-cmd">
+                            <code id="install-command">brew install hahwul/hwaro/hwaro</code>
+                            <button type="button" class="install-copy" id="install-copy" aria-label="Copy command">
+                                <svg class="copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                <svg class="check-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5 11-11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                        </div>
+                        <p class="install-more">
+                            <a href="https://hwaro.hahwul.com/start/installation/">DEB, RPM, APK, and source builds &rarr;</a>
+                        </p>
+                    </div>
+                    <a href="https://hwaro.hahwul.com/start/" class="btn btn-primary">Get started</a>
+                </div>
+            </section>
+
+            <div class="lp-wrap">
+                <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+            </div>
+        </main>
+        <script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+        <script>
+        // Ember particles rising from the hero art. Skipped entirely under
+        // prefers-reduced-motion; rAF pauses on hidden tabs by itself.
+        (function() {
+            var reduce = window.matchMedia &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var canvas = document.getElementById('ember-canvas');
+            if (!canvas || reduce) return;
+            var ctx = canvas.getContext('2d');
+            var host = canvas.parentElement;
+            var embers = [];
+            var MAX = 40;
+
+            function resize() {
+                canvas.width = host.offsetWidth;
+                canvas.height = host.offsetHeight;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+
+            function Ember() {
+                this.reset();
+                this.y = Math.random() * canvas.height;
+            }
+
+            Ember.prototype.reset = function() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height + 4;
+                this.r = Math.random() * 2.2 + 0.8;
+                this.vx = (Math.random() - 0.5) * 0.6;
+                this.vy = -(Math.random() * 1.2 + 0.4);
+                this.life = 1;
+                this.decay = Math.random() * 0.008 + 0.003;
+                this.drift = Math.random() * 0.3 + 0.1;
+                this.wobble = Math.random() * Math.PI * 2;
+                var hue = Math.random();
+                if (hue < 0.5) {
+                    this.color = [255, 160 + Math.random() * 60 | 0, 30 + Math.random() * 30 | 0];
+                } else if (hue < 0.8) {
+                    this.color = [255, 80 + Math.random() * 60 | 0, 20 + Math.random() * 20 | 0];
+                } else {
+                    this.color = [255, 220 + Math.random() * 35 | 0, 80 + Math.random() * 60 | 0];
+                }
+            };
+
+            Ember.prototype.update = function() {
+                this.wobble += 0.04;
+                this.x += this.vx + Math.sin(this.wobble) * this.drift;
+                this.y += this.vy;
+                this.life -= this.decay;
+                if (this.life <= 0 || this.y < -10 || this.x < -10 || this.x > canvas.width + 10) {
+                    this.reset();
+                }
+            };
+
+            Ember.prototype.draw = function(ctx) {
+                var a = this.life * 0.65;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + a + ')';
+                ctx.shadowColor = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + (a * 0.5) + ')';
+                ctx.shadowBlur = this.r * 5;
+                ctx.fill();
+            };
+
+            for (var i = 0; i < MAX; i++) {
+                embers.push(new Ember());
+            }
+
+            function loop() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (var i = 0; i < embers.length; i++) {
+                    embers[i].update();
+                    embers[i].draw(ctx);
+                }
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                requestAnimationFrame(loop);
+            }
+            loop();
+        })();
+        </script>
+        <script>
+        // Install tabs + clipboard, shared by the hero one-liner and the
+        // closer's tabbed picker.
+        (function() {
+            function copyText(text, onDone) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(onDone, function() {});
+                } else {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'absolute';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); onDone(); } catch (e) {}
+                    document.body.removeChild(ta);
+                }
+            }
+
+            function flash(el) {
+                el.classList.add('is-copied');
+                clearTimeout(el._copyTimer);
+                el._copyTimer = setTimeout(function() {
+                    el.classList.remove('is-copied');
+                }, 1600);
+            }
+
+            var heroInstall = document.getElementById('hero-install');
+            if (heroInstall) {
+                heroInstall.addEventListener('click', function() {
+                    copyText(heroInstall.getAttribute('data-command'), function() {
+                        flash(heroInstall);
+                    });
+                });
+            }
+
+            var install = document.getElementById('install');
+            if (!install) return;
+            var tabs = install.querySelectorAll('[role="tab"]');
+            var cmdEl = document.getElementById('install-command');
+            var copyBtn = document.getElementById('install-copy');
+
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].addEventListener('click', function() {
+                    for (var j = 0; j < tabs.length; j++) {
+                        tabs[j].setAttribute('aria-selected', 'false');
+                    }
+                    this.setAttribute('aria-selected', 'true');
+                    cmdEl.textContent = this.getAttribute('data-command');
+                });
+            }
+
+            copyBtn.addEventListener('click', function() {
+                copyText(cmdEl.textContent.trim(), function() {
+                    flash(copyBtn);
+                });
+            });
+        })();
+        </script>
+        <script>
+        // Scroll reveals + the benchmark chart replayed in real time.
+        // Honors prefers-reduced-motion.
+        (function() {
+            var reduce = window.matchMedia &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            // The speed stage replays the actual measured build: the bar
+            // fills in exactly MS milliseconds (the median 1,000-page minimal
+            // build) while the counter tracks real elapsed time.
+            function runSpeed(section) {
+                var MS = 443;
+                var fill = section.querySelector('.speed-fill');
+                var num = section.querySelector('.speed-number');
+                var stage = section.querySelector('.speed-stage');
+                if (!fill || !num || !stage) return;
+                var running = false;
+
+                function play() {
+                    if (running) return;
+                    if (reduce) {
+                        num.textContent = (MS / 1000).toFixed(2);
+                        fill.style.transform = 'scaleX(1)';
+                        stage.classList.add('is-done');
+                        return;
+                    }
+                    running = true;
+                    stage.classList.remove('is-done');
+                    fill.style.transition = 'none';
+                    fill.style.transform = 'scaleX(0)';
+                    void fill.offsetWidth; /* flush the reset */
+                    fill.style.transition = 'transform ' + MS + 'ms linear';
+                    fill.style.transform = 'scaleX(1)';
+                    var t0 = null;
+                    function step(ts) {
+                        if (t0 === null) t0 = ts;
+                        var p = Math.min((ts - t0) / MS, 1);
+                        num.textContent = ((MS * p) / 1000).toFixed(2);
+                        if (p < 1) {
+                            requestAnimationFrame(step);
+                        } else {
+                            stage.classList.add('is-done');
+                            running = false;
+                        }
+                    }
+                    requestAnimationFrame(step);
+                }
+
+                var replay = section.querySelector('.speed-replay');
+                if (replay) replay.addEventListener('click', play);
+                play();
+            }
+
+            var reveals = document.querySelectorAll('.reveal');
+
+            function show(el) {
+                el.classList.add('is-visible');
+                if (el.classList.contains('speed')) runSpeed(el);
+            }
+
+            if (reduce || !('IntersectionObserver' in window)) {
+                for (var i = 0; i < reveals.length; i++) show(reveals[i]);
+                return;
+            }
+
+            var io = new IntersectionObserver(function(entries) {
+                entries.forEach(function(e) {
+                    if (!e.isIntersecting) return;
+                    show(e.target);
+                    io.unobserve(e.target);
+                });
+            }, { threshold: 0.15, rootMargin: '0px 0px -8% 0px' });
+
+            for (var j = 0; j < reveals.length; j++) io.observe(reveals[j]);
+        })();
+        </script>
+    </body>
+</html>

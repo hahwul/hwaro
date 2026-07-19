@@ -1,0 +1,962 @@
+/* =============================================================================
+   Hwaro Landing — ember editorial, dark-locked
+   The page hardcodes data-theme="dark", so every token resolves to its dark
+   side here. All rules stay scoped to landing classes.
+   ============================================================================= */
+
+.landing-body {
+    /* The landing sits a step deeper than the docs: close to the original
+       pure-black stage, so the fire art and embers carry the scene. */
+    --bg: #070709;
+    --bg-subtle: #101014;
+    --bg-code: #121216;
+    --border: #222229;
+    --border-subtle: #17171c;
+    --glass: rgba(7, 7, 9, 0.82);
+    background: var(--bg);
+    color: var(--text);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.lp-wrap {
+    max-width: 1152px;
+    margin: 0 auto;
+    padding-inline: var(--space-5);
+}
+
+/* Copy / check icon swap shared by every clipboard control on the page. */
+.landing-body .check-icon {
+    display: none;
+}
+
+.landing-body .is-copied .copy-icon {
+    display: none;
+}
+
+.landing-body .is-copied .check-icon {
+    display: block;
+    color: var(--ok);
+}
+
+/* =============================================================================
+   Header
+   ============================================================================= */
+
+.landing-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-5);
+    z-index: 100;
+}
+
+.landing-header .logo {
+    display: flex;
+    align-items: center;
+}
+
+.landing-header .logo img {
+    height: 30px;
+    width: auto;
+}
+
+.landing-header nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.landing-header nav a {
+    font-size: 0.88rem;
+    font-weight: 450;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.8rem;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition), background var(--transition);
+}
+
+.landing-header nav a:hover {
+    color: var(--heading);
+    background: var(--bg-subtle);
+}
+
+.landing-header .github-link {
+    display: flex;
+    padding: 0.35rem 0.5rem;
+}
+
+/* The landing nav's generous link padding would bloat the language menu —
+   restore the compact dropdown rows from 03-layout.css. */
+.landing-header nav .lang-switch-menu a {
+    font-size: 0.82rem;
+    padding: 0.4rem 0.6rem;
+}
+
+/* =============================================================================
+   Buttons
+   ============================================================================= */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.72rem 1.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 550;
+    line-height: 1;
+    transition:
+        background var(--transition),
+        color var(--transition),
+        transform 0.1s ease;
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+/* The landing keeps its original signature: a white primary on black.
+   The ember accent stays in the headline, links, and data. */
+.btn-primary {
+    background: var(--heading);
+    color: var(--bg);
+}
+
+.btn-primary:hover {
+    background: #ffffff;
+    color: var(--bg);
+}
+
+/* =============================================================================
+   Hero - immersive: brazier art + embers behind centered copy
+   ============================================================================= */
+
+.hero {
+    position: relative;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 64px;
+    overflow: hidden;
+}
+
+.hero-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Toned-down fire cover as an immersive backdrop. The pseudo-element is
+   sized to the artwork (capped at its native 1280px) and centred at 48%, so
+   the radial feather stays locked to the image's edges at every viewport:
+   the art dissolves into the black stage with no visible border. The inner
+   scrim keeps the centred title readable over the flames. */
+.hero-bg::before {
+    content: "";
+    position: absolute;
+    top: 48%;
+    left: 50%;
+    width: min(1240px, 94vw);
+    aspect-ratio: 16 / 9;
+    transform: translate(-50%, -50%);
+    background-image:
+        radial-gradient(
+            ellipse 68% 60% at 50% 50%,
+            rgba(0, 0, 0, 0.5) 0%,
+            rgba(0, 0, 0, 0.18) 55%,
+            rgba(0, 0, 0, 0) 82%
+        ),
+        url("/images/landing/cover.jpg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+    filter: saturate(0.58) brightness(0.88);
+    -webkit-mask-image: radial-gradient(
+        ellipse 50% 50% at 50% 50%,
+        #000 24%,
+        rgba(0, 0, 0, 0.5) 58%,
+        transparent 88%
+    );
+    mask-image: radial-gradient(
+        ellipse 50% 50% at 50% 50%,
+        #000 24%,
+        rgba(0, 0, 0, 0.5) 58%,
+        transparent 88%
+    );
+}
+
+#ember-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 0 var(--space-5);
+    max-width: 960px;
+    width: 100%;
+}
+
+.hero-content h1 {
+    font-size: clamp(2.6rem, 6vw, 4.4rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    color: var(--heading);
+    margin: 0 0 var(--space-5);
+    text-wrap: balance;
+    /* keep the title legible over the bright flames behind it */
+    text-shadow:
+        0 2px 28px rgba(0, 0, 0, 0.65),
+        0 1px 6px rgba(0, 0, 0, 0.55);
+}
+
+.hero-content .highlight {
+    color: var(--primary);
+}
+
+.hero-sub {
+    font-size: 1.1rem;
+    line-height: 1.75;
+    color: var(--text);
+    max-width: 52ch;
+    margin: 0 auto var(--space-6);
+    text-wrap: pretty;
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+}
+
+.hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.hero-install {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.62rem 1rem;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color var(--transition), color var(--transition);
+}
+
+.hero-install code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.hero-install:hover {
+    border-color: var(--text-muted);
+    color: var(--text);
+}
+
+/* Entry - a single quiet rise, only when motion is welcome. */
+@media (prefers-reduced-motion: no-preference) {
+    .hero-content h1,
+    .hero-content .hero-sub,
+    .hero-content .hero-actions {
+        opacity: 0;
+        transform: translateY(14px);
+        animation: lp-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .hero-content .hero-sub {
+        animation-delay: 0.1s;
+    }
+
+    .hero-content .hero-actions {
+        animation-delay: 0.2s;
+    }
+}
+
+@keyframes lp-rise {
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* =============================================================================
+   Section rhythm + scroll reveal
+   ============================================================================= */
+
+.landing section {
+    padding-block: var(--space-8);
+}
+
+.section-header {
+    margin-bottom: var(--space-6);
+    max-width: 60ch;
+}
+
+.section-header h2,
+.speed-header h2 {
+    font-size: var(--step-3);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: var(--heading);
+    margin: 0 0 var(--space-2);
+    text-wrap: balance;
+}
+
+.section-header p,
+.speed-header p {
+    margin: 0;
+    color: var(--text-secondary);
+    text-wrap: pretty;
+}
+
+html.js .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition:
+        opacity 0.6s ease,
+        transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.js .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.js .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+}
+
+/* =============================================================================
+   Speed — the measured build, replayed
+   ============================================================================= */
+
+.speed {
+    background: var(--bg-subtle);
+    border-block: 1px solid var(--border-subtle);
+}
+
+.speed-header {
+    margin-bottom: var(--space-6);
+    max-width: 60ch;
+}
+
+.speed-figure {
+    font-family: var(--font-mono);
+    font-size: clamp(3.2rem, 7vw, 5rem);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--heading);
+    margin: 0 0 var(--space-4);
+    font-variant-numeric: tabular-nums;
+}
+
+.speed-unit {
+    font-size: 0.5em;
+    color: var(--text-muted);
+    margin-left: 0.08em;
+}
+
+.speed-stage.is-done .speed-number {
+    color: var(--primary);
+}
+
+.speed-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--border-subtle);
+    overflow: hidden;
+}
+
+.speed-fill {
+    display: block;
+    height: 100%;
+    width: 100%;
+    border-radius: 999px;
+    background: var(--spark);
+    transform-origin: left center;
+}
+
+/* Only a JS-driven page starts the bar at zero; no-JS sees it full. */
+html.js .speed-fill {
+    transform: scaleX(0);
+}
+
+.speed-caption {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin: var(--space-3) 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.speed-replay {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.22rem 0.6rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color var(--transition), border-color var(--transition);
+}
+
+.speed-replay:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.speed-modes {
+    list-style: none;
+    margin: var(--space-6) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+}
+
+.speed-modes li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+}
+
+.mode-name {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--heading);
+}
+
+.mode-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.mode-time {
+    font-family: var(--font-mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-top: var(--space-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* =============================================================================
+   Bento — six cells, no holes
+   ============================================================================= */
+
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3);
+}
+
+.bento-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.bento-cell h3 {
+    font-family: var(--font-mono);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--heading);
+    margin: 0;
+}
+
+.bento-cell p {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+/* A: OG collage cell — real build output as the visual. */
+.cell-seo {
+    grid-column: span 2;
+    grid-row: span 2;
+    background: var(--bg-subtle);
+    overflow: hidden;
+}
+
+.og-fan {
+    position: relative;
+    margin-top: auto;
+    min-height: 220px;
+}
+
+.og-fan img {
+    position: absolute;
+    width: 58%;
+    height: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.og-fan img:nth-child(1) {
+    left: 0;
+    bottom: 6%;
+    transform: rotate(-5deg);
+}
+
+.og-fan img:nth-child(2) {
+    left: 21%;
+    bottom: 16%;
+    transform: rotate(1.5deg);
+}
+
+.og-fan img:nth-child(3) {
+    left: 42%;
+    bottom: 2%;
+    transform: rotate(6deg);
+}
+
+.cell-fast {
+    grid-column: span 2;
+}
+
+/* C: a real front-matter snippet in real highlight classes. */
+.cell-markdown {
+    background: var(--bg-code);
+}
+
+.cell-markdown pre {
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.cell-markdown pre code {
+    font-size: 0.78rem;
+}
+
+.cell-taxonomies {
+    grid-column: span 2;
+    background: var(--primary-tint);
+    border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
+}
+
+.cell-extensible {
+    grid-column: span 2;
+}
+
+/* =============================================================================
+   Scaffolds — scroll-snap rail
+   ============================================================================= */
+
+.scaffolds .section-header {
+    margin-bottom: var(--space-5);
+}
+
+.scaffold-rail {
+    display: flex;
+    gap: var(--space-4);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: var(--space-1) max(calc((100vw - 1152px) / 2 + var(--space-5)), var(--space-5)) var(--space-4);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.scaffold-card {
+    flex: 0 0 auto;
+    width: min(420px, 78vw);
+    scroll-snap-align: start;
+    margin: 0;
+}
+
+.scaffold-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.scaffold-card figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: var(--space-3);
+}
+
+.scaffold-card figcaption code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.scaffold-card figcaption span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* =============================================================================
+   OG marquee — one slow drift of real output; static row under reduced motion
+   ============================================================================= */
+
+.ogband .section-header {
+    margin-bottom: var(--space-5);
+}
+
+.og-marquee {
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+
+.og-track {
+    display: flex;
+    gap: var(--space-4);
+    width: max-content;
+}
+
+.og-track img {
+    width: 300px;
+    height: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .og-track {
+        animation: og-drift 80s linear infinite;
+    }
+
+    .og-marquee:hover .og-track {
+        animation-play-state: paused;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .og-marquee {
+        overflow-x: auto;
+        mask-image: none;
+        -webkit-mask-image: none;
+    }
+}
+
+@keyframes og-drift {
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+/* =============================================================================
+   Showcase — media gallery
+   ============================================================================= */
+
+.showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+}
+
+.showcase-card {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--bg-subtle);
+    transition: transform 0.25s ease, border-color var(--transition);
+}
+
+.showcase-card:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.showcase-preview {
+    display: block;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+}
+
+.showcase-preview img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    transition: transform 0.4s ease;
+}
+
+.showcase-card:hover .showcase-preview img {
+    transform: scale(1.03);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .showcase-card,
+    .showcase-preview img {
+        transition: none;
+    }
+}
+
+.showcase-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+}
+
+.showcase-name {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--heading);
+}
+
+.showcase-tag {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* =============================================================================
+   Closer — install and go
+   ============================================================================= */
+
+.get-started {
+    text-align: center;
+    border-top: 1px solid var(--border-subtle);
+    background: radial-gradient(
+        620px 320px at 50% 100%,
+        color-mix(in srgb, var(--primary) 9%, transparent),
+        transparent 72%
+    );
+}
+
+.get-started h2 {
+    font-size: var(--step-3);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: var(--heading);
+    margin: 0 0 var(--space-2);
+}
+
+.get-started > .lp-wrap > p {
+    margin: 0 0 var(--space-6);
+    color: var(--text-secondary);
+}
+
+.install {
+    max-width: 560px;
+    margin: 0 auto var(--space-6);
+}
+
+.install-tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    margin-bottom: var(--space-3);
+}
+
+.install-tabs [role="tab"] {
+    border: none;
+    background: transparent;
+    padding: 0.38rem 0.9rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+}
+
+.install-tabs [role="tab"]:hover {
+    color: var(--heading);
+}
+
+.install-tabs [role="tab"][aria-selected="true"] {
+    background: var(--bg);
+    color: var(--heading);
+    font-weight: 550;
+    box-shadow: var(--shadow-sm);
+}
+
+.install-cmd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 0.8rem 1rem;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.install-cmd code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.88rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+.install-copy {
+    display: flex;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.3rem;
+    transition: color var(--transition);
+}
+
+.install-copy:hover {
+    color: var(--primary);
+}
+
+.install-more {
+    margin: var(--space-3) 0 0;
+    font-size: 0.82rem;
+}
+
+.install-more a {
+    color: var(--text-muted);
+}
+
+.install-more a:hover {
+    color: var(--primary);
+}
+
+/* Landing footer spacing — the shared partial brings its own top border. */
+.landing-body .site-footer {
+    margin-top: 0;
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+
+@media (max-width: 960px) {
+    .hero-content h1 {
+        font-size: clamp(2.2rem, 8.5vw, 3.2rem);
+    }
+
+    .bento-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .cell-seo,
+    .cell-fast,
+    .cell-taxonomies,
+    .cell-extensible {
+        grid-column: span 2;
+    }
+
+    .cell-seo {
+        grid-row: auto;
+    }
+
+    .showcase-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .speed-modes {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .landing section {
+        padding-block: var(--space-7);
+    }
+
+    .landing-header {
+        padding: 0 var(--space-4);
+    }
+
+    .landing-header nav a {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.82rem;
+    }
+
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cell-seo,
+    .cell-fast,
+    .cell-markdown,
+    .cell-templates,
+    .cell-taxonomies,
+    .cell-extensible {
+        grid-column: auto;
+    }
+
+    .showcase-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .hero-install {
+        justify-content: center;
+    }
+
+    .og-fan {
+        min-height: 160px;
+    }
+}

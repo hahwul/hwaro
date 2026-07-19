@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="표준 CommonMark를 넘어서는 선택적 마크다운 확장">
+  <title>마크다운 확장 - Hwaro</title>
+  <meta property="og:title" content="마크다운 확장">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/markdown-extensions/">
+  <meta property="og:description" content="표준 CommonMark를 넘어서는 선택적 마크다운 확장">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-markdown-extensions.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="마크다운 확장">
+  <meta name="twitter:description" content="표준 CommonMark를 넘어서는 선택적 마크다운 확장">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-markdown-extensions.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/markdown-extensions/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/" class="active">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">마크다운 확장</li>
+  </ol>
+</nav>
+    <h1>마크다운 확장</h1>
+    <p>Hwaro는 표준 CommonMark를 넘어서는 선택적 마크다운 확장을 지원합니다. 각 확장은 <code>config.toml</code>에서 켜고 끌 수 있습니다(기본값은 아래 표 참고).</p>
+<h2 id="설정">설정</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+task_lists <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+definition_lists <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+footnotes <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+math <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+math_engine <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;katex&quot;</span>
+mermaid <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>task_lists</td>
+<td>bool</td>
+<td>true</td>
+<td>체크박스 목록(<code>- [ ]</code> / <code>- [x]</code>)</td>
+</tr>
+<tr>
+<td>definition_lists</td>
+<td>bool</td>
+<td>true</td>
+<td>정의 목록(<code>Term\n: Definition</code>)</td>
+</tr>
+<tr>
+<td>footnotes</td>
+<td>bool</td>
+<td>true</td>
+<td>각주(<code>[^1]</code>)</td>
+</tr>
+<tr>
+<td>math</td>
+<td>bool</td>
+<td>false</td>
+<td>수식(<code>$...$</code>, <code>$$...$$</code>)</td>
+</tr>
+<tr>
+<td>math_engine</td>
+<td>string</td>
+<td>&quot;katex&quot;</td>
+<td>수식 렌더링 엔진(<code>&quot;katex&quot;</code> 또는 <code>&quot;mathjax&quot;</code>)</td>
+</tr>
+<tr>
+<td>mermaid</td>
+<td>bool</td>
+<td>false</td>
+<td>Mermaid 다이어그램 블록</td>
+</tr>
+<tr>
+<td>admonitions</td>
+<td>bool</td>
+<td>true</td>
+<td>GitHub 스타일 <code>&gt; [!NOTE]</code> 인용문을 admonition 블록으로 변환</td>
+</tr>
+<tr>
+<td>heading_ids</td>
+<td>bool</td>
+<td>true</td>
+<td>커스텀 헤딩 ID(<code>## Heading {#custom-id}</code>)</td>
+</tr>
+<tr>
+<td>ins</td>
+<td>bool</td>
+<td>false</td>
+<td>삽입 텍스트(<code>++text++</code> → <code>&lt;ins&gt;text&lt;/ins&gt;</code>)</td>
+</tr>
+<tr>
+<td>mark</td>
+<td>bool</td>
+<td>false</td>
+<td>강조 표시 텍스트(<code>==text==</code> → <code>&lt;mark&gt;text&lt;/mark&gt;</code>)</td>
+</tr>
+<tr>
+<td>sub</td>
+<td>bool</td>
+<td>false</td>
+<td>아래 첨자(<code>~text~</code> → <code>&lt;sub&gt;text&lt;/sub&gt;</code>)</td>
+</tr>
+<tr>
+<td>sup</td>
+<td>bool</td>
+<td>false</td>
+<td>위 첨자(<code>^text^</code> → <code>&lt;sup&gt;text&lt;/sup&gt;</code>)</td>
+</tr>
+<tr>
+<td>attributes</td>
+<td>bool</td>
+<td>false</td>
+<td>헤딩과 인라인 이미지에 붙는 일반화된 <code>{#id .class key=val}</code> 블록</td>
+</tr>
+<tr>
+<td>safe</td>
+<td>bool</td>
+<td>false</td>
+<td>출력에서 원시 HTML 제거(주석으로 대체)</td>
+</tr>
+<tr>
+<td>lazy_loading</td>
+<td>bool</td>
+<td>false</td>
+<td><code>&lt;img&gt;</code> 태그에 <code>loading=&quot;lazy&quot;</code> 추가</td>
+</tr>
+<tr>
+<td>emoji</td>
+<td>bool</td>
+<td>false</td>
+<td>이모지 숏코드(예: <code>:smile:</code>)를 이모지 문자로 변환</td>
+</tr>
+<tr>
+<td>smart_punctuation</td>
+<td>bool</td>
+<td>false</td>
+<td>타이포그래피 따옴표/대시/줄임표</td>
+</tr>
+<tr>
+<td>containers</td>
+<td>bool</td>
+<td>false</td>
+<td><code>:::note Title</code> … <code>:::</code> 커스텀 컨테이너</td>
+</tr>
+<tr>
+<td>task_list_classes</td>
+<td>bool</td>
+<td>false</td>
+<td>작업 목록 마크업에 GFM 클래스 부여</td>
+</tr>
+<tr>
+<td>insert_anchor_links</td>
+<td>string</td>
+<td>&quot;none&quot;</td>
+<td>사이트 전역 헤딩 앵커 링크(<code>&quot;none&quot;</code>/<code>&quot;left&quot;</code>/<code>&quot;right&quot;</code>)</td>
+</tr>
+<tr>
+<td>external_links_target_blank</td>
+<td>bool</td>
+<td>false</td>
+<td>절대 http(s) 링크에 <code>target=&quot;_blank&quot; rel=&quot;noopener&quot;</code></td>
+</tr>
+<tr>
+<td>external_links_no_follow</td>
+<td>bool</td>
+<td>false</td>
+<td>절대 http(s) 링크에 <code>rel=&quot;nofollow&quot;</code></td>
+</tr>
+<tr>
+<td>external_links_no_referrer</td>
+<td>bool</td>
+<td>false</td>
+<td>절대 http(s) 링크에 <code>rel=&quot;noreferrer&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="작업-목록">작업 목록</h2>
+<p>목록 안에 체크박스를 렌더링합니다.</p>
+<h3 id="문법">문법</h3>
+<pre><code class="language-markdown hljs"><span class="hljs-keyword">- </span><span class="hljs-keyword">[x]</span> Completed task
+<span class="hljs-keyword">- </span><span class="hljs-keyword">[ ]</span> Incomplete task
+<span class="hljs-keyword">- </span><span class="hljs-keyword">[X]</span> Also completed (case-insensitive)
+</code></pre>
+<h3 id="출력">출력</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">ul</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">input</span> <span class="hljs-attr">type</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;checkbox&quot;</span> <span class="hljs-attr">checked</span> <span class="hljs-attr">disabled</span><span class="hljs-punctuation">&gt;</span> Completed task<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">input</span> <span class="hljs-attr">type</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;checkbox&quot;</span> <span class="hljs-attr">disabled</span><span class="hljs-punctuation">&gt;</span> Incomplete task<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">input</span> <span class="hljs-attr">type</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;checkbox&quot;</span> <span class="hljs-attr">checked</span> <span class="hljs-attr">disabled</span><span class="hljs-punctuation">&gt;</span> Also completed<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">ul</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="정의-목록">정의 목록</h2>
+<p><code>&lt;dl&gt;</code>, <code>&lt;dt&gt;</code>, <code>&lt;dd&gt;</code> 요소로 용어와 정의를 렌더링합니다.</p>
+<h3 id="문법-1">문법</h3>
+<pre><code class="language-markdown hljs">Crystal
+: A compiled language with Ruby-like syntax
+
+Go
+: A statically typed, compiled language by Google
+</code></pre>
+<h3 id="출력-1">출력</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">dl</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>Crystal<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>A compiled language with Ruby-like syntax<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>Go<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dt</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>A statically typed, compiled language by Google<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dd</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">dl</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="각주">각주</h2>
+<p>각주 참조와 정의를 추가합니다.</p>
+<h3 id="문법-2">문법</h3>
+<pre><code class="language-markdown hljs">This is a statement[^1] with multiple references[^note].
+
+[<span class="hljs-symbol">^1</span>]: <span class="hljs-attr">First footnote content.</span>
+[<span class="hljs-symbol">^note</span>]: <span class="hljs-attr">Named footnote content.</span>
+</code></pre>
+<h3 id="출력-2">출력</h3>
+<p>참조는 위 첨자 링크가 됩니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>This is a statement<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sup</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-ref&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fn-1&quot;</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fnref-1&quot;</span><span class="hljs-punctuation">&gt;</span>[1]<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span>
+with multiple references<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sup</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-ref&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fn-note&quot;</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fnref-note&quot;</span><span class="hljs-punctuation">&gt;</span>[2]<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span>.<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>문서 끝에 각주 섹션이 덧붙습니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">section</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnotes&quot;</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">hr</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-name">ol</span><span class="hljs-punctuation">&gt;</span>
+    <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fn-1&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>First footnote content. <span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fnref-1&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-backref&quot;</span><span class="hljs-punctuation">&gt;</span>↩<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+    <span class="hljs-punctuation">&lt;</span><span class="hljs-name">li</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;fn-note&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>Named footnote content. <span class="hljs-punctuation">&lt;</span><span class="hljs-name">a</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;#fnref-note&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;footnote-backref&quot;</span><span class="hljs-punctuation">&gt;</span>↩<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">a</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">li</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">ol</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">section</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="수식">수식</h2>
+<p>수학 표현식을 렌더링합니다. 클라이언트 사이드 수식 라이브러리(KaTeX 또는 MathJax)가 필요합니다.</p>
+<h3 id="문법-3">문법</h3>
+<p>인라인 수식은 <code>$</code> 하나로 감쌉니다.</p>
+<pre><code class="language-markdown hljs">The equation $E = mc^2$ is well known.
+</code></pre>
+<p>디스플레이 수식은 <code>$$</code> 두 개로 감쌉니다.</p>
+<pre><code class="language-markdown hljs">$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$
+</code></pre>
+<h3 id="출력-3">출력</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>The equation <span class="hljs-punctuation">&lt;</span><span class="hljs-name">span</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;math math-inline&quot;</span><span class="hljs-punctuation">&gt;</span>\(E = mc^2\)<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">span</span><span class="hljs-punctuation">&gt;</span> is well known.<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>
+
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;math math-display&quot;</span><span class="hljs-punctuation">&gt;</span>\[\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}\]<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="클라이언트-사이드-설정">클라이언트 사이드 설정</h3>
+<h4 id="katex">KaTeX</h4>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+  <span class="hljs-built_in">document</span><span class="hljs-punctuation">.</span>addEventListener<span class="hljs-punctuation">(</span><span class="hljs-string">&quot;DOMContentLoaded&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-keyword">function</span><span class="hljs-punctuation">(</span><span class="hljs-punctuation">)</span> <span class="hljs-punctuation">{</span>
+    renderMathInElement<span class="hljs-punctuation">(</span><span class="hljs-built_in">document</span><span class="hljs-punctuation">.</span>body<span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h4 id="mathjax">MathJax</h4>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+  MathJax <span class="hljs-operator">=</span> <span class="hljs-punctuation">{</span> tex<span class="hljs-operator">:</span> <span class="hljs-punctuation">{</span> inlineMath<span class="hljs-operator">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span><span class="hljs-string">&#39;\\(&#39;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&#39;\\)&#39;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span> displayMath<span class="hljs-operator">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span><span class="hljs-string">&#39;\\[&#39;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&#39;\\]&#39;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span> <span class="hljs-punctuation">}</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="mermaid-다이어그램">Mermaid 다이어그램</h2>
+<p>Mermaid 다이어그램 블록을 <code>&lt;div class=&quot;mermaid&quot;&gt;</code> 요소로 렌더링합니다.</p>
+<p>이는 <a href="/ko/templates/render-hooks/">렌더 훅</a>의 &quot;항상 적용&quot; 규칙에 대한 유일한 예외입니다. <code>mermaid = true</code>이면 <code>```mermaid</code> 펜스는 <code>render-codeblock.html</code> 훅이 설정되어 있어도 항상 이 파이프라인을 거칩니다. 코드블록 훅이 다른 언어처럼 mermaid 펜스도 처리하게 하려면 <code>mermaid = false</code>로 설정합니다.</p>
+<h3 id="문법-4">문법</h3>
+<pre><code class="language-markdown hljs"><span class="hljs-string">```</span><span class="hljs-symbol">mermaid</span>
+graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
+<span class="hljs-string">```</span>
+</code></pre>
+<h3 id="출력-4">출력</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">div</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;mermaid&quot;</span><span class="hljs-punctuation">&gt;</span>
+graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
+<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">div</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="클라이언트-사이드-설정-1">클라이언트 사이드 설정</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>mermaid<span class="hljs-punctuation">.</span>initialize<span class="hljs-punctuation">(</span><span class="hljs-punctuation">{</span> startOnLoad<span class="hljs-operator">:</span> <span class="hljs-literal">true</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="인라인-마크업ins-mark-sub-sup">인라인 마크업(ins, mark, sub, sup)</h2>
+<p>각각 별도 플래그 뒤에 있는 네 가지 옵트인 인라인 스타일입니다. 기본값이 모두 꺼짐이므로, 하나를 켜도 나머지에는 영향이 없습니다.</p>
+<h3 id="문법-5">문법</h3>
+<pre><code class="language-markdown hljs">++Inserted text++ and ==highlighted text==.
+Formula: x~2~ + y^2^ = z~n~
+</code></pre>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+ins <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+mark <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+sub <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+sup <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<h3 id="출력-5">출력</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-name">ins</span><span class="hljs-punctuation">&gt;</span>Inserted text<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">ins</span><span class="hljs-punctuation">&gt;</span> and <span class="hljs-punctuation">&lt;</span><span class="hljs-name">mark</span><span class="hljs-punctuation">&gt;</span>highlighted text<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">mark</span><span class="hljs-punctuation">&gt;</span>.
+Formula: x<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span>2<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span> + y<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span>2<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sup</span><span class="hljs-punctuation">&gt;</span> = z<span class="hljs-punctuation">&lt;</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span>n<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">sub</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="제한-사항">제한 사항</h3>
+<ul>
+<li><strong>백슬래시 이스케이프가 없습니다.</strong> 네 구분자 모두 CommonMark 스타일 <code>\</code> 이스케이프로 변환을 억제할 수 없고, 시도했을 때의 결과도 일관적이지 않습니다 — 백슬래시가 리터럴 구분자나 스타일된 결과 대신 깨진 이스케이프 태그 출력을 남길 수 있습니다. 문법을 텍스트 그대로 보여야 할 때는 코드 스팬(<code>`++literal++`</code>)을 사용합니다.</li>
+<li><strong>구분자 관련 주의점:</strong> <code>++</code>/<code>==</code>/<code>~</code>/<code>^</code>는 모두 내용 양쪽에 비공백 문자가 있어야 동작하므로, 산술식처럼 생긴 텍스트(<code>a ~ b</code>, <code>x ^ y</code>, 공백이 있는 <code>a == b</code>)는 건드리지 않습니다. 단일 <code>~</code>와 <code>^</code>는 취소선의 <code>~~</code>나 일반 <code>**</code>/<code>__</code> 강조와 의도적으로 분리되어 있어 같은 줄의 <code>~~del~~</code>과 <code>~sub~</code>가 모두 동작합니다. 다만 리터럴 <code>~</code>/<code>^</code>/<code>==</code>/<code>++</code>가 많은 페이지(셸 프롬프트, C/C++ 스니펫, XOR이 많은 코드)는 어차피 코드 스팬이나 펜스 코드 블록에 담아 두는 편이 좋습니다 — sub/sup/ins/mark는 그 바깥에서만 적용되기 때문입니다.</li>
+<li><code>footnotes</code>가 함께 켜져 있어도 <code>sup</code>이 각주 참조(<code>[^1]</code>)를 망가뜨리지 않습니다.</li>
+</ul>
+<h2 id="속성id-class-keyval">속성(<code>{#id .class key=val}</code>)</h2>
+<p>헤딩이나 인라인 이미지에 붙는 pandoc 스타일 속성 블록입니다. <a href="/ko/writing/pages/">커스텀 헤딩 ID</a> 축약 문법을 일반화한 것으로, 클래스와 임의 속성까지 설정할 수 있고 이미지에도 적용됩니다.</p>
+<h3 id="문법-6">문법</h3>
+<pre><code class="language-markdown hljs"><span class="hljs-section">## Section Title {#section-title .highlight data-index=3}</span>
+
+![<span class="hljs-name">A diagram</span>](<span class="hljs-attr">diagram.png</span>){.responsive width=800}
+</code></pre>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+attributes <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<h3 id="출력-6">출력</h3>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">h2</span> <span class="hljs-attr">id</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;section-title&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;highlight&quot;</span> <span class="hljs-attr">data-index</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;3&quot;</span><span class="hljs-punctuation">&gt;</span>Section Title<span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">h2</span><span class="hljs-punctuation">&gt;</span>
+
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">img</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;diagram.png&quot;</span> <span class="hljs-attr">alt</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;A diagram&quot;</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;responsive&quot;</span> <span class="hljs-attr">width</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;800&quot;</span> <span class="hljs-punctuation">/</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>토큰은 공백으로 구분합니다(쉼표는 구분자가 아님). <code>#id</code>는 id를 설정하고, <code>.class</code>는 클래스를 추가하며(반복 가능), <code>key=value</code> / <code>key=&quot;quoted value&quot;</code>는 그 밖의 속성을 설정합니다. <code>id=value</code>와 <code>class=value</code>는 <code>#value</code> / <code>.value</code>의 별칭으로 허용됩니다. 유효하지 않은 토큰이 하나라도 있으면 블록 전체가 무효가 되어 원본 <code>{...}</code>이 그대로 남습니다.</p>
+<h3 id="제한-사항-1">제한 사항</h3>
+<ul>
+<li><strong>v1 범위는 헤딩과 인라인 이미지뿐입니다</strong> — 다른 요소(문단, 링크, 코드 스팬, 목록 항목) 뒤의 속성 블록은 지원되지 않고 리터럴 텍스트로 남습니다.</li>
+<li>다른 토큰 없이 <code>## Heading {#id}</code>만 있는 경우는 <code>attributes</code>가 켜져 있어도 여전히 더 좁은 <code>heading_ids</code> 메커니즘이 처리합니다. 따라서 <code>attributes</code>를 켜도 기존 <code>{#id}</code> 전용 헤딩은 달라지지 않습니다.</li>
+<li><strong>safe 모드는 블록을 버립니다.</strong> <code>markdown.safe = true</code>이면 <code>{...}</code> 속성 블록이 출력에서 제거되며(<code>heading_ids</code>와 동일), 어떤 속성도 적용되지 않습니다.</li>
+</ul>
+<h2 id="스마트-문장부호">스마트 문장부호</h2>
+<p><code>smart_punctuation = true</code>이면 곧은 따옴표, 이중/삼중 대시, 점 세 개가 타이포그래피 형태로 바뀝니다.</p>
+<table>
+<thead>
+<tr>
+<th>입력</th>
+<th>출력</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&quot;quoted&quot;</code> / <code>&#39;quoted&#39;</code></td>
+<td>“quoted” / ‘quoted’</td>
+</tr>
+<tr>
+<td><code>--</code></td>
+<td>– (en dash)</td>
+</tr>
+<tr>
+<td><code>---</code></td>
+<td>— (em dash)</td>
+</tr>
+<tr>
+<td><code>...</code></td>
+<td>… (ellipsis)</td>
+</tr>
+</tbody>
+</table>
+<p>코드 스팬, 코드 블록, 원시 HTML, 수식 본문은 절대 다시 쓰지 않습니다. 표 셀, 정의 본문, 각주 본문은 미리 렌더링된 HTML이라 그 내부에는 스마트 문장부호가 적용되지 않습니다. <code>markdownify</code> 템플릿 필터는 사이트 설정을 따릅니다.</p>
+<h2 id="커스텀-컨테이너">커스텀 컨테이너</h2>
+<p><code>containers = true</code>이면 <code>:::</code> 펜스 블록이 admonition과 같은 마크업(과 CSS)으로 렌더링됩니다.</p>
+<pre><code class="language-markdown hljs">:::note Optional Title
+Any <span class="hljs-strong">**markdown**</span> body — code fences and task lists included.
+:::
+</code></pre>
+<p>제목의 기본값은 타입을 대문자로 시작한 형태입니다. 더 긴 구분자는 중첩되고(<code>::::outer</code> … <code>:::inner</code> … <code>:::</code> … <code>::::</code>), 단독 <code>:::</code>는 가장 안쪽의 열린 컨테이너를 닫으며, 닫히지 않은 컨테이너는 페이지 끝에서 자동으로 닫힙니다. 코드 펜스 안의 <code>:::</code> 줄은 리터럴로 남습니다. <code>safe = true</code>와는 함께 쓸 수 없습니다(원시 래퍼가 제거되기 때문).</p>
+<h2 id="작업-목록-클래스">작업 목록 클래스</h2>
+<p><code>task_list_classes = true</code>이면 작업 목록 마크업에 GFM의 클래스가 붙어 GitHub 대상 CSS가 그대로 적용됩니다. <code>&lt;li class=&quot;task-list-item&quot;&gt;</code>, 체크박스의 <code>class=&quot;task-list-item-checkbox&quot;</code>, 작업 항목을 직접 포함하는 모든 목록의 <code>class=&quot;contains-task-list&quot;</code>가 붙습니다. 기존 사이트의 출력을 바이트 단위로 동일하게 유지하기 위해 기본값은 꺼짐입니다.</p>
+<h2 id="헤딩-앵커-링크">헤딩 앵커 링크</h2>
+<p><code>insert_anchor_links = &quot;left&quot;</code>(또는 <code>&quot;right&quot;</code>)는 사이트 전체의 모든 헤딩에 <code>🔗</code> 앵커 링크를 헤딩 텍스트 앞 또는 뒤에 추가합니다. 페이지 프론트 매터의 <code>insert_anchor_links = true/false</code>가 사이트 설정을 페이지 단위로 덮어씁니다. 마크업을 완전히 바꾸려면 <a href="/ko/templates/render-hooks/">render-heading 훅</a>을 사용합니다.</p>
+<h2 id="외부-링크-정책">외부 링크 정책</h2>
+<p>세 가지 플래그가 렌더링된 마크다운(표 셀과 각주 포함)의 절대 <code>http(s)://</code> 링크에 사이트 전역 정책을 적용합니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+external_links_target_blank <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span> <span class="hljs-comment"># target=&quot;_blank&quot; + rel=&quot;noopener&quot;</span>
+external_links_no_follow <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>    <span class="hljs-comment"># rel=&quot;nofollow&quot;</span>
+external_links_no_referrer <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>  <span class="hljs-comment"># rel=&quot;noreferrer&quot;</span>
+</code></pre>
+<p>이미 <code>target=</code>을 가진 링크는 그대로 유지되고, <code>rel</code> 토큰은 기존 <code>rel</code> 속성에 중복 없이 병합됩니다 — 즉 render-link 훅이 명시한 선택이 우선합니다. 이 정책은 자신의 도메인을 가리키는 링크를 포함해 모든 절대 http(s) 링크에 적용됩니다.</p>
+<h2 id="여러-줄-각주와-정의">여러 줄 각주와 정의</h2>
+<p>각주 정의는 4칸 공백(또는 탭)으로 들여쓴 이어지는 줄을 수집하며, 빈 줄로 구분된 문단도 포함합니다.</p>
+<pre><code class="language-markdown hljs">[<span class="hljs-symbol">^1</span>]: <span class="hljs-attr">First paragraph of the note,</span>
+    soft-wrapped onto a second line.
+
+    Second paragraph of the same note.
+</code></pre>
+<p>정의 목록 본문도 같은 방식으로 이어집니다(들여쓴 줄이 같은 <code>&lt;dd&gt;</code>에 합쳐짐). 들여쓰지 않은(lazy) 이어쓰기, 각주 본문 안의 블록 요소, 여러 문단으로 된 <code>&lt;dd&gt;</code>는 지원되지 않습니다.</p>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/start/config/">설정</a> — 마크다운 설정 옵션</li>
+<li><a href="/ko/features/syntax-highlighting/">구문 강조</a> — 코드 블록 강조</li>
+<li><a href="/ko/templates/render-hooks/">렌더 훅</a> — 링크·이미지·헤딩·코드 블록 렌더링 방식 재정의</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/syntax-highlighting/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Syntax Highlighting</span>
+    <span class="pn-desc">Automatic syntax highlighting for code blocks</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/features/markdown-extensions/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">Markdown Extensions</span>
+    <span class="pn-desc">Optional markdown extensions beyond standard CommonMark</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#설정">설정</a></li><li><a href="#작업-목록">작업 목록</a><ul><li><a href="#문법">문법</a></li><li><a href="#출력">출력</a></li></ul></li><li><a href="#정의-목록">정의 목록</a><ul><li><a href="#문법-1">문법</a></li><li><a href="#출력-1">출력</a></li></ul></li><li><a href="#각주">각주</a><ul><li><a href="#문법-2">문법</a></li><li><a href="#출력-2">출력</a></li></ul></li><li><a href="#수식">수식</a><ul><li><a href="#문법-3">문법</a></li><li><a href="#출력-3">출력</a></li><li><a href="#클라이언트-사이드-설정">클라이언트 사이드 설정</a><ul><li><a href="#katex">KaTeX</a></li><li><a href="#mathjax">MathJax</a></li></ul></li></ul></li><li><a href="#mermaid-다이어그램">Mermaid 다이어그램</a><ul><li><a href="#문법-4">문법</a></li><li><a href="#출력-4">출력</a></li><li><a href="#클라이언트-사이드-설정-1">클라이언트 사이드 설정</a></li></ul></li><li><a href="#인라인-마크업ins-mark-sub-sup">인라인 마크업(ins, mark, sub, sup)</a><ul><li><a href="#문법-5">문법</a></li><li><a href="#출력-5">출력</a></li><li><a href="#제한-사항">제한 사항</a></li></ul></li><li><a href="#속성id-class-keyval">속성({#id .class key=val})</a><ul><li><a href="#문법-6">문법</a></li><li><a href="#출력-6">출력</a></li><li><a href="#제한-사항-1">제한 사항</a></li></ul></li><li><a href="#스마트-문장부호">스마트 문장부호</a></li><li><a href="#커스텀-컨테이너">커스텀 컨테이너</a></li><li><a href="#작업-목록-클래스">작업 목록 클래스</a></li><li><a href="#헤딩-앵커-링크">헤딩 앵커 링크</a></li><li><a href="#외부-링크-정책">외부 링크 정책</a></li><li><a href="#여러-줄-각주와-정의">여러 줄 각주와 정의</a></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

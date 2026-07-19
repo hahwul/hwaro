@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="순수 Crystal로 구현된 내장 SCSS 컴파일 — 외부 도구가 필요 없습니다">
+  <title>Sass/SCSS - Hwaro</title>
+  <meta property="og:title" content="Sass/SCSS">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/sass/">
+  <meta property="og:description" content="순수 Crystal로 구현된 내장 SCSS 컴파일 — 외부 도구가 필요 없습니다">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-sass.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sass/SCSS">
+  <meta name="twitter:description" content="순수 Crystal로 구현된 내장 SCSS 컴파일 — 외부 도구가 필요 없습니다">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-sass.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/sass/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/sass/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/sass/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/sass/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/sass/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">Sass/SCSS</li>
+  </ol>
+</nav>
+    <h1>Sass/SCSS</h1>
+    <p>Hwaro는 빌드 시점에 순수 Crystal로 구현된 내장 컴파일러로 SCSS를 컴파일합니다. dart-sass 바이너리 설치도, npm 툴체인도, C 라이브러리도 필요 없습니다 — 외부 의존성 없음이라는 Hwaro의 철학 그대로입니다.</p>
+<h2 id="빠른-시작">빠른 시작</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>sass<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<p>SCSS 파일을 <code>static/</code> 아래에 둡니다.</p>
+<pre><code>static/
+├── css/
+│   ├── _variables.scss   # partial — never published
+│   ├── _mixins.scss      # partial — never published
+│   └── style.scss        # entry — compiles to /css/style.css
+</code></pre>
+<pre><code class="language-scss hljs">// static/css/style.scss
+@use &quot;variables&quot;;
+@use &quot;mixins&quot;;
+
+.card {
+  color: variables.$primary;
+  &amp;:hover { color: variables.$accent; }
+
+  @include mixins.respond(768px) {
+    padding: 2rem;
+  }
+}
+</code></pre>
+<p>파셜이 아닌 모든 <code>*.scss</code>는 출력에서 같은 경로의 <code>.css</code>로 컴파일되므로(<code>static/css/style.scss</code> → <code>/css/style.css</code>), 스타일시트 URL이 안정적으로 유지됩니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;{{ url_for(path=&quot;</span>/<span class="hljs-attr">css</span>/<span class="hljs-attr">style</span>.<span class="hljs-attr">css</span>&quot;) }}&quot;<span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h2 id="규칙">규칙</h2>
+<ul>
+<li><strong>엔트리</strong> — 이름이 <code>_</code>로 시작하지 않는 <code>*.scss</code> 파일은 출력의 같은 상대 경로에 <code>.css</code>로 컴파일됩니다.</li>
+<li><strong>파셜</strong> — <code>_*.scss</code> 파일은 단독으로 컴파일되지 않고 게시되지도 않습니다. <code>@use</code>/<code>@import</code>로만 접근할 수 있습니다.</li>
+<li><strong>원본 소스는 게시되지 않음</strong> — <code>[sass]</code>가 활성화된 동안 <code>.scss</code> 파일은 정적 파일 그대로 복사되는 대상에서 제외됩니다.</li>
+<li><strong>번들</strong> — <code>[[assets.bundles]]</code>의 <code>files</code> 항목에 <code>.scss</code> 파일을 지정할 수 있습니다. <code>[sass]</code>가 활성화된 동안에는 이어 붙이기 전에 컴파일된 뒤 일반적인 압축(minify) → 핑거프린트 파이프라인을 거칩니다. <code>[sass]</code>가 비활성화되면 번들 항목은 그대로 이어 붙입니다(미리 컴파일했거나 지원 범위를 벗어난 소스를 위한 탈출구).</li>
+<li><strong>감시</strong> — <code>hwaro serve</code>는 <code>.scss</code> 변경 시 다시 컴파일합니다. 파셜을 수정하면 모든 엔트리를 다시 컴파일합니다(의존성 그래프가 없습니다 — 정적 사이트 규모에서는 전체 재컴파일도 충분히 빠릅니다). 컴파일 오류는 브라우저 오류 오버레이에 표시됩니다.</li>
+</ul>
+<h2 id="설정">설정</h2>
+<table>
+<thead>
+<tr>
+<th>옵션</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>SCSS 컴파일 활성화</td>
+</tr>
+<tr>
+<td><code>minify</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>컴파일된 CSS 압축(에셋 파이프라인과 같은 압축기 사용)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="지원-범위">지원 범위</h2>
+<p>Hwaro는 실용적인 SCSS 부분집합을 구현합니다 — 직접 작성하는 사이트 스타일시트에서 실제로 쓰이는 기능들입니다.</p>
+<table>
+<thead>
+<tr>
+<th>기능</th>
+<th>지원</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$variables</code></td>
+<td>✅ <code>!default</code> / <code>!global</code>, 렉시컬 스코프와 섀도잉 지원</td>
+</tr>
+<tr>
+<td>중첩 규칙</td>
+<td>✅ 셀렉터 목록 포함(카테시안 조합)</td>
+</tr>
+<tr>
+<td><code>&amp;</code> 부모 셀렉터</td>
+<td>✅ <code>&amp;:hover</code>, <code>&amp;.mod</code>, BEM <code>&amp;__elem</code> / <code>&amp;--mod</code></td>
+</tr>
+<tr>
+<td><code>#{...}</code> 보간</td>
+<td>✅ 셀렉터, 속성 이름, 값, at-규칙 서두, 문자열, <code>url()</code> — 내부에서 전체 표현식 평가</td>
+</tr>
+<tr>
+<td>파셜 + <code>@use</code></td>
+<td>✅ 네임스페이스(<code>colors.$primary</code>), <code>as x</code>, <code>as *</code>, 1회 로드, <code>with (...)</code> 설정</td>
+</tr>
+<tr>
+<td><code>@forward</code></td>
+<td>✅ <code>show</code> / <code>hide</code> 필터, <code>as prefix-*</code></td>
+</tr>
+<tr>
+<td><code>@import</code>(Sass 파일)</td>
+<td>✅ 클래식 전역 병합 시맨틱, 순수 CSS 형태는 그대로 통과</td>
+</tr>
+<tr>
+<td><code>@mixin</code> / <code>@include</code></td>
+<td>✅ 기본값, 키워드 인자, 가변 인자 <code>$args...</code>, 스프레드, <code>@content</code> 블록</td>
+</tr>
+<tr>
+<td><code>@function</code> / <code>@return</code></td>
+<td>✅ 값 안에서 호출 가능한 사용자 함수, 기본값/키워드/가변 인자, 재귀</td>
+</tr>
+<tr>
+<td>제어 흐름</td>
+<td>✅ <code>@if</code> / <code>@else if</code> / <code>@else</code>, <code>@each</code>(구조 분해 포함), <code>@for</code>(<code>through</code>/<code>to</code>, 내림차순), <code>@while</code></td>
+</tr>
+<tr>
+<td>SassScript 표현식</td>
+<td>✅ 산술(<code>+ - * %</code>), 비교, <code>and</code>/<code>or</code>/<code>not</code>, 문자열, 리스트, 맵 — <code>/</code>는 차이점 참고</td>
+</tr>
+<tr>
+<td>내장 함수</td>
+<td>✅ <code>sass:math</code>, <code>sass:string</code>, <code>sass:list</code>, <code>sass:map</code>, <code>sass:meta</code> 부분집합 + 레거시 전역 이름(<code>map-get</code>, <code>nth</code>, <code>if()</code> 등)</td>
+</tr>
+<tr>
+<td><code>@debug</code> / <code>@warn</code> / <code>@error</code></td>
+<td>✅ <code>@error</code>는 위치 정보가 담긴 메시지로 빌드를 실패시킴</td>
+</tr>
+<tr>
+<td><code>@at-root</code></td>
+<td>✅ 셀렉터 형태와 블록 형태(<code>with:</code>/<code>without:</code> 쿼리는 제외)</td>
+</tr>
+<tr>
+<td>규칙 안의 <code>@media</code> / <code>@supports</code></td>
+<td>✅ 중첩 밖으로 자동 버블링, 피처 값에서 표현식 평가</td>
+</tr>
+<tr>
+<td><code>@keyframes</code>, <code>@font-face</code>, 커스텀 속성</td>
+<td>✅ 올바르게 통과</td>
+</tr>
+<tr>
+<td>순수 CSS</td>
+<td>✅ 유효한 <code>.css</code>는 그대로 컴파일(공백 정규화)</td>
+</tr>
+</tbody>
+</table>
+<p>알 수 없는 함수(<code>calc()</code>, <code>var()</code>, <code>rgba()</code>, <code>clamp()</code>, <code>color-mix()</code> 등)는 손대지 않고 그대로 통과합니다 — 인자는 평가됩니다(<code>translate($x * 2, -50%)</code> 동작).</p>
+<pre><code class="language-scss hljs">@use &quot;sass:math&quot;;
+$breakpoints: (sm: 640px, md: 768px, lg: 1024px);
+
+@function rem($px, $base: 16px) { @return math.div($px, $base) * 1rem; }
+
+@mixin respond($name) {
+  @if not map-has-key($breakpoints, $name) { @error &quot;unknown breakpoint #{$name}&quot;; }
+  @media (min-width: map-get($breakpoints, $name)) { @content; }
+}
+
+@each $name, $bp in $breakpoints {
+  .container-#{$name} { max-width: $bp - 24px; }
+}
+@for $i from 1 through 12 {
+  .col-#{$i} { width: math.percentage(math.div($i, 12)); }
+}
+.hero {
+  font-size: rem(28px);
+  @include respond(md) { font-size: rem(40px); }
+}
+</code></pre>
+<h3 id="미지원-아직">미지원 (아직)</h3>
+<p><code>@extend</code>, 컬러 값과 <code>color.*</code> 함수, 단위 변환(<code>px</code>↔<code>cm</code>), <code>@at-root (with: ...)</code> 쿼리, <code>@forward ... with (...)</code>, <code>@content(args)</code> / <code>using</code>, <code>math.random</code> / <code>unique-id()</code>(빌드는 결정적이어야 합니다), 중첩 속성(<code>font: { family: ... }</code>), 들여쓰기 방식의 <code>.sass</code> 문법, 소스맵은 지원하지 않습니다.</p>
+<p><strong>미지원 지시문은 위치 정보가 담긴 오류와 함께 빌드를 실패시킵니다</strong> — Hwaro는 조용히 깨진 CSS를 내보내지 않습니다.</p>
+<pre><code>Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not supported by hwaro's Sass subset (yet)
+</code></pre>
+<h3 id="표현식-시맨틱">표현식 시맨틱</h3>
+<p>이 컴파일러의 첫 번째 의무는 순수 CSS 보장이므로, 표현식은 두 단계 정책을 따릅니다.</p>
+<ul>
+<li><strong>값 컨텍스트는 관대(lenient)합니다.</strong> 선언이나 변수 값은 눈에 보이게 무언가를 계산할 때만 — 숫자 사이의 연산자, 알려진 함수 호출 — 평가됩니다. 그 외의 값, 그리고 평가에 <em>실패</em>하는 값(단위가 안 맞는 <code>$a + 2em</code>, <code>min(100% - 10px, 20rem)</code>)은 이전과 똑같이 원문 텍스트를 유지합니다. 기존 스타일시트는 바이트 단위로 동일하게 컴파일됩니다.</li>
+<li><strong>새 구문은 엄격(strict)합니다.</strong> <code>@if</code>/<code>@while</code> 조건, <code>@each</code>/<code>@for</code> 헤더, <code>@return</code>, <code>@use ... with</code>는 모든 실패를 위치 정보가 담긴 빌드 오류로 보고합니다.</li>
+</ul>
+<h3 id="dart-sass와의-차이">dart-sass와의 차이</h3>
+<ul>
+<li><code>/</code>는 <strong>절대</strong> 나눗셈이 아닙니다 — <code>font: 12px/1.5</code>와 <code>grid-area: 1 / 2</code>는 그대로 유지됩니다. 나눗셈은 <code>math.div()</code>를 사용합니다(슬래시 나눗셈을 제거한 dart-sass 2.0과 같은 방향).</li>
+<li>값은 평가 사이에 CSS 텍스트로 저장되고 사용 시점에 타입이 다시 유도됩니다. 리스트처럼 <em>보이는</em> 따옴표 없는 문자열(<code>&quot;a, b&quot;</code>를 unquote한 값)은 리스트로 취급됩니다.</li>
+<li>단위 산술은 동일 단위이거나 한쪽이 단위 없는 경우만 지원합니다. <code>px</code>↔<code>in</code> 변환 테이블은 없습니다.</li>
+<li><em>값</em> 위치의 <code>and</code>/<code>or</code>는 실제 불리언에만 동작합니다 — <code>font-family: Franklin and Marshall</code>은 텍스트로 남습니다. 조건식에서는 Sass의 완전한 truthiness를 따릅니다.</li>
+<li>전역 <code>min()</code>/<code>max()</code>/<code>round()</code>/<code>abs()</code>는 모든 인자가 정적으로 비교 가능한 숫자일 때만 평가됩니다. CSS 형태(<code>min(5vw, 100px)</code>, <code>round(up, 101px, 10px)</code>)는 그대로 통과합니다.</li>
+<li>내장 함수는 위치 인자만 받습니다. 키워드 호출(<code>list.append($l, x, $separator: comma)</code>)은 평가되지 않고 원문 그대로 남습니다 — 사용자 정의 <code>@mixin</code>/<code>@function</code>의 키워드 인자는 정상 동작합니다.</li>
+<li><code>if()</code>는 두 분기를 모두 즉시 평가합니다(부수 효과가 없으므로, 선택되지 않은 분기의 <code>@error</code>로만 관찰 가능합니다).</li>
+<li>at-규칙 서두와 값 안의 변수는 직접 치환됩니다(<code>@media (min-width: $bp)</code> 동작). 셀렉터와 속성 이름에는 <code>#{...}</code> 보간이 필요합니다(dart-sass와 동일).</li>
+<li>at-규칙 서두에서는 <code>(feature: value)</code> 구간 안에서만 표현식이 평가됩니다. 쿼리 구조 자체는 원문 그대로 유지됩니다.</li>
+<li><code>@media</code> 안에 중첩된 <code>@media</code>는 문자 그대로 중첩된 블록으로 출력됩니다(dart-sass는 조건을 병합).</li>
+<li><code>&amp;</code> 치환은 텍스트 기반입니다 — <code>&amp;__elem</code>은 결합 셀렉터를 검증하지 않고 이어 붙입니다.</li>
+<li>커스텀 속성 값은 그대로 유지됩니다: <code>$var</code>는 리터럴로 남고 <code>#{...}</code>만 보간됩니다(dart-sass 시맨틱). 다만 앞뒤 공백은 잘라냅니다.</li>
+<li>같은 파일을 여러 번 <code>@import</code>하면 그때마다 CSS를 다시 내보냅니다(클래식 Sass 동작). <code>@use</code>는 한 번만 로드합니다.</li>
+<li>자체적으로 <code>@forward</code>를 사용하는 모듈을 설정(<code>@use &quot;lib&quot; with (...)</code>)하는 것은 조용히 무시되는 대신 오류입니다.</li>
+<li>중첩 규칙 <em>뒤에</em> 놓인 선언은 부모의 단일 출력 블록으로 병합됩니다(<code>.a { color: red; .b {} color: blue; }</code>는 <code>.a</code> 블록 하나로 출력). dart-sass는 소스 순서대로 분리합니다. 부모의 후행 선언과 중첩 규칙 사이의 캐스케이드 순서에 의존하지 않는 것이 좋습니다.</li>
+<li>값은 텍스트로 치환됩니다: 짝이 맞지 않는 따옴표 문자가 들어 있는 변수를 보간하면 이후의 공백/따옴표 처리가 꼬일 수 있습니다. 따옴표 문자는 따옴표로 감싼 문자열 안에만 둡니다.</li>
+<li>소문자 <code>.scss</code> 확장자만 Sass 소스로 취급합니다. 다른 대소문자 조합은 일반 정적 파일처럼 그대로 게시됩니다.</li>
+</ul>
+<h2 id="오류">오류</h2>
+<p>컴파일 실패는 콘텐츠 오류로 분류되며(종료 코드 5), <code>path:line:column</code> 위치 정보가 함께 표시됩니다.</p>
+<pre><code>Error [HWARO_E_CONTENT]: Sass: static/css/_mixins.scss:7:12: undefined variable: &quot;$primry&quot;
+</code></pre>
+<p><code>hwaro serve</code> 중에는 오류가 브라우저 오버레이에 표시되고, 이전 출력은 디스크에 그대로 남습니다.</p>
+<h2 id="다른-기능과의-상호작용">다른 기능과의 상호작용</h2>
+<ul>
+<li><strong>에셋 파이프라인</strong> — 단독으로 컴파일된 엔트리는 안정적인(핑거프린트 없는) URL을 유지하고 <code>asset()</code>의 패스스루로 해석됩니다. 핑거프린트가 필요하면 번들에서 <code>.scss</code> 파일을 참조합니다.</li>
+<li><strong>빌드 훅</strong> — Tailwind/PostCSS나 완전한 dart-sass 프로젝트는 여전히 <code>[build] hooks.pre</code>로 실행하고, 컴파일된 출력을 Hwaro가 사용하게 하면 됩니다.</li>
+<li><strong>캐시</strong> — Sass는 전체 빌드마다 다시 컴파일됩니다(증분 페이지 캐시에 참여하지 않습니다). 엔트리 <code>.scss</code>를 삭제하면 이전에 컴파일된 <code>.css</code>가 오래된 출력 디렉터리에 남습니다. 클린 빌드는 이를 제거합니다.</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/build-hooks/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Build Hooks</span>
+    <span class="pn-desc">Run custom shell commands before and after the build process</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/features/sass/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">Sass/SCSS</span>
+    <span class="pn-desc">Built-in SCSS compilation — pure Crystal, no external tools</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#빠른-시작">빠른 시작</a></li><li><a href="#규칙">규칙</a></li><li><a href="#설정">설정</a></li><li><a href="#지원-범위">지원 범위</a><ul><li><a href="#미지원-아직">미지원 (아직)</a></li><li><a href="#표현식-시맨틱">표현식 시맨틱</a></li><li><a href="#dart-sass와의-차이">dart-sass와의 차이</a></li></ul></li><li><a href="#오류">오류</a></li><li><a href="#다른-기능과의-상호작용">다른 기능과의 상호작용</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

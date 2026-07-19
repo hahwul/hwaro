@@ -1,0 +1,988 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/config/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/config/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/config/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/vercel/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/vercel/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/vercel/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/vercel/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/vercel/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/vercel/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/docker/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/docker/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/docker/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/docker/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/docker/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/docker/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/gitlab-ci/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/gitlab-ci/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/gitlab-ci/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/gitlab-ci/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/netlify/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/netlify/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/netlify/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/netlify/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/netlify/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/netlify/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/cloudflare-pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/cloudflare-pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/cloudflare-pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/config/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/config/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/config/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/codeberg-pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/codeberg-pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/codeberg-pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/codeberg-pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/github-pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/github-pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/github-pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/github-pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/github-pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/github-pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/templates/filters/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/filters/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/filters/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/templates/render-hooks/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/render-hooks/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/render-hooks/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/templates/filters/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/filters/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/filters/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/templates/functions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/functions/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/functions/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/templates/syntax/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/syntax/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/syntax/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/templates/data-model/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/data-model/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/data-model/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/templates/functions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/functions/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/functions/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/templates/data-model/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/data-model/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/data-model/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/templates/syntax/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/syntax/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/syntax/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/templates/render-hooks/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/render-hooks/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/render-hooks/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/build-hooks/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/build-hooks/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/build-hooks/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/incremental-build/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/incremental-build/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/incremental-build/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/env-variables/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/env-variables/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/env-variables/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/pagination/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/pagination/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/pagination/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/env-variables/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/env-variables/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/env-variables/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/image-processing/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/image-processing/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/image-processing/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/image-processing/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/image-processing/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/image-processing/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/amp/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/amp/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/amp/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/deployment/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/deployment/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/deployment/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/multilingual/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/multilingual/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/multilingual/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/auto-includes/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/auto-includes/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/auto-includes/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/pagination/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/pagination/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/pagination/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/content-files/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/content-files/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/content-files/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/syntax-highlighting/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/syntax-highlighting/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/series/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/series/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/series/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/markdown-extensions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/markdown-extensions/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/markdown-extensions/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/env-config/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/env-config/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/env-config/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/markdown-extensions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/markdown-extensions/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/markdown-extensions/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/deployment/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/deployment/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/deployment/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/asset-pipeline/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/asset-pipeline/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/asset-pipeline/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/output-formats/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/output-formats/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/output-formats/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/search/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/search/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/search/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/multilingual/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/multilingual/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/multilingual/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/seo/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/seo/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/seo/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/seo/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/seo/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/seo/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/amp/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/amp/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/amp/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/search/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/search/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/search/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/asset-pipeline/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/asset-pipeline/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/asset-pipeline/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/streaming-build/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/streaming-build/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/streaming-build/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/related-posts/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/related-posts/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/related-posts/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/menus/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/menus/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/menus/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/env-config/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/env-config/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/env-config/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/cache-busting/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/cache-busting/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/cache-busting/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/auto-includes/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/auto-includes/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/auto-includes/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/pwa/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/pwa/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/pwa/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/menus/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/menus/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/menus/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/incremental-build/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/incremental-build/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/incremental-build/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/syntax-highlighting/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/syntax-highlighting/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/og-images/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/og-images/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/og-images/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/cache-busting/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/cache-busting/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/cache-busting/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/structured-data/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/structured-data/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/structured-data/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/pwa/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/pwa/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/pwa/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/sass/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/sass/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/sass/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/series/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/series/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/series/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/streaming-build/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/streaming-build/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/streaming-build/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/related-posts/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/related-posts/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/related-posts/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/llms-txt/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/llms-txt/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/llms-txt/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/llms-txt/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/llms-txt/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/llms-txt/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/og-images/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/og-images/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/og-images/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/output-formats/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/output-formats/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/output-formats/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/content-files/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/content-files/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/content-files/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/build-hooks/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/build-hooks/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/build-hooks/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/structured-data/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/structured-data/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/structured-data/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/sass/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/sass/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/sass/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/writing/pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/writing/pages/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/pages/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/pages/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/writing/shortcodes/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/shortcodes/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/shortcodes/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/writing/archetypes/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/archetypes/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/archetypes/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/writing/taxonomies/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/taxonomies/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/taxonomies/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/writing/shortcodes/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/shortcodes/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/shortcodes/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/writing/archetypes/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/archetypes/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/archetypes/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/writing/sections/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/sections/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/sections/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/writing/sections/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/sections/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/sections/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/writing/taxonomies/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/taxonomies/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/taxonomies/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/integrations/skills/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/integrations/skills/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/integrations/skills/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/integrations/skills/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/integrations/skills/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/integrations/skills/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/config/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/config/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/config/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/cli/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/cli/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/cli/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/convert/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/convert/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/convert/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/validate/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/validate/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/validate/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/agents-md/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/agents-md/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/agents-md/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/import/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/import/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/import/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/platform/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/platform/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/platform/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/list/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/list/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/list/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/stats/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/stats/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/stats/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/export/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/export/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/export/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/convert/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/convert/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/convert/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/agents-md/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/agents-md/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/agents-md/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/unused-assets/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/unused-assets/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/unused-assets/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/ci/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/ci/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/ci/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/platform/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/platform/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/platform/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/export/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/export/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/export/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/list/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/list/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/list/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/doctor/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/doctor/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/doctor/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/validate/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/validate/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/validate/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/unused-assets/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/unused-assets/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/unused-assets/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/import/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/import/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/import/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/stats/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/stats/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/stats/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/check-links/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/check-links/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/check-links/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/doctor/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/doctor/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/doctor/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/ci/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/ci/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/ci/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/check-links/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/check-links/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/check-links/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/config/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/config/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/config/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/installation/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/installation/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/installation/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/first-site/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/first-site/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/first-site/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/first-site/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/first-site/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/first-site/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/cli/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/cli/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/cli/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/installation/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/installation/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/installation/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/deploy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/deploy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/templates/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/templates/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/features/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/features/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/writing/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/writing/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/integrations/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/integrations/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/integrations/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/integrations/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/integrations/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/integrations/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/ko/start/tools/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/tools/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/tools/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/tools/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/start/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hwaro.hahwul.com/tags/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>

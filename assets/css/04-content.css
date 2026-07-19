@@ -1,0 +1,440 @@
+/* =============================================================================
+   Hwaro Docs — Content Typography
+   Prose, code (server-highlighted), tables, breadcrumbs.
+   ============================================================================= */
+
+/* Breadcrumbs — quiet wayfinding above the page title. */
+.breadcrumbs {
+    margin-bottom: var(--space-4);
+}
+
+.breadcrumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.8rem;
+}
+
+.breadcrumbs li {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text-muted);
+}
+
+.breadcrumbs li + li::before {
+    content: "/";
+    color: var(--border);
+}
+
+.breadcrumbs a {
+    color: var(--text-muted);
+}
+
+.breadcrumbs a:hover {
+    color: var(--primary);
+}
+
+.breadcrumbs [aria-current="page"] {
+    color: var(--text-secondary);
+}
+
+/* Page title with the ember rule — the one shared hwaro mark. */
+.docs-main > h1:first-of-type {
+    font-size: var(--step-3);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--heading);
+    margin: 0 0 var(--space-5);
+    text-wrap: balance;
+}
+
+.docs-main > h1:first-of-type::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 3px;
+    margin-top: var(--space-4);
+    border-radius: 999px;
+    background: var(--spark);
+}
+
+/* Page description directly under the title reads as a standfirst. */
+.docs-main > h1:first-of-type + p {
+    font-size: var(--step-1);
+    line-height: 1.5;
+    color: var(--text-secondary);
+    text-wrap: pretty;
+}
+
+.docs-main h1 {
+    font-size: var(--step-2);
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--heading);
+    margin: var(--space-7) 0 var(--space-4);
+    text-wrap: balance;
+}
+
+.docs-main h2 {
+    font-size: var(--step-1);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--heading);
+    margin: var(--space-7) 0 var(--space-4);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
+    text-wrap: balance;
+}
+
+.docs-main h3 {
+    font-size: var(--step-0);
+    font-weight: 600;
+    color: var(--heading);
+    margin: var(--space-6) 0 var(--space-3);
+}
+
+.docs-main h4 {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: var(--space-5) 0 var(--space-2);
+}
+
+.docs-main p {
+    margin: 0 0 var(--space-4);
+    color: var(--text);
+    text-wrap: pretty;
+}
+
+.docs-main ul,
+.docs-main ol {
+    margin: 0 0 var(--space-4);
+    padding-left: var(--space-5);
+    color: var(--text);
+}
+
+.docs-main li {
+    margin-bottom: var(--space-1);
+}
+
+.docs-main li::marker {
+    color: var(--text-muted);
+}
+
+.docs-main strong {
+    color: var(--heading);
+    font-weight: 600;
+}
+
+/* Prose links — ember underline. */
+.docs-main p a,
+.docs-main li a,
+.docs-main td a,
+.docs-main blockquote a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
+    text-underline-offset: 3px;
+    transition: color var(--transition), text-decoration-color var(--transition);
+}
+
+.docs-main p a:hover,
+.docs-main li a:hover,
+.docs-main td a:hover,
+.docs-main blockquote a:hover {
+    color: var(--primary-strong);
+    text-decoration-color: var(--primary-strong);
+}
+
+.docs-main img {
+    border-radius: var(--radius);
+    border: 1px solid var(--border-subtle);
+}
+
+/* Task lists */
+.docs-main input[type="checkbox"] {
+    accent-color: var(--primary);
+    margin-right: 0.35rem;
+}
+
+/* =============================================================================
+   Heading anchors
+   ============================================================================= */
+
+.docs-main h1[id],
+.docs-main h2[id],
+.docs-main h3[id],
+.docs-main h4[id],
+.docs-main h5[id],
+.docs-main h6[id] {
+    position: relative;
+    scroll-margin-top: calc(var(--header-h) + 1.5rem);
+}
+
+.heading-anchor {
+    opacity: 0;
+    color: var(--text-muted);
+    padding: 0.15rem 0.3rem;
+    margin-left: 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    border-radius: var(--radius-sm);
+    transition: opacity var(--transition), color var(--transition);
+}
+
+.heading-anchor svg {
+    width: 14px;
+    height: 14px;
+}
+
+.heading-anchor:hover {
+    color: var(--primary);
+}
+
+.docs-main h1:hover .heading-anchor,
+.docs-main h2:hover .heading-anchor,
+.docs-main h3:hover .heading-anchor,
+.docs-main h4:hover .heading-anchor,
+.docs-main h5:hover .heading-anchor,
+.docs-main h6:hover .heading-anchor,
+.heading-anchor:focus-visible {
+    opacity: 1;
+}
+
+.heading-anchor.copied {
+    color: var(--ok);
+}
+
+/* =============================================================================
+   Code
+   ============================================================================= */
+
+/* Inline code — warm ember tint so it reads as a distinct token. */
+code {
+    background: var(--primary-tint);
+    color: var(--primary-strong);
+    padding: 0.12rem 0.38rem;
+    font-size: 0.85em;
+    border-radius: var(--radius-sm);
+}
+
+pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    padding: var(--space-4) var(--space-5);
+    margin: var(--space-3) 0 var(--space-4);
+    overflow-x: auto;
+    line-height: 1.65;
+}
+
+pre code,
+pre code.hljs {
+    background: transparent;
+    color: var(--text);
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.82rem;
+}
+
+.code-wrapper {
+    position: relative;
+    margin: var(--space-3) 0 var(--space-4);
+}
+
+.code-wrapper pre {
+    margin: 0;
+}
+
+.code-copy-btn {
+    font-family: var(--font-mono);
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.6rem;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    background: var(--glass);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.code-copy-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.code-wrapper:hover .code-copy-btn,
+.code-copy-btn:focus-visible {
+    opacity: 1;
+}
+
+.code-copy-btn:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+}
+
+.code-copy-btn.copied {
+    color: var(--ok);
+    border-color: var(--ok);
+    opacity: 1;
+}
+
+/* Syntax highlighting — ember-warm, token-driven (recolor via --code-*). */
+.hljs-comment, .hljs-quote { color: var(--code-comment); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-doctag { color: var(--code-keyword); }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-meta .hljs-string { color: var(--code-string); }
+.hljs-number, .hljs-built_in, .hljs-builtin-name, .hljs-bullet { color: var(--code-number); }
+.hljs-title, .hljs-title.function_, .hljs-section .hljs-title { color: var(--code-func); }
+.hljs-type, .hljs-class .hljs-title, .hljs-title.class_, .hljs-tag { color: var(--code-type); }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-name { color: var(--code-variable); }
+.hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: var(--code-attr); }
+.hljs-symbol, .hljs-link, .hljs-meta, .hljs-params { color: var(--code-symbol); }
+.hljs-deletion { color: var(--code-keyword); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+
+/* Fence options: {linenos=true, hl_lines="..."} (server highlighting). */
+pre code .line.hl {
+    display: inline-block;
+    width: 100%;
+    background: color-mix(in srgb, var(--code-keyword) 12%, transparent);
+}
+
+pre code .ln {
+    user-select: none;
+    -webkit-user-select: none;
+    opacity: 0.45;
+}
+
+/* =============================================================================
+   Tables
+   ============================================================================= */
+
+.docs-main table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-4) 0 var(--space-5);
+    font-size: 0.85rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.docs-main th,
+.docs-main td {
+    padding: 0.65rem 1rem;
+    text-align: left;
+}
+
+.docs-main th {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
+    border-bottom: 1px solid var(--border);
+}
+
+.docs-main td {
+    color: var(--text);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.docs-main tr:last-child td {
+    border-bottom: none;
+}
+
+.docs-main td code {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+/* =============================================================================
+   Blockquote, rule, kbd, details
+   ============================================================================= */
+
+blockquote {
+    margin: var(--space-5) 0;
+    padding: var(--space-3) var(--space-5);
+    border-left: 2px solid var(--primary);
+    background: linear-gradient(90deg, var(--primary-tint), transparent 85%);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    color: var(--text-secondary);
+}
+
+blockquote p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+blockquote p + p {
+    margin-top: var(--space-2);
+}
+
+hr {
+    border: none;
+    height: 1px;
+    background: var(--border-subtle);
+    margin: var(--space-7) 0;
+}
+
+kbd {
+    font-size: 0.72em;
+    padding: 0.15rem 0.45rem;
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm);
+}
+
+.docs-main details {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    background: var(--bg-subtle);
+}
+
+.docs-main details summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--heading);
+}
+
+/* Footnotes */
+.docs-main .footnotes {
+    margin-top: var(--space-7);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .docs-main table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    .heading-anchor {
+        opacity: 0.4;
+    }
+}

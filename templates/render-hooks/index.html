@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Override how Markdown elements render with Hugo/Zola-style template hooks">
+  <title>Render Hooks - Hwaro</title>
+  <meta property="og:title" content="Render Hooks">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/templates/render-hooks/">
+  <meta property="og:description" content="Override how Markdown elements render with Hugo/Zola-style template hooks">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/templates-render-hooks.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Render Hooks">
+  <meta name="twitter:description" content="Override how Markdown elements render with Hugo/Zola-style template hooks">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/templates-render-hooks.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/templates/render-hooks/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/render-hooks/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/render-hooks/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/" class="active">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/templates/render-hooks/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/" class="active">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+    
+    <li aria-current="page">Render Hooks</li>
+  </ol>
+</nav>
+    <h1>Render Hooks</h1>
+    <p>Render hooks let you override how individual Markdown elements — links, images, headings, fenced code blocks, blockquotes, and tables — turn into HTML, without touching hwaro's Markdown parser. Drop a template in <code>templates/hooks/</code>, and every matching element on every page renders through it instead of the built-in markup.</p>
+<p>If you don't create any <code>templates/hooks/render-*</code> template, nothing changes: hwaro renders exactly as it always has.</p>
+<h2 id="file-layout">File Layout</h2>
+<pre><code>templates/
+└── hooks/
+    ├── render-link.html        # [text](url &quot;title&quot;)
+    ├── render-image.html       # ![alt](url &quot;title&quot;)
+    ├── render-heading.html     # ## Heading
+    ├── render-codeblock.html   # ```lang ... ```
+    ├── render-blockquote.html  # &gt; quoted
+    └── render-table.html       # | GFM | tables |
+</code></pre>
+<p>Each file is independent — add only the ones you want to override. A site with just <code>render-image.html</code> gets a custom image wrapper and stock rendering for everything else.</p>
+<p>Any other <code>hooks/render-*</code> name is unrecognized and logs a warning at build time.</p>
+<h2 id="context-variables">Context Variables</h2>
+<p>All values are Crinja <code>Value</code>s and — like every other hwaro template — <strong>already HTML-escaped where that matters</strong>. See <a href="#rules">Rule 1</a> below before reaching for an <code>| e</code> filter.</p>
+<h3 id="render-linkhtml"><code>render-link.html</code></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>destination</code></td>
+<td>The link target, escaped. Empty string when <code>markdown.safe = true</code> and the destination uses an unsafe protocol (<code>javascript:</code>, etc.)</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>The link&#39;s <code>&quot;title&quot;</code> text, escaped. Empty string when absent</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>The already-rendered inner HTML of the link (may itself contain nested markup, or a hook-rendered <code>&lt;img&gt;</code> if the link wraps an image)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="render-imagehtml"><code>render-image.html</code></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>destination</code></td>
+<td>The image <code>src</code>, escaped (same unsafe-protocol rule as links)</td>
+</tr>
+<tr>
+<td><code>alt</code></td>
+<td>The image&#39;s alt text — plain text only, even if the Markdown source nested inline markup in the alt (matches CommonMark: an image&#39;s &quot;children&quot; never produce tags)</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>The image&#39;s <code>&quot;title&quot;</code> text, escaped. Empty string when absent</td>
+</tr>
+</tbody>
+</table>
+<h3 id="render-headinghtml"><code>render-heading.html</code></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>level</code></td>
+<td>Heading level as an integer (<code>1</code>–<code>6</code>)</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>The already-rendered inner HTML of the heading</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>The heading&#39;s id — either a custom <code>{#id}</code> from the Markdown source, or an auto-generated, deduplicated slug (<code>heading</code>, <code>heading-1</code>, <code>heading-2</code>, …)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="render-codeblockhtml"><code>render-codeblock.html</code></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lang</code></td>
+<td>The fence&#39;s language token, escaped (<code>python</code> in `<code> </code>`<code>python </code>`). Empty string for a fence with no language</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td>The raw Zola/Pandoc-style <code>{...}</code> options block after the language (see <a href="/features/syntax-highlighting/">Syntax Highlighting</a>), or any trailing info-string text when there&#39;s no <code>{...}</code> block. Escaped</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td>The fence body, HTML-escaped</td>
+</tr>
+<tr>
+<td><code>highlighted</code></td>
+<td>The server-mode syntax-highlighted body (hljs-class spans), or an empty string when <code>[highlight] mode</code> isn&#39;t <code>&quot;server&quot;</code>, highlighting is off, or the language has no lexer. A <code>{hide_lines=…}</code> fence option is already applied — hidden lines never reach the template (nor <code>code</code>) in server mode</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>The parsed <code>{name=...}</code>/<code>{title=...}</code> filename label, escaped. Empty string when absent</td>
+</tr>
+<tr>
+<td><code>copy</code></td>
+<td><code>&quot;true&quot;</code> when the copy button applies to this block (<code>[highlight] copy</code> / per-fence <code>{copy=...}</code>, never for mermaid), empty string otherwise. The template decides what markup to emit for it</td>
+</tr>
+</tbody>
+</table>
+<h3 id="render-blockquotehtml"><code>render-blockquote.html</code></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td>The already-rendered inner HTML of the blockquote — block-level content (paragraphs, lists, nested quotes), usually ending with a newline</td>
+</tr>
+</tbody>
+</table>
+<h3 id="render-tablehtml"><code>render-table.html</code></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>html</code></td>
+<td>The complete stock <code>&lt;table&gt;...&lt;/table&gt;</code> markup</td>
+</tr>
+<tr>
+<td><code>header_html</code></td>
+<td>The table&#39;s <code>&lt;thead&gt;...&lt;/thead&gt;</code> section</td>
+</tr>
+<tr>
+<td><code>body_html</code></td>
+<td>The table&#39;s <code>&lt;tbody&gt;...&lt;/tbody&gt;</code> section — empty string for a header-only table</td>
+</tr>
+</tbody>
+</table>
+<p>All hook templates additionally see the standard <code>page</code> (<code>url</code>, <code>title</code>, <code>path</code>, <code>language</code>) and <code>config</code> (<code>base_url</code>, <code>title</code>) variables.</p>
+<h2 id="default-equivalent-templates">Default-Equivalent Templates</h2>
+<p>These templates reproduce hwaro's stock output exactly — a useful starting point to modify from:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# templates/hooks/render-link.html #}</span>
+&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">destination</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">title</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">present</span> <span class="hljs-meta">%}</span> title=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">title</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">text</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# templates/hooks/render-image.html #}</span>
+&lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">destination</span> <span class="hljs-meta">}}</span>&quot; alt=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">alt</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">title</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">present</span> <span class="hljs-meta">%}</span> title=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">title</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span> /&gt;
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# templates/hooks/render-heading.html #}</span>
+&lt;h<span class="hljs-meta">{{</span> <span class="hljs-variable">level</span> <span class="hljs-meta">}}</span> id=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">id</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">text</span> <span class="hljs-meta">}}</span>&lt;/h<span class="hljs-meta">{{</span> <span class="hljs-variable">level</span> <span class="hljs-meta">}}</span>&gt;
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# templates/hooks/render-codeblock.html #}</span>
+&lt;pre&gt;&lt;code<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">lang</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">present</span> <span class="hljs-meta">%}</span> class=&quot;language-<span class="hljs-meta">{{</span> <span class="hljs-variable">lang</span> <span class="hljs-meta">}}</span> hljs&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">highlighted</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">present</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">highlighted</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">code</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&lt;/code&gt;&lt;/pre&gt;
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# templates/hooks/render-blockquote.html #}</span>
+&lt;blockquote&gt;
+<span class="hljs-meta">{{</span> <span class="hljs-variable">text</span> <span class="hljs-meta">}}</span>&lt;/blockquote&gt;
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# templates/hooks/render-table.html #}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">html</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<p>Note <code>{% if title is present %}</code>, not a bare <code>{% if title %}</code> — Crinja's truthiness only treats <code>false</code>/<code>0</code>/nil as falsy, so a bare <code>{% if title %}</code> would render <code>title=&quot;&quot;</code> even when there's no title. The custom <code>is present</code>/<code>is empty</code> tests (also used throughout hwaro's own templates) check for that correctly.</p>
+<p>The codeblock template's <code> hljs</code> class matches stock output under the
+default config (<code>[highlight] enabled = true</code> — most Highlight.js themes key
+their base styling off that class). If you've disabled highlighting
+entirely, stock output emits <code>class=&quot;language-{{ lang }}&quot;</code> with no <code> hljs</code>;
+drop it from your hook to stay byte-identical.</p>
+<h2 id="example-figure-wrapped-images">Example: Figure-Wrapped Images</h2>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# templates/hooks/render-image.html #}</span>
+&lt;figure&gt;
+  &lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">destination</span> <span class="hljs-meta">}}</span>&quot; alt=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">alt</span> <span class="hljs-meta">}}</span>&quot; loading=&quot;lazy&quot; /&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">title</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">present</span> <span class="hljs-meta">%}</span>&lt;figcaption&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">title</span> <span class="hljs-meta">}}</span>&lt;/figcaption&gt;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+&lt;/figure&gt;
+</code></pre>
+<p>Every <code>![alt](src &quot;caption&quot;)</code> in your Markdown now renders as a captioned <code>&lt;figure&gt;</code> — no per-image markup needed in content files.</p>
+<h2 id="rules">Rules</h2>
+<ol>
+<li><strong>Values are pre-escaped — emit them verbatim.</strong> Autoescape is off in hwaro templates (the same as everywhere else), and <code>destination</code>/<code>title</code>/<code>alt</code>/<code>lang</code>/<code>options</code>/<code>code</code> are already HTML-escaped by the renderer. Piping any of them through <code>| e</code> double-escapes; piping <code>text</code> or <code>highlighted</code> through it corrupts already-rendered HTML.</li>
+<li><strong>Keep conventional double-quoted <code>href</code>/<code>src</code> attributes.</strong> Everything downstream — <code>@/internal-page.md</code> link resolution, subpath (<code>base_path</code>) prefixing of root-relative links, responsive-image <code>srcset</code>/<code>sizes</code> injection, and <code>loading=&quot;lazy&quot;</code> — runs as a plain-text pass over the <em>final</em> HTML, matching on <code>href=&quot;...&quot;</code> / <code>src=&quot;...&quot;</code>. A hook that emits an unquoted or single-quoted attribute, or restructures the destination into something other than a normal attribute value, opts that element out of all of it. An <code>@/</code>-prefixed <code>destination</code> must land inside <code>href=&quot;...&quot;</code> for <code>InternalLinkResolver</code> to find and resolve it.</li>
+<li><strong><code>render-heading.html</code> must emit an <code>&lt;hN id=&quot;{{ id }}&quot;&gt;</code> element.</strong> The TOC (<code>{{ toc }}</code> / <code>page.toc</code>) and <code>insert_anchor_links</code> both post-process the final HTML looking for <code>&lt;h1&gt;</code>–<code>&lt;h6&gt;</code> tags with an <code>id</code> attribute; a hook that renders something other than a heading tag, or drops <code>id</code>, silently falls out of both.</li>
+<li><strong>Don't transform <code>{{ text }}</code>.</strong> It's already-rendered HTML, and on pages using shortcodes it may contain an internal placeholder comment (<code>&lt;!--HWARO-SHORTCODE-PLACEHOLDER-N--&gt;</code>) that gets swapped for the shortcode's output in a later pass — filtering, truncating, or re-escaping <code>text</code> can corrupt or strand that placeholder.</li>
+<li><strong>Mermaid owns its own fence.</strong> With <code>[markdown] mermaid = true</code>, a <code>```mermaid</code> fence always renders through the existing Mermaid pipeline (<code>&lt;div class=&quot;mermaid&quot;&gt;…&lt;/div&gt;</code>), never through <code>render-codeblock.html</code> — a config-decided exception to &quot;every hook always applies to every matching element.&quot; Set <code>mermaid = false</code> to have your codeblock hook render mermaid fences like any other language instead.</li>
+<li><strong>Admonitions own their blockquotes.</strong> With <code>[markdown] admonitions = true</code> (the default), a <code>&gt; [!NOTE]</code>-style blockquote keeps rendering through the admonition pipeline (<code>&lt;div class=&quot;admonition admonition-note&quot;&gt;…&lt;/div&gt;</code>), never through <code>render-blockquote.html</code> — the same config-decided pattern as Mermaid. Set <code>admonitions = false</code> to route those quotes through your hook like any other blockquote.</li>
+<li><strong>No blank lines in <code>render-table.html</code> output.</strong> Table hook output is spliced into the Markdown <em>before</em> the main parse, and an HTML block ends at the first blank line — anything after it would be re-parsed as Markdown. hwaro collapses blank lines out of the output as a safety net, so multi-line templates work, but don't rely on blank-line-sensitive markup.</li>
+<li><strong>Hooks don't apply inside table cells, footnote bodies, definition lists, or the front-matter <code>description</code>/summary text.</strong> Those render through a separate, simpler inline-markdown path that never touches the main Markd parser hooks attach to (table <em>cells</em> keep that path even when <code>render-table.html</code> wraps the table itself). This is a known limitation, not a bug.</li>
+</ol>
+<h2 id="incremental-builds">Incremental Builds</h2>
+<p>Editing a file under <code>templates/hooks/</code> is tracked like any other template edit for <code>hwaro build --cache</code> and <code>hwaro serve</code> — but because a hook isn't reached via <code>{% include %}</code>/<code>{% extends %}</code> from any specific page template, hwaro can't narrow down which pages it affects. An edit to any <code>templates/hooks/render-*.html</code> file re-renders <strong>every</strong> page, regardless of <code>[build] template_deps</code>. See <a href="/features/incremental-build/">Incremental Build</a>.</p>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/features/syntax-highlighting/">Syntax Highlighting</a> — fence language/options parsing that feeds <code>render-codeblock.html</code></li>
+<li><a href="/features/markdown-extensions/">Markdown Extensions</a> — <code>{#custom-id}</code> headings and Mermaid diagrams</li>
+<li><a href="/templates/">Templates Overview</a> — template directory layout and selection rules</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/templates/render-hooks/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">렌더 훅</span>
+    <span class="pn-desc">Hugo/Zola 스타일 템플릿 훅으로 마크다운 요소의 렌더링 방식 재정의</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">기능</span>
+    <span class="pn-desc">SEO, 검색 등 기본 제공 기능</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#file-layout">File Layout</a></li><li><a href="#context-variables">Context Variables</a><ul><li><a href="#render-linkhtml">render-link.html</a></li><li><a href="#render-imagehtml">render-image.html</a></li><li><a href="#render-headinghtml">render-heading.html</a></li><li><a href="#render-codeblockhtml">render-codeblock.html</a></li><li><a href="#render-blockquotehtml">render-blockquote.html</a></li><li><a href="#render-tablehtml">render-table.html</a></li></ul></li><li><a href="#default-equivalent-templates">Default-Equivalent Templates</a></li><li><a href="#example-figure-wrapped-images">Example: Figure-Wrapped Images</a></li><li><a href="#rules">Rules</a></li><li><a href="#incremental-builds">Incremental Builds</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

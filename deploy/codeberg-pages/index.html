@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Deploy your Hwaro site to Codeberg Pages">
+  <title>Codeberg Pages - Hwaro</title>
+  <meta property="og:title" content="Codeberg Pages">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/deploy/codeberg-pages/">
+  <meta property="og:description" content="Deploy your Hwaro site to Codeberg Pages">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/deploy-codeberg-pages.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Codeberg Pages">
+  <meta name="twitter:description" content="Deploy your Hwaro site to Codeberg Pages">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/deploy-codeberg-pages.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/deploy/codeberg-pages/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/deploy/codeberg-pages/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="deploy">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/" class="active">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/" class="active">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main no-toc">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+    
+    <li aria-current="page">Codeberg Pages</li>
+  </ol>
+</nav>
+    <h1>Codeberg Pages</h1>
+    <p>Deploy your Hwaro site to <a href="https://codeberg.page/">Codeberg Pages</a> — free static hosting backed by Codeberg's Forgejo instance.</p>
+<h2 id="how-codeberg-pages-works">How Codeberg Pages Works</h2>
+<p>Codeberg serves static sites in two modes:</p>
+<ul>
+<li><strong>User / org site</strong> — a repository named <strong><code>pages</code></strong> under your account. Codeberg serves the <em>default branch</em> of that repo at <code>https://USERNAME.codeberg.page/</code>.</li>
+<li><strong>Project site</strong> — any other repository. Codeberg serves a branch named <strong><code>pages</code></strong> at <code>https://USERNAME.codeberg.page/REPO/</code>.</li>
+</ul>
+<p>This distinction matters: a project site pushes to a <code>pages</code> <em>branch</em>, while a user site pushes to the <em>default branch</em> (typically <code>main</code>) of the <code>pages</code> <em>repo</em>. The workflow below defaults to the project-site case and exposes <code>PAGES_BRANCH</code> so the user-site case is a one-line change.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>Codeberg account</li>
+<li>Repository on Codeberg (either <code>pages</code> for a user site, or any repo for a project site)</li>
+<li>A Codeberg access token with <code>write:repository</code> scope (Settings → Applications → Generate new token)</li>
+</ul>
+<h2 id="method-1-forgejo-actions-recommended">Method 1: Forgejo Actions (Recommended)</h2>
+<p>Codeberg supports <a href="https://forgejo.org/docs/latest/user/actions/">Forgejo Actions</a>, which is GitHub Actions–compatible. Forgejo Actions is opt-in per repository — enable it under <strong>Settings → Actions</strong> before the workflow will run.</p>
+<blockquote>
+<p>Forgejo also accepts workflows under <code>.gitea/workflows/</code> for backwards compatibility, but <code>.forgejo/workflows/</code> is the upstream-blessed path and the one Hwaro generates.</p>
+</blockquote>
+<h3 id="generate-the-workflow">Generate the Workflow</h3>
+<pre><code class="language-bash hljs">hwaro tool platform codeberg-pages
+</code></pre>
+<p>This writes <code>.forgejo/workflows/deploy.yml</code>:</p>
+<pre><code class="language-yaml hljs"><span class="hljs-title class_">---</span>
+<span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Hwaro Deploy</span>
+
+<span class="hljs-name">on</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">push</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">branches</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-literal">main]</span>
+  <span class="hljs-name">workflow_dispatch</span><span class="hljs-punctuation">:</span>
+
+<span class="hljs-name">jobs</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">deploy</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">runs-on</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">docker</span>
+    <span class="hljs-name">container</span><span class="hljs-punctuation">:</span>
+      <span class="hljs-name">image</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">ghcr.io/hahwul/hwaro:latest</span>
+    <span class="hljs-name">env</span><span class="hljs-punctuation">:</span>
+      <span class="hljs-comment"># Project site: &quot;pages&quot; (default). User/org site (repo named</span>
+      <span class="hljs-comment"># &quot;pages&quot;): override to your default branch, e.g. &quot;main&quot;.</span>
+      <span class="hljs-name">PAGES_BRANCH</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">pages</span>
+    <span class="hljs-name">steps</span><span class="hljs-punctuation">:</span>
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Checkout</span>
+        <span class="hljs-name">uses</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">actions/checkout@v4</span>
+
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Build site</span>
+        <span class="hljs-name">run</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">hwaro build</span>
+
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Deploy to Codeberg Pages</span>
+        <span class="hljs-name">env</span><span class="hljs-punctuation">:</span>
+          <span class="hljs-name">CODEBERG_TOKEN</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">${{ secrets.CODEBERG_TOKEN }}</span>
+        <span class="hljs-name">run</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">|</span><span class="hljs-doctag">
+</span><span class="hljs-doctag">          cd public
+</span><span class="hljs-doctag">          git init -b &quot;$PAGES_BRANCH&quot;
+</span><span class="hljs-doctag">          git config user.name  &quot;${{ github.actor }}&quot;
+</span><span class="hljs-doctag">          git config user.email &quot;${{ github.actor }}@noreply.codeberg.org&quot;
+</span><span class="hljs-doctag">          git add -A
+</span><span class="hljs-doctag">          git commit -m &quot;Deploy: $(date -u +&#39;%Y-%m-%dT%H:%M:%SZ&#39;)&quot;
+</span><span class="hljs-doctag">          git push --force \
+</span><span class="hljs-doctag">            &quot;https://${{ github.actor }}:$CODEBERG_TOKEN@codeberg.org/${{ github.repository }}.git&quot; \
+</span><span class="hljs-doctag">            &quot;$PAGES_BRANCH&quot;</span>          
+</code></pre>
+<blockquote>
+<p><strong>Branch history is not preserved.</strong> Each run starts with a fresh <code>git init</code> and force-pushes, so the published branch is treated as a publish-only artifact. Keep your source on <code>main</code> (or wherever you develop); never edit the <code>pages</code> branch by hand.</p>
+</blockquote>
+<h3 id="user-site-vs-project-site">User Site vs Project Site</h3>
+<p>The default <code>PAGES_BRANCH: pages</code> targets a <strong>project site</strong> (any repo, served at <code>USERNAME.codeberg.page/REPO/</code>). For a <strong>user / org site</strong> in a repo literally named <code>pages</code>, change the branch to your default branch:</p>
+<pre><code class="language-yaml hljs">    <span class="hljs-name">env</span><span class="hljs-punctuation">:</span>
+      <span class="hljs-name">PAGES_BRANCH</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">main  </span> <span class="hljs-comment"># default branch of the `pages` repo</span>
+</code></pre>
+<h3 id="add-the-token-secret">Add the Token Secret</h3>
+<ol>
+<li>Go to your repository <strong>Settings → Actions → Secrets</strong></li>
+<li>Add a new secret named <code>CODEBERG_TOKEN</code></li>
+<li>Paste your Codeberg access token (with <code>write:repository</code> scope)</li>
+</ol>
+<h3 id="set-base-url">Set Base URL</h3>
+<p>Update <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs"><span class="hljs-comment"># User/org site (repo named &quot;pages&quot;)</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://USERNAME.codeberg.page&quot;</span>
+
+<span class="hljs-comment"># Project site (any other repo)</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://USERNAME.codeberg.page/REPO&quot;</span>
+</code></pre>
+<p>Push to <code>main</code> and the workflow will build and deploy automatically.</p>
+<h2 id="method-2-deploy-via-hwaro-deploy">Method 2: Deploy via <code>hwaro deploy</code></h2>
+<p>If you'd rather deploy from your local machine, wire it up as a <code>[[deployment.targets]]</code> entry that calls a small shell script.</p>
+<p>Create <code>scripts/deploy-codeberg.sh</code>:</p>
+<pre><code class="language-bash hljs"><span class="hljs-meta">#!/bin/bash
+</span><span class="hljs-meta"></span><span class="hljs-built_in">set</span> -e
+
+<span class="hljs-variable">SOURCE_DIR</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${</span><span class="hljs-variable">1</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation">?Usage</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation"> deploy-codeberg.sh &lt;source-dir&gt;</span><span class="hljs-subst">}</span><span class="hljs-string">&quot;</span>
+<span class="hljs-variable">REMOTE_URL</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${</span><span class="hljs-variable">CODEBERG_REMOTE</span><span class="hljs-keyword">:-</span><span class="hljs-keyword">$(</span>git remote get-url origin<span class="hljs-keyword">)</span><span class="hljs-subst">}</span><span class="hljs-string">&quot;</span>
+<span class="hljs-variable">PAGES_BRANCH</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${</span><span class="hljs-variable">PAGES_BRANCH</span><span class="hljs-keyword">:-</span><span class="hljs-variable">pages</span><span class="hljs-subst">}</span><span class="hljs-string">&quot;</span>
+<span class="hljs-variable">TMPDIR</span><span class="hljs-operator">=</span><span class="hljs-keyword">$(</span>mktemp -d<span class="hljs-keyword">)</span>
+
+cp -r <span class="hljs-string">&quot;</span><span class="hljs-variable">$SOURCE_DIR</span><span class="hljs-string">&quot;</span>/. <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+
+<span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+git init -b <span class="hljs-string">&quot;</span><span class="hljs-variable">$PAGES_BRANCH</span><span class="hljs-string">&quot;</span>
+git add -A
+git commit -m <span class="hljs-string">&quot;Deploy to Codeberg Pages&quot;</span>
+git push --force <span class="hljs-string">&quot;</span><span class="hljs-variable">$REMOTE_URL</span><span class="hljs-string">&quot;</span> <span class="hljs-string">&quot;</span><span class="hljs-variable">$PAGES_BRANCH</span><span class="hljs-string">&quot;</span>
+
+rm -rf <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+</code></pre>
+<pre><code class="language-bash hljs">chmod +x scripts/deploy-codeberg.sh
+</code></pre>
+<p>Add the target to <code>config.toml</code>:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;codeberg-pages&quot;</span>
+command <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;scripts/deploy-codeberg.sh {source}&quot;</span>
+</code></pre>
+<p>Then build and deploy:</p>
+<pre><code class="language-bash hljs">hwaro build
+hwaro deploy codeberg-pages
+
+<span class="hljs-comment"># Preview without deploying</span>
+hwaro deploy codeberg-pages --dry-run
+
+<span class="hljs-comment"># User site (push to the default branch instead of `pages`)</span>
+<span class="hljs-variable">PAGES_BRANCH</span><span class="hljs-operator">=</span>main hwaro deploy codeberg-pages
+</code></pre>
+<p>As with Method 1, the script force-pushes a fresh init — branch history is not preserved.</p>
+<h2 id="method-3-manual-branch-deploy">Method 3: Manual Branch Deploy</h2>
+<pre><code class="language-bash hljs">hwaro build
+
+<span class="hljs-built_in">cd</span> public
+git init -b pages
+git add -A
+git commit -m <span class="hljs-string">&quot;Deploy&quot;</span>
+git push --force https://codeberg.org/USERNAME/REPO.git pages
+</code></pre>
+<p>For a user site (<code>pages</code> repo), substitute the default branch name (e.g. <code>main</code>) for <code>pages</code> in both the <code>init</code> and <code>push</code> commands.</p>
+<h2 id="custom-domain">Custom Domain</h2>
+<p>Codeberg Pages supports custom domains via a <code>.domains</code> file plus a DNS record. See the <a href="https://docs.codeberg.org/codeberg-pages/using-custom-domain/">official Codeberg docs</a> for the authoritative version.</p>
+<blockquote>
+<p><strong>Repo names with dots are unsupported.</strong> Use <code>-</code> or <code>_</code> in the repo name if you plan to attach a custom domain.</p>
+</blockquote>
+<h3 id="1-add-a-domains-file">1. Add a <code>.domains</code> file</h3>
+<p>Place a <code>.domains</code> file at the root of the served branch listing the domains, one per line. The <strong>first line is the canonical domain</strong>; all subsequent domains are 301-redirected to it. Empty lines and <code>#</code> comments are allowed.</p>
+<pre><code>www.example.org
+example.org
+</code></pre>
+<p>Drop it under <code>static/.domains</code> so Hwaro copies it into <code>public/</code> on every build:</p>
+<pre><code>static/
+└── .domains
+</code></pre>
+<p>Hwaro copies hidden dot-paths from <code>static/</code> verbatim into <code>public/</code> on every build — cold or <code>--cache</code>/incremental — so <code>static/.domains</code> always reaches the served branch. See <a href="/start/config/#static-files">Static Files</a> for details.</p>
+<h3 id="2-configure-dns">2. Configure DNS</h3>
+<p>Pick <strong>one</strong> of the three options below.</p>
+<p><strong>Option A — CNAME (recommended, simplest).</strong> Point your domain at one of these names:</p>
+<table>
+<thead>
+<tr>
+<th>Site type</th>
+<th>CNAME target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Personal site</td>
+<td><code>USERNAME.codeberg.page</code></td>
+</tr>
+<tr>
+<td>Project site</td>
+<td><code>REPO.USERNAME.codeberg.page</code></td>
+</tr>
+<tr>
+<td>Custom branch</td>
+<td><code>BRANCH.REPO.USERNAME.codeberg.page</code></td>
+</tr>
+</tbody>
+</table>
+<p>CNAME delegates <em>the whole hostname</em>, so you cannot run email (MX) on the same name with this option.</p>
+<p><strong>Option B — ALIAS + TXT.</strong> If your DNS provider supports <code>ALIAS</code> (or <code>ANAME</code>) records:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ALIAS</td>
+<td>@</td>
+<td><code>codeberg.page</code></td>
+</tr>
+<tr>
+<td>TXT</td>
+<td>@</td>
+<td><code>REPO.USERNAME.codeberg.page</code> (or <code>USERNAME.codeberg.page</code> for a user site)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Option C — A + AAAA + TXT.</strong> Use this if your provider doesn't support ALIAS, or if your zone uses DNSSEC (which is incompatible with the <code>codeberg.page</code> CNAME):</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td>@</td>
+<td><code>217.197.84.141</code></td>
+</tr>
+<tr>
+<td>AAAA</td>
+<td>@</td>
+<td><code>2a0a:4580:103f:c0de::2</code></td>
+</tr>
+<tr>
+<td>TXT</td>
+<td>@</td>
+<td><code>REPO.USERNAME.codeberg.page</code> (or <code>USERNAME.codeberg.page</code> for a user site)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Verify the latest IPs on the <a href="https://docs.codeberg.org/codeberg-pages/using-custom-domain/">Codeberg Pages docs</a> before relying on them — Codeberg occasionally rotates them.</p>
+</blockquote>
+<p>If your zone uses CAA records, add an entry that allows Let's Encrypt so Codeberg can issue a TLS certificate:</p>
+<pre><code>@   CAA   0 issue &quot;letsencrypt.org&quot;
+</code></pre>
+<h3 id="3-update-base-url">3. Update <code>base_url</code></h3>
+<pre><code class="language-toml hljs">base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://www.example.org&quot;</span>
+</code></pre>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="workflow-doesnt-run">Workflow Doesn't Run</h3>
+<ul>
+<li>Make sure Forgejo Actions is enabled under <strong>Settings → Actions</strong> for the repository</li>
+<li>Confirm the workflow file is committed at <code>.forgejo/workflows/deploy.yml</code> (or <code>.gitea/workflows/deploy.yml</code>)</li>
+</ul>
+<h3 id="push-fails-with-401-403">Push Fails with 401 / 403</h3>
+<ul>
+<li>Re-check the <code>CODEBERG_TOKEN</code> secret value and that the token still has <code>write:repository</code> scope</li>
+<li>Tokens are tied to your account — make sure the actor has push access to the target repo</li>
+</ul>
+<h3 id="404-on-the-deployed-site">404 on the Deployed Site</h3>
+<ul>
+<li>Codeberg Pages may take a minute or two to publish after the first push</li>
+<li>For a project site, confirm the branch is named exactly <code>pages</code></li>
+<li>For a user site, confirm the repo is named exactly <code>pages</code> and <code>PAGES_BRANCH</code> matches its default branch</li>
+<li>Verify <code>base_url</code> matches the published URL (no trailing slash)</li>
+</ul>
+<h3 id="custom-domain-doesnt-resolve-to-https">Custom Domain Doesn't Resolve to HTTPS</h3>
+<ul>
+<li>Confirm the <code>.domains</code> file is present at the root of the published branch</li>
+<li>If you have CAA records, make sure <code>letsencrypt.org</code> is allowed</li>
+<li>Allow a few minutes for the certificate to be issued after DNS propagates</li>
+</ul>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/deploy/config/">Deploy Configuration</a> — Target setup and matchers</li>
+<li><a href="/start/cli/">CLI Reference</a> — All deploy command options</li>
+<li><a href="https://docs.codeberg.org/codeberg-pages/">Codeberg Pages docs</a> — Upstream reference</li>
+<li>Other platforms: <a href="/deploy/github-pages/">GitHub Pages</a> | <a href="/deploy/gitlab-ci/">GitLab CI</a> | <a href="/deploy/netlify/">Netlify</a> | <a href="/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">Codeberg Pages</span>
+    <span class="pn-desc">Hwaro 사이트를 Codeberg Pages에 배포</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/deploy/docker/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">Docker</span>
+    <span class="pn-desc">Docker로 Hwaro 사이트 배포</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

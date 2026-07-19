@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="페이지 제목으로 Open Graph 미리보기 이미지 자동 생성">
+  <title>자동 OG 이미지 - Hwaro</title>
+  <meta property="og:title" content="자동 OG 이미지">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/og-images/">
+  <meta property="og:description" content="페이지 제목으로 Open Graph 미리보기 이미지 자동 생성">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-og-images.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="자동 OG 이미지">
+  <meta name="twitter:description" content="페이지 제목으로 Open Graph 미리보기 이미지 자동 생성">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-og-images.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/og-images/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/og-images/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/og-images/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/og-images/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/og-images/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/" class="active">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">자동 OG 이미지</li>
+  </ol>
+</nav>
+    <h1>자동 OG 이미지</h1>
+    <p>Hwaro는 프론트 매터에 커스텀 <code>image</code>가 없는 모든 페이지에 1200x630 Open Graph 미리보기 이미지를 자동 생성합니다. 생성된 경로가 <code>page.image</code>로 설정되므로 <code>og:image</code> 메타 태그가 자동으로 이를 사용합니다 — 템플릿을 고칠 필요가 없습니다.</p>
+<p><img src="/og-images/features-og-images.png" alt="자동 OG 이미지 페이지의 자동 생성 OG 이미지" />
+<em>이 페이지의 자동 생성 OG 이미지 (<code>style = &quot;terminal&quot;</code>).</em></p>
+<h2 id="빠른-시작">빠른 시작</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>og<span class="hljs-punctuation">.</span>auto_image<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+style <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;terminal&quot;</span>
+accent_color <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;#2ee66b&quot;</span>
+logo <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;static/logo.png&quot;</span>
+</code></pre>
+<h2 id="설정">설정</h2>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>자동 OG 이미지 생성 여부</td>
+</tr>
+<tr>
+<td>style</td>
+<td>string</td>
+<td><code>&quot;default&quot;</code></td>
+<td>구성 프리셋 — <a href="#스타일-프리셋">스타일 프리셋</a> 참고</td>
+</tr>
+<tr>
+<td>background</td>
+<td>string</td>
+<td><code>&quot;#171310&quot;</code></td>
+<td>배경색(hex)</td>
+</tr>
+<tr>
+<td>text_color</td>
+<td>string</td>
+<td><code>&quot;#f4ede4&quot;</code></td>
+<td>제목과 설명의 텍스트 색</td>
+</tr>
+<tr>
+<td>accent_color</td>
+<td>string</td>
+<td><code>&quot;#ec7a66&quot;</code></td>
+<td>룰, 브랜드 마크, 색 블록에 쓰는 액센트 색</td>
+</tr>
+<tr>
+<td>secondary_color</td>
+<td>string</td>
+<td>—</td>
+<td>투톤 스타일(<code>split</code>, <code>brutalist</code>, <code>bauhaus</code>, …)의 두 번째 색. 생략하면 <code>accent_color</code>에서 자동 파생</td>
+</tr>
+<tr>
+<td>font_size</td>
+<td>int</td>
+<td><code>48</code></td>
+<td>제목 폰트 크기(px). 더 큰 값을 지정하지 않으면 각 스타일이 자체 스케일로 자동 확대</td>
+</tr>
+<tr>
+<td>logo</td>
+<td>string</td>
+<td>—</td>
+<td>이미지에 삽입할 로고 파일 경로 (예: <code>static/logo.png</code>)</td>
+</tr>
+<tr>
+<td>logo_position</td>
+<td>string</td>
+<td><code>&quot;bottom-left&quot;</code></td>
+<td><code>bottom-left</code>, <code>bottom-right</code>, <code>top-left</code>, <code>top-right</code></td>
+</tr>
+<tr>
+<td>show_title</td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>사이트 이름 표시 (하단 브랜드 행, 또는 스타일별 자리 — 아이브로, 키커, 창 제목 표시줄)</td>
+</tr>
+<tr>
+<td>output_dir</td>
+<td>string</td>
+<td><code>&quot;og-images&quot;</code></td>
+<td>생성 이미지를 담을 디렉터리</td>
+</tr>
+<tr>
+<td>format</td>
+<td>string</td>
+<td><code>&quot;png&quot;</code></td>
+<td><code>&quot;png&quot;</code> 또는 <code>&quot;svg&quot;</code>. 소셜 플랫폼은 SVG <code>og:image</code>를 렌더링하지 않으므로 PNG가 기본값</td>
+</tr>
+<tr>
+<td>font_path</td>
+<td>string</td>
+<td>—</td>
+<td>PNG 출력용 커스텀 <code>.ttf</code>/<code>.otf</code>. 폰트 체인의 맨 앞에 오고, 없는 글리프는 번들 폰트로 대체</td>
+</tr>
+<tr>
+<td>background_image</td>
+<td>string</td>
+<td>—</td>
+<td>텍스트 뒤에 합성할 배경 사진</td>
+</tr>
+<tr>
+<td>overlay_opacity</td>
+<td>float</td>
+<td><code>0.45</code></td>
+<td><code>background</code> 색이 사진을 덮는 정도 (0.0 = 사진 그대로, 1.0 = 사진 가림)</td>
+</tr>
+<tr>
+<td>text_panel</td>
+<td>float</td>
+<td><code>0.0</code></td>
+<td>0.0–0.6. 복잡한 배경에서 가독성을 높이는 텍스트 뒤 소프트 패널</td>
+</tr>
+<tr>
+<td>pattern_opacity</td>
+<td>float</td>
+<td><code>0.35</code></td>
+<td>패턴 스타일(<code>dots</code>, <code>grid</code>, …)의 최대 알파. 각 패턴은 이 값을 정점으로 내부에서 점차 옅어짐</td>
+</tr>
+<tr>
+<td>pattern_scale</td>
+<td>float</td>
+<td><code>1.0</code></td>
+<td>패턴 스타일의 배율 (최소 0.1)</td>
+</tr>
+<tr>
+<td>accent_bars</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>패턴 스타일에 클래식한 얇은 상/하단 액센트 바 추가</td>
+</tr>
+<tr>
+<td>lazy_generate</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td><code>hwaro serve</code>에서 일괄 생성을 건너뛰고 첫 요청 때 렌더링. 대규모 사이트에 권장. <code>hwaro build</code>에는 영향 없음</td>
+</tr>
+</tbody>
+</table>
+<p>제목은 Space Grotesk, 설명은 Space Grotesk Medium, <code>terminal</code> 스타일은 JetBrains Mono로 렌더링됩니다 — 모두 바이너리에 번들되어 있어 PNG 출력이 어떤 머신에서든 동일합니다. 제목에 필요하면 CJK를 지원하는 시스템 폰트가 체인에 자동으로 추가되고, 그 밖의 모든 경우는 DejaVu Sans Bold가 받쳐 줍니다.</p>
+<h2 id="스타일-프리셋">스타일 프리셋</h2>
+<p><code>style</code> 옵션이 구성 전체를 결정합니다. 아래 미리보기를 클릭하면 확대됩니다.</p>
+<p><strong>Signature</strong> — 그 자체로 완결된 구성:</p>
+<table>
+<thead>
+<tr>
+<th>스타일</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>terminal</code></td>
+<td>신호등 버튼, <code>$</code> 프롬프트, 블록 커서가 있는 코드 에디터 창. 개발 블로그와 문서용</td>
+</tr>
+<tr>
+<td><code>bauhaus</code></td>
+<td>액센트/보조/파생 색으로 구성한 평면 기하학 아트 포스터 도형</td>
+</tr>
+<tr>
+<td><code>halftone</code></td>
+<td>오른쪽 가장자리에서 번져 들어오는 인쇄풍 하프톤 도트 필드</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Modern</strong> — 생성된 배경 위의 타이포그래피 중심 구성:</p>
+<table>
+<thead>
+<tr>
+<th>스타일</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>editorial</code></td>
+<td>잡지 표지풍: 헤어라인 룰, 대문자 사이트명 키커, 세로 액센트 룰. 무난하고 조화로운 기본 선택지</td>
+</tr>
+<tr>
+<td><code>artistic</code></td>
+<td>필름 그레인을 더한 메시 그라디언트 색 필드. 완성도 높은 풍부한 느낌</td>
+</tr>
+<tr>
+<td><code>hero</code></td>
+<td>스포트라이트 글로우, 제목 첫 단어의 거대한 고스트 에코, 포스터 타이포그래피</td>
+</tr>
+<tr>
+<td><code>surreal</code></td>
+<td>오로라 구체와 흐르는 리본 밴드에 그레인을 더한 구성</td>
+</tr>
+<tr>
+<td><code>monument</code></td>
+<td>극단적 미니멀리즘 — 거대한 타이포, 넓은 여백, 제목 위 액센트 룰, 오른쪽 아래 브랜드 행</td>
+</tr>
+<tr>
+<td><code>framed</code></td>
+<td>초대장 카드: 중립 색 헤어라인 프레임에 액센트 코너 브래킷과 가운데 정렬 타이포</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Geometric</strong> — 대담한 평면 색 블로킹:</p>
+<table>
+<thead>
+<tr>
+<th>스타일</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>split</code></td>
+<td>왼쪽 대각선 투톤 색 블록, 오른쪽 제목</td>
+</tr>
+<tr>
+<td><code>band</code></td>
+<td>제목을 뚫어낸 전체 폭 색 밴드와 그 위를 받치는 얇은 룰 — 잡지 표지 스타일</td>
+</tr>
+<tr>
+<td><code>brutalist</code></td>
+<td>강한 오프셋 그림자와 거대한 타이포가 있는 두꺼운 프레임 패널</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Patterns</strong> — 초점이 있는 구성 (각 패턴은 <code>pattern_opacity</code>를 정점으로 내부에서 점차 옅어짐):</p>
+<table>
+<thead>
+<tr>
+<th>스타일</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>default</code></td>
+<td>머스트헤드: 상단의 대문자 사이트명 아이브로, 낮은 코너 글로우, 은은한 비네트</td>
+</tr>
+<tr>
+<td><code>minimal</code></td>
+<td>타이포만 — 제목 뒤의 액센트 마침표가 전부</td>
+</tr>
+<tr>
+<td><code>dots</code></td>
+<td>오른쪽 위 모서리에서 번져 들어오는 엇갈린 하프톤 도트</td>
+</tr>
+<tr>
+<td><code>grid</code></td>
+<td>초점 크로스헤어와 레지스트레이션 마크가 있는 가는 청사진 그리드</td>
+</tr>
+<tr>
+<td><code>diagonal</code></td>
+<td>오른쪽 아래 모서리의 45° 스트라이프 쐐기와 빗변의 액센트 룰</td>
+</tr>
+<tr>
+<td><code>gradient</code></td>
+<td>코너 글로우, 비네트, 그레인이 있는 액센트 톤 듀오톤 워시</td>
+</tr>
+<tr>
+<td><code>waves</code></td>
+<td>아래 가장자리에 겹겹이 쌓인 물결 밴드</td>
+</tr>
+</tbody>
+</table>
+<h3 id="미리보기">미리보기</h3>
+<div class="og-style-grid">
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-terminal_128w.png 128w, /images/og-style-examples/style-terminal_256w.png 256w, /images/og-style-examples/style-terminal_512w.png 512w, /images/og-style-examples/style-terminal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-terminal.png" alt="terminal 스타일" loading="lazy" />
+    <span class="og-style-label"><code>terminal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-terminal_128w.png 128w, /images/og-style-examples/style-terminal_256w.png 256w, /images/og-style-examples/style-terminal_512w.png 512w, /images/og-style-examples/style-terminal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-terminal.png" alt="terminal 스타일" />
+        <p><code>terminal</code> — 프롬프트와 커서가 있는 코드 에디터 창</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-bauhaus_128w.png 128w, /images/og-style-examples/style-bauhaus_256w.png 256w, /images/og-style-examples/style-bauhaus_512w.png 512w, /images/og-style-examples/style-bauhaus_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-bauhaus.png" alt="bauhaus 스타일" loading="lazy" />
+    <span class="og-style-label"><code>bauhaus</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-bauhaus_128w.png 128w, /images/og-style-examples/style-bauhaus_256w.png 256w, /images/og-style-examples/style-bauhaus_512w.png 512w, /images/og-style-examples/style-bauhaus_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-bauhaus.png" alt="bauhaus 스타일" />
+        <p><code>bauhaus</code> — 평면 기하학 아트 포스터 도형</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-halftone_128w.png 128w, /images/og-style-examples/style-halftone_256w.png 256w, /images/og-style-examples/style-halftone_512w.png 512w, /images/og-style-examples/style-halftone_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-halftone.png" alt="halftone 스타일" loading="lazy" />
+    <span class="og-style-label"><code>halftone</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-halftone_128w.png 128w, /images/og-style-examples/style-halftone_256w.png 256w, /images/og-style-examples/style-halftone_512w.png 512w, /images/og-style-examples/style-halftone_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-halftone.png" alt="halftone 스타일" />
+        <p><code>halftone</code> — 인쇄풍 하프톤 도트 페이드</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-editorial_128w.png 128w, /images/og-style-examples/style-editorial_256w.png 256w, /images/og-style-examples/style-editorial_512w.png 512w, /images/og-style-examples/style-editorial_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-editorial.png" alt="editorial 스타일" loading="lazy" />
+    <span class="og-style-label"><code>editorial</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-editorial_128w.png 128w, /images/og-style-examples/style-editorial_256w.png 256w, /images/og-style-examples/style-editorial_512w.png 512w, /images/og-style-examples/style-editorial_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-editorial.png" alt="editorial 스타일" />
+        <p><code>editorial</code> — 잡지 표지풍: 룰, 키커, 세로 액센트 룰</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-artistic_128w.png 128w, /images/og-style-examples/style-artistic_256w.png 256w, /images/og-style-examples/style-artistic_512w.png 512w, /images/og-style-examples/style-artistic_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-artistic.png" alt="artistic 스타일" loading="lazy" />
+    <span class="og-style-label"><code>artistic</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-artistic_128w.png 128w, /images/og-style-examples/style-artistic_256w.png 256w, /images/og-style-examples/style-artistic_512w.png 512w, /images/og-style-examples/style-artistic_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-artistic.png" alt="artistic 스타일" />
+        <p><code>artistic</code> — 필름 그레인을 더한 메시 그라디언트 색 필드</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-hero_128w.png 128w, /images/og-style-examples/style-hero_256w.png 256w, /images/og-style-examples/style-hero_512w.png 512w, /images/og-style-examples/style-hero_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-hero.png" alt="hero 스타일" loading="lazy" />
+    <span class="og-style-label"><code>hero</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-hero_128w.png 128w, /images/og-style-examples/style-hero_256w.png 256w, /images/og-style-examples/style-hero_512w.png 512w, /images/og-style-examples/style-hero_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-hero.png" alt="hero 스타일" />
+        <p><code>hero</code> — 고스트 타이포 에코가 있는 스포트라이트 글로우</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-surreal_128w.png 128w, /images/og-style-examples/style-surreal_256w.png 256w, /images/og-style-examples/style-surreal_512w.png 512w, /images/og-style-examples/style-surreal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-surreal.png" alt="surreal 스타일" loading="lazy" />
+    <span class="og-style-label"><code>surreal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-surreal_128w.png 128w, /images/og-style-examples/style-surreal_256w.png 256w, /images/og-style-examples/style-surreal_512w.png 512w, /images/og-style-examples/style-surreal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-surreal.png" alt="surreal 스타일" />
+        <p><code>surreal</code> — 오로라 구체와 흐르는 리본</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-monument_128w.png 128w, /images/og-style-examples/style-monument_256w.png 256w, /images/og-style-examples/style-monument_512w.png 512w, /images/og-style-examples/style-monument_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-monument.png" alt="monument 스타일" loading="lazy" />
+    <span class="og-style-label"><code>monument</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-monument_128w.png 128w, /images/og-style-examples/style-monument_256w.png 256w, /images/og-style-examples/style-monument_512w.png 512w, /images/og-style-examples/style-monument_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-monument.png" alt="monument 스타일" />
+        <p><code>monument</code> — 제목 위 액센트 룰과 거대한 타이포</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-framed_128w.png 128w, /images/og-style-examples/style-framed_256w.png 256w, /images/og-style-examples/style-framed_512w.png 512w, /images/og-style-examples/style-framed_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-framed.png" alt="framed 스타일" loading="lazy" />
+    <span class="og-style-label"><code>framed</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-framed_128w.png 128w, /images/og-style-examples/style-framed_256w.png 256w, /images/og-style-examples/style-framed_512w.png 512w, /images/og-style-examples/style-framed_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-framed.png" alt="framed 스타일" />
+        <p><code>framed</code> — 액센트 코너 브래킷이 있는 헤어라인 프레임</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-split_128w.png 128w, /images/og-style-examples/style-split_256w.png 256w, /images/og-style-examples/style-split_512w.png 512w, /images/og-style-examples/style-split_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-split.png" alt="split 스타일" loading="lazy" />
+    <span class="og-style-label"><code>split</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-split_128w.png 128w, /images/og-style-examples/style-split_256w.png 256w, /images/og-style-examples/style-split_512w.png 512w, /images/og-style-examples/style-split_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-split.png" alt="split 스타일" />
+        <p><code>split</code> — 대각선 투톤 색 블록</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-band_128w.png 128w, /images/og-style-examples/style-band_256w.png 256w, /images/og-style-examples/style-band_512w.png 512w, /images/og-style-examples/style-band_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-band.png" alt="band 스타일" loading="lazy" />
+    <span class="og-style-label"><code>band</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-band_128w.png 128w, /images/og-style-examples/style-band_256w.png 256w, /images/og-style-examples/style-band_512w.png 512w, /images/og-style-examples/style-band_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-band.png" alt="band 스타일" />
+        <p><code>band</code> — 뚫어낸 제목 뒤의 잡지풍 색 밴드</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-brutalist_128w.png 128w, /images/og-style-examples/style-brutalist_256w.png 256w, /images/og-style-examples/style-brutalist_512w.png 512w, /images/og-style-examples/style-brutalist_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-brutalist.png" alt="brutalist 스타일" loading="lazy" />
+    <span class="og-style-label"><code>brutalist</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-brutalist_128w.png 128w, /images/og-style-examples/style-brutalist_256w.png 256w, /images/og-style-examples/style-brutalist_512w.png 512w, /images/og-style-examples/style-brutalist_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-brutalist.png" alt="brutalist 스타일" />
+        <p><code>brutalist</code> — 강한 오프셋 그림자가 있는 두꺼운 프레임 패널</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-default_128w.png 128w, /images/og-style-examples/style-default_256w.png 256w, /images/og-style-examples/style-default_512w.png 512w, /images/og-style-examples/style-default_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-default.png" alt="default 스타일" loading="lazy" />
+    <span class="og-style-label"><code>default</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-default_128w.png 128w, /images/og-style-examples/style-default_256w.png 256w, /images/og-style-examples/style-default_512w.png 512w, /images/og-style-examples/style-default_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-default.png" alt="default 스타일" />
+        <p><code>default</code> — 머스트헤드: 아이브로, 코너 글로우, 비네트</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-minimal_128w.png 128w, /images/og-style-examples/style-minimal_256w.png 256w, /images/og-style-examples/style-minimal_512w.png 512w, /images/og-style-examples/style-minimal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-minimal.png" alt="minimal 스타일" loading="lazy" />
+    <span class="og-style-label"><code>minimal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-minimal_128w.png 128w, /images/og-style-examples/style-minimal_256w.png 256w, /images/og-style-examples/style-minimal_512w.png 512w, /images/og-style-examples/style-minimal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-minimal.png" alt="minimal 스타일" />
+        <p><code>minimal</code> — 타이포와 액센트 마침표만</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-dots_128w.png 128w, /images/og-style-examples/style-dots_256w.png 256w, /images/og-style-examples/style-dots_512w.png 512w, /images/og-style-examples/style-dots_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-dots.png" alt="dots 스타일" loading="lazy" />
+    <span class="og-style-label"><code>dots</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-dots_128w.png 128w, /images/og-style-examples/style-dots_256w.png 256w, /images/og-style-examples/style-dots_512w.png 512w, /images/og-style-examples/style-dots_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-dots.png" alt="dots 스타일" />
+        <p><code>dots</code> — 오른쪽 위에서 번져 들어오는 하프톤 도트</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-grid_128w.png 128w, /images/og-style-examples/style-grid_256w.png 256w, /images/og-style-examples/style-grid_512w.png 512w, /images/og-style-examples/style-grid_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-grid.png" alt="grid 스타일" loading="lazy" />
+    <span class="og-style-label"><code>grid</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-grid_128w.png 128w, /images/og-style-examples/style-grid_256w.png 256w, /images/og-style-examples/style-grid_512w.png 512w, /images/og-style-examples/style-grid_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-grid.png" alt="grid 스타일" />
+        <p><code>grid</code> — 초점 크로스헤어가 있는 청사진 그리드</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-diagonal_128w.png 128w, /images/og-style-examples/style-diagonal_256w.png 256w, /images/og-style-examples/style-diagonal_512w.png 512w, /images/og-style-examples/style-diagonal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-diagonal.png" alt="diagonal 스타일" loading="lazy" />
+    <span class="og-style-label"><code>diagonal</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-diagonal_128w.png 128w, /images/og-style-examples/style-diagonal_256w.png 256w, /images/og-style-examples/style-diagonal_512w.png 512w, /images/og-style-examples/style-diagonal_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-diagonal.png" alt="diagonal 스타일" />
+        <p><code>diagonal</code> — 액센트 빗변 룰이 있는 스트라이프 쐐기</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-gradient_128w.png 128w, /images/og-style-examples/style-gradient_256w.png 256w, /images/og-style-examples/style-gradient_512w.png 512w, /images/og-style-examples/style-gradient_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-gradient.png" alt="gradient 스타일" loading="lazy" />
+    <span class="og-style-label"><code>gradient</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-gradient_128w.png 128w, /images/og-style-examples/style-gradient_256w.png 256w, /images/og-style-examples/style-gradient_512w.png 512w, /images/og-style-examples/style-gradient_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-gradient.png" alt="gradient 스타일" />
+        <p><code>gradient</code> — 글로우, 비네트, 그레인이 있는 듀오톤 워시</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/style-waves_128w.png 128w, /images/og-style-examples/style-waves_256w.png 256w, /images/og-style-examples/style-waves_512w.png 512w, /images/og-style-examples/style-waves_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-waves.png" alt="waves 스타일" loading="lazy" />
+    <span class="og-style-label"><code>waves</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/style-waves_128w.png 128w, /images/og-style-examples/style-waves_256w.png 256w, /images/og-style-examples/style-waves_512w.png 512w, /images/og-style-examples/style-waves_640w.png 640w" sizes="100vw" src="/images/og-style-examples/style-waves.png" alt="waves 스타일" />
+        <p><code>waves</code> — 아래 가장자리에 겹겹이 쌓인 물결 밴드</p>
+      </div>
+    </dialog>
+  </div>
+</div>
+<style>
+.og-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.og-style-card {
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border, #1e1e24);
+  background: var(--bg-card, #111114);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.og-style-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: var(--border-light, #2e2e36);
+}
+.og-style-card > img {
+  width: 100%;
+  display: block;
+}
+.og-style-label {
+  display: block;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.og-style-card dialog {
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+.og-style-card dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+.og-style-dialog {
+  position: relative;
+  background: var(--bg-elevated, #101014);
+  border: 1px solid var(--border, #1e1e24);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.og-style-dialog > img {
+  display: block;
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.og-style-dialog > button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+.og-style-dialog > p {
+  text-align: center;
+  padding: 12px;
+  margin: 0;
+}
+</style>
+<h2 id="배경-이미지">배경 이미지</h2>
+<p>사진을 텍스트 뒤에 합성합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>og<span class="hljs-punctuation">.</span>auto_image<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+style <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;editorial&quot;</span>
+background_image <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;static/og-bg.jpg&quot;</span>
+overlay_opacity <span class="hljs-punctuation">=</span> <span class="hljs-number">0.55</span>
+</code></pre>
+<p>렌더링 순서는 배경색 → 사진 → 색 오버레이 → 스타일 구성 → 텍스트/로고입니다. <code>overlay_opacity</code>는 배경색이 사진을 얼마나 덮을지 결정합니다. 자체 배경을 생성하는 스타일(<code>artistic</code>, <code>hero</code>, <code>surreal</code>)은 사진이 설정되면 배경 생성을 건너뛰어 사진이 그대로 드러납니다.</p>
+<h3 id="미리보기-1">미리보기</h3>
+<p>아래 예시는 <code>overlay_opacity</code>만 다릅니다 (같은 사진, <code>style = &quot;editorial&quot;</code>, 검정에 가까운 <code>background</code>). 클릭하면 확대됩니다.</p>
+<div class="og-style-grid">
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/bg-image-low_128w.png 128w, /images/og-style-examples/bg-image-low_256w.png 256w, /images/og-style-examples/bg-image-low_512w.png 512w, /images/og-style-examples/bg-image-low_640w.png 640w" sizes="100vw" src="/images/og-style-examples/bg-image-low.png" alt="오버레이가 낮은 배경 이미지" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.3</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/bg-image-low_128w.png 128w, /images/og-style-examples/bg-image-low_256w.png 256w, /images/og-style-examples/bg-image-low_512w.png 512w, /images/og-style-examples/bg-image-low_640w.png 640w" sizes="100vw" src="/images/og-style-examples/bg-image-low.png" alt="오버레이가 낮은 배경 이미지" />
+        <p><code>overlay_opacity = 0.3</code> — 사진이 선명하게 유지됨</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/bg-image-mid_128w.png 128w, /images/og-style-examples/bg-image-mid_256w.png 256w, /images/og-style-examples/bg-image-mid_512w.png 512w, /images/og-style-examples/bg-image-mid_640w.png 640w" sizes="100vw" src="/images/og-style-examples/bg-image-mid.png" alt="오버레이가 중간인 배경 이미지" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.55</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/bg-image-mid_128w.png 128w, /images/og-style-examples/bg-image-mid_256w.png 256w, /images/og-style-examples/bg-image-mid_512w.png 512w, /images/og-style-examples/bg-image-mid_640w.png 640w" sizes="100vw" src="/images/og-style-examples/bg-image-mid.png" alt="오버레이가 중간인 배경 이미지" />
+        <p><code>overlay_opacity = 0.55</code> — 사진과 텍스트의 균형</p>
+      </div>
+    </dialog>
+  </div>
+  <div class="og-style-card" onclick="this.querySelector('dialog').showModal()">
+    <img srcset="/images/og-style-examples/bg-image-high_128w.png 128w, /images/og-style-examples/bg-image-high_256w.png 256w, /images/og-style-examples/bg-image-high_512w.png 512w, /images/og-style-examples/bg-image-high_640w.png 640w" sizes="100vw" src="/images/og-style-examples/bg-image-high.png" alt="오버레이가 높은 배경 이미지" loading="lazy" />
+    <span class="og-style-label"><code>overlay_opacity = 0.8</code></span>
+    <dialog onclick="if(event.target===this)this.close()">
+      <div class="og-style-dialog">
+        <button onclick="event.stopPropagation();this.closest('dialog').close()">&times;</button>
+        <img srcset="/images/og-style-examples/bg-image-high_128w.png 128w, /images/og-style-examples/bg-image-high_256w.png 256w, /images/og-style-examples/bg-image-high_512w.png 512w, /images/og-style-examples/bg-image-high_640w.png 640w" sizes="100vw" src="/images/og-style-examples/bg-image-high.png" alt="오버레이가 높은 배경 이미지" />
+        <p><code>overlay_opacity = 0.8</code> — 사진은 어둡게, 텍스트가 도드라짐</p>
+      </div>
+    </dialog>
+  </div>
+</div>
+<h2 id="출력-포맷">출력 포맷</h2>
+<p>PNG가 기본값입니다 — stb_truetype과 stb_image_write로 자체 렌더링하므로 외부 도구가 필요 없습니다. 시스템 폰트는 자동 감지되며(macOS는 Helvetica/Arial, Linux는 DejaVu/Liberation/Noto), 최후 수단으로 번들된 DejaVu Sans Bold를 사용합니다.</p>
+<p>CJK 문자가 들어간 제목에는 CJK를 지원하는 <code>font_path</code>(예: Noto Sans CJK)가 필요합니다 — 번들 폰트는 라틴 문자만 지원합니다.</p>
+<p>의존성 없는 SVG 출력이 필요하면 <code>format = &quot;svg&quot;</code>로 설정합니다. 다만 소셜 플랫폼은 일반적으로 SVG <code>og:image</code>를 렌더링하지 않습니다.</p>
+<h2 id="증분-생성">증분 생성</h2>
+<p>Hwaro는 생성 이미지 옆에 <code>.og_manifest.json</code>을 저장하고 입력이 바뀌지 않은 페이지를 건너뜁니다. 빌드 간에 출력 디렉터리를 유지하면(예: <code>--cache</code> 모드) 증분 생성이 자동으로 동작합니다 — <code>hahwul/hwaro</code> GitHub Action은 이를 알아서 처리합니다.</p>
+<table>
+<thead>
+<tr>
+<th>변경</th>
+<th>재생성 대상</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>페이지 제목, 설명, URL</td>
+<td>해당 페이지만</td>
+</tr>
+<tr>
+<td>OG 설정, 또는 로고/배경 이미지의 <strong>파일 내용</strong></td>
+<td>전체 페이지</td>
+</tr>
+<tr>
+<td>디스크에 이미지 파일이 없음</td>
+<td>해당 페이지만</td>
+</tr>
+</tbody>
+</table>
+<h2 id="개발-서버-속도-개선">개발 서버 속도 개선</h2>
+<p>OG 생성은 대규모 사이트에서 가장 비용이 큰 빌드 단계 중 하나입니다. 두 가지 방법이 있습니다:</p>
+<ul>
+<li><code>lazy_generate = true</code> — <code>hwaro serve</code>가 일괄 생성을 건너뛰고, 각 이미지는 해당 페이지의 첫 요청 때 렌더링된 뒤 캐시됩니다. <code>hwaro build</code>에는 영향이 없습니다. <code>hwaro serve --fast-start</code>와 잘 어울립니다.</li>
+<li><code>hwaro build --skip-og-image</code> — OG 이미지를 아예 건너뜁니다.</li>
+</ul>
+<h2 id="동작">동작</h2>
+<ul>
+<li>프론트 매터에 커스텀 <code>image</code>가 있는 페이지는 그대로 유지하고, 초안은 건너뜁니다</li>
+<li>긴 제목은 자동으로 줄바꿈됩니다 (CJK 인식)</li>
+<li>로고와 배경 이미지는 한 번만 로드해 전체 페이지에서 재사용합니다</li>
+</ul>
+<h2 id="출력">출력</h2>
+<p><code>/posts/hello-world/</code> 페이지는 <code>public/og-images/posts-hello-world.png</code>와 다음 태그를 만듭니다:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">meta</span> <span class="hljs-attr">property</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;og:image&quot;</span> <span class="hljs-attr">content</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/og-images/posts-hello-world.png&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>특정 페이지에 커스텀 이미지를 쓰려면 프론트 매터에 <code>image</code>를 설정합니다:</p>
+<pre><code class="language-toml hljs">+++
+title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;My Post&quot;</span>
+image <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/images/custom-og.png&quot;</span>
++++
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/features/seo/">SEO</a> — OpenGraph, Twitter 카드, 메타 태그</li>
+<li><a href="/ko/features/image-processing/">이미지 처리</a> — 반응형 이미지 리사이징</li>
+<li><a href="/ko/start/config/">설정</a> — 전체 설정 레퍼런스</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/structured-data/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Structured Data</span>
+    <span class="pn-desc">Extended Schema.org JSON-LD support for rich search results</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/features/og-images/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">Auto OG Images</span>
+    <span class="pn-desc">Auto-generate Open Graph preview images from page titles</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#빠른-시작">빠른 시작</a></li><li><a href="#설정">설정</a></li><li><a href="#스타일-프리셋">스타일 프리셋</a><ul><li><a href="#미리보기">미리보기</a></li></ul></li><li><a href="#배경-이미지">배경 이미지</a><ul><li><a href="#미리보기-1">미리보기</a></li></ul></li><li><a href="#출력-포맷">출력 포맷</a></li><li><a href="#증분-생성">증분 생성</a></li><li><a href="#개발-서버-속도-개선">개발 서버 속도 개선</a></li><li><a href="#동작">동작</a></li><li><a href="#출력">출력</a></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

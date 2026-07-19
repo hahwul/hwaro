@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Built-in functions for data retrieval and URL generation">
+  <title>Functions - Hwaro</title>
+  <meta property="og:title" content="Functions">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/templates/functions/">
+  <meta property="og:description" content="Built-in functions for data retrieval and URL generation">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/templates-functions.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Functions">
+  <meta name="twitter:description" content="Built-in functions for data retrieval and URL generation">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/templates-functions.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/templates/functions/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/functions/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/functions/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/" class="active">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/templates/functions/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/templates/functions/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/" class="active">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+    
+    <li aria-current="page">Functions</li>
+  </ol>
+</nav>
+    <h1>Functions</h1>
+    <p>Built-in functions for retrieving data and generating URLs in templates.</p>
+<h2 id="data-retrieval">Data Retrieval</h2>
+<h3 id="get-page">get_page()</h3>
+<p>Retrieve any page by path or URL:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">about</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_page</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;about.md&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">about</span> <span class="hljs-meta">%}</span>
+&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">about</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">about</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Relative source path (e.g. <code>about.md</code>) or URL path (e.g. <code>/about/</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Page? (nil if not found) — exposes the standard <a href="/templates/data-model/#page">Page properties</a>, minus per-render computed fields (<code>permalink</code>, <code>lower</code>/<code>higher</code>, <code>ancestors</code>, <code>series_index</code>, <code>series_pages</code>, <code>related_posts</code>).</p>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Page in root #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">contact</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_page</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;contact.md&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# Page in section #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">intro</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_page</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;docs/introduction.md&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# Match by URL #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">intro_by_url</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_page</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/docs/introduction/&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<hr />
+<h3 id="get-section">get_section()</h3>
+<p>Retrieve a section by section name, source path, or URL:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">blog</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_section</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;blog&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">blog</span> <span class="hljs-meta">%}</span>
+&lt;h2&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">blog</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/h2&gt;
+&lt;ul&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">p</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">blog</span><span class="hljs-variable">.pages</span> <span class="hljs-meta">%}</span>
+  &lt;li&gt;&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">p</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">p</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/a&gt;&lt;/li&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/ul&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Section name (<code>blog</code>), path (<code>blog/_index.md</code>), or URL (<code>/blog/</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Section? (nil if not found)</p>
+<p><strong>Returned Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>title</td>
+<td>String</td>
+</tr>
+<tr>
+<td>description</td>
+<td>String?</td>
+</tr>
+<tr>
+<td>url</td>
+<td>String</td>
+</tr>
+<tr>
+<td>path</td>
+<td>String</td>
+</tr>
+<tr>
+<td>name</td>
+<td>String</td>
+</tr>
+<tr>
+<td>pages</td>
+<td>Array&lt;Page&gt;</td>
+</tr>
+<tr>
+<td>pages_count</td>
+<td>Int</td>
+</tr>
+<tr>
+<td>assets</td>
+<td>Array&lt;String&gt;</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Top-level section #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">docs</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_section</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;docs&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# Nested section #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">guides</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_section</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;docs/guides&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# Match by URL #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">blog</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_section</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/blog/&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# Display count #}</span>
+&lt;p&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">docs</span><span class="hljs-variable">.pages_count</span> <span class="hljs-meta">}}</span> articles&lt;/p&gt;
+</code></pre>
+<hr />
+<h3 id="get-taxonomy">get_taxonomy()</h3>
+<p>Access taxonomy terms and their pages:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">tags</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_taxonomy</span><span class="hljs-operator">(</span><span class="hljs-variable">kind</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;tags&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">tags</span> <span class="hljs-meta">%}</span>
+&lt;ul class=&quot;tag-cloud&quot;&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">term</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">tags</span><span class="hljs-variable">.items</span> <span class="hljs-meta">%}</span>
+  &lt;li&gt;
+    &lt;a href=&quot;/tags/<span class="hljs-meta">{{</span> <span class="hljs-variable">term</span><span class="hljs-variable">.slug</span> <span class="hljs-meta">}}</span>/&quot;&gt;
+      <span class="hljs-meta">{{</span> <span class="hljs-variable">term</span><span class="hljs-variable">.name</span> <span class="hljs-meta">}}</span> (<span class="hljs-meta">{{</span> <span class="hljs-variable">term</span><span class="hljs-variable">.count</span> <span class="hljs-meta">}}</span>)
+    &lt;/a&gt;
+  &lt;/li&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/ul&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kind</td>
+<td>String</td>
+<td>Taxonomy name (e.g., &quot;tags&quot;, &quot;categories&quot;)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Taxonomy? (nil if not found)</p>
+<p><strong>Returned Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+</tr>
+<tr>
+<td>items</td>
+<td>Array&lt;Term&gt;</td>
+</tr>
+</tbody>
+</table>
+<p><code>items</code> is ordered by the taxonomy's
+<a href="/writing/taxonomies/#sorting"><code>terms_sort_by</code></a>: <code>&quot;name&quot;</code> (the default —
+alphabetical) or <code>&quot;count&quot;</code> (page count descending, name-ascending
+tiebreak). Counts are site-wide across every language, matching the root
+taxonomy index page.</p>
+<p><strong>Term Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+</tr>
+<tr>
+<td>slug</td>
+<td>String</td>
+</tr>
+<tr>
+<td>pages</td>
+<td>Array&lt;Page&gt;</td>
+</tr>
+<tr>
+<td>count</td>
+<td>Int</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="get-taxonomy-url">get_taxonomy_url()</h3>
+<p>Generate URL for a taxonomy term:</p>
+<pre><code class="language-jinja hljs">&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">get_taxonomy_url</span><span class="hljs-operator">(</span><span class="hljs-variable">kind</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;tags&#39;</span><span class="hljs-operator">,</span> <span class="hljs-variable">term</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;crystal&#39;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;
+  Crystal articles
+&lt;/a&gt;
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kind</td>
+<td>String</td>
+<td>Taxonomy name</td>
+</tr>
+<tr>
+<td>term</td>
+<td>String</td>
+<td>Term name</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String (absolute URL)</p>
+<hr />
+<h3 id="get-menu">get_menu()</h3>
+<p>Access a named menu's resolved entry tree (<a href="/features/menus/">Menus</a>):</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">item</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">get_menu</span><span class="hljs-operator">(</span><span class="hljs-variable">name</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;main&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">item</span><span class="hljs-variable">.href</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">item</span><span class="hljs-variable">.url</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">active_path</span> <span class="hljs-meta">%}</span> aria-current=&quot;page&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">item</span><span class="hljs-variable">.name</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+<td>Menu name (e.g., &quot;main&quot;, &quot;footer&quot;)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Array&lt;Entry&gt; — resolved against the <strong>current page's</strong> language, falling back to the default language when that language has no entries for <code>name</code>. An unknown/unregistered menu name returns an empty array (never nil), so a <code>{% for %}</code> loop never errors.</p>
+<p><strong>Entry Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+<td>Display label</td>
+</tr>
+<tr>
+<td>url</td>
+<td>String</td>
+<td>Bare root-relative path, or untouched external URL</td>
+</tr>
+<tr>
+<td>href</td>
+<td>String</td>
+<td><code>url</code> with <code>base_path</code> applied (internal) or unchanged (external) — use this in <code>&lt;a href&gt;</code></td>
+</tr>
+<tr>
+<td>identifier</td>
+<td>String</td>
+<td>Unique key within the menu</td>
+</tr>
+<tr>
+<td>weight</td>
+<td>Int</td>
+<td>Sort order</td>
+</tr>
+<tr>
+<td>external</td>
+<td>Bool</td>
+<td><code>true</code> for <code>http://</code>, <code>https://</code>, or <code>//</code> URLs</td>
+</tr>
+<tr>
+<td>children</td>
+<td>Array\&lt;Entry\&gt;</td>
+<td>Nested entries</td>
+</tr>
+<tr>
+<td>page</td>
+<td>Page?</td>
+<td>The registering page&#39;s data (front-matter-registered entries only)</td>
+</tr>
+</tbody>
+</table>
+<p>Prefer <code>site.menus.&lt;name&gt;</code> only when you specifically need the <strong>default language's</strong> menu regardless of the current page — <code>get_menu()</code> is almost always the right choice inside a shared nav partial.</p>
+<hr />
+<h2 id="data-loading">Data Loading</h2>
+<h3 id="load-data">load_data()</h3>
+<p>Load external data files (JSON, TOML, YAML, CSV):</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">menu</span> <span class="hljs-operator">=</span> <span class="hljs-variable">load_data</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;data/menu.json&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">item</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">menu</span> <span class="hljs-meta">%}</span>
+&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">item</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">item</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Path to data file</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Parsed data or nil</p>
+<p><strong>Supported Formats:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Extension</th>
+<th>Format</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>.json</td>
+<td>JSON</td>
+</tr>
+<tr>
+<td>.toml</td>
+<td>TOML</td>
+</tr>
+<tr>
+<td>.yaml, .yml</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td>.csv</td>
+<td>CSV (array of arrays)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<p>JSON (<code>data/team.json</code>):</p>
+<pre><code class="language-json hljs"><span class="hljs-punctuation">[</span>
+  <span class="hljs-punctuation">{</span><span class="hljs-name">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Alice&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Developer&quot;</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-punctuation">{</span><span class="hljs-name">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Bob&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Designer&quot;</span><span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">]</span>
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">team</span> <span class="hljs-operator">=</span> <span class="hljs-variable">load_data</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;data/team.json&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;ul&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">member</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">team</span> <span class="hljs-meta">%}</span>
+  &lt;li&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">member</span><span class="hljs-variable">.name</span> <span class="hljs-meta">}}</span> - <span class="hljs-meta">{{</span> <span class="hljs-variable">member</span><span class="hljs-variable">.role</span> <span class="hljs-meta">}}</span>&lt;/li&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/ul&gt;
+</code></pre>
+<p>TOML (<code>data/social.toml</code>):</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>links<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Twitter&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://twitter.com/example&quot;</span>
+</code></pre>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">social</span> <span class="hljs-operator">=</span> <span class="hljs-variable">load_data</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;data/social.toml&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">link</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">social</span><span class="hljs-variable">.links</span> <span class="hljs-meta">%}</span>
+&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">link</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">link</span><span class="hljs-variable">.name</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<hr />
+<h2 id="environment">Environment</h2>
+<h3 id="env">env()</h3>
+<p>Read environment variables in templates:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">env</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;ANALYTICS_ID&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">env</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;API_KEY&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">default</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;none&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+<td>Environment variable name</td>
+</tr>
+<tr>
+<td>default</td>
+<td>String?</td>
+<td>Fallback value if variable is unset (optional)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String (env var value, default, or empty string)</p>
+<p>If the variable is not set and no default is provided, an empty string is returned and a build warning is logged.</p>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Google Analytics #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">env</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;GA_ID&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;script async src=&quot;https://www.googletagmanager.com/gtag/js?id=<span class="hljs-meta">{{</span> <span class="hljs-variable">env</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;GA_ID&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;&lt;/script&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# API endpoint with fallback #}</span>
+&lt;script&gt;
+  const API = &quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">env</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;API_URL&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">default</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://api.example.com&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;;
+&lt;/script&gt;
+</code></pre>
+<hr />
+<h2 id="url-functions">URL Functions</h2>
+<h3 id="url-for">url_for()</h3>
+<p>Generate URL with base_url:</p>
+<pre><code class="language-jinja hljs">&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">url_for</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;/about/&#39;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;About&lt;/a&gt;
+&lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">url_for</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;/images/logo.png&#39;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Path to convert</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String (absolute URL)</p>
+<hr />
+<h3 id="get-url">get_url()</h3>
+<p>Alias for <code>url_for()</code>. You can use either name:</p>
+<pre><code class="language-jinja hljs">&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">get_url</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;/about/&#39;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;About&lt;/a&gt;
+</code></pre>
+<hr />
+<h3 id="asset">asset()</h3>
+<p>Resolve a bundled or fingerprinted asset to its final URL. When the <a href="/features/asset-pipeline/">asset pipeline</a> is enabled, the input name is looked up in the build manifest so you always get the hashed filename.</p>
+<pre><code class="language-jinja hljs">&lt;link rel=&quot;stylesheet&quot; href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">asset</span><span class="hljs-operator">(</span><span class="hljs-variable">name</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;main.css&#39;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;
+&lt;script src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">asset</span><span class="hljs-operator">(</span><span class="hljs-variable">name</span><span class="hljs-operator">=</span><span class="hljs-string">&#39;app.js&#39;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&quot;&gt;&lt;/script&gt;
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>String</td>
+<td>Bundle or asset name (e.g. <code>main.css</code>, <code>app.js</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String — absolute URL under <code>base_url</code>. When no manifest entry is found, the name is returned as a path under <code>base_url</code> unchanged, so templates keep working before you turn the pipeline on.</p>
+<hr />
+<h3 id="asset-url">asset_url()</h3>
+<p>Alias for <code>asset()</code>. Use whichever reads better in your templates.</p>
+<hr />
+<h3 id="now">now()</h3>
+<p>Get current datetime:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Default format #}</span>
+&lt;p&gt;Generated: <span class="hljs-meta">{{</span> <span class="hljs-variable">now</span><span class="hljs-operator">(</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&lt;/p&gt;
+
+<span class="hljs-comment">{# Custom format #}</span>
+&lt;p&gt;Year: <span class="hljs-meta">{{</span> <span class="hljs-variable">now</span><span class="hljs-operator">(</span><span class="hljs-variable">format</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;%Y&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&lt;/p&gt;
+&lt;p&gt;Date: <span class="hljs-meta">{{</span> <span class="hljs-variable">now</span><span class="hljs-operator">(</span><span class="hljs-variable">format</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;%B %d, %Y&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&lt;/p&gt;
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>format</td>
+<td>String?</td>
+<td>Date format string (optional)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> String</p>
+<p><strong>Format Codes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>%Y</td>
+<td>Year</td>
+<td>2025</td>
+</tr>
+<tr>
+<td>%m</td>
+<td>Month (01-12)</td>
+<td>01</td>
+</tr>
+<tr>
+<td>%d</td>
+<td>Day (01-31)</td>
+<td>15</td>
+</tr>
+<tr>
+<td>%B</td>
+<td>Month name</td>
+<td>January</td>
+</tr>
+<tr>
+<td>%b</td>
+<td>Month abbr</td>
+<td>Jan</td>
+</tr>
+<tr>
+<td>%H</td>
+<td>Hour (00-23)</td>
+<td>14</td>
+</tr>
+<tr>
+<td>%M</td>
+<td>Minute</td>
+<td>30</td>
+</tr>
+<tr>
+<td>%S</td>
+<td>Second</td>
+<td>45</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="media-functions">Media Functions</h2>
+<h3 id="resize-image">resize_image()</h3>
+<p>Returns a resized image variant. When <a href="/features/image-processing/">image processing</a> is enabled, this returns the URL to an automatically generated resized image. Otherwise, it returns the original URL.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">6</span><span class="hljs-number">4</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot; width=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.width</span> <span class="hljs-meta">}}</span>&quot;&gt;
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>path</td>
+<td>String</td>
+<td>Image path (e.g., <code>/images/photo.jpg</code>)</td>
+</tr>
+<tr>
+<td>width</td>
+<td>Int</td>
+<td>Requested width in pixels (0 = original)</td>
+</tr>
+<tr>
+<td>height</td>
+<td>Int</td>
+<td>Requested height in pixels (0 = original)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Object with properties:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>url</td>
+<td>String</td>
+<td>URL to the resized variant (or original if unavailable)</td>
+</tr>
+<tr>
+<td>width</td>
+<td>Int</td>
+<td>Requested width</td>
+</tr>
+<tr>
+<td>height</td>
+<td>Int</td>
+<td>Requested height</td>
+</tr>
+<tr>
+<td>lqip</td>
+<td>String</td>
+<td>Base64 data URI of a tiny JPEG placeholder (empty if LQIP disabled)</td>
+</tr>
+<tr>
+<td>dominant_color</td>
+<td>String</td>
+<td>Hex color string of the image&#39;s dominant color, e.g. <code>#a3b2c1</code> (empty if LQIP disabled)</td>
+</tr>
+</tbody>
+</table>
+<p>The function selects the closest available width from the configured <code>widths</code>. If you request <code>width=500</code> and the configured widths are <code>[320, 640, 1024]</code>, it returns the 640px variant (smallest width &gt;= requested). If nothing is large enough, it falls back to the largest available.</p>
+<p>The <code>lqip</code> and <code>dominant_color</code> properties require <code>[image_processing.lqip]</code> to be enabled. When disabled, they return empty strings.</p>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Single resized image #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">8</span><span class="hljs-number">0</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot; alt=&quot;Hero&quot;&gt;
+
+<span class="hljs-comment">{# Responsive srcset #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">sm</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">3</span><span class="hljs-number">2</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">md</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">6</span><span class="hljs-number">4</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">lg</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">0</span><span class="hljs-number">2</span><span class="hljs-number">4</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img
+  src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">md</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+  srcset=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">sm</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 320w, <span class="hljs-meta">{{</span> <span class="hljs-variable">md</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 640w, <span class="hljs-meta">{{</span> <span class="hljs-variable">lg</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span> 1024w&quot;
+  sizes=&quot;(max-width: 640px) 320px, (max-width: 1024px) 640px, 1024px&quot;
+&gt;
+
+<span class="hljs-comment">{# With page image from front matter #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.image</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">thumb</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-variable">page</span><span class="hljs-variable">.image</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">3</span><span class="hljs-number">2</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+  &lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">thumb</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot; alt=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page_title</span> <span class="hljs-meta">}}</span>&quot;&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# LQIP blur-up placeholder #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/hero.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">1</span><span class="hljs-number">0</span><span class="hljs-number">2</span><span class="hljs-number">4</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img
+  src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+  style=&quot;background-image: url(<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.lqip</span> <span class="hljs-meta">}}</span>); background-size: cover;&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Hero&quot;
+&gt;
+
+<span class="hljs-comment">{# Dominant color placeholder #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">img</span> <span class="hljs-operator">=</span> <span class="hljs-variable">resize_image</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/photo.jpg&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">width</span><span class="hljs-operator">=</span><span class="hljs-number">6</span><span class="hljs-number">4</span><span class="hljs-number">0</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;img
+  src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+  style=&quot;background-color: <span class="hljs-meta">{{</span> <span class="hljs-variable">img</span><span class="hljs-variable">.dominant_color</span> <span class="hljs-meta">}}</span>&quot;
+  loading=&quot;lazy&quot;
+  alt=&quot;Photo&quot;
+&gt;
+</code></pre>
+<p>Requires <code>[image_processing]</code> to be enabled in <code>config.toml</code>. See <a href="/features/image-processing/">Image Processing</a> for setup details.</p>
+<hr />
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="always-check-for-nil">Always Check for nil</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">page</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_page</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;featured.md&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>
+&lt;p&gt;Coming soon&lt;/p&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h3 id="cache-function-results">Cache Function Results</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Good: Single lookup #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">blog</span> <span class="hljs-operator">=</span> <span class="hljs-variable">get_section</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;blog&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;h2&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">blog</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/h2&gt;
+&lt;p&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">blog</span><span class="hljs-variable">.pages_count</span> <span class="hljs-meta">}}</span> posts&lt;/p&gt;
+
+<span class="hljs-comment">{# Avoid: Multiple lookups #}</span>
+&lt;h2&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">get_section</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;blog&quot;</span><span class="hljs-operator">)</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/h2&gt;
+&lt;p&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">get_section</span><span class="hljs-operator">(</span><span class="hljs-variable">path</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;blog&quot;</span><span class="hljs-operator">)</span><span class="hljs-variable">.pages_count</span> <span class="hljs-meta">}}</span> posts&lt;/p&gt;
+</code></pre>
+<h3 id="organize-data-files">Organize Data Files</h3>
+<pre><code>data/
+├── navigation/
+│   ├── main.json
+│   └── footer.json
+├── team.yaml
+└── products.toml
+</code></pre>
+<hr />
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/templates/data-model/">Data Model</a> — Site, Section, Page types</li>
+<li><a href="/templates/data-model/#paginator">Data Model › Paginator</a> — pagination object in section templates</li>
+<li><a href="/templates/filters/">Filters</a> — Value transformation</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/templates/functions/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">함수</span>
+    <span class="pn-desc">데이터 조회와 URL 생성을 위한 내장 함수</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/templates/filters/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">필터</span>
+    <span class="pn-desc">파이프 연산자로 템플릿의 값 변환</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#data-retrieval">Data Retrieval</a><ul><li><a href="#get-page">get_page()</a></li><li><a href="#get-section">get_section()</a></li><li><a href="#get-taxonomy">get_taxonomy()</a></li><li><a href="#get-taxonomy-url">get_taxonomy_url()</a></li><li><a href="#get-menu">get_menu()</a></li></ul></li><li><a href="#data-loading">Data Loading</a><ul><li><a href="#load-data">load_data()</a></li></ul></li><li><a href="#environment">Environment</a><ul><li><a href="#env">env()</a></li></ul></li><li><a href="#url-functions">URL Functions</a><ul><li><a href="#url-for">url_for()</a></li><li><a href="#get-url">get_url()</a></li><li><a href="#asset">asset()</a></li><li><a href="#asset-url">asset_url()</a></li><li><a href="#now">now()</a></li></ul></li><li><a href="#media-functions">Media Functions</a><ul><li><a href="#resize-image">resize_image()</a></li></ul></li><li><a href="#best-practices">Best Practices</a><ul><li><a href="#always-check-for-nil">Always Check for nil</a></li><li><a href="#cache-function-results">Cache Function Results</a></li><li><a href="#organize-data-files">Organize Data Files</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Jinja2 호환 템플릿 문법 레퍼런스">
+  <title>문법 - Hwaro</title>
+  <meta property="og:title" content="문법">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/templates/syntax/">
+  <meta property="og:description" content="Jinja2 호환 템플릿 문법 레퍼런스">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-templates-syntax.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="문법">
+  <meta name="twitter:description" content="Jinja2 호환 템플릿 문법 레퍼런스">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-templates-syntax.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/templates/syntax/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/syntax/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/syntax/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/" class="active">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/templates/syntax/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/" class="active">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+    
+    <li aria-current="page">문법</li>
+  </ol>
+</nav>
+    <h1>문법</h1>
+    <p>Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이지는 핵심 문법을 다룹니다.</p>
+<h2 id="변수">변수</h2>
+<p>이중 중괄호로 값을 출력합니다.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">site</span><span class="hljs-variable">.description</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<h2 id="주석">주석</h2>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# This is a comment #}</span>
+</code></pre>
+<h2 id="조건문">조건문</h2>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.description</span> <span class="hljs-meta">%}</span>
+&lt;meta name=&quot;description&quot; content=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.description</span> <span class="hljs-meta">}}</span>&quot;&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>else와 함께:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.draft</span> <span class="hljs-meta">%}</span>
+&lt;span class=&quot;badge&quot;&gt;Draft&lt;/span&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>
+&lt;span class=&quot;badge&quot;&gt;Published&lt;/span&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>elif와 함께:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.section</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;blog&quot;</span> <span class="hljs-meta">%}</span>
+&lt;article class=&quot;post&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>&lt;/article&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">elif</span> <span class="hljs-variable">page</span><span class="hljs-variable">.section</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;docs&quot;</span> <span class="hljs-meta">%}</span>
+&lt;div class=&quot;documentation&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>&lt;/div&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>
+&lt;main&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>&lt;/main&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="반복문">반복문</h2>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">p</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">section</span><span class="hljs-variable">.pages</span> <span class="hljs-meta">%}</span>
+&lt;li&gt;&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">p</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">p</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/a&gt;&lt;/li&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>인덱스와 함께:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">tag</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.tags</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-built_in">loop</span><span class="hljs-variable">.first</span> <span class="hljs-meta">%}</span>, <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">tag</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>반복 변수:</p>
+<table>
+<thead>
+<tr>
+<th>변수</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>loop.index</td>
+<td>현재 반복 횟수(1부터 시작)</td>
+</tr>
+<tr>
+<td>loop.index0</td>
+<td>현재 반복 횟수(0부터 시작)</td>
+</tr>
+<tr>
+<td>loop.first</td>
+<td>첫 반복에서 true</td>
+</tr>
+<tr>
+<td>loop.last</td>
+<td>마지막 반복에서 true</td>
+</tr>
+<tr>
+<td>loop.length</td>
+<td>전체 항목 수</td>
+</tr>
+</tbody>
+</table>
+<h2 id="템플릿-상속">템플릿 상속</h2>
+<h3 id="베이스-템플릿">베이스 템플릿</h3>
+<p><code>templates/base.html</code>:</p>
+<pre><code class="language-jinja hljs">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;<span class="hljs-meta">{%</span> <span class="hljs-keyword">block</span> <span class="hljs-variable">title</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">site</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">endblock</span> <span class="hljs-meta">%}</span>&lt;/title&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_css</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+&lt;body&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">block</span> <span class="hljs-variable">content</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">endblock</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">highlight_js</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<h3 id="자식-템플릿">자식 템플릿</h3>
+<p><code>templates/page.html</code>:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">extends</span> <span class="hljs-string">&quot;base.html&quot;</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">block</span> <span class="hljs-variable">title</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span> - <span class="hljs-meta">{{</span> <span class="hljs-variable">site</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">endblock</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">block</span> <span class="hljs-variable">content</span> <span class="hljs-meta">%}</span>
+&lt;article&gt;
+  &lt;h1&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/h1&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/article&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endblock</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="인클루드">인클루드</h2>
+<p>부분 템플릿을 불러옵니다.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">include</span> <span class="hljs-string">&quot;partials/header.html&quot;</span> <span class="hljs-meta">%}</span>
+&lt;main&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>&lt;/main&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">include</span> <span class="hljs-string">&quot;partials/footer.html&quot;</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="변수-1">변수</h2>
+<p>변수를 설정합니다.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">author</span> <span class="hljs-operator">=</span> <span class="hljs-variable">page</span><span class="hljs-variable">.authors</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">first</span> <span class="hljs-meta">%}</span>
+&lt;span&gt;By <span class="hljs-meta">{{</span> <span class="hljs-variable">author</span> <span class="hljs-meta">}}</span>&lt;/span&gt;
+</code></pre>
+<h2 id="필터">필터</h2>
+<p>파이프 연산자로 값을 변환합니다.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.title</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">upper</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.date</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">date</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;%B %d, %Y&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.authors</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">join</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;, &quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<p>전체 필터 목록은 <a href="/ko/templates/filters/">필터</a>를 참고합니다.</p>
+<h2 id="테스트">테스트</h2>
+<p>조건을 평가합니다.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.url</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">startswith</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;/blog/&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;span&gt;Blog post&lt;/span&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.description</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">empty</span> <span class="hljs-meta">%}</span>
+&lt;meta name=&quot;description&quot; content=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">site</span><span class="hljs-variable">.description</span> <span class="hljs-meta">}}</span>&quot;&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>테스트는 필터가 아니지만 같은 페이지에 문서화되어 있습니다 — <a href="/ko/templates/filters/">필터 › 테스트</a> 참고.</p>
+<h2 id="공백-제어">공백 제어</h2>
+<p>마이너스 기호로 공백을 제거합니다.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span>- <span class="hljs-keyword">if</span> <span class="hljs-variable">condition</span> -<span class="hljs-meta">%}</span>
+trimmed
+<span class="hljs-meta">{%</span>- <span class="hljs-keyword">endif</span> -<span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="raw-블록">raw 블록</h2>
+<p>Jinja 문법을 그대로 출력합니다.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">raw</span> <span class="hljs-meta">%}</span>
+{{ this will not be parsed }}
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endraw</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="연산자">연산자</h2>
+<h3 id="비교">비교</h3>
+<table>
+<thead>
+<tr>
+<th>연산자</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>==</code></td>
+<td>같음</td>
+</tr>
+<tr>
+<td><code>!=</code></td>
+<td>같지 않음</td>
+</tr>
+<tr>
+<td><code>&lt;</code></td>
+<td>미만</td>
+</tr>
+<tr>
+<td><code>&gt;</code></td>
+<td>초과</td>
+</tr>
+<tr>
+<td><code>&lt;=</code></td>
+<td>이하</td>
+</tr>
+<tr>
+<td><code>&gt;=</code></td>
+<td>이상</td>
+</tr>
+</tbody>
+</table>
+<h3 id="논리">논리</h3>
+<table>
+<thead>
+<tr>
+<th>연산자</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>and</code></td>
+<td>둘 다 참</td>
+</tr>
+<tr>
+<td><code>or</code></td>
+<td>둘 중 하나라도 참</td>
+</tr>
+<tr>
+<td><code>not</code></td>
+<td>부정</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.section</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;blog&quot;</span> <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> <span class="hljs-variable">page</span><span class="hljs-variable">.draft</span> <span class="hljs-meta">%}</span>
+&lt;article&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>&lt;/article&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h3 id="포함-여부">포함 여부</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;tutorial&quot;</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.tags</span> <span class="hljs-meta">%}</span>
+&lt;span class=&quot;badge&quot;&gt;Tutorial&lt;/span&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="자주-쓰는-패턴">자주 쓰는 패턴</h2>
+<h3 id="활성-내비게이션">활성 내비게이션</h3>
+<pre><code class="language-jinja hljs">&lt;nav&gt;
+  &lt;a href=&quot;/&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.url</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;/&quot;</span> <span class="hljs-meta">%}</span> class=&quot;active&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;Home&lt;/a&gt;
+  &lt;a href=&quot;/blog/&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.section</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;blog&quot;</span> <span class="hljs-meta">%}</span> class=&quot;active&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;Blog&lt;/a&gt;
+&lt;/nav&gt;
+</code></pre>
+<h3 id="조건부-메타-태그">조건부 메타 태그</h3>
+<pre><code class="language-jinja hljs">&lt;head&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.description</span> <span class="hljs-meta">%}</span>
+  &lt;meta name=&quot;description&quot; content=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.description</span> <span class="hljs-meta">}}</span>&quot;&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">og_all_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+&lt;/head&gt;
+</code></pre>
+<h3 id="섹션별-레이아웃">섹션별 레이아웃</h3>
+<pre><code class="language-jinja hljs">&lt;body data-section=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.section</span> <span class="hljs-meta">}}</span>&quot;&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.section</span> <span class="hljs-operator">==</span> <span class="hljs-string">&quot;docs&quot;</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">include</span> <span class="hljs-string">&quot;partials/sidebar.html&quot;</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+  
+  &lt;main&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>&lt;/main&gt;
+&lt;/body&gt;
+</code></pre>
+<h3 id="빈-목록-확인과-반복">빈 목록 확인과 반복</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">section</span><span class="hljs-variable">.pages</span> <span class="hljs-meta">%}</span>
+&lt;ul&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">p</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">section</span><span class="hljs-variable">.pages</span> <span class="hljs-meta">%}</span>
+  &lt;li&gt;&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">p</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">p</span><span class="hljs-variable">.title</span> <span class="hljs-meta">}}</span>&lt;/a&gt;&lt;/li&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/ul&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>
+&lt;p&gt;No articles yet.&lt;/p&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/templates/data-model/">데이터 모델</a> — 사용할 수 있는 변수</li>
+<li><a href="/ko/templates/functions/">함수</a> — 내장 함수</li>
+<li><a href="/ko/templates/filters/">필터</a> — 필터와 테스트</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/templates/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">Templates</span>
+    <span class="pn-desc">Design your site with Jinja2 templates</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/templates/syntax/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">Syntax</span>
+    <span class="pn-desc">Jinja2-compatible template syntax reference</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#변수">변수</a></li><li><a href="#주석">주석</a></li><li><a href="#조건문">조건문</a></li><li><a href="#반복문">반복문</a></li><li><a href="#템플릿-상속">템플릿 상속</a><ul><li><a href="#베이스-템플릿">베이스 템플릿</a></li><li><a href="#자식-템플릿">자식 템플릿</a></li></ul></li><li><a href="#인클루드">인클루드</a></li><li><a href="#변수-1">변수</a></li><li><a href="#필터">필터</a></li><li><a href="#테스트">테스트</a></li><li><a href="#공백-제어">공백 제어</a></li><li><a href="#raw-블록">raw 블록</a></li><li><a href="#연산자">연산자</a><ul><li><a href="#비교">비교</a></li><li><a href="#논리">논리</a></li><li><a href="#포함-여부">포함 여부</a></li></ul></li><li><a href="#자주-쓰는-패턴">자주 쓰는 패턴</a><ul><li><a href="#활성-내비게이션">활성 내비게이션</a></li><li><a href="#조건부-메타-태그">조건부 메타 태그</a></li><li><a href="#섹션별-레이아웃">섹션별 레이아웃</a></li><li><a href="#빈-목록-확인과-반복">빈 목록 확인과 반복</a></li></ul></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

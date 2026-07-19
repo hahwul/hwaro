@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="사이트를 만들고, 빌드하고, 서빙하는 명령">
+  <title>CLI - Hwaro</title>
+  <meta property="og:title" content="CLI">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/start/cli/">
+  <meta property="og:description" content="사이트를 만들고, 빌드하고, 서빙하는 명령">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-start-cli.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="CLI">
+  <meta name="twitter:description" content="사이트를 만들고, 빌드하고, 서빙하는 명령">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-start-cli.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/start/cli/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/cli/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/cli/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=82df685b">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=82df685b">
+</head>
+<body data-section="start">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/" class="active">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/start/cli/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/start/cli/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/" class="active">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+    
+    <li aria-current="page">CLI</li>
+  </ol>
+</nav>
+    <h1>CLI</h1>
+    <p>Hwaro는 사이트를 만들고, 빌드하고, 서빙하는 명령을 제공합니다.</p>
+<h2 id="전역-플래그">전역 플래그</h2>
+<p>이 플래그들은 모든 최상위 명령에서 동작하며 CLI가 터미널에 출력하는
+방식을 제어합니다. 스크립트, CI 로그, 깔끔한 출력이 필요한 AI 에이전트에
+특히 유용합니다.</p>
+<table>
+<thead>
+<tr>
+<th>플래그 / 환경 변수</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-q</code>, <code>--quiet</code></td>
+<td>정보성 출력과 시작 배너를 숨김. 경고와 오류는 stderr에 계속 표시</td>
+</tr>
+<tr>
+<td><code>NO_COLOR</code> (env)</td>
+<td>비어 있지 않은 값이면 모든 명령 출력에서 ANSI 색상 코드를 제거. <a href="https://no-color.org">no-color.org</a>의 도구 공통 규약을 따름</td>
+</tr>
+</tbody>
+</table>
+<p>stdout이 TTY가 아니면(예: <code>cat</code>으로 파이프, 파일로 리디렉션, 대부분의
+CI 환경) 색상은 자동으로 꺼집니다. 어디서든 색상을 강제로 끄려면
+<code>NO_COLOR=1</code>만 설정하면 됩니다. 별도 플래그는 필요 없습니다.</p>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># 스크립트·CI용 무음 빌드 — 경고와 오류만 표시됨</span>
+hwaro build --quiet
+
+<span class="hljs-comment"># stdout이 TTY여도 ANSI 이스케이프 없는 일반 텍스트 출력</span>
+<span class="hljs-variable">NO_COLOR</span><span class="hljs-operator">=</span><span class="hljs-number">1</span> hwaro doctor
+</code></pre>
+<h3 id="오류-분류">오류 분류</h3>
+<p>분류된 실패 경로는 안정적인 오류 코드와 그에 대응하는 프로세스 종료
+코드를 함께 내보냅니다. 스크립트, CI, 에이전트가 사람 대상 메시지를
+파싱하지 않고도 안정적으로 분기할 수 있습니다.</p>
+<p>텍스트 모드에서는 오류 줄 앞에 코드가 붙습니다:</p>
+<pre><code>Error [HWARO_E_USAGE]: missing &lt;path&gt; argument
+</code></pre>
+<p><code>--json</code>(또는 <code>--quiet</code>)에서는 분류된 오류가 stdout에 구조화된
+페이로드로 출력됩니다:</p>
+<pre><code class="language-json hljs"><span class="hljs-punctuation">{</span>
+  <span class="hljs-name">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;error&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-name">&quot;error&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-name">&quot;code&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;HWARO_E_USAGE&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;category&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;usage&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;message&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;missing &lt;path&gt; argument&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;hint&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Usage: hwaro new &lt;path&gt; [options] — run &#39;hwaro new --help&#39; for details.&quot;</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p>분류되지 않은 실패는 기존 <code>Error: &lt;message&gt;</code> 형식과 종료 코드 <code>1</code>을
+그대로 유지하므로, 이 규약은 기존 동작에 순수하게 추가만 됩니다.</p>
+<table>
+<thead>
+<tr>
+<th>코드</th>
+<th>분류</th>
+<th>종료 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HWARO_E_USAGE</code></td>
+<td>usage</td>
+<td>2</td>
+<td>잘못되거나 누락된 플래그, 필수 인자 누락, 알 수 없는 명령</td>
+</tr>
+<tr>
+<td><code>HWARO_E_CONFIG</code></td>
+<td>config</td>
+<td>3</td>
+<td><code>config.toml</code> 누락, 파싱 불가 또는 유효하지 않음</td>
+</tr>
+<tr>
+<td><code>HWARO_E_TEMPLATE</code></td>
+<td>template</td>
+<td>4</td>
+<td>Crinja 템플릿 렌더링 오류</td>
+</tr>
+<tr>
+<td><code>HWARO_E_CONTENT</code></td>
+<td>content</td>
+<td>5</td>
+<td>콘텐츠 파일 파싱 오류, 유효하지 않은 프론트 매터</td>
+</tr>
+<tr>
+<td><code>HWARO_E_IO</code></td>
+<td>io</td>
+<td>6</td>
+<td>파일시스템 접근 오류 (디렉터리 없음, 권한 거부)</td>
+</tr>
+<tr>
+<td><code>HWARO_E_NETWORK</code></td>
+<td>network</td>
+<td>7</td>
+<td>배포 업로드, 원격 스캐폴드 가져오기 실패</td>
+</tr>
+<tr>
+<td><code>HWARO_E_INTERNAL</code></td>
+<td>internal</td>
+<td>70</td>
+<td>복구 불가능한 버그 또는 예기치 않은 상태</td>
+</tr>
+<tr>
+<td><em>(미분류)</em></td>
+<td>—</td>
+<td>1</td>
+<td>기존/일반 실패 경로</td>
+</tr>
+<tr>
+<td><em>(성공)</em></td>
+<td>—</td>
+<td>0</td>
+<td>명령 정상 완료</td>
+</tr>
+</tbody>
+</table>
+<h2 id="명령">명령</h2>
+<h3 id="init">init</h3>
+<p>새 사이트를 만듭니다:</p>
+<pre><code class="language-bash hljs">hwaro init                    <span class="hljs-comment"># 기본값으로 즉시 초기화</span>
+hwaro init my-site            <span class="hljs-comment"># my-site/에 초기화</span>
+hwaro init --wizard           <span class="hljs-comment"># 대화형 위저드(TTY): 스캐폴드, 제목</span>
+hwaro init my-site --wizard   <span class="hljs-comment"># 위저드; 디렉터리 프롬프트 생략 (경로는 인자 사용)</span>
+hwaro init my-site --scaffold blog
+hwaro init my-site --scaffold docs
+hwaro init my-site --scaffold book
+</code></pre>
+<p><strong>대화형 모드:</strong></p>
+<p>대화형 터미널에서 <code>--wizard</code>를 주면 안내 흐름이 열립니다. 디렉터리,
+스캐폴드, 사이트 제목을 차례로 묻고, 요약을 보여 준 뒤 확인을 받고
+나서야 파일을 씁니다. 경로 인자를 함께 주면(<code>hwaro init my-site --wizard</code>)
+위저드는 디렉터리 프롬프트를 건너뛰고 그 경로를 그대로 사용합니다.</p>
+<p><code>--wizard</code> 없이 실행하면 <code>hwaro init</code>은 기본값으로 즉시 초기화합니다 —
+스크립트와 CI가 기존에 의존하던 동작 그대로입니다.</p>
+<p>모든 스캐폴드는 읽는 사람의 OS 색상 모드를 자동으로 따릅니다(공유 토큰
+시스템이 CSS <code>light-dark()</code> 쌍을 사용). 스타일이 있는 스캐폴드에는
+auto → light → dark로 순환하며 선택을 <code>localStorage</code>에 기억하는 헤더
+테마 전환 버튼이 들어 있습니다. 한 가지 모드로 고정하려면
+<code>css/style.css</code> 끝에 <code>:root { color-scheme: dark; }</code>(또는 <code>light</code>)를
+추가합니다.</p>
+<p>GitHub 저장소의 원격 스캐폴드도 사용할 수 있습니다:</p>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># GitHub 축약형</span>
+hwaro init my-site --scaffold github:user/repo
+hwaro init my-site --scaffold github:user/repo/docs
+
+<span class="hljs-comment"># 전체 URL</span>
+hwaro init my-site --scaffold https://github.com/user/repo
+hwaro init my-site --scaffold https://github.com/user/repo/tree/main/docs
+</code></pre>
+<p>원격 스캐폴드는 저장소에서 <code>config.toml</code>, <code>templates/</code>, <code>static/</code>,
+콘텐츠 구조를 가져옵니다. 콘텐츠 파일은 프론트 매터(메타데이터)만
+유지하므로 원본 본문 없이도 기대되는 페이지 구조를 확인할 수 있습니다.
+API 요청 제한을 피하려면 <code>GITHUB_TOKEN</code> 환경 변수를 설정합니다.</p>
+<p><strong>옵션:</strong></p>
+<table>
+<thead>
+<tr>
+<th>플래그</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>--scaffold TYPE</td>
+<td>내장 스캐폴드(<code>simple</code>, <code>bare</code>, <code>blog</code>, <code>docs</code>, <code>book</code>) 또는 원격 소스(<code>github:user/repo[/path]</code>, URL)</td>
+</tr>
+<tr>
+<td>--wizard</td>
+<td>대화형 위저드 실행 (TTY 전용)</td>
+</tr>
+<tr>
+<td>--agents MODE</td>
+<td>AGENTS.md 콘텐츠 모드: <code>remote</code>(가벼움, 기본값) 또는 <code>local</code>(전체 레퍼런스 내장)</td>
+</tr>
+<tr>
+<td>-f, --force</td>
+<td>디렉터리가 비어 있지 않아도 강제로 생성</td>
+</tr>
+<tr>
+<td>--skip-agents-md</td>
+<td>AGENTS.md 파일 생성 생략</td>
+</tr>
+<tr>
+<td>--skip-sample-content</td>
+<td>샘플 콘텐츠 파일 생성 생략</td>
+</tr>
+<tr>
+<td>--skip-taxonomies</td>
+<td>택소노미 설정과 템플릿 생략</td>
+</tr>
+<tr>
+<td>--include-multilingual LANGS</td>
+<td>다국어 지원 활성화 (예: <code>en,ko,ja</code>)</td>
+</tr>
+<tr>
+<td>--minimal-config</td>
+<td>주석과 선택 섹션 없는 최소 <code>config.toml</code> 생성</td>
+</tr>
+<tr>
+<td>--list-scaffolds</td>
+<td>사용 가능한 내장 스캐폴드 목록 출력 후 종료</td>
+</tr>
+<tr>
+<td>--json</td>
+<td>기계가 읽을 수 있는 JSON 출력 (--list-scaffolds와 함께)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="new">new</h3>
+<p>새 콘텐츠 파일을 만듭니다:</p>
+<pre><code class="language-bash hljs">hwaro new                                     <span class="hljs-comment"># 대화형 위저드(TTY): 모든 항목을 프롬프트로 입력</span>
+hwaro new content/about.md
+hwaro new content/blog/my-post.md
+hwaro new posts/my-post.md -a posts
+hwaro new my-post.md --section blog --draft --tags <span class="hljs-string">&quot;go,web&quot;</span> --date 2026-03-22
+</code></pre>
+<p>프론트 매터 템플릿이 채워진 마크다운 파일을 만듭니다. 커스터마이즈
+가능한 템플릿인 <strong>아키타입</strong>을 지원합니다.</p>
+<p><strong>대화형 모드:</strong></p>
+<p>대화형 터미널에서 <code>&lt;path&gt;</code> 없이 <code>hwaro new</code>를 실행하면 안내 위저드가 열립니다.
+제목, 설명, (제목과 섹션에서 만들어 낸) <strong>추천 경로</strong>, 태그, 날짜, 초안 여부,
+아키타입을 차례로 묻고, 요약을 보여 준 뒤 확인을 받고 나서 파일을 씁니다.
+이미 넘긴 플래그는 해당 프롬프트를 미리 채우므로 <code>hwaro new -t &quot;My Post&quot;</code>는
+나머지만 묻습니다. 마지막 확인에서 <code>Ctrl-D</code>를 누르거나 <code>n</code>으로 답하면 아무것도
+만들지 않고 취소합니다.</p>
+<p>위저드는 비대화형 컨텍스트 — 파이프, CI, 에이전트, <code>--json</code>, <code>--quiet</code> — 에서는
+절대 실행되지 않고 대신 분류된 <code>HWARO_E_USAGE</code> 오류를 출력하므로, 스크립트
+호출은 예측 가능하게 유지됩니다. <code>&lt;path&gt;</code>(그리고 필요한 플래그)를 주면
+프롬프트를 완전히 건너뜁니다.</p>
+<p><strong>옵션:</strong></p>
+<table>
+<thead>
+<tr>
+<th>플래그</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-t, --title TITLE</td>
+<td>콘텐츠 제목</td>
+</tr>
+<tr>
+<td>--date DATE</td>
+<td>콘텐츠 날짜 (기본값: 현재, 예: <code>2026-03-22</code>)</td>
+</tr>
+<tr>
+<td>--draft</td>
+<td>초안으로 표시</td>
+</tr>
+<tr>
+<td>--tags TAGS</td>
+<td>쉼표로 구분한 태그</td>
+</tr>
+<tr>
+<td>-s, --section NAME</td>
+<td>섹션 디렉터리 (예: <code>blog</code>, <code>docs</code>)</td>
+</tr>
+<tr>
+<td>-a, --archetype NAME</td>
+<td>사용할 아키타입</td>
+</tr>
+<tr>
+<td>--bundle</td>
+<td>단일 파일 대신 리프 번들 디렉터리(<code>foo/index.md</code>) 생성</td>
+</tr>
+<tr>
+<td>--no-bundle</td>
+<td>단일 파일(<code>foo.md</code>) 강제; <code>[content.new].bundle = true</code>보다 우선</td>
+</tr>
+<tr>
+<td>--list-archetypes</td>
+<td>현재 프로젝트의 아키타입 목록 출력 후 종료</td>
+</tr>
+<tr>
+<td>--json</td>
+<td>기계가 읽을 수 있는 JSON 출력 (아키타입 목록과 분류된 오류)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>아키타입:</strong></p>
+<p>아키타입은 새 콘텐츠의 기본 프론트 매터를 정의하는 <code>archetypes/</code> 디렉터리의 템플릿 파일입니다:</p>
+<ul>
+<li><code>archetypes/default.md</code> - 모든 콘텐츠의 기본 템플릿</li>
+<li><code>archetypes/posts.md</code> - <code>hwaro new posts/...</code>에 사용</li>
+<li><code>archetypes/tools/develop.md</code> - <code>hwaro new tools/develop/...</code>에 사용</li>
+</ul>
+<p>아키타입 파일은 플레이스홀더를 지원합니다: <code>{{ title }}</code>, <code>{{ date }}</code>, <code>{{ draft }}</code>, <code>{{ tags }}</code>, <code>{{ description }}</code></p>
+<p>아키타입 예시 (<code>archetypes/posts.md</code>):</p>
+<pre><code>---
+title: &quot;{{ title }}&quot;
+date: {{ date }}
+draft: false
+tags: []
+---
+
+# {{ title }}
+</code></pre>
+<p>아키타입 매칭 우선순위:</p>
+<ol>
+<li>명시적 <code>-a</code> 플래그 (예: <code>-a posts</code>는 <code>archetypes/posts.md</code> 사용)</li>
+<li>경로 기반 매칭 (예: <code>posts/hello.md</code>는 <code>archetypes/posts.md</code> 확인)</li>
+<li>중첩 경로는 상위 아키타입을 시도 (예: <code>tools/dev/x.md</code>는 <code>tools/dev.md</code>, 그다음 <code>tools.md</code>)</li>
+<li><code>archetypes/default.md</code>로 대체</li>
+<li>아키타입이 없으면 내장 템플릿 사용</li>
+</ol>
+<h3 id="build">build</h3>
+<p>사이트를 <code>public/</code>으로 빌드합니다:</p>
+<pre><code class="language-bash hljs">hwaro build
+hwaro build --drafts
+hwaro build --minify
+hwaro build -i /path/to/my-site
+hwaro build -i /path/to/my-site -o ./dist
+</code></pre>
+<p><strong>옵션:</strong></p>
+<table>
+<thead>
+<tr>
+<th>플래그</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-i, --input DIR</td>
+<td>빌드할 프로젝트 디렉터리 (기본값: 현재 디렉터리)</td>
+</tr>
+<tr>
+<td>-o, --output DIR</td>
+<td>출력 디렉터리 (기본값: public)</td>
+</tr>
+<tr>
+<td>--base-url URL</td>
+<td><code>config.toml</code>의 <code>base_url</code>을 일시적으로 오버라이드</td>
+</tr>
+<tr>
+<td>-e, --env ENV</td>
+<td>환경 이름 (<code>config.&lt;env&gt;.toml</code> 오버라이드 로드)</td>
+</tr>
+<tr>
+<td>-d, --drafts</td>
+<td>초안 콘텐츠 포함</td>
+</tr>
+<tr>
+<td>--include-expired</td>
+<td>만료된 콘텐츠 포함</td>
+</tr>
+<tr>
+<td>--include-future</td>
+<td>미래 날짜 콘텐츠 포함</td>
+</tr>
+<tr>
+<td>--minify</td>
+<td>출력 파일 압축(minify) (아래 참고)</td>
+</tr>
+<tr>
+<td>--no-parallel</td>
+<td>병렬 처리 끄기</td>
+</tr>
+<tr>
+<td>--jobs N</td>
+<td>동시 렌더 워커 수 (기본값: 자동). 템플릿이 많은 사이트는 <code>1</code>-<code>2</code> 시도 (아래 참고)</td>
+</tr>
+<tr>
+<td>--cache</td>
+<td>증분 빌드 캐시 사용 (아래 참고)</td>
+</tr>
+<tr>
+<td>--full</td>
+<td>캐시를 비우고 전체 재빌드 강제</td>
+</tr>
+<tr>
+<td>--skip-highlighting</td>
+<td>구문 강조 끄기</td>
+</tr>
+<tr>
+<td>--skip-og-image</td>
+<td>자동 OG 이미지 생성 생략</td>
+</tr>
+<tr>
+<td>--skip-image-processing</td>
+<td>이미지 리사이즈와 LQIP 생성 생략</td>
+</tr>
+<tr>
+<td>--skip-cache-busting</td>
+<td>CSS/JS 리소스의 캐시 버스팅 쿼리 파라미터 끄기</td>
+</tr>
+<tr>
+<td>--stream</td>
+<td>메모리 사용을 줄이는 스트리밍 빌드 사용</td>
+</tr>
+<tr>
+<td>--memory-limit SIZE</td>
+<td>스트리밍 빌드 메모리 제한 (예: <code>2G</code>, <code>512M</code>)</td>
+</tr>
+<tr>
+<td>-v, --verbose</td>
+<td>상세 출력</td>
+</tr>
+<tr>
+<td>--profile</td>
+<td>단계별·템플릿별 빌드 시간 출력</td>
+</tr>
+<tr>
+<td>--debug</td>
+<td>빌드 후 디버그 정보 출력</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>--stream</code> / <code>--memory-limit</code> (스트리밍 빌드):</strong></p>
+<p>페이지가 수천 개인 사이트에서는 렌더링된 HTML을 전부 메모리에 올리면 메모리 사용량이 커질 수 있습니다. 스트리밍 빌드는 Render 단계에서 페이지를 배치 단위로 처리하고, 각 배치를 디스크에 쓴 뒤 렌더링된 HTML을 해제합니다.</p>
+<ul>
+<li><code>--stream</code>은 기본 배치 크기 500페이지로 스트리밍을 켭니다.</li>
+<li><code>--memory-limit SIZE</code>는 스트리밍을 켜고 주어진 제한에 맞춰 배치 크기를 자동 계산합니다(휴리스틱: 페이지당 약 50KB). <code>G</code>, <code>M</code>, <code>K</code> 접미사를 받습니다(예: <code>2G</code>, <code>512M</code>, <code>256K</code>).</li>
+<li>대체 수단으로 <code>HWARO_MEMORYLIMIT</code> 환경 변수도 설정할 수 있습니다. CLI 플래그가 환경 변수보다 우선합니다.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th><code>--stream</code></th>
+<th><code>--memory-limit</code></th>
+<th><code>HWARO_MEMORYLIMIT</code></th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>일반 빌드</td>
+</tr>
+<tr>
+<td>yes</td>
+<td>-</td>
+<td>-</td>
+<td>스트리밍, 배치=500</td>
+</tr>
+<tr>
+<td>-</td>
+<td>2G</td>
+<td>-</td>
+<td>스트리밍, 배치≈20000</td>
+</tr>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>1G</td>
+<td>스트리밍, 배치≈10000</td>
+</tr>
+<tr>
+<td>yes</td>
+<td>512M</td>
+<td>-</td>
+<td>스트리밍, 배치≈5000</td>
+</tr>
+<tr>
+<td>-</td>
+<td>2G</td>
+<td>1G</td>
+<td>CLI 우선 (2G)</td>
+</tr>
+</tbody>
+</table>
+<p>빌드 결과물은 동일합니다 — 스트리밍은 빌드 중 메모리 사용량에만 영향을 줍니다.</p>
+<p><strong><code>--minify</code>:</strong></p>
+<p>이 플래그는 생성된 파일을 줄이되 압축 전 출력과 시각적으로 동일하게 유지합니다:</p>
+<ul>
+<li><strong>HTML</strong>: 주석을 제거하고(조건부 주석, SSI 지시문, <code>&lt;!-- more --&gt;</code>는 보존), 줄 끝 공백을 지우고, 태그 내부 공백을 접고(속성 사이 연속 공백은 한 칸으로, 따옴표로 감싼 속성 값은 그대로), 태그 사이 공백은 이웃 요소 분류에 따라 접습니다. 어느 한쪽 이웃이라도 블록 레벨 요소면 공백을 완전히 제거합니다(블록 형제의 시작·끝·사이 공백은 어차피 브라우저가 접습니다). 양쪽 이웃이 <em>모두</em> 인라인일 때만 한 칸을 남겨 <code>&lt;a&gt;x&lt;/a&gt; &lt;a&gt;y&lt;/a&gt;</code>처럼 눈에 보이는 간격을 보존합니다.</li>
+<li><strong>JSON</strong>: 공백과 줄바꿈을 제거해 압축된 출력을 만듭니다.</li>
+<li><strong>XML</strong>: 태그 사이 공백을 제거해 파일 크기를 줄입니다.</li>
+</ul>
+<p>공백에 민감한 요소 — <code>&lt;pre&gt;</code>, <code>&lt;code&gt;</code>, <code>&lt;textarea&gt;</code>, <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code>, <code>&lt;svg&gt;</code>, <code>&lt;math&gt;</code>, <code>&lt;noscript&gt;</code> — 는 공백 처리 전에 추출했다가 그대로 복원하므로 내용을 절대 건드리지 않습니다.</p>
+<p>더 공격적인 축소(속성 따옴표 처리, 엔티티 축약 등)가 필요하면 <code>html-minifier-terser</code>나 <code>minify-html</code> 같은 전용 도구로 <code>public/</code>을 후처리합니다.</p>
+<p><strong><code>--cache</code> (증분 빌드):</strong></p>
+<p>켜면 Hwaro가 파일 수정 시각과 콘텐츠 체크섬을 프로젝트 루트의 <code>.hwaro_cache.json</code> 파일에 기록합니다. 이후 빌드에서는 지난 빌드 이후 바뀐 파일만 다시 렌더링합니다. 캐시는 템플릿과 설정 체크섬도 추적합니다 — 템플릿이나 <code>config.toml</code>이 바뀌면 모든 항목이 자동으로 무효화되어 전체 페이지가 재빌드됩니다.</p>
+<p><code>--full</code>을 <code>--cache</code>와 함께 쓰면 깨끗하게 재빌드하면서도 다음 실행을 위한 캐시는 저장합니다:</p>
+<pre><code class="language-bash hljs">hwaro build --cache --full
+</code></pre>
+<p>자세한 내용은 <a href="/ko/features/incremental-build/">증분 빌드</a>를 참고합니다.</p>
+<p><strong><code>--jobs</code> (렌더 동시성):</strong></p>
+<p>기본적으로 Hwaro는 CPU 기반으로 자동 산정한 수의 동시 워커로 페이지를 렌더링합니다. <code>--jobs N</code>은 그 수의 상한을 정합니다. 생성 결과물은 절대 바뀌지 않고, 한 번에 렌더링하는 페이지 수만 달라집니다.</p>
+<p>값을 낮추면 <strong>템플릿/Crinja 비중이 큰</strong> 사이트의 빌드가 빨라질 수 있습니다. 이런 페이지는 작은 객체를 많이 할당해서, 워커가 약 2개를 넘어가면 코어를 더 쓰는 이득보다 가비지 컬렉터의 할당 락 경합이 더 커집니다. <strong>마크다운 비중이 큰</strong> 사이트(본문이 큰 페이지)는 계속 확장되므로 기본값은 자동으로 둡니다.</p>
+<pre><code class="language-bash hljs">hwaro build --jobs <span class="hljs-number">2</span>   <span class="hljs-comment"># 템플릿/숏코드가 많은 빌드라면 시도해 볼 것</span>
+</code></pre>
+<p>설정하지 않으면 자동 기본값을 사용합니다. <code>--no-parallel</code>과 함께 쓰면 <code>--jobs</code>는 효과가 없습니다.</p>
+<p><strong><code>-i, --input</code>:</strong></p>
+<p>지정하면 Hwaro가 빌드 전에 작업 디렉터리를 해당 경로로 바꿉니다. 먼저 <code>cd</code>하지 않고도 다른 디렉터리에 있는 사이트를 빌드할 수 있습니다.</p>
+<ul>
+<li>모든 사이트 소스(<code>config.toml</code>, <code>content/</code>, <code>templates/</code>, <code>static/</code>)를 입력 디렉터리에서 읽습니다.</li>
+<li><strong><code>-o</code> 없이:</strong> 기본 출력 디렉터리 <code>public/</code>은 입력 디렉터리 안에 만들어집니다(즉, 그 사이트 자신의 <code>public/</code> 폴더). 이것이 자연스러운 동작입니다 — <code>hwaro build -i ../my-site</code>는 <code>../my-site/public/</code>을 만듭니다.</li>
+<li><strong><code>-o</code>와 함께:</strong> 출력 경로는 (입력 디렉터리가 아니라) <strong>현재 디렉터리</strong> 기준으로 해석되므로, <code>hwaro build -i ../my-site -o ./dist</code>는 셸의 CWD에 있는 <code>./dist</code>에 출력합니다.</li>
+<li><code>-i</code>를 생략하면 동작은 그대로입니다 — 현재 디렉터리를 사용합니다.</li>
+</ul>
+<h3 id="serve">serve</h3>
+<p>라이브 리로드(기본 활성화)가 있는 개발 서버를 시작합니다:</p>
+<pre><code class="language-bash hljs">hwaro serve
+hwaro serve --port <span class="hljs-number">8080</span>
+hwaro serve --open
+hwaro serve --access-log
+hwaro serve --no-live-reload
+hwaro serve -i /path/to/my-site
+hwaro serve -i /path/to/my-site -p <span class="hljs-number">8080</span>
+</code></pre>
+<p><strong>옵션:</strong></p>
+<table>
+<thead>
+<tr>
+<th>플래그</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-i, --input DIR</td>
+<td>서빙할 프로젝트 디렉터리 (기본값: 현재 디렉터리)</td>
+</tr>
+<tr>
+<td>-b, --bind HOST</td>
+<td>바인드 주소 (기본값: 127.0.0.1)</td>
+</tr>
+<tr>
+<td>-p, --port PORT</td>
+<td>포트 번호 (기본값: 3000)</td>
+</tr>
+<tr>
+<td>--base-url URL</td>
+<td><code>config.toml</code>의 <code>base_url</code>을 일시적으로 오버라이드</td>
+</tr>
+<tr>
+<td>-e, --env ENV</td>
+<td>환경 이름 (<code>config.&lt;env&gt;.toml</code> 오버라이드 로드)</td>
+</tr>
+<tr>
+<td>--minify</td>
+<td>압축된 출력 서빙</td>
+</tr>
+<tr>
+<td>--jobs N</td>
+<td>동시 렌더 워커 수 (기본값: 자동). 템플릿이 많은 사이트는 <code>1</code>-<code>2</code> 시도</td>
+</tr>
+<tr>
+<td>--open</td>
+<td>시작 후 브라우저 열기</td>
+</tr>
+<tr>
+<td>-d, --drafts</td>
+<td>초안 콘텐츠 포함</td>
+</tr>
+<tr>
+<td>--include-expired</td>
+<td>만료된 콘텐츠 포함</td>
+</tr>
+<tr>
+<td>--include-future</td>
+<td>미래 날짜 콘텐츠 포함</td>
+</tr>
+<tr>
+<td>-v, --verbose</td>
+<td>상세 출력</td>
+</tr>
+<tr>
+<td>--debug</td>
+<td>재빌드마다 디버그 정보 출력</td>
+</tr>
+<tr>
+<td>--access-log</td>
+<td>HTTP 접근 로그 표시 (예: GET 요청)</td>
+</tr>
+<tr>
+<td>--no-error-overlay</td>
+<td>브라우저 내 오류 오버레이 끄기 (기본값: 활성화)</td>
+</tr>
+<tr>
+<td>--live-reload</td>
+<td>파일 변경 시 브라우저 라이브 리로드 켜기 (기본값: 활성화; 하위 호환용으로 유지)</td>
+</tr>
+<tr>
+<td>--no-live-reload</td>
+<td>파일 변경 시 브라우저 라이브 리로드 끄기</td>
+</tr>
+<tr>
+<td>--header &quot;NAME: VALUE&quot;</td>
+<td>커스텀 응답 헤더 추가 (반복 가능). <code>config.toml</code>의 <code>[serve.headers]</code>와 병합 (CLI 우선). <code>hwaro serve</code>에만 적용</td>
+</tr>
+<tr>
+<td>--cache</td>
+<td>빌드 캐시 사용 (변경 없는 파일 생략)</td>
+</tr>
+<tr>
+<td>--stream</td>
+<td>메모리 사용을 줄이는 스트리밍 빌드 사용</td>
+</tr>
+<tr>
+<td>--memory-limit SIZE</td>
+<td>스트리밍 빌드 메모리 제한 (예: <code>2G</code>, <code>512M</code>)</td>
+</tr>
+<tr>
+<td>--fast-start</td>
+<td>홈페이지 + 최신 N개 페이지를 먼저 렌더링하고 나머지는 백그라운드에서 렌더링</td>
+</tr>
+<tr>
+<td>--fast-start-count N</td>
+<td><code>--fast-start</code>로 먼저 렌더링할 최근 페이지 수 (기본값: 20)</td>
+</tr>
+<tr>
+<td>--skip-cache-busting</td>
+<td>CSS/JS 리소스의 캐시 버스팅 쿼리 파라미터 끄기</td>
+</tr>
+<tr>
+<td>--skip-og-image</td>
+<td>자동 OG 이미지 생성 생략</td>
+</tr>
+<tr>
+<td>--skip-image-processing</td>
+<td>이미지 리사이즈와 LQIP 생성 생략</td>
+</tr>
+<tr>
+<td>--profile</td>
+<td>단계별·템플릿별 빌드 시간 출력</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>대규모 사이트의 빠른 개발 서버:</strong> <code>config.toml</code>에 <code>[og.auto_image] lazy_generate = true</code>를 설정하면 <code>hwaro serve</code> 중 일괄 OG 생성을 생략합니다. 이미지는 첫 요청 시 생성됩니다. 전체 설명과 <code>--fast-start</code>를 곁들인 권장 워크플로는 <a href="/ko/features/og-images/">자동 OG 이미지</a> 문서를 참고합니다.</p>
+</blockquote>
+<p>서버는 파일 변경을 감시해 자동으로 재빌드합니다. 무엇이 바뀌었는지에 따라 <strong>스마트 재빌드 전략</strong>을 사용합니다:</p>
+<table>
+<thead>
+<tr>
+<th>변경 유형</th>
+<th>전략</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config.toml</code></td>
+<td>전체 재빌드</td>
+<td>사이트 전체 재빌드</td>
+</tr>
+<tr>
+<td><code>content/</code>만</td>
+<td>증분</td>
+<td>영향받는 콘텐츠 페이지만 재빌드</td>
+</tr>
+<tr>
+<td><code>templates/</code>만</td>
+<td>템플릿 재렌더링</td>
+<td>기존 콘텐츠로 전체 페이지 재렌더링</td>
+</tr>
+<tr>
+<td><code>static/</code>만</td>
+<td>정적 복사</td>
+<td>변경된 정적 파일만 복사</td>
+</tr>
+<tr>
+<td>혼합 / 새 파일 / 삭제된 파일</td>
+<td>전체 재빌드</td>
+<td>사이트 전체 재빌드</td>
+</tr>
+</tbody>
+</table>
+<p><strong>라이브 리로드:</strong></p>
+<p>라이브 리로드는 <strong>기본으로 켜져 있습니다</strong>. 서버가 모든 HTML 응답에 작은 WebSocket 클라이언트 스크립트를 주입하고, 재빌드가 성공할 때마다 연결된 브라우저가 자동으로 페이지를 새로 고칩니다 — 수동 새로 고침이 필요 없습니다. 클라이언트는 재연결에 지수 백오프(1초–30초)를 사용하므로 서버를 재시작해도 연결이 영구히 끊기지 않습니다.</p>
+<p>이 동작을 끄려면 <code>--no-live-reload</code>를 줍니다(프로덕션과 비슷한 전달 방식을 로컬에서 테스트할 때 유용합니다). <code>--live-reload</code> 플래그는 기존 호출과의 하위 호환을 위해 아무 동작 없는 별칭으로 남아 있습니다.</p>
+<p><code>-i</code>를 지정하면 서버는 해당 디렉터리로 <code>cd</code>한 것처럼 동작합니다 — 그 프로젝트 루트를 감시하고 서빙합니다.</p>
+<p><strong>커스텀 응답 헤더 (<code>--header</code> / <code>[serve.headers]</code>):</strong></p>
+<p>프로덕션 리버스 프록시, CDN, 정적 호스팅이 설정하는 헤더(보안 헤더, <code>Cache-Control</code>, 커스텀 CORS 등)를 재현해, 정적 출력을 배포하기 전에 로컬에서 테스트하는 용도입니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>serve<span class="hljs-punctuation">.</span>headers<span class="hljs-punctuation">]</span>
+X-Frame-Options <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;SAMEORIGIN&quot;</span>
+X-Content-Type-Options <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;nosniff&quot;</span>
+Referrer-Policy <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;strict-origin-when-cross-origin&quot;</span>
+<span class="hljs-comment"># Cache-Control = &quot;public, max-age=3600&quot;</span>
+</code></pre>
+<pre><code class="language-bash hljs">hwaro serve --header <span class="hljs-string">&quot;X-Custom: foo&quot;</span> --header <span class="hljs-string">&quot;Cache-Control: no-store&quot;</span>
+</code></pre>
+<ul>
+<li>CLI <code>--header</code> 값이 <code>config.toml</code>의 같은 키보다 우선합니다.</li>
+<li>헤더는 <strong>모든</strong> 개발 서버 응답(HTML, 에셋, 404, 리디렉션, 라이브 리로드가 주입된 페이지)에 붙습니다.</li>
+<li>이 기능은 <code>hwaro serve</code>에만 적용됩니다. <code>public/</code>에 쓰이는 파일은 그대로입니다.</li>
+</ul>
+<h3 id="deploy">deploy</h3>
+<p>생성된 사이트를 설정된 대상에 배포합니다.</p>
+<pre><code class="language-bash hljs">hwaro deploy <span class="hljs-operator">[</span>target ...<span class="hljs-operator">]</span>
+hwaro deploy --dry-run
+</code></pre>
+<p><strong>옵션:</strong></p>
+<table>
+<thead>
+<tr>
+<th>플래그</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-s, --source DIR</td>
+<td>배포할 소스 디렉터리 (기본값: deployment.source_dir 또는 public)</td>
+</tr>
+<tr>
+<td>--dry-run</td>
+<td>실제로 쓰지 않고 계획된 변경만 표시</td>
+</tr>
+<tr>
+<td>--confirm</td>
+<td>배포 전 확인 요청</td>
+</tr>
+<tr>
+<td>--force</td>
+<td>강제 업로드/복사 (파일 비교 무시)</td>
+</tr>
+<tr>
+<td>--max-deletes N</td>
+<td>최대 삭제 수 (기본값: deployment.maxDeletes 또는 256, -1이면 제한 없음)</td>
+</tr>
+<tr>
+<td>--list-targets</td>
+<td>설정된 배포 대상 목록 출력 후 종료</td>
+</tr>
+<tr>
+<td>--json</td>
+<td>기계가 읽을 수 있는 JSON 출력 (--list-targets와 함께)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="doctor">doctor</h3>
+<p>설정, 템플릿, 구조 문제를 진단합니다 (최상위 단축 명령):</p>
+<pre><code class="language-bash hljs">hwaro doctor               <span class="hljs-comment"># 설정, 템플릿, 구조 문제 진단</span>
+hwaro doctor --fix         <span class="hljs-comment"># 설정 값 정규화 (base_url 끝 슬래시, sitemap priority…)</span>
+hwaro doctor --approve     <span class="hljs-comment"># 권장 설정 섹션을 config.toml에 추가</span>
+hwaro doctor --full        <span class="hljs-comment"># 둘 다 (--fix --approve와 동일)</span>
+</code></pre>
+<p><strong>종료 코드.</strong> <code>doctor</code>는 보고된 가장 심각한 문제를 기준으로 분류된
+종료 코드를 반환하므로, CI 파이프라인이 이 값으로 바로 게이트를 걸 수
+있습니다:</p>
+<table>
+<thead>
+<tr>
+<th>결과</th>
+<th>종료 코드</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>문제 없음, 경고만, 또는 info 수준 발견</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>설정 오류 (<code>config.toml</code> 누락/손상)</td>
+<td><code>3</code> (<code>HWARO_E_CONFIG</code>)</td>
+</tr>
+<tr>
+<td>템플릿 오류 (필수 파일 누락, 닫히지 않은 태그)</td>
+<td><code>4</code> (<code>HWARO_E_TEMPLATE</code>)</td>
+</tr>
+<tr>
+<td>콘텐츠 오류 (잘못된 프론트 매터, 해당 검사가 도입되면)</td>
+<td><code>5</code> (<code>HWARO_E_CONTENT</code>)</td>
+</tr>
+<tr>
+<td>그 외 error 수준 문제</td>
+<td><code>1</code></td>
+</tr>
+</tbody>
+</table>
+<p>경고(빈 <code>base_url</code>, 끝 슬래시, 중복 택소노미 이름 등)는 참고용이며
+종료 코드를 바꾸지 않습니다.</p>
+<p>콘텐츠 검증에는 <code>hwaro tool validate</code>를 사용합니다. 자세한 내용은 <a href="/ko/start/tools/doctor/">doctor</a>를 참고합니다.</p>
+<h3 id="tool">tool</h3>
+<p>콘텐츠 관리를 위한 유틸리티 도구:</p>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># 콘텐츠 도구</span>
+hwaro tool list all             <span class="hljs-comment"># 전체 콘텐츠 파일 목록</span>
+hwaro tool list drafts          <span class="hljs-comment"># 초안 파일 목록</span>
+hwaro tool convert to-yaml      <span class="hljs-comment"># 프론트 매터를 YAML로 변환</span>
+hwaro tool convert to-toml      <span class="hljs-comment"># 프론트 매터를 TOML로 변환</span>
+hwaro tool convert to-json      <span class="hljs-comment"># 프론트 매터를 JSON으로 변환</span>
+hwaro tool check-links          <span class="hljs-comment"># 죽은 외부 링크 검사</span>
+hwaro tool stats                <span class="hljs-comment"># 콘텐츠 통계 표시</span>
+hwaro tool validate             <span class="hljs-comment"># 콘텐츠 프론트 매터와 마크업 검증</span>
+hwaro tool unused-assets        <span class="hljs-comment"># 참조되지 않는 정적 파일 찾기</span>
+
+<span class="hljs-comment"># 사이트 도구</span>
+hwaro tool platform netlify       <span class="hljs-comment"># Netlify 설정 생성</span>
+hwaro tool platform vercel        <span class="hljs-comment"># Vercel 설정 생성</span>
+hwaro tool platform cloudflare    <span class="hljs-comment"># Cloudflare Pages 설정 생성</span>
+hwaro tool platform github-pages  <span class="hljs-comment"># GitHub Pages 배포 워크플로 생성</span>
+hwaro tool platform gitlab-ci     <span class="hljs-comment"># GitLab CI 설정 생성</span>
+hwaro tool platform codeberg-pages <span class="hljs-comment"># Codeberg Pages(Forgejo Actions) 워크플로 생성</span>
+hwaro tool doctor                 <span class="hljs-comment"># 설정/템플릿/구조 문제 진단</span>
+hwaro tool import hugo /path      <span class="hljs-comment"># Hugo에서 가져오기</span>
+hwaro tool import jekyll /path    <span class="hljs-comment"># Jekyll에서 가져오기</span>
+hwaro tool <span class="hljs-built_in">export</span> hugo            <span class="hljs-comment"># Hugo 형식으로 내보내기</span>
+hwaro tool <span class="hljs-built_in">export</span> jekyll          <span class="hljs-comment"># Jekyll 형식으로 내보내기</span>
+hwaro tool agents-md --write      <span class="hljs-comment"># AGENTS.md를 파일로 쓰기</span>
+
+<span class="hljs-comment"># JSON 출력</span>
+hwaro tool list all --json
+hwaro tool stats --json
+hwaro tool validate --json
+hwaro tool unused-assets --json
+hwaro tool doctor --json
+hwaro tool check-links --json
+</code></pre>
+<p><strong>서브커맨드:</strong></p>
+<table>
+<thead>
+<tr>
+<th>분류</th>
+<th>서브커맨드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>콘텐츠</td>
+<td><a href="/ko/start/tools/list/">list</a></td>
+<td>상태별 콘텐츠 파일 목록 (all, drafts, published)</td>
+</tr>
+<tr>
+<td>콘텐츠</td>
+<td><a href="/ko/start/tools/convert/">convert</a></td>
+<td>프론트 매터를 TOML, YAML, JSON 형식 간 변환</td>
+</tr>
+<tr>
+<td>콘텐츠</td>
+<td><a href="/ko/start/tools/check-links/">check-links</a></td>
+<td>콘텐츠 파일의 죽은 링크 검사</td>
+</tr>
+<tr>
+<td>콘텐츠</td>
+<td><a href="/ko/start/tools/stats/">stats</a></td>
+<td>콘텐츠 통계 표시</td>
+</tr>
+<tr>
+<td>콘텐츠</td>
+<td><a href="/ko/start/tools/validate/">validate</a></td>
+<td>콘텐츠 프론트 매터와 마크업 검증</td>
+</tr>
+<tr>
+<td>콘텐츠</td>
+<td><a href="/ko/start/tools/unused-assets/">unused-assets</a></td>
+<td>참조되지 않는 정적 파일 찾기</td>
+</tr>
+<tr>
+<td>사이트</td>
+<td><a href="/ko/start/tools/platform/">platform</a></td>
+<td>플랫폼 설정과 CI/CD 워크플로 파일 생성</td>
+</tr>
+<tr>
+<td>사이트</td>
+<td><a href="/ko/start/tools/doctor/">doctor</a></td>
+<td>설정, 템플릿, 구조 문제 진단</td>
+</tr>
+<tr>
+<td>사이트</td>
+<td>import</td>
+<td>WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy에서 콘텐츠 가져오기</td>
+</tr>
+<tr>
+<td>사이트</td>
+<td><a href="/ko/start/tools/export/">export</a></td>
+<td>콘텐츠를 Hugo 또는 Jekyll로 내보내기</td>
+</tr>
+<tr>
+<td>사이트</td>
+<td><a href="/ko/start/tools/agents-md/">agents-md</a></td>
+<td>AGENTS.md 파일 생성 또는 갱신</td>
+</tr>
+</tbody>
+</table>
+<p><strong>공통 옵션:</strong></p>
+<table>
+<thead>
+<tr>
+<th>플래그</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-c, --content DIR</td>
+<td>특정 콘텐츠 디렉터리로 제한</td>
+</tr>
+<tr>
+<td>-j, --json</td>
+<td>결과를 JSON으로 출력</td>
+</tr>
+<tr>
+<td>-h, --help</td>
+<td>도움말 표시</td>
+</tr>
+</tbody>
+</table>
+<p>자세한 사용법은 <a href="/ko/start/tools/">도구와 자동 완성</a>을 참고합니다.</p>
+<h3 id="completion">completion</h3>
+<p>셸 자동 완성 스크립트를 생성합니다:</p>
+<pre><code class="language-bash hljs">hwaro completion bash    <span class="hljs-comment"># Bash 자동 완성 스크립트</span>
+hwaro completion zsh     <span class="hljs-comment"># Zsh 자동 완성 스크립트</span>
+hwaro completion fish    <span class="hljs-comment"># Fish 자동 완성 스크립트</span>
+</code></pre>
+<p><strong>설치:</strong></p>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># Bash (~/.bashrc에 추가)</span>
+<span class="hljs-built_in">eval</span> <span class="hljs-string">&quot;</span><span class="hljs-keyword">$(</span>hwaro completion bash<span class="hljs-keyword">)</span><span class="hljs-string">&quot;</span>
+
+<span class="hljs-comment"># Zsh (~/.zshrc에 추가)</span>
+<span class="hljs-built_in">eval</span> <span class="hljs-string">&quot;</span><span class="hljs-keyword">$(</span>hwaro completion zsh<span class="hljs-keyword">)</span><span class="hljs-string">&quot;</span>
+
+<span class="hljs-comment"># Fish (~/.config/fish/config.fish에 추가)</span>
+hwaro completion fish <span class="hljs-punctuation">|</span> <span class="hljs-built_in">source</span>
+</code></pre>
+<p>자세한 설치 방법은 <a href="/ko/start/tools/">도구와 자동 완성</a>을 참고합니다.</p>
+<h2 id="예시">예시</h2>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># 개발 워크플로</span>
+hwaro serve --drafts --verbose
+
+<span class="hljs-comment"># HTTP 접근 로그를 켠 개발</span>
+hwaro serve --access-log
+
+<span class="hljs-comment"># 라이브 리로드 없는 개발 (프로덕션과 비슷한 서빙)</span>
+hwaro serve --no-live-reload
+
+<span class="hljs-comment"># 프로덕션 빌드</span>
+hwaro build
+
+<span class="hljs-comment"># 커스텀 출력 디렉터리</span>
+hwaro build -o dist
+
+<span class="hljs-comment"># 특정 포트에서 미리 보기</span>
+hwaro serve -p <span class="hljs-number">8000</span> --open
+
+<span class="hljs-comment"># 다른 디렉터리의 사이트 빌드</span>
+hwaro build -i ~/projects/my-blog
+
+<span class="hljs-comment"># 다른 위치의 프로젝트를 빌드해 현재 디렉터리에 출력</span>
+hwaro build -i ~/projects/my-blog -o ./output
+
+<span class="hljs-comment"># 증분 빌드 (변경 없는 파일 생략)</span>
+hwaro build --cache
+
+<span class="hljs-comment"># 전체 재빌드 강제 + 캐시 재생성</span>
+hwaro build --cache --full
+
+<span class="hljs-comment"># 대규모 사이트용 스트리밍 빌드</span>
+hwaro build --stream
+hwaro build --memory-limit 512M
+
+<span class="hljs-comment"># 환경 변수로 스트리밍 빌드</span>
+<span class="hljs-variable">HWARO_MEMORYLIMIT</span><span class="hljs-operator">=</span>1G hwaro build
+
+<span class="hljs-comment"># 다른 디렉터리의 사이트 서빙</span>
+hwaro serve -i ~/projects/my-blog --open
+</code></pre>
+<h2 id="전역-옵션">전역 옵션</h2>
+<table>
+<thead>
+<tr>
+<th>플래그</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-h, --help</td>
+<td>도움말 표시</td>
+</tr>
+<tr>
+<td>-v, --verbose</td>
+<td>상세 출력</td>
+</tr>
+</tbody>
+</table>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/start/config/">설정</a> — CLI 플래그가 오버라이드하는 설정 옵션</li>
+<li><a href="/ko/features/build-hooks/">빌드 훅</a> — 빌드 전/후 명령</li>
+<li><a href="/ko/start/tools/">도구와 자동 완성</a> — 유틸리티 서브커맨드</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/start/first-site/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">First Site</span>
+    <span class="pn-desc">Create your first Hwaro site in 5 minutes</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/start/cli/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">CLI</span>
+    <span class="pn-desc">Commands for creating, building, and serving your site</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#전역-플래그">전역 플래그</a><ul><li><a href="#오류-분류">오류 분류</a></li></ul></li><li><a href="#명령">명령</a><ul><li><a href="#init">init</a></li><li><a href="#new">new</a></li><li><a href="#build">build</a></li><li><a href="#serve">serve</a></li><li><a href="#deploy">deploy</a></li><li><a href="#doctor">doctor</a></li><li><a href="#tool">tool</a></li><li><a href="#completion">completion</a></li></ul></li><li><a href="#예시">예시</a></li><li><a href="#전역-옵션">전역 옵션</a></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=82df685b"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=82df685b"></script>
+</body>
+</html>

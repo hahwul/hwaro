@@ -1,0 +1,1389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Hwaro (한국어)</title>
+    <link>https://hwaro.hahwul.com/ko/</link>
+    <description>Fast and lightweight static site generator built with Crystal</description>
+    <language>ko</language>
+    <atom:link href="https://hwaro.hahwul.com/ko/rss.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Cloudflare Pages</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/</guid>
+      <description>Hwaro 사이트를 Cloudflare Pages에 배포</description>
+      <content:encoded><![CDATA[<p>Cloudflare Pages에 Hwaro 사이트를 배포해 전 세계에 빠르게 서비스합니다.</p>
+<h2 id="빠른-시작">빠른 시작</h2>
+<h3 id="설정-파일-생성">설정 파일 생성</h3>
+<pre><code class="language-bash hljs">hwaro tool platform cloudflare
+</code></pre>
+<p>프로젝트 설정과 사이트 버킷 구성이 담긴 <code>wrangler.toml</code>이 생성됩니다.</p>
+<h3 id="대시보드로-배포">대시보드로 배포</h3>
+<ol>
+<li><a href="https://dash.cloudflare.com">Cloudflare Dashboard</a> &gt; <strong>Workers &amp; Pages</strong>로 이동</li>
+<li><strong>Create application</strong> &gt; <strong>Pages</strong> &gt; <strong>Connect to Git</strong> 클릭</li>
+<li>저장소 선택</li>
+<li>빌드 설정 입력:
+<ul>
+<li><strong>Build command</strong>: <code>hwaro build</code></li>
+<li><strong>Build output directory</strong>: <code>public</code></li>
+</ul>
+</li>
+<li><strong>Save and Deploy</strong> 클릭</li>
+</ol>
+<h3 id="wrangler-cli로-배포">Wrangler CLI로 배포</h3>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># Wrangler 설치</span>
+npm install -g wrangler
+
+<span class="hljs-comment"># 사이트 빌드</span>
+hwaro build
+
+<span class="hljs-comment"># 배포</span>
+wrangler pages deploy public --project-name my-site
+</code></pre>
+<h2 id="수동-설정">수동 설정</h2>
+<p>직접 설정하려면 Cloudflare Pages 대시보드에서 다음 값을 지정합니다:</p>
+<table>
+<thead>
+<tr>
+<th>설정</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Build command</td>
+<td><code>hwaro build</code></td>
+</tr>
+<tr>
+<td>Build output directory</td>
+<td><code>public</code></td>
+</tr>
+</tbody>
+</table>
+<p>또는 <code>wrangler.toml</code>을 작성합니다:</p>
+<pre><code class="language-toml hljs">name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;my-site&quot;</span>
+compatibility_date <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;2024-01-01&quot;</span> <span class="hljs-comment"># 배포 시점의 날짜 사용</span>
+
+<span class="hljs-punctuation">[</span>site<span class="hljs-punctuation">]</span>
+  bucket <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;./public&quot;</span>
+</code></pre>
+<h2 id="리다이렉트">리다이렉트</h2>
+<p>Cloudflare Pages는 출력 디렉터리의 <code>_redirects</code> 파일을 사용합니다. 페이지 별칭(alias)에 대한 리다이렉트 규칙을 <code>static/_redirects</code>에 작성합니다:</p>
+<pre><code>/old-url/ /posts/new-post/ 301
+/legacy/post/ /posts/new-post/ 301
+</code></pre>
+<p>별칭은 페이지 프론트 매터에 정의합니다:</p>
+<pre><code class="language-markdown hljs">---
+title: New Post
+aliases:
+  <span class="hljs-keyword">-</span> /old-url/
+<span class="hljs-section">  - /legacy/post/</span>
+<span class="hljs-section">---</span>
+</code></pre>
+<p><code>hwaro tool platform cloudflare</code>로 생성한 <code>wrangler.toml</code>에는 이 리다이렉트 목록이 주석으로 포함되어 있어 <code>static/_redirects</code>로 그대로 복사하면 됩니다.</p>
+<h2 id="커스텀-도메인">커스텀 도메인</h2>
+<ol>
+<li><strong>Workers &amp; Pages</strong> &gt; 프로젝트 &gt; <strong>Custom domains</strong>로 이동</li>
+<li><strong>Set up a custom domain</strong> 클릭</li>
+<li>DNS 설정 안내를 따라 진행</li>
+<li><code>config.toml</code>의 <code>base_url</code> 갱신:</li>
+</ol>
+<pre><code class="language-toml hljs">base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://www.yourdomain.com&quot;</span>
+</code></pre>
+<h2 id="프리뷰-배포">프리뷰 배포</h2>
+<p>Cloudflare Pages는 브랜치에 푸시할 때마다 프리뷰 배포를 자동 생성합니다. 프리뷰 URL은 <code>&lt;branch&gt;.&lt;project&gt;.pages.dev</code> 형식을 따릅니다.</p>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/start/tools/platform/">platform</a> — 플랫폼 설정 생성기 상세 옵션</li>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — tool 명령 전체</li>
+<li>다른 플랫폼: <a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a> | <a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a> | <a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>Codeberg Pages</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/codeberg-pages/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/codeberg-pages/</guid>
+      <description>Hwaro 사이트를 Codeberg Pages에 배포</description>
+      <content:encoded><![CDATA[<p><a href="https://codeberg.page/">Codeberg Pages</a>에 Hwaro 사이트를 배포합니다. Codeberg의 Forgejo 인스턴스가 뒷받침하는 무료 정적 호스팅입니다.</p>
+<h2 id="codeberg-pages-동작-방식">Codeberg Pages 동작 방식</h2>
+<p>Codeberg는 정적 사이트를 두 가지 방식으로 제공합니다:</p>
+<ul>
+<li><strong>사용자/조직 사이트</strong> — 계정 아래 **<code>pages</code>**라는 이름의 저장소. Codeberg는 이 저장소의 <em>기본 브랜치</em>를 <code>https://USERNAME.codeberg.page/</code>에서 제공합니다.</li>
+<li><strong>프로젝트 사이트</strong> — 그 외 모든 저장소. **<code>pages</code>**라는 이름의 브랜치를 <code>https://USERNAME.codeberg.page/REPO/</code>에서 제공합니다.</li>
+</ul>
+<p>이 구분이 중요합니다. 프로젝트 사이트는 <code>pages</code> <em>브랜치</em>에 푸시하고, 사용자 사이트는 <code>pages</code> <em>저장소</em>의 <em>기본 브랜치</em>(보통 <code>main</code>)에 푸시합니다. 아래 워크플로는 프로젝트 사이트를 기본값으로 하되 <code>PAGES_BRANCH</code> 변수를 노출해, 사용자 사이트는 한 줄만 바꾸면 되도록 했습니다.</p>
+<h2 id="사전-준비">사전 준비</h2>
+<ul>
+<li>Codeberg 계정</li>
+<li>Codeberg 저장소 (사용자 사이트는 <code>pages</code>, 프로젝트 사이트는 아무 저장소나)</li>
+<li><code>write:repository</code> 스코프를 가진 Codeberg 액세스 토큰 (Settings → Applications → Generate new token)</li>
+</ul>
+<h2 id="방법-1-forgejo-actions-권장">방법 1: Forgejo Actions (권장)</h2>
+<p>Codeberg는 GitHub Actions와 호환되는 <a href="https://forgejo.org/docs/latest/user/actions/">Forgejo Actions</a>를 지원합니다. Forgejo Actions는 저장소별로 직접 켜야 하는 옵트인 기능이므로, 워크플로를 실행하기 전에 <strong>Settings → Actions</strong>에서 활성화합니다.</p>
+<blockquote>
+<p>Forgejo는 하위 호환을 위해 <code>.gitea/workflows/</code> 경로도 허용하지만, 업스트림이 권장하는 경로이자 Hwaro가 생성하는 경로는 <code>.forgejo/workflows/</code>입니다.</p>
+</blockquote>
+<h3 id="워크플로-생성">워크플로 생성</h3>
+<pre><code class="language-bash hljs">hwaro tool platform codeberg-pages
+</code></pre>
+<p>다음 내용이 <code>.forgejo/workflows/deploy.yml</code>에 생성됩니다:</p>
+<pre><code class="language-yaml hljs"><span class="hljs-title class_">---</span>
+<span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Hwaro Deploy</span>
+
+<span class="hljs-name">on</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">push</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">branches</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-literal">main]</span>
+  <span class="hljs-name">workflow_dispatch</span><span class="hljs-punctuation">:</span>
+
+<span class="hljs-name">jobs</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">deploy</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">runs-on</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">docker</span>
+    <span class="hljs-name">container</span><span class="hljs-punctuation">:</span>
+      <span class="hljs-name">image</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">ghcr.io/hahwul/hwaro:latest</span>
+    <span class="hljs-name">env</span><span class="hljs-punctuation">:</span>
+      <span class="hljs-comment"># 프로젝트 사이트: &quot;pages&quot; (기본값). 사용자/조직 사이트(&quot;pages&quot;라는</span>
+      <span class="hljs-comment"># 이름의 저장소): 기본 브랜치(예: &quot;main&quot;)로 바꿉니다.</span>
+      <span class="hljs-name">PAGES_BRANCH</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">pages</span>
+    <span class="hljs-name">steps</span><span class="hljs-punctuation">:</span>
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Checkout</span>
+        <span class="hljs-name">uses</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">actions/checkout@v4</span>
+
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Build site</span>
+        <span class="hljs-name">run</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">hwaro build</span>
+
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Deploy to Codeberg Pages</span>
+        <span class="hljs-name">env</span><span class="hljs-punctuation">:</span>
+          <span class="hljs-name">CODEBERG_TOKEN</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">${{ secrets.CODEBERG_TOKEN }}</span>
+        <span class="hljs-name">run</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">|</span><span class="hljs-doctag">
+</span><span class="hljs-doctag">          cd public
+</span><span class="hljs-doctag">          git init -b &quot;$PAGES_BRANCH&quot;
+</span><span class="hljs-doctag">          git config user.name  &quot;${{ github.actor }}&quot;
+</span><span class="hljs-doctag">          git config user.email &quot;${{ github.actor }}@noreply.codeberg.org&quot;
+</span><span class="hljs-doctag">          git add -A
+</span><span class="hljs-doctag">          git commit -m &quot;Deploy: $(date -u +&#39;%Y-%m-%dT%H:%M:%SZ&#39;)&quot;
+</span><span class="hljs-doctag">          git push --force \
+</span><span class="hljs-doctag">            &quot;https://${{ github.actor }}:$CODEBERG_TOKEN@codeberg.org/${{ github.repository }}.git&quot; \
+</span><span class="hljs-doctag">            &quot;$PAGES_BRANCH&quot;</span>          
+</code></pre>
+<blockquote>
+<p><strong>브랜치 히스토리는 보존되지 않습니다.</strong> 실행할 때마다 새로 <code>git init</code>한 뒤 강제 푸시하므로, 게시 브랜치는 게시 전용 산출물로 취급합니다. 소스는 <code>main</code>(또는 개발에 쓰는 브랜치)에 두고, <code>pages</code> 브랜치는 직접 수정하지 않습니다.</p>
+</blockquote>
+<h3 id="사용자-사이트와-프로젝트-사이트">사용자 사이트와 프로젝트 사이트</h3>
+<p>기본값 <code>PAGES_BRANCH: pages</code>는 <strong>프로젝트 사이트</strong>(아무 저장소, <code>USERNAME.codeberg.page/REPO/</code>에서 제공)를 대상으로 합니다. 저장소 이름이 정확히 <code>pages</code>인 <strong>사용자/조직 사이트</strong>라면 브랜치를 기본 브랜치로 바꿉니다:</p>
+<pre><code class="language-yaml hljs">    <span class="hljs-name">env</span><span class="hljs-punctuation">:</span>
+      <span class="hljs-name">PAGES_BRANCH</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">main  </span> <span class="hljs-comment"># `pages` 저장소의 기본 브랜치</span>
+</code></pre>
+<h3 id="토큰-시크릿-추가">토큰 시크릿 추가</h3>
+<ol>
+<li>저장소 <strong>Settings → Actions → Secrets</strong>로 이동</li>
+<li><code>CODEBERG_TOKEN</code>이라는 이름으로 새 시크릿 추가</li>
+<li><code>write:repository</code> 스코프를 가진 Codeberg 액세스 토큰 붙여넣기</li>
+</ol>
+<h3 id="base-url-설정">Base URL 설정</h3>
+<p><code>config.toml</code>을 수정합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-comment"># 사용자/조직 사이트 (&quot;pages&quot;라는 이름의 저장소)</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://USERNAME.codeberg.page&quot;</span>
+
+<span class="hljs-comment"># 프로젝트 사이트 (그 외 저장소)</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://USERNAME.codeberg.page/REPO&quot;</span>
+</code></pre>
+<p><code>main</code>에 푸시하면 워크플로가 자동으로 빌드하고 배포합니다.</p>
+<h2 id="방법-2-hwaro-deploy로-배포">방법 2: <code>hwaro deploy</code>로 배포</h2>
+<p>로컬 머신에서 배포하려면 간단한 셸 스크립트를 호출하는 <code>[[deployment.targets]]</code> 항목으로 연결합니다.</p>
+<p><code>scripts/deploy-codeberg.sh</code>를 작성합니다:</p>
+<pre><code class="language-bash hljs"><span class="hljs-meta">#!/bin/bash
+</span><span class="hljs-meta"></span><span class="hljs-built_in">set</span> -e
+
+<span class="hljs-variable">SOURCE_DIR</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${</span><span class="hljs-variable">1</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation">?Usage</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation"> deploy-codeberg.sh &lt;source-dir&gt;</span><span class="hljs-subst">}</span><span class="hljs-string">&quot;</span>
+<span class="hljs-variable">REMOTE_URL</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${</span><span class="hljs-variable">CODEBERG_REMOTE</span><span class="hljs-keyword">:-</span><span class="hljs-keyword">$(</span>git remote get-url origin<span class="hljs-keyword">)</span><span class="hljs-subst">}</span><span class="hljs-string">&quot;</span>
+<span class="hljs-variable">PAGES_BRANCH</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${</span><span class="hljs-variable">PAGES_BRANCH</span><span class="hljs-keyword">:-</span><span class="hljs-variable">pages</span><span class="hljs-subst">}</span><span class="hljs-string">&quot;</span>
+<span class="hljs-variable">TMPDIR</span><span class="hljs-operator">=</span><span class="hljs-keyword">$(</span>mktemp -d<span class="hljs-keyword">)</span>
+
+cp -r <span class="hljs-string">&quot;</span><span class="hljs-variable">$SOURCE_DIR</span><span class="hljs-string">&quot;</span>/. <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+
+<span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+git init -b <span class="hljs-string">&quot;</span><span class="hljs-variable">$PAGES_BRANCH</span><span class="hljs-string">&quot;</span>
+git add -A
+git commit -m <span class="hljs-string">&quot;Deploy to Codeberg Pages&quot;</span>
+git push --force <span class="hljs-string">&quot;</span><span class="hljs-variable">$REMOTE_URL</span><span class="hljs-string">&quot;</span> <span class="hljs-string">&quot;</span><span class="hljs-variable">$PAGES_BRANCH</span><span class="hljs-string">&quot;</span>
+
+rm -rf <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+</code></pre>
+<pre><code class="language-bash hljs">chmod +x scripts/deploy-codeberg.sh
+</code></pre>
+<p><code>config.toml</code>에 타깃을 추가합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;codeberg-pages&quot;</span>
+command <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;scripts/deploy-codeberg.sh {source}&quot;</span>
+</code></pre>
+<p>이제 빌드하고 배포합니다:</p>
+<pre><code class="language-bash hljs">hwaro build
+hwaro deploy codeberg-pages
+
+<span class="hljs-comment"># 배포하지 않고 미리 보기</span>
+hwaro deploy codeberg-pages --dry-run
+
+<span class="hljs-comment"># 사용자 사이트 (`pages` 대신 기본 브랜치에 푸시)</span>
+<span class="hljs-variable">PAGES_BRANCH</span><span class="hljs-operator">=</span>main hwaro deploy codeberg-pages
+</code></pre>
+<p>방법 1과 마찬가지로 스크립트는 새로 초기화한 저장소를 강제 푸시하므로, 브랜치 히스토리는 보존되지 않습니다.</p>
+<h2 id="방법-3-브랜치-수동-배포">방법 3: 브랜치 수동 배포</h2>
+<pre><code class="language-bash hljs">hwaro build
+
+<span class="hljs-built_in">cd</span> public
+git init -b pages
+git add -A
+git commit -m <span class="hljs-string">&quot;Deploy&quot;</span>
+git push --force https://codeberg.org/USERNAME/REPO.git pages
+</code></pre>
+<p>사용자 사이트(<code>pages</code> 저장소)라면 <code>init</code>과 <code>push</code> 명령의 <code>pages</code> 자리에 기본 브랜치 이름(예: <code>main</code>)을 넣습니다.</p>
+<h2 id="커스텀-도메인">커스텀 도메인</h2>
+<p>Codeberg Pages는 <code>.domains</code> 파일과 DNS 레코드로 커스텀 도메인을 지원합니다. 정확한 최신 내용은 <a href="https://docs.codeberg.org/codeberg-pages/using-custom-domain/">공식 Codeberg 문서</a>를 참고합니다.</p>
+<blockquote>
+<p><strong>점(<code>.</code>)이 들어간 저장소 이름은 지원되지 않습니다.</strong> 커스텀 도메인을 붙일 계획이라면 저장소 이름에 <code>-</code>나 <code>_</code>를 사용합니다.</p>
+</blockquote>
+<h3 id="1-domains-파일-추가">1. <code>.domains</code> 파일 추가</h3>
+<p>제공되는 브랜치의 루트에 <code>.domains</code> 파일을 두고 도메인을 한 줄에 하나씩 나열합니다. <strong>첫 줄이 대표(canonical) 도메인</strong>이며, 나머지 도메인은 모두 첫 줄로 301 리다이렉트됩니다. 빈 줄과 <code>#</code> 주석을 쓸 수 있습니다.</p>
+<pre><code>www.example.org
+example.org
+</code></pre>
+<p><code>static/.domains</code>에 두면 Hwaro가 빌드할 때마다 <code>public/</code>으로 복사합니다:</p>
+<pre><code>static/
+└── .domains
+</code></pre>
+<p>Hwaro는 콜드 빌드든 <code>--cache</code>/증분 빌드든 매번 <code>static/</code>의 숨김 dot 경로를 그대로 <code>public/</code>에 복사하므로, <code>static/.domains</code>는 항상 게시 브랜치에 포함됩니다. 자세한 내용은 <a href="https://hwaro.hahwul.com/ko/start/config/">설정</a> 문서의 정적 파일 항목을 참고합니다.</p>
+<h3 id="2-dns-설정">2. DNS 설정</h3>
+<p>아래 세 가지 옵션 중 <strong>하나만</strong> 선택합니다.</p>
+<p><strong>옵션 A — CNAME (권장, 가장 간단).</strong> 도메인을 다음 이름 중 하나로 연결합니다:</p>
+<table>
+<thead>
+<tr>
+<th>사이트 유형</th>
+<th>CNAME 대상</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>개인 사이트</td>
+<td><code>USERNAME.codeberg.page</code></td>
+</tr>
+<tr>
+<td>프로젝트 사이트</td>
+<td><code>REPO.USERNAME.codeberg.page</code></td>
+</tr>
+<tr>
+<td>커스텀 브랜치</td>
+<td><code>BRANCH.REPO.USERNAME.codeberg.page</code></td>
+</tr>
+</tbody>
+</table>
+<p>CNAME은 <em>호스트네임 전체</em>를 위임하므로, 이 옵션에서는 같은 이름으로 이메일(MX)을 운영할 수 없습니다.</p>
+<p><strong>옵션 B — ALIAS + TXT.</strong> DNS 제공자가 <code>ALIAS</code>(또는 <code>ANAME</code>) 레코드를 지원하는 경우:</p>
+<table>
+<thead>
+<tr>
+<th>타입</th>
+<th>이름</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ALIAS</td>
+<td>@</td>
+<td><code>codeberg.page</code></td>
+</tr>
+<tr>
+<td>TXT</td>
+<td>@</td>
+<td><code>REPO.USERNAME.codeberg.page</code> (사용자 사이트는 <code>USERNAME.codeberg.page</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>옵션 C — A + AAAA + TXT.</strong> 제공자가 ALIAS를 지원하지 않거나, 존이 DNSSEC를 사용하는 경우(<code>codeberg.page</code> CNAME과 호환되지 않음) 사용합니다:</p>
+<table>
+<thead>
+<tr>
+<th>타입</th>
+<th>이름</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td>@</td>
+<td><code>217.197.84.141</code></td>
+</tr>
+<tr>
+<td>AAAA</td>
+<td>@</td>
+<td><code>2a0a:4580:103f:c0de::2</code></td>
+</tr>
+<tr>
+<td>TXT</td>
+<td>@</td>
+<td><code>REPO.USERNAME.codeberg.page</code> (사용자 사이트는 <code>USERNAME.codeberg.page</code>)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Codeberg는 이 IP를 가끔 교체하므로, 사용하기 전에 <a href="https://docs.codeberg.org/codeberg-pages/using-custom-domain/">Codeberg Pages 문서</a>에서 최신 IP를 확인합니다.</p>
+</blockquote>
+<p>존에 CAA 레코드가 있다면 Codeberg가 TLS 인증서를 발급할 수 있도록 Let's Encrypt를 허용하는 항목을 추가합니다:</p>
+<pre><code>@   CAA   0 issue &quot;letsencrypt.org&quot;
+</code></pre>
+<h3 id="3-base-url-갱신">3. <code>base_url</code> 갱신</h3>
+<pre><code class="language-toml hljs">base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://www.example.org&quot;</span>
+</code></pre>
+<h2 id="문제-해결">문제 해결</h2>
+<h3 id="워크플로가-실행되지-않을-때">워크플로가 실행되지 않을 때</h3>
+<ul>
+<li>저장소 <strong>Settings → Actions</strong>에서 Forgejo Actions가 활성화되어 있는지 확인합니다</li>
+<li>워크플로 파일이 <code>.forgejo/workflows/deploy.yml</code>(또는 <code>.gitea/workflows/deploy.yml</code>)에 커밋되어 있는지 확인합니다</li>
+</ul>
+<h3 id="푸시가-401403으로-실패할-때">푸시가 401/403으로 실패할 때</h3>
+<ul>
+<li><code>CODEBERG_TOKEN</code> 시크릿 값과 토큰에 <code>write:repository</code> 스코프가 아직 있는지 다시 확인합니다</li>
+<li>토큰은 계정에 귀속되므로, 해당 계정에 대상 저장소 푸시 권한이 있는지 확인합니다</li>
+</ul>
+<h3 id="배포된-사이트가-404일-때">배포된 사이트가 404일 때</h3>
+<ul>
+<li>Codeberg Pages는 첫 푸시 후 게시까지 1~2분 걸릴 수 있습니다</li>
+<li>프로젝트 사이트라면 브랜치 이름이 정확히 <code>pages</code>인지 확인합니다</li>
+<li>사용자 사이트라면 저장소 이름이 정확히 <code>pages</code>이고 <code>PAGES_BRANCH</code>가 기본 브랜치와 일치하는지 확인합니다</li>
+<li><code>base_url</code>이 게시된 URL과 일치하는지(끝 슬래시 없음) 확인합니다</li>
+</ul>
+<h3 id="커스텀-도메인이-https로-연결되지-않을-때">커스텀 도메인이 HTTPS로 연결되지 않을 때</h3>
+<ul>
+<li><code>.domains</code> 파일이 게시 브랜치 루트에 있는지 확인합니다</li>
+<li>CAA 레코드가 있다면 <code>letsencrypt.org</code>가 허용되어 있는지 확인합니다</li>
+<li>DNS 전파 후 인증서 발급까지 몇 분 기다립니다</li>
+</ul>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/deploy/config/">배포 설정</a> — 타깃 설정과 매처</li>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — 배포 명령 옵션 전체</li>
+<li><a href="https://docs.codeberg.org/codeberg-pages/">Codeberg Pages 문서</a> — 업스트림 레퍼런스</li>
+<li>다른 플랫폼: <a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a> | <a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a> | <a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a> | <a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>배포 설정</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/config/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/config/</guid>
+      <description>배포 타깃, 매처, 옵션 설정</description>
+      <content:encoded><![CDATA[<p><code>hwaro deploy</code> 명령이 사용할 배포 타깃을 <code>config.toml</code>에 설정합니다.</p>
+<h2 id="전역-옵션">전역 옵션</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">]</span>
+target <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;prod&quot;</span>
+source_dir <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;public&quot;</span>
+confirm <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+dry_run <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+max_deletes <span class="hljs-punctuation">=</span> <span class="hljs-number">256</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>target</td>
+<td>string</td>
+<td>—</td>
+<td>기본으로 배포할 타깃 이름</td>
+</tr>
+<tr>
+<td>source_dir</td>
+<td>string</td>
+<td>&quot;public&quot;</td>
+<td>빌드된 사이트가 있는 디렉터리</td>
+</tr>
+<tr>
+<td>confirm</td>
+<td>bool</td>
+<td>false</td>
+<td>배포 전 확인 프롬프트 표시</td>
+</tr>
+<tr>
+<td>dry_run</td>
+<td>bool</td>
+<td>false</td>
+<td>실제 변경 없이 배포될 내용만 표시</td>
+</tr>
+<tr>
+<td>force</td>
+<td>bool</td>
+<td>false</td>
+<td>변경 사항이 없어도 강제로 배포</td>
+</tr>
+<tr>
+<td>max_deletes</td>
+<td>int</td>
+<td>256</td>
+<td>파일 삭제 개수의 안전 한도(음수를 지정하면 한도 해제)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="타깃">타깃</h2>
+<p>배포 타깃을 하나 이상 정의합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;prod&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;file:///var/www/mysite&quot;</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;s3&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;s3://my-bucket&quot;</span>
+<span class="hljs-comment"># 자동 생성: aws s3 sync {source}/ s3://my-bucket --delete</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;custom&quot;</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;s3://my-bucket&quot;</span>
+command <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;aws s3 sync {source}/ {url} --delete --exclude &#39;.git/*&#39;&quot;</span>
+<span class="hljs-comment"># 사용자 지정 명령이 자동 생성보다 우선합니다</span>
+</code></pre>
+<p><strong>URL 스킴별 자동 생성 명령:</strong></p>
+<table>
+<thead>
+<tr>
+<th>스킴</th>
+<th>명령</th>
+<th>필요 도구</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file://</code></td>
+<td>내장 디렉터리 동기화</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>s3://</code></td>
+<td><code>aws s3 sync {source}/ {url} --delete</code></td>
+<td>AWS CLI</td>
+</tr>
+<tr>
+<td><code>gs://</code></td>
+<td><code>gsutil -m rsync -r -d {source}/ {url}</code></td>
+<td>Google Cloud SDK</td>
+</tr>
+<tr>
+<td><code>az://</code></td>
+<td><code>az storage blob sync --source {source} --container &lt;container&gt; [--destination &lt;path&gt;]</code></td>
+<td>Azure CLI</td>
+</tr>
+</tbody>
+</table>
+<p><code>az://container/sub/dir</code> 형태의 URL에서는 경로가 컨테이너 내부의 <code>--destination</code> 접두사가 됩니다.</p>
+<p><code>command</code> 필드를 지정하면 항상 자동 생성보다 우선합니다.</p>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>string</td>
+<td>—</td>
+<td>타깃 식별자</td>
+</tr>
+<tr>
+<td>url</td>
+<td>string</td>
+<td>—</td>
+<td>대상 URL (<code>file://</code>, <code>s3://</code>, <code>gs://</code>, <code>az://</code>)</td>
+</tr>
+<tr>
+<td>include</td>
+<td>string</td>
+<td>—</td>
+<td>포함할 파일의 글롭 패턴</td>
+</tr>
+<tr>
+<td>exclude</td>
+<td>string</td>
+<td>—</td>
+<td>제외할 파일의 글롭 패턴</td>
+</tr>
+<tr>
+<td>strip_index_html</td>
+<td>bool</td>
+<td>false</td>
+<td>URL에서 <code>index.html</code> 제거</td>
+</tr>
+<tr>
+<td>command</td>
+<td>string</td>
+<td>—</td>
+<td>사용자 지정 명령(자동 생성보다 우선)</td>
+</tr>
+</tbody>
+</table>
+<p>사용자 지정 명령에서는 플레이스홀더를 사용할 수 있습니다:</p>
+<table>
+<thead>
+<tr>
+<th>플레이스홀더</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{source}</code></td>
+<td>소스 디렉터리(기본값: <code>public</code>)</td>
+</tr>
+<tr>
+<td><code>{url}</code></td>
+<td>타깃 URL</td>
+</tr>
+<tr>
+<td><code>{target}</code></td>
+<td>타깃 이름</td>
+</tr>
+</tbody>
+</table>
+<h2 id="매처">매처</h2>
+<p>패턴 매처로 파일별 배포 설정을 지정합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>matchers<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+pattern <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;^.+\\.html$&quot;</span>
+force <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pattern</td>
+<td>string</td>
+<td>—</td>
+<td>파일 경로에 매칭할 정규식 패턴</td>
+</tr>
+<tr>
+<td>force</td>
+<td>bool</td>
+<td>false</td>
+<td>대상에 동일한 파일이 있어도 매칭된 파일을 항상 복사</td>
+</tr>
+<tr>
+<td>cache_control</td>
+<td>string</td>
+<td>—</td>
+<td>예약됨 — 내장 동기화에서는 적용되지 않음(아래 참고)</td>
+</tr>
+<tr>
+<td>content_type</td>
+<td>string</td>
+<td>—</td>
+<td>예약됨 — 내장 동기화에서는 적용되지 않음(아래 참고)</td>
+</tr>
+<tr>
+<td>gzip</td>
+<td>bool</td>
+<td>false</td>
+<td>예약됨 — 내장 동기화에서는 적용되지 않음(아래 참고)</td>
+</tr>
+</tbody>
+</table>
+<p>내장 동기화는 파일을 복사하고 외부 CLI를 실행할 뿐 오브젝트 스토어 API와 직접 통신하지 않으므로, 실제로 반영되는 옵션은 <code>force</code>뿐입니다. <code>cache_control</code>, <code>content_type</code>, <code>gzip</code>을 설정하면 경고가 출력됩니다. 헤더와 압축은 호스트나 CDN에서 설정합니다.</p>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — 배포 명령줄 옵션 전체</li>
+<li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a> — 간단한 개요</li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>Docker</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/docker/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/docker/</guid>
+      <description>Docker로 Hwaro 사이트 배포</description>
+      <content:encoded><![CDATA[<p>Docker로 Hwaro 사이트를 배포합니다.</p>
+<h2 id="공식-이미지">공식 이미지</h2>
+<p>공식 Docker 이미지는 <code>ghcr.io/hahwul/hwaro</code>에서 받을 수 있습니다.</p>
+<pre><code class="language-bash hljs">docker pull ghcr.io/hahwul/hwaro:latest
+</code></pre>
+<h2 id="멀티-스테이지-빌드">멀티 스테이지 빌드</h2>
+<p>멀티 스테이지 빌드로 사이트를 빌드한 뒤 Nginx 같은 경량 웹 서버로 서비스할 수 있습니다.</p>
+<p>프로젝트 루트에 <code>Dockerfile</code>을 만듭니다:</p>
+<pre><code class="language-dockerfile hljs"><span class="hljs-comment"># 1단계: 사이트 빌드</span>
+<span class="hljs-keyword">FROM</span> <span class="hljs-string">ghcr.io/hahwul/hwaro:latest</span> <span class="hljs-keyword">AS</span> <span class="hljs-string">builder</span>
+
+<span class="hljs-keyword">WORKDIR</span> <span class="hljs-string">/site</span>
+<span class="hljs-keyword">COPY</span> . .
+
+<span class="hljs-comment"># 사이트 빌드</span>
+<span class="hljs-keyword">RUN</span> hwaro build
+
+<span class="hljs-comment"># 2단계: Nginx로 서비스</span>
+<span class="hljs-keyword">FROM</span> <span class="hljs-string">nginx:alpine</span>
+
+<span class="hljs-comment"># 빌더 스테이지에서 빌드 결과 복사</span>
+<span class="hljs-keyword">COPY</span> --from<span class="hljs-operator">=</span>builder /site/public /usr/share/nginx/html
+
+<span class="hljs-comment"># 80 포트 노출</span>
+<span class="hljs-keyword">EXPOSE</span> <span class="hljs-string">80</span>
+
+<span class="hljs-keyword">CMD</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;nginx&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;-g&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;daemon off;&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<h3 id="빌드-및-실행">빌드 및 실행</h3>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># 이미지 빌드</span>
+docker build -t my-hwaro-site .
+
+<span class="hljs-comment"># 컨테이너 실행</span>
+docker run -d -p 8080:80 my-hwaro-site
+</code></pre>
+<p><code>http://localhost:8080</code>에 접속해 사이트를 확인합니다.</p>
+<h2 id="cli-사용">CLI 사용</h2>
+<p>Crystal이나 Hwaro를 로컬에 설치하지 않고도 Docker 이미지로 Hwaro 명령을 바로 실행할 수 있습니다.</p>
+<pre><code class="language-bash hljs"><span class="hljs-comment"># 사이트 빌드</span>
+docker run --rm -v <span class="hljs-keyword">$(</span><span class="hljs-built_in">pwd</span><span class="hljs-keyword">)</span>:/site -w /site ghcr.io/hahwul/hwaro build
+
+<span class="hljs-comment"># 대화형 셸</span>
+docker run --rm -it -v <span class="hljs-keyword">$(</span><span class="hljs-built_in">pwd</span><span class="hljs-keyword">)</span>:/site -w /site ghcr.io/hahwul/hwaro /bin/sh
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/deploy/config/">배포 설정</a> — 타깃 설정과 매처</li>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — 빌드/배포 옵션 전체</li>
+<li>다른 플랫폼: <a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a> | <a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a> | <a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>GitHub Pages</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/github-pages/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/github-pages/</guid>
+      <description>Hwaro 사이트를 GitHub Pages에 배포</description>
+      <content:encoded><![CDATA[<p>GitHub Pages에 Hwaro 사이트를 배포해 무료로 호스팅합니다.</p>
+<h2 id="사전-준비">사전 준비</h2>
+<ul>
+<li>GitHub 저장소</li>
+<li>빌드할 수 있는 Hwaro 사이트</li>
+</ul>
+<h2 id="방법-1-github-actions-권장">방법 1: GitHub Actions (권장)</h2>
+<p>공식 <a href="https://github.com/hahwul/hwaro"><code>hahwul/hwaro</code></a> 액션을 사용하면 Hwaro를 직접 설치하지 않고도 빌드와 배포를 처리할 수 있습니다.</p>
+<h3 id="워크플로-생성">워크플로 생성</h3>
+<p>다음 명령으로 워크플로 파일을 자동 생성합니다:</p>
+<pre><code class="language-bash hljs">hwaro tool platform github-pages
+</code></pre>
+<p>또는 <code>.github/workflows/deploy.yml</code>을 직접 작성합니다:</p>
+<pre><code class="language-yaml hljs"><span class="hljs-title class_">---</span>
+<span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Hwaro CI/CD</span>
+
+<span class="hljs-name">on</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">push</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">branches</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-literal">main]</span>
+  <span class="hljs-name">pull_request</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">branches</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-literal">main]</span>
+  <span class="hljs-name">workflow_dispatch</span><span class="hljs-punctuation">:</span>
+
+<span class="hljs-name">permissions</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">contents</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">write</span>
+
+<span class="hljs-name">jobs</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">build</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">runs-on</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">ubuntu-latest</span>
+    <span class="hljs-name">if</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">github.event_name == &#39;pull_request&#39;</span>
+    <span class="hljs-name">steps</span><span class="hljs-punctuation">:</span>
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Checkout</span>
+        <span class="hljs-name">uses</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">actions/checkout@v6</span>
+
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Build Only</span>
+        <span class="hljs-name">uses</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">hahwul/hwaro@main</span>
+        <span class="hljs-name">with</span><span class="hljs-punctuation">:</span>
+          <span class="hljs-name">build_only</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">true</span>
+
+  <span class="hljs-name">deploy</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">runs-on</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">ubuntu-latest</span>
+    <span class="hljs-name">if</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">github.event_name == &#39;push&#39; &amp;&amp; github.ref == &#39;refs/heads/main&#39;</span>
+    <span class="hljs-name">steps</span><span class="hljs-punctuation">:</span>
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Checkout</span>
+        <span class="hljs-name">uses</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">actions/checkout@v6</span>
+
+      - <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Build and Deploy</span>
+        <span class="hljs-name">uses</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">hahwul/hwaro@main</span>
+        <span class="hljs-name">with</span><span class="hljs-punctuation">:</span>
+          <span class="hljs-name">token</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">${{ secrets.GITHUB_TOKEN }}</span>
+</code></pre>
+<h3 id="액션-입력값">액션 입력값</h3>
+<table>
+<thead>
+<tr>
+<th>입력</th>
+<th>설명</th>
+<th>기본값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>build_dir</code></td>
+<td>Hwaro 사이트가 있는 디렉터리</td>
+<td><code>.</code> (저장소 루트)</td>
+</tr>
+<tr>
+<td><code>build_only</code></td>
+<td>배포 없이 빌드만 수행</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>token</code></td>
+<td>배포에 사용할 GitHub 토큰</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Hwaro 사이트가 하위 디렉터리(예: <code>docs/</code>)에 있다면 <code>build_dir</code>를 지정합니다:</p>
+<pre><code class="language-yaml hljs">- <span class="hljs-name">name</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">Build and Deploy</span>
+  <span class="hljs-name">uses</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">hahwul/hwaro@main</span>
+  <span class="hljs-name">with</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">build_dir</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;docs&quot;</span>
+    <span class="hljs-name">token</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">${{ secrets.GITHUB_TOKEN }}</span>
+</code></pre>
+<h3 id="og-이미지-캐시">OG 이미지 캐시</h3>
+<p>이 액션은 배포 사이에 OG 이미지를 자동으로 캐시합니다. 매 빌드 전에 <code>gh-pages</code> 브랜치에서 이전에 생성한 이미지를 복원하고 <code>--cache</code> 모드를 켭니다. 제목·설명·URL 같은 콘텐츠가 바뀌었거나 OG 설정이 갱신된 페이지만 이미지를 다시 생성하므로, 규모가 큰 사이트에서 빌드가 크게 빨라집니다.</p>
+<h3 id="github-pages-설정">GitHub Pages 설정</h3>
+<ol>
+<li>저장소 <strong>Settings</strong> → <strong>Pages</strong>로 이동</li>
+<li>&quot;Build and deployment&quot;에서 <strong>Deploy from a branch</strong> 선택</li>
+<li><code>gh-pages</code> 브랜치와 <code>/ (root)</code> 폴더 선택</li>
+<li><code>main</code> 브랜치에 푸시하면 배포가 시작됩니다</li>
+</ol>
+<h3 id="base-url-설정">Base URL 설정</h3>
+<p><code>config.toml</code>을 수정합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-comment"># 사용자/조직 사이트 (username.github.io)</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://username.github.io&quot;</span>
+
+<span class="hljs-comment"># 프로젝트 사이트 (username.github.io/repo)</span>
+base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://username.github.io/repo&quot;</span>
+</code></pre>
+<h2 id="방법-2-hwaro-deploy로-배포">방법 2: <code>hwaro deploy</code>로 배포</h2>
+<p>배포 스크립트 <code>scripts/deploy-ghpages.sh</code>를 작성합니다:</p>
+<pre><code class="language-bash hljs"><span class="hljs-meta">#!/bin/bash
+</span><span class="hljs-meta"></span><span class="hljs-built_in">set</span> -e
+
+<span class="hljs-variable">SOURCE_DIR</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${</span><span class="hljs-variable">1</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation">?Usage</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation"> deploy-ghpages.sh &lt;source-dir&gt;</span><span class="hljs-subst">}</span><span class="hljs-string">&quot;</span>
+<span class="hljs-variable">REMOTE_URL</span><span class="hljs-operator">=</span><span class="hljs-keyword">$(</span>git remote get-url origin<span class="hljs-keyword">)</span>
+<span class="hljs-variable">TMPDIR</span><span class="hljs-operator">=</span><span class="hljs-keyword">$(</span>mktemp -d<span class="hljs-keyword">)</span>
+
+cp -r <span class="hljs-string">&quot;</span><span class="hljs-variable">$SOURCE_DIR</span><span class="hljs-string">&quot;</span>/. <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+touch <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">/.nojekyll</span><span class="hljs-string">&quot;</span>
+
+<span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+git init -b gh-pages
+git add -A
+git commit -m <span class="hljs-string">&quot;Deploy to GitHub Pages&quot;</span>
+git push --force <span class="hljs-string">&quot;</span><span class="hljs-variable">$REMOTE_URL</span><span class="hljs-string">&quot;</span> gh-pages
+
+rm -rf <span class="hljs-string">&quot;</span><span class="hljs-variable">$TMPDIR</span><span class="hljs-string">&quot;</span>
+</code></pre>
+<pre><code class="language-bash hljs">chmod +x scripts/deploy-ghpages.sh
+</code></pre>
+<p><code>config.toml</code>에 타깃을 추가합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>deployment<span class="hljs-punctuation">.</span>targets<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;github-pages&quot;</span>
+command <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;scripts/deploy-ghpages.sh {source}&quot;</span>
+</code></pre>
+<p>이제 빌드하고 배포합니다:</p>
+<pre><code class="language-bash hljs">hwaro build
+hwaro deploy github-pages
+
+<span class="hljs-comment"># 배포하지 않고 미리 보기</span>
+hwaro deploy github-pages --dry-run
+</code></pre>
+<h3 id="github-pages-설정-1">GitHub Pages 설정</h3>
+<ol>
+<li>저장소 <strong>Settings</strong> → <strong>Pages</strong>로 이동</li>
+<li>&quot;Build and deployment&quot;에서 <strong>Deploy from a branch</strong> 선택</li>
+<li><code>gh-pages</code> 브랜치와 <code>/ (root)</code> 폴더 선택</li>
+<li><strong>Save</strong> 클릭</li>
+</ol>
+<h2 id="방법-3-브랜치-수동-배포">방법 3: 브랜치 수동 배포</h2>
+<pre><code class="language-bash hljs">hwaro build
+
+<span class="hljs-comment"># orphan 브랜치 생성</span>
+git checkout --orphan gh-pages
+
+<span class="hljs-comment"># 모든 파일 제거</span>
+git rm -rf .
+
+<span class="hljs-comment"># 빌드된 사이트 복사</span>
+cp -r public/* .
+
+<span class="hljs-comment"># 커밋 후 푸시</span>
+git add .
+git commit -m <span class="hljs-string">&quot;Deploy site&quot;</span>
+git push origin gh-pages --force
+
+<span class="hljs-comment"># main 브랜치로 복귀</span>
+git checkout main
+</code></pre>
+<h2 id="커스텀-도메인">커스텀 도메인</h2>
+<h3 id="dns-설정">DNS 설정</h3>
+<p><code>username.github.io</code>를 가리키는 CNAME 레코드를 추가합니다:</p>
+<table>
+<thead>
+<tr>
+<th>타입</th>
+<th>이름</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CNAME</td>
+<td>www</td>
+<td>username.github.io</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.108.153</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.109.153</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.110.153</td>
+</tr>
+<tr>
+<td>A</td>
+<td>@</td>
+<td>185.199.111.153</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cname-파일-추가">CNAME 파일 추가</h3>
+<p><code>static/CNAME</code> 파일을 만듭니다:</p>
+<pre><code>www.yourdomain.com
+</code></pre>
+<h3 id="설정-변경">설정 변경</h3>
+<pre><code class="language-toml hljs">base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://www.yourdomain.com&quot;</span>
+</code></pre>
+<h3 id="https-활성화">HTTPS 활성화</h3>
+<ol>
+<li>저장소 <strong>Settings</strong> → <strong>Pages</strong>로 이동</li>
+<li><strong>Enforce HTTPS</strong> 체크</li>
+</ol>
+<h2 id="문제-해결">문제 해결</h2>
+<h3 id="404-오류">404 오류</h3>
+<ul>
+<li><code>base_url</code>이 GitHub Pages URL과 일치하는지 확인합니다</li>
+<li>CNAME 파일이 <code>static/</code> 디렉터리에 있는지 확인합니다</li>
+<li>배포가 완료될 때까지 몇 분 기다립니다</li>
+</ul>
+<h3 id="에셋이-로드되지-않을-때">에셋이 로드되지 않을 때</h3>
+<ul>
+<li><code>base_url</code> 끝에 슬래시가 없는지 확인합니다</li>
+<li>에셋 경로가 <code>{{ base_url }}</code> 접두사를 사용하는지 확인합니다</li>
+</ul>
+<h3 id="빌드-실패">빌드 실패</h3>
+<ul>
+<li>Actions 로그에서 오류 메시지를 확인합니다</li>
+<li><code>build_dir</code>가 올바른 디렉터리를 가리키는지 확인합니다</li>
+</ul>
+<h2 id="저장소-구조-예시">저장소 구조 예시</h2>
+<pre><code>my-site/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml
+├── content/
+├── templates/
+├── static/
+│   └── CNAME
+├── config.toml
+└── README.md
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/deploy/config/">배포 설정</a> — 타깃 설정과 매처</li>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — 배포 명령 옵션 전체</li>
+<li>다른 플랫폼: <a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a> | <a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a> | <a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a> | <a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>GitLab CI</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/gitlab-ci/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/gitlab-ci/</guid>
+      <description>GitLab CI/CD로 Hwaro 사이트 배포</description>
+      <content:encoded><![CDATA[<p>GitLab CI/CD로 Hwaro 사이트를 배포합니다.</p>
+<h2 id="빠른-시작">빠른 시작</h2>
+<p>설정 파일을 자동 생성합니다:</p>
+<pre><code class="language-bash hljs">hwaro tool platform gitlab-ci
+</code></pre>
+<h2 id="설정">설정</h2>
+<p>또는 저장소에 <code>.gitlab-ci.yml</code>을 직접 추가합니다:</p>
+<pre><code class="language-yaml hljs"><span class="hljs-name">image</span><span class="hljs-punctuation">:</span> <span class="hljs-literal">ghcr.io/hahwul/hwaro:latest</span>
+
+<span class="hljs-name">pages</span><span class="hljs-punctuation">:</span>
+  <span class="hljs-name">script</span><span class="hljs-punctuation">:</span>
+    - <span class="hljs-literal">hwaro build</span>
+  <span class="hljs-name">artifacts</span><span class="hljs-punctuation">:</span>
+    <span class="hljs-name">paths</span><span class="hljs-punctuation">:</span>
+      - <span class="hljs-literal">public</span>
+  <span class="hljs-name">only</span><span class="hljs-punctuation">:</span>
+    - <span class="hljs-literal">main</span>
+</code></pre>
+<p>이 설정은 공식 Hwaro Docker 이미지로 사이트를 빌드하고 <code>public</code> 디렉터리를 GitLab Pages에 배포합니다.</p>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/deploy/config/">배포 설정</a> — 타깃 설정과 매처</li>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — 배포 명령 옵션 전체</li>
+<li>다른 플랫폼: <a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a> | <a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a> | <a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>Netlify</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/netlify/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/netlify/</guid>
+      <description>Hwaro 사이트를 Netlify에 배포</description>
+      <content:encoded><![CDATA[<p>Netlify에 Hwaro 사이트를 배포하면 자동 빌드와 글로벌 CDN을 이용할 수 있습니다.</p>
+<h2 id="빠른-시작">빠른 시작</h2>
+<h3 id="설정-파일-생성">설정 파일 생성</h3>
+<pre><code class="language-bash hljs">hwaro tool platform netlify
+</code></pre>
+<p>빌드 설정, 별칭(alias) 기반 리다이렉트, 캐시 헤더가 담긴 <code>netlify.toml</code>이 생성됩니다.</p>
+<h3 id="git으로-배포">Git으로 배포</h3>
+<ol>
+<li>저장소를 GitHub, GitLab 또는 Bitbucket에 푸시</li>
+<li><a href="https://app.netlify.com">Netlify</a>에서 <strong>Add new site</strong> &gt; <strong>Import an existing project</strong> 클릭</li>
+<li>저장소 연결</li>
+<li>Netlify가 <code>netlify.toml</code> 설정을 자동 감지</li>
+<li><strong>Deploy site</strong> 클릭</li>
+</ol>
+<h2 id="수동-설정">수동 설정</h2>
+<p>생성기 대신 직접 설정하려면 <code>netlify.toml</code>을 작성합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>build<span class="hljs-punctuation">]</span>
+  command <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;hwaro build&quot;</span>
+  publish <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;public&quot;</span>
+
+<span class="hljs-punctuation">[</span>build<span class="hljs-punctuation">.</span>environment<span class="hljs-punctuation">]</span>
+  <span class="hljs-comment"># 필요한 환경 변수를 설정합니다</span>
+</code></pre>
+<h2 id="리다이렉트">리다이렉트</h2>
+<p><code>hwaro tool platform netlify</code>를 사용하면 프론트 매터에 정의한 페이지 별칭이 301 리다이렉트로 자동 포함됩니다:</p>
+<pre><code class="language-markdown hljs">---
+title: New Post
+aliases:
+  <span class="hljs-keyword">-</span> /old-url/
+<span class="hljs-section">  - /legacy/post/</span>
+<span class="hljs-section">---</span>
+</code></pre>
+<p>생성 결과:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>redirects<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+  from <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/old-url/&quot;</span>
+  to <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/posts/new-post/&quot;</span>
+  status <span class="hljs-punctuation">=</span> <span class="hljs-number">301</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>redirects<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+  from <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/legacy/post/&quot;</span>
+  to <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/posts/new-post/&quot;</span>
+  status <span class="hljs-punctuation">=</span> <span class="hljs-number">301</span>
+</code></pre>
+<h2 id="커스텀-도메인">커스텀 도메인</h2>
+<ol>
+<li><strong>Site settings</strong> &gt; <strong>Domain management</strong>로 이동</li>
+<li><strong>Add custom domain</strong> 클릭</li>
+<li>DNS 설정 안내를 따라 진행</li>
+<li><code>config.toml</code>의 <code>base_url</code> 갱신:</li>
+</ol>
+<pre><code class="language-toml hljs">base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://www.yourdomain.com&quot;</span>
+</code></pre>
+<h2 id="배포-프리뷰">배포 프리뷰</h2>
+<p>Netlify는 풀 리퀘스트마다 배포 프리뷰를 자동 생성합니다. 프리뷰 빌드는 임시 URL을 사용하므로, 배포 컨텍스트에서 base URL을 재정의합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>context<span class="hljs-punctuation">.</span>deploy-preview<span class="hljs-punctuation">]</span>
+  command <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;hwaro build --base-url $DEPLOY_PRIME_URL&quot;</span>
+</code></pre>
+<p><code>$DEPLOY_PRIME_URL</code>은 Netlify가 제공하는 환경 변수로, 고유한 프리뷰 URL이 담겨 있습니다(예: <code>https://deploy-preview-42--your-site.netlify.app</code>).</p>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/start/tools/platform/">platform</a> — 플랫폼 설정 생성기 상세 옵션</li>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — tool 명령 전체</li>
+<li>다른 플랫폼: <a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a> | <a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a> | <a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>Vercel</title>
+      <link>https://hwaro.hahwul.com/ko/deploy/vercel/</link>
+      <guid>https://hwaro.hahwul.com/ko/deploy/vercel/</guid>
+      <description>Hwaro 사이트를 Vercel에 배포</description>
+      <content:encoded><![CDATA[<p>Vercel에 Hwaro 사이트를 배포합니다. 별도 설정 없이도 바로 배포됩니다.</p>
+<h2 id="빠른-시작">빠른 시작</h2>
+<h3 id="설정-파일-생성">설정 파일 생성</h3>
+<pre><code class="language-bash hljs">hwaro tool platform vercel
+</code></pre>
+<p>빌드 설정, 별칭(alias) 기반 리다이렉트, 캐시 헤더가 담긴 <code>vercel.json</code>이 생성됩니다.</p>
+<h3 id="git으로-배포">Git으로 배포</h3>
+<ol>
+<li>저장소를 GitHub, GitLab 또는 Bitbucket에 푸시</li>
+<li><a href="https://vercel.com">Vercel</a>에서 <strong>Add New</strong> &gt; <strong>Project</strong> 클릭</li>
+<li>저장소 가져오기</li>
+<li>Vercel이 <code>vercel.json</code> 설정을 자동 감지</li>
+<li><strong>Deploy</strong> 클릭</li>
+</ol>
+<h2 id="수동-설정">수동 설정</h2>
+<p>직접 설정하려면 <code>vercel.json</code>을 작성합니다:</p>
+<pre><code class="language-json hljs"><span class="hljs-punctuation">{</span>
+  <span class="hljs-name">&quot;buildCommand&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;hwaro build&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-name">&quot;outputDirectory&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;public&quot;</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h2 id="리다이렉트">리다이렉트</h2>
+<p><code>hwaro tool platform vercel</code>을 사용하면 프론트 매터에 정의한 페이지 별칭이 301 리다이렉트로 자동 포함됩니다:</p>
+<pre><code class="language-markdown hljs">---
+title: New Post
+aliases:
+<span class="hljs-section">  - /old-url/</span>
+<span class="hljs-section">---</span>
+</code></pre>
+<p>생성 결과:</p>
+<pre><code class="language-json hljs"><span class="hljs-punctuation">{</span>
+  <span class="hljs-name">&quot;redirects&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-name">&quot;source&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/old-url/&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-name">&quot;destination&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/posts/new-post/&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-name">&quot;statusCode&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">301</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h2 id="커스텀-도메인">커스텀 도메인</h2>
+<ol>
+<li><strong>Settings</strong> &gt; <strong>Domains</strong>로 이동</li>
+<li>커스텀 도메인 추가</li>
+<li>DNS 설정 안내를 따라 진행</li>
+<li><code>config.toml</code>의 <code>base_url</code> 갱신:</li>
+</ol>
+<pre><code class="language-toml hljs">base_url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://www.yourdomain.com&quot;</span>
+</code></pre>
+<h2 id="프리뷰-배포">프리뷰 배포</h2>
+<p>Vercel은 프로덕션이 아닌 브랜치에 푸시할 때마다 프리뷰 배포를 자동 생성합니다. 추가 설정은 필요 없습니다.</p>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/start/tools/platform/">platform</a> — 플랫폼 설정 생성기 상세 옵션</li>
+<li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a> — tool 명령 전체</li>
+<li>다른 플랫폼: <a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a> | <a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a> | <a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>AMP</title>
+      <link>https://hwaro.hahwul.com/ko/features/amp/</link>
+      <guid>https://hwaro.hahwul.com/ko/features/amp/</guid>
+      <description>콘텐츠 페이지의 AMP 호환 버전 생성</description>
+      <content:encoded><![CDATA[<p>Hwaro는 일반 페이지와 함께 콘텐츠의 AMP(Accelerated Mobile Pages) 버전을 자동으로 생성할 수 있습니다.</p>
+<h2 id="동작-방식">동작 방식</h2>
+<ol>
+<li>일반 페이지를 먼저 렌더링합니다</li>
+<li>렌더링이 끝나면 Hwaro가 각 페이지의 HTML을 읽어 AMP 호환 버전을 만듭니다</li>
+<li>AMP 페이지는 설정 가능한 경로 접두사(기본값: <code>/amp/</code>) 아래에 기록됩니다</li>
+<li>캐노니컬 페이지의 <code>&lt;head&gt;</code>에 <code>&lt;link rel=&quot;amphtml&quot;&gt;</code> 태그가 주입됩니다</li>
+</ol>
+<h2 id="설정">설정</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>amp<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+path_prefix <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;amp&quot;</span>
+sections <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;posts&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enabled</td>
+<td>bool</td>
+<td>false</td>
+<td>AMP 페이지 생성 활성화</td>
+</tr>
+<tr>
+<td>path_prefix</td>
+<td>string</td>
+<td>&quot;amp&quot;</td>
+<td>AMP 페이지의 URL 접두사</td>
+</tr>
+<tr>
+<td>sections</td>
+<td>array</td>
+<td>[]</td>
+<td>AMP를 생성할 섹션 (비워 두면 전체)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="변환-내용">변환 내용</h2>
+<p>AMP 변환기는 다음 변환을 자동으로 적용합니다:</p>
+<table>
+<thead>
+<tr>
+<th>원본</th>
+<th>AMP 버전</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;html&gt;</code></td>
+<td><code>&lt;html amp&gt;</code></td>
+</tr>
+<tr>
+<td><code>&lt;img&gt;</code></td>
+<td><code>&lt;amp-img layout=&quot;responsive&quot;&gt;</code></td>
+</tr>
+<tr>
+<td><code>&lt;video&gt;</code></td>
+<td><code>&lt;amp-video layout=&quot;responsive&quot;&gt;</code></td>
+</tr>
+<tr>
+<td><code>&lt;iframe&gt;</code></td>
+<td><code>&lt;amp-iframe layout=&quot;responsive&quot;&gt;</code></td>
+</tr>
+<tr>
+<td><code>&lt;script&gt;</code> (인라인)</td>
+<td>제거</td>
+</tr>
+<tr>
+<td><code>style=&quot;...&quot;</code> 속성</td>
+<td>제거</td>
+</tr>
+<tr>
+<td><code>onclick</code> 핸들러</td>
+<td>제거</td>
+</tr>
+</tbody>
+</table>
+<p>추가로 다음이 주입됩니다:</p>
+<ul>
+<li>AMP 보일러플레이트 CSS</li>
+<li>AMP 런타임 스크립트 (<code>cdn.ampproject.org/v0.js</code>)</li>
+<li>원본 페이지를 가리키는 <code>&lt;link rel=&quot;canonical&quot;&gt;</code></li>
+</ul>
+<h2 id="출력-구조">출력 구조</h2>
+<p><code>/posts/hello/</code> 페이지가 있을 때 출력은 다음과 같습니다:</p>
+<pre><code>public/
+  posts/hello/index.html       ← canonical (has &lt;link rel=&quot;amphtml&quot;&gt;)
+  amp/posts/hello/index.html   ← AMP version
+</code></pre>
+<h2 id="섹션-필터링">섹션 필터링</h2>
+<p>기본적으로 AMP 페이지는 모든 섹션에 대해 생성됩니다. <code>sections</code>로 대상을 제한합니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>amp<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+sections <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;posts&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;blog&quot;</span><span class="hljs-punctuation">]</span>   <span class="hljs-comment"># 이 섹션들만 AMP 버전 생성</span>
+</code></pre>
+<h2 id="사용자-지정-경로-접두사">사용자 지정 경로 접두사</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>amp<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+path_prefix <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;mobile&quot;</span>    <span class="hljs-comment"># /amp/posts/hello/ 대신 /mobile/posts/hello/</span>
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a> — 전체 설정 레퍼런스</li>
+<li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a> — 사이트맵, 피드, OpenGraph</li>
+</ul>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>에셋 파이프라인</title>
+      <link>https://hwaro.hahwul.com/ko/features/asset-pipeline/</link>
+      <guid>https://hwaro.hahwul.com/ko/features/asset-pipeline/</guid>
+      <description>내장 CSS/JS 번들링, 압축, 핑거프린트</description>
+      <content:encoded><![CDATA[<p>Hwaro에는 CSS와 JS 파일을 번들링·압축(minify)·핑거프린트해 프로덕션에 바로 쓸 수 있는 출력물을 만드는 에셋 파이프라인이 내장되어 있습니다.</p>
+<h2 id="기능">기능</h2>
+<ul>
+<li><strong>번들링</strong> — 여러 CSS/JS 파일을 하나의 번들로 결합</li>
+<li><strong>압축</strong> — 주석과 공백을 제거해 파일 크기 축소</li>
+<li><strong>핑거프린트</strong> — 캐시 버스팅을 위한 콘텐츠 해시 파일명(예: <code>style.a1b2c3d4.css</code>)</li>
+<li><strong>템플릿 헬퍼</strong> — <code>{{ asset(name=&quot;style.css&quot;) }}</code>가 핑거프린트된 경로로 해석</li>
+</ul>
+<h2 id="설정">설정</h2>
+<p><code>config.toml</code>에 <code>[assets]</code> 섹션을 추가합니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+minify <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+fingerprint <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">.</span>bundles<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;main.css&quot;</span>
+files <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;css/reset.css&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;css/style.css&quot;</span><span class="hljs-punctuation">]</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">.</span>bundles<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;app.js&quot;</span>
+files <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;js/util.js&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;js/app.js&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<p>번들 <code>files</code>에는 <code>.scss</code> 소스도 지정할 수 있습니다. <code>[sass]</code>가 활성화된 동안에는 <a href="https://hwaro.hahwul.com/ko/features/sass/">Sass/SCSS</a> 내장 컴파일러로 컴파일된 뒤 이어 붙고, 다른 CSS와 똑같이 압축·핑거프린트됩니다. 이런 번들은 출력이 올바른 타입으로 제공되도록 <code>.css</code> 확장자로 이름을 짓습니다.</p>
+<table>
+<thead>
+<tr>
+<th>옵션</th>
+<th>타입</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>에셋 파이프라인 활성화</td>
+</tr>
+<tr>
+<td><code>minify</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>CSS/JS 출력 압축</td>
+</tr>
+<tr>
+<td><code>fingerprint</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>파일명에 콘텐츠 해시 추가</td>
+</tr>
+<tr>
+<td><code>source_dir</code></td>
+<td>string</td>
+<td><code>&quot;static&quot;</code></td>
+<td>소스 파일이 있는 디렉터리</td>
+</tr>
+<tr>
+<td><code>output_dir</code></td>
+<td>string</td>
+<td><code>&quot;assets&quot;</code></td>
+<td>빌드 출력 내 출력 하위 디렉터리</td>
+</tr>
+</tbody>
+</table>
+<h3 id="번들-정의">번들 정의</h3>
+<p><code>[[assets.bundles]]</code> 항목 하나가 출력 파일 하나를 정의합니다.</p>
+<table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>string</td>
+<td>출력 파일명(예: <code>&quot;main.css&quot;</code>)</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>array</td>
+<td><code>source_dir</code> 기준 상대 경로의 소스 파일</td>
+</tr>
+</tbody>
+</table>
+<p>파일은 나열한 순서대로 이어 붙입니다.</p>
+<h2 id="템플릿에서-사용">템플릿에서 사용</h2>
+<p>템플릿에서 번들된 에셋을 참조하려면 <code>asset()</code> 함수를 사용합니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;{{ asset(name=&#39;main.css&#39;) }}&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">script</span> <span class="hljs-attr">src</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;{{ asset(name=&#39;app.js&#39;) }}&quot;</span><span class="hljs-punctuation">&gt;</span><span class="hljs-punctuation">&lt;</span><span class="hljs-punctuation">/</span><span class="hljs-name">script</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>핑거프린트가 활성화되어 있으면 해시가 붙은 경로로 해석됩니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/assets/main.a1b2c3d4.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>에셋이 파이프라인 매니페스트에 없으면(예: 번들로 설정하지 않은 경우) <code>base_url</code> 아래의 경로를 그대로 반환합니다.</p>
+<p><code>asset</code>의 별칭으로 <code>asset_url</code>도 쓸 수 있습니다.</p>
+<h2 id="동작-방식">동작 방식</h2>
+<ol>
+<li>Initialize 단계에서 파이프라인이 <code>source_dir</code>의 소스 파일을 읽습니다</li>
+<li>각 번들에 나열된 파일을 순서대로 이어 붙입니다</li>
+<li><code>minify</code>가 활성화되어 있으면 CSS/JS별 압축을 적용합니다</li>
+<li><code>fingerprint</code>가 활성화되어 있으면 확장자 앞에 8자리 SHA-256 해시를 삽입합니다</li>
+<li>출력은 빌드 디렉터리의 <code>{output_dir}/{output_name}</code>에 기록됩니다</li>
+<li>원본 이름과 출력 경로를 매핑한 매니페스트가 템플릿 해석용으로 저장됩니다</li>
+</ol>
+<h3 id="압축">압축</h3>
+<p>내장 압축기는 보수적이고 안전하게 동작합니다.</p>
+<p><strong>CSS:</strong></p>
+<ul>
+<li>주석 제거(<code>/* ... */</code>)</li>
+<li>공백 축소</li>
+<li><code>{</code>, <code>}</code>, <code>:</code>, <code>;</code>, <code>,</code> 주변 공백 제거</li>
+<li><code>}</code> 앞의 불필요한 세미콜론 제거</li>
+</ul>
+<p><strong>JS:</strong></p>
+<ul>
+<li>문자열 밖의 한 줄 주석(<code>// ...</code>) 제거</li>
+<li>여러 줄 주석(<code>/* ... */</code>) 제거</li>
+<li>문자열 리터럴 보존(작은따옴표, 큰따옴표, 템플릿)</li>
+<li>빈 줄 제거</li>
+</ul>
+<p>더 강한 압축이 필요하면 <a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a>에서 <code>esbuild</code>나 <code>terser</code> 같은 외부 도구를 사용합니다.</p>
+<h2 id="예시">예시</h2>
+<h3 id="기본-css-번들">기본 CSS 번들</h3>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">.</span>bundles<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;style.css&quot;</span>
+files <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;css/normalize.css&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;css/base.css&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;css/layout.css&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;{{ asset(name=&#39;style.css&#39;) }}&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<h3 id="여러-번들">여러 번들</h3>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">.</span>bundles<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;vendor.css&quot;</span>
+files <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;css/vendor/normalize.css&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;css/vendor/highlight.css&quot;</span><span class="hljs-punctuation">]</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">.</span>bundles<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;site.css&quot;</span>
+files <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;css/base.css&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;css/components.css&quot;</span><span class="hljs-punctuation">]</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">.</span>bundles<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;app.js&quot;</span>
+files <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;js/search.js&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;js/nav.js&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<h3 id="핑거프린트-없는-개발-설정">핑거프린트 없는 개발 설정</h3>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+minify <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+fingerprint <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>assets<span class="hljs-punctuation">.</span>bundles<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;style.css&quot;</span>
+files <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;css/style.css&quot;</span><span class="hljs-punctuation">]</span>
+</code></pre>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a> — 파이프라인을 거치지 않는 에셋을 위한 쿼리 스트링 기반 캐시 무효화</li>
+<li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a> — 정적 디렉터리의 CSS/JS 자동 로드</li>
+<li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a> — 빌드 전후 외부 도구 실행</li>
+</ul>
+]]></content:encoded>
+    </item>
+  </channel>
+</rss>
