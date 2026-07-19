@@ -119,8 +119,8 @@ module Hwaro
       # Normalizes each entry's `url` in place and flags `external`.
       # Root-relative (internal) URLs get a leading `/` and a trailing `/`
       # unless the last path segment contains a `.` (an extension, e.g.
-      # `/feed.xml`, `/robots.txt`). External URLs (`http://`, `https://`,
-      # `//`) are left untouched — they aren't comparable to `page.url`.
+      # `/feed.xml`, `/robots.txt`). Scheme-bearing and protocol-relative
+      # URLs are left untouched — they aren't comparable to `page.url`.
       private def self.normalize_urls!(entries : Array(Entry))
         entries.each do |entry|
           url = entry.url
@@ -141,8 +141,13 @@ module Hwaro
         end
       end
 
+      # True for absolute scheme URLs (`http:`, `mailto:`, `tel:`, …) and
+      # protocol-relative `//host`. A bare scheme like `mailto:` used to be
+      # treated as an internal path and rewritten to `/mailto:…/`.
+      SCHEME_URL_RE = /\A[a-z][a-z0-9+\-.]*:/i
+
       private def self.external_url?(url : String) : Bool
-        url.starts_with?("http://") || url.starts_with?("https://") || url.starts_with?("//")
+        url.starts_with?("//") || !!url.matches?(SCHEME_URL_RE)
       end
 
       # Assembles a flat entry list into a parent/child tree keyed by

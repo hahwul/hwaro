@@ -184,7 +184,10 @@ module Hwaro::Core::Build::Phases::Transform
       # `_index` — so keep only this language's subtree.
       if section.subsections.size > 0
         same_lang = section.subsections.select { |sub| (sub.language || default_lang) == lang }
-        sorted_subsections = same_lang.sort_by(&.weight)
+        # Path tiebreak mirrors top-level sections (compare_sections_by_weight):
+        # equal-weight subsections otherwise follow insertion/glob order and
+        # can flip prev/next blocks across rebuilds.
+        sorted_subsections = same_lang.sort { |a, b| compare_sections_by_weight(a, b) }
         flatten_section_tree(sorted_subsections, sections_by_path, pages_by_section, result, lang, default_lang)
       end
     end
@@ -284,6 +287,12 @@ module Hwaro::Core::Build::Phases::Transform
     site.taxonomies.clear
 
     pages.each do |page|
+      # Match Content::Taxonomies.build_taxonomy_index: draft / unpublished
+      # (--include-future/--include-expired) / generated pages must not inflate
+      # get_taxonomy counts or terms_sort_by="count" relative to written
+      # /tags/… pages and term feeds.
+      next if page.excluded_from_listings?
+
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)
         terms.each do |term|
@@ -386,8 +395,11 @@ module Hwaro::Core::Build::Phases::Transform
 
       # 2. Add new assignments from re-parsed page — unless the caller is
       # about to exclude it from the site model (removal above still ran,
-      # so its old terms are gone; skipping the add keeps it gone).
+      # so its old terms are gone; skipping the add keeps it gone). Also
+      # skip unpublished/draft/generated pages so get_taxonomy membership
+      # stays aligned with build_taxonomy_index (and rebuild_taxonomies).
       next if excluded_paths.includes?(page_path)
+      next if page.excluded_from_listings?
 
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)

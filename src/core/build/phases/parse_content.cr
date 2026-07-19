@@ -124,10 +124,28 @@ module Hwaro::Core::Build::Phases::ParseContent
     rescue ex
       # A broken shortcode in a summary must not abort the whole parse
       # phase — fall back to plain-Markdown rendering (same config flags,
-      # critically including safe mode) and let the body render surface
-      # the real error with full diagnostics.
+      # critically including safe mode). Still resolve `@/` links: body
+      # render never sees render:false summaries, and strict mode would
+      # otherwise miss broken links that ship in listings.
       Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
       fallback, _ = Processor::Markdown.render(summary_md.to_s, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+      pbp = (pages_by_path ||= begin
+        map = {} of String => Models::Page
+        link_targets.each { |p| map[p.path] ||= p }
+        map
+      end)
+      if site.config.links.broken_internal == "error"
+        misses = [] of {String, String}
+        fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url, misses: misses)
+        unless misses.empty?
+          @broken_links_mutex.synchronize do
+            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+          end
+        end
+      else
+        fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
+      end
+      fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url)
       page.summary_html = fallback
       recomputed_paths << page.path
     end

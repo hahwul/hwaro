@@ -35,6 +35,8 @@ require "./phases/output_formats"
 require "./phases/generate"
 require "./phases/write"
 require "./phases/finalize"
+require "../../assets/pipeline"
+require "../../content/hooks/asset_hooks"
 require "../../content/seo/feeds"
 require "../../content/seo/sitemap"
 require "../../content/seo/robots"
@@ -1163,6 +1165,8 @@ module Hwaro
         # Used by serve mode when only static files have changed.
         def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false)
           static_config = static_publish_config
+          config = @config
+          sass_on = config.try(&.sass.enabled) || false
           copied = 0
           changed_files.each do |src_path|
             next unless File.exists?(src_path)
@@ -1170,7 +1174,18 @@ module Hwaro
 
             relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)
-            next if @config.try(&.sass_source?(relative))
+            next if config.try(&.sass_source?(relative))
+            # When Sass is on, a hand-written sibling of an SCSS entry must not
+            # overwrite the compiled CSS during serve (full build ends with
+            # SCSS winning). Skip the copy and leave the compiled output.
+            if sass_on && relative.ends_with?(".css")
+              scss_sibling = relative.sub(/\.css\z/i, ".scss")
+              scss_src = File.join("static", scss_sibling)
+              if File.exists?(scss_src) && !File.basename(scss_src).starts_with?("_")
+                Logger.warn "  Sass: skipping static copy of #{relative} — sibling #{scss_sibling} compiles to the same path."
+                next
+              end
+            end
             dest_path = File.join(output_dir, relative)
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
@@ -1190,6 +1205,26 @@ module Hwaro
           compiler = Assets::SassCompiler.new(config.sass, config.static)
           count = compiler.compile_all(output_dir)
           Logger.outcome("compiled", "#{count} sass #{count == 1 ? "file" : "files"}") if count > 0
+
+          # Bundle entries with `.scss` sources only recompile inside the asset
+          # pipeline (AfterInitialize on a full build). Static-only serve
+          # reloads would otherwise leave fingerprinted bundles stale.
+          reprocess_asset_bundles(output_dir) if config.assets.enabled
+        end
+
+        # Re-run the asset pipeline so SCSS (or plain CSS/JS) bundle sources
+        # refresh under serve. Updates the AssetHooks class-level manifest so
+        # subsequent renders see new fingerprint paths.
+        def reprocess_asset_bundles(output_dir : String)
+          config = @config
+          return unless config && config.assets.enabled
+
+          pipeline = Assets::Pipeline.new(config.assets, config.base_url, config.sass.enabled)
+          pipeline.process(output_dir)
+          Content::Hooks::AssetHooks.replace_manifest(pipeline.manifest)
+          if pipeline.manifest.size > 0
+            Logger.outcome("bundled", "#{pipeline.manifest.size} asset #{pipeline.manifest.size == 1 ? "bundle" : "bundles"}")
+          end
         end
 
         # Republish non-Markdown content assets (images, etc.) to the output

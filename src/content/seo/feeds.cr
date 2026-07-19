@@ -8,6 +8,8 @@ require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/text_utils"
 require "../../utils/sort_utils"
+require "../../utils/path_utils"
+require "../../utils/output_guard"
 require "../processors/markdown"
 require "../processors/internal_link_resolver"
 
@@ -29,7 +31,10 @@ module Hwaro
 
         def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false, templates : Hash(String, String)? = nil, renderer : Renderer? = nil)
           if skip_if_unchanged && config.feeds.enabled
-            feed_file = config.feeds.filename.empty? ? (config.feeds.type == "atom" ? "atom.xml" : "rss.xml") : config.feeds.filename
+            # Basename only: process_feed refuses nested filename components
+            # (path-traversal defense), so the skip probe must match the
+            # path that is actually written.
+            feed_file = safe_feed_filename(config.feeds.filename, config.feeds.type)
             if File.exists?(File.join(output_dir, feed_file))
               Logger.debug "  Feeds unchanged (cache hit), skipping."
               return
@@ -39,21 +44,7 @@ module Hwaro
           # 1. Generate Main Site Feed
           if config.feeds.enabled
             site_pages = pages.reject { |p| p.draft || p.unpublished || !p.render || p.is_a?(Models::Section) }
-
-            # Deduplicate by URL, keeping the page the build actually wrote:
-            # output collisions resolve to the source-path-sort-first page
-            # (render.cr#compute_output_url_winners), so the feed must
-            # advertise that page's content — not whichever colliding page
-            # happened to come last.
-            url_winners = {} of String => Models::Page
-            site_pages.each do |p|
-              if prev = url_winners[p.url]?
-                url_winners[p.url] = p if p.path < prev.path
-              else
-                url_winners[p.url] = p
-              end
-            end
-            site_pages = site_pages.select { |p| url_winners[p.url].same?(p) }
+            site_pages = dedupe_by_output_url(site_pages)
 
             # Filter by section if configured for main feed
             if !config.feeds.sections.empty?
@@ -87,12 +78,14 @@ module Hwaro
           pages.each do |page|
             # Check if it's a section and has feed generation enabled
             if page.is_a?(Models::Section) && page.generate_feeds && page.render && !page.draft && !page.unpublished
-              section_pages = pages_by_section[page.section]? || [] of Models::Page
+              section_pages = dedupe_by_output_url(pages_by_section[page.section]? || [] of Models::Page)
 
               # Construct output path for section feed
-              # e.g., output_dir/posts/rss.xml
-              section_output_dir = File.join(output_dir, page.url.lchop("/"))
-              Hwaro::Utils::FileSafe.mkdir_p(section_output_dir)
+              # e.g., output_dir/posts/rss.xml — sanitize + OutputGuard so a
+              # custom_path of `../../outside` cannot escape the public tree
+              # (HTML writers already guard; feed dirs used to skip).
+              section_output_dir = feed_output_dir_for(output_dir, page.url)
+              next unless section_output_dir
 
               feed_title = "#{config.title} - #{page.title}"
 
@@ -123,6 +116,7 @@ module Hwaro
             lang_pages = pages.select { |p|
               !p.draft && !p.unpublished && p.render && !p.is_a?(Models::Section) && p.language == lang_code
             }
+            lang_pages = dedupe_by_output_url(lang_pages)
 
             # Apply section filter if configured on the main feed
             if !config.feeds.sections.empty?
@@ -136,8 +130,8 @@ module Hwaro
             next if lang_pages.empty?
 
             # Build the output directory: output_dir/{lang}/
-            lang_output_dir = File.join(output_dir, lang_code)
-            Hwaro::Utils::FileSafe.mkdir_p(lang_output_dir)
+            lang_output_dir = feed_output_dir_for(output_dir, "/#{lang_code}/")
+            next unless lang_output_dir
 
             # Build a language-specific feed title
             lang_name = lang_config.language_name
@@ -174,11 +168,9 @@ module Hwaro
             feed_type = "rss"
           end
 
-          filename = if !custom_filename.empty?
-                       custom_filename
-                     else
-                       feed_type == "atom" ? "atom.xml" : "rss.xml"
-                     end
+          # Basename only — nested components would desync the self URL from
+          # the write path (basename at write, full string in build_feed_url).
+          filename = safe_feed_filename(custom_filename, feed_type)
 
           # Sort a copy to avoid mutating the caller's array
           pages = pages.sort { |a, b| Utils::SortUtils.compare_by_date(a, b) }
@@ -216,10 +208,49 @@ module Hwaro
                            end
                          end
 
-          # Write feed file (basename prevents path traversal via config filename)
-          feed_path = File.join(output_dir, File.basename(filename))
+          # Write feed file (filename is already basename-normalized above)
+          feed_path = File.join(output_dir, filename)
           Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
           Logger.action :create, feed_path if verbose
+        end
+
+        # Keep the page the build actually wrote when two pages collide on
+        # one URL (path-sort-first winner, matching
+        # render.cr#compute_output_url_winners). Used for main, section,
+        # language, and taxonomy feeds so no surface advertises a loser.
+        def self.dedupe_by_output_url(pages : Array(Models::Page)) : Array(Models::Page)
+          url_winners = {} of String => Models::Page
+          pages.each do |p|
+            if prev = url_winners[p.url]?
+              url_winners[p.url] = p if p.path < prev.path
+            else
+              url_winners[p.url] = p
+            end
+          end
+          pages.select { |p| url_winners[p.url].same?(p) }
+        end
+
+        # Config `feeds.filename` and empty custom names resolve to a single
+        # basename under the feed's output directory.
+        def self.safe_feed_filename(custom_filename : String, feed_type : String) : String
+          if custom_filename.empty?
+            feed_type.downcase == "atom" ? "atom.xml" : "rss.xml"
+          else
+            File.basename(custom_filename)
+          end
+        end
+
+        # Safe subdirectory under `output_dir` for a section/lang/taxonomy
+        # feed. Returns nil (and warns) when the URL escapes the public tree.
+        def self.feed_output_dir_for(output_dir : String, url : String) : String?
+          url_path = Utils::PathUtils.sanitize_path(url.lchop("/"))
+          candidate = url_path.empty? ? output_dir : File.join(output_dir, url_path)
+          unless Utils::OutputGuard.within_output_dir?(candidate, output_dir)
+            Logger.warn "Skipping feed output outside output directory: #{url}"
+            return
+          end
+          Hwaro::Utils::FileSafe.mkdir_p(candidate)
+          candidate
         end
 
         # Render a user feed template, classifying any failure as a template

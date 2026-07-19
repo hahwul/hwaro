@@ -525,6 +525,19 @@ describe "fence options rendering (server mode)" do
     reset_fence_options_state
   end
 
+  it "applies the global line_numbers default when a brace block is present but unrecognized" do
+    # Malformed `{oops}` is treated as "no fence options" — global default
+    # must still wrap lines (do not gate on the presence of `{`).
+    Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
+    Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = true
+    html = Hwaro::Content::Processors::SyntaxHighlighter.render(
+      "```python {oops}\nprint(1)\n```", highlight: true)
+    html.should contain(%(<span class="line"))
+    html.should contain(%(<span class="ln"))
+  ensure
+    reset_fence_options_state
+  end
+
   it "leaves an indented code block untouched by the global line_numbers default" do
     Hwaro::Content::Processors::SyntaxHighlighter.server_mode = true
     Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = true

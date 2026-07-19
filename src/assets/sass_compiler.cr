@@ -10,6 +10,7 @@ require "./sass"
 require "../utils/css_minifier"
 require "../utils/errors"
 require "../utils/logger"
+require "../utils/path_utils"
 require "../models/config"
 
 module Hwaro
@@ -29,12 +30,21 @@ module Hwaro
 
         count = 0
         glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+        project_root = Dir.current
         Dir.glob(File.join(@source_dir, "**", "*.scss"), match: glob_match) do |src_path|
           next unless File.file?(src_path)
           next if File.basename(src_path).starts_with?("_")
 
           relative = Path[src_path].relative_to(@source_dir).to_s
           next if @static_config.excluded?(relative)
+
+          # Entry paths used to skip the outside-symlink guard imports already
+          # have: a `static/css/style.scss` → /etc/passwd symlink would publish
+          # the target's contents as CSS. Match static-copy / importer policy.
+          unless Utils::PathUtils.resolves_within?(src_path, project_root)
+            Logger.warn "  Sass: skipping entry outside project root (symlink?): #{relative}"
+            next
+          end
 
           # A hand-written sibling `.css` and this compiled output land on
           # the same path: full builds copy the raw file first and clobber it

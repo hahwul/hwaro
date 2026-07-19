@@ -493,17 +493,19 @@ module Hwaro
         templates : Hash(String, String)? = nil,
         builder : Core::Build::Builder? = nil,
       )
-        # No base_url guard: like the main and section feeds, taxonomy feeds
-        # emit with relative URLs when base_url is empty (the user opted in via
-        # `feed = true`) rather than being silently dropped.
-        feed_output_dir = File.join(output_dir, base_url.lchop("/"))
-        Hwaro::Utils::FileSafe.mkdir_p(feed_output_dir)
+        # No base_url guard on emission: like the main and section feeds,
+        # taxonomy feeds emit with relative URLs when base_url is empty.
+        # Directory still goes through the shared feed path guard so a
+        # traversal-shaped term/URL can't escape the public tree.
+        feed_output_dir = Content::Seo::Feeds.feed_output_dir_for(output_dir, base_url)
+        return unless feed_output_dir
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"
 
         # No caller-side sort/limit: process_feed itself sorts date-desc
-        # (SortUtils.compare_by_date) and applies feeds.limit.
+        # (SortUtils.compare_by_date) and applies feeds.limit. Dedupe by URL
+        # so collision losers (not written as HTML) never appear in the feed.
         Content::Seo::Feeds.process_feed(
-          pages,
+          Content::Seo::Feeds.dedupe_by_output_url(pages),
           site.config,
           feed_output_dir,
           "",
