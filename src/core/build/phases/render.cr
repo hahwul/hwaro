@@ -1945,6 +1945,18 @@ module Hwaro::Core::Build::Phases::Render
           digest_file(digest, file)
         end
       end
+      # Also digest SCSS outside auto_includes dirs (e.g. static/lib/_theme.scss
+      # pulled in via @use from static/css/style.scss). Without this, a
+      # partial-only edit recompiles CSS bytes but keeps the old ?v=.
+      if config.sass.enabled
+        Dir.glob(File.join("static", "**", "*.scss")).sort.each do |file|
+          relative = Path[file].relative_to("static").to_s
+          next if config.auto_includes.dirs.any? { |dir|
+            relative == dir || relative.starts_with?("#{dir}/")
+          }
+          digest_file(digest, file)
+        end
+      end
     end
 
     digest.hexfinal[0, 8]

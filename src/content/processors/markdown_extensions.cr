@@ -243,7 +243,9 @@ module Hwaro
           rel_tokens << "noreferrer" if config.external_links_no_referrer
           # Every active flag contributes a rel token, so empty ⇒ policy off.
           return html if rel_tokens.empty?
-          return html unless html.includes?(%(href="http))
+          # Markd keeps author scheme case (`HTTPS://…`); the rewrite regex is
+          # already /i, so the early-out must not require lowercase `http`.
+          return html unless html.includes?(%(href="http)) || html.includes?(%(href="HTTP))
 
           html.gsub(EXTERNAL_ANCHOR_RE) do |match|
             attrs = $1
@@ -956,7 +958,11 @@ module Hwaro
         # --- Mermaid ---
         # Post-processing: convert mermaid code blocks to div elements
         def postprocess_mermaid(html : String) : String
-          html.gsub(/<pre><code class="language-mermaid[^"]*">(.*?)<\/code><\/pre>/m) do |_|
+          # Match the mermaid class as a full token only (`language-mermaid`
+          # or `language-mermaid …`), not a prefix of `language-mermaidjs` /
+          # `language-mermaid2`. Copy/hook paths already require exact
+          # `lang.downcase == "mermaid"`.
+          html.gsub(/<pre><code class="language-mermaid(?:\s[^"]*)?">(.*?)<\/code><\/pre>/m) do |_|
             # Keep HTML entities as-is; the browser decodes them automatically
             # when Mermaid.js reads the element's textContent.
             # Only decode &amp; which Mermaid syntax may require in labels.

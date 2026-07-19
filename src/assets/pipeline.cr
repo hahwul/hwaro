@@ -8,6 +8,7 @@ require "file_utils"
 require "../utils/css_minifier"
 require "../utils/js_minifier"
 require "../utils/logger"
+require "../utils/path_utils"
 require "../models/config"
 require "./sass_compiler"
 
@@ -51,6 +52,14 @@ module Hwaro
             end
             unless File.exists?(source)
               Logger.warn "Asset pipeline: source file not found: #{source}"
+              next
+            end
+            # Symlink targets outside the configured source_dir must not be
+            # read into a published bundle. Bound against source_dir (not
+            # Dir.current) so mktmpdir-based tests and custom source roots
+            # still work while still rejecting /etc-style escapes.
+            unless Utils::PathUtils.resolves_within?(source, source_dir_real)
+              Logger.warn "Asset pipeline: source outside source directory (symlink?): #{file}"
               next
             end
             io << "\n" if i > 0

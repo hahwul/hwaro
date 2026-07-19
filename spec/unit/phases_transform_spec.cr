@@ -316,6 +316,24 @@ describe Hwaro::Core::Build::Phases::Transform do
       site.taxonomies.has_key?("stale").should be_false
     end
 
+    it "excludes unpublished and draft pages from get_taxonomy membership" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      published = make_page("p1.md")
+      published.taxonomies = {"tags" => ["crystal"]}
+      future = make_page("p2.md")
+      future.taxonomies = {"tags" => ["crystal"]}
+      future.unpublished = true
+      draft = make_page("p3.md")
+      draft.taxonomies = {"tags" => ["crystal"]}
+      draft.draft = true
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_rebuild_taxonomies(site, [published, future, draft])
+
+      site.taxonomies["tags"]["crystal"].size.should eq(1)
+      site.taxonomies["tags"]["crystal"][0].path.should eq("p1.md")
+    end
+
     it "includes a configured 'authors' taxonomy sourced from page.authors" do
       # "authors" lives on @authors, not page.taxonomies, so the render-phase
       # map omitted it — making get_taxonomy("authors") empty even though the

@@ -202,6 +202,14 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("<pre>")
       result.should_not contain("mermaid")
     end
+
+    it "does not treat language-mermaidjs as a mermaid fence (full class token only)" do
+      html = "<pre><code class=\"language-mermaidjs hljs\">not a diagram</code></pre>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_mermaid(html)
+      result.should contain("<pre>")
+      result.should contain("language-mermaidjs")
+      result.should_not contain(%(<div class="mermaid">))
+    end
   end
 
   describe "task lists (extended)" do
@@ -1235,6 +1243,16 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       )
       html.should contain(%(rel="nofollow noreferrer"))
       html.should_not contain("target=")
+    end
+
+    it "honors uppercase scheme hrefs (HTTPS://…)" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="HTTPS://example.com">x</a>), cfg
+      )
+      html.should contain(%(target="_blank"))
+      html.should contain(%(rel="noopener"))
     end
 
     it "leaves links inside code blocks and mailto links alone" do

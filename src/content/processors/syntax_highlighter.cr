@@ -696,7 +696,10 @@ module Hwaro
           return {lang, nil} if lang.try(&.downcase) == "mermaid"
           return {lang, opts} if opts
 
-          if info && !info.includes?('{') && lang.presence && SyntaxHighlighter.default_line_numbers?
+          # Malformed/unrecognized `{…}` leaves opts=nil (legacy path). Docs
+          # treat that "exactly as if fence options did not exist", so the
+          # global line_numbers default must still apply — don't gate on `{`.
+          if info && lang.presence && SyntaxHighlighter.default_line_numbers?
             return {lang, FenceOptions::Options.new(linenos: true)}
           end
 

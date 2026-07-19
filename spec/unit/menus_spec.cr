@@ -35,6 +35,27 @@ describe Hwaro::Content::Menus do
       main.map(&.weight).should eq([1, 2])
     end
 
+    it "leaves mailto:/tel: and other scheme URLs untouched (not internal paths)" do
+      config = Hwaro::Models::Config.new
+      config.menus = {
+        "main" => [
+          menu_item("Email", "mailto:hello@example.com"),
+          menu_item("Call", "tel:+15551212"),
+          menu_item("GitHub", "https://github.com/hahwul"),
+        ],
+      }
+
+      trees = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [] of Hwaro::Models::Section)
+      main = trees["en"]["main"]
+      by_name = main.index_by(&.name)
+      by_name["Email"].url.should eq("mailto:hello@example.com")
+      by_name["Email"].external.should be_true
+      by_name["Call"].url.should eq("tel:+15551212")
+      by_name["Call"].external.should be_true
+      by_name["GitHub"].url.should eq("https://github.com/hahwul")
+      by_name["GitHub"].external.should be_true
+    end
+
     it "assembles parent/child hierarchy from `parent` identifiers" do
       config = Hwaro::Models::Config.new
       config.menus = {

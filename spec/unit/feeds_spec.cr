@@ -2363,6 +2363,70 @@ describe Hwaro::Content::Seo::Feeds do
     end
   end
 
+  describe "feed filename and collision parity" do
+    it "basename-normalizes feeds.filename so self URL matches the written file" do
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "rss"
+      config.feeds.filename = "feeds/rss.xml"
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+
+      page = Hwaro::Models::Page.new("posts/hello.md")
+      page.title = "Hello"
+      page.url = "/posts/hello/"
+      page.render = true
+      page.raw_content = "body"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([page], config, output_dir)
+        File.exists?(File.join(output_dir, "rss.xml")).should be_true
+        File.exists?(File.join(output_dir, "feeds", "rss.xml")).should be_false
+        feed = File.read(File.join(output_dir, "rss.xml"))
+        feed.should contain("https://example.com/rss.xml")
+        feed.should_not contain("https://example.com/feeds/rss.xml")
+      end
+    end
+
+    it "dedupes section feeds by the path-sort-first URL winner" do
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = false
+      config.feeds.type = "rss"
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+
+      section = Hwaro::Models::Section.new("posts/_index.md")
+      section.section = "posts"
+      section.url = "/posts/"
+      section.title = "Posts"
+      section.generate_feeds = true
+      section.render = true
+
+      a = Hwaro::Models::Page.new("posts/a.md")
+      a.title = "Winner"
+      a.url = "/posts/same/"
+      a.section = "posts"
+      a.render = true
+      a.date = Time.utc(2026, 1, 2)
+      a.raw_content = "a"
+
+      b = Hwaro::Models::Page.new("posts/z.md")
+      b.title = "Loser"
+      b.url = "/posts/same/"
+      b.section = "posts"
+      b.render = true
+      b.date = Time.utc(2026, 1, 3)
+      b.raw_content = "b"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([section, a, b], config, output_dir)
+        feed = File.read(File.join(output_dir, "posts", "rss.xml"))
+        feed.should contain("Winner")
+        feed.should_not contain("Loser")
+      end
+    end
+  end
+
   describe "atom entry dates" do
     it "emits the same calendar date for date-only frontmatter on a non-UTC host" do
       # Regression: date-only frontmatter parses as local midnight; the Atom

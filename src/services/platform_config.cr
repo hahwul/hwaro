@@ -307,7 +307,20 @@ module Hwaro
       private def extract_aliases_from_file(path : String, redirects : Array(Tuple(String, String)))
         raw_content = File.read(path)
         data = Processor::Markdown.parse(raw_content, path)
+        # Mirror the build's publish filter: drafts, headless pages, and
+        # outside-window (future/expired) content write no output and must
+        # not fail platform generation over a date-token permalink they
+        # never ship (build uses resolve_url_lenient + raise only on
+        # surviving render=true pages).
         return if data[:draft]
+        return unless data[:render]
+        now = Time.utc
+        if exp = data[:expires]
+          return if exp <= now
+        end
+        if date = data[:date]
+          return if date > now
+        end
 
         aliases = data[:aliases]
         return if aliases.empty?
@@ -317,6 +330,7 @@ module Hwaro
         basename = Path[path].basename
         language = extract_language_from_filename(basename)
         target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path], language, data[:date], data[:title])
+        return unless target_url
 
         aliases.each do |alias_path|
           # Carry base_path so generated redirects match the build's own
@@ -333,9 +347,10 @@ module Hwaro
       # build pipeline (Utils::PermalinkResolver) so generated platform
       # redirects always match the built site's canonical URLs. Handles slug
       # overrides, custom_path, permalinks (remaps and token patterns), and
-      # index pages.
-      private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?, language : String? = nil, date : Time? = nil, title : String = "") : String
-        Utils::PermalinkResolver.resolve_url(
+      # index pages. Returns nil when a date-token pattern can't resolve
+      # (caller skips aliases for that file).
+      private def calculate_page_url(relative_path : String, slug : String?, custom_path : String?, language : String? = nil, date : Time? = nil, title : String = "") : String?
+        url, error = Utils::PermalinkResolver.resolve_url_lenient(
           relative_path,
           @config,
           slug: slug,
@@ -344,6 +359,8 @@ module Hwaro
           date: date,
           title: title,
         )
+        return nil if error
+        url
       end
     end
   end
