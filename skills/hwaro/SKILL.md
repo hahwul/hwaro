@@ -35,7 +35,7 @@ Trigger this skill when the user asks to:
 
 Confirm you are in a Hwaro project before acting: a project root has a
 `config.toml`, usually alongside `content/` and `templates/`. Run
-`hwaro --version` (also `hwaro -V` or `hwaro version`) to confirm the binary is
+`hwaro --version` (also `hwaro -v`, `hwaro -V`, or `hwaro version`) to confirm the binary is
 installed and which version you are targeting. This skill is written against
 **Hwaro 0.16.x**.
 
