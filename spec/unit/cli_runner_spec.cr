@@ -213,4 +213,30 @@ describe Hwaro::CLI::Runner do
       end
     end
   end
+
+  describe "#run" do
+    it "prints version with -v, -V, and --version flags" do
+      ["-v", "-V", "--version"].each do |flag|
+        previous_io = Hwaro::Logger.io
+        previous_level = Hwaro::Logger.level
+        sink = IO::Memory.new
+        Hwaro::Logger.io = sink
+        Hwaro::Logger.level = Hwaro::Logger::Level::Info
+
+        old_argv = ARGV.dup
+        ARGV.clear
+        ARGV.push(flag)
+
+        begin
+          Hwaro::CLI::Runner.new.run
+          sink.to_s.should contain(Hwaro::VERSION)
+        ensure
+          ARGV.clear
+          ARGV.concat(old_argv)
+          Hwaro::Logger.io = previous_io
+          Hwaro::Logger.level = previous_level
+        end
+      end
+    end
+  end
 end
