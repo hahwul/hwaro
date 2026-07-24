@@ -1306,7 +1306,7 @@ module Hwaro
                 <section class="home-latest" aria-labelledby="home-latest-title">
                   <h2 id="home-latest-title" class="home-section-title">Latest posts</h2>
                   <ul class="post-list">
-                    {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
+                    {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | selectattr("language", "equalto", page_language) | sort(attribute="date", reverse=true) %}
                     {% if loop.index <= 5 %}
                       <li class="post-item">
                         <time class="post-date" datetime="{{ p.date }}">{{ p.date }}</time>
@@ -1772,6 +1772,10 @@ module Hwaro
         # We avoid `{% set %}` year-grouping because Crinja doesn't
         # implement Jinja2's `namespace()` helper that would otherwise
         # let us track the current year across iterations cleanly.
+        #
+        # `selectattr("language", "equalto", page_language)` keeps a
+        # multilingual site's archives scoped to the current language —
+        # without it every language's posts pile into one list.
         private def archives_template : String
           <<-HTML
             {% include "header.html" %}
@@ -1783,7 +1787,7 @@ module Hwaro
                 {{ content }}
 
                 <ul class="archive-list">
-                {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | sort(attribute="date", reverse=true) %}
+                {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | selectattr("language", "equalto", page_language) | sort(attribute="date", reverse=true) %}
                   <li class="archive-entry">
                     <time datetime="{{ p.date }}">{{ p.date }}</time>
                     <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>

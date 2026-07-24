@@ -77,14 +77,14 @@ Hwaro implements a practical SCSS subset — the features hand-written site styl
 | `@function` / `@return` | ✅ user functions callable in values, defaults/keywords/variadic, recursion |
 | Control flow | ✅ `@if` / `@else if` / `@else`, `@each` (with destructuring), `@for` (`through`/`to`, descending), `@while` |
 | SassScript expressions | ✅ arithmetic (`+ - * %`), comparisons, `and`/`or`/`not`, strings, lists, maps — see deviations for `/` |
-| Built-in functions | ✅ `sass:math`, `sass:string`, `sass:list`, `sass:map`, `sass:meta` subset + legacy global names (`map-get`, `nth`, `if()`, …) |
+| Built-in functions | ✅ `sass:math`, `sass:string`, `sass:list`, `sass:map`, `sass:meta`, `sass:color` subset + legacy global names (`map-get`, `nth`, `darken`, `if()`, …) |
 | `@debug` / `@warn` / `@error` | ✅ `@error` fails the build with a located message |
 | `@at-root` | ✅ selector and block forms (no `with:`/`without:` queries) |
 | `@media` / `@supports` in rules | ✅ bubbled out of nesting automatically; feature values evaluate expressions |
 | `@keyframes`, `@font-face`, custom properties | ✅ pass through correctly |
 | Plain CSS | ✅ any valid `.css` compiles to itself (whitespace-normalized) |
 
-Unknown functions (`calc()`, `var()`, `rgba()`, `clamp()`, `color-mix()`, …) pass through untouched — arguments still evaluate (`translate($x * 2, -50%)` works).
+Unknown functions (`calc()`, `var()`, `clamp()`, `color-mix()`, …) pass through untouched — arguments still evaluate (`translate($x * 2, -50%)` works).
 
 ```scss
 @use "sass:math";
@@ -109,9 +109,45 @@ $breakpoints: (sm: 640px, md: 768px, lg: 1024px);
 }
 ```
 
+### Colors
+
+Color functions operate on hex literals (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`) and the CSS color keywords (`red`, `rebeccapurple`, `transparent`):
+
+```scss
+$brand: #336699;
+
+.button {
+  background: $brand;
+  border-color: darken($brand, 10%);      // #264d73
+  color: scale-color($brand, $lightness: 60%);
+  box-shadow: 0 1px 2px rgba($brand, 0.4); // rgba(51, 102, 153, 0.4)
+}
+```
+
+| Group | Functions |
+|-------|-----------|
+| Lightness | `darken`, `lighten` |
+| Saturation | `saturate`, `desaturate`, `grayscale` |
+| Hue | `adjust-hue`, `complement` |
+| Blending | `mix`, `invert` |
+| Alpha | `rgba($color, $alpha)`, `opacify` / `fade-in`, `transparentize` / `fade-out` |
+| Compound | `adjust-color`, `scale-color`, `change-color` |
+| Components | `red`, `green`, `blue`, `hue`, `saturation`, `lightness`, `alpha` / `opacity` |
+
+The same functions are available under `sass:color` with the modern names — `color.adjust`, `color.scale`, `color.change`, `color.mix`, `color.complement`, `color.grayscale`, `color.invert`, and the component getters:
+
+```scss
+@use "sass:color";
+.a { border-color: color.scale(#336699, $lightness: -20%); }
+```
+
+A computed color serializes as `#rrggbb` when opaque and `rgba(r, g, b, a)` otherwise. A color you *don't* modify keeps the exact spelling you wrote — `#FFF` stays `#FFF`.
+
+Two colors are only compared as colors once a color function has produced them; `#ffffff == #FFF` between two literals is still the generic text comparison and is false. Teaching `==` to parse every literal would flip `@if` branches in stylesheets that compile today, which the plain-CSS guarantee rules out.
+
 ### Not supported (yet)
 
-`@extend`, color values and `color.*` functions, unit conversion (`px`↔`cm`), `@at-root (with: ...)` queries, `@forward ... with (...)`, `@content(args)` / `using`, `math.random` / `unique-id()` (builds must stay deterministic), nested properties (`font: { family: ... }`), the indented `.sass` syntax, and source maps.
+`@extend`, unit conversion (`px`↔`cm`), `@at-root (with: ...)` queries, `@forward ... with (...)`, `@content(args)` / `using`, `math.random` / `unique-id()` (builds must stay deterministic), nested properties (`font: { family: ... }`), the indented `.sass` syntax, and source maps.
 
 **Unsupported directives fail the build with a located error** — Hwaro never emits silently broken CSS:
 
@@ -133,7 +169,8 @@ The compiler's first duty is the plain-CSS guarantee, so expressions follow a tw
 - Unit arithmetic requires identical units or one unitless side; there is no `px`↔`in` conversion table.
 - `and`/`or` in *value* positions only operate on real booleans — `font-family: Franklin and Marshall` stays text. Conditions have full Sass truthiness.
 - Global `min()`/`max()`/`round()`/`abs()` evaluate only when all arguments are statically comparable numbers; CSS forms (`min(5vw, 100px)`, `round(up, 101px, 10px)`) pass through.
-- Built-in functions take positional arguments only. A keyword call (`list.append($l, x, $separator: comma)`) doesn't evaluate and keeps its verbatim text — user-defined `@mixin`/`@function` keyword arguments work normally.
+- `rgb()`/`rgba()`/`hsl()`/`hsla()` are **not** folded in their CSS forms: `rgb(0, 0, 0)` stays verbatim where dart-sass would emit `black`. Only the Sass-only `rgba($color, $alpha)` spelling — which is not valid CSS — evaluates. Likewise `grayscale()`, `invert()`, `saturate()` and `opacity()` are color functions when handed a color and plain CSS filters when handed a number (`filter: grayscale(50%)` passes through).
+- Most built-in functions take positional arguments only. A keyword call (`list.append($l, x, $separator: comma)`) doesn't evaluate and keeps its verbatim text. The **color** functions are the exception — they accept their documented keyword names (`darken($c, $amount: 10%)`, `mix($a, $b, $weight: 25%)`, `scale-color($c, $lightness: 60%)`), since `$lightness`-style arguments are the only way to call `adjust`/`scale`/`change`. User-defined `@mixin`/`@function` keyword arguments work normally.
 - `if()` evaluates both branches eagerly (no side effects exist, so this is observable only via `@error` in the untaken branch).
 - Variables in at-rule preludes and values substitute directly (`@media (min-width: $bp)` works); selectors and property names require `#{...}` interpolation (same as dart-sass).
 - At-rule preludes evaluate expressions only inside `(feature: value)` spans; the query structure itself stays verbatim.

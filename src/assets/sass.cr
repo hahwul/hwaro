@@ -8,7 +8,7 @@
 # interpolation, @media/@supports bubbling through nesting, SassScript
 # expressions (arithmetic, comparisons, string/list/map values), and a
 # curated built-in function set (`sass:math`, `sass:string`, `sass:list`,
-# `sass:map`, `sass:meta` + the legacy global names).
+# `sass:map`, `sass:meta`, `sass:color` + the legacy global names).
 #
 # Two invariants shape the design:
 # - Valid plain CSS compiles to itself (whitespace-normalized): value

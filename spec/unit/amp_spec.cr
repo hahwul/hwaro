@@ -238,6 +238,116 @@ describe Hwaro::Content::Seo::Amp do
       result.scan(/sandbox=/).size.should eq(1)
     end
 
+    # AMP: "An amp-iframe must not be in the same origin as the container
+    # unless they do not allow allow-same-origin in the sandbox attribute."
+    it "grants allow-same-origin to a cross-origin iframe" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe src="https://www.youtube.com/embed/x"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain(%(sandbox="allow-scripts allow-same-origin allow-popups"))
+    end
+
+    it "withholds allow-same-origin from a same-origin iframe" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe src="https://example.com/embed/"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain(%(sandbox="allow-scripts allow-popups"))
+      result.should_not contain("allow-same-origin")
+    end
+
+    it "withholds allow-same-origin from a root-relative iframe src" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe src="/embed/widget.html"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("allow-same-origin")
+    end
+
+    it "withholds allow-same-origin from an unquoted same-origin src" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe src=/embed/widget.html width=600></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("allow-same-origin")
+    end
+
+    it "withholds allow-same-origin from an iframe with no src" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe width="600"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("allow-same-origin")
+    end
+
+    it "keeps the iframe body when adding a sandbox" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe src="https://cdn.example.org/e"><p>fallback</p></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("<p>fallback</p>")
+    end
+
+    describe ".same_origin_src?" do
+      it "treats relative references as same-origin" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("/a/", "https://example.com").should be_true
+        Hwaro::Content::Seo::Amp.same_origin_src?("a/b.html", "https://example.com").should be_true
+      end
+
+      it "compares scheme, host, and port" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("https://example.com/a", "https://example.com").should be_true
+        Hwaro::Content::Seo::Amp.same_origin_src?("https://EXAMPLE.com/a", "https://example.com").should be_true
+        Hwaro::Content::Seo::Amp.same_origin_src?("https://other.com/a", "https://example.com").should be_false
+        Hwaro::Content::Seo::Amp.same_origin_src?("http://example.com/a", "https://example.com").should be_false
+        Hwaro::Content::Seo::Amp.same_origin_src?("https://example.com:8443/a", "https://example.com").should be_false
+      end
+
+      it "treats an explicit default port as equal to an implicit one" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("https://example.com:443/a", "https://example.com").should be_true
+      end
+
+      it "resolves a protocol-relative src against the document scheme" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("//example.com/a", "https://example.com").should be_true
+        Hwaro::Content::Seo::Amp.same_origin_src?("//other.com/a", "https://example.com").should be_false
+      end
+
+      # Fail-safe direction: an src we can't read must not be granted
+      # allow-same-origin, because a wrong guess there is the exact AMP
+      # violation this check exists to prevent.
+      it "treats an unreadable src as same-origin" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("", "https://example.com").should be_true
+        Hwaro::Content::Seo::Amp.same_origin_src?("   ", "https://example.com").should be_true
+      end
+
+      it "compares the port on a protocol-relative src" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("//example.com:8443/a", "https://example.com").should be_false
+        Hwaro::Content::Seo::Amp.same_origin_src?("//example.com:443/a", "https://example.com").should be_true
+      end
+
+      it "treats opaque-origin schemes as cross-origin" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("data:text/html,hi", "https://example.com").should be_false
+        Hwaro::Content::Seo::Amp.same_origin_src?("about:blank", "https://example.com").should be_false
+      end
+
+      it "handles a base_url carrying a subpath" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("/repo/e/", "https://user.github.io/repo").should be_true
+        Hwaro::Content::Seo::Amp.same_origin_src?("https://user.github.io/repo/e/", "https://user.github.io/repo").should be_true
+      end
+    end
+
     it "adds amp-video extension script when video present" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"

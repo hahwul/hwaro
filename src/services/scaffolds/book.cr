@@ -1491,8 +1491,11 @@ module Hwaro
                  before a top-level chapter by weight. The sort is weight with a
                  path tiebreak to match the prev/next reading chain in
                  transform.cr; Crinja sort is stable, so sort-by-path then
-                 sort-by-weight yields weight-asc, path-tiebroken order. #}
-              {% for sec in site.sections | rejectattr("name", "equalto", "") | selectattr("top_level") | sort(attribute="path") | sort(attribute="weight") %}
+                 sort-by-weight yields weight-asc, path-tiebroken order.
+                 `selectattr("language", "equalto", page_language)` keeps a
+                 multilingual book's sidebar scoped to the current language —
+                 without it every language's chapters pile into one TOC. #}
+              {% for sec in site.sections | rejectattr("name", "equalto", "") | selectattr("top_level") | selectattr("language", "equalto", page_language) | sort(attribute="path") | sort(attribute="weight") %}
               {% set chapter_index = loop.index %}
               <div class="chapter-group">
                 <span class="chapter-title">{{ sec.title | e }}</span>

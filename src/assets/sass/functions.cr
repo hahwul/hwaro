@@ -9,12 +9,23 @@
 #   mixes, `min(100% - 10px, 2rem)`) they raise SoftEvalError and the
 #   lenient value path passes the call through as CSS — same behavior
 #   dart-sass implements with special cases.
-# - Color functions — no color value model in the v2 subset.
+# - `rgb()`/`rgba()`/`hsl()`/`hsla()` are NOT evaluated in their CSS
+#   forms. dart-sass folds `rgb(0, 0, 0)` to `black`, but the plain-CSS
+#   guarantee here outranks that: rewriting a literal every stylesheet
+#   already contains would change output for existing sites. Only the
+#   Sass-only two-argument `rgba($color, $alpha)` / `rgb($color, $alpha)`
+#   spelling — which is not valid CSS and currently emits broken output —
+#   evaluates; every other shape raises SoftEvalError and passes through.
+# - `grayscale()`, `invert()`, `saturate()` and `opacity()` are also CSS
+#   filter functions. They evaluate only when handed a color; a numeric
+#   argument (`filter: grayscale(50%)`) raises SoftEvalError and stays
+#   verbatim, the same shadowing rule `min()`/`max()` follow.
 #
 # All argument mismatches raise SoftEvalError: lenient contexts fall back
 # to verbatim CSS, strict contexts surface a located error.
 
 require "./value"
+require "./color"
 require "./expr"
 
 module Hwaro
@@ -98,6 +109,139 @@ module Hwaro
           else
             raise SoftEvalError.new("#{name}() expects a map, got #{value.to_css.inspect}")
           end
+        end
+
+        # A color argument. `Raw` is the shape a source color arrives in
+        # (`#336699` lexes as token soup), so parsing happens here on
+        # demand rather than in the lexer — that is what keeps untouched
+        # colors byte-identical. Quoted strings are never colors:
+        # `"red"` is a string in Sass, only bare `red` is a color.
+        private def self.color?(value : Value) : ColorV?
+          case value
+          when ColorV then value
+          when Raw    then ColorV.parse?(value.text)
+          when Str    then value.quoted ? nil : ColorV.parse?(value.text)
+          end
+        end
+
+        private def self.color!(name : String, value : Value) : ColorV
+          color?(value) ||
+            raise SoftEvalError.new("#{name}() expects a color, got #{value.to_css.inspect}")
+        end
+
+        # Colour argument for a built-in whose name is also a real CSS
+        # function. Declining with ShapeMismatch (rather than raising
+        # SoftEvalError) is what keeps `filter: grayscale(50%)` from
+        # unwinding every other expression in its declaration.
+        private def self.shadowed_color!(value : Value) : ColorV
+          color?(value) || raise ShapeMismatch.new
+        end
+
+        private def self.shadowed_arity!(args : Array(Value), min : Int32, max : Int32 = min) : Nil
+          raise ShapeMismatch.new unless args.size >= min && args.size <= max
+        end
+
+        # Binds a shadowed built-in's arguments, declining rather than
+        # erroring when a required one is absent. `saturate(180%)` is the CSS
+        # filter: it must reconstruct verbatim, not raise, or it takes every
+        # other expression in the declaration down with it.
+        private def self.shadowed_bind!(name : String, args : Array(Value),
+                                        kwargs : Hash(String, Value),
+                                        params : Array(String), required : Int32) : Array(Value?)
+          shadowed_arity!(args, 0, params.size)
+          bound = bind_args(name, args, kwargs, params)
+          required.times { |index| raise ShapeMismatch.new unless bound[index] }
+          bound
+        end
+
+        # Rejects NaN/Infinity before it reaches channel math. `NaN.to_i`
+        # raises OverflowError, which nothing in the compiler catches, so an
+        # unguarded NaN escapes as a bare arithmetic crash with no source
+        # location instead of the normal located error.
+        private def self.finite!(name : String, number : Number) : Float64
+          value = number.value
+          unless value.finite?
+            raise SoftEvalError.new("#{name}() expects a finite number, got #{number.to_css}")
+          end
+          value
+        end
+
+        # Percentage-style amount (`10%` or bare `10`). Out-of-range values
+        # raise rather than clamp: silently turning `lighten($c, -10%)` into
+        # a no-op, or `darken($c, 200%)` into black, hides the mistake in
+        # output that looks perfectly valid. dart-sass errors here too.
+        private def self.amount!(name : String, value : Value,
+                                 min : Float64 = 0.0, max : Float64 = 100.0) : Float64
+          raw = finite!(name, number!(name, value))
+          unless raw >= min && raw <= max
+            raise SoftEvalError.new(
+              "#{name}(): expected #{Number.format(raw)} to be within #{Number.format(min)} and #{Number.format(max)}")
+          end
+          raw
+        end
+
+        # Alpha-style amount, on 0..1. A percentage spelling (`50%`) is
+        # accepted and scaled, matching dart-sass.
+        private def self.alpha!(name : String, value : Value,
+                                min : Float64 = 0.0, max : Float64 = 1.0) : Float64
+          number = number!(name, value)
+          raw = finite!(name, number)
+          raw /= 100.0 if number.unit == "%"
+          unless raw >= min && raw <= max
+            raise SoftEvalError.new(
+              "#{name}(): expected #{Number.format(raw)} to be within #{Number.format(min)} and #{Number.format(max)}")
+          end
+          raw
+        end
+
+        # Rejects keyword arguments the function doesn't define, so a typo
+        # (`$lightnes:`) fails loudly instead of being silently dropped.
+        # Keys arrive already normalized to the `-` spelling (`eval_call`
+        # runs them through `Sass.normalize_ident`), so no further
+        # translation is needed here.
+        private def self.known_kwargs!(name : String, kwargs : Hash(String, Value),
+                                       allowed : Array(String)) : Nil
+          kwargs.each_key do |key|
+            next if allowed.includes?(key)
+            raise SoftEvalError.new("#{name}() has no argument named $#{key}")
+          end
+        end
+
+        # Binds positional arguments and the keyword spellings dart-sass
+        # accepts onto `params`, so `darken($c, $amount: 10%)` reaches the
+        # same slots as `darken($c, 10%)`. Returns one entry per parameter,
+        # nil where the caller supplied nothing.
+        private def self.bind_args(name : String, args : Array(Value),
+                                   kwargs : Hash(String, Value),
+                                   params : Array(String)) : Array(Value?)
+          known_kwargs!(name, kwargs, params)
+          if args.size > params.size
+            raise SoftEvalError.new("#{name}() expects at most #{params.size} argument(s), got #{args.size}")
+          end
+          params.map_with_index do |param, index|
+            positional = args[index]?
+            if named = kwargs[param]?
+              if positional
+                raise SoftEvalError.new("#{name}() got multiple values for $#{param}")
+              end
+              next named.as(Value?)
+            end
+            positional.as(Value?)
+          end
+        end
+
+        # `bind_args` plus a required-argument check on the leading
+        # `required` parameters.
+        private def self.bind!(name : String, args : Array(Value),
+                               kwargs : Hash(String, Value),
+                               params : Array(String), required : Int32) : Array(Value?)
+          bound = bind_args(name, args, kwargs, params)
+          required.times do |index|
+            unless bound[index]
+              raise SoftEvalError.new("#{name}() is missing required argument $#{params[index]}")
+            end
+          end
+          bound
         end
 
         private def self.same_units!(name : String, numbers : Array(Number)) : String
@@ -471,11 +615,15 @@ module Hwaro
             name =
               case value = args[0]
               when Number then "number"
-              when Str    then "string"
+              when ColorV then "color"
               when BoolV  then "bool"
               when NullV  then "null"
               when ListV  then "list"
               when MapV   then "map"
+              when Str
+                # A bare ident can name a color (`red`); a quoted string
+                # with the same text is just a string.
+                !value.quoted && ColorV.parse?(value.text) ? "color" : "string"
               else
                 # Raw soup: coerce for a better answer, else "string".
                 value.is_a?(Raw) ? type_of_raw(value.text) : "string"
@@ -497,12 +645,280 @@ module Hwaro
           when NullV  then "null"
           when MapV   then "map"
           when ListV  then "list"
-          else             "string"
+          else
+            # Hex and named colors survive coercion as Raw; they are
+            # colors, not strings.
+            ColorV.parse?(text) ? "color" : "string"
           end
         end
 
         def self.inspect_value(value : Value) : String
           value.inspect_css
+        end
+
+        # ---------------------------------------------------------------
+        # sass:color
+        # ---------------------------------------------------------------
+
+        # Shifts one HSL component and rebuilds the color.
+        private def self.adjust_hsl(color : ColorV, hue : Float64 = 0.0,
+                                    saturation : Float64 = 0.0,
+                                    lightness : Float64 = 0.0) : ColorV
+          h, s, l = color.to_hsl
+          ColorV.from_hsl(h + hue, s + saturation, l + lightness, color.alpha)
+        end
+
+        # dart-sass's weighted mix. The alpha channels bias the RGB weights
+        # so mixing into a translucent color doesn't wash it out: a fully
+        # transparent operand contributes its hue proportionally less.
+        private def self.mix_colors(color1 : ColorV, color2 : ColorV,
+                                    weight : Float64) : ColorV
+          weight_scale = weight / 100.0
+          normalized = weight_scale * 2.0 - 1.0
+          alpha_distance = color1.alpha - color2.alpha
+
+          product = normalized * alpha_distance
+          combined = product == -1.0 ? normalized : (normalized + alpha_distance) / (1.0 + product)
+
+          weight1 = (combined + 1.0) / 2.0
+          weight2 = 1.0 - weight1
+
+          ColorV.new(
+            color1.red * weight1 + color2.red * weight2,
+            color1.green * weight1 + color2.green * weight2,
+            color1.blue * weight1 + color2.blue * weight2,
+            color1.alpha * weight_scale + color2.alpha * (1.0 - weight_scale)
+          )
+        end
+
+        # `scale-color()` moves each component a percentage of the distance
+        # to its own limit, so the result can never overshoot: +100% lands
+        # exactly on the maximum, -100% on the minimum.
+        private def self.scale_component(current : Float64, factor : Float64,
+                                         max : Float64) : Float64
+          if factor > 0
+            current + (max - current) * (factor / 100.0)
+          else
+            current + current * (factor / 100.0)
+          end
+        end
+
+        # RGB and HSL adjustments describe the same color two ways; letting
+        # both through would make the result depend on which is applied
+        # first, so dart-sass rejects the combination outright.
+        private def self.reject_mixed_spaces!(name : String, rgb : Bool, hsl : Bool) : Nil
+          return unless rgb && hsl
+          raise SoftEvalError.new("#{name}() can't mix RGB and HSL arguments")
+        end
+
+        ADJUST_KWARGS = ["red", "green", "blue", "hue", "saturation", "lightness", "alpha"]
+        SCALE_KWARGS  = ["red", "green", "blue", "saturation", "lightness", "alpha"]
+
+        # How `adjust`/`scale`/`change` differ: each takes the current
+        # component value and the requested amount and returns the new
+        # value. Everything else about the three — argument binding, the
+        # RGB/HSL exclusivity check, the alpha handling — is identical, so
+        # they share `compound_color` below rather than three near-copies
+        # that drift apart.
+        enum ComponentMode
+          Adjust
+          Scale
+          Change
+        end
+
+        private def self.combine(mode : ComponentMode, current : Float64,
+                                 requested : Float64, max : Float64) : Float64
+          case mode
+          in ComponentMode::Adjust then current + requested
+          in ComponentMode::Scale  then scale_component(current, requested, max)
+          in ComponentMode::Change then requested
+          end
+        end
+
+        # Range a component argument may occupy, which is the one thing the
+        # three modes disagree on: `adjust` takes a signed delta, `scale` a
+        # signed percentage, `change` an absolute value.
+        private def self.component_range(mode : ComponentMode, max : Float64) : Tuple(Float64, Float64)
+          case mode
+          in ComponentMode::Adjust then {-max, max}
+          in ComponentMode::Scale  then {-100.0, 100.0}
+          in ComponentMode::Change then {0.0, max}
+          end
+        end
+
+        private def self.compound_color(name : String, mode : ComponentMode,
+                                        args : Array(Value), kwargs : Hash(String, Value)) : Value
+          params = mode.scale? ? SCALE_KWARGS : ADJUST_KWARGS
+          bound = bind!(name, args, kwargs, ["color"] + params, required: 1)
+          color = color!(name, bound[0].as(Value))
+
+          # `bound` is [color, *params]; re-key it by parameter name.
+          given = {} of String => Value
+          params.each_with_index { |param, index| (v = bound[index + 1]) && (given[param] = v) }
+          red, green, blue = given["red"]?, given["green"]?, given["blue"]?
+          hue, saturation, lightness = given["hue"]?, given["saturation"]?, given["lightness"]?
+          alpha = given["alpha"]?
+
+          reject_mixed_spaces!(name,
+            !(red.nil? && green.nil? && blue.nil?),
+            !(hue.nil? && saturation.nil? && lightness.nil?))
+
+          result =
+            if hue || saturation || lightness
+              h, s, l = color.to_hsl
+              # Hue is an angle, not a bounded component: it wraps rather
+              # than clamping, and `scale` has no meaningful limit for it
+              # (which is why $hue isn't in SCALE_KWARGS).
+              if hue
+                degrees = finite!(name, number!(name, hue))
+                h = mode.change? ? degrees : h + degrees
+              end
+              if saturation
+                min, max = component_range(mode, 100.0)
+                s = combine(mode, s, amount!(name, saturation, min, max), 100.0)
+              end
+              if lightness
+                min, max = component_range(mode, 100.0)
+                l = combine(mode, l, amount!(name, lightness, min, max), 100.0)
+              end
+              ColorV.from_hsl(h, s, l, color.alpha)
+            else
+              min, max = component_range(mode, 255.0)
+              ColorV.new(
+                red ? combine(mode, color.red, amount!(name, red, min, max), 255.0) : color.red,
+                green ? combine(mode, color.green, amount!(name, green, min, max), 255.0) : color.green,
+                blue ? combine(mode, color.blue, amount!(name, blue, min, max), 255.0) : color.blue,
+                color.alpha)
+            end
+
+          if alpha
+            amin, amax = component_range(mode, 1.0)
+            requested = mode.scale? ? amount!(name, alpha, amin, amax) : alpha!(name, alpha, amin, amax)
+            result = result.with_alpha(combine(mode, result.alpha, requested, 1.0))
+          end
+          result
+        end
+
+        COLOR_FNS = {
+          "adjust" => Fn.new do |args, kwargs|
+            compound_color("color.adjust", ComponentMode::Adjust, args, kwargs)
+          end,
+          "scale" => Fn.new do |args, kwargs|
+            compound_color("color.scale", ComponentMode::Scale, args, kwargs)
+          end,
+          "change" => Fn.new do |args, kwargs|
+            compound_color("color.change", ComponentMode::Change, args, kwargs)
+          end,
+          "mix" => Fn.new do |args, kwargs|
+            bound = bind!("mix", args, kwargs, ["color1", "color2", "weight"], required: 2)
+            weight = (w = bound[2]) ? amount!("mix", w) : 50.0
+            mix_colors(color!("mix", bound[0].as(Value)), color!("mix", bound[1].as(Value)), weight)
+          end,
+          "invert" => Fn.new do |args, kwargs|
+            # `invert(20%)` is the CSS filter; only a color is ours.
+            bound = shadowed_bind!("invert", args, kwargs, ["color", "weight"], required: 1)
+            color = shadowed_color!(bound[0].as(Value))
+            weight = (w = bound[1]) ? amount!("invert", w) : 100.0
+            inverse = ColorV.new(255.0 - color.red, 255.0 - color.green,
+              255.0 - color.blue, color.alpha)
+            mix_colors(inverse, color, weight)
+          end,
+          "grayscale" => Fn.new do |args, kwargs|
+            # `grayscale(50%)` is the CSS filter; only a color is ours.
+            bound = shadowed_bind!("grayscale", args, kwargs, ["color"], required: 1)
+            adjust_hsl(shadowed_color!(bound[0].as(Value)), saturation: -100.0)
+          end,
+          "complement" => Fn.new do |args, kwargs|
+            bound = bind!("complement", args, kwargs, ["color"], required: 1)
+            adjust_hsl(color!("complement", bound[0].as(Value)), hue: 180.0)
+          end,
+          "adjust-hue" => Fn.new do |args, kwargs|
+            bound = bind!("adjust-hue", args, kwargs, ["color", "degrees"], required: 2)
+            color = color!("adjust-hue", bound[0].as(Value))
+            adjust_hsl(color, hue: finite!("adjust-hue", number!("adjust-hue", bound[1].as(Value))))
+          end,
+          "darken" => Fn.new do |args, kwargs|
+            bound = bind!("darken", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("darken", bound[0].as(Value))
+            adjust_hsl(color, lightness: -amount!("darken", bound[1].as(Value)))
+          end,
+          "lighten" => Fn.new do |args, kwargs|
+            bound = bind!("lighten", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("lighten", bound[0].as(Value))
+            adjust_hsl(color, lightness: amount!("lighten", bound[1].as(Value)))
+          end,
+          "saturate" => Fn.new do |args, kwargs|
+            # One-argument `saturate(50%)` is the CSS filter, not this
+            # function — decline so it stays verbatim.
+            bound = shadowed_bind!("saturate", args, kwargs, ["color", "amount"], required: 2)
+            color = shadowed_color!(bound[0].as(Value))
+            adjust_hsl(color, saturation: amount!("saturate", bound[1].as(Value)))
+          end,
+          "desaturate" => Fn.new do |args, kwargs|
+            bound = bind!("desaturate", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("desaturate", bound[0].as(Value))
+            adjust_hsl(color, saturation: -amount!("desaturate", bound[1].as(Value)))
+          end,
+          "opacify" => Fn.new do |args, kwargs|
+            bound = bind!("opacify", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("opacify", bound[0].as(Value))
+            color.with_alpha(color.alpha + alpha!("opacify", bound[1].as(Value)))
+          end,
+          "transparentize" => Fn.new do |args, kwargs|
+            bound = bind!("transparentize", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("transparentize", bound[0].as(Value))
+            color.with_alpha(color.alpha - alpha!("transparentize", bound[1].as(Value)))
+          end,
+          "red" => Fn.new do |args, kwargs|
+            bound = bind!("red", args, kwargs, ["color"], required: 1)
+            Number.new(color!("red", bound[0].as(Value)).red8.to_f)
+          end,
+          "green" => Fn.new do |args, kwargs|
+            bound = bind!("green", args, kwargs, ["color"], required: 1)
+            Number.new(color!("green", bound[0].as(Value)).green8.to_f)
+          end,
+          "blue" => Fn.new do |args, kwargs|
+            bound = bind!("blue", args, kwargs, ["color"], required: 1)
+            Number.new(color!("blue", bound[0].as(Value)).blue8.to_f)
+          end,
+          "hue" => Fn.new do |args, kwargs|
+            bound = bind!("hue", args, kwargs, ["color"], required: 1)
+            Number.new(color!("hue", bound[0].as(Value)).hue, "deg")
+          end,
+          "saturation" => Fn.new do |args, kwargs|
+            bound = bind!("saturation", args, kwargs, ["color"], required: 1)
+            Number.new(color!("saturation", bound[0].as(Value)).saturation, "%")
+          end,
+          "lightness" => Fn.new do |args, kwargs|
+            bound = bind!("lightness", args, kwargs, ["color"], required: 1)
+            Number.new(color!("lightness", bound[0].as(Value)).lightness, "%")
+          end,
+          "alpha" => Fn.new do |args, kwargs|
+            bound = bind!("alpha", args, kwargs, ["color"], required: 1)
+            Number.new(color!("alpha", bound[0].as(Value)).alpha)
+          end,
+          "opacity" => Fn.new do |args, kwargs|
+            # `opacity(50%)` is the CSS filter; only a color is ours.
+            bound = shadowed_bind!("opacity", args, kwargs, ["color"], required: 1)
+            Number.new(shadowed_color!(bound[0].as(Value)).alpha)
+          end,
+        }
+
+        # `color.fade-in` / `color.fade-out` are the module spellings of
+        # opacify / transparentize. dart-sass defines both, so the module
+        # table needs them or `color.fade-in(...)` leaks its call text.
+        COLOR_FNS["fade-in"] = COLOR_FNS["opacify"]
+        COLOR_FNS["fade-out"] = COLOR_FNS["transparentize"]
+
+        # `rgba($color, $alpha)` / `rgb($color, $alpha)` — the Sass-only
+        # two-argument spelling. Every other shape (`rgb(0, 0, 0)`,
+        # `rgb(0 0 0 / 50%)`, relative color syntax) is real CSS, so those
+        # decline with ShapeMismatch and reconstruct verbatim instead of
+        # unwinding the whole declaration.
+        RGBA_FN = Fn.new do |args, kwargs|
+          bound = shadowed_bind!("rgba", args, kwargs, ["color", "alpha"], required: 2)
+          color = shadowed_color!(bound[0].as(Value))
+          color.with_alpha(alpha!("rgba", bound[1].as(Value)))
         end
 
         # ---------------------------------------------------------------
@@ -548,6 +964,33 @@ module Hwaro
           "comparable"     => MATH_FNS["compatible"],
           "type-of"        => META_FNS["type-of"],
           "inspect"        => META_FNS["inspect"],
+          "darken"         => COLOR_FNS["darken"],
+          "lighten"        => COLOR_FNS["lighten"],
+          "saturate"       => COLOR_FNS["saturate"],
+          "desaturate"     => COLOR_FNS["desaturate"],
+          "grayscale"      => COLOR_FNS["grayscale"],
+          "greyscale"      => COLOR_FNS["grayscale"],
+          "complement"     => COLOR_FNS["complement"],
+          "adjust-hue"     => COLOR_FNS["adjust-hue"],
+          "invert"         => COLOR_FNS["invert"],
+          "mix"            => COLOR_FNS["mix"],
+          "adjust-color"   => COLOR_FNS["adjust"],
+          "scale-color"    => COLOR_FNS["scale"],
+          "change-color"   => COLOR_FNS["change"],
+          "opacify"        => COLOR_FNS["opacify"],
+          "fade-in"        => COLOR_FNS["opacify"],
+          "transparentize" => COLOR_FNS["transparentize"],
+          "fade-out"       => COLOR_FNS["transparentize"],
+          "red"            => COLOR_FNS["red"],
+          "green"          => COLOR_FNS["green"],
+          "blue"           => COLOR_FNS["blue"],
+          "hue"            => COLOR_FNS["hue"],
+          "saturation"     => COLOR_FNS["saturation"],
+          "lightness"      => COLOR_FNS["lightness"],
+          "alpha"          => COLOR_FNS["alpha"],
+          "opacity"        => COLOR_FNS["opacity"],
+          "rgba"           => RGBA_FN,
+          "rgb"            => RGBA_FN,
         }
 
         # `sass:<name>` module tables: {functions, variables}.
@@ -557,6 +1000,7 @@ module Hwaro
           "list"   => {LIST_FNS, {} of String => String},
           "map"    => {MAP_FNS, {} of String => String},
           "meta"   => {META_FNS, {} of String => String},
+          "color"  => {COLOR_FNS, {} of String => String},
         }
       end
     end

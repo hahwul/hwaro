@@ -477,6 +477,12 @@ module Hwaro
         # the alert — **bold**, `code`, [links](…) — renders as HTML instead
         # of appearing as literal markup. (Crinja autoescaping is off here, the
         # same way `{{ content }}` emits rendered HTML.)
+        #
+        # `title`, when given, replaces the uppercased `type` as the bold
+        # label — the built-in fallback (BuiltinShortcodes) documents and
+        # positionally maps `title` as the shortcode's second argument, so
+        # silently dropping it here (as this template used to) meant
+        # `{% alert(type="info", title="Note") %}` lost "Note" with no error.
         protected def alert_shortcode : String
           # A translucent ember tint driven by the shared --primary token so
           # the alert follows the resolved scheme (and any user retheme).
@@ -485,7 +491,7 @@ module Hwaro
           # no tokens. `color: inherit` keeps the body on the theme palette.
           <<-HTML
             <div class="alert" style="padding: 0.9rem 1.15rem; border: 1px solid color-mix(in srgb, var(--primary, #b35454) 22%, transparent); border-left: 3px solid var(--primary, #b35454); background-color: color-mix(in srgb, var(--primary, #b35454) 6%, transparent); border-radius: var(--radius-sm, 6px); margin: 1.25rem 0; color: inherit;">
-              <strong style="color: var(--primary, #b35454);">{{ type | upper }}:</strong> {{ body | markdownify }}
+              <strong style="color: var(--primary, #b35454);">{% if title %}{{ title | e }}{% else %}{{ type | upper | e }}{% endif %}:</strong> {{ body | markdownify }}
             </div>
             HTML
         end
