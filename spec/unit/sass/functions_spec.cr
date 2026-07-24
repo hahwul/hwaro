@@ -123,9 +123,17 @@ describe "Sass functions" do
   end
 
   it "rejects unknown built-in modules" do
+    # `sass:selector` is a real dart-sass module this subset doesn't
+    # implement. (`sass:color` used to stand in here, before the color
+    # functions landed.)
     expect_raises(Hwaro::Assets::Sass::SyntaxError, /unknown built-in module/) do
-      compile(%q(@use "sass:color";))
+      compile(%q(@use "sass:selector";))
     end
+  end
+
+  it "loads the sass:color module" do
+    css = compile(%q(@use "sass:color"; .a { b: color.scale(#336699, $lightness: 20%); }))
+    css.should contain("b: #4785c2;")
   end
 
   # ===========================================================================

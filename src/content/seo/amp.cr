@@ -1,4 +1,5 @@
 require "file_utils"
+require "uri"
 require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
@@ -72,6 +73,65 @@ module Hwaro
           end
 
           Logger.info "  Generated #{generated} AMP page(s)" if generated > 0
+        end
+
+        # Default `sandbox` for a converted iframe.
+        #
+        # AMP: "An amp-iframe must not be in the same origin as the container
+        # unless they do not allow allow-same-origin in the sandbox
+        # attribute." Third-party embeds (YouTube, CodePen, Gist) are
+        # cross-origin and need `allow-same-origin` to function, but adding it
+        # unconditionally makes any iframe pointing back at the site itself
+        # fail AMP validation outright.
+        def self.sandbox_for(src : String, base_url : String) : String
+          if same_origin_src?(src, base_url)
+            %( sandbox="allow-scripts allow-popups")
+          else
+            %( sandbox="allow-scripts allow-same-origin allow-popups")
+          end
+        end
+
+        # True when `src` resolves to the same origin as the AMP document.
+        def self.same_origin_src?(src : String, base_url : String) : Bool
+          trimmed = src.strip
+          return false if trimmed.empty?
+
+          uri = URI.parse(trimmed)
+          scheme = uri.scheme.try(&.downcase)
+          # data:/blob:/about: frames get an opaque origin — never the
+          # container's, so `allow-same-origin` stays allowed for them.
+          return false if scheme && scheme != "http" && scheme != "https"
+
+          host = uri.host
+          # No host component means a document-relative reference ("/a/",
+          # "a/"), which by definition resolves against this document's
+          # own origin.
+          return true if host.nil? || host.empty?
+
+          base = URI.parse(base_url)
+          base_host = base.host
+          return false if base_host.nil? || base_host.empty?
+          return false unless host.compare(base_host, case_insensitive: true) == 0
+
+          # A protocol-relative src ("//host/x") inherits the document's
+          # scheme, so a matching host already settles it.
+          return true if trimmed.starts_with?("//")
+
+          scheme == base.scheme.try(&.downcase) && default_port(uri) == default_port(base)
+        rescue URI::Error
+          # An unparseable src can't be shown to be cross-origin; assume
+          # same-origin, which only ever drops a privilege.
+          true
+        end
+
+        # Port with the scheme's default filled in, so `https://x` and
+        # `https://x:443` compare equal.
+        private def self.default_port(uri : URI) : Int32?
+          return uri.port if uri.port
+          case uri.scheme.try(&.downcase)
+          when "https" then 443
+          when "http"  then 80
+          end
         end
 
         # Convert standard HTML to AMP-compliant HTML
@@ -157,16 +217,20 @@ module Hwaro
           needs_amp_iframe = false
           result = result.gsub(/<iframe([^>]*)>(.*?)<\/iframe>/mi) do
             needs_amp_iframe = true
+            # Capture both groups before any inner match: `$~` is per-scope,
+            # so the src lookup below would otherwise clobber `$2`.
             attrs = $1
+            inner = $2
             unless attrs.includes?("layout=")
               attrs += %( layout="responsive")
             end
             # amp-iframe requires a sandbox attribute; add a sane default when
             # the source <iframe> didn't carry one.
             unless attrs.includes?("sandbox=")
-              attrs += %( sandbox="allow-scripts allow-same-origin allow-popups")
+              src = attrs.match(/\ssrc=["']([^"']*)["']/i).try(&.[1]) || ""
+              attrs += sandbox_for(src, config.base_url)
             end
-            %(<amp-iframe#{attrs}>#{$2}</amp-iframe>)
+            %(<amp-iframe#{attrs}>#{inner}</amp-iframe>)
           end
 
           # Mandatory extension scripts for amp-iframe / amp-video. These must be
