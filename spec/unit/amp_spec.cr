@@ -271,6 +271,26 @@ describe Hwaro::Content::Seo::Amp do
       result.should_not contain("allow-same-origin")
     end
 
+    it "withholds allow-same-origin from an unquoted same-origin src" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe src=/embed/widget.html width=600></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("allow-same-origin")
+    end
+
+    it "withholds allow-same-origin from an iframe with no src" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = make_amp_config
+
+      html = %(<html><head></head><body><iframe width="600"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("allow-same-origin")
+    end
+
     it "keeps the iframe body when adding a sandbox" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
@@ -302,6 +322,19 @@ describe Hwaro::Content::Seo::Amp do
       it "resolves a protocol-relative src against the document scheme" do
         Hwaro::Content::Seo::Amp.same_origin_src?("//example.com/a", "https://example.com").should be_true
         Hwaro::Content::Seo::Amp.same_origin_src?("//other.com/a", "https://example.com").should be_false
+      end
+
+      # Fail-safe direction: an src we can't read must not be granted
+      # allow-same-origin, because a wrong guess there is the exact AMP
+      # violation this check exists to prevent.
+      it "treats an unreadable src as same-origin" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("", "https://example.com").should be_true
+        Hwaro::Content::Seo::Amp.same_origin_src?("   ", "https://example.com").should be_true
+      end
+
+      it "compares the port on a protocol-relative src" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("//example.com:8443/a", "https://example.com").should be_false
+        Hwaro::Content::Seo::Amp.same_origin_src?("//example.com:443/a", "https://example.com").should be_true
       end
 
       it "treats opaque-origin schemes as cross-origin" do

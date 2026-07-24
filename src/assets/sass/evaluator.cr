@@ -1331,6 +1331,11 @@ module Hwaro
           elsif builtin = Builtins::GLOBAL_FNS[norm]?
             builtin.call(args, kwargs)
           end
+        rescue ShapeMismatch
+          # A CSS-shadowing built-in declining this call shape. Answering
+          # nil reconstructs just this call as verbatim CSS and leaves the
+          # rest of the declaration evaluating normally.
+          nil
         end
 
         private def invoke_fn(fn : SassFn, name : String, args : Array(Value),

@@ -21,6 +21,19 @@ module Hwaro
       class SoftEvalError < Exception
       end
 
+      # "This call isn't mine" — raised by a built-in whose name shadows a
+      # real CSS function (`rgba()`, `grayscale()`, `saturate()`, …) when
+      # the arguments are the CSS shape rather than the Sass one.
+      #
+      # Deliberately NOT a SoftEvalError. A SoftEvalError unwinds the whole
+      # declaration to verbatim text, which drags every other expression in
+      # it down too — `filter: grayscale(50%) blur($r * 1px)` would ship
+      # `blur(2 * 1px)`. `expr_call` catches this one separately and answers
+      # "no such function", so only the offending call reconstructs and the
+      # rest of the declaration still evaluates.
+      class ShapeMismatch < Exception
+      end
+
       abstract class Value
         # CSS text for this value (what lands in output).
         abstract def to_css : String

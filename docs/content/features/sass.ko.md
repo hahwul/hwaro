@@ -170,7 +170,7 @@ Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not suppor
 - *값* 위치의 `and`/`or`는 실제 불리언에만 동작합니다 — `font-family: Franklin and Marshall`은 텍스트로 남습니다. 조건식에서는 Sass의 완전한 truthiness를 따릅니다.
 - 전역 `min()`/`max()`/`round()`/`abs()`는 모든 인자가 정적으로 비교 가능한 숫자일 때만 평가됩니다. CSS 형태(`min(5vw, 100px)`, `round(up, 101px, 10px)`)는 그대로 통과합니다.
 - `rgb()`/`rgba()`/`hsl()`/`hsla()`는 CSS 형태 그대로 두고 접지 **않습니다**. dart-sass는 `rgb(0, 0, 0)`을 `black`으로 내보내지만 여기서는 원문이 유지됩니다. 유효한 CSS가 아닌 Sass 전용 `rgba($color, $alpha)` 철자만 평가됩니다. 마찬가지로 `grayscale()`, `invert()`, `saturate()`, `opacity()`는 색상을 받으면 색상 함수, 숫자를 받으면 순수 CSS 필터로 취급됩니다(`filter: grayscale(50%)`는 그대로 통과).
-- 내장 함수는 위치 인자만 받습니다. 키워드 호출(`list.append($l, x, $separator: comma)`)은 평가되지 않고 원문 그대로 남습니다 — 사용자 정의 `@mixin`/`@function`의 키워드 인자는 정상 동작합니다.
+- 대부분의 내장 함수는 위치 인자만 받습니다. 키워드 호출(`list.append($l, x, $separator: comma)`)은 평가되지 않고 원문 그대로 남습니다. **색상** 함수는 예외로, 문서화된 키워드 이름을 받습니다(`darken($c, $amount: 10%)`, `mix($a, $b, $weight: 25%)`, `scale-color($c, $lightness: 60%)`). `adjust`/`scale`/`change`는 `$lightness` 같은 키워드 인자가 유일한 호출 방법이기 때문입니다. 사용자 정의 `@mixin`/`@function`의 키워드 인자는 정상 동작합니다.
 - `if()`는 두 분기를 모두 즉시 평가합니다(부수 효과가 없으므로, 선택되지 않은 분기의 `@error`로만 관찰 가능합니다).
 - at-규칙 서두와 값 안의 변수는 직접 치환됩니다(`@media (min-width: $bp)` 동작). 셀렉터와 속성 이름에는 `#{...}` 보간이 필요합니다(dart-sass와 동일).
 - at-규칙 서두에서는 `(feature: value)` 구간 안에서만 표현식이 평가됩니다. 쿼리 구조 자체는 원문 그대로 유지됩니다.

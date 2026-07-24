@@ -491,7 +491,7 @@ module Hwaro
           # no tokens. `color: inherit` keeps the body on the theme palette.
           <<-HTML
             <div class="alert" style="padding: 0.9rem 1.15rem; border: 1px solid color-mix(in srgb, var(--primary, #b35454) 22%, transparent); border-left: 3px solid var(--primary, #b35454); background-color: color-mix(in srgb, var(--primary, #b35454) 6%, transparent); border-radius: var(--radius-sm, 6px); margin: 1.25rem 0; color: inherit;">
-              <strong style="color: var(--primary, #b35454);">{% if title %}{{ title | e }}{% else %}{{ type | upper }}{% endif %}:</strong> {{ body | markdownify }}
+              <strong style="color: var(--primary, #b35454);">{% if title %}{{ title | e }}{% else %}{{ type | upper | e }}{% endif %}:</strong> {{ body | markdownify }}
             </div>
             HTML
         end

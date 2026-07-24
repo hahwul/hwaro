@@ -129,37 +129,119 @@ module Hwaro
             raise SoftEvalError.new("#{name}() expects a color, got #{value.to_css.inspect}")
         end
 
-        # Percentage-style amount (`10%` or bare `10`). Sass treats the
-        # unit as decorative here; what matters is the 0..100 magnitude.
+        # Colour argument for a built-in whose name is also a real CSS
+        # function. Declining with ShapeMismatch (rather than raising
+        # SoftEvalError) is what keeps `filter: grayscale(50%)` from
+        # unwinding every other expression in its declaration.
+        private def self.shadowed_color!(value : Value) : ColorV
+          color?(value) || raise ShapeMismatch.new
+        end
+
+        private def self.shadowed_arity!(args : Array(Value), min : Int32, max : Int32 = min) : Nil
+          raise ShapeMismatch.new unless args.size >= min && args.size <= max
+        end
+
+        # Binds a shadowed built-in's arguments, declining rather than
+        # erroring when a required one is absent. `saturate(180%)` is the CSS
+        # filter: it must reconstruct verbatim, not raise, or it takes every
+        # other expression in the declaration down with it.
+        private def self.shadowed_bind!(name : String, args : Array(Value),
+                                        kwargs : Hash(String, Value),
+                                        params : Array(String), required : Int32) : Array(Value?)
+          shadowed_arity!(args, 0, params.size)
+          bound = bind_args(name, args, kwargs, params)
+          required.times { |index| raise ShapeMismatch.new unless bound[index] }
+          bound
+        end
+
+        # Rejects NaN/Infinity before it reaches channel math. `NaN.to_i`
+        # raises OverflowError, which nothing in the compiler catches, so an
+        # unguarded NaN escapes as a bare arithmetic crash with no source
+        # location instead of the normal located error.
+        private def self.finite!(name : String, number : Number) : Float64
+          value = number.value
+          unless value.finite?
+            raise SoftEvalError.new("#{name}() expects a finite number, got #{number.to_css}")
+          end
+          value
+        end
+
+        # Percentage-style amount (`10%` or bare `10`). Out-of-range values
+        # raise rather than clamp: silently turning `lighten($c, -10%)` into
+        # a no-op, or `darken($c, 200%)` into black, hides the mistake in
+        # output that looks perfectly valid. dart-sass errors here too.
         private def self.amount!(name : String, value : Value,
                                  min : Float64 = 0.0, max : Float64 = 100.0) : Float64
-          number!(name, value).value.clamp(min, max)
+          raw = finite!(name, number!(name, value))
+          unless raw >= min && raw <= max
+            raise SoftEvalError.new(
+              "#{name}(): expected #{Number.format(raw)} to be within #{Number.format(min)} and #{Number.format(max)}")
+          end
+          raw
         end
 
         # Alpha-style amount, on 0..1. A percentage spelling (`50%`) is
         # accepted and scaled, matching dart-sass.
         private def self.alpha!(name : String, value : Value,
                                 min : Float64 = 0.0, max : Float64 = 1.0) : Float64
-          n = number!(name, value)
-          raw = n.unit == "%" ? n.value / 100.0 : n.value
-          raw.clamp(min, max)
-        end
-
-        # Named argument lookup that tolerates the `$foo-bar` / `$foo_bar`
-        # spellings Sass treats as one name.
-        private def self.kwarg?(kwargs : Hash(String, Value), name : String) : Value?
-          kwargs[name]? || kwargs[name.tr("-", "_")]? || kwargs[name.tr("_", "-")]?
+          number = number!(name, value)
+          raw = finite!(name, number)
+          raw /= 100.0 if number.unit == "%"
+          unless raw >= min && raw <= max
+            raise SoftEvalError.new(
+              "#{name}(): expected #{Number.format(raw)} to be within #{Number.format(min)} and #{Number.format(max)}")
+          end
+          raw
         end
 
         # Rejects keyword arguments the function doesn't define, so a typo
         # (`$lightnes:`) fails loudly instead of being silently dropped.
+        # Keys arrive already normalized to the `-` spelling (`eval_call`
+        # runs them through `Sass.normalize_ident`), so no further
+        # translation is needed here.
         private def self.known_kwargs!(name : String, kwargs : Hash(String, Value),
                                        allowed : Array(String)) : Nil
           kwargs.each_key do |key|
-            normalized = key.tr("_", "-")
-            next if allowed.includes?(normalized)
+            next if allowed.includes?(key)
             raise SoftEvalError.new("#{name}() has no argument named $#{key}")
           end
+        end
+
+        # Binds positional arguments and the keyword spellings dart-sass
+        # accepts onto `params`, so `darken($c, $amount: 10%)` reaches the
+        # same slots as `darken($c, 10%)`. Returns one entry per parameter,
+        # nil where the caller supplied nothing.
+        private def self.bind_args(name : String, args : Array(Value),
+                                   kwargs : Hash(String, Value),
+                                   params : Array(String)) : Array(Value?)
+          known_kwargs!(name, kwargs, params)
+          if args.size > params.size
+            raise SoftEvalError.new("#{name}() expects at most #{params.size} argument(s), got #{args.size}")
+          end
+          params.map_with_index do |param, index|
+            positional = args[index]?
+            if named = kwargs[param]?
+              if positional
+                raise SoftEvalError.new("#{name}() got multiple values for $#{param}")
+              end
+              next named.as(Value?)
+            end
+            positional.as(Value?)
+          end
+        end
+
+        # `bind_args` plus a required-argument check on the leading
+        # `required` parameters.
+        private def self.bind!(name : String, args : Array(Value),
+                               kwargs : Hash(String, Value),
+                               params : Array(String), required : Int32) : Array(Value?)
+          bound = bind_args(name, args, kwargs, params)
+          required.times do |index|
+            unless bound[index]
+              raise SoftEvalError.new("#{name}() is missing required argument $#{params[index]}")
+            end
+          end
+          bound
         end
 
         private def self.same_units!(name : String, numbers : Array(Number)) : String
@@ -632,226 +714,211 @@ module Hwaro
         ADJUST_KWARGS = ["red", "green", "blue", "hue", "saturation", "lightness", "alpha"]
         SCALE_KWARGS  = ["red", "green", "blue", "saturation", "lightness", "alpha"]
 
+        # How `adjust`/`scale`/`change` differ: each takes the current
+        # component value and the requested amount and returns the new
+        # value. Everything else about the three — argument binding, the
+        # RGB/HSL exclusivity check, the alpha handling — is identical, so
+        # they share `compound_color` below rather than three near-copies
+        # that drift apart.
+        enum ComponentMode
+          Adjust
+          Scale
+          Change
+        end
+
+        private def self.combine(mode : ComponentMode, current : Float64,
+                                 requested : Float64, max : Float64) : Float64
+          case mode
+          in ComponentMode::Adjust then current + requested
+          in ComponentMode::Scale  then scale_component(current, requested, max)
+          in ComponentMode::Change then requested
+          end
+        end
+
+        # Range a component argument may occupy, which is the one thing the
+        # three modes disagree on: `adjust` takes a signed delta, `scale` a
+        # signed percentage, `change` an absolute value.
+        private def self.component_range(mode : ComponentMode, max : Float64) : Tuple(Float64, Float64)
+          case mode
+          in ComponentMode::Adjust then {-max, max}
+          in ComponentMode::Scale  then {-100.0, 100.0}
+          in ComponentMode::Change then {0.0, max}
+          end
+        end
+
+        private def self.compound_color(name : String, mode : ComponentMode,
+                                        args : Array(Value), kwargs : Hash(String, Value)) : Value
+          params = mode.scale? ? SCALE_KWARGS : ADJUST_KWARGS
+          bound = bind!(name, args, kwargs, ["color"] + params, required: 1)
+          color = color!(name, bound[0].as(Value))
+
+          # `bound` is [color, *params]; re-key it by parameter name.
+          given = {} of String => Value
+          params.each_with_index { |param, index| (v = bound[index + 1]) && (given[param] = v) }
+          red, green, blue = given["red"]?, given["green"]?, given["blue"]?
+          hue, saturation, lightness = given["hue"]?, given["saturation"]?, given["lightness"]?
+          alpha = given["alpha"]?
+
+          reject_mixed_spaces!(name,
+            !(red.nil? && green.nil? && blue.nil?),
+            !(hue.nil? && saturation.nil? && lightness.nil?))
+
+          result =
+            if hue || saturation || lightness
+              h, s, l = color.to_hsl
+              # Hue is an angle, not a bounded component: it wraps rather
+              # than clamping, and `scale` has no meaningful limit for it
+              # (which is why $hue isn't in SCALE_KWARGS).
+              if hue
+                degrees = finite!(name, number!(name, hue))
+                h = mode.change? ? degrees : h + degrees
+              end
+              if saturation
+                min, max = component_range(mode, 100.0)
+                s = combine(mode, s, amount!(name, saturation, min, max), 100.0)
+              end
+              if lightness
+                min, max = component_range(mode, 100.0)
+                l = combine(mode, l, amount!(name, lightness, min, max), 100.0)
+              end
+              ColorV.from_hsl(h, s, l, color.alpha)
+            else
+              min, max = component_range(mode, 255.0)
+              ColorV.new(
+                red ? combine(mode, color.red, amount!(name, red, min, max), 255.0) : color.red,
+                green ? combine(mode, color.green, amount!(name, green, min, max), 255.0) : color.green,
+                blue ? combine(mode, color.blue, amount!(name, blue, min, max), 255.0) : color.blue,
+                color.alpha)
+            end
+
+          if alpha
+            amin, amax = component_range(mode, 1.0)
+            requested = mode.scale? ? amount!(name, alpha, amin, amax) : alpha!(name, alpha, amin, amax)
+            result = result.with_alpha(combine(mode, result.alpha, requested, 1.0))
+          end
+          result
+        end
+
         COLOR_FNS = {
           "adjust" => Fn.new do |args, kwargs|
-            arity!("color.adjust", args, 1)
-            known_kwargs!("color.adjust", kwargs, ADJUST_KWARGS)
-            color = color!("color.adjust", args[0])
-
-            red = kwarg?(kwargs, "red")
-            green = kwarg?(kwargs, "green")
-            blue = kwarg?(kwargs, "blue")
-            hue = kwarg?(kwargs, "hue")
-            saturation = kwarg?(kwargs, "saturation")
-            lightness = kwarg?(kwargs, "lightness")
-            alpha = kwarg?(kwargs, "alpha")
-            reject_mixed_spaces!("color.adjust",
-              !(red.nil? && green.nil? && blue.nil?),
-              !(hue.nil? && saturation.nil? && lightness.nil?))
-
-            result =
-              if hue || saturation || lightness
-                adjust_hsl(color,
-                  hue: hue ? number!("color.adjust", hue).value : 0.0,
-                  saturation: saturation ? amount!("color.adjust", saturation, -100.0) : 0.0,
-                  lightness: lightness ? amount!("color.adjust", lightness, -100.0) : 0.0)
-              else
-                ColorV.new(
-                  color.red + (red ? amount!("color.adjust", red, -255.0, 255.0) : 0.0),
-                  color.green + (green ? amount!("color.adjust", green, -255.0, 255.0) : 0.0),
-                  color.blue + (blue ? amount!("color.adjust", blue, -255.0, 255.0) : 0.0),
-                  color.alpha)
-              end
-            result = result.with_alpha(result.alpha + alpha!("color.adjust", alpha, -1.0)) if alpha
-            result
+            compound_color("color.adjust", ComponentMode::Adjust, args, kwargs)
           end,
           "scale" => Fn.new do |args, kwargs|
-            arity!("color.scale", args, 1)
-            known_kwargs!("color.scale", kwargs, SCALE_KWARGS)
-            color = color!("color.scale", args[0])
-
-            red = kwarg?(kwargs, "red")
-            green = kwarg?(kwargs, "green")
-            blue = kwarg?(kwargs, "blue")
-            saturation = kwarg?(kwargs, "saturation")
-            lightness = kwarg?(kwargs, "lightness")
-            alpha = kwarg?(kwargs, "alpha")
-            reject_mixed_spaces!("color.scale",
-              !(red.nil? && green.nil? && blue.nil?),
-              !(saturation.nil? && lightness.nil?))
-
-            result =
-              if saturation || lightness
-                h, s, l = color.to_hsl
-                s = scale_component(s, amount!("color.scale", saturation, -100.0), 100.0) if saturation
-                l = scale_component(l, amount!("color.scale", lightness, -100.0), 100.0) if lightness
-                ColorV.from_hsl(h, s, l, color.alpha)
-              else
-                ColorV.new(
-                  red ? scale_component(color.red, amount!("color.scale", red, -100.0), 255.0) : color.red,
-                  green ? scale_component(color.green, amount!("color.scale", green, -100.0), 255.0) : color.green,
-                  blue ? scale_component(color.blue, amount!("color.scale", blue, -100.0), 255.0) : color.blue,
-                  color.alpha)
-              end
-            if alpha
-              scaled = scale_component(result.alpha, amount!("color.scale", alpha, -100.0), 1.0)
-              result = result.with_alpha(scaled)
-            end
-            result
+            compound_color("color.scale", ComponentMode::Scale, args, kwargs)
           end,
           "change" => Fn.new do |args, kwargs|
-            arity!("color.change", args, 1)
-            known_kwargs!("color.change", kwargs, ADJUST_KWARGS)
-            color = color!("color.change", args[0])
-
-            red = kwarg?(kwargs, "red")
-            green = kwarg?(kwargs, "green")
-            blue = kwarg?(kwargs, "blue")
-            hue = kwarg?(kwargs, "hue")
-            saturation = kwarg?(kwargs, "saturation")
-            lightness = kwarg?(kwargs, "lightness")
-            alpha = kwarg?(kwargs, "alpha")
-            reject_mixed_spaces!("color.change",
-              !(red.nil? && green.nil? && blue.nil?),
-              !(hue.nil? && saturation.nil? && lightness.nil?))
-
-            result =
-              if hue || saturation || lightness
-                h, s, l = color.to_hsl
-                h = number!("color.change", hue).value if hue
-                s = amount!("color.change", saturation) if saturation
-                l = amount!("color.change", lightness) if lightness
-                ColorV.from_hsl(h, s, l, color.alpha)
-              else
-                ColorV.new(
-                  red ? amount!("color.change", red, 0.0, 255.0) : color.red,
-                  green ? amount!("color.change", green, 0.0, 255.0) : color.green,
-                  blue ? amount!("color.change", blue, 0.0, 255.0) : color.blue,
-                  color.alpha)
-              end
-            result = result.with_alpha(alpha!("color.change", alpha)) if alpha
-            result
+            compound_color("color.change", ComponentMode::Change, args, kwargs)
           end,
           "mix" => Fn.new do |args, kwargs|
-            no_kwargs!("color.mix", kwargs)
-            arity!("color.mix", args, 2, 3)
-            weight = args.size == 3 ? amount!("color.mix", args[2]) : 50.0
-            mix_colors(color!("color.mix", args[0]), color!("color.mix", args[1]), weight)
+            bound = bind!("mix", args, kwargs, ["color1", "color2", "weight"], required: 2)
+            weight = (w = bound[2]) ? amount!("mix", w) : 50.0
+            mix_colors(color!("mix", bound[0].as(Value)), color!("mix", bound[1].as(Value)), weight)
           end,
           "invert" => Fn.new do |args, kwargs|
-            no_kwargs!("color.invert", kwargs)
-            arity!("color.invert", args, 1, 2)
-            color = color!("color.invert", args[0])
-            weight = args.size == 2 ? amount!("color.invert", args[1]) : 100.0
+            # `invert(20%)` is the CSS filter; only a color is ours.
+            bound = shadowed_bind!("invert", args, kwargs, ["color", "weight"], required: 1)
+            color = shadowed_color!(bound[0].as(Value))
+            weight = (w = bound[1]) ? amount!("invert", w) : 100.0
             inverse = ColorV.new(255.0 - color.red, 255.0 - color.green,
               255.0 - color.blue, color.alpha)
             mix_colors(inverse, color, weight)
           end,
           "grayscale" => Fn.new do |args, kwargs|
-            no_kwargs!("color.grayscale", kwargs)
-            arity!("color.grayscale", args, 1)
-            adjust_hsl(color!("color.grayscale", args[0]), saturation: -100.0)
+            # `grayscale(50%)` is the CSS filter; only a color is ours.
+            bound = shadowed_bind!("grayscale", args, kwargs, ["color"], required: 1)
+            adjust_hsl(shadowed_color!(bound[0].as(Value)), saturation: -100.0)
           end,
           "complement" => Fn.new do |args, kwargs|
-            no_kwargs!("color.complement", kwargs)
-            arity!("color.complement", args, 1)
-            adjust_hsl(color!("color.complement", args[0]), hue: 180.0)
+            bound = bind!("complement", args, kwargs, ["color"], required: 1)
+            adjust_hsl(color!("complement", bound[0].as(Value)), hue: 180.0)
           end,
           "adjust-hue" => Fn.new do |args, kwargs|
-            no_kwargs!("color.adjust-hue", kwargs)
-            arity!("adjust-hue", args, 2)
-            color = color!("adjust-hue", args[0])
-            adjust_hsl(color, hue: number!("adjust-hue", args[1]).value)
+            bound = bind!("adjust-hue", args, kwargs, ["color", "degrees"], required: 2)
+            color = color!("adjust-hue", bound[0].as(Value))
+            adjust_hsl(color, hue: finite!("adjust-hue", number!("adjust-hue", bound[1].as(Value))))
           end,
           "darken" => Fn.new do |args, kwargs|
-            no_kwargs!("darken", kwargs)
-            arity!("darken", args, 2)
-            color = color!("darken", args[0])
-            adjust_hsl(color, lightness: -amount!("darken", args[1]))
+            bound = bind!("darken", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("darken", bound[0].as(Value))
+            adjust_hsl(color, lightness: -amount!("darken", bound[1].as(Value)))
           end,
           "lighten" => Fn.new do |args, kwargs|
-            no_kwargs!("lighten", kwargs)
-            arity!("lighten", args, 2)
-            color = color!("lighten", args[0])
-            adjust_hsl(color, lightness: amount!("lighten", args[1]))
+            bound = bind!("lighten", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("lighten", bound[0].as(Value))
+            adjust_hsl(color, lightness: amount!("lighten", bound[1].as(Value)))
           end,
           "saturate" => Fn.new do |args, kwargs|
-            no_kwargs!("saturate", kwargs)
             # One-argument `saturate(50%)` is the CSS filter, not this
-            # function — leave it verbatim.
-            arity!("saturate", args, 2)
-            color = color!("saturate", args[0])
-            adjust_hsl(color, saturation: amount!("saturate", args[1]))
+            # function — decline so it stays verbatim.
+            bound = shadowed_bind!("saturate", args, kwargs, ["color", "amount"], required: 2)
+            color = shadowed_color!(bound[0].as(Value))
+            adjust_hsl(color, saturation: amount!("saturate", bound[1].as(Value)))
           end,
           "desaturate" => Fn.new do |args, kwargs|
-            no_kwargs!("desaturate", kwargs)
-            arity!("desaturate", args, 2)
-            color = color!("desaturate", args[0])
-            adjust_hsl(color, saturation: -amount!("desaturate", args[1]))
+            bound = bind!("desaturate", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("desaturate", bound[0].as(Value))
+            adjust_hsl(color, saturation: -amount!("desaturate", bound[1].as(Value)))
           end,
           "opacify" => Fn.new do |args, kwargs|
-            no_kwargs!("opacify", kwargs)
-            arity!("opacify", args, 2)
-            color = color!("opacify", args[0])
-            color.with_alpha(color.alpha + alpha!("opacify", args[1]))
+            bound = bind!("opacify", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("opacify", bound[0].as(Value))
+            color.with_alpha(color.alpha + alpha!("opacify", bound[1].as(Value)))
           end,
           "transparentize" => Fn.new do |args, kwargs|
-            no_kwargs!("transparentize", kwargs)
-            arity!("transparentize", args, 2)
-            color = color!("transparentize", args[0])
-            color.with_alpha(color.alpha - alpha!("transparentize", args[1]))
+            bound = bind!("transparentize", args, kwargs, ["color", "amount"], required: 2)
+            color = color!("transparentize", bound[0].as(Value))
+            color.with_alpha(color.alpha - alpha!("transparentize", bound[1].as(Value)))
           end,
           "red" => Fn.new do |args, kwargs|
-            no_kwargs!("color.red", kwargs)
-            arity!("red", args, 1)
-            Number.new(color!("red", args[0]).red8.to_f)
+            bound = bind!("red", args, kwargs, ["color"], required: 1)
+            Number.new(color!("red", bound[0].as(Value)).red8.to_f)
           end,
           "green" => Fn.new do |args, kwargs|
-            no_kwargs!("color.green", kwargs)
-            arity!("green", args, 1)
-            Number.new(color!("green", args[0]).green8.to_f)
+            bound = bind!("green", args, kwargs, ["color"], required: 1)
+            Number.new(color!("green", bound[0].as(Value)).green8.to_f)
           end,
           "blue" => Fn.new do |args, kwargs|
-            no_kwargs!("color.blue", kwargs)
-            arity!("blue", args, 1)
-            Number.new(color!("blue", args[0]).blue8.to_f)
+            bound = bind!("blue", args, kwargs, ["color"], required: 1)
+            Number.new(color!("blue", bound[0].as(Value)).blue8.to_f)
           end,
           "hue" => Fn.new do |args, kwargs|
-            no_kwargs!("color.hue", kwargs)
-            arity!("hue", args, 1)
-            Number.new(color!("hue", args[0]).hue, "deg")
+            bound = bind!("hue", args, kwargs, ["color"], required: 1)
+            Number.new(color!("hue", bound[0].as(Value)).hue, "deg")
           end,
           "saturation" => Fn.new do |args, kwargs|
-            no_kwargs!("color.saturation", kwargs)
-            arity!("saturation", args, 1)
-            Number.new(color!("saturation", args[0]).saturation, "%")
+            bound = bind!("saturation", args, kwargs, ["color"], required: 1)
+            Number.new(color!("saturation", bound[0].as(Value)).saturation, "%")
           end,
           "lightness" => Fn.new do |args, kwargs|
-            no_kwargs!("color.lightness", kwargs)
-            arity!("lightness", args, 1)
-            Number.new(color!("lightness", args[0]).lightness, "%")
+            bound = bind!("lightness", args, kwargs, ["color"], required: 1)
+            Number.new(color!("lightness", bound[0].as(Value)).lightness, "%")
           end,
           "alpha" => Fn.new do |args, kwargs|
-            no_kwargs!("color.alpha", kwargs)
-            arity!("alpha", args, 1)
-            Number.new(color!("alpha", args[0]).alpha)
+            bound = bind!("alpha", args, kwargs, ["color"], required: 1)
+            Number.new(color!("alpha", bound[0].as(Value)).alpha)
           end,
           "opacity" => Fn.new do |args, kwargs|
-            no_kwargs!("color.opacity", kwargs)
-            arity!("opacity", args, 1)
-            Number.new(color!("opacity", args[0]).alpha)
+            # `opacity(50%)` is the CSS filter; only a color is ours.
+            bound = shadowed_bind!("opacity", args, kwargs, ["color"], required: 1)
+            Number.new(shadowed_color!(bound[0].as(Value)).alpha)
           end,
         }
 
+        # `color.fade-in` / `color.fade-out` are the module spellings of
+        # opacify / transparentize. dart-sass defines both, so the module
+        # table needs them or `color.fade-in(...)` leaks its call text.
+        COLOR_FNS["fade-in"] = COLOR_FNS["opacify"]
+        COLOR_FNS["fade-out"] = COLOR_FNS["transparentize"]
+
         # `rgba($color, $alpha)` / `rgb($color, $alpha)` — the Sass-only
         # two-argument spelling. Every other shape (`rgb(0, 0, 0)`,
-        # `rgb(0 0 0 / 50%)`, relative color syntax) is real CSS and stays
-        # verbatim, so this raises rather than reconstructing.
+        # `rgb(0 0 0 / 50%)`, relative color syntax) is real CSS, so those
+        # decline with ShapeMismatch and reconstruct verbatim instead of
+        # unwinding the whole declaration.
         RGBA_FN = Fn.new do |args, kwargs|
-          no_kwargs!("rgba", kwargs)
-          arity!("rgba", args, 2)
-          color = color!("rgba", args[0])
-          color.with_alpha(alpha!("rgba", args[1]))
+          bound = shadowed_bind!("rgba", args, kwargs, ["color", "alpha"], required: 2)
+          color = shadowed_color!(bound[0].as(Value))
+          color.with_alpha(alpha!("rgba", bound[1].as(Value)))
         end
 
         # ---------------------------------------------------------------

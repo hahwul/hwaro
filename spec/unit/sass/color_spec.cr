@@ -28,11 +28,35 @@ describe "Sass colors" do
       value_of("transparent").should eq("transparent")
     end
 
-    it "leaves CSS color functions verbatim, spacing included" do
+    it "leaves CSS color functions as CSS" do
       value_of("rgb(0, 0, 0)").should eq("rgb(0, 0, 0)")
-      value_of("rgba(0,0,0,.5)").should eq("rgba(0,0,0,.5)")
-      value_of("hsl(120, 50%, 50%)").should eq("hsl(120, 50%, 50%)")
+      # hsl()/hsla() aren't registered at all, so they survive byte-for-byte.
+      value_of("hsl(120,50%,50%)").should eq("hsl(120,50%,50%)")
       value_of("hsla(120, 50%, 50%, 0.4)").should eq("hsla(120, 50%, 50%, 0.4)")
+    end
+
+    # `rgb()`/`rgba()` ARE registered (the Sass-only two-argument form has to
+    # work), so a CSS-shaped call is declined and re-serialized rather than
+    # passed through untouched. Numbers keep their source spelling — only
+    # argument spacing normalizes, which the plain-CSS guarantee allows
+    # ("compiles to itself, whitespace-normalized").
+    it "normalizes only the spacing of a CSS-shaped rgba()" do
+      value_of("rgba(0,0,0,.5)").should eq("rgba(0, 0, 0, .5)")
+      value_of("rgba(0, 0, 0, 0.5)").should eq("rgba(0, 0, 0, 0.5)")
+    end
+
+    # The regression this guards: a declined call used to raise
+    # SoftEvalError, which unwound the WHOLE declaration to verbatim text
+    # and took every other expression down with it.
+    it "does not poison sibling expressions in the same declaration" do
+      compile("$r: 2; .a { filter: grayscale(50%) blur($r * 1px); }")
+        .should contain("filter: grayscale(50%) blur(2px);")
+      compile("$r: 2; .a { filter: saturate(180%) blur($r * 1px); }")
+        .should contain("blur(2px)")
+      compile("$r: 2; .a { filter: invert(1) opacity(0.5) blur($r * 1px); }")
+        .should contain("blur(2px)")
+      compile("$o: 0.5; .a { box-shadow: 0 0 (2px * 2) rgba(0,0,0,$o); }")
+        .should contain("box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);")
     end
 
     it "leaves the CSS filter forms verbatim" do
@@ -315,6 +339,45 @@ describe "Sass colors" do
 
     it "keeps a non-color argument verbatim in a lenient context" do
       value_of("darken(12px, 10%)").should eq("darken(12px, 10%)")
+    end
+
+    it "round-trips a translucent color through a variable" do
+      # Variables store `inspect_css` and re-coerce on use, so a computed
+      # rgba() has to parse back into a color or the next function breaks.
+      compile("$c: rgba(#336699, 0.5); .a { color: darken($c, 10%); }")
+        .should contain("color: rgba(38, 77, 115, 0.5);")
+    end
+
+    it "accepts the dart-sass keyword argument names" do
+      value_of("darken(#336699, $amount: 10%)").should eq("#264d73")
+      value_of("lighten($color: #336699, $amount: 10%)").should eq("#4080bf")
+      value_of("mix(#ff0000, #0000ff, $weight: 25%)").should eq("#4000bf")
+      value_of("rgba($color: #336699, $alpha: 0.5)").should eq("rgba(51, 102, 153, 0.5)")
+    end
+
+    it "compares equal regardless of operand order" do
+      css = compile(".a { b: if(darken(#ff0000, 0%) == #ff0000, yes, no); c: if(#ff0000 == darken(#ff0000, 0%), yes, no); }")
+      css.should contain("b: yes;")
+      css.should contain("c: yes;")
+    end
+
+    it "rejects an out-of-range amount instead of silently clamping" do
+      # A no-op `lighten` or a surprise black is worse than a visible
+      # fallback: the output would look perfectly valid either way.
+      value_of("lighten(#336699, -10%)").should eq("lighten(#336699, -10%)")
+      value_of("darken(#336699, 200%)").should eq("darken(#336699, 200%)")
+    end
+
+    it "survives a non-finite argument without crashing" do
+      # `NaN.to_i` raises OverflowError, which nothing in the compiler
+      # catches — it would escape as a bare arithmetic error.
+      compile(%(@use "sass:math"; .a { color: darken(#336699, math.pow(-1, 0.5)); }))
+        .should contain("darken(")
+    end
+
+    it "exposes fade-in / fade-out on the sass:color module" do
+      compile(%(@use "sass:color"; .a { b: color.fade-in(rgba(#336699, 0.5), 0.2); c: color.fade-out(rgba(#336699, 0.5), 0.2); }))
+        .should contain("b: rgba(51, 102, 153, 0.7);")
     end
   end
 end

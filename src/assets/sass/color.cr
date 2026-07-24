@@ -31,8 +31,18 @@ module Hwaro
         # rather than from a computation. Nil for computed colors.
         getter lexeme : String?
 
+        @hsl : Tuple(Float64, Float64, Float64)?
+
         def initialize(red : Float64, green : Float64, blue : Float64,
                        alpha : Float64 = 1.0, @lexeme : String? = nil)
+          # `Float#clamp` passes NaN straight through, and `NaN.to_i` raises
+          # OverflowError — an exception nothing in the compiler catches, so
+          # it would escape as a bare arithmetic crash with no source
+          # location. Reject it here, at the one door every color goes
+          # through, rather than at each arithmetic call site.
+          unless red.finite? && green.finite? && blue.finite? && alpha.finite?
+            raise SoftEvalError.new("color channels must be finite numbers")
+          end
           @red = red.clamp(0.0, 255.0)
           @green = green.clamp(0.0, 255.0)
           @blue = blue.clamp(0.0, 255.0)
@@ -85,17 +95,32 @@ module Hwaro
         # differ. Comparing `to_css` (the Value default) would call them
         # three different colors and pick the wrong `@if` branch.
         def eq?(other : Value) : Bool
-          return false unless other.is_a?(ColorV)
-          red8 == other.red8 && green8 == other.green8 &&
-            blue8 == other.blue8 && @alpha == other.alpha
+          # A literal operand arrives as Raw/Str, and `Value#eq?` compares
+          # serialized text. Without coercing here, `==` would answer
+          # differently depending on operand order: `#ff0000 == darken(…)`
+          # goes through Raw#eq? (text) while `darken(…) == #ff0000` goes
+          # through this method. Both must agree.
+          return false unless color = ColorV.coerce?(other)
+          # Alpha is compared at output precision, matching the channels;
+          # exact float equality would call 0.1+0.2 and 0.3 different.
+          red8 == color.red8 && green8 == color.green8 &&
+            blue8 == color.blue8 && alpha8 == color.alpha8
         end
 
-        # Drops the source spelling — used when a function returns a color
-        # it did not actually change, so the result still serializes
-        # canonically like every other computed color.
-        def computed : ColorV
-          return self unless @lexeme
-          ColorV.new(@red, @green, @blue, @alpha)
+        # The alpha as it would serialize, so equality doesn't hinge on
+        # float noise below the emitted precision.
+        protected def alpha8 : String
+          Number.format(@alpha)
+        end
+
+        # A color view of any value: colors as themselves, hex/named
+        # literals parsed, everything else nil.
+        def self.coerce?(value : Value) : ColorV?
+          case value
+          when ColorV then value
+          when Raw    then parse?(value.text)
+          when Str    then value.quoted ? nil : parse?(value.text)
+          end
         end
 
         def with_alpha(alpha : Float64) : ColorV
@@ -107,7 +132,16 @@ module Hwaro
         # ---------------------------------------------------------------
 
         # Returns {hue 0..360, saturation 0..100, lightness 0..100}.
+        #
+        # Memoized: a ColorV is immutable, and reading two or three
+        # components (`hue($c) saturation($c) lightness($c)`, or a palette
+        # loop over the `sass:color` getters) would otherwise redo the whole
+        # min/max/delta conversion per accessor.
         def to_hsl : Tuple(Float64, Float64, Float64)
+          @hsl ||= compute_hsl
+        end
+
+        private def compute_hsl : Tuple(Float64, Float64, Float64)
           r = @red / 255.0
           g = @green / 255.0
           b = @blue / 255.0
@@ -199,7 +233,49 @@ module Hwaro
           stripped = text.strip
           return if stripped.empty?
           return parse_hex?(stripped) if stripped[0] == '#'
-          named?(stripped)
+          named?(stripped) || parse_rgb_call?(stripped)
+        end
+
+        # Parses the `rgb(…)` / `rgba(…)` spelling.
+        #
+        # This exists because variables round-trip through text: a value is
+        # stored as `inspect_css` and re-coerced on use, so a translucent
+        # computed color becomes the string `rgba(51, 102, 153, 0.5)`.
+        # Without this, `$c: rgba($brand, .5); darken($c, 10%)` would hand
+        # `darken` a value it can't read and emit broken CSS — the exact
+        # failure this module exists to prevent.
+        #
+        # Only the comma-separated legacy form is accepted. The modern
+        # space/slash syntax (`rgb(0 0 0 / 50%)`) and relative color syntax
+        # are CSS this compiler deliberately leaves alone, and a color
+        # function handed one still declines rather than guessing.
+        private def self.parse_rgb_call?(text : String) : ColorV?
+          return unless match = text.match(/\A rgba? \( ([^()]*) \) \z/xi)
+          parts = match[1].split(',').map(&.strip)
+          return unless parts.size == 3 || parts.size == 4
+          return if parts.any?(&.empty?)
+
+          channels = parts[0, 3].map do |part|
+            return unless value = channel_value?(part)
+            value
+          end
+          alpha = 1.0
+          if raw_alpha = parts[3]?
+            return unless parsed = number_value?(raw_alpha)
+            alpha = raw_alpha.ends_with?('%') ? parsed / 100.0 : parsed
+          end
+          return unless channels.all?(&.finite?) && alpha.finite?
+          new(channels[0], channels[1], channels[2], alpha, lexeme: text)
+        end
+
+        # An RGB channel: `0`..`255`, or a percentage of 255.
+        private def self.channel_value?(text : String) : Float64?
+          return unless value = number_value?(text)
+          text.ends_with?('%') ? value * 255.0 / 100.0 : value
+        end
+
+        private def self.number_value?(text : String) : Float64?
+          text.rstrip('%').to_f?
         end
 
         private def self.parse_hex?(text : String) : ColorV?

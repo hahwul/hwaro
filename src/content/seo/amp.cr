@@ -92,9 +92,15 @@ module Hwaro
         end
 
         # True when `src` resolves to the same origin as the AMP document.
+        #
+        # Unknown means same-origin. An empty or unreadable src is the one
+        # case we must not guess cross-origin on: guessing wrong there hands
+        # `allow-same-origin` to a same-origin frame, which is precisely the
+        # AMP violation this function exists to prevent. Guessing the other
+        # way only drops a privilege.
         def self.same_origin_src?(src : String, base_url : String) : Bool
           trimmed = src.strip
-          return false if trimmed.empty?
+          return true if trimmed.empty?
 
           uri = URI.parse(trimmed)
           scheme = uri.scheme.try(&.downcase)
@@ -114,8 +120,10 @@ module Hwaro
           return false unless host.compare(base_host, case_insensitive: true) == 0
 
           # A protocol-relative src ("//host/x") inherits the document's
-          # scheme, so a matching host already settles it.
-          return true if trimmed.starts_with?("//")
+          # scheme but NOT its port, so the port still has to match.
+          if trimmed.starts_with?("//")
+            return (uri.port || default_port(base)) == default_port(base)
+          end
 
           scheme == base.scheme.try(&.downcase) && default_port(uri) == default_port(base)
         rescue URI::Error
@@ -227,7 +235,11 @@ module Hwaro
             # amp-iframe requires a sandbox attribute; add a sane default when
             # the source <iframe> didn't carry one.
             unless attrs.includes?("sandbox=")
-              src = attrs.match(/\ssrc=["']([^"']*)["']/i).try(&.[1]) || ""
+              # Matches quoted and unquoted (legal HTML5) attribute values.
+              # A miss yields "", which same_origin_src? treats as
+              # same-origin — the conservative direction.
+              src = attrs.match(/\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i)
+                .try { |m| m[1]? || m[2]? || m[3]? } || ""
               attrs += sandbox_for(src, config.base_url)
             end
             %(<amp-iframe#{attrs}>#{inner}</amp-iframe>)
