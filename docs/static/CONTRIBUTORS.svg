@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="392" height="72" viewBox="0 0 392 72">
-  <style>.hof-label{fill:#57606a}.hof-role{fill:#6e7781}.hof-title{fill:#24292f}.hof-bg{fill:transparent}@media (prefers-color-scheme:dark){.hof-label{fill:#8b949e}.hof-role{fill:#7d8590}.hof-title{fill:#e6edf3}.hof-bg{fill:transparent}}</style>
+  <style>.mural-label{fill:#57606a}.mural-role{fill:#6e7781}.mural-title{fill:#24292f}.mural-bg{fill:transparent}@media (prefers-color-scheme:dark){.mural-label{fill:#8b949e}.mural-role{fill:#7d8590}.mural-title{fill:#e6edf3}.mural-bg{fill:transparent}}</style>
   <defs><clipPath id="avatar-clip" clipPathUnits="objectBoundingBox"><circle cx="0.5" cy="0.5" r="0.5"/></clipPath></defs>
   <a href="https://github.com/hahwul" target="_blank">
     <title>hahwul</title>
