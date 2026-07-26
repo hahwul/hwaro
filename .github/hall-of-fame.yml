@@ -1,0 +1,10 @@
+# https://github.com/crystal-actions/hall-of-fame
+contributors:
+
+output: docs/static/CONTRIBUTORS.svg
+
+grid:
+  columns: 12
+  avatar_size: 56
+  shape: circle
+  show_names: false
