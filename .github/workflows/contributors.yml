@@ -17,13 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: wow-actions/contributors-list@v1.2.1
+      - uses: crystal-actions/hall-of-fame@main
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          round: false
-          includeBots: false
-          svgPath: docs/static/CONTRIBUTORS.svg
-          noCommit: true
+          no_commit: "true"
       - uses: peter-evans/create-pull-request@v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
