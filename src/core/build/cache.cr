@@ -103,6 +103,21 @@ module Hwaro
         @[JSON::Field(key: "section_set_hash", emit_null: false)]
         property section_set_hash : String = ""
 
+        # hwaro version that wrote this cache. Every hash above fingerprints
+        # the *inputs* (sources, templates, config, cascade) — none of them
+        # move when only the renderer changes, so a build that fixes how
+        # markdown becomes HTML would otherwise never reach a `--cache` site:
+        # its pages are unedited, so they stay skipped indefinitely. Treating
+        # a version change as a full invalidation costs one cold build per
+        # upgrade and makes every future rendering fix actually land.
+        #
+        # Written by Cache#save (which always stamps the running version, so
+        # the in-memory rebuilds in set_global_checksums/set_set_fingerprints
+        # cannot drop it) and compared by Cache#load. Default "" so caches
+        # written before this field existed invalidate once on upgrade.
+        @[JSON::Field(key: "generator_version", emit_null: false)]
+        property generator_version : String = ""
+
         def initialize(@template_hash : String = "", @config_hash : String = "",
                        @page_set_hash : String = "", @section_set_hash : String = "")
         end
@@ -364,7 +379,13 @@ module Hwaro
             # be writing @entries via #update, and iterating a Hash mid-mutation
             # is undefined behavior under -Dpreview_mt.
             data = @mutex.synchronize do
-              CacheData.new(metadata: @metadata, entries: @entries.values)
+              # Stamp the running version on the copy that goes to disk, so the
+              # next build can tell the renderer changed even though every input
+              # hash matches (see CacheMetadata#generator_version). CacheMetadata
+              # is a struct, so this leaves @metadata itself untouched.
+              stamped = @metadata
+              stamped.generator_version = Hwaro::VERSION
+              CacheData.new(metadata: stamped, entries: @entries.values)
             end
             File.write(tmp_path, data.to_json)
             File.rename(tmp_path, @cache_path)
@@ -411,6 +432,19 @@ module Hwaro
               @metadata = CacheMetadata.new
               delete_corrupt_cache
             end
+          end
+
+          # A different hwaro wrote this cache: its entries were rendered by a
+          # different renderer, and no input hash can detect that. Drop them so
+          # renderer fixes reach incrementally-built sites (see
+          # CacheMetadata#generator_version).
+          if @metadata.generator_version != Hwaro::VERSION
+            unless @entries.empty?
+              Logger.info "  Cache: hwaro version changed — invalidating all entries."
+              @entries.clear
+            end
+            @metadata = CacheMetadata.new
+            @dirty = true
           end
         end
 

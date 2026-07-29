@@ -22,6 +22,7 @@ require "crinja"
 require "./ext/crinja_resolve_fix"
 require "http/server"
 require "markd"
+require "./ext/markd_entity_fix"
 require "toml"
 require "emoji"
 
