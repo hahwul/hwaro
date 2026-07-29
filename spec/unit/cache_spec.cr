@@ -745,7 +745,7 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
-    it "loads legacy cache format (plain array without metadata)" do
+    it "parses legacy cache format (plain array without metadata) but drops its entries" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")
         test_file = File.join(dir, "test.md")
@@ -756,8 +756,12 @@ describe Hwaro::Core::Build::Cache do
         File.write(cache_path, legacy_json)
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.stats[:total].should eq(1)
-        cache.changed?(test_file).should be_false
+        # Parsed, not rejected as corrupt — the file survives the load.
+        File.exists?(cache_path).should be_true
+        # But a legacy array carries no generator_version, so the hwaro that
+        # wrote those entries is unknown and they cannot be trusted to match
+        # this renderer's output.
+        cache.stats[:total].should eq(0)
       end
     end
 
@@ -770,7 +774,7 @@ describe Hwaro::Core::Build::Cache do
 
         new_json = <<-JSON
           {
-            "metadata":{"template_hash":"abc","config_hash":"def"},
+            "metadata":{"template_hash":"abc","config_hash":"def","generator_version":"#{Hwaro::VERSION}"},
             "entries":[{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":""}]
           }
           JSON
@@ -821,7 +825,7 @@ describe Hwaro::Core::Build::Cache do
 
         json_with_extra = <<-JSON
           {
-            "metadata":{"template_hash":"","config_hash":""},
+            "metadata":{"template_hash":"","config_hash":"","generator_version":"#{Hwaro::VERSION}"},
             "entries":[{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":"","unknown_field":"value"}]
           }
           JSON
@@ -914,14 +918,19 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
-    it "loads legacy cache JSON without an output_paths key as an empty array" do
+    it "loads cache JSON without an output_paths key as an empty array" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")
         test_file = File.join(dir, "test.md")
         File.write(test_file, "content")
         mtime = File.info(test_file).modification_time.to_unix_ms
 
-        legacy_json = %([{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":""}])
+        legacy_json = <<-JSON
+          {
+            "metadata":{"template_hash":"","config_hash":"","generator_version":"#{Hwaro::VERSION}"},
+            "entries":[{"path":"#{test_file}","mtime":#{mtime},"hash":"","output_path":""}]
+          }
+          JSON
         File.write(cache_path, legacy_json)
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
@@ -1037,13 +1046,70 @@ describe Hwaro::Core::Build::Cache do
         File.write(cache_path, legacy_json)
 
         # Legacy load marks @dirty=true so the first save upgrades the format
-        # even on an otherwise no-op build.
+        # even on an otherwise no-op build. Its entries are dropped (unknown
+        # writer version), so re-register the file to have something to write.
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file)
         cache.save
 
         data = Hwaro::Core::Build::CacheData.from_json(File.read(cache_path))
         data.entries.size.should eq(1)
         data.metadata.should be_a(Hwaro::Core::Build::CacheMetadata)
+        data.metadata.generator_version.should eq(Hwaro::VERSION)
+      end
+    end
+
+    it "stamps the running hwaro version on every saved cache file" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file)
+        cache.save
+
+        data = Hwaro::Core::Build::CacheData.from_json(File.read(cache_path))
+        data.metadata.generator_version.should eq(Hwaro::VERSION)
+      end
+    end
+
+    it "reuses entries written by the same hwaro version" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        c1 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        c1.update(test_file)
+        c1.save
+
+        c2 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        c2.stats[:total].should eq(1)
+        c2.changed?(test_file).should be_false
+      end
+    end
+
+    it "invalidates entries written by a different hwaro version" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "content")
+
+        c1 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        c1.update(test_file)
+        c1.save
+
+        # Same sources, same templates, same config — only the renderer moved.
+        # Nothing else in the entry can detect that, so without the version
+        # stamp a rendering fix would never reach an incrementally-built site.
+        data = Hwaro::Core::Build::CacheData.from_json(File.read(cache_path))
+        data.metadata.generator_version = "0.0.0-not-this-build"
+        File.write(cache_path, data.to_json)
+
+        c2 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        c2.stats[:total].should eq(0)
+        c2.changed?(test_file).should be_true
       end
     end
   end

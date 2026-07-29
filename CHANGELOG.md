@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- A bare `&` in prose no longer swallows every inline construct up to the next `;` in the same block. `R & D **bold** here; done.` emitted the `**bold**` verbatim; entity references now follow CommonMark — a name from the HTML5 list plus a trailing `;`, anything else is literal text. Also fixes a build-aborting `IndexError` on the input `&;` (#717)
+- `--cache` invalidates when the hwaro binary changes: cached pages were keyed only on their inputs (source, templates, config, cascade), so a rendering fix never reached an incrementally-built site until something else happened to change (#717)
+
 ## v0.18.0
 
 ### Added
