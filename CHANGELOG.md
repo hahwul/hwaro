@@ -1,12 +1,22 @@
 # Changelog
 
-## Unreleased
+## v0.18.1
+
+### Added
+- Sass color functions: `darken`/`lighten`, `saturate`/`desaturate`, `grayscale`, `complement`, `adjust-hue`, `mix`, `invert`, `opacify`/`transparentize`, `adjust-color`/`scale-color`/`change-color`, the channel getters, and the `sass:color` module. They previously fell through as literal text, emitting invalid CSS (#712)
+- `hwaro -v` as a short alias for `--version` (#711)
 
 ### Fixed
-- A bare `&` in prose no longer swallows every inline construct up to the next `;` in the same block. `R & D **bold** here; done.` emitted the `**bold**` verbatim; entity references now follow CommonMark — a name from the HTML5 list plus a trailing `;`, anything else is literal text. Also fixes a build-aborting `IndexError` on the input `&;` (#717)
-- `--cache` invalidates when the hwaro binary changes: cached pages were keyed only on their inputs (source, templates, config, cascade), so a rendering fix never reached an incrementally-built site until something else happened to change (#717)
-- Numeric character references above U+10FFF decode correctly instead of becoming `�` — this covered every emoji (`&#x1F600;`, `&#128512;`), CJK Ext B and beyond, and math alphanumerics (#719)
-- A long numeric character reference in a link destination, link title, or fence info string no longer aborts the build with `ArgumentError`, and a semicolon-less one (`&#38`) stays literal instead of silently decoding to a control character (#719)
+- A bare `&` in prose no longer swallows every inline construct up to the next `;` in the same block. Entity references now follow CommonMark — a name from the HTML5 list plus a trailing `;`, anything else is literal text. Also fixes a build-aborting `IndexError` on the input `&;` (#717)
+- `--cache` invalidates when the hwaro binary changes: cached pages were keyed only on their inputs, so a rendering fix never reached an incrementally-built site until something else happened to change (#717)
+- Numeric character references above U+10FFF decode correctly instead of becoming `�` — emoji, CJK Ext B and beyond, math alphanumerics (#719)
+- A long numeric character reference in a link destination, link title, or fence info string no longer aborts the build with `ArgumentError`, and a semicolon-less one (`&#38`) stays literal (#719)
+- AMP: `<iframe>` sandboxing is origin-aware — same-origin and relative `src`es no longer get `allow-same-origin`, which AMP forbids and which failed validation (#712)
+- Multilingual scaffolds: the blog homepage/archives listings and the book sidebar TOC scope to the current language instead of mixing every language's content (#712)
+- The shared `alert` shortcode template honors its documented `title` parameter instead of silently dropping it (#712)
+
+### Changed
+- Homebrew tap formula auto-publishes after a release build again (#710)
 
 ## v0.18.0
 
