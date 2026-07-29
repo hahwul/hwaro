@@ -76,3 +76,88 @@ module Markd::Parser
     end
   end
 end
+
+# === Decoder: the entity path used OUTSIDE inline body text ================
+#
+# Link destinations, link titles, and fence info strings do not go through
+# the scanner above — they are decoded wholesale by
+# `Markd::HTMLEntities::Decoder.decode` (via `Markd::Utils
+# .decode_entities_string`). That decoder has three defects of its own,
+# found while auditing the neighbourhood of hwaro#717. All three are fixed
+# by overriding the three methods below; `Decoder::REGEX` itself cannot be
+# reassigned from a reopened module, so `decode` switches to the strict
+# pattern defined here and the old constant simply goes unused.
+#
+# 1. CRASH. `REGEX` accepts `#\d+;?` with no digit bound and `decode_entity`
+#    then calls `.to_i` on the run, so a long enough reference raises
+#    `ArgumentError: Invalid Int32` and aborts the build:
+#      `[t](/a?x=&#99999999999999999999;)` — link destination
+#      `[t](/a "&#99999999999999999999;")` — link title
+#      "```&#99999999999999999999;"       — fence info string
+#    hwaro's own importer already guards this with `to_i?` (see
+#    html_to_markdown.cr); the vendored decoder does not.
+#
+# 2. MIS-DECODE. `REGEX` makes the trailing `;` optional, but `decode`
+#    unconditionally strips the FIRST AND LAST character before decoding.
+#    A semicolon-less reference therefore loses its final digit and decodes
+#    the wrong codepoint entirely: `&#38` -> U+0003, `&#100` -> newline.
+#    CommonMark does not recognize semicolon-less references at all, so the
+#    strict pattern leaves them as literal text.
+#
+# 3. ASTRAL PLANE. `decode_codepoint` range-checks against `0x10FFF`
+#    (69_631) where Unicode's maximum is `0x10FFFF` (1_114_111) — one hex
+#    digit short. EVERY reference above U+10FFF decoded to U+FFFD: all
+#    emoji (`&#x1F600;`, `&#128512;`), CJK Ext B and beyond, math
+#    alphanumerics, musical symbols. This one also reaches ordinary body
+#    text through the scanner above.
+#
+# Remove when: upstream requires `;`, bounds the digit run, parses with
+# `to_i?`, and range-checks against 0x10FFFF.
+
+module Markd::HTMLEntities
+  module Decoder
+    # The CommonMark 0.31.2 grammar, matching Rule::NAMED_HTML_ENTITY and
+    # Rule::NUMERIC_HTML_ENTITY above: `;` required, digits bounded.
+    STRICT_REGEX = /&(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[Xx][0-9a-fA-F]{1,6}|#[0-9]{1,7});/
+
+    def self.decode(source)
+      source.gsub(STRICT_REGEX) do |chars|
+        # Safe now that the pattern guarantees a leading `&` and trailing `;`
+        # with a non-empty body between them.
+        decode_entity(chars[1..-2])
+      end
+    end
+
+    def self.decode_entity(chars)
+      return "&;" if chars.empty?
+
+      if chars[0] == '#'
+        if chars.size > 2 && chars[1].downcase == 'x'
+          # to_i?, not to_i: never raise on a caller that skipped the pattern.
+          if codepoint = chars[2..-1].to_i?(16)
+            return decode_codepoint(codepoint)
+          end
+        elsif chars.size > 1
+          if codepoint = chars[1..-1].to_i?(10)
+            return decode_codepoint(codepoint)
+          end
+        end
+      elsif resolved_entity = Markd::HTMLEntities::ENTITIES_MAPPINGS[chars]?
+        return resolved_entity
+      end
+
+      "&#{chars};"
+    end
+
+    def self.decode_codepoint(codepoint)
+      # 0x10FFFF, not 0x10FFF — see defect 3 above.
+      return "�" if (0xD800 <= codepoint <= 0xDFFF) || codepoint > 0x10FFFF
+
+      if decoded = Markd::HTMLEntities::DECODE_MAPPINGS[codepoint]?
+        codepoint = decoded
+      end
+
+      codepoint.unsafe_chr
+    end
+  end
+end
