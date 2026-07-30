@@ -822,3 +822,42 @@ describe Hwaro::Content::Processors::TableParser do
     end
   end
 end
+describe "GFM delimiter-row lengths" do
+  # The delimiter cell was matched with `:?-{3,}:?`, but GFM's cell is
+  # `:?-+:?`. Any ALIGNED row shorter than three hyphens (`|:--|--:|`,
+  # `|:-:|`, `| - |`) failed the check and the whole table was left as a
+  # paragraph of literal pipes — the unaligned `|---|---|` form happened to
+  # clear the bar, so the bug only appeared once an author added alignment.
+  {
+    {"two hyphens with left colon", "| a | b |\n|:--|---|\n| 1 | 2 |"},
+    {"two hyphens with right colon", "| a | b |\n|---|--:|\n| 1 | 2 |"},
+    {"single hyphen with both colons", "| a | b |\n|:-:|---|\n| 1 | 2 |"},
+    {"short aligned on both columns", "| a | b |\n|:--|--:|\n| 1 | 2 |"},
+    {"spaced short delimiters", "| a | b |\n| :-- | --- |\n| 1 | 2 |"},
+    {"single hyphen cells", "| a | b |\n| - | - |\n| 1 | 2 |"},
+    {"no outer pipes, short", "a | b\n:--|--:\n1 | 2"},
+  }.each do |(label, md)|
+    it "renders a table for #{label}" do
+      result = Hwaro::Content::Processors::TableParser.process(md)
+      result.should contain("<table>")
+      result.should contain(">1</td>")
+      result.should_not contain("|:--")
+    end
+  end
+
+  it "keeps the alignment carried by a short delimiter cell" do
+    result = Hwaro::Content::Processors::TableParser.process("| a | b |\n|:-:|--:|\n| 1 | 2 |")
+    result.should contain("text-align: center;")
+    result.should contain("text-align: right;")
+  end
+
+  it "still rejects a row that is not a delimiter row" do
+    result = Hwaro::Content::Processors::TableParser.process("| a | b |\n| x | y |\n| 1 | 2 |")
+    result.should_not contain("<table>")
+  end
+
+  it "does not treat a bare list item as a delimiter row" do
+    result = Hwaro::Content::Processors::TableParser.process("intro | text\n- item\n- other")
+    result.should_not contain("<table>")
+  end
+end

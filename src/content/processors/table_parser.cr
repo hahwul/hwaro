@@ -170,7 +170,13 @@ module Hwaro
         # markdown table (e.g. `|---|---|` or `---|---`).  This avoids false
         # positives from random `|` in code blocks, URLs, or inline code while
         # still catching tables with or without leading/trailing pipes.
-        TABLE_SEPARATOR_CHECK = /^\s*\|?\s*:?-{3,}:?\s*\|/m
+        # `-+`, not `-{3,}`: GFM's delimiter cell is `:?-+:?`, so `|:-:|`,
+        # `|:--|` and `| - |` are all valid tables. Requiring three hyphens
+        # silently demoted every short ALIGNED row (`|:--|--:|`) to a
+        # paragraph of literal pipes — the plain `|---|---|` form happened to
+        # clear the bar, so the bug only showed up once an author added
+        # alignment.
+        TABLE_SEPARATOR_CHECK = /^\s*\|?\s*:?-+:?\s*\|/m
 
         def has_table?(content : String) : Bool
           TABLE_SEPARATOR_CHECK.matches?(content)
@@ -195,11 +201,11 @@ module Hwaro
           cells = split_row(stripped)
           return false if cells.empty?
 
-          # Each cell should match the separator pattern
+          # Each cell must be GFM's delimiter cell: `:?-+:?` (one or more
+          # hyphens, optional leading/trailing colon for alignment).
           cells.all? do |cell|
             cell = cell.strip
-            # Must be at least 3 dashes (with optional colons)
-            cell.matches?(/^:?-{3,}:?$/)
+            cell.matches?(/^:?-+:?$/)
           end
         end
 
