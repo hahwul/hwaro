@@ -373,7 +373,11 @@ module Hwaro
         def save
           return unless @enabled
           return unless @dirty
-          tmp_path = "#{@cache_path}.tmp"
+          # Per-process temp name: a shared `.tmp` lets two hwaro processes in
+          # the same project (the common `hwaro serve` + `hwaro build` pair)
+          # interleave their writes into one file, and whichever renames last
+          # publishes the spliced bytes as the cache.
+          tmp_path = "#{@cache_path}.#{Process.pid}.tmp"
           begin
             # Snapshot shared state under the mutex: parallel fibers may still
             # be writing @entries via #update, and iterating a Hash mid-mutation

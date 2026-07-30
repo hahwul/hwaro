@@ -62,8 +62,10 @@ module Hwaro
           minified = minified.gsub(/\x00HTML_PRESERVE_(\d+)\x00/) do |match|
             # Restore the preserved block. If the index is out of range — e.g.
             # the source content itself contained a literal marker — leave the
-            # matched text untouched rather than raising IndexError.
-            preserves[$1.to_i]? || match
+            # matched text untouched rather than raising IndexError. `to_i?`
+            # (not `to_i`) so a forged marker whose digit run overflows Int32
+            # returns nil instead of raising ArgumentError.
+            $1.to_i?.try { |i| preserves[i]? } || match
           end
 
           # Remove trailing whitespace on each line
