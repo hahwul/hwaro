@@ -6,6 +6,7 @@ require "../utils/text_utils"
 require "../utils/permalink_resolver"
 require "../utils/env_substitutor"
 require "../utils/path_utils"
+require "../content/processors/internal_link_resolver"
 
 module Hwaro
   module Models
@@ -521,11 +522,18 @@ module Hwaro
         end
       end
 
-      # Resolve an image path to an absolute URL, falling back to default_image
+      # Resolve an image path to an absolute URL, falling back to default_image.
+      # A value that already carries its own origin (any `scheme:` URL, or a
+      # protocol-relative `//cdn.example.com/og.png`) is returned untouched:
+      # the old `starts_with?("http")` test sent `//cdn…` down the
+      # root-relative branch and emitted `https://site.com//cdn.example.com/og.png`
+      # as og:image, while a relative path merely starting with the letters
+      # "http" (`http-guide/cover.png`) was left relative — invalid for OG.
       def resolve_image_url(image : String?, base_url : String) : String?
         img = image || @default_image
         return unless img
-        img.starts_with?("http") ? img : "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
+        return img if Content::Processors::InternalLinkResolver.has_own_origin?(img)
+        "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
       end
 
       # Generate both OG and Twitter tags

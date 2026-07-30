@@ -2,6 +2,7 @@ require "html"
 require "../../models/config"
 require "../../models/page"
 require "../../utils/text_utils"
+require "../processors/internal_link_resolver"
 
 module Hwaro
   module Content
@@ -53,7 +54,11 @@ module Hwaro
             # Add translations (already ordered by ordered_language_codes via link_translations!)
             page.translations.each do |t|
               next if t.is_current
-              abs_url = t.url.starts_with?("http") ? t.url : "#{base}#{t.url.starts_with?("/") ? t.url : "/#{t.url}"}"
+              abs_url = if Processors::InternalLinkResolver.has_own_origin?(t.url)
+                          t.url
+                        else
+                          "#{base}#{t.url.starts_with?("/") ? t.url : "/#{t.url}"}"
+                        end
               abs_url = Utils::TextUtils.encode_url_path(abs_url)
               str << '\n'
               str << %(<link rel="alternate" hreflang="#{HTML.escape(t.code)}" href="#{HTML.escape(abs_url)}">)

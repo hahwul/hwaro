@@ -328,3 +328,28 @@ describe Hwaro::Content::Seo::JsonLd do
     end
   end
 end
+describe "JsonLd image absolutization" do
+  it "leaves a protocol-relative article image untouched" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://site.com"
+    page = Hwaro::Models::Page.new("post.md")
+    page.title = "T"
+    page.url = "/post/"
+    page.image = "//cdn.example.com/hero.png"
+
+    Hwaro::Content::Seo::JsonLd.article(page, config)
+      .should contain(%("image":"//cdn.example.com/hero.png"))
+  end
+
+  it "absolutizes a relative image path that starts with 'http'" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://site.com"
+    page = Hwaro::Models::Page.new("post.md")
+    page.title = "T"
+    page.url = "/post/"
+    page.image = "http-guide/hero.png"
+
+    Hwaro::Content::Seo::JsonLd.article(page, config)
+      .should contain(%("image":"https://site.com/http-guide/hero.png"))
+  end
+end

@@ -1,6 +1,7 @@
 require "json"
 require "../../models/config"
 require "../../models/page"
+require "../processors/internal_link_resolver"
 
 module Hwaro
   module Content
@@ -13,9 +14,10 @@ module Hwaro
           "#{base}#{path.starts_with?("/") ? path : "/#{path}"}"
         end
 
-        # Like abs_path, but leaves an already-absolute http(s) URL untouched.
+        # Like abs_path, but leaves a value that already carries its own origin
+        # (any `scheme:` URL, or a protocol-relative `//host/…`) untouched.
         private def abs_or_external(base : String, value : String) : String
-          value.starts_with?("http") ? value : abs_path(base, value)
+          Processors::InternalLinkResolver.has_own_origin?(value) ? value : abs_path(base, value)
         end
 
         # Generate Article JSON-LD for a page

@@ -17,13 +17,12 @@ module Hwaro
           #     `/`, so the root-relative branch turned it into
           #     `https://site.com//cdn.example.com/x.js`.
           #
-          # Same rule (and same regex) as InternalLinkResolver's
-          # `absolute_or_anchor?`, minus the bare `#anchor` case: a
-          # fragment-only href has no origin of its own, and resolving it
-          # against base_url is the long-standing behaviour of these filters.
+          # Same rule as InternalLinkResolver's `absolute_or_anchor?`, minus
+          # the bare `#anchor` case: a fragment-only href has no origin of its
+          # own, and resolving it against base_url is the long-standing
+          # behaviour of these filters.
           def self.has_own_origin?(url : String) : Bool
-            url.starts_with?("//") ||
-              url.matches?(InternalLinkResolver::SCHEME_PREFIX_REGEX)
+            InternalLinkResolver.has_own_origin?(url)
           end
 
           def self.register(env : Crinja)
