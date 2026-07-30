@@ -45,14 +45,14 @@ jobs:
         run: |
           mkdir -p build
           # Use Alpine/musl-based Crystal container for proper static binary.
-          # `-Dpreview_mt` enables Crystal's multi-threaded runtime; without
-          # it, `hwaro build` runs all fibers on a single OS thread and big
-          # sites are bottlenecked on one core.
-          docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.20.0-alpine sh -c "
+          # Parallelism comes from Crystal's execution contexts, sized in
+          # src/main.cr — the old `-Dpreview_mt` flag is deprecated and its
+          # legacy MT scheduler can spin forever at process exit.
+          docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.21.0-alpine sh -c "
             apk add --no-cache yaml-dev git curl &&
             shards install --release --no-debug --production &&
             mkdir -p build &&
-            crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static -Dpreview_mt
+            crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static
           "
       - if: matrix.platform == 'macos'
         name: Install macOS build dependencies
@@ -64,7 +64,7 @@ jobs:
           OPENSSL_PREFIX="$(brew --prefix openssl@3)"
           export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig"
           BIN="build/hwaro-${GITHUB_REF_SLUG}-osx-${ARCH}"
-          crystal build src/main.cr -o "$BIN" --no-debug --release -Dpreview_mt
+          crystal build src/main.cr -o "$BIN" --no-debug --release
           chmod +x scripts/package-macos.sh
           scripts/package-macos.sh "$BIN" "build/hwaro-${GITHUB_REF_SLUG}-osx-${ARCH}.tar.gz" hwaro
           rm -f "$BIN"

@@ -75,7 +75,7 @@ end
 
 describe "hwaro serve --fast-start" do
   it "answers HTTP requests immediately after emitting the ready signal" do
-    pending! "bin/hwaro not built — run `shards build -Dpreview_mt` first" unless fast_start_serve_available?
+    pending! "bin/hwaro not built — run `shards build` first" unless fast_start_serve_available?
 
     Dir.mktmpdir do |dir|
       make_fast_start_site(dir)

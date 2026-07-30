@@ -96,15 +96,16 @@ sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 git clone https://github.com/hahwul/hwaro
 cd hwaro
 shards install
-shards build --release --no-debug -Dpreview_mt
+shards build --release --no-debug
 ```
 
 바이너리는 `./bin/hwaro`에 생성됩니다.
 
-> `-Dpreview_mt`는 Crystal의 멀티스레드 런타임을 켭니다. 공식 바이너리와
-> Docker 이미지가 이 방식으로 빌드되며, `hwaro build`의 병렬 페이지 렌더링도
-> 이 플래그가 있어야 동작합니다. 패키저는 항상 이 플래그를 넣어야 합니다.
-> 없으면 빌드가 단일 스레드로 실행됩니다.
+> Crystal **1.21 이상**이 필요합니다. 병렬 페이지 렌더링은 `src/main.cr`에서
+> Crystal 기본 실행 컨텍스트 크기를 조정해 켜지므로 별도 빌드 플래그가
+> 필요 없습니다. 워커 수는 `CRYSTAL_WORKERS=N`으로 조정할 수 있습니다(기본값은
+> CPU 코어 수). 예전 `-Dpreview_mt` 플래그는 넣지 마세요. Crystal 1.21에서
+> deprecated 되었고, 해당 스케줄러는 프로세스 종료 시 멈출 수 있습니다.
 
 ### PATH 등록 (선택)
 
