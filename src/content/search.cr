@@ -93,12 +93,11 @@ module Hwaro
         fields = config.search.fields.map(&.downcase)
         cjk = config.search.tokenize_cjk
 
-        # Extract base path from base_url for subpath deployments
-        base_path = if config.base_url.empty?
-                      ""
-                    else
-                      URI.parse(config.base_url).path.rstrip("/")
-                    end
+        # Extract base path from base_url for subpath deployments. Use the
+        # memoized Config helper rather than re-parsing: it also rescues a
+        # malformed base_url (a bare `URI.parse` raised out of the generator
+        # and aborted the build) and normalizes a "/" path to "".
+        base_path = config.base_path
 
         pages.map do |page|
           data = {} of String => String | Array(String)

@@ -497,21 +497,48 @@ module Hwaro
             # base slug. Fall back to safe_slugify when the map is absent or the
             # term is unknown — plain slugify("🎉") is "" → "/tags//" (a dead
             # double-slash link), so safe_slugify is the right fallback.
+            # A multilingual site writes `/<lang>/<taxonomy>/<slug>/` term pages
+            # for every non-default language that enables the taxonomy. Prefer
+            # the CURRENT page's language when such a page exists: the root
+            # `/tags/<slug>/` either 404s (term present only in that language) or
+            # lands the reader on the default language's listing.
+            # `__taxonomy_lang_slugs__` only carries terms the generator actually
+            # wrote, so a miss safely falls through to the root URL below.
+            lang = env.resolve("page_language").to_s
+            default_lang = env.resolve("_i18n_default_language").to_s
+            lang_prefix = ""
             slug = nil
-            slugs_raw = env.resolve("__taxonomy_slugs__").raw
-            if slugs_raw.is_a?(Hash)
-              if kind_map = slugs_raw[kind]?
-                kind_raw = kind_map.raw
-                if kind_raw.is_a?(Hash)
-                  if mapped = kind_raw[term]?
+
+            if !lang.empty? && lang != default_lang
+              lang_raw = env.resolve("__taxonomy_lang_slugs__").raw
+              if lang_raw.is_a?(Hash) && (per_lang = lang_raw[lang]?)
+                per_lang_raw = per_lang.raw
+                if per_lang_raw.is_a?(Hash) && (kind_map = per_lang_raw[kind]?)
+                  kind_raw = kind_map.raw
+                  if kind_raw.is_a?(Hash) && (mapped = kind_raw[term]?)
                     slug = mapped.to_s
+                    lang_prefix = "/#{lang}"
+                  end
+                end
+              end
+            end
+
+            unless slug
+              slugs_raw = env.resolve("__taxonomy_slugs__").raw
+              if slugs_raw.is_a?(Hash)
+                if kind_map = slugs_raw[kind]?
+                  kind_raw = kind_map.raw
+                  if kind_raw.is_a?(Hash)
+                    if mapped = kind_raw[term]?
+                      slug = mapped.to_s
+                    end
                   end
                 end
               end
             end
             slug ||= Utils::TextUtils.safe_slugify(term)
 
-            url = "/#{kind}/#{slug}/"
+            url = "#{lang_prefix}/#{kind}/#{slug}/"
             Crinja::Value.new(base_url.rstrip("/") + url)
           end
         end

@@ -1708,6 +1708,27 @@ module Hwaro::Core::Build::Phases::Render
     multilingual = config.multilingual?
     taxonomies_hash = {} of String => Crinja::Value
     taxonomy_slugs = {} of String => Crinja::Value
+    # {language => {taxonomy => {term => slug}}} for the LANGUAGE-PREFIXED term
+    # pages (`/ko/tags/foo/`) the taxonomy generator writes for every non-default
+    # language that enables the taxonomy. Without this, `get_taxonomy_url` on a
+    # Korean page emitted the root `/tags/foo/` — which for a term that appears
+    # only in Korean content was never written at all (a hard 404 on the built-in
+    # blog scaffold's tag pills), and for a shared term pointed readers at the
+    # English listing. Only populated for languages that actually enable the
+    # taxonomy, so the lookup can never invent a page the generator skipped.
+    taxonomy_lang_slugs = {} of String => Crinja::Value
+    lang_taxonomy_names = {} of String => Array(String)
+    if multilingual
+      config.languages.each do |code, lang_cfg|
+        next if code == default_lang
+        next if lang_cfg.taxonomies.empty?
+        lang_taxonomy_names[code] = lang_cfg.taxonomies
+      end
+    end
+    # Accumulated as plain hashes and converted to Crinja::Value once at the end —
+    # round-tripping through Crinja::Value per insert would re-wrap the inner hash
+    # each time and keep only the last term.
+    lang_slug_maps = {} of String => Hash(String, Hash(String, String))
     site.taxonomies.each do |name, terms|
       # Disambiguate over the SAME term set the taxonomy generator uses to write
       # pages — build_taxonomy_index counts only non-draft, non-generated pages.
@@ -1754,6 +1775,23 @@ module Hwaro::Core::Build::Phases::Render
         end
         slug = (has_root ? slug_map[term]? : nil) || Utils::TextUtils.safe_slugify(term)
         term_slug_values[term] = Crinja::Value.new(slug) if has_root
+
+        # Record the term under every non-default language that (a) enables this
+        # taxonomy and (b) has a publishable page carrying the term — exactly the
+        # two conditions under which generate_taxonomies_for_language writes
+        # `/<lang>/<taxonomy>/<slug>/`. The generator disambiguates over the same
+        # term set, so `slug_map[term]` is the slug it used.
+        unless lang_taxonomy_names.empty?
+          lang_taxonomy_names.each do |code, names|
+            next unless names.includes?(name)
+            next unless term_pages.any? do |p|
+                          !p.draft && !p.generated && (p.language || default_lang) == code
+                        end
+            per_lang = lang_slug_maps[code] ||= {} of String => Hash(String, String)
+            tax_map = per_lang[name] ||= {} of String => String
+            tax_map[term] = slug_map[term]? || slug
+          end
+        end
         Crinja::Value.new({
           "name"  => Crinja::Value.new(term),
           "slug"  => Crinja::Value.new(slug),
@@ -1767,8 +1805,18 @@ module Hwaro::Core::Build::Phases::Render
       })
       taxonomy_slugs[name] = Crinja::Value.new(term_slug_values)
     end
+    lang_slug_maps.each do |code, per_lang|
+      tax_values = {} of String => Crinja::Value
+      per_lang.each do |tax_name, term_slugs|
+        term_values = {} of String => Crinja::Value
+        term_slugs.each { |term, s| term_values[term] = Crinja::Value.new(s) }
+        tax_values[tax_name] = Crinja::Value.new(term_values)
+      end
+      taxonomy_lang_slugs[code] = Crinja::Value.new(tax_values)
+    end
     vars["__taxonomies__"] = Crinja::Value.new(taxonomies_hash)
     vars["__taxonomy_slugs__"] = Crinja::Value.new(taxonomy_slugs)
+    vars["__taxonomy_lang_slugs__"] = Crinja::Value.new(taxonomy_lang_slugs)
 
     # Menus: config [[menus.*]]-declared entries + front-matter menus/menu
     # registrations, resolved into one tree per language. `__menus__` backs

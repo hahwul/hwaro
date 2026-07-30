@@ -518,3 +518,102 @@ describe "Multilingual: Taxonomy output" do
     end
   end
 end
+
+# =============================================================================
+# Multilingual: taxonomy term links
+#
+# `get_taxonomy_url` used to always emit the ROOT term URL (`/tags/foo/`).
+# On a multilingual site the taxonomy generator writes `/<lang>/tags/<slug>/`
+# for every non-default language that enables the taxonomy, so a term that
+# exists only in that language had NO root page — the link was a hard 404 —
+# and a shared term pointed the reader at the default language's listing.
+# =============================================================================
+
+MULTILINGUAL_TAXONOMY_CONFIG = <<-TOML
+  title = "Test Site"
+  base_url = "http://localhost"
+  default_language = "en"
+  taxonomies = [{ name = "tags" }]
+
+  [languages.en]
+  taxonomies = ["tags"]
+
+  [languages.ko]
+  language_name = "한국어"
+  taxonomies = ["tags"]
+  TOML
+
+TAXONOMY_LINK_FILES = {
+  "posts/a.md"    => "---\ntitle: English post\ntags: [shared, onlyen]\n---\nHello",
+  "posts/a.ko.md" => "---\ntitle: 한국어 글\ntags: [shared, onlyko]\n---\n안녕",
+}
+
+TAXONOMY_LINK_TEMPLATES = {
+  "page.html" => "{% for t in page.tags %}<a href=\"{{ get_taxonomy_url(kind='tags', term=t) }}\"></a>{% endfor %}",
+}
+
+describe "Multilingual: taxonomy term links" do
+  it "links a non-default-language page at that language's term pages" do
+    build_site(
+      MULTILINGUAL_TAXONOMY_CONFIG,
+      content_files: TAXONOMY_LINK_FILES,
+      template_files: TAXONOMY_LINK_TEMPLATES,
+    ) do
+      ko_html = File.read("public/ko/posts/a/index.html")
+      ko_html.should contain("http://localhost/ko/tags/onlyko/")
+      ko_html.should contain("http://localhost/ko/tags/shared/")
+
+      # Every emitted link must be a page that was actually written.
+      File.exists?("public/ko/tags/onlyko/index.html").should be_true
+      File.exists?("public/ko/tags/shared/index.html").should be_true
+    end
+  end
+
+  it "leaves default-language pages on the root term URLs" do
+    build_site(
+      MULTILINGUAL_TAXONOMY_CONFIG,
+      content_files: TAXONOMY_LINK_FILES,
+      template_files: TAXONOMY_LINK_TEMPLATES,
+    ) do
+      en_html = File.read("public/posts/a/index.html")
+      en_html.should contain("http://localhost/tags/onlyen/")
+      en_html.should contain("http://localhost/tags/shared/")
+      en_html.should_not contain("/ko/tags/")
+
+      File.exists?("public/tags/onlyen/index.html").should be_true
+      File.exists?("public/tags/shared/index.html").should be_true
+    end
+  end
+
+  it "falls back to the root term URL when the language does not enable the taxonomy" do
+    build_site(
+      <<-TOML,
+        title = "Test Site"
+        base_url = "http://localhost"
+        default_language = "en"
+        taxonomies = [{ name = "topics" }]
+
+        [languages.en]
+        taxonomies = ["topics"]
+
+        [languages.ko]
+        language_name = "한국어"
+        taxonomies = []
+        TOML
+      content_files: {
+        "posts/a.md"    => "---\ntitle: English post\ntopics: [shared]\n---\nHello",
+        "posts/a.ko.md" => "---\ntitle: 한국어 글\ntopics: [shared]\n---\n안녕",
+      },
+      template_files: {
+        "page.html" => "{% for t in page.taxonomies['topics'] %}<a href=\"{{ get_taxonomy_url(kind='topics', term=t) }}\"></a>{% endfor %}",
+      },
+    ) do
+      # `[languages.ko].taxonomies = []` means no /ko/topics/ pages exist — the
+      # link must stay on the root URL rather than inventing one.
+      ko_html = File.read("public/ko/posts/a/index.html")
+      ko_html.should_not contain("/ko/topics/")
+      ko_html.should contain("http://localhost/topics/shared/")
+      Dir.exists?("public/ko/topics").should be_false
+    end
+  end
+end
