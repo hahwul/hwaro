@@ -172,6 +172,50 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
+    it "unwraps an angle-bracket destination" do
+      # Regression: `[t](</about/>)` is a plain CommonMark destination that the
+      # build resolves fine, but the extractor kept the angle brackets (and the
+      # whitespace split turned `</my page.md>` into `</my`), so every one was
+      # reported dead — a false positive that fails a CI link gate.
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"),
+          %([Angle](</about/>)\n[AngleTitle](</posts/b/> "T")\n![AngleImg](</img/a.png>)))
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        urls = cmd.find_internal_links_for_test(dir).map(&.url)
+
+        urls.should contain("/about/")
+        urls.should contain("/posts/b/")
+        urls.should contain("/img/a.png")
+        urls.none?(&.includes?("<")).should be_true
+        urls.none?(&.includes?(">")).should be_true
+      end
+    end
+
+    it "unwraps an angle-bracket destination containing spaces" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), %([Spaced](</my page/>)))
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        cmd.find_internal_links_for_test(dir).map(&.url).should eq(["/my page/"])
+      end
+    end
+
+    it "keeps balanced parentheses inside a destination" do
+      # `[^\)]+` stopped at the first `)`, so `/docs/foo_(bar)` was scanned as
+      # `/docs/foo_(bar` — a link the build resolves, reported dead.
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"),
+          %([Paren](/docs/foo_(bar))\n![ParenImg](/img/a_(1).png)))
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        urls = cmd.find_internal_links_for_test(dir).map(&.url)
+
+        urls.should contain("/docs/foo_(bar)")
+        urls.should contain("/img/a_(1).png")
+      end
+    end
+
     it "strips an optional CommonMark title from the destination" do
       # Regression: `[t](/url "title")` captured `/url "title"`, which never
       # resolves on disk — every titled internal link was falsely flagged dead.
