@@ -173,3 +173,89 @@ describe "SassScript expressions in values" do
     end
   end
 end
+
+describe "Sass grouping parentheses" do
+  # Grouping parens are Sass syntax with no meaning in CSS. The lenient
+  # verbatim fallback only kicks in when nothing "computes", and a paren
+  # around a bare literal or a slash/space list computes nothing — so the
+  # parens were emitted into the stylesheet as part of the declaration
+  # value, which no browser accepts.
+  it "does not leak parentheses around a slash list" do
+    css = Hwaro::Assets::Sass.compile("a { width: (10px / 2); }")
+    css.should contain("width: 10px / 2;")
+    css.should_not contain("(10px")
+  end
+
+  it "does not leak parentheses around a space list" do
+    css = Hwaro::Assets::Sass.compile("a { margin: (1px 2px); }")
+    css.should contain("margin: 1px 2px;")
+    css.should_not contain("(1px")
+  end
+
+  it "does not leak parentheses around a bare literal" do
+    css = Hwaro::Assets::Sass.compile("a { width: (10px); }")
+    css.should contain("width: 10px;")
+    css.should_not contain("(10px)")
+  end
+
+  it "still evaluates arithmetic inside parentheses" do
+    css = Hwaro::Assets::Sass.compile("a { width: (1px + 2px) * 2; }")
+    css.should contain("width: 6px;")
+  end
+
+  it "leaves genuine CSS function calls untouched" do
+    css = Hwaro::Assets::Sass.compile("a { width: calc(100% - 10px); background: url(a.png); }")
+    css.should contain("calc(100% - 10px)")
+    css.should contain("url(a.png)")
+  end
+end
+
+private def capture_warnings(&) : String
+  io = IO::Memory.new
+  previous = Hwaro::Logger.io
+  Hwaro::Logger.io = io
+  begin
+    yield
+  ensure
+    Hwaro::Logger.io = previous
+  end
+  io.to_s
+end
+
+describe "Sass namespaced-reference failures" do
+  it "warns when a namespaced call falls back to literal text" do
+    warnings = capture_warnings do
+      Hwaro::Assets::Sass.compile("a { width: math.div(10px, 2); }").should contain("math.div(10px, 2)")
+    end
+    warnings.should contain("no module namespace")
+    warnings.should contain("not valid CSS")
+  end
+
+  it "warns when a namespaced call fails inside the function" do
+    warnings = capture_warnings do
+      Hwaro::Assets::Sass.compile(%(@use "sass:math";\na { width: math.div(1px, 0); }))
+    end
+    warnings.should contain("division by zero")
+  end
+
+  it "reports the failing location" do
+    warnings = capture_warnings do
+      Hwaro::Assets::Sass.compile("a {\n  width: math.div(10px, 2);\n}", "css/x.scss")
+    end
+    warnings.should contain("css/x.scss:2:")
+  end
+
+  it "stays silent for unknown plain CSS functions" do
+    warnings = capture_warnings do
+      Hwaro::Assets::Sass.compile("a { background: -webkit-linear-gradient(red, blue); }")
+    end
+    warnings.should_not contain("not valid CSS")
+  end
+
+  it "stays silent for the IE progid filter" do
+    warnings = capture_warnings do
+      Hwaro::Assets::Sass.compile(%(a { filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#fff'); }))
+    end
+    warnings.should_not contain("not valid CSS")
+  end
+end

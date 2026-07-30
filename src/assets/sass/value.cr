@@ -21,6 +21,20 @@ module Hwaro
       class SoftEvalError < Exception
       end
 
+      # A failure inside a NAMESPACED reference (`math.div(…)`, `$map.key`,
+      # i.e. anything reached through an `@use` namespace).
+      #
+      # These must NOT take the lenient verbatim fallback. Falling back
+      # reconstructs the call as `math.div(1px, 0)` and splices that straight
+      # into the stylesheet — but no CSS function name may contain a `.`, so
+      # the result is guaranteed-invalid CSS that no browser will apply. The
+      # author gets a silently broken declaration instead of a build error,
+      # which is the opposite of what leniency is for (leniency exists so
+      # *valid* CSS the compiler doesn't model — `-webkit-…()`, `progid:…` —
+      # survives untouched; those are never namespaced).
+      class NamespacedEvalError < SoftEvalError
+      end
+
       # "This call isn't mine" — raised by a built-in whose name shadows a
       # real CSS function (`rgba()`, `grayscale()`, `saturate()`, …) when
       # the arguments are the CSS shape rather than the Sass one.

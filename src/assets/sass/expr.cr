@@ -994,7 +994,12 @@ module Hwaro
           when MapE
             node.pairs.any? { |pair| computes?(pair.key, host) || computes?(pair.value, host) }
           when ParenE
-            computes?(node.inner, host)
+            # Grouping parens ALWAYS count as work, even around a bare literal
+            # or a slash/space list: they are Sass syntax with no meaning in
+            # CSS, so the legacy verbatim path emitted them into the stylesheet
+            # (`width: (10px / 2)`, `margin: (1px 2px)`) — invalid declaration
+            # values that no browser accepts. Evaluating consumes them.
+            true
           when ConcatE
             node.parts.any? { |p| computes?(p, host) }
           else

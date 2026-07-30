@@ -1139,6 +1139,8 @@ module Hwaro
             if Expr.computes?(node, self)
               begin
                 return value_storage(Expr::Evaluator.new(self).eval(node))
+              rescue ex : NamespacedEvalError
+                warn_namespaced(template, ex)
               rescue SoftEvalError
                 # fall through to the verbatim path
               end
@@ -1158,6 +1160,8 @@ module Hwaro
               begin
                 value = Expr::Evaluator.new(self).eval(node)
                 return ResolvedValue.new(value.to_css, value.is_a?(NullV))
+              rescue ex : NamespacedEvalError
+                warn_namespaced(template, ex)
               rescue SoftEvalError
                 # fall through to the verbatim path
               end
@@ -1177,6 +1181,8 @@ module Hwaro
             if Expr.computes?(node, self)
               begin
                 return Expr::Evaluator.new(self).eval(node).to_css
+              rescue ex : NamespacedEvalError
+                warn_namespaced(template, ex)
               rescue SoftEvalError
                 # fall through to the verbatim path
               end
@@ -1307,9 +1313,9 @@ module Hwaro
         def expr_var(name : String, ns : String?) : String
           if ns
             mod = @env.module?(ns)
-            raise SoftEvalError.new("there is no module namespace \"#{ns}\"") unless mod
+            raise NamespacedEvalError.new("there is no module namespace \"#{ns}\"") unless mod
             mod.variables[Sass.normalize_ident(name)]? ||
-              raise SoftEvalError.new("undefined variable: \"#{ns}.$#{name}\"")
+              raise NamespacedEvalError.new("undefined variable: \"#{ns}.$#{name}\"")
           else
             @env.lookup_var(name) ||
               raise SoftEvalError.new("undefined variable: \"$#{name}\"")
@@ -1322,10 +1328,19 @@ module Hwaro
           norm = Sass.normalize_ident(name)
           if ns
             mod = @env.module?(ns)
-            raise SoftEvalError.new("there is no module namespace \"#{ns}\"") unless mod
+            raise NamespacedEvalError.new("there is no module namespace \"#{ns}\"") unless mod
             fn = mod.functions[norm]? ||
-                 raise SoftEvalError.new("undefined function: \"#{ns}.#{name}\"")
-            invoke_fn(fn, name, args, kwargs)
+                 raise NamespacedEvalError.new("undefined function: \"#{ns}.#{name}\"")
+            begin
+              invoke_fn(fn, name, args, kwargs)
+            rescue ex : NamespacedEvalError
+              raise ex
+            rescue ex : SoftEvalError
+              # A failure *inside* a namespaced built-in (`math.div(1px, 0)`,
+              # `math.percentage(1px)`, …) must not fall back either — the
+              # fallback emits `math.div(1px, 0)` as a CSS value.
+              raise NamespacedEvalError.new(ex.message || "call failed")
+            end
           elsif fn = @env.lookup_function(norm)
             invoke_fn(fn, name, args, kwargs)
           elsif builtin = Builtins::GLOBAL_FNS[norm]?
@@ -1488,6 +1503,18 @@ module Hwaro
 
         private def error_at(line : Int32, column : Int32, message : String) : NoReturn
           raise SyntaxError.new(message, @path, line, column)
+        end
+
+        # A namespaced reference that fails still takes the documented lenient
+        # fallback (see the `math.div` passthrough spec), but the fallback
+        # splices `math.div(1px, 0)` into the stylesheet — and no CSS function
+        # name may contain a `.`, so that declaration is dead on arrival in
+        # every browser. Leniency exists to preserve *valid* CSS the compiler
+        # doesn't model (`-webkit-…()`, `progid:…`), which is never namespaced,
+        # so this particular fallback is always a silent breakage: say so.
+        private def warn_namespaced(template : Ast::TextTemplate, ex : NamespacedEvalError) : Nil
+          Logger.warn "Sass: #{@path}:#{template.line}:#{template.column}: " \
+                      "#{ex.message} — emitted as literal text, which is not valid CSS."
         end
       end
     end
