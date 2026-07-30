@@ -335,7 +335,13 @@ module Hwaro
             path = arguments["path"].to_s
             base_url = env.resolve("base_url").to_s
 
-            if path.starts_with?("/")
+            # A value that already carries its own origin (any `scheme:` URL, or
+            # a protocol-relative `//host/…`) is returned untouched — prefixing
+            # base_url produced `https://site.com/mailto:a@b.com` and
+            # `https://site.com//cdn.example.com/x.js`. Matches `absolute_url`.
+            if Filters::UrlFilters.has_own_origin?(path)
+              Crinja::Value.new(path)
+            elsif path.starts_with?("/")
               Crinja::Value.new(base_url.rstrip("/") + path)
             else
               Crinja::Value.new(base_url.rstrip("/") + "/" + path)
@@ -520,8 +526,11 @@ module Hwaro
           # Note: actual output dimensions depend on aspect ratio preservation.
           @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0}) do
             path = arguments["path"].to_s
-            width = Math.max(0, arguments["width"].as_number.to_i)
-            height = Math.max(0, arguments["height"].as_number.to_i)
+            # Lenient coercion: shortcode arguments are always Strings, so a
+            # `width="800"` forwarded from `{% img(width="800") %}` must resize
+            # rather than raise Crinja::TypeError and abort the page.
+            width = Utils::CrinjaUtils.to_count(arguments["width"])
+            height = Utils::CrinjaUtils.to_count(arguments["height"])
 
             base_url = env.resolve("base_url").to_s
 
