@@ -115,7 +115,16 @@ module Hwaro
       # and runs first, but it cannot rewrite the value text itself —
       # in those rare cases this pass simply leaves the surrounding
       # whitespace untouched (the prior conservative behaviour).
-      private REGEX_INTERTOKEN_WS  = /(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00)(\s+)(?=(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00))/
+      #
+      # The whitespace run is `[ \t\r\n\f]+`, NOT `\s+`. Crystal compiles
+      # patterns with PCRE2's UCP flag, so `\s` also matches U+00A0
+      # (NBSP), U+3000 and the other Unicode space separators — none of
+      # which are HTML "space characters". Those are *content*: an
+      # `&nbsp;` written between two tags decodes to a literal U+00A0 in
+      # the rendered HTML, and collapsing it either downgraded it to a
+      # breakable space (inline neighbours) or deleted it outright
+      # (block neighbours), silently changing the rendered page.
+      private REGEX_INTERTOKEN_WS  = /(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00)([ \t\r\n\f]+)(?=(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00))/
       private REGEX_TAG_NAME       = /^<\/?([A-Za-z][\w-]*)/
       private REGEX_BLANK_LINES    = /\n{2,}/
       private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P[BI]_(\d+)\x00/

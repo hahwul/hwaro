@@ -9,13 +9,13 @@ default:
 
 # Build hwaro binary.
 #
-# Always passes `-Dpreview_mt` so dev/CI builds exercise the same
-# multi-threaded runtime that release binaries ship with. Without this,
-# fiber races stay hidden in dev and only surface for end users.
+# Parallelism comes from Crystal's execution contexts (see src/main.cr),
+# not the deprecated `-Dpreview_mt` flag: its legacy MT scheduler spins
+# forever at exit under CPU oversubscription and the process never quits.
 [group('build')]
 build:
     shards install
-    shards build -Dpreview_mt
+    shards build
 
 # Update shards.nix.
 [group('build')]

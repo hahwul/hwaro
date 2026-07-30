@@ -11,7 +11,10 @@ module Hwaro
           # Check if sitemap is enabled
           return unless site.config.sitemap.enabled
 
-          if skip_if_unchanged && File.exists?(File.join(output_dir, site.config.sitemap.filename))
+          # `File.basename` here too — the write below basenames the configured
+          # filename, so probing the raw value made the cache-hit check look for
+          # a path that is never written and re-emit the sitemap every build.
+          if skip_if_unchanged && File.exists?(File.join(output_dir, File.basename(site.config.sitemap.filename)))
             Logger.debug "  Sitemap unchanged (cache hit), skipping."
             return
           end

@@ -138,12 +138,58 @@ describe Hwaro::Core::Build::Builder do
       templates = {"shortcodes/note" => "<div class=\"note\">{{ body }}</div>"}
       context = {} of String => Crinja::Value
 
-      # Named closers are supported (the parser's BLOCK_CLOSE_RE recognizes them).
-      # For the test we normalize once so the existing depth logic consumes it.
       content = "{% note(type=\"info\") %}Named closer works{% endnote %}"
-        .gsub(/\{\%\s*end\s*[a-zA-Z_][\w\-]*\s*\%\}/i, "{% end %}")
       result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
       result.should contain("<div class=\"note\">Named closer works</div>")
+    end
+
+    # The named-closer normalizer used a keyword lookahead with no word
+    # boundary, so `{% endcallout %}` was read as the Jinja `call` closer and
+    # left alone. The block parser then never found a `{% end %}` and the raw
+    # shortcode source leaked verbatim into the published page.
+    %w[callout iframe setup format blockquote rawdata withdraw commentary doable fromage].each do |name|
+      it "expands a block shortcode named '#{name}' closed by {% end#{name} %}" do
+        builder = Hwaro::Core::Build::Builder.new
+        env = Crinja.new
+        templates = {"shortcodes/#{name}" => "<div class=\"x\">{{ body }}</div>"}
+        context = {} of String => Crinja::Value
+
+        content = "{% #{name}(type=\"info\") %}Body{% end#{name} %}"
+        result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+        result.should eq("<div class=\"x\">Body</div>")
+      end
+    end
+
+    %w[include-code if-banner do-not-translate].each do |name|
+      it "expands a hyphenated block shortcode named '#{name}'" do
+        builder = Hwaro::Core::Build::Builder.new
+        env = Crinja.new
+        templates = {"shortcodes/#{name}" => "<div>{{ body }}</div>"}
+        context = {} of String => Crinja::Value
+
+        content = "{% #{name}(type=\"i\") %}Body{% end#{name} %}"
+        result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+        result.should eq("<div>Body</div>")
+      end
+    end
+
+    it "leaves Jinja control closers untouched while normalizing shortcode closers" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/note" => "<div>{{ body }}</div>"}
+      context = {} of String => Crinja::Value
+
+      content = "{% note() %}{% if x %}A{% endif %}{% for i in y %}B{% endfor %}{% endnote %}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should eq("<div>{% if x %}A{% endif %}{% for i in y %}B{% endfor %}</div>")
+    end
+
+    it "leaves a bare {% raw %} block untouched" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      content = "{% raw %}{{ x }}{% endraw %}"
+      result = builder.test_process_shortcodes_jinja(content, {} of String => String, {} of String => Crinja::Value, crinja_env_override: env)
+      result.should eq(content)
     end
 
     it "processes explicit shortcode calls" do

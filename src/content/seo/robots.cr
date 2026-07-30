@@ -39,7 +39,13 @@ module Hwaro
             # Add Sitemap directive if sitemap is enabled and base_url is set
             if config.sitemap.enabled && !config.base_url.empty?
               base_url = config.base_url.rstrip('/')
-              sitemap_filename = config.sitemap.filename
+              # `File.basename`, matching where Sitemap.generate actually writes
+              # the file: it basenames the configured filename so the output
+              # can't escape the public tree. Advertising the raw config value
+              # here pointed robots.txt at `/reports/sitemap.xml` while the
+              # file sat at `/sitemap.xml` — a 404 for every crawler that
+              # followed it.
+              sitemap_filename = File.basename(config.sitemap.filename)
               sitemap_url = "#{base_url}/#{sitemap_filename}"
               str << "Sitemap: #{sitemap_url}\n"
             end

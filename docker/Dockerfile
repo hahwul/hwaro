@@ -1,5 +1,5 @@
 ##= BUILDER =##
-FROM crystallang/crystal:1.20.0 AS builder
+FROM crystallang/crystal:1.21.0 AS builder
 WORKDIR /hwaro
 
 RUN apt-get update && \
@@ -10,10 +10,10 @@ COPY shard.yml shard.lock ./
 RUN shards install --production
 
 COPY . .
-# `-Dpreview_mt` enables Crystal's multi-threaded runtime so `hwaro build`
+# Parallelism comes from Crystal's execution contexts (see src/main.cr) so `hwaro build`
 # can use multiple cores on big sites. Default workers = 4; override with
 # CRYSTAL_WORKERS at run time.
-RUN shards build --release --no-debug --production -Dpreview_mt && \
+RUN shards build --release --no-debug --production && \
     strip /hwaro/bin/hwaro
 
 ##= RUNNER =##

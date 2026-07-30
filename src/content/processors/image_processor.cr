@@ -394,18 +394,31 @@ module Hwaro
             scale_w = target_w.to_f / src_w
             scale_h = target_h.to_f / src_h
             scale = Math.min(scale_w, scale_h)
-            {Math.max(1, (src_w * scale).round.to_i32), Math.max(1, (src_h * scale).round.to_i32)}
+            {saturating_i32(src_w * scale), saturating_i32(src_h * scale)}
           elsif target_w > 0
             # Width only: scale proportionally
             scale = target_w.to_f / src_w
-            {target_w, Math.max(1, (src_h * scale).round.to_i32)}
+            {target_w, saturating_i32(src_h * scale)}
           elsif target_h > 0
             # Height only: scale proportionally
             scale = target_h.to_f / src_h
-            {Math.max(1, (src_w * scale).round.to_i32), target_h}
+            {saturating_i32(src_w * scale), target_h}
           else
             {src_w, src_h}
           end
+        end
+
+        # Round a scaled dimension to at least 1, SATURATING at Int32::MAX.
+        # `[image_processing] widths` is only bounded below (`> 0`), so an
+        # absurd entry makes the proportional side exceed Int32 and the plain
+        # `.round.to_i32` raised a bare `OverflowError` — an unclassified crash
+        # of the whole build instead of a skipped variant. Saturating hands the
+        # oversized size to the existing MAX_PIXELS guard, which declines it
+        # with a debug line and moves on.
+        private def saturating_i32(value : Float64) : Int32
+          return 1 if value.nan? || value < 1
+          return Int32::MAX if value >= Int32::MAX.to_f
+          value.round.to_i32.clamp(1, Int32::MAX)
         end
 
         # Write image in the appropriate format based on extension

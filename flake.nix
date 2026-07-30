@@ -28,7 +28,7 @@
 
           buildPhase = ''
             runHook preBuild
-            shards build --release -Dpreview_mt
+            shards build --release
             runHook postBuild
           '';
 

@@ -13,6 +13,42 @@ describe Hwaro::Models::OpenGraphConfig do
     end
   end
 
+  describe "#resolve_image_url" do
+    # `starts_with?("http")` was wrong in both directions: it missed
+    # `//cdn…`/`data:` (which then took the root-relative branch and produced
+    # `https://site.com//cdn.example.com/og.png`), and it false-positived on a
+    # relative path that merely starts with the letters "http".
+    it "leaves a protocol-relative image untouched" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      config.resolve_image_url("//cdn.example.com/og.png", "https://site.com")
+        .should eq("//cdn.example.com/og.png")
+    end
+
+    it "leaves a data: image untouched" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      config.resolve_image_url("data:image/png;base64,AAAA", "https://site.com")
+        .should eq("data:image/png;base64,AAAA")
+    end
+
+    it "leaves an https image untouched" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      config.resolve_image_url("https://cdn.example.com/og.png", "https://site.com")
+        .should eq("https://cdn.example.com/og.png")
+    end
+
+    it "absolutizes a relative path that merely starts with 'http'" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      config.resolve_image_url("http-guide/cover.png", "https://site.com")
+        .should eq("https://site.com/http-guide/cover.png")
+    end
+
+    it "absolutizes a root-relative path" do
+      config = Hwaro::Models::OpenGraphConfig.new
+      config.resolve_image_url("/img/og.png", "https://site.com")
+        .should eq("https://site.com/img/og.png")
+    end
+  end
+
   describe "#og_tags" do
     it "generates basic OG tags with title, type, and url" do
       config = Hwaro::Models::OpenGraphConfig.new

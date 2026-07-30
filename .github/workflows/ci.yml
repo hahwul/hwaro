@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        crystal-version: [1.19.0, 1.20.0, 1.21.0]
+        crystal-version: [1.21.0]
     steps:
       - uses: actions/checkout@v6
       - uses: crystal-lang/install-crystal@v1
@@ -31,9 +31,7 @@ jobs:
       - name: Install dependencies
         run: shards install
       - name: Build
-        # `-Dpreview_mt` mirrors release builds so CI surfaces fiber-race
-        # regressions before they ship.
-        run: shards build -Dpreview_mt
+        run: shards build
   build-docker:
     strategy:
       fail-fast: false
@@ -76,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        crystal-version: [1.19.0, 1.20.0, 1.21.0]
+        crystal-version: [1.21.0]
     steps:
       - uses: actions/checkout@v6
       - uses: crystal-lang/install-crystal@v1
@@ -85,9 +83,7 @@ jobs:
       - name: Install dependencies
         run: shards install
       - name: Build binary
-        # `-Dpreview_mt` mirrors release builds so CI surfaces fiber-race
-        # regressions before they ship.
-        run: shards build -Dpreview_mt
+        run: shards build
       - name: Run tests
         run: crystal spec
   build-snapcraft:

@@ -47,7 +47,7 @@ Hwaro processes Markdown content with TOML, YAML, or JSON front matter and Jinja
 - Page weight and custom sorting (by date, weight, title)
 
 ### Build & Performance
-- Multi-threaded parallel processing (Crystal `preview_mt`) — tune with `CRYSTAL_WORKERS` (default 4)
+- Multi-threaded parallel processing (Crystal execution contexts) — tune with `CRYSTAL_WORKERS` (defaults to the CPU count)
 - Incremental build caching
 - Streaming build mode with memory limits
 - Pre/post build hooks
@@ -104,9 +104,9 @@ cd hwaro
 shards install
 
 # Build
-# -Dpreview_mt enables the multi-threaded runtime (how official binaries
-# ship) — without it, builds render on a single thread.
-shards build --release --no-debug --production -Dpreview_mt
+# Parallelism comes from Crystal's execution contexts, sized in src/main.cr
+# (same as the official binaries). Requires Crystal >= 1.21.
+shards build --release --no-debug --production
 ```
 
 > For more installation options including Docker and pre-built binaries, see the [Installation Guide](https://hwaro.hahwul.com/start/installation/).

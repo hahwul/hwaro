@@ -5,7 +5,7 @@ Hwaro is a fast, lifecycle-driven static site generator written in Crystal. Feat
 
 ## Build & Run
 ```bash
-just build          # shards install && shards build -Dpreview_mt → bin/hwaro
+just build          # shards install && shards build → bin/hwaro
 just test           # crystal spec (unit + functional + content)
 just fix            # crystal tool format
 just dev            # Serve docs site locally (bin/hwaro serve -i docs)
@@ -13,7 +13,7 @@ just clean          # Remove bin/, lib/, stb_impl.o
 ```
 Dependencies (shard.yml): `markd` (Markdown), `toml` (TOML parsing), `crinja` (Jinja2 templates), `emoji`.
 
-All build paths (dev, CI, docker, snap, homebrew, release-binary) pass `-Dpreview_mt` so the multi-threaded Crystal runtime is enabled. Set `CRYSTAL_WORKERS=N` to override the worker count (default 4). New code that mutates shared state from worker fibers must guard with a `Mutex` or use the existing `@crinja_cache_mutex`; new directory creation must go through `Hwaro::Utils::FileSafe.mkdir_p` rather than `FileUtils.mkdir_p` (the latter has a check-then-create race that fires under MT).
+Hwaro requires Crystal >= 1.21 and gets its parallelism from Crystal's **execution contexts**: `src/main.cr` resizes the default `Fiber::ExecutionContext::Parallel` to `default_workers_count` (which honours `CRYSTAL_WORKERS`, defaulting to the CPU count). Do NOT reintroduce `-Dpreview_mt` — Crystal 1.21 deprecated it, and its legacy MT scheduler can spin forever at process exit (all `CRYSTAL-MT-*` threads stuck in `Crystal::SpinLock#lock` inside the event loop), so `hwaro build` never returns. Every `spawn` lands in the default context, so the build still runs fibers across cores: new code that mutates shared state from worker fibers must guard with a `Mutex` or use the existing `@crinja_cache_mutex`; new directory creation must go through `Hwaro::Utils::FileSafe.mkdir_p` rather than `FileUtils.mkdir_p` (the latter has a check-then-create race that fires under parallelism).
 
 ## Directory Structure
 ```

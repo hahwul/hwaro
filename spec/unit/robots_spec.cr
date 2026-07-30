@@ -435,6 +435,40 @@ describe Hwaro::Models::RobotsConfig do
       config.rules.first.user_agent.should eq("Googlebot")
     end
 
+    # Sitemap.generate basenames the configured filename before writing, so
+    # advertising the raw config value pointed crawlers at a path that is
+    # never produced.
+    it "advertises the sitemap at the path the sitemap generator actually writes" do
+      Dir.mktmpdir do |output_dir|
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+        config.robots.enabled = true
+        config.sitemap.enabled = true
+        config.sitemap.filename = "reports/sitemap.xml"
+
+        Hwaro::Content::Seo::Robots.generate(config, output_dir)
+
+        content = File.read(File.join(output_dir, "robots.txt"))
+        content.should contain("Sitemap: https://example.com/sitemap.xml")
+        content.should_not contain("reports/")
+      end
+    end
+
+    it "advertises a custom sitemap filename verbatim when it has no directory" do
+      Dir.mktmpdir do |output_dir|
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+        config.robots.enabled = true
+        config.sitemap.enabled = true
+        config.sitemap.filename = "sitemap-index.xml"
+
+        Hwaro::Content::Seo::Robots.generate(config, output_dir)
+
+        File.read(File.join(output_dir, "robots.txt"))
+          .should contain("Sitemap: https://example.com/sitemap-index.xml")
+      end
+    end
+
     it "can set multiple rules" do
       config = Hwaro::Models::RobotsConfig.new
 

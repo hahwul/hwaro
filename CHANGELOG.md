@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- HTML minifier no longer deletes rendered `&nbsp;`: Crystal's `\s` (UCP) matched U+00A0/U+3000, so a non-breaking space between two tags was downgraded to a breakable space or dropped outright
+- CSS minifier no longer mangles descendant combinators inside at-rule blocks (`@media screen{.card :hover{…}}` became the compound `.card:hover`), and a comment containing an apostrophe (`/* don't */`) no longer swallows the rules after it
+- `slugify()` treats the ideographic space U+3000 and U+00A0 as word separators instead of dropping them — CJK titles no longer weld into one slug segment
+- Block shortcodes whose name starts with a Jinja keyword (`callout`, `iframe`, `setup`, `format`, `blockquote`, …) expand again when closed with the named form `{% endcallout %}`; previously the raw shortcode source leaked into the published page. Hyphenated names (`include-code`) work too
+- `absolute_url`/`relative_url`/`url_for`/`get_url` leave `mailto:`, `tel:`, `data:` and protocol-relative `//host` URLs alone instead of prefixing base_url onto them
+- `resize_image(width="800")` and `truncate_words(length="20")` accept quoted numbers — every shortcode argument is a String, and these used to raise and abort the page render
+- `og:image`, `twitter:image` and JSON-LD `image` handle protocol-relative and `data:` values, and absolutize a relative path that merely starts with the letters "http"
+- `robots.txt` advertises the sitemap at the path the sitemap generator actually writes (a `filename` with a directory component pointed crawlers at a 404)
+- `get_taxonomy_url` on a multilingual site links to that language's term page (`/ko/tags/foo/`) when one exists — a term appearing only in non-default-language content previously linked to a root page that was never written
+- **Release binaries could hang forever at exit.** `-Dpreview_mt` is deprecated in Crystal 1.21 and its legacy MT scheduler spins in the event loop's spin lock at process exit, so `hwaro build` never returned (measured 4/120 short-lived runs under CPU oversubscription). Parallelism now comes from Crystal's execution contexts, sized in `src/main.cr`
+- Sass grouping parentheses no longer leak into declaration values (`width: (10px / 2)`, `margin: (1px 2px)`); a failing namespaced reference (`math.div(…)`) now warns with a `path:line:col` location instead of silently emitting invalid CSS
+- GFM tables with short alignment delimiters (`|:--|--:|`, `|:-:|`, `| - |`) render as tables; the delimiter cell now matches GFM's `:?-+:?` instead of requiring three hyphens
+- `hwaro tool check-links` stops reporting valid links as dead: angle-bracket destinations (`[t](</about/>)`, including ones containing spaces) and destinations with balanced parentheses (`/docs/foo_(bar)`)
+- An oversized `[image_processing] widths` entry no longer aborts the build with a bare `OverflowError`; the variant is declined by the existing pixel-count guard instead
+
+### Changed
+- **Breaking (packagers):** minimum Crystal is now 1.21, and no build path passes `-Dpreview_mt` any more. Worker count still honours `CRYSTAL_WORKERS` (now defaulting to the CPU count)
+
 ## v0.18.1
 
 ### Added

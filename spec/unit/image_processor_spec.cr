@@ -390,6 +390,49 @@ describe Hwaro::Content::Processors::ImageProcessor do
   end
 end
 
+# Exposes the private dimension math so the saturation guard can be asserted
+# without producing a multi-gigapixel image.
+module Hwaro::Content::Processors
+  module ImageProcessor
+    def self.calculate_dimensions_for_test(src_w, src_h, target_w, target_h)
+      calculate_dimensions(src_w, src_h, target_w, target_h)
+    end
+  end
+end
+
+describe "ImageProcessor#calculate_dimensions overflow" do
+  # `[image_processing] widths` is only bounded below (`> 0`), so an absurd
+  # entry made the proportional side exceed Int32 and `.round.to_i32` raised a
+  # bare OverflowError — an unclassified crash of the whole build rather than a
+  # skipped variant. It now saturates so the MAX_PIXELS guard can decline it.
+  it "saturates instead of raising for an oversized target width" do
+    w, h = Hwaro::Content::Processors::ImageProcessor
+      .calculate_dimensions_for_test(200, 500, 2_000_000_000, 0)
+    w.should eq(2_000_000_000)
+    h.should eq(Int32::MAX)
+  end
+
+  it "saturates instead of raising for an extreme source aspect ratio" do
+    Hwaro::Content::Processors::ImageProcessor
+      .calculate_dimensions_for_test(1, 2_000_000_000, 2_000_000_000, 0)
+      .last.should eq(Int32::MAX)
+  end
+
+  it "leaves ordinary proportional scaling unchanged" do
+    Hwaro::Content::Processors::ImageProcessor
+      .calculate_dimensions_for_test(200, 500, 100, 0).should eq({100, 250})
+    Hwaro::Content::Processors::ImageProcessor
+      .calculate_dimensions_for_test(800, 600, 400, 400).should eq({400, 300})
+  end
+
+  it "never returns a dimension below 1" do
+    w, h = Hwaro::Content::Processors::ImageProcessor
+      .calculate_dimensions_for_test(10_000, 3, 1, 0)
+    w.should eq(1)
+    h.should eq(1)
+  end
+end
+
 describe Hwaro::Content::Hooks::ImageHooks do
   # Helper to set up and tear down test resize map
   before_each do

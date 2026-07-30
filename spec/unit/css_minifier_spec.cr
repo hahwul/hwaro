@@ -713,6 +713,75 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain("color:red")
     end
 
+    # =========================================================================
+    # Descendant combinator inside at-rule blocks (BUG FIX verification)
+    # =========================================================================
+    it "preserves descendant combinator before pseudo-class inside @media" do
+      css = "@media screen {\n  .card :hover { color: red; }\n}"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should eq("@media screen{.card :hover{color:red}}")
+    end
+
+    it "preserves descendant combinator before pseudo-class inside @supports" do
+      css = "@supports (display: grid) { .grid :focus { outline: 0; } }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain(".grid :focus")
+      result.should contain("display:grid")
+    end
+
+    it "preserves descendant combinator in a nested rule inside @media" do
+      css = "@media print { .a .b :first-child { margin : 0 ; } }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain(".a .b :first-child")
+      result.should contain("margin:0")
+    end
+
+    it "still tightens declaration colons inside nested at-rule blocks" do
+      css = "@media screen { .x { color : red ; font-size : 2px ; } }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should eq("@media screen{.x{color:red;font-size:2px}}")
+    end
+
+    # =========================================================================
+    # Quotes inside comments (BUG FIX verification)
+    # =========================================================================
+    it "removes a comment containing an apostrophe" do
+      css = "/* don't */ .a { color: red; } .b { content: 'x'; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should_not contain("don't")
+      result.should eq(".a{color:red}.b{content:'x'}")
+    end
+
+    it "removes a comment containing an unbalanced double quote" do
+      css = %(/* say " hi */ .a { color: red; })
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should eq(".a{color:red}")
+    end
+
+    it "keeps a quote inside a comment from swallowing later rules" do
+      css = "/* it's */ .a { color: red; } /* fine */ .b { color: blue; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should eq(".a{color:red}.b{color:blue}")
+    end
+
+    it "preserves an apostrophe inside a string even after a comment" do
+      css = "/* c */ p::before { content: \"it's\"; }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should eq("p::before{content:\"it's\"}")
+    end
+
+    it "drops an unterminated comment through end of file" do
+      css = ".a { color: red; } /* trailing"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should eq(".a{color:red}")
+    end
+
+    it "preserves uppercase URL() contents" do
+      css = "body { background: URL( 'a b.png' ); }"
+      result = Hwaro::Utils::CssMinifier.minify(css)
+      result.should contain("URL('a b.png')")
+    end
+
     it "leaves a counterfeit out-of-range PRESERVE placeholder token intact" do
       # The counterfeit token sits inside a real string literal so Step 2 stashes
       # the surrounding string; Step 7's restore regex then re-matches the embedded

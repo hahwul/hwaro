@@ -1,4 +1,5 @@
 require "crinja"
+require "../../../utils/crinja_utils"
 
 module Hwaro
   module Content
@@ -12,7 +13,11 @@ module Hwaro
               # a leading "" token, consuming a word slot and emitting a stray
               # leading space (off-by-one truncation).
               text = target.to_s.strip
-              length = (arguments["length"].as_number rescue 50).to_i
+              # Lenient coercion: a quoted `length="20"` (which is all a
+              # shortcode can forward) used to fall into the `rescue` and
+              # silently mean 50, and a negative count sliced `words[0...-n]`
+              # and dropped words off the END of the text.
+              length = Utils::CrinjaUtils.to_count(arguments["length"], default: 50)
               ending = arguments["end"].to_s
 
               words = text.split(/\s+/, limit: length + 1)

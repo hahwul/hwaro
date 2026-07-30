@@ -408,7 +408,7 @@ def compile_hwaro
   puts "Building hwaro (release, parity with shipped binaries)..."
   # Same flags as .github/workflows/release-binary.yml so measurements
   # reflect what users actually run.
-  status = Process.run("shards", ["build", "--release", "--no-debug", "-Dpreview_mt"],
+  status = Process.run("shards", ["build", "--release", "--no-debug"],
     output: Process::Redirect::Inherit, error: Process::Redirect::Inherit)
   unless status.success?
     puts "Build failed"

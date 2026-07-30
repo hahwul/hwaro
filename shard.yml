@@ -4,7 +4,7 @@ version: 0.18.1
 authors:
   - HAHWUL <hahwul@gmail.com>
 
-crystal: ">= 1.19.0"
+crystal: ">= 1.21.0"
 
 license: MIT
 

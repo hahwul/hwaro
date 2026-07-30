@@ -32,6 +32,22 @@ module Hwaro
         # A URI scheme prefix (e.g. `https:`, `mailto:`, `tel:`, `data:`).
         SCHEME_PREFIX_REGEX = /\A[a-zA-Z][a-zA-Z0-9+.\-]*:/
 
+        # True when `value` already carries its own origin: any `scheme:` URL
+        # (`https:`, `mailto:`, `tel:`, `data:`, …) or a protocol-relative
+        # `//host/…`. Such a value must never have a base_url or page-URL
+        # prefix glued onto it.
+        #
+        # Single source of truth for every "is this already absolute?" test.
+        # The ad-hoc `starts_with?("http")` form it replaces was wrong in both
+        # directions: it missed `mailto:`/`data:`/`//cdn…` (which then got a
+        # base_url prefix — and `//cdn…` even took the *root-relative* branch,
+        # yielding `https://site.com//cdn.example.com/og.png`), and it
+        # false-positived on a relative path that merely starts with the
+        # letters "http" (`http-guide/cover.png`), leaving it un-absolutized.
+        def has_own_origin?(value : String) : Bool
+          value.starts_with?("//") || value.matches?(SCHEME_PREFIX_REGEX)
+        end
+
         # Resolve internal `@/` links in HTML to actual page URLs.
         #
         # - `html` — rendered HTML string
@@ -190,9 +206,7 @@ module Hwaro
         # URL: absolute URLs (scheme:), protocol-relative (//host), and pure
         # in-page anchors (#section).
         private def absolute_or_anchor?(value : String) : Bool
-          value.starts_with?('#') ||
-            value.starts_with?("//") ||
-            value.matches?(SCHEME_PREFIX_REGEX)
+          value.starts_with?('#') || has_own_origin?(value)
         end
       end
     end

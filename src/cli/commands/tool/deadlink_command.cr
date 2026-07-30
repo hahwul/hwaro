@@ -276,34 +276,55 @@ module Hwaro
             links
           end
 
+          # Markdown link/image destination, allowing ONE level of balanced
+          # parentheses inside it. Plain `([^\)]+)` stopped at the first `)`,
+          # so `[x](/docs/foo_(bar))` was scanned as `/docs/foo_(bar` and
+          # reported dead — a false positive on a link the build resolves fine.
+          # The alternation branches start with disjoint characters, so there
+          # is no backtracking ambiguity.
+          LINK_DEST = /((?:[^()]|\([^()]*\))*)/
+
           # Normalize a Markdown link/image destination to a bare URL.
+          #
           # CommonMark allows an optional title after the destination
-          # (`[t](/url "title")` / `![a](/img 'title')`); the capturing regex
-          # `([^\)]+)` includes that title, so without stripping it the resolved
-          # target became e.g. `/posts/b/ "title"` and every titled internal link
-          # was falsely reported dead. A non-`<…>` destination cannot contain a
-          # space (CommonMark ends it at the first whitespace), so taking the
-          # first whitespace-delimited token yields the real destination.
+          # (`[t](/url "title")` / `![a](/img 'title')`); the capture includes
+          # that title, so without stripping it the resolved target became e.g.
+          # `/posts/b/ "title"` and every titled internal link was falsely
+          # reported dead.
+          #
+          # An angle-bracket destination (`[t](</my page.md> "title")`) is the
+          # one form that MAY contain spaces, so the whitespace split has to
+          # come after unwrapping it — otherwise the target was the literal
+          # `</my`, and even a space-free `</about/>` was reported dead while
+          # the build resolved it correctly.
           private def clean_link_target(raw : String) : String
-            dest = raw.strip.split(/\s/, 2).first
+            stripped = raw.strip
+            dest =
+              if stripped.starts_with?('<') && (close = stripped.index('>'))
+                stripped[1...close]
+              else
+                stripped.split(/\s/, 2).first
+              end
             dest.split("#").first.split("?").first.strip
           end
 
           private def find_internal_links(dir : String) : Array(Link)
             links = [] of Link
+            link_re = /(?<!!)\[([^\]]*)\]\(#{LINK_DEST.source}\)/
+            image_re = /!\[([^\]]*)\]\(#{LINK_DEST.source}\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
               content = strip_code(File.read(file))
 
               # Regular links (exclude images by using negative lookbehind)
-              content.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
+              content.scan(link_re) do |match|
                 url = clean_link_target(match[2])
                 next if url.empty? || url.starts_with?("#") || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
                 links << Link.new(file: file, url: url, kind: :internal)
               end
 
               # Image links
-              content.scan(/!\[([^\]]*)\]\(([^\)]+)\)/) do |match|
+              content.scan(image_re) do |match|
                 url = clean_link_target(match[2])
                 next if url.empty? || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
                 links << Link.new(file: file, url: url, kind: :image)

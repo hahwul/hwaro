@@ -96,15 +96,16 @@ sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 git clone https://github.com/hahwul/hwaro
 cd hwaro
 shards install
-shards build --release --no-debug -Dpreview_mt
+shards build --release --no-debug
 ```
 
 The binary is created at `./bin/hwaro`.
 
-> `-Dpreview_mt` enables Crystal's multi-threaded runtime — it is how the
-> official binaries and Docker image are built, and `hwaro build` renders
-> pages in parallel only with it. Packagers should always pass this flag;
-> without it, builds run on a single thread.
+> Requires Crystal **1.21 or newer**. Parallel page rendering is enabled in
+> `src/main.cr`, which resizes Crystal's default execution context — no build
+> flag needed. Set `CRYSTAL_WORKERS=N` to override the worker count (it
+> defaults to the CPU count). Do not pass the old `-Dpreview_mt` flag:
+> Crystal 1.21 deprecated it and its scheduler can hang at process exit.
 
 ### Add to PATH (Optional)
 

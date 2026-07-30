@@ -791,6 +791,123 @@ describe "UrlFilters" do
     end
   end
 
+  describe "values that already carry their own origin" do
+    # `absolute_url`/`relative_url` only special-cased http(s)://, so a
+    # `mailto:` link came back as https://example.com/mailto:a@b.com and a
+    # protocol-relative CDN URL (which starts with "/") became
+    # https://example.com//cdn.example.com/x.js.
+    {
+      "mailto:hello@example.com",
+      "tel:+15551234",
+      "data:image/png;base64,AAAA",
+      "//cdn.example.com/lib.js",
+      "ftp://files.example.com/x.zip",
+    }.each do |url|
+      it "absolute_url passes #{url} through unchanged" do
+        page = Hwaro::Models::Page.new("test.md")
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+        context.add("my_url", url)
+
+        result = Hwaro::Content::Processors::Template.process("{{ my_url | absolute_url }}", context).strip
+        result.should eq(url)
+      end
+
+      it "relative_url passes #{url} through unchanged" do
+        page = Hwaro::Models::Page.new("test.md")
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com/sub/"
+
+        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+        context.add("my_url", url)
+
+        result = Hwaro::Content::Processors::Template.process("{{ my_url | relative_url }}", context).strip
+        result.should eq(url)
+      end
+
+      it "url_for passes #{url} through unchanged" do
+        page = Hwaro::Models::Page.new("test.md")
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+        context.add("my_url", url)
+
+        result = Hwaro::Content::Processors::Template.process("{{ url_for(path=my_url) }}", context).strip
+        result.should eq(url)
+      end
+    end
+
+    it "relative_url survives a malformed base_url instead of aborting the build" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = "http://[bad"
+
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("my_url", "/about/")
+
+      result = Hwaro::Content::Processors::Template.process("{{ my_url | relative_url }}", context).strip
+      result.should eq("/about/")
+    end
+  end
+
+  describe "numeric arguments given as strings" do
+    # Every shortcode argument is parsed into a String, so a numeric argument
+    # forwarded from a shortcode always arrives quoted. `as_number` raised
+    # Crinja::TypeError on those and the raise aborted the whole page render.
+    it "truncate_words accepts a quoted length" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("text", "one two three four five")
+
+      result = Hwaro::Content::Processors::Template.process(%({{ text | truncate_words(length="2", end="…") }}), context).strip
+      result.should eq("one two…")
+    end
+
+    it "truncate_words falls back to the default for a non-numeric length" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("text", "one two three")
+
+      result = Hwaro::Content::Processors::Template.process(%({{ text | truncate_words(length="wat") }}), context).strip
+      result.should eq("one two three")
+    end
+
+    it "truncate_words does not drop trailing words for a negative length" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+      context.add("text", "one two three")
+
+      result = Hwaro::Content::Processors::Template.process(%({{ text | truncate_words(length=-5, end="…") }}), context).strip
+      result.should eq("…")
+    end
+
+    it "resize_image accepts a quoted width instead of aborting the render" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      result = Hwaro::Content::Processors::Template.process(%({{ resize_image(path="/img/a.png", width="800").width }}), context).strip
+      result.should eq("800")
+    end
+
+    it "resize_image clamps an out-of-range width instead of raising" do
+      page = Hwaro::Models::Page.new("test.md")
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+      result = Hwaro::Content::Processors::Template.process(%({{ resize_image(path="/img/a.png", width="999999999999").width }}), context).strip
+      result.should eq(Int32::MAX.to_s)
+    end
+  end
+
   describe "empty base_url (pre-deploy state)" do
     it "absolute_url returns the path unchanged and never emits a // prefix" do
       page = Hwaro::Models::Page.new("test.md")

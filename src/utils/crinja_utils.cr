@@ -116,6 +116,29 @@ module Hwaro
           Crinja::Value.new(value.to_s)
         end
       end
+
+      # Coerce a template/filter argument to an Int32 count, clamped to
+      # [min, max], with `default` for anything that isn't a number at all.
+      #
+      # Numeric arguments reach templates as strings far more often than not:
+      # `parse_shortcode_args_jinja` produces a `Hash(String, String)`, so every
+      # value a shortcode forwards is a String. `Crinja::Value#as_number` raises
+      # `Crinja::TypeError` on those, and the raise propagated out of the filter
+      # and aborted the whole page render — `resize_image(width="800")` killed
+      # the page instead of resizing. Out-of-range and NaN values clamp here too
+      # rather than raising OverflowError from `Float64#to_i`.
+      def to_count(value : Crinja::Value, default : Int32 = 0, min : Int32 = 0, max : Int32 = Int32::MAX) : Int32
+        num = begin
+          value.as_number.to_f
+        rescue Exception
+          value.to_s.strip.to_f?
+        end
+        return default unless num
+        return default if num.nan?
+        return min if num <= min.to_f
+        return max if num >= max.to_f
+        num.to_i32
+      end
     end
   end
 end
