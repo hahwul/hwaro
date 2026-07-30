@@ -20,17 +20,23 @@ module Hwaro
       #   slugify("My Blog Post")  # => "my-blog-post"
       #   slugify("한글 제목")      # => "한글-제목"
       #   slugify("CJK 테스트!")   # => "cjk-테스트"
+      #   slugify("日本語　テスト") # => "日本語-テスト"  (U+3000)
       #
       def slugify(text : String) : String
         # Single-pass: directly emit hyphens for separators, collapsing runs.
         # Avoids intermediate String allocation + regex gsub.
         String.build(text.bytesize) do |io|
           last_was_sep = true # suppress leading hyphen
+          # Separator test is `whitespace?`, not `ascii_whitespace?`: the
+          # ideographic space U+3000 is the ordinary word separator in CJK
+          # titles, and an `&nbsp;` in a title decodes to U+00A0. Neither is
+          # a letter, so the old test dropped them entirely and welded the
+          # surrounding words together ("日本語　テスト" → "日本語テスト").
           text.each_char do |char|
             if char.ascii_letter? || char.ascii_number?
               io << char.downcase
               last_was_sep = false
-            elsif char.ascii_whitespace? || char == '-' || char == '_'
+            elsif char.whitespace? || char == '-' || char == '_'
               unless last_was_sep
                 io << '-'
                 last_was_sep = true

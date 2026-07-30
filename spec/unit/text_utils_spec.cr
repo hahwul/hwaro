@@ -383,6 +383,31 @@ describe Hwaro::Utils::TextUtils do
     end
   end
 
+  describe ".slugify with Unicode whitespace" do
+    # `ascii_whitespace?` misses U+3000 (the CJK word separator) and U+00A0
+    # (what `&nbsp;` decodes to), so those characters were dropped and the
+    # words on either side were welded into one slug segment.
+    it "treats the ideographic space as a separator" do
+      Hwaro::Utils::TextUtils.slugify("日本語\u{3000}テスト").should eq("日本語-テスト")
+    end
+
+    it "treats a non-breaking space as a separator" do
+      Hwaro::Utils::TextUtils.slugify("Hello\u{00A0}World").should eq("hello-world")
+    end
+
+    it "treats an em space as a separator" do
+      Hwaro::Utils::TextUtils.slugify("a\u{2003}b").should eq("a-b")
+    end
+
+    it "collapses mixed ASCII and Unicode whitespace runs into one hyphen" do
+      Hwaro::Utils::TextUtils.slugify("a \u{00A0} b").should eq("a-b")
+    end
+
+    it "does not emit a trailing hyphen for trailing Unicode whitespace" do
+      Hwaro::Utils::TextUtils.slugify("한글 제목\u{3000}").should eq("한글-제목")
+    end
+  end
+
   describe ".cjk_char? (extended)" do
     it "returns true for CJK Extension A" do
       # U+3400 is in CJK Extension A range

@@ -368,6 +368,31 @@ describe Hwaro::Utils::HtmlMinifier do
       end
     end
 
+    describe "non-breaking and other Unicode spaces" do
+      # `\s` under PCRE2's UCP flag (which Crystal enables) matches U+00A0
+      # and friends, so the inter-token pass used to treat rendered `&nbsp;`
+      # text as collapsible layout whitespace.
+      it "keeps a non-breaking space between inline siblings" do
+        html = "<em>a</em>\u{00A0}<em>b</em>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(html)
+      end
+
+      it "keeps a non-breaking space between block siblings" do
+        html = "<p>a</p>\u{00A0}<p>b</p>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(html)
+      end
+
+      it "keeps an ideographic space between tags" do
+        html = "<p>a</p>\u{3000}<p>b</p>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(html)
+      end
+
+      it "still collapses ASCII whitespace next to a non-breaking space" do
+        html = "<p>a</p>\n<p>b</p>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<p>a</p><p>b</p>")
+      end
+    end
+
     describe "trailing and blank-line whitespace" do
       it "strips trailing spaces from each line" do
         html = "<div>A</div>   \n<div>B</div>\t\t\n<div>C</div>"
