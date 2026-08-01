@@ -67,12 +67,14 @@ end
 # order-dependent. `MIME.register` overwrites, so anything that already had a
 # mapping can be put back exactly.
 #
-# The three extensions stdlib does not map at all (`.md`, `.webmanifest`,
-# `.map`) cannot be restored — there is no API to remove a registration. They
-# are listed here so the residue is explicit rather than a surprise.
+# Whichever extensions the platform's database does NOT already map cannot be
+# restored — there is no API to remove a registration — so a little residue is
+# unavoidable. Which extensions those are is itself platform-dependent (macOS
+# has no `.md`, Linux does), which is precisely why the production rule must
+# not branch on it.
 private def with_utf8_mime_types(&)
   snapshot = {} of String => String
-  Hwaro::Services::Server::UTF8_MIME_EXTENSIONS.each do |ext|
+  Hwaro::Services::Server::UTF8_MIME_TYPES.each_key do |ext|
     if existing = MIME.from_extension?(ext)
       snapshot[ext] = existing
     end
@@ -821,18 +823,21 @@ describe Hwaro::Services::Server do
   describe ".register_utf8_mime_types" do
     it "teaches the MIME table a UTF-8 charset for text extensions" do
       with_utf8_mime_types do
-        MIME.from_extension(".txt").should contain("charset=utf-8")
-        MIME.from_extension(".json").should contain("charset=utf-8")
-        MIME.from_extension(".xml").should contain("charset=utf-8")
-        MIME.from_extension(".svg").should contain("charset=utf-8")
+        {".txt", ".json", ".xml", ".svg"}.each do |ext|
+          MIME.from_extension(ext).should contain("charset=utf-8")
+        end
       end
     end
 
-    it "keeps the stdlib base type and is idempotent" do
+    it "is idempotent and never double-appends a charset" do
       with_utf8_mime_types do
+        first = Hwaro::Services::Server::UTF8_MIME_TYPES.keys.map { |ext| MIME.from_extension(ext) }
         Hwaro::Services::Server.register_utf8_mime_types
-        MIME.from_extension(".txt").should eq("text/plain; charset=utf-8")
-        MIME.from_extension(".json").should eq("application/json; charset=utf-8")
+        Hwaro::Services::Server.register_utf8_mime_types
+        second = Hwaro::Services::Server::UTF8_MIME_TYPES.keys.map { |ext| MIME.from_extension(ext) }
+
+        second.should eq(first)
+        second.each(&.scan("charset=").size.should(eq(1)))
       end
     end
 
@@ -850,21 +855,62 @@ describe Hwaro::Services::Server do
     # Finding 3: HTML is the site's primary content type and was missing, so
     # a large page — exactly the case the charset fix exists for — still lost
     # its encoding.
+    # Asserted as a property, not a literal: the base type comes from the
+    # platform's MIME database, so `should eq("text/html; charset=utf-8")`
+    # is a spec that can pass on one OS and fail on another.
     it "covers HTML" do
       with_utf8_mime_types do
-        MIME.from_extension(".html").should eq("text/html; charset=utf-8")
-        MIME.from_extension(".htm").should eq("text/html; charset=utf-8")
+        {".html", ".htm"}.each do |ext|
+          type = MIME.from_extension(ext)
+          type.should contain("charset=utf-8")
+          type.should contain("html")
+        end
       end
     end
 
-    # Finding 3: stdlib maps none of these, so appending to a nil base was a
-    # silent no-op and they were served as application/octet-stream.
-    it "registers a full type for extensions stdlib does not map" do
+    # The CI regression: the old rule only registered these when stdlib had NO
+    # mapping, which is true on macOS and false on Linux — so on Linux they
+    # came back as a bare `text/markdown`, with no charset at all. Every
+    # extension must end up with one on every platform, whatever the local
+    # database happens to know.
+    it "ensures a charset for every listed extension on any platform" do
       with_utf8_mime_types do
-        {".md", ".webmanifest", ".map"}.each do |ext|
+        Hwaro::Services::Server::UTF8_MIME_TYPES.each_key do |ext|
           type = MIME.from_extension(ext)
           type.should contain("charset=utf-8")
           type.should_not contain("octet-stream")
+        end
+      end
+    end
+
+    # The CI failure, reproduced on ANY platform by simulating the condition
+    # instead of depending on it: Linux's /etc/mime.types maps `.md`, macOS's
+    # /etc/apache2/mime.types does not. The old rule only registered the
+    # fallback extensions when stdlib had NO mapping, so this pre-registration
+    # is enough to make it emit a bare `text/markdown` with no charset.
+    it "ensures a charset even when the platform database already maps the extension" do
+      original = MIME.from_extension?(".md")
+      MIME.register(".md", "text/markdown")
+      begin
+        Hwaro::Services::Server.register_utf8_mime_types
+        MIME.from_extension(".md").should eq("text/markdown; charset=utf-8")
+      ensure
+        MIME.register(".md", original) if original
+      end
+    end
+
+    # Whether the platform maps an extension must not change the outcome, only
+    # which base the charset is appended to.
+    it "appends to the platform base type without overriding it" do
+      before = {} of String => String?
+      Hwaro::Services::Server::UTF8_MIME_TYPES.each_key { |ext| before[ext] = MIME.from_extension?(ext) }
+
+      with_utf8_mime_types do
+        Hwaro::Services::Server::UTF8_MIME_TYPES.each do |ext, assumed|
+          type = MIME.from_extension(ext)
+          expected_base = before[ext] || assumed
+          next if expected_base.includes?("charset=")
+          type.should eq("#{expected_base}; charset=utf-8")
         end
       end
     end

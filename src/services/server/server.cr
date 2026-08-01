@@ -702,40 +702,56 @@ module Hwaro
       # appearing for users who had explicitly turned overlays off.
       @error_overlay : Bool = true
 
-      # Extensions whose served bytes are UTF-8 text. Registering the charset
-      # in the MIME table makes `HTTP::StaticFileHandler` emit it directly,
-      # which is the only thing that works for responses past the response
-      # output buffer (`IO::DEFAULT_BUFFER_SIZE`, 32 KiB) — a post-`call_next`
-      # header edit is too late there, so a 40 KB `search.json` used to lose
-      # its charset entirely. The base type is whatever stdlib already maps
-      # the extension to, so nothing but the charset changes.
-      # `.html`/`.htm` lead deliberately: HTML is the site's primary content
-      # type, and with `--no-live-reload` (or any page the injector doesn't
-      # match) it goes out through StaticFileHandler like any other file, so a
-      # 60 KB CJK page was rendering as mojibake — the original defect on the
-      # file type that matters most.
-      UTF8_MIME_EXTENSIONS = %w[.html .htm .txt .json .xml .js .mjs .css .svg .csv]
-
-      # Extensions stdlib has no mapping for at all. Appending a charset to a
-      # nil base is impossible, and leaving them unregistered means
-      # `application/octet-stream`, which CharsetHandler also (correctly)
-      # declines to touch — so register the whole type.
-      UTF8_MIME_FALLBACKS = {
-        ".md"          => "text/markdown; charset=utf-8",
-        ".webmanifest" => "application/manifest+json; charset=utf-8",
-        ".map"         => "application/json; charset=utf-8",
+      # Extensions whose served bytes are UTF-8 text, each with the base type to
+      # assume when the platform's MIME database has no opinion.
+      #
+      # Registering the charset in the MIME table makes `HTTP::StaticFileHandler`
+      # emit it directly, which is the only thing that works for responses past
+      # the response output buffer (`IO::DEFAULT_BUFFER_SIZE`, 32 KiB) — a
+      # post-`call_next` header edit is too late there, so a 40 KB
+      # `search.json` used to lose its charset entirely. `.html`/`.htm` matter
+      # most: HTML is the site's primary content type and with
+      # `--no-live-reload` (or any page the injector doesn't match) it goes out
+      # through StaticFileHandler like any other file, so a 60 KB CJK page
+      # rendered as mojibake.
+      #
+      # One list with one rule — deliberately NOT split on "does stdlib map
+      # this extension?". That question has a platform-dependent answer:
+      # Crystal seeds `MIME::DEFAULT_TYPES` (which already carries charsets)
+      # and then lets the OS database override it, so macOS reads
+      # `/etc/apache2/mime.types` and reports `.md` as nil while Linux reads
+      # `/etc/mime.types` and reports `text/markdown`. Keying behaviour on that
+      # split left these extensions with no charset at all on Linux — the very
+      # bug the fallback existed to fix, invisible on macOS.
+      UTF8_MIME_TYPES = {
+        ".html"        => "text/html",
+        ".htm"         => "text/html",
+        ".txt"         => "text/plain",
+        ".json"        => "application/json",
+        ".xml"         => "application/xml",
+        ".js"          => "text/javascript",
+        ".mjs"         => "text/javascript",
+        ".css"         => "text/css",
+        ".svg"         => "image/svg+xml",
+        ".csv"         => "text/csv",
+        ".md"          => "text/markdown",
+        ".webmanifest" => "application/manifest+json",
+        ".map"         => "application/json",
       }
 
-      # Idempotent; only ever called from the dev server, so the built output
-      # and every other command keep stdlib's MIME table untouched.
+      # Ensure every listed extension carries `charset=utf-8` whatever the
+      # platform's database says: append to the system's base type when it has
+      # one, use ours when it does not. Never overrides a system type beyond
+      # adding the charset, never double-appends, and is idempotent — a second
+      # pass sees the charset already there and skips.
+      #
+      # Only ever called from the dev server, so the built output and every
+      # other command keep stdlib's MIME table untouched.
       def self.register_utf8_mime_types
-        UTF8_MIME_EXTENSIONS.each do |ext|
-          base = MIME.from_extension?(ext)
-          next if base.nil? || base.includes?("charset=")
+        UTF8_MIME_TYPES.each do |ext, assumed|
+          base = MIME.from_extension?(ext) || assumed
+          next if base.includes?("charset=")
           MIME.register(ext, "#{base}; charset=utf-8")
-        end
-        UTF8_MIME_FALLBACKS.each do |ext, type|
-          MIME.register(ext, type) if MIME.from_extension?(ext).nil?
         end
       end
 
