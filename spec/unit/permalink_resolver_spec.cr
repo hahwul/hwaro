@@ -227,4 +227,41 @@ describe Hwaro::Utils::PermalinkResolver do
       resolve("blog/a.md", nil).should eq("/blog/a/")
     end
   end
+
+  # Regression: `slug` is documented as "Custom URL slug", but index pages
+  # skipped it entirely — so converting a page to bundle layout (which is what
+  # `hwaro new --bundle` and multilingual siblings produce) silently reverted
+  # its URL to the directory name with no warning.
+  describe ".resolve_url with a bundle slug" do
+    it "renames the leaf bundle's own segment" do
+      resolve("blog/my-post/index.md", nil, slug: "renamed").should eq("/blog/renamed/")
+    end
+
+    it "renames a top-level leaf bundle" do
+      resolve("my-post/index.md", nil, slug: "renamed").should eq("/renamed/")
+    end
+
+    it "leaves section indexes alone so their children stay under them" do
+      resolve("blog/_index.md", nil, slug: "renamed").should eq("/blog/")
+    end
+
+    it "never moves the homepage" do
+      resolve("index.md", nil, slug: "renamed").should eq("/")
+    end
+
+    it "keeps the directory name when no slug is set" do
+      resolve("blog/my-post/index.md", nil).should eq("/blog/my-post/")
+    end
+
+    it "prefixes the language before the renamed segment" do
+      config = config_with({} of String => String)
+      resolve("blog/my-post/index.ko.md", config, slug: "renamed", language: "ko")
+        .should eq("/ko/blog/renamed/")
+    end
+
+    it "renames the segment the remap moved it to" do
+      config = config_with({"old" => "archive"})
+      resolve("old/my-post/index.md", config, slug: "renamed").should eq("/archive/renamed/")
+    end
+  end
 end

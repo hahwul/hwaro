@@ -11,6 +11,7 @@ require "./doctor"
 require "../utils/errors"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
+require "../utils/text_utils"
 
 module Hwaro
   module Services
@@ -54,7 +55,9 @@ module Hwaro
       end
 
       private def validate_file(file_path : String, issues : Array(Issue))
-        content = File.read(file_path)
+        # Match the build's frontmatter reader (see TextUtils.strip_bom) so a
+        # BOM'd file isn't reported as missing every front matter field.
+        content = Utils::TextUtils.strip_bom(File.read(file_path))
 
         frontmatter = parse_frontmatter(file_path, content, issues) || {} of String => FrontmatterValue
 

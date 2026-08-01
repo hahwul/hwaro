@@ -560,27 +560,72 @@ describe Hwaro::Models::Page do
       end
     end
 
-    # Regression: a root `_index.md` bundle scoops the whole content tree, so
-    # without honoring [content.files] it republished arbitrary non-md files
-    # (e.g. content/public/robots.txt -> public/public/robots.txt). When
-    # `allow_extensions` is set, bundle assets must obey the same allowlist.
     it "honors [content.files] allow/disallow when content_files is enabled" do
       Dir.mktmpdir do |dir|
-        page_dir = File.join(dir, "public")
-        FileUtils.mkdir_p(page_dir)
-        File.write(File.join(dir, "_index.md"), "# Home")
-        File.write(File.join(page_dir, "robots.txt"), "User-agent: *")
-        File.write(File.join(dir, "photo.png"), "fake png")
+        bundle = File.join(dir, "post")
+        nested = File.join(bundle, "private")
+        FileUtils.mkdir_p(nested)
+        File.write(File.join(bundle, "index.md"), "# Post")
+        File.write(File.join(nested, "robots.txt"), "User-agent: *")
+        File.write(File.join(bundle, "photo.png"), "fake png")
 
-        page = Hwaro::Models::Page.new("_index.md")
+        page = Hwaro::Models::Page.new("post/index.md")
         page.is_index = true
 
         content_files = Hwaro::Models::ContentFilesConfig.new
         content_files.allow_extensions = Hwaro::Models::ContentFilesConfig.normalize_extensions(["png"])
 
         assets = page.collect_assets(dir, content_files)
-        assets.should contain("photo.png")
-        assets.should_not contain("public/robots.txt")
+        assets.should contain("post/photo.png")
+        assets.should_not contain("post/private/robots.txt")
+      end
+    end
+
+    # Regression: `content/index.md` is the homepage, not a bundle spanning the
+    # whole site. Treating it as one republished every non-markdown file
+    # anywhere under content/ into the output root — including files no
+    # `[content.files]` allowlist had opted in, because a config without that
+    # section disables the filter entirely. Root-level files publish through
+    # `[content.files]` instead, which is the documented path for them.
+    it "never treats the content root itself as a page bundle" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "private"))
+        File.write(File.join(dir, "index.md"), "# Home")
+        File.write(File.join(dir, "photo.png"), "fake png")
+        File.write(File.join(dir, "private", "internal.pdf"), "secret")
+
+        page = Hwaro::Models::Page.new("index.md")
+        page.is_index = true
+
+        # No [content.files] configured — the unfiltered path.
+        page.collect_assets(dir, Hwaro::Models::ContentFilesConfig.new).should be_empty
+      end
+    end
+
+    # Regression: a nested `index.md`/`_index.md` is a separate page that
+    # publishes its own assets; recursing into it made every ancestor index
+    # re-copy the same files (and, once a nested bundle's `slug` moved its
+    # URL, publish them at a second, stale location).
+    it "stops recursion at nested bundles and sections" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "post")
+        FileUtils.mkdir_p(File.join(bundle, "gallery"))
+        FileUtils.mkdir_p(File.join(bundle, "child"))
+        FileUtils.mkdir_p(File.join(bundle, "sub-section"))
+        File.write(File.join(bundle, "index.md"), "# Post")
+        File.write(File.join(bundle, "gallery", "a.png"), "own asset")
+        File.write(File.join(bundle, "child", "index.md"), "# Child")
+        File.write(File.join(bundle, "child", "b.png"), "child asset")
+        File.write(File.join(bundle, "sub-section", "_index.md"), "# Sub")
+        File.write(File.join(bundle, "sub-section", "c.png"), "section asset")
+
+        page = Hwaro::Models::Page.new("post/index.md")
+        page.is_index = true
+
+        assets = page.collect_assets(dir)
+        assets.should contain("post/gallery/a.png")
+        assets.should_not contain("post/child/b.png")
+        assets.should_not contain("post/sub-section/c.png")
       end
     end
 

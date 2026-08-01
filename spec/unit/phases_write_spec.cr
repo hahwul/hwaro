@@ -8,12 +8,12 @@ module Hwaro::Core::Build
       generate_404_page(site, templates, output_dir, minify, verbose)
     end
 
-    def test_process_raw_files(raw_files, output_dir, minify, verbose) : Int32
-      process_raw_files(raw_files, output_dir, minify, verbose)
+    def test_process_raw_files(raw_files, output_dir, minify, verbose, written = Set(String).new) : Int32
+      process_raw_files(raw_files, output_dir, minify, verbose, written)
     end
 
-    def test_process_assets(pages, output_dir, verbose)
-      process_assets(pages, output_dir, verbose)
+    def test_process_assets(pages, output_dir, verbose, already_written = Set(String).new)
+      process_assets(pages, output_dir, verbose, already_written)
     end
 
     def test_ensure_dir(dir : String)
@@ -117,6 +117,33 @@ describe Hwaro::Core::Build::Phases::Write do
           FileUtils.mkdir_p("public")
           builder = Hwaro::Core::Build::Builder.new
           builder.test_process_raw_files([] of Hwaro::Core::Lifecycle::RawFile, "public", false, false).should eq(0)
+        end
+      end
+    end
+
+    # Regression: a `.json`/`.xml` file inside a page bundle that
+    # `[content.files]` also publishes is written twice — minified here, then
+    # copied verbatim by process_assets. The asset copy ran last and silently
+    # undid `--minify` for that file.
+    it "keeps its minified output when the same path is also a bundle asset" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/post")
+          File.write("content/post/index.md", "+++\ntitle = \"P\"\n+++\n")
+          File.write("content/post/data.json", "{\n    \"a\": 1\n}\n")
+          FileUtils.mkdir_p("public")
+
+          raw = Hwaro::Core::Lifecycle::RawFile.new("content/post/data.json", "post/data.json")
+          page = Hwaro::Models::Page.new("post/index.md")
+          page.url = "/post/"
+          page.assets = ["post/data.json"]
+
+          builder = Hwaro::Core::Build::Builder.new
+          written = Set(String).new
+          builder.test_process_raw_files([raw], "public", true, false, written)
+          builder.test_process_assets([page], "public", false, written)
+
+          File.read("public/post/data.json").should eq(%({"a":1}))
         end
       end
     end

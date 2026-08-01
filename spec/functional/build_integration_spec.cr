@@ -463,6 +463,42 @@ describe "Build Integration: Redirects" do
     end
   end
 
+  # Regression: aliases were prefixed with base_path but `redirect_to` was not,
+  # so on a project-pages deployment a redirect page sent readers to the domain
+  # root (a 404) instead of the intended page under the subpath.
+  it "prefixes redirect_to with base_url's path for subpath deployments" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://example.com/myblog\"\n",
+      content_files: {
+        "old-page.md"           => "---\ntitle: Old\nredirect_to: /new-page/\n---\n",
+        "old-section/_index.md" => "---\ntitle: Old Section\nredirect_to: /new-section/\n---\n",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "{{ content }}",
+      },
+    ) do
+      File.read("public/old-page/index.html").should contain("url=/myblog/new-page/")
+      File.read("public/old-section/index.html").should contain("url=/myblog/new-section/")
+    end
+  end
+
+  # An off-site `redirect_to` is left alone — base_path only applies to
+  # root-relative, site-internal targets.
+  it "leaves an external redirect_to untouched under a subpath deployment" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://example.com/myblog\"\n",
+      content_files: {
+        "ext.md"      => "---\ntitle: Ext\nredirect_to: https://example.org/x\n---\n",
+        "protorel.md" => "---\ntitle: Proto\nredirect_to: \"//cdn.example.org/x\"\n---\n",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      File.read("public/ext/index.html").should contain("url=https://example.org/x")
+      File.read("public/protorel/index.html").should contain("url=//cdn.example.org/x")
+    end
+  end
+
   it "prefixes alias redirects with base_url's path for subpath deployments" do
     # GitHub/GitLab project pages serve the site under a subpath. The alias
     # redirect must include that prefix or it 404s (it previously emitted a

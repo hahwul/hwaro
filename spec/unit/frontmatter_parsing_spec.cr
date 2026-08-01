@@ -1839,4 +1839,38 @@ describe Hwaro::Content::Processors::Markdown do
       html.should contain("<strong>world</strong>")
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # UTF-8 BOM
+  #
+  # Regression: the fences below are `\A`-anchored and the JSON test is a bare
+  # leading `{`, so a BOM'd file matched none of them. Front matter then fell
+  # through as body text: the page rendered "Untitled" with its literal `+++`
+  # block printed into the output, and no warning was emitted.
+  # ---------------------------------------------------------------------------
+  describe "BOM-prefixed front matter" do
+    it "parses TOML front matter behind a BOM" do
+      result = processor.parse("\uFEFF+++\ntitle = \"BOM Post\"\n+++\n\nBody text\n")
+      result[:title].should eq("BOM Post")
+      result[:content].should contain("Body text")
+      result[:content].should_not contain("+++")
+    end
+
+    it "parses YAML front matter behind a BOM" do
+      result = processor.parse("\uFEFF---\ntitle: BOM YAML\n---\n\nBody text\n")
+      result[:title].should eq("BOM YAML")
+      result[:content].should_not contain("---")
+    end
+
+    it "parses JSON front matter behind a BOM" do
+      result = processor.parse("\uFEFF{\"title\": \"BOM JSON\"}\n\nBody text\n")
+      result[:title].should eq("BOM JSON")
+      result[:content].should contain("Body text")
+    end
+
+    it "keeps a BOM'd body without front matter intact" do
+      result = processor.parse("\uFEFFJust body text\n")
+      result[:content].should eq("Just body text\n")
+    end
+  end
 end

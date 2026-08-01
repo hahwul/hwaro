@@ -11,6 +11,18 @@ module Hwaro
     module TextUtils
       extend self
 
+      # Strip a leading UTF-8 byte order mark.
+      #
+      # Windows editors (Notepad, PowerShell `>` redirection, "UTF-8 with BOM"
+      # in VS Code) prepend U+FEFF. Every parser hwaro hands file text to
+      # anchors on the first character — the front matter fences (`\A\+\+\+`,
+      # `\A---`, a leading `{`), TOML's first token, JSON's first token — so a
+      # BOM silently turns front matter into body text and makes config.toml
+      # and data files unparseable. Strip it once at the point of read.
+      def strip_bom(content : String) : String
+        content.lchop('\uFEFF')
+      end
+
       # Convert text to a URL-friendly slug
       #
       # Supports Unicode characters (CJK, Hangul, etc.) in addition to ASCII.

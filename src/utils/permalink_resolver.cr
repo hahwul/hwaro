@@ -150,7 +150,7 @@ module Hwaro
                 if effective_dir == "." || effective_dir.empty?
                   lang_prefix.empty? ? "/" : "#{lang_prefix}/"
                 else
-                  "#{lang_prefix}/#{effective_dir}/"
+                  "#{lang_prefix}/#{bundle_dir(effective_dir, clean_stem, slug)}/"
                 end
               else
                 leaf = slug || clean_stem
@@ -161,6 +161,24 @@ module Hwaro
                 end
               end
         {url, error}
+      end
+
+      # A leaf bundle (`<dir>/index.md`) is a single page whose URL segment is
+      # its directory name, so a front-matter `slug` has to rename that
+      # segment — otherwise `slug` (documented as "Custom URL slug") silently
+      # stops working the moment a page is converted to bundle layout, which
+      # is exactly what `hwaro new --bundle` and multilingual siblings produce.
+      #
+      # Section indexes (`_index.md`) are deliberately excluded: their
+      # directory name is also the prefix every child page derives its own URL
+      # from, and children resolve independently from their own path — renaming
+      # it here would move the section listing away from its own children.
+      private def bundle_dir(effective_dir : String, clean_stem : String, slug : String?) : String
+        return effective_dir unless clean_stem == "index"
+        return effective_dir if slug.nil? || slug.empty?
+
+        parent = Path[effective_dir].dirname
+        parent == "." || parent.empty? ? slug : "#{parent}/#{slug}"
       end
 
       # First `[permalinks]` rule whose source matches `directory_path`
