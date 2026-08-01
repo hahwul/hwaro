@@ -143,6 +143,16 @@ module Hwaro
           needs_seo : Bool,
           needs_jsonld : Bool,
           needs_section_pages : Bool
+        # Which page fields the site's LISTING templates can actually read.
+        # A field folded into the page/section-set fingerprint re-renders every
+        # listing whenever that field moves on any page, so `extra` and the
+        # content-derived trio (`summary`, `word_count`, `reading_time`) are
+        # only fingerprinted when some page-set-dependent template names them.
+        # Detection is substring-based over those templates' closure sources,
+        # so it only ever over-approximates: naming the field always keeps it.
+        record ListingPageFields,
+          extra : Bool,
+          content_derived : Bool
         # Keyed by entry template NAME (closure semantics are per-name).
         # Populated once in load_templates, read-only during render. Missing
         # key means "unknown": build everything, exactly as before.
@@ -529,7 +539,7 @@ module Hwaro
             site.pages.reject! { |p| excluded_paths.includes?(p.path) }
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
-              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)]
+              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
               delete_orphaned_outputs(stale, output_dir)
             end
           end
@@ -798,7 +808,7 @@ module Hwaro
             site.pages.reject! { |p| excluded_paths.includes?(p.path) }
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
-              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)]
+              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
               delete_orphaned_outputs(stale, output_dir)
             end
           end
@@ -1295,7 +1305,9 @@ module Hwaro
                 # Section _index pages live in site.sections, not site.pages —
                 # deleting one used to leave its index.html served forever.
                 if page = site.pages.find { |p| p.path == rel } || site.sections.find { |s| s.path == rel }
-                  outputs << get_output_path(page, output_dir)
+                  if primary = get_output_path(page, output_dir)
+                    outputs << primary
+                  end
 
                   # Sibling output-format files (see `[outputs]`): prefer what
                   # the cache actually recorded for this source (the ground
@@ -1322,7 +1334,7 @@ module Hwaro
         # to prune the old files when an edit relocates the page's URL or
         # excludes the page from the site.
         private def collect_page_output_paths(page : Models::Page, output_dir : String) : Array(String)
-          paths = [get_output_path(page, output_dir)]
+          paths = [get_output_path(page, output_dir)].compact
           if cfg = @config
             paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
           end

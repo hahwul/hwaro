@@ -1,4 +1,5 @@
 require "file_utils"
+require "set"
 require "../../config/options/import_options"
 require "../../utils/file_safe"
 require "../../utils/frontmatter_writer"
@@ -38,12 +39,15 @@ module Hwaro
         # closing `---` on its own line (multiline mode so ^ matches line starts).
         YAML_FM_REGEX = /\A---[ \t]*\n(.*?\n?)^---[ \t]*$\n?(.*)\z/m
 
-        # Read a content file for import, normalizing CRLF line endings.
-        # Windows-authored sources (or `core.autocrlf=true` checkouts) would
-        # otherwise defeat the `\n`-anchored frontmatter regexes, silently
-        # dropping every field and leaking raw YAML into the page body.
+        # Read a content file for import, stripping a UTF-8 BOM and
+        # normalizing CRLF line endings. Windows-authored sources (or
+        # `core.autocrlf=true` checkouts) would otherwise defeat the
+        # `\n`-anchored frontmatter regexes, silently dropping every field and
+        # leaking raw YAML into the page body. A leading U+FEFF does the same
+        # to the `\A---` / `\A+++` anchors — every other reader hwaro hands
+        # file text to already goes through `TextUtils.strip_bom`.
         protected def read_text(path : String) : String
-          File.read(path).gsub("\r\n", "\n")
+          Utils::TextUtils.strip_bom(File.read(path)).gsub("\r\n", "\n")
         end
 
         # Split YAML frontmatter from a document body. Returns {frontmatter, body}
@@ -71,6 +75,14 @@ module Hwaro
           Dir.each_child(dir) do |entry|
             full_path = File.join(dir, entry)
             if File.directory?(full_path)
+              # A symlinked directory can close a cycle (`ln -s .. sub`), and
+              # following it raises ELOOP straight out of this walk — killing
+              # the whole import before a single file is read. It can also
+              # point outside the source tree entirely. Skip, don't descend.
+              if File.symlink?(full_path)
+                Logger.warn "Skipped symlinked directory: #{full_path}"
+                next
+              end
               next if skip_dir && skip_dir.call(entry)
               walk_files_into(full_path, files, extensions, skip_dir)
             elsif extensions.any? { |ext| entry.ends_with?(ext) }
@@ -172,9 +184,81 @@ module Hwaro
           body
         end
 
+        # Destinations already claimed by this importer instance. Two source
+        # files can normalize to one destination (a stripped `YYYY-MM-DD-`
+        # prefix, a duplicate `slug`, two same-titled notes, two collection
+        # subfolders flattened into one section) — without this the second
+        # one was silently dropped, or silently CLOBBERED under `--force`
+        # while still being counted as imported.
+        @claimed_paths = Set(String).new
+
+        # Reset per-run state. Importers call this at the top of `run` so a
+        # reused importer instance doesn't disambiguate against a previous
+        # run's destinations.
+        protected def reset_written_paths : Nil
+          @claimed_paths.clear
+        end
+
+        # Resolve the on-disk destination for a section/slug pair, or nil when
+        # the components sanitize to something unsafe.
+        #
+        # Importers consume third-party exports, so `section` and `slug` are
+        # UNTRUSTED. A malicious WordPress `<wp:post_name>` or Hugo front
+        # matter `slug` of "../../../etc/x" would otherwise let `File.write`
+        # escape `output_dir` and plant or overwrite files anywhere the
+        # running user can write. Neutralise traversal at this single sink so
+        # every current and future importer is protected.
+        protected def resolve_content_path(output_dir : String, section : String, slug : String, verbose : Bool = false) : String?
+          safe_section = Utils::PathUtils.sanitize_path(section)
+          safe_slug = safe_filename_component(slug)
+          if safe_slug.empty?
+            Logger.warn "Skipped (unsafe slug #{slug.inspect})" if verbose
+            return
+          end
+
+          dir = safe_section.empty? ? output_dir : File.join(output_dir, safe_section)
+          filename = safe_slug.ends_with?(".md") ? safe_slug : "#{safe_slug}.md"
+          path = File.join(dir, filename)
+
+          # Belt-and-suspenders: refuse to write outside output_dir even if a
+          # component slipped past the sanitisers above.
+          unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+            Logger.warn "Skipped (escapes output directory): #{path}"
+            return
+          end
+
+          path
+        end
+
+        # Claim `path` for this run, appending `-1`, `-2`, … when an earlier
+        # file already took it. Importers that disambiguate their own slugs
+        # (Jekyll's date re-attachment, Notion, Eleventy) hand over paths that
+        # are already unique, so this never fires for them — it's the backstop
+        # for the importers that don't.
+        private def claim_path(path : String) : String
+          return path if @claimed_paths.add?(path)
+
+          ext = File.extname(path)
+          stem = path.chomp(ext)
+          n = 1
+          until @claimed_paths.add?("#{stem}-#{n}#{ext}")
+            n += 1
+          end
+          unique = "#{stem}-#{n}#{ext}"
+          Logger.warn "Destination collision: #{path} already written this run; writing #{File.basename(unique)} instead."
+          unique
+        end
+
         # Write a content file. Skips if it already exists unless `force`
         # is true, in which case the existing file is overwritten. Returns
         # true when a file was written, false when it was skipped.
+        #
+        # `force` means "overwrite a file that was already on disk before this
+        # import" — never "clobber a file this same run just wrote", which is
+        # why the destination is claimed before the existence check. Claiming
+        # first also keeps re-imports idempotent: on a second run every source
+        # resolves to the same destination it did the first time and is
+        # skipped, rather than piling up `-1` copies.
         protected def write_content_file(
           output_dir : String,
           section : String,
@@ -184,30 +268,11 @@ module Hwaro
           verbose : Bool = false,
           force : Bool = false,
         ) : Bool
-          # Importers consume third-party exports, so `section` and `slug` are
-          # UNTRUSTED. A malicious WordPress `<wp:post_name>` or Hugo front
-          # matter `slug` of "../../../etc/x" would otherwise let `File.write`
-          # escape `output_dir` and plant or overwrite files anywhere the
-          # running user can write. Neutralise traversal at this single sink so
-          # every current and future importer is protected.
-          safe_section = Utils::PathUtils.sanitize_path(section)
-          safe_slug = safe_filename_component(slug)
-          if safe_slug.empty?
-            Logger.warn "Skipped (unsafe slug #{slug.inspect})" if verbose
-            return false
-          end
+          resolved = resolve_content_path(output_dir, section, slug, verbose)
+          return false unless resolved
 
-          dir = safe_section.empty? ? output_dir : File.join(output_dir, safe_section)
-
-          filename = safe_slug.ends_with?(".md") ? safe_slug : "#{safe_slug}.md"
-          path = File.join(dir, filename)
-
-          # Belt-and-suspenders: refuse to write outside output_dir even if a
-          # component slipped past the sanitisers above.
-          unless Utils::OutputGuard.within_output_dir?(path, output_dir)
-            Logger.warn "Skipped (escapes output directory): #{path}"
-            return false
-          end
+          path = claim_path(resolved)
+          dir = File.dirname(path)
 
           Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
 
@@ -222,6 +287,43 @@ module Hwaro
             Logger.debug(force ? "Overwrote: #{path}" : "Imported: #{path}")
           end
           true
+        end
+
+        # Copy a page bundle's co-located assets — every non-Markdown sibling
+        # of the bundle's `index.md` — into the bundle's destination
+        # directory. Hwaro serves those files straight out of the bundle, so
+        # an import that carries only the `.md` leaves every
+        # `![](cover.png)` in the post 404ing. Symlinks are skipped for the
+        # same reason `walk_files_into` skips them, and every destination is
+        # re-checked against `output_dir`.
+        protected def copy_bundle_assets(
+          source_dir : String,
+          dest_dir : String,
+          output_dir : String,
+          verbose : Bool = false,
+          force : Bool = false,
+        ) : Int32
+          return 0 unless Dir.exists?(source_dir)
+          return 0 unless Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
+
+          copied = 0
+          Dir.each_child(source_dir) do |entry|
+            src = File.join(source_dir, entry)
+            next if File.directory?(src) || File.symlink?(src)
+            next if entry.ends_with?(".md") || entry.ends_with?(".markdown")
+
+            dest = File.join(dest_dir, safe_filename_component(entry))
+            next unless Utils::OutputGuard.within_output_dir?(dest, output_dir)
+            next if File.exists?(dest) && !force
+
+            Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
+            File.copy(src, dest)
+            Logger.debug "Copied bundle asset: #{dest}" if verbose
+            copied += 1
+          rescue ex
+            Logger.warn "Could not copy bundle asset #{src}: #{ex.message}"
+          end
+          copied
         end
 
         # Collapse an untrusted slug to a single safe filename component so it

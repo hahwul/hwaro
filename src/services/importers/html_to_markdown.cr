@@ -65,16 +65,22 @@ module Hwaro
           # Lists — innermost first, so a nested <ul> inside an <li> is
           # converted before its parent. The old single outer pass stopped at
           # the INNER </ul>, garbling nested lists and dropping trailing items.
+          # A converted list opens with a newline and each item's continuation
+          # lines are indented: by the time an OUTER list is converted, the
+          # inner one is already Markdown sitting inside the parent `<li>`,
+          # so without those two things `<li>b<ul><li>b1</li></ul></li>`
+          # collapsed to the single line `- b- b1` (and `2. second1. s1` for
+          # ordered lists), which renders as literal text.
           innermost_list = /<(ul|ol)[^>]*>((?:(?!<[uo]l[^>]*>).)*?)<\/\1>/mi
           while result.matches?(innermost_list)
             result = result.gsub(innermost_list) do
               kind = $1.downcase
               items = $2.scan(/<li[^>]*>(.*?)<\/li>/mi)
-              if kind == "ol"
-                items.map_with_index { |m, i| "#{i + 1}. #{strip_tags(m[1]).strip}" }.join("\n") + "\n\n"
-              else
-                items.map { |m| "- #{strip_tags(m[1]).strip}" }.join("\n") + "\n\n"
+              lines = items.map_with_index do |m, i|
+                marker = kind == "ol" ? "#{i + 1}. " : "- "
+                "#{marker}#{indent_continuation(strip_tags(m[1]).strip, marker.size)}"
               end
+              "\n" + lines.join("\n") + "\n\n"
             end
           end
 
@@ -169,6 +175,19 @@ module Hwaro
 
         private def self.strip_tags(html : String) : String
           html.gsub(/<[^>]*>/, "")
+        end
+
+        # Indent every line after the first to the item's content column so an
+        # already converted nested list stays nested under its parent item.
+        # The width is the marker's own width (`- ` → 2, `10. ` → 4), which is
+        # what CommonMark requires for a child block. Blank lines are left
+        # alone (trailing whitespace would survive into the imported Markdown).
+        private def self.indent_continuation(text : String, width : Int32) : String
+          return text unless text.includes?('\n')
+          pad = " " * width
+          text.lines(chomp: false).map_with_index do |line, i|
+            i.zero? || line.strip.empty? ? line : "#{pad}#{line}"
+          end.join
         end
 
         # Emit a markdown link/image only when the URL scheme is safe; otherwise

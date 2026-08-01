@@ -24,6 +24,8 @@ module Hwaro
           skipped = 0
           errors = 0
 
+          reset_written_paths
+
           unless Dir.exists?(path)
             return ImportResult.new(
               success: false,
@@ -403,7 +405,12 @@ module Hwaro
                     alt_or_width = parts.size > 1 ? parts[1].strip : ""
 
                     if target.matches?(/\.(png|jpg|jpeg|gif|svg|webp|avif)$/i)
-                      alt = alt_or_width.empty? ? target : alt_or_width
+                      # `![[img.png|300]]` / `![[img.png|400x200]]` — the
+                      # pipe segment on an IMAGE embed is Obsidian's display
+                      # size, not an alias. Using it as alt text gave every
+                      # sized image a meaningless numeric alt attribute.
+                      sized = alt_or_width.matches?(/\A\d+(x\d+)?\z/)
+                      alt = (alt_or_width.empty? || sized) ? target : alt_or_width
                       "![#{alt}](#{target})"
                     else
                       display = alt_or_width.empty? ? target : alt_or_width

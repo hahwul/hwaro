@@ -198,7 +198,9 @@ module Hwaro
 
         ConversionResult.new(
           success: errors == 0,
-          message: "Converted #{converted} files to #{format_name}",
+          # On failure `message` is what the CLI surfaces as the error, so it
+          # has to describe the failure — not the (partial) success.
+          message: errors > 0 ? "#{errors} file(s) could not be converted to #{format_name}" : "Converted #{converted} files to #{format_name}",
           converted_count: converted,
           skipped_count: skipped,
           error_count: errors

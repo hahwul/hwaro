@@ -129,7 +129,7 @@ hwaro build --cache
 hwaro build --cache --full
 
 # Combine with other flags
-hwaro build --cache --minify --parallel
+hwaro build --cache --minify
 ```
 
 ## See Also

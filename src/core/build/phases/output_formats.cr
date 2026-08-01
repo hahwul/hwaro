@@ -145,7 +145,11 @@ module Hwaro::Core::Build::Phases::OutputFormats
   # instead of silently colliding multiple pages onto one shared root-level
   # `index.<fmt>` file.
   def write_format_output(page : Models::Page, output_dir : String, fmt : String, content : String, verbose : Bool)
-    url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
+    url_path = url_output_path(page.url.lchop("/"))
+    unless url_path
+      Logger.warn "Skipping #{fmt} output for #{page.path}: a path segment in #{page.url.inspect} would escape the output directory."
+      return
+    end
     candidate = File.join(output_dir, url_path, "index.#{fmt}")
     output_path = Utils::OutputGuard.safe_output_path(candidate, output_dir)
     unless output_path
@@ -162,7 +166,8 @@ module Hwaro::Core::Build::Phases::OutputFormats
   # fail the OutputGuard check. Used by the cache (to detect a deleted sibling
   # file) and by stale-output removal (when a page's source disappears).
   def format_output_paths(page : Models::Page, output_dir : String, formats : Array(String)) : Array(String)
-    url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
+    url_path = url_output_path(page.url.lchop("/"))
+    return [] of String unless url_path
     formats.compact_map do |fmt|
       candidate = File.join(output_dir, url_path, "index.#{fmt}")
       Utils::OutputGuard.safe_output_path(candidate, output_dir)

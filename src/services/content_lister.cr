@@ -140,21 +140,29 @@ module Hwaro
 
         Logger.info ""
 
+        # Titles come from semi-trusted front matter, so strip control bytes
+        # before they reach the terminal (a raw ANSI escape could repaint the
+        # console, and it throws the column widths off either way).
+        cells = contents.map do |info|
+          {Utils::TextUtils.strip_control(info.title), Utils::TextUtils.strip_control(info.path)}
+        end
+
         # Cap long cells so the table stays scannable; the header labels are
         # the minimum column widths (Logger::Table aligns to the widest cell).
-        max_title_width = [[contents.max_of(&.title.size), 30].min, HEADER_TITLE.size].max
-        max_path_width = [[contents.max_of(&.path.size), 40].min, HEADER_PATH.size].max
+        max_title_width = [[cells.max_of { |title, _| title.size }, 30].min, HEADER_TITLE.size].max
+        max_path_width = [[cells.max_of { |_, path| path.size }, 40].min, HEADER_PATH.size].max
 
         table = Logger::Table.new([HEADER_STATUS, HEADER_DATE, HEADER_TITLE, HEADER_PATH])
-        contents.each do |info|
+        contents.each_with_index do |info, index|
           status = info.draft ? "[draft]" : "[pub]"
           status_role = info.draft ? Logger::Role::Warn : Logger::Role::Dim
+          title, path = cells[index]
           table.row(
             [
               status,
               info.date.try(&.to_s("%Y-%m-%d")) || "-",
-              truncate(info.title, max_title_width),
-              truncate(info.path, max_path_width),
+              truncate(title, max_title_width),
+              truncate(path, max_path_width),
             ],
             [status_role, Logger::Role::Dim, Logger::Role::Plain, Logger::Role::Dim]
           )

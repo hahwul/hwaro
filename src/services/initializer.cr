@@ -91,16 +91,29 @@ module Hwaro
         end
 
         unless Dir.exists?(target_path)
-          Hwaro::Utils::FileSafe.mkdir_p(target_path)
+          begin
+            Hwaro::Utils::FileSafe.mkdir_p(target_path)
+          rescue ex : File::Error
+            # A target that is an existing file, or a parent the process
+            # cannot write to, is a filesystem failure — classify it so
+            # callers get HWARO_E_IO (6) instead of the generic exit 1.
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Cannot create project directory '#{target_path}': #{ex.os_error.try(&.message) || ex.message}",
+              hint: "Pick a path that is not an existing file and whose parent directory is writable.",
+            )
+          end
         end
 
         # --clean wipes the dir up front; --force allows non-empty target but
         # keeps any existing files in place (only adds missing scaffold files).
         # Neither blindly overwrites user content.
-        unless force || clean || Dir.empty?(target_path)
-          Logger.error "Directory '#{target_path}' is not empty."
-          Logger.error "Use --force to proceed (keeps existing files, adds missing scaffold files), or --clean to remove existing files first."
-          exit(1)
+        unless force || clean || occupied_entries(target_path).empty?
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Directory '#{target_path}' is not empty.",
+            hint: "Use --force to proceed (keeps existing files, adds missing scaffold files), or --clean to remove existing files first.",
+          )
         end
 
         # The wizard already rendered the heading and a scaffold/title receipt;
@@ -120,10 +133,6 @@ module Hwaro
 
         if multilingual_languages.size == 1
           Logger.warn "  --include-multilingual needs 2+ languages; '#{multilingual_languages.first}' alone is treated as non-multilingual."
-        end
-
-        if minimal_config && is_multilingual
-          Logger.warn "  --minimal-config does not include multilingual settings; ignoring --include-multilingual"
         end
 
         # Create content structure
@@ -400,6 +409,18 @@ module Hwaro
       # itself. Refuses to touch a target that contains `.git/` so a
       # typo'd path or an accidental `--clean .` in a real repo can't
       # wipe the user's work.
+      # Entries that make a target directory count as "not empty". VCS and
+      # OS metadata are ignored: `git init && hwaro init .` is the canonical
+      # first-site workflow, and a stray `.DS_Store` (created by merely
+      # opening a folder in Finder) should not force `--force` on a
+      # directory that is otherwise pristine.
+      IGNORABLE_ENTRIES = %w[.git .gitignore .gitattributes .gitkeep .DS_Store .hg .svn]
+
+      private def occupied_entries(target_path : String) : Array(String)
+        return [] of String unless Dir.exists?(target_path)
+        Dir.children(target_path).reject { |entry| IGNORABLE_ENTRIES.includes?(entry) }
+      end
+
       private def clean_target(target_path : String)
         if Dir.exists?(File.join(target_path, ".git"))
           raise Hwaro::HwaroError.new(

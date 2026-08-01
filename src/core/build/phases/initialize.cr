@@ -87,7 +87,7 @@ module Hwaro::Core::Build::Phases::Initialize
         # config edit does. Without this, `build --cache` keeps serving stale
         # `site.data` values and diverges from `--full` (see I-cache-data).
         config_hash = Cache.compute_config_hash(config, ctx.options.env)
-        config_hash = "#{config_hash}-#{compute_data_hash}"
+        config_hash = "#{config_hash}-#{compute_data_hash}-#{Cache.compute_options_hash(ctx.options)}"
         build_cache.set_global_checksums(@global_templates_hash, config_hash,
           invalidate_on_template_change: !@per_page_template_hash)
       end
@@ -108,13 +108,24 @@ module Hwaro::Core::Build::Phases::Initialize
     Hwaro::Utils::FileSafe.mkdir_p(output_dir)
   end
 
+  # Directories a build READS. `output_dir` is wiped before a cold build, so
+  # aiming it at one of these (`hwaro build -o content`) deleted the site's
+  # own sources — silently, and with exit 0. Matching is on the RESOLVED
+  # path, so an output directory that merely shares a prefix with one of
+  # these names (`-o contents`, `-o static-site`) is unaffected.
+  PROTECTED_INPUT_DIRS = %w[content templates static data i18n themes archetypes .git]
+
   # Refuse to recursively delete a directory that isn't safely *inside* a
   # sane workspace. A cold `hwaro build` clears `output_dir` before writing;
   # a mistyped or hostile config value (""/"."/"/"/an absolute path/an
-  # ancestor of the project) would turn that `rm_rf` into a wipe of the
-  # filesystem root, the home directory, or the project source itself.
+  # ancestor of the project/one of the project's own input directories)
+  # would turn that `rm_rf` into a wipe of the filesystem root, the home
+  # directory, or the project source itself.
   private def guard_destructive_clean!(output_dir : String)
     expanded = File.expand_path(output_dir)
+    # expand_path keeps a trailing separator, and `content/` must be
+    # recognized as the same directory as `content`.
+    expanded = expanded.rstrip(File::SEPARATOR) unless expanded == File::SEPARATOR_STRING
     cwd = File.expand_path(Dir.current)
 
     reason =
@@ -124,14 +135,24 @@ module Hwaro::Core::Build::Phases::Initialize
         "the home directory"
       elsif cwd == expanded || cwd.starts_with?(expanded + File::SEPARATOR)
         "the project directory (or a parent of it)"
+      elsif input_dir = protected_input_dir(expanded, cwd)
+        "the project's #{input_dir.inspect} directory, which hwaro reads as build input"
       end
 
     if reason
       raise Hwaro::HwaroError.new(
         code: Hwaro::Errors::HWARO_E_CONFIG,
         message: "Refusing to delete #{reason}: output_dir resolves to #{expanded.inspect}.",
-        hint: "Point output_dir at a dedicated subdirectory such as \"public\"."
+        hint: "Point output_dir at a dedicated build directory such as \"public\" (hwaro build -o public)."
       )
+    end
+  end
+
+  # The project input directory `expanded` is, or lives inside, if any.
+  private def protected_input_dir(expanded : String, cwd : String) : String?
+    PROTECTED_INPUT_DIRS.find do |dir|
+      root = File.join(cwd, dir)
+      expanded == root || expanded.starts_with?(root + File::SEPARATOR)
     end
   end
 
@@ -212,8 +233,15 @@ module Hwaro::Core::Build::Phases::Initialize
       dest_path = File.join(output_dir, relative)
       # `info` from above already carries the source mtime — re-statting
       # src_path here tripled the stat count over static/ on watch rebuilds.
+      #
+      # The test is EQUALITY, not "destination is newer": copy_static_pairs
+      # stamps the source's mtime onto the copy, so an unchanged file matches
+      # exactly. The old `source <= destination` test skipped any source whose
+      # mtime went BACKWARDS — exactly what `git checkout`, `git stash pop`
+      # and `rsync --times` do — leaving `public/` serving the previous
+      # revision's asset on every subsequent incremental build.
       if incremental && (dest_info = File.info?(dest_path)) &&
-         info.modification_time <= dest_info.modification_time
+         info.modification_time == dest_info.modification_time
         next
       end
 
@@ -243,7 +271,22 @@ module Hwaro::Core::Build::Phases::Initialize
         while pair = work_queue.receive?
           src, dest = pair
           begin
+            src_info = File.info?(src)
             FileUtils.cp(src, dest)
+            # Stamp the source mtime onto the copy so the incremental skip in
+            # collect_static_files can compare for equality — that is what
+            # makes a source whose mtime moved BACKWARDS (git checkout, stash
+            # pop, rsync --times) still count as changed. Same idiom the raw
+            # asset copy in the Write phase uses.
+            if src_info
+              begin
+                File.utime(Time.utc, src_info.modification_time, dest)
+              rescue File::Error
+                # Stamping is an optimization; a failure just means the next
+                # build recopies this file. It must NOT be reported as a copy
+                # failure — the copy above already succeeded.
+              end
+            end
           rescue ex
             Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
           end

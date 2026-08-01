@@ -83,15 +83,15 @@ module Hwaro
             when "to-yaml"
               result = converter.convert_to_yaml
               puts result.to_json if json_output
-              exit(1) unless result.success
+              fail_conversion(result, json_output) unless result.success
             when "to-toml"
               result = converter.convert_to_toml
               puts result.to_json if json_output
-              exit(1) unless result.success
+              fail_conversion(result, json_output) unless result.success
             when "to-json"
               result = converter.convert_to_json
               puts result.to_json if json_output
-              exit(1) unless result.success
+              fail_conversion(result, json_output) unless result.success
             else
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,
@@ -99,6 +99,20 @@ module Hwaro
                 hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
               )
             end
+          end
+
+          # Surface the converter's own message instead of exiting 1 in
+          # silence — a missing content directory used to produce no output
+          # at all in human mode, with the reason only ever reachable via
+          # `--json`. JSON consumers already got it in the payload above.
+          private def fail_conversion(result : Services::ConversionResult, json_output : Bool) : NoReturn
+            exit(1) if json_output
+
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: result.message,
+              hint: "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
+            )
           end
         end
       end

@@ -53,7 +53,7 @@ hwaro tool import hugo path/to/site --verbose
 
 ## 동작
 
-- 프론트 매터는 hwaro 기본 형식인 TOML(`+++`)로 변환됩니다. hwaro는 YAML 프론트 매터(`---`)도 지원하므로, 기본값을 바꾸려면 `config.toml`에 `[content.new].front_matter_format = "yaml"`을 설정하거나 가져온 뒤 `hwaro tool convert to-yaml`을 실행하면 됩니다.
+- 프론트 매터는 hwaro 기본 형식인 TOML(`+++`)로 변환됩니다. hwaro는 YAML 프론트 매터(`---`)도 지원합니다: 가져온 뒤 `hwaro tool convert to-yaml`을 실행하거나, 이후 `hwaro new`가 생성할 형식을 바꾸려면 `config.toml`에 `[content.new].front_matter_format = "yaml"`을 설정합니다. 다만 `front_matter_format`은 내장 템플릿에만 적용됩니다 — 아키타입은 자신의 프론트 매터를 그대로 사용하고 모든 스캐폴드가 `archetypes/default.md`를 포함하므로, 이 설정을 적용하려면 해당 파일(또는 매칭되는 아키타입)을 삭제해야 합니다. [아키타입](/ko/writing/archetypes/) 문서를 참고합니다.
 - HTML 콘텐츠(예: WordPress)는 마크다운으로 변환됩니다.
 - 대상 경로에 이미 있는 파일은 덮어쓰지 않고 **건너뜁니다**. 다시 가져오려면 먼저 삭제하거나 이름을 바꿔야 합니다.
 - 알려진 글 유형만 가져옵니다 (예: WordPress의 `post`와 `page`).

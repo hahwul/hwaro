@@ -266,8 +266,14 @@ module Hwaro
           # specifying the on-disk location (e.g. posts/my-post or even when
           # they also passed a conflicting --section). Honor the path as the
           # target file location (flat) unless they explicitly asked for --bundle.
+          # A trailing separator on the raw argument (`hwaro new notes/`) is an
+          # explicit "this is a directory" signal, so it opts out of both flat
+          # heuristics below and routes to the container branch instead.
+          path_is_dir = options.path_is_dir
+
           user_intends_file_under_section = !path.nil? && !path.ends_with?(".md") &&
-                                            path.includes?("/") && options.bundle != true
+                                            path.includes?("/") && options.bundle != true &&
+                                            !path_is_dir
 
           # A bare single-segment path (e.g. `hwaro new design-lab --title "..."`)
           # without --section and without forcing --bundle should also be treated
@@ -281,7 +287,7 @@ module Hwaro
           bare_dir_exists = target_dir_for_bare ? Dir.exists?(target_dir_for_bare) : false
           user_intends_bare_flat = !path.nil? && !path.ends_with?(".md") &&
                                    !path.includes?("/") && options.bundle != true && options.section.nil? &&
-                                   !bare_dir_exists
+                                   !bare_dir_exists && !path_is_dir
 
           # With explicit --no-bundle (or the section-path / bare-path heuristics above), treat the
           # provided path as the desired file location.
@@ -452,6 +458,13 @@ module Hwaro
         end
 
         content = if archetype_content
+                    # An archetype supplies its own front matter verbatim, so
+                    # `[content.new]`'s format/default_fields do not apply
+                    # (CLI > archetype > config, as documented). Every built-in
+                    # scaffold ships archetypes/default.md, so a configured
+                    # `front_matter_format = "yaml"` would otherwise appear to
+                    # do nothing at all with no explanation.
+                    warn_archetype_overrides_content_new(content_new)
                     process_archetype(archetype_content, title, date, is_draft, tags, description)
                   else
                     generate_default_content(title, date, is_draft, tags, content_new, description)
@@ -662,6 +675,20 @@ module Hwaro
 
         # 4. No archetype found
         nil
+      end
+
+      # Tell the author once, per invocation, that the archetype — not
+      # `[content.new]` — decided the front matter. Every built-in scaffold
+      # ships `archetypes/default.md`, so a configured
+      # `front_matter_format = "yaml"` otherwise appears to do nothing with no
+      # explanation. Compared against the built-in defaults so a project that
+      # never configured `[content.new]` stays silent.
+      private def warn_archetype_overrides_content_new(content_new : Models::ContentNewConfig)
+        defaults = Models::ContentNewConfig.new
+        return if content_new.front_matter_format == defaults.front_matter_format &&
+                  content_new.default_fields == defaults.default_fields
+
+        Logger.warn "  archetype front matter is used as-is; [content.new] front_matter_format/default_fields are not applied. Remove archetypes/default.md (or the matching archetype) to use the built-in template."
       end
 
       private def process_archetype(archetype_content : String, title : String, date : String, is_draft : Bool, tags : Array(String), description : String? = nil) : String

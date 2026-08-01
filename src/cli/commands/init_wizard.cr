@@ -27,10 +27,25 @@ module Hwaro
 
         # Returns the collected `InitOptions`, or `nil` on cancellation — a
         # declined confirmation or an EOF (Ctrl-D) on any prompt — so the
-        # caller can bail out without creating anything. A `path` positional
-        # (e.g. `hwaro init my-site`) skips the directory prompt and uses that
-        # path directly; a bare `hwaro init` still asks.
-        def run(seed_path : String? = nil) : Config::Options::InitOptions?
+        # caller can bail out without creating anything.
+        #
+        # The wizard only asks for what the user has not already supplied on
+        # the command line: a `path` positional (e.g. `hwaro init my-site
+        # --wizard`) skips the directory prompt, and `--scaffold blog` skips
+        # the scaffold picker. Every remaining flag rides in on `base` — which
+        # is the fully parsed `InitOptions` — so `--force`, `--clean`,
+        # `--skip-*`, `--minimal-config`/`--full-config`, `--agents` and
+        # `--include-multilingual` keep working alongside `--wizard` instead
+        # of being silently dropped.
+        def run(
+          seed_path : String? = nil,
+          base : Config::Options::InitOptions? = nil,
+          seed_scaffold : Config::Options::ScaffoldType? = nil,
+        ) : Config::Options::InitOptions?
+          # `InitOptions` is a struct, so this is a copy — mutating it here
+          # cannot leak back into the caller's parsed options.
+          options = base || Config::Options::InitOptions.new
+
           path = if seed = seed_path
                    Logger.heading("init", seed == "." ? nil : seed)
                    seed
@@ -41,14 +56,21 @@ module Hwaro
                    asked
                  end
 
-          labels = BASE_ORDER.map do |type|
-            "#{type} — #{Services::Scaffolds::Registry.get(type).description}"
-          end
-          picked = Prompt.select("Scaffold", labels, skip_hint: "Enter for simple")
-          scaffold = if picked && (idx = labels.index(picked))
-                       BASE_ORDER[idx]
+          # A remote scaffold (`--scaffold github:owner/repo`) has no entry in
+          # the built-in picker, so it also skips the prompt.
+          remote = options.scaffold_remote
+          scaffold = if seed_scaffold || remote
+                       seed_scaffold || options.scaffold
                      else
-                       Config::Options::ScaffoldType::Simple
+                       labels = BASE_ORDER.map do |type|
+                         "#{type} — #{Services::Scaffolds::Registry.get(type).description}"
+                       end
+                       picked = Prompt.select("Scaffold", labels, skip_hint: "Enter for simple")
+                       if picked && (idx = labels.index(picked))
+                         BASE_ORDER[idx]
+                       else
+                         Config::Options::ScaffoldType::Simple
+                       end
                      end
 
           title = Prompt.ask("Site title", default: "My Hwaro Site")
@@ -56,18 +78,17 @@ module Hwaro
 
           Logger::Receipt.new("init")
             .row("path", path == "." ? "current directory" : path)
-            .row("scaffold", scaffold.to_s)
+            .row("scaffold", remote || scaffold.to_s)
             .row("title", title)
             .emit
 
           return unless Prompt.confirm?("Create project?", default: true)
 
-          Config::Options::InitOptions.new(
-            path: path,
-            scaffold: scaffold,
-            site_title: title,
-            from_wizard: true,
-          )
+          options.path = path
+          options.scaffold = scaffold
+          options.site_title = title
+          options.from_wizard = true
+          options
         end
       end
     end

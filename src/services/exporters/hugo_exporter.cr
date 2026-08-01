@@ -50,7 +50,7 @@ module Hwaro
           include_drafts : Bool,
           verbose : Bool,
         ) : Symbol
-          raw = File.read(file_path)
+          raw = read_content(file_path)
           fields, body = parse_content(raw)
 
           # Skip drafts unless requested
@@ -97,6 +97,14 @@ module Hwaro
           out_path = File.join(output_dir, "content", relative)
 
           write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", verbose)
+
+          # Leaf bundle (`posts/my-post/index.md`): Hugo reads the bundle's
+          # co-located resources out of this same directory, so carry them
+          # across instead of exporting a post whose images all 404.
+          if File.basename(relative).in?("index.md", "index.markdown") && relative.includes?('/')
+            copy_bundle_assets(File.dirname(file_path), File.dirname(out_path), output_dir, verbose)
+          end
+
           :exported
         end
 

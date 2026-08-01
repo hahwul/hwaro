@@ -23,6 +23,127 @@ module Hwaro
         content.lchop('\uFEFF')
       end
 
+      # Remove control characters (ANSI escapes, CR, BEL, \u2026).
+      #
+      # Titles, tags and link targets come from semi-trusted content \u2014 a docs
+      # or blog PR \u2014 and end up printed to a maintainer's terminal by the
+      # `tool` reports. Raw escape bytes there can repaint or spoof the
+      # console, and they wreck column alignment even when benign.
+      def strip_control(s : String) : String
+        return s unless s.each_char.any?(&.control?)
+        s.gsub { |c| c.control? ? "" : c }
+      end
+
+      # Codepoint ranges that occupy two terminal columns: East Asian Wide (W)
+      # and Fullwidth (F) per UAX #11, plus the emoji blocks terminals render
+      # double-width. Sorted and non-overlapping so `display_width` can binary
+      # search. Anything outside is one column.
+      WIDE_RANGES = [
+        0x1100..0x115F,   # Hangul Jamo initial consonants
+        0x2E80..0x303E,   # CJK radicals, Kangxi, CJK symbols & punctuation
+        0x3041..0x33FF,   # Hiragana, Katakana, Bopomofo, Hangul compat, CJK compat
+        0x3400..0x4DBF,   # CJK unified ideographs extension A
+        0x4E00..0x9FFF,   # CJK unified ideographs
+        0xA000..0xA4CF,   # Yi syllables & radicals
+        0xA960..0xA97F,   # Hangul Jamo extended-A
+        0xAC00..0xD7A3,   # Hangul syllables
+        0xF900..0xFAFF,   # CJK compatibility ideographs
+        0xFE10..0xFE19,   # Vertical forms
+        0xFE30..0xFE6F,   # CJK compatibility & small form variants
+        0xFF00..0xFF60,   # Fullwidth ASCII variants
+        0xFFE0..0xFFE6,   # Fullwidth signs
+        0x1F300..0x1F64F, # Misc symbols & pictographs, emoticons
+        0x1F680..0x1F6FF, # Transport & map symbols
+        0x1F900..0x1F9FF, # Supplemental symbols & pictographs
+        0x20000..0x2FFFD, # CJK extension B and beyond
+        0x30000..0x3FFFD,
+      ]
+
+      # How many terminal columns a string occupies.
+      #
+      # `String#size` counts codepoints, which is the wrong unit for padding a
+      # column: a Hangul or CJK title renders twice as wide as its codepoint
+      # count, a combining mark renders in the previous cell, and a control
+      # byte renders as nothing — so `ljust` left every table row after a
+      # non-ASCII cell visibly misaligned.
+      #
+      # Printable ASCII returns exactly `size`, so ASCII-only output — every
+      # existing table — is unchanged.
+      def display_width(s : String) : Int32
+        return s.bytesize if printable_ascii?(s)
+
+        width = 0
+        s.each_char do |c|
+          # `Char#control?` covers Cc *and* Cf, so ZWJ / ZWSP / BOM are zero
+          # too; `mark?` covers combining marks and variation selectors.
+          next if c.control? || c.mark?
+          width += wide_char?(c) ? 2 : 1
+        end
+        width
+      end
+
+      # Left-align `s` in a field `width` terminal columns across. The
+      # display-width counterpart of `String#ljust`; identical to it for
+      # ASCII-only input.
+      def pad_display(s : String, width : Int32) : String
+        pad = width - display_width(s)
+        pad > 0 ? "#{s}#{" " * pad}" : s
+      end
+
+      # Space through `~`: one byte, one codepoint, one column each — the
+      # overwhelmingly common case, and the one that must stay exact.
+      private def printable_ascii?(s : String) : Bool
+        s.each_byte { |b| return false if b < 0x20 || b > 0x7E }
+        true
+      end
+
+      private def wide_char?(c : Char) : Bool
+        ord = c.ord
+        return false if ord < 0x1100
+        WIDE_RANGES.any?(&.includes?(ord))
+      end
+
+      # Count words the way the build does.
+      #
+      # Single pass: skip HTML tags, and treat Markdown punctuation as a
+      # separator rather than a word so `## Heading` counts one word and a
+      # table row's pipes count none. This is the single source of truth
+      # behind both `page.word_count` / `page.reading_time` and
+      # `hwaro tool stats`, which previously split on whitespace alone and
+      # reported ~30% more words than the site itself rendered.
+      def count_words(text : String) : Int32
+        in_tag = false
+        in_word = false
+        count = 0
+
+        reader = Char::Reader.new(text)
+        while reader.has_next?
+          char = reader.current_char
+          if char == '<'
+            # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`).
+            # A bare `<` in prose/math ("n < 1000", "if 0 < x") is a literal
+            # less-than, not a tag \u2014 treating it as one set in_tag with no closing
+            # `>` and swallowed the rest of the document, collapsing the count.
+            nxt = reader.peek_next_char
+            in_tag = true if nxt.ascii_letter? || nxt == '/' || nxt == '!'
+            in_word = false
+          elsif char == '>'
+            in_tag = false
+          elsif !in_tag
+            is_word_char = !char.ascii_whitespace? && !char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '<', '|')
+            if is_word_char
+              count += 1 unless in_word
+              in_word = true
+            else
+              in_word = false
+            end
+          end
+          reader.next_char
+        end
+
+        count
+      end
+
       # Convert text to a URL-friendly slug
       #
       # Supports Unicode characters (CJK, Hangul, etc.) in addition to ASCII.

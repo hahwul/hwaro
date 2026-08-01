@@ -21,6 +21,7 @@ module Hwaro
           errors = 0
 
           @used_slugs.clear
+          reset_written_paths
 
           unless Dir.exists?(path)
             return ImportResult.new(

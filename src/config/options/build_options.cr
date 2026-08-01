@@ -1,3 +1,5 @@
+require "../../utils/errors"
+
 module Hwaro
   module Config
     module Options
@@ -108,19 +110,31 @@ module Hwaro
             when /^(\d+)$/
               $1.to_f
             else
-              raise "Invalid memory limit format: #{value}. Use format like '2G', '512M', or '256K'."
+              raise memory_limit_error("Invalid memory limit format: #{value}")
             end
 
           # Validate the resolved size before narrowing to Int64 so callers get a
           # clear message instead of a degenerate batch size (0 -> batch of 1) or
           # a raw "Arithmetic overflow" from `.to_i64` on an enormous value.
           if bytes < 1
-            raise "Invalid memory limit: #{value}. Must be a positive size like '2G', '512M', or '256K'."
+            raise memory_limit_error("Invalid memory limit: #{value}. Must be a positive size")
           elsif bytes >= Int64::MAX.to_f
-            raise "Memory limit too large: #{value}. Maximum is #{Int64::MAX} bytes (~8 EiB)."
+            raise memory_limit_error("Memory limit too large: #{value}. Maximum is #{Int64::MAX} bytes (~8 EiB)")
           end
 
           bytes.to_i64
+        end
+
+        # Classified so a bad `--memory-limit` exits like every other usage
+        # error (HWARO_E_USAGE / exit 2, JSON envelope under --json) instead
+        # of surfacing as a bare `Error: …` with exit 1. Mirrors the handling
+        # `CLI.register_jobs` gives `--jobs`.
+        private def memory_limit_error(message : String) : Hwaro::HwaroError
+          Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: message,
+            hint: "Pass a positive size such as --memory-limit 2G, 512M, or 256K. Omit it to build without a memory cap.",
+          )
         end
       end
     end

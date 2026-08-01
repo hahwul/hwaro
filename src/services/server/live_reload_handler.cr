@@ -1,6 +1,7 @@
 require "http/server"
 require "http/web_socket"
 require "../../utils/path_utils"
+require "./dev_path"
 
 module Hwaro
   module Services
@@ -236,11 +237,13 @@ module Hwaro
       def call(context)
         path = context.request.path
 
-        # GET only: StaticFileHandler correctly rejects other methods, and a
-        # full HTML body on HEAD (Crystal never suppresses it for handlers
-        # that print) desyncs spec-conformant keep-alive clients — the body
-        # bytes read as the start of the next response.
-        unless context.request.method == "GET"
+        # GET and HEAD both answered here. HEAD used to fall through to
+        # StaticFileHandler, which reported the on-disk size — short by the
+        # injected script — so HEAD and GET disagreed on Content-Length for
+        # every page. Crystal never suppresses a handler-written body for
+        # HEAD, so we set the length and return without printing.
+        method = context.request.method
+        unless method == "GET" || method == "HEAD"
           call_next(context)
           return
         end
@@ -250,8 +253,14 @@ module Hwaro
           return
         end
 
-        # Resolve file path from request, sanitizing to prevent directory traversal
-        relative = Utils::PathUtils.sanitize_path(path)
+        # Resolve strictly (see DevPath): routing through the lenient
+        # `sanitize_path` made `/a%5Cb.html` and `/%2Fa%2Fb.html` serve pages
+        # that every static host 404s.
+        relative = DevPath.safe_relative(path)
+        if relative.nil? || relative.empty?
+          call_next(context)
+          return
+        end
         file_path = File.join(@public_dir, relative)
 
         # Verify resolved path is within public_dir
@@ -279,6 +288,11 @@ module Hwaro
         injected = inject_script(html)
 
         context.response.content_type = "text/html; charset=utf-8"
+        # Set the length explicitly so HEAD matches GET byte-for-byte and so
+        # pages larger than the response output buffer get a Content-Length
+        # instead of chunked framing.
+        context.response.content_length = injected.bytesize
+        return if method == "HEAD"
         context.response.print(injected)
       end
 

@@ -13,6 +13,8 @@ module Hwaro
           verbose = options.verbose
           force = options.force
 
+          reset_written_paths
+
           content_dir = File.join(hugo_path, "content")
 
           unless Dir.exists?(content_dir)
@@ -125,6 +127,14 @@ module Hwaro
             categories = array_string_value(data, "categories")
             fields["categories"] = categories unless categories.empty?
 
+            # authors — Hugo's `authors` list maps 1:1 onto hwaro's own
+            # `authors` front matter (the blog scaffold writes it, and the
+            # WordPress/Astro importers already populate it). Dropping it
+            # lost author attribution on every Hugo import and made
+            # `hwaro → hugo export → hugo import` non-round-tripping.
+            authors = array_string_value(data, "authors")
+            fields["authors"] = authors unless authors.empty?
+
             # series
             if series = string_value(data, "series")
               fields["series"] = series
@@ -178,6 +188,24 @@ module Hwaro
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, section, file_slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
+
+          # Leaf bundle (`posts/my-post/index.md`): the section already
+          # mirrors the bundle directory, so the co-located images land in
+          # the right place — they just were never copied, leaving every
+          # `![](cover.png)` in the imported post 404ing.
+          # `section` must be non-empty: a bare `content/index.md` is the site
+          # root, not a bundle, and sweeping the whole content root's loose
+          # files into the output is not what the author asked for.
+          if !section.empty? && (filename == "index.md" || filename == "index.markdown")
+            copy_bundle_assets(
+              File.dirname(file_path),
+              File.join(output_dir, Utils::PathUtils.sanitize_path(section)),
+              output_dir,
+              verbose,
+              force,
+            )
+          end
+
           has_shortcodes ? :imported_wrapped : :imported
         end
 

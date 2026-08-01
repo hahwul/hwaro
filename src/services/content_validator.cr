@@ -217,7 +217,7 @@ module Hwaro
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))
         unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
           issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
-            message: "Date format may be invalid: \"#{date_str}\"")
+            message: "Date format may be invalid: \"#{Utils::TextUtils.strip_control(date_str)}\"")
           return
         end
 
@@ -249,7 +249,7 @@ module Hwaro
 
         unless parsed
           issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
-            message: "Date format may be invalid: \"#{date_str}\"")
+            message: "Date format may be invalid: \"#{Utils::TextUtils.strip_control(date_str)}\"")
         end
       end
 
@@ -258,7 +258,7 @@ module Hwaro
         mixed = tags.select { |tag| tag != tag.downcase && tag != tag.upcase }
         mixed.each do |tag|
           issues << Issue.new(id: "content-tag-mixed-case", level: :info, category: "content", file: file_path,
-            message: "Tag has mixed case: \"#{tag}\" (consider lowercase)")
+            message: "Tag has mixed case: \"#{Utils::TextUtils.strip_control(tag)}\" (consider lowercase)")
         end
       end
 
@@ -267,7 +267,7 @@ module Hwaro
         body = strip_code_blocks(extract_body(content))
         body.scan(/!\[\s*\]\([^\)]+\)/) do |match|
           issues << Issue.new(id: "content-alt-text-missing", level: :warning, category: "content", file: file_path,
-            message: "Image missing alt text: #{match[0]}")
+            message: "Image missing alt text: #{Utils::TextUtils.strip_control(match[0])}")
         end
       end
 
@@ -290,16 +290,23 @@ module Hwaro
 
           unless exists
             issues << Issue.new(id: "content-internal-link-broken", level: :warning, category: "content", file: file_path,
-              message: "Possible broken internal link: #{raw_url}")
+              message: "Possible broken internal link: #{Utils::TextUtils.strip_control(raw_url)}")
           end
         end
       end
 
+      # Strip front matter, if any. The TOML and YAML strips are mutually
+      # exclusive: chaining them let the `\A`-anchored YAML pattern eat a
+      # *body* that opens with a thematic break (`---\n…\n---`) once the TOML
+      # front matter had already been removed, so alt-text and broken-link
+      # findings inside that first block were silently dropped.
       private def extract_body(content : String) : String
         if content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
           content.byte_slice(end_idx)
+        elsif content.matches?(TOML_FRONTMATTER_RE)
+          content.sub(TOML_FRONTMATTER_RE, "")
         else
-          content.sub(TOML_FRONTMATTER_RE, "").sub(YAML_FRONTMATTER_RE, "")
+          content.sub(YAML_FRONTMATTER_RE, "")
         end
       end
 

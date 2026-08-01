@@ -24,6 +24,7 @@ module Hwaro
           wrapped = 0
 
           @used_paths.clear
+          reset_written_paths
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -121,6 +122,10 @@ module Hwaro
 
           Dir.each_child(dir) do |entry|
             full_path = File.join(dir, entry)
+            # Skip symlinked directories: a cycle would raise ELOOP out of
+            # this walk and abort the whole import (same guard as
+            # `Base#walk_files_into`).
+            next if File.symlink?(full_path)
             if File.directory?(full_path) && !entry.starts_with?(".") && entry != "node_modules" && entry != "_site"
               scan_data_files(full_path, base_path, data)
             end
@@ -170,7 +175,21 @@ module Hwaro
 
           # Merge directory data as defaults
           relative_dir = File.dirname(file_path).sub(base_path, "").lstrip('/')
-          is_collection_root = relative_dir.empty? || !relative_dir.includes?('/')
+          basename = File.basename(file_path, File.extname(file_path))
+
+          # `index.md` means two different things in an 11ty project, and the
+          # split has to happen here rather than inside the title fallback
+          # below — that guard only ran for files WITHOUT a title, so a
+          # titled homepage (the normal case) fell through and was buried at
+          # `content/posts/index.md`, leaving the site with no home page.
+          #
+          #   - site root `index.md`   → hwaro's homepage, `content/index.md`
+          #   - collection `blog/index.md` → a section landing page, which
+          #     hwaro generates itself; skip it.
+          is_site_root_index = basename == "index" && relative_dir.empty?
+          is_collection_index = basename == "index" && !relative_dir.empty? && !relative_dir.includes?('/')
+          return :skipped if is_collection_index
+
           merged_yaml = merge_directory_data(dir_data, relative_dir, frontmatter_yaml)
 
           if merged_yaml
@@ -244,16 +263,11 @@ module Hwaro
             end
           end
 
-          # Fallback title from filename
-          unless fields.has_key?("title")
-            name = File.basename(file_path, File.extname(file_path))
-            if name == "index"
-              if is_collection_root
-                return :skipped
-              else
-                name = File.basename(File.dirname(file_path))
-              end
-            end
+          # Fallback title from filename. The site root index keeps an empty
+          # title, matching hwaro's own scaffolded `content/index.md`.
+          unless fields.has_key?("title") || is_site_root_index
+            name = basename
+            name = File.basename(File.dirname(file_path)) if name == "index"
             fields["title"] = name.gsub(/[-_]/, " ").split.map(&.capitalize).join(" ")
           end
 
@@ -277,11 +291,11 @@ module Hwaro
             Logger.warn "Template tags detected in #{file_path} — manual conversion needed."
           end
 
-          # Determine section
-          section = top_section_from_path(file_path, base_path, "posts")
+          # Determine section — the site root index belongs at the content
+          # root, not under the default `posts` section.
+          section = is_site_root_index ? "" : top_section_from_path(file_path, base_path, "posts")
 
-          basename = File.basename(file_path, File.extname(file_path))
-          slug = if basename == "index" && !is_collection_root
+          slug = if basename == "index" && !is_site_root_index
                    slugify(File.basename(File.dirname(file_path)))
                  else
                    slugify(basename)

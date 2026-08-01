@@ -157,7 +157,13 @@ module Hwaro
             config = load_config(project_root)
             taxonomy_names = config ? config.taxonomies.map(&.name) : [] of String
             base_path = config ? config.base_path : ""
-            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path)
+            # Non-default language codes are served under a `/<code>/` prefix
+            # (`content/about.ko.md` → `/ko/about/`), so the checker has to
+            # strip that segment before resolving — otherwise every link in a
+            # multilingual site resolves against `content/ko/…` and is
+            # reported dead.
+            language_codes = translation_language_codes(config)
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes)
 
             total = external_links.size + internal_links.size
             dead_total = dead_external.size + dead_internal.size
@@ -268,12 +274,30 @@ module Hwaro
             link_regex = /(?:!\[[^\]]*?\]|\[[^\]]*?\])\((https?:\/\/(?:\([^\s()]*\)|[^\s()])+)\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
-              content = strip_code(File.read(file))
+              content = readable_markdown(file) || next
               content.scan(link_regex) do |match|
                 links << Link.new(file: file, url: match[1], kind: :external)
               end
+              scan_reference_definitions(content) do |url|
+                next unless url.starts_with?("http://") || url.starts_with?("https://")
+                links << Link.new(file: file, url: url, kind: :external)
+              end
             end
             links
+          end
+
+          # Read and code-strip one Markdown file, returning nil when the file
+          # cannot be scanned. A file containing invalid UTF-8 makes PCRE2
+          # raise `ArgumentError` mid-scan, which used to abort the whole run
+          # with a bare "Error: Regex match error" and exit 1 — the same code
+          # as "dead links found", so CI could not tell the two apart. Skip the
+          # file with a warning instead, matching how `tool list` and
+          # `tool validate` degrade on the same input.
+          private def readable_markdown(file : String) : String?
+            strip_code(File.read(file))
+          rescue ex : ArgumentError | IO::Error
+            Logger.warn "Skipping #{file}: #{ex.message}"
+            nil
           end
 
           # Markdown link/image destination, allowing ONE level of balanced
@@ -314,26 +338,78 @@ module Hwaro
             image_re = /!\[([^\]]*)\]\(#{LINK_DEST.source}\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
-              content = strip_code(File.read(file))
+              content = readable_markdown(file) || next
 
               # Regular links (exclude images by using negative lookbehind)
               content.scan(link_re) do |match|
                 url = clean_link_target(match[2])
-                next if url.empty? || url.starts_with?("#") || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
+                next if skip_internal?(url)
                 links << Link.new(file: file, url: url, kind: :internal)
               end
 
               # Image links
               content.scan(image_re) do |match|
                 url = clean_link_target(match[2])
-                next if url.empty? || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
+                next if skip_internal?(url, allow_fragment: false)
                 links << Link.new(file: file, url: url, kind: :image)
+              end
+
+              # Reference-style links (`[text][id]` + `[id]: /target/`) and
+              # raw HTML anchors/images. Both render as real links, so a page
+              # written that way used to get a clean bill of health.
+              scan_reference_definitions(content) do |raw|
+                url = clean_link_target(raw)
+                next if skip_internal?(url)
+                links << Link.new(file: file, url: url, kind: :internal)
+              end
+
+              content.scan(HTML_LINK_RE) do |match|
+                url = clean_link_target(match[2])
+                next if skip_internal?(url) || url.includes?("{{") || url.includes?("{%")
+                kind = match[1].downcase == "a" ? :internal : :image
+                links << Link.new(file: file, url: url, kind: kind)
               end
             end
             links
           end
 
-          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "") : Array(Result)
+          # `<a href="…">` / `<img src="…">` written directly in Markdown.
+          # Restricted to those two tags so shortcode/template attributes on
+          # other elements can't leak in as links.
+          HTML_LINK_RE = /<(a|img)\b[^>]*?\s(?:href|src)\s*=\s*["']([^"']*)["']/i
+
+          # A Markdown link reference definition (`[id]: /target/ "title"`).
+          #
+          # Two guards keep this from inventing links: footnote definitions
+          # (`[^1]: …`) are skipped, and the destination must actually look
+          # like a URL or path — otherwise the first word of a plain-prose
+          # definition body would be resolved as a relative path and reported
+          # dead.
+          REFERENCE_DEFINITION_RE = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(\S+)/m
+
+          private def scan_reference_definitions(content : String, &)
+            content.scan(REFERENCE_DEFINITION_RE) do |match|
+              next if match[1].starts_with?('^')
+              dest = match[2]
+              dest = dest[1..-2] if dest.starts_with?('<') && dest.ends_with?('>')
+              next unless dest.starts_with?('/') || dest.starts_with?("./") ||
+                          dest.starts_with?("../") || dest.starts_with?("@/") ||
+                          dest =~ /\A[a-z][a-z0-9+.\-]*:/i
+              yield dest
+            end
+          end
+
+          # Destinations the filesystem check cannot say anything about:
+          # empty, protocol-relative, pure fragments, and anything carrying a
+          # URI scheme (`mailto:`, `tel:`, `javascript:`, `https:`, …).
+          private def skip_internal?(url : String, allow_fragment : Bool = true) : Bool
+            return true if url.empty?
+            return true if allow_fragment && url.starts_with?("#")
+            return true if url.starts_with?("//")
+            !!(url =~ /\A[a-z][a-z0-9+.\-]*:/i)
+          end
+
+          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String) : Array(Result)
             results = [] of Result
             project_root = find_project_root(content_dir)
 
@@ -346,6 +422,15 @@ module Hwaro
                 elsif resolved_url.starts_with?(base_path + "/")
                   resolved_url = resolved_url[base_path.size..]
                 end
+              end
+
+              # `/ko/about/` is `content/about.ko.md`; strip the language
+              # segment and remember the code so the leaf candidates below
+              # can look for the translated source file.
+              lang = strip_language_prefix(resolved_url, language_codes)
+              if lang
+                resolved_url = resolved_url[(lang.size + 1)..]
+                resolved_url = "/" if resolved_url.empty?
               end
 
               base_dir = File.dirname(link.file)
@@ -375,6 +460,16 @@ module Hwaro
                        File.exists?(File.join(target_no_slash, "_index.md")) ||
                        File.exists?(File.join(target_no_slash, "index.md")) ||
                        (link.kind != :image && taxonomy_url?(resolved_url, taxonomy_names))
+
+              # Translated sources carry the language code in the filename
+              # (`about.ko.md`, `_index.ko.md`), so a `/ko/…` link only
+              # resolves once those candidates are probed too.
+              if !exists && (code = lang)
+                exists = File.exists?("#{target_no_slash}.#{code}.md") ||
+                         File.exists?("#{target_no_slash}.#{code}.markdown") ||
+                         File.exists?(File.join(target_no_slash, "_index.#{code}.md")) ||
+                         File.exists?(File.join(target_no_slash, "index.#{code}.md"))
+              end
 
               # Also accept assets that live in static/ (source) or public/ (after build).
               # This prevents false positives for:
@@ -418,6 +513,23 @@ module Hwaro
           # generated by Hwaro at build time, so they have no source file to
           # check against. Match the URL's leading segment against the site's
           # declared taxonomy names and accept it when it lines up.
+          # Language codes that get a `/<code>/` URL prefix: every declared
+          # language except the default one, which is served at the root.
+          private def translation_language_codes(config : Models::Config?) : Array(String)
+            return [] of String unless config
+            config.languages.keys.reject { |code| code.empty? || code == config.default_language }
+          end
+
+          # Returns the leading language segment of an absolute URL when it
+          # names a non-default language, else nil.
+          private def strip_language_prefix(url : String, codes : Array(String)) : String?
+            return if codes.empty?
+            return unless url.starts_with?("/")
+            segment = url.lstrip("/").split("/").first?
+            return unless segment
+            codes.includes?(segment) ? segment : nil
+          end
+
           private def taxonomy_url?(url : String, names : Array(String)) : Bool
             return false if names.empty?
             return false unless url.starts_with?("/")

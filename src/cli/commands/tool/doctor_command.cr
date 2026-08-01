@@ -102,7 +102,8 @@ module Hwaro
               # `--fix` gates value normalization, `--approve` gates section
               # appends — a bare `--approve` must not silently edit values.
               run_fix(doctor, fix_values: fix_mode, approve_sections: approve_mode, dry_run: dry_run_mode, json_output: json_output)
-              return
+              exit(post_fix_exit_code(doctor, strict: strict_mode, max_warnings: max_warnings,
+                report: !json_output, invocation: invocation))
             end
 
             issues = doctor.run
@@ -154,6 +155,22 @@ module Hwaro
             return Hwaro::Errors::EXIT_GENERIC if strict && warnings > 0
             return Hwaro::Errors::EXIT_GENERIC if max_warnings >= 0 && warnings > max_warnings
             Hwaro::Errors::EXIT_SUCCESS
+          end
+
+          # Re-diagnose after `--fix` / `--approve` / `--full` wrote the config
+          # so the exit code still reflects what is left broken. The fix path
+          # used to `return` right after printing its summary, hardcoding a
+          # success exit — `hwaro doctor --fix` in CI passed on a site with
+          # missing templates or an unfixable config error.
+          private def post_fix_exit_code(doctor : Services::Doctor, strict : Bool, max_warnings : Int32,
+                                         report : Bool = true, invocation : String = "hwaro doctor") : Int32
+            remaining = doctor.run
+            code = exit_code_for(remaining, strict: strict, max_warnings: max_warnings)
+            if report && code != Hwaro::Errors::EXIT_SUCCESS
+              actionable = remaining.count { |i| i.level != :info }
+              Logger.warn "#{actionable} issue(s) remain — run '#{invocation}' for details."
+            end
+            code
           end
 
           private def exit_code_for_category(category : String) : Int32

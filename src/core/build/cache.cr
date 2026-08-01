@@ -9,6 +9,7 @@ require "json"
 require "../../utils/digest_utils"
 require "../../utils/logger"
 require "../../models/config"
+require "../../config/options/build_options"
 
 module Hwaro
   module Core
@@ -237,6 +238,21 @@ module Hwaro
 
           # Check if output exists
           if !output_path.empty? && !File.exists?(output_path)
+            return true
+          end
+
+          # This entry was produced for a DIFFERENT output directory (e.g.
+          # alternating `build --cache -o dist` and `-o preview` from one
+          # checkout). The file at `output_path` exists but predates the
+          # edits recorded here, and nothing else would ever re-render it —
+          # the source hash already matches. Treat the switch as a miss.
+          # Compare the raw strings first (the hot path: both come from
+          # get_output_path, so they are already identical absolute paths) and
+          # only pay expand_path when they differ, so an equivalent spelling
+          # of the SAME file (`public/x` vs `./public/x`) is not a false miss.
+          if !output_path.empty? && !entry.output_path.empty? &&
+             entry.output_path != output_path &&
+             File.expand_path(entry.output_path) != File.expand_path(output_path)
             return true
           end
 
@@ -505,6 +521,32 @@ module Hwaro
           else
             ""
           end
+        end
+
+        # Fingerprint the CLI options that change what a page RENDERS TO.
+        #
+        # Every other cache hash covers files (sources, templates, config,
+        # data). None of them move when the same sources are built with a
+        # different flag, so `build --cache --minify` after a plain
+        # `build --cache` kept serving the unminified HTML it had already
+        # rendered — for as long as the pages stayed untouched. Flags that
+        # only affect *which* pages are built (`--drafts`, `--include-future`)
+        # or how fast the build runs (`--jobs`, `--stream`, `--no-parallel`)
+        # are deliberately excluded: they never change a rendered page's
+        # bytes, and folding them in would force needless cold rebuilds.
+        def self.compute_options_hash(options : Config::Options::BuildOptions) : String
+          digest = Digest::MD5.new
+          {
+            "minify"                => options.minify,
+            "highlight"             => options.highlight,
+            "cache_busting"         => options.cache_busting,
+            "skip_og_image"         => options.skip_og_image,
+            "skip_image_processing" => options.skip_image_processing,
+          }.each do |name, value|
+            Utils::DigestUtils.update_length_prefixed(digest, name)
+            Utils::DigestUtils.update_length_prefixed(digest, value.to_s)
+          end
+          digest.final.hexstring
         end
 
         # Compute a checksum for the *effective* (env-merged, env-substituted)

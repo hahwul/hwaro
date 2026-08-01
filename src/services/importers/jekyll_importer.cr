@@ -30,6 +30,7 @@ module Hwaro
           end
 
           @used_slugs.clear
+          reset_written_paths
           files = collect_files(path, options.drafts)
 
           if files.empty?

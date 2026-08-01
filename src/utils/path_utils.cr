@@ -10,13 +10,14 @@ module Hwaro
       # This method performs the following operations:
       # 1. URL-decodes the path (repeated until stable to catch double-encoding)
       # 2. Removes null bytes
-      # 3. Splits into segments and rejects ".." components
+      # 3. Splits into segments and rejects traversal components
       # 4. Rejoins with "/" separator
       #
       # Example:
       #   sanitize_path("/foo/../bar//baz/") # => "foo/bar/baz"
       #   sanitize_path("%2Ffoo%2Fbar")      # => "foo/bar"
       #   sanitize_path("....//etc/passwd")  # => "etc/passwd"
+      #   sanitize_path("notes/v1..v2")      # => "notes/v1..v2"
       def sanitize_path(path : String) : String
         # URL-decode repeatedly until stable to catch double/triple encoding
         decoded = path
@@ -29,9 +30,24 @@ module Hwaro
         # Remove null bytes
         decoded = decoded.gsub("\0", "")
 
-        # Split into segments, reject any that are empty, ".", "..",
-        # or contain ".." anywhere (e.g. "....") to prevent bypass attempts
-        parts = decoded.split(/[\/\\]/).reject { |seg| seg.empty? || seg == "." || seg.includes?("..") }
+        # Split into segments and drop every one that can name a directory
+        # OTHER than a child of the current one.
+        #
+        # The test is "is this segment nothing but dots and spaces", not "does
+        # it contain ..". Only a segment that IS `.`/`..` traverses; one that
+        # merely CONTAINS dots (`v1..v2`, `..foo`, `foo..`) is an ordinary
+        # name, and discarding it silently RELOCATED whatever was being
+        # addressed — a `content/a..b/` page collapsed to `""` and was written
+        # over the site's `index.html`, destroying the homepage.
+        #
+        # Windows strips trailing dots and spaces from path components, so
+        # `..`, `.. `, `. ` and `...` all normalize to `.` or `..` there.
+        # Rejecting any all-dots-and-spaces segment therefore neutralizes MORE
+        # traversal shapes than the old rule (which let `". "` through), while
+        # keeping every previously-neutralized form neutralized: `..`,
+        # `%2e%2e`, `%252e%252e`, `....//`, and the backslash variants all
+        # still collapse away.
+        parts = decoded.split(/[\/\\]/).reject { |seg| seg.empty? || seg.rstrip(". ").empty? }
 
         parts.join("/")
       end

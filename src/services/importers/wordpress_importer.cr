@@ -14,6 +14,8 @@ module Hwaro
           verbose = options.verbose
           force = options.force
 
+          reset_written_paths
+
           unless File.exists?(wxr_path)
             return ImportResult.new(
               success: false,

@@ -124,12 +124,19 @@ ignore = [
 
 Use `hwaro doctor --json` to find rule IDs in the output. Ignored issues are completely excluded from both human-readable and JSON output.
 
+> `ignore` only silences **warning** and **info** issues. Error-level rules
+> (marked ✗ below) report problems that will fail `hwaro build` anyway, so
+> listing one cannot disable the CI gate — doctor keeps reporting it and warns
+> that the entry has no effect.
+
 ### Available Rule IDs
+
+Rows marked ✗ are error level and **cannot** be ignored.
 
 | ID | Category | Description |
 |----|----------|-------------|
-| `config-not-found` | config | Config file not found |
-| `config-parse-error` | config | Failed to parse config |
+| `config-not-found` | config | Config file not found ✗ |
+| `config-parse-error` | config | Failed to parse config ✗ |
 | `base-url-missing` | config | base_url is not set |
 | `base-url-scheme` | config | base_url doesn't start with http(s) |
 | `base-url-trailing-slash` | config | base_url has trailing slash |
@@ -140,11 +147,11 @@ Use `hwaro doctor --json` to find rule IDs in the output. Ignored issues are com
 | `search-format-invalid` | config | Unsupported search.format |
 | `language-duplicate` | config | Duplicate language code |
 | `missing-config-*` | config_missing | Missing config section (e.g. `missing-config-pwa`) |
-| `template-dir-missing` | template | Templates directory not found |
-| `template-required-missing` | template | Required template missing |
-| `template-unclosed-block` | template | Unclosed block tag |
-| `template-mismatched-vars` | template | Mismatched variable tags |
-| `template-read-error` | template | Failed to read template |
+| `template-dir-missing` | template | Templates directory not found ✗ |
+| `template-required-missing` | template | Required template missing ✗ |
+| `template-unclosed-block` | template | Unclosed block tag ✗ |
+| `template-mismatched-vars` | template | Mismatched variable tags ✗ |
+| `template-read-error` | template | Failed to read template ✗ |
 | `structure-missing-index` | structure | Section missing _index.md |
 
 ## JSON Output

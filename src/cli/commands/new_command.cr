@@ -33,7 +33,7 @@ module Hwaro
 
           # Introspection
           FlagInfo.new(short: nil, long: "--list-archetypes", description: "List archetypes available in the current project and exit"),
-          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output"),
+          FlagInfo.new(short: "-j", long: "--json", description: "Emit machine-readable JSON output"),
 
           QUIET_FLAG,
           HELP_FLAG,
@@ -52,13 +52,14 @@ module Hwaro
         ARCHETYPES_DIR = "archetypes"
 
         def run(args : Array(String))
-          if args.includes?("--list-archetypes")
-            json_mode = args.includes?("--json")
-            print_archetypes(json_mode)
+          # Parse first so an unknown flag alongside `--list-archetypes` is
+          # still rejected instead of being silently swallowed.
+          options, json_output = parse_options(args)
+
+          if @list_archetypes
+            print_archetypes(json_output)
             return
           end
-
-          options, json_output = parse_options(args)
 
           # Signal json mode to the Runner so any HwaroError we raise is
           # rendered as the structured payload on stdout instead of the
@@ -107,6 +108,13 @@ module Hwaro
           # The wizard always sets a path on success; this guard is defensive
           # and also narrows `raw_path` to String for the pipeline below.
           return if raw_path.nil?
+
+          # Record the trailing-separator intent before normalization strips
+          # it. `hwaro new notes/` means "a page inside content/notes/", which
+          # is otherwise indistinguishable from `hwaro new notes` once the
+          # slash is gone — and that ambiguity made the result depend on
+          # whether content/notes/ happened to exist yet.
+          options.path_is_dir = raw_path.rstrip.ends_with?('/')
 
           # Canonicalize early so the rest of the pipeline (and the
           # `Created new content: …` log line) works with a path that
@@ -237,6 +245,10 @@ module Hwaro
           results
         end
 
+        # Set by #parse_options so #run can act on `--list-archetypes` after —
+        # rather than before — full option parsing.
+        @list_archetypes = false
+
         def parse_options(args : Array(String)) : {Config::Options::NewOptions, Bool}
           path = nil.as(String?)
           title = nil.as(String?)
@@ -246,7 +258,7 @@ module Hwaro
           tags = [] of String
           section = nil.as(String?)
           bundle = nil.as(Bool?)
-          json_output = args.includes?("--json")
+          json_output = false
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro new <path> [options]"
@@ -263,7 +275,9 @@ module Hwaro
             # typical Unix convention.
             parser.on("--bundle", "Create a leaf-bundle directory (foo/index.md)") { bundle = true }
             parser.on("--no-bundle", "Create a single file (foo.md)") { bundle = false }
-            parser.on("--json", "Emit machine-readable JSON output") { json_output = true }
+            parser.on("-j", "--json", "Emit machine-readable JSON output") { json_output = true }
+            # Introspection (acted on by #run after parsing).
+            parser.on("--list-archetypes", "List archetypes available in the current project and exit") { @list_archetypes = true }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             parser.unknown_args do |before_dash, after_dash|

@@ -182,7 +182,15 @@ module Hwaro::Core::Build::Phases::Write
     # A page that lost an output-path collision renders normally (its content
     # still feeds listings/feeds/search) but must not race the winner on disk.
     return if collision_suppressed?(page, page.url)
-    output_path = get_output_path(page, output_dir)
+    # nil = this page cannot be published where its URL says (a traversing
+    # path segment, or a result outside the output directory). Skip it rather
+    # than write it over the site root index — but never silently: an authored
+    # page vanishing from the output with an exit code of 0 is exactly the
+    # failure this warning exists to prevent.
+    unless output_path = get_output_path(page, output_dir)
+      Logger.warn "Not publishing #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory (a path segment traverses or escapes it). Rename the file or set an explicit `slug`/`path` in its front matter."
+      return
+    end
 
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)

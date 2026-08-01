@@ -19,6 +19,8 @@ module Hwaro
           errors = 0
           wrapped = 0
 
+          reset_written_paths
+
           unless Dir.exists?(path)
             return ImportResult.new(
               success: false,
