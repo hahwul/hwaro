@@ -193,6 +193,10 @@ module Hwaro
 
         # Returns parsed metadata and content
         def parse(raw_content : String, file_path : String = "")
+          # A UTF-8 BOM would defeat every `\A`-anchored fence below and the
+          # leading-`{` JSON test, silently turning the front matter into body
+          # text. Strip it first so BOM'd files parse like any other.
+          raw_content = Utils::TextUtils.strip_bom(raw_content)
           markdown_content = raw_content
 
           # Try TOML (+++), YAML (---), then JSON ({...}) front matter

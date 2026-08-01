@@ -262,6 +262,20 @@ module Hwaro
       # `content/public/robots.txt`) to the output regardless of
       # `allow_extensions`. When `[content.files]` is not configured, every
       # non-markdown file is collected (unchanged behavior).
+      #
+      # Two structural limits keep the recursion inside the bundle it belongs
+      # to (both hold regardless of `[content.files]`, which many hand-written
+      # configs omit entirely):
+      #
+      #   1. `content/` itself is never a bundle. `content/index.md` is the
+      #      homepage, not a bundle spanning the site, and treating it as one
+      #      republished every non-markdown file anywhere under `content/`
+      #      (`content/private/internal.pdf`, `notes.txt`, `*.bak`, …) into the
+      #      output root.
+      #   2. Recursion stops at nested bundles/sections. A subdirectory holding
+      #      its own `index.md`/`_index.md` is a different page and publishes
+      #      its own assets; descending into it made every ancestor index
+      #      re-copy the same files.
       def collect_assets(content_dir : String, content_files : ContentFilesConfig? = nil) : Array(String)
         # Assets are only collected for page bundles (directories)
         # This usually means the page is an index.md (either _index.md or index.md)
@@ -271,10 +285,12 @@ module Hwaro
         page_dir = File.dirname(File.join(content_dir, @path))
 
         return [] of String unless Dir.exists?(page_dir)
+        return [] of String if Path[page_dir].normalize == Path[content_dir].normalize
 
         @assets = Dir.glob(File.join(page_dir, "**", "*")).compact_map do |file|
           next unless File.file?(file)
           next if file.ends_with?(".md") || file.ends_with?(".markdown")
+          next if nested_bundle?(page_dir, file)
 
           relative = Path[file].relative_to(content_dir).to_s
           # Honor [content.files] allow/disallow rules when configured so the
@@ -285,6 +301,22 @@ module Hwaro
         end
 
         @assets
+      end
+
+      # True when `file` sits under a subdirectory of `page_dir` that carries
+      # its own `index.md`/`_index.md` — i.e. it is another page's asset, not
+      # this bundle's. Walks the intermediate directories from the bundle root
+      # down to the file's own directory.
+      private def nested_bundle?(page_dir : String, file : String) : Bool
+        dir = File.dirname(file)
+        while dir != page_dir && dir.size > page_dir.size
+          return true if File.exists?(File.join(dir, "index.md")) ||
+                         File.exists?(File.join(dir, "_index.md"))
+          parent = File.dirname(dir)
+          break if parent == dir
+          dir = parent
+        end
+        false
       end
 
       # Calculate word count from raw content

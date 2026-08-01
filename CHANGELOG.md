@@ -17,9 +17,16 @@
 - GFM tables with short alignment delimiters (`|:--|--:|`, `|:-:|`, `| - |`) render as tables; the delimiter cell now matches GFM's `:?-+:?` instead of requiring three hyphens
 - `hwaro tool check-links` stops reporting valid links as dead: angle-bracket destinations (`[t](</about/>)`, including ones containing spaces) and destinations with balanced parentheses (`/docs/foo_(bar)`)
 - An oversized `[image_processing] widths` entry no longer aborts the build with a bare `OverflowError`; the variant is declined by the existing pixel-count guard instead
+- A UTF-8 BOM no longer breaks parsing. Every parser hwaro hands file text to anchors on the first character, so a BOM'd file silently misbehaved: `.md` front matter fell through as body text (page titled "Untitled" with its literal `+++` block printed into the output), `config.toml` failed with `unexpected char '﻿' at 1:1`, and `.json`/`.toml` data files were warn-skipped until the render failed on the missing `site.data` key. Windows editors, "UTF-8 with BOM", and PowerShell `>` redirection all produce these files
+- `slug` works on leaf bundles again (`<dir>/index.md`): the permalink resolver skipped it for every index page, so converting a page to bundle layout — what `hwaro new --bundle` and multilingual siblings produce — silently reverted its URL to the directory name. Section indexes (`_index.md`) are deliberately unaffected, since their directory name is the prefix their child pages derive their own URLs from
+- `content/index.md` no longer republishes the entire `content/` tree. The homepage was treated as a page bundle spanning the whole site, so every non-Markdown file anywhere under `content/` (`private/internal.pdf`, `notes.txt`, `*.bak`) was copied into the output root — the `[content.files]` allowlist only guarded this when that section was present, and hand-written configs usually omit it. Recursion now also stops at nested `index.md`/`_index.md` instead of letting every ancestor index re-copy the same files
+- `--minify` is no longer silently undone for `.json`/`.xml` files inside a page bundle: the minified output was written first and then overwritten by the verbatim bundle-asset copy
+- Shortcode arguments accept an escaped quote (`caption="The \"big\" reveal"`). The value used to be truncated at the first `\"` — leaving a stray backslash — and a comma inside it re-split the argument list, dropping every argument that followed. `\\`, `\"` and `\'` are the only escapes, so `C:\new` and `\alpha` still round-trip verbatim
+- `redirect_to` is prefixed with `base_url`'s path component, like `aliases` already was; on a project-pages deployment under a subpath the redirect previously pointed at the domain root and 404'd. External and protocol-relative targets are left untouched
 
 ### Changed
 - **Breaking (packagers):** minimum Crystal is now 1.21, and no build path passes `-Dpreview_mt` any more. Worker count still honours `CRYSTAL_WORKERS` (now defaulting to the CPU count)
+- `hwaro tool convert` names the files whose front-matter comments it drops. The blanket "comments are not preserved" notice fired on every run and identified nothing, so an in-place rewrite across hundreds of files gave no clue what it cost
 
 ## v0.18.1
 

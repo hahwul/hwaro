@@ -568,7 +568,10 @@ module Hwaro::Core::Build::Phases::Initialize
 
   private def parse_data_file(path : String) : Crinja::Value?
     ext = File.extname(path).downcase
-    content = File.read(path)
+    # JSON and TOML both reject a leading BOM outright, so a data file saved
+    # by a Windows editor would warn-and-skip and leave `site.data.<key>`
+    # undefined — which then fails the whole render.
+    content = Utils::TextUtils.strip_bom(File.read(path))
     case ext
     when ".yml", ".yaml"
       Utils::CrinjaUtils.from_yaml(YAML.parse(content))

@@ -432,4 +432,32 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.cjk_char?('😀').should be_false
     end
   end
+
+  # Regression: a UTF-8 BOM (Notepad, PowerShell `>`, "UTF-8 with BOM") anchors
+  # ahead of every parser hwaro feeds file text to — the `\A`-anchored front
+  # matter fences, TOML's first token, JSON's first token — so leaving it in
+  # place turned front matter into body text and made config/data files
+  # unparseable.
+  describe ".strip_bom" do
+    it "removes a leading UTF-8 BOM" do
+      Hwaro::Utils::TextUtils.strip_bom("\uFEFF+++\ntitle = \"x\"\n+++\n")
+        .should eq("+++\ntitle = \"x\"\n+++\n")
+    end
+
+    it "leaves BOM-free content untouched" do
+      Hwaro::Utils::TextUtils.strip_bom("+++\n").should eq("+++\n")
+    end
+
+    it "removes only the first BOM" do
+      Hwaro::Utils::TextUtils.strip_bom("\uFEFF\uFEFFx").should eq("\uFEFFx")
+    end
+
+    it "leaves a BOM that is not at the start" do
+      Hwaro::Utils::TextUtils.strip_bom("x\uFEFFy").should eq("x\uFEFFy")
+    end
+
+    it "handles an empty string" do
+      Hwaro::Utils::TextUtils.strip_bom("").should eq("")
+    end
+  end
 end

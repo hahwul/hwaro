@@ -61,6 +61,56 @@ describe Hwaro::Core::Build::Builder do
       args["key1"].should eq("value1")
       args["key2"].should eq("value2")
     end
+
+    # Regression: `"([^"]*)"` stopped at the first escaped quote, so a caption
+    # containing the delimiter silently became a truncated value ending in a
+    # stray backslash — and the comma inside it re-split the argument list, so
+    # every later argument was lost too.
+    it "resolves an escaped quote inside a double-quoted value" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%q(caption="The \"big\" reveal", color="c"))
+
+      args["caption"].should eq(%q(The "big" reveal))
+      args["color"].should eq("c")
+    end
+
+    it "keeps a comma that sits inside an escaped-quote run" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%q(label="a\"b,c", color="c"))
+
+      args["label"].should eq(%q(a"b,c))
+      args["color"].should eq("c")
+    end
+
+    it "resolves an escaped quote inside a single-quoted value" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%q(label='it\'s here', color='c'))
+
+      args["label"].should eq("it's here")
+      args["color"].should eq("c")
+    end
+
+    it "unescapes a doubled backslash" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%q(label="back\\slash"))
+      args["label"].should eq(%q(back\slash))
+    end
+
+    # Only \\ \" \' are escapes; anything else keeps its backslash so Windows
+    # paths and LaTeX-ish text survive a round trip.
+    it "leaves a non-escape backslash verbatim" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%q(a="C:\new", b="\alpha"))
+
+      args["a"].should eq(%q(C:\new))
+      args["b"].should eq(%q(\alpha))
+    end
+
+    it "unescapes positional quoted arguments too" do
+      builder = Hwaro::Core::Build::Builder.new
+      args = builder.test_parse_shortcode_args_jinja(%q("say \"hi\""))
+      args["_0"].should eq(%q(say "hi"))
+    end
   end
 
   describe "#process_shortcodes_jinja" do

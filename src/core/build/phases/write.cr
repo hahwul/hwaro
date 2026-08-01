@@ -18,11 +18,16 @@ module Hwaro::Core::Build::Phases::Write
       generate_404_page(site, templates, output_dir, minify, verbose, @render_global_vars)
 
       # Process raw files (JSON, XML)
-      raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose)
+      written_raw = Set(String).new
+      raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose, written_raw)
       ctx.stats.raw_files_processed = raw_count
 
-      # Process co-located assets (images, etc. in page bundles)
-      process_assets(ctx.all_pages, output_dir, verbose)
+      # Process co-located assets (images, etc. in page bundles). A `.json`/
+      # `.xml` bundle asset that `[content.files]` also publishes is already
+      # written above — as MINIFIED output under `--minify`. Copying the raw
+      # source over it here silently undid the minification, so the
+      # destinations just written are passed in and skipped.
+      process_assets(ctx.all_pages, output_dir, verbose, written_raw)
     end
     profiler.end_phase
     result
@@ -59,7 +64,7 @@ module Hwaro::Core::Build::Phases::Write
   end
 
   # Process raw files (JSON, XML) with minification
-  private def process_raw_files(raw_files : Array(Lifecycle::RawFile), output_dir : String, minify : Bool, verbose : Bool) : Int32
+  private def process_raw_files(raw_files : Array(Lifecycle::RawFile), output_dir : String, minify : Bool, verbose : Bool, written : Set(String)) : Int32
     count = 0
 
     raw_files.each do |raw_file|
@@ -94,6 +99,7 @@ module Hwaro::Core::Build::Phases::Write
         FileUtils.cp(raw_file.source_path, output_path)
       end
 
+      written << File.expand_path(output_path)
       Logger.action :create, output_path if verbose
       count += 1
     end
@@ -102,7 +108,7 @@ module Hwaro::Core::Build::Phases::Write
   end
 
   # Process co-located assets for pages
-  private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool)
+  private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new)
     pages.each do |page|
       next if page.assets.empty?
 
@@ -137,6 +143,10 @@ module Hwaro::Core::Build::Phases::Write
         # Defense in depth: never write outside the output directory even if
         # an asset's relative path somehow climbs out of the bundle.
         next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
+
+        # Already emitted by process_raw_files (possibly minified) — a plain
+        # copy here would overwrite the processed output with the source.
+        next if already_written.includes?(File.expand_path(dest_path))
 
         # Skip unchanged assets. The Write phase runs on every build with a
         # surviving output dir (serve rebuilds, --preserve-output), so

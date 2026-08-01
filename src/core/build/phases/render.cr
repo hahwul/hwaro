@@ -685,7 +685,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Handle redirect_to for pages AND sections
     if page.has_redirect?
-      generate_redirect_page(page, output_dir, verbose)
+      generate_redirect_page(page, site, output_dir, verbose)
       generate_aliases(page, site, output_dir, verbose)
       return
     end
@@ -911,11 +911,19 @@ module Hwaro::Core::Build::Phases::Render
 
   private def generate_redirect_page(
     page : Models::Page,
+    site : Models::Site,
     output_dir : String,
     verbose : Bool = false,
   )
     redirect_url = page.redirect_to
     return unless redirect_url
+
+    # Prefix a root-relative target with `base_url`'s path component, exactly
+    # as generate_aliases does: without it, `redirect_to = "/about/"` on a
+    # site deployed under `/repo/` sent readers to the domain root, which 404s.
+    # `with_base_path` leaves http(s) and protocol-relative targets untouched,
+    # so an intentional off-site redirect still works.
+    redirect_url = site.config.with_base_path(redirect_url)
     return if collision_suppressed?(page, page.url)
 
     url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))

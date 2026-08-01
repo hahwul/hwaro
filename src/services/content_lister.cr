@@ -8,6 +8,7 @@ require "yaml"
 require "toml"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
+require "../utils/text_utils"
 
 module Hwaro
   module Services
@@ -179,7 +180,9 @@ module Hwaro
       end
 
       private def parse_content_info(file_path : String) : ContentInfo?
-        content = File.read(file_path)
+        # Match the build's frontmatter reader: a BOM'd file would otherwise
+        # list as "Untitled" with no date while it builds correctly.
+        content = Utils::TextUtils.strip_bom(File.read(file_path))
 
         title = "Untitled"
         draft = false

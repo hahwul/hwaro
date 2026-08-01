@@ -20,9 +20,14 @@ module Hwaro
   module Core
     module Build
       module ShortcodeProcessor
-        SHORTCODE_ARGS_REGEX  = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s]+))/
+        # Quoted values accept backslash escapes (`\"`, `\'`, `\\`) so a caption
+        # or title can contain the same quote character that delimits it. Without
+        # `(?:[^"\\]|\\.)*`, `caption="The \"big\" reveal"` matched only up to the
+        # first escaped quote: the value silently became `The \` and the rest of
+        # the argument list was mis-split.
+        SHORTCODE_ARGS_REGEX  = /(\w+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^,\s]+))/
         MAX_SHORTCODE_NESTING = 5
-        BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
+        BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
         # Support both bare {% end %} and named {% endNAME %}.
         BLOCK_CLOSE_RE = /\{\%\s*end(?:\s+[a-zA-Z_][\w\-]*)?\s*\%\}/i
         # Broader close matcher for the outer fence loop's depth tracking: it
@@ -595,8 +600,13 @@ module Hwaro
             if token.matches?(NAMED_TOKEN_RE)
               token.scan(SHORTCODE_ARGS_REGEX) do |match|
                 key = match[1]
-                value = match[2]? || match[3]? || match[4]? || ""
-                args[key] = value
+                # Only the quoted alternatives carry escapes; an unquoted value
+                # (match[4]) is taken verbatim so a Windows path stays intact.
+                args[key] = if quoted = match[2]? || match[3]?
+                              unescape_shortcode_arg(quoted)
+                            else
+                              match[4]? || ""
+                            end
               end
             else
               value = unquote_shortcode_arg(token)
@@ -610,15 +620,24 @@ module Hwaro
         end
 
         # Split an argument string on top-level commas; commas inside single-
-        # or double-quoted values belong to the value.
+        # or double-quoted values belong to the value. A backslash inside a
+        # quoted run escapes the next character, so `label="a\"b,c"` stays one
+        # token instead of splitting at the comma and dropping the args after it.
         private def split_shortcode_args(args_str : String) : Array(String)
           parts = [] of String
           current = String::Builder.new
           quote : Char? = nil
+          escaped = false
           args_str.each_char do |ch|
             if q = quote
               current << ch
-              quote = nil if ch == q
+              if escaped
+                escaped = false
+              elsif ch == '\\'
+                escaped = true
+              elsif ch == q
+                quote = nil
+              end
             elsif ch == '"' || ch == '\''
               quote = ch
               current << ch
@@ -633,13 +652,37 @@ module Hwaro
           parts
         end
 
-        # Strip one layer of surrounding quotes from an argument value.
+        # Strip one layer of surrounding quotes from an argument value, and
+        # resolve the escapes inside it (positional args go through here).
         private def unquote_shortcode_arg(value : String) : String
           if value.size >= 2 && ((value.starts_with?('"') && value.ends_with?('"')) ||
              (value.starts_with?('\'') && value.ends_with?('\'')))
-            value[1..-2]
+            unescape_shortcode_arg(value[1..-2])
           else
             value
+          end
+        end
+
+        # Resolve backslash escapes in a quoted argument value. Only `\`, `"`
+        # and `'` are special; every other backslash is kept verbatim so a
+        # literal `C:\new` or a LaTeX-ish `\alpha` survives unchanged.
+        private def unescape_shortcode_arg(value : String) : String
+          return value unless value.includes?('\\')
+
+          String.build(value.bytesize) do |io|
+            escaped = false
+            value.each_char do |ch|
+              if escaped
+                io << '\\' unless ch == '\\' || ch == '"' || ch == '\''
+                io << ch
+                escaped = false
+              elsif ch == '\\'
+                escaped = true
+              else
+                io << ch
+              end
+            end
+            io << '\\' if escaped
           end
         end
 

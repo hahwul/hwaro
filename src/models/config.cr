@@ -1436,7 +1436,10 @@ module Hwaro
       # `--json` handlers emit the structured error payload. The hint points
       # users at the offending file so they can fix the syntax.
       private def self.parse_toml(content : String, path : String) : Hash(String, TOML::Any)
-        TOML.parse(content)
+        # A BOM'd config.toml (Notepad / PowerShell `>` / "UTF-8 with BOM")
+        # otherwise dies on `unexpected char '﻿' at 1:1` — an invisible
+        # character the user cannot see in their editor.
+        TOML.parse(Utils::TextUtils.strip_bom(content))
       rescue ex : Hwaro::HwaroError
         raise ex
       rescue ex

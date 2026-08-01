@@ -9,6 +9,7 @@ require "toml"
 require "../utils/frontmatter_scanner"
 require "../utils/frontmatter_writer"
 require "../utils/logger"
+require "../utils/text_utils"
 
 module Hwaro
   module Services
@@ -112,7 +113,9 @@ module Hwaro
       end
 
       private def convert_file_with_status(file_path : String, target_format : FrontmatterFormat, log_skipped : Bool = true) : ConversionStatus
-        content = File.read(file_path)
+        # Strip a BOM before detection so a BOM'd file isn't misread as
+        # "no frontmatter" and skipped. The rewrite below drops the BOM too.
+        content = Utils::TextUtils.strip_bom(File.read(file_path))
         current_format = detect_format(content)
 
         # Skip if already in target format or unknown format
@@ -134,6 +137,16 @@ module Hwaro
         unless frontmatter_mapping?(content, current_format)
           Logger.item("skipped (leading #{format_label(current_format)} block is not frontmatter): #{file_path}", glyph: :warn) if log_skipped
           return ConversionStatus::Skipped
+        end
+
+        # The command already prints a blanket "comments are not preserved"
+        # notice, but that fires on every run and says nothing about which
+        # files are actually affected. Name the casualties so an author with
+        # hundreds of files knows exactly what this in-place rewrite cost —
+        # hwaro's own scaffolds ship commented frontmatter, so this is easy
+        # to hit and easy to miss in a large `git diff`.
+        if dropped = dropped_comment_count(content, current_format)
+          Logger.warn "#{file_path}: dropping #{dropped} frontmatter comment line(s)."
         end
 
         converted_content = convert_content(content, current_format, target_format)
@@ -263,6 +276,22 @@ module Hwaro
       rescue ex
         File.delete(tmp_path) if tmp_path && File.exists?(tmp_path)
         raise ex
+      end
+
+      # Number of whole-line comments in the source frontmatter block, or nil
+      # when there are none. Only full-line `#` comments count: a trailing `#`
+      # can legally live inside a quoted value, and this drives a warning, not
+      # a decision, so a conservative under-count beats false alarms. JSON has
+      # no comment syntax, so it is never scanned.
+      private def dropped_comment_count(content : String, from : FrontmatterFormat) : Int32?
+        block = case from
+                when FrontmatterFormat::TOML then content.match(TOML_FRONTMATTER_RE).try(&.[1])
+                when FrontmatterFormat::YAML then content.match(YAML_FRONTMATTER_RE).try(&.[1])
+                end
+        return unless block
+
+        count = block.each_line.count(&.lstrip.starts_with?('#'))
+        count > 0 ? count : nil
       end
 
       private def format_label(fmt : FrontmatterFormat) : String
