@@ -119,6 +119,14 @@ module Hwaro
         @[JSON::Field(key: "generator_version", emit_null: false)]
         property generator_version : String = ""
 
+        # Output directory this cache was built for, RELATIVE to the project
+        # root when it lives inside it. Alternating `-o dist` and `-o preview`
+        # from one checkout must invalidate (each tree holds pre-edit files the
+        # source hashes would otherwise mark up to date), but merely moving the
+        # workspace must NOT — hence relative, not absolute.
+        @[JSON::Field(key: "output_dir", emit_null: false)]
+        property output_dir : String = ""
+
         def initialize(@template_hash : String = "", @config_hash : String = "",
                        @page_set_hash : String = "", @section_set_hash : String = "")
         end
@@ -169,13 +177,19 @@ module Hwaro
         # is true — with template dependency tracking active, the builder
         # passes false and per-page closure hashes (see `changed?`) decide
         # which pages a template edit actually affects.
-        def set_global_checksums(template_hash : String, config_hash : String, invalidate_on_template_change : Bool = true)
+        def set_global_checksums(template_hash : String, config_hash : String, invalidate_on_template_change : Bool = true, output_dir : String = "")
           @current_template_hash = template_hash
           @current_config_hash = config_hash
 
           return unless @enabled
 
           invalidated = false
+          output_key = Cache.output_dir_key(output_dir)
+
+          if !@metadata.output_dir.empty? && !output_key.empty? && @metadata.output_dir != output_key
+            Logger.info "  Cache: output directory changed — invalidating all entries."
+            invalidated = true
+          end
 
           if invalidate_on_template_change && !@metadata.template_hash.empty? && @metadata.template_hash != template_hash
             Logger.info "  Cache: templates changed — invalidating all entries."
@@ -199,6 +213,7 @@ module Hwaro
           # the current ones.
           @metadata = CacheMetadata.new(template_hash: template_hash, config_hash: config_hash,
             page_set_hash: @metadata.page_set_hash, section_set_hash: @metadata.section_set_hash)
+          @metadata.output_dir = output_key unless output_key.empty?
         end
 
         # Has the global page set (content page metadata that listings render —
@@ -219,8 +234,10 @@ module Hwaro
           if @metadata.page_set_hash != page_set || @metadata.section_set_hash != section_set
             @dirty = true
           end
+          previous_output_dir = @metadata.output_dir
           @metadata = CacheMetadata.new(template_hash: @metadata.template_hash, config_hash: @metadata.config_hash,
             page_set_hash: page_set, section_set_hash: section_set)
+          @metadata.output_dir = previous_output_dir
         end
 
         # Check if a file has changed since last build.
@@ -241,20 +258,12 @@ module Hwaro
             return true
           end
 
-          # This entry was produced for a DIFFERENT output directory (e.g.
-          # alternating `build --cache -o dist` and `-o preview` from one
-          # checkout). The file at `output_path` exists but predates the
-          # edits recorded here, and nothing else would ever re-render it —
-          # the source hash already matches. Treat the switch as a miss.
-          # Compare the raw strings first (the hot path: both come from
-          # get_output_path, so they are already identical absolute paths) and
-          # only pay expand_path when they differ, so an equivalent spelling
-          # of the SAME file (`public/x` vs `./public/x`) is not a false miss.
-          if !output_path.empty? && !entry.output_path.empty? &&
-             entry.output_path != output_path &&
-             File.expand_path(entry.output_path) != File.expand_path(output_path)
-            return true
-          end
+          # NOTE: the output-directory switch is detected ONCE, by comparing
+          # `CacheMetadata#output_dir` in `set_global_checksums`, not per entry.
+          # Comparing the persisted per-entry path here invalidated every entry
+          # whenever the workspace moved (CI restoring `.hwaro_cache.json` under
+          # a different checkout path, Docker vs native, a renamed project dir),
+          # because those paths are stored absolute.
 
           return true if extra_outputs.any? { |p| !File.exists?(p) }
 
@@ -512,6 +521,21 @@ module Hwaro
             Utils::DigestUtils.update_length_prefixed(digest, templates[name])
           end
           digest.final.hexstring
+        end
+
+        # Workspace-independent identity for an output directory: relative to
+        # the project root when it lives inside it, absolute otherwise. Makes
+        # `-o dist` vs `-o preview` distinguishable while `/ci/a/dist` and
+        # `/ci/b/dist` compare equal.
+        def self.output_dir_key(output_dir : String) : String
+          return "" if output_dir.empty?
+          expanded = File.expand_path(output_dir)
+          # expand_path preserves a trailing separator; `public/` and `public`
+          # are the same directory and must produce the same key.
+          expanded = expanded.rstrip(File::SEPARATOR) unless expanded == File::SEPARATOR_STRING
+          root = File.expand_path(Dir.current)
+          return expanded unless expanded.starts_with?(root + File::SEPARATOR)
+          expanded[(root.size + 1)..]
         end
 
         # Compute a checksum for the config file

@@ -98,5 +98,50 @@ describe Hwaro::Services::UnusedAssets do
         unused_basenames(dir).should eq(["orphan.png"])
       end
     end
+
+    describe "unreadable reference sources (review finding 10)" do
+      it "skips a file containing invalid UTF-8 instead of aborting the scan" do
+        # The corpus is concatenated and regex-scanned, so one bad byte made
+        # every later PCRE2 call raise and the command exited 1 with no results.
+        # Much more reachable now the static scan includes .json/.xml/.svg/.txt.
+        Dir.mktmpdir do |dir|
+          scaffold_project(dir)
+          FileUtils.mkdir_p(File.join(dir, "static", "data"))
+          File.write(File.join(dir, "static", "data", "bad.json"), Bytes[0xFF, 0xFE, 0x7B, 0x7D])
+          File.write(File.join(dir, "templates", "index.html"), %(<img src="/used.png">))
+          File.write(File.join(dir, "static", "used.png"), "png")
+          File.write(File.join(dir, "static", "orphan.png"), "png")
+
+          result = nil
+          output = with_captured_log do
+            result = Hwaro::Services::UnusedAssets.new(
+              content_dir: File.join(dir, "content"),
+              static_dir: File.join(dir, "static"),
+              templates_dir: File.join(dir, "templates"),
+            ).run
+          end
+
+          output.should contain("bad.json")
+          r = result.not_nil!
+          r.unused_files.map { |f| File.basename(f) }.should eq(["orphan.png"])
+        end
+      end
+
+      it "keeps working when a content file is invalid UTF-8" do
+        Dir.mktmpdir do |dir|
+          scaffold_project(dir)
+          File.write(File.join(dir, "content", "bad.md"), Bytes[0xFF, 0xFE, 0x0A])
+          File.write(File.join(dir, "static", "orphan.png"), "png")
+
+          with_captured_log do
+            Hwaro::Services::UnusedAssets.new(
+              content_dir: File.join(dir, "content"),
+              static_dir: File.join(dir, "static"),
+              templates_dir: File.join(dir, "templates"),
+            ).run.unused_count.should eq(1)
+          end
+        end
+      end
+    end
   end
 end

@@ -189,11 +189,13 @@ module Hwaro::Core::Build::Phases::Write
     # failure this warning exists to prevent.
     unless output_path = get_output_path(page, output_dir)
       Logger.warn "Not publishing #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory (a path segment traverses or escapes it). Rename the file or set an explicit `slug`/`path` in its front matter."
+      note_unpublished_page
       return
     end
 
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+    note_published_page
     Logger.action :create, output_path if verbose
   end
 

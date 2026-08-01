@@ -43,15 +43,17 @@ describe "convert regressions" do
         File.write(path, "+++\ntitle = \"RO\"\n+++\n\nBody.\n")
         File.chmod(path, 0o444)
 
-        # Running as root defeats the permission bit, so only assert when the
-        # file is genuinely unwritable.
-        unless File::Info.writable?(path)
-          result = Hwaro::Services::FrontmatterConverter.new(content_dir).convert_to_yaml
+        # Root (and Windows) ignore the read-only bit, so the precondition
+        # this example needs cannot be built there. Report that explicitly as
+        # pending — wrapping the assertions in a silent `unless writable?`
+        # left the example reporting green while asserting nothing.
+        pending! "cannot create an unwritable file here (running as root?)" if File::Info.writable?(path)
 
-          result.success.should be_false
-          result.error_count.should eq(1)
-          result.message.should contain("could not be converted")
-        end
+        result = Hwaro::Services::FrontmatterConverter.new(content_dir).convert_to_yaml
+
+        result.success.should be_false
+        result.error_count.should eq(1)
+        result.message.should contain("could not be converted")
 
         File.chmod(path, 0o644)
       end

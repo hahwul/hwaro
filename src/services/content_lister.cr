@@ -149,8 +149,10 @@ module Hwaro
 
         # Cap long cells so the table stays scannable; the header labels are
         # the minimum column widths (Logger::Table aligns to the widest cell).
-        max_title_width = [[cells.max_of { |title, _| title.size }, 30].min, HEADER_TITLE.size].max
-        max_path_width = [[cells.max_of { |_, path| path.size }, 40].min, HEADER_PATH.size].max
+        # Measured in terminal columns to match both `truncate` below and the
+        # table's own padding.
+        max_title_width = [[cells.max_of { |title, _| Utils::TextUtils.display_width(title) }, 30].min, HEADER_TITLE.size].max
+        max_path_width = [[cells.max_of { |_, path| Utils::TextUtils.display_width(path) }, 40].min, HEADER_PATH.size].max
 
         table = Logger::Table.new([HEADER_STATUS, HEADER_DATE, HEADER_TITLE, HEADER_PATH])
         contents.each_with_index do |info, index|
@@ -290,12 +292,23 @@ module Hwaro
         nil
       end
 
+      # Cap a cell at `max_length` terminal COLUMNS. Measuring in codepoints
+      # while the table pads by display width let a 30-codepoint CJK title
+      # claim a 60-column column, undoing the alignment fix one step earlier.
       private def truncate(str : String, max_length : Int32) : String
-        if str.size > max_length
-          str[0, max_length - 3] + "..."
-        else
-          str
+        return str if Utils::TextUtils.display_width(str) <= max_length
+
+        budget = max_length - 3
+        kept = String.build do |io|
+          used = 0
+          str.each_char do |c|
+            w = Utils::TextUtils.display_width(c.to_s)
+            break if used + w > budget
+            io << c
+            used += w
+          end
         end
+        "#{kept}..."
       end
     end
   end

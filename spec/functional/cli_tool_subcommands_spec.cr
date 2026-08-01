@@ -413,26 +413,31 @@ describe "hwaro tool convert" do
     end
   end
 
-  it "exits 1 and emits a failing ConversionResult JSON for a missing content dir" do
+  it "exits HWARO_E_IO and emits a failing ConversionResult JSON for a missing content dir" do
     with_initialized_project do |project_dir|
       status, output, _ = run_hwaro(
         ["tool", "convert", "to-yaml", "-c", "does-not-exist", "--json"],
         chdir: project_dir
       )
-      status.exit_code.should eq(1)
+      # Same code as the human path below: an exit status that depends on the
+      # output format hands machine consumers a different answer for the
+      # identical failure. The payload shape is unchanged.
+      status.exit_code.should eq(Hwaro::Errors::EXIT_IO)
       parsed = JSON.parse(output.strip)
       parsed["success"].as_bool.should be_false
       parsed["message"].as_s.should contain("not found")
     end
   end
 
-  it "exits 1 for a missing content dir without --json" do
+  it "exits HWARO_E_IO for a missing content dir without --json" do
     with_initialized_project do |project_dir|
-      status, _, _ = run_hwaro(
+      status, _, err = run_hwaro(
         ["tool", "convert", "to-yaml", "-c", "does-not-exist"],
         chdir: project_dir
       )
-      status.exit_code.should eq(1)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+      err.should contain("HWARO_E_IO")
+      err.should contain("not found")
     end
   end
 end

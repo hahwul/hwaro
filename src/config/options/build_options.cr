@@ -76,6 +76,13 @@ module Hwaro
           @fast_start_count : Int32 = 20,
           @serve_mode : Bool = false,
         )
+          # Validate NOW, not lazily from `batch_size`. That was first reached
+          # in the render phase — after `setup_output_dir` had already wiped
+          # `public/` — so `hwaro build --memory-limit bogus` destroyed the
+          # previous output and THEN exited 2.
+          if limit = @memory_limit
+            parse_memory_limit(limit)
+          end
         end
 
         def streaming? : Bool

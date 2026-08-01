@@ -229,11 +229,12 @@ describe "cache: static files whose mtime moves backwards" do
         # equality test rather than a "destination is newer" test.
         File.info("public/app.js").modification_time.should eq(source_mtime)
 
-        # Mark the destination so a needless re-copy is detectable.
-        File.write("public/app.js", "SENTINEL")
+        # Mark the destination so a needless re-copy is detectable. Same LENGTH
+        # as the source: the skip requires size equality too.
+        File.write("public/app.js", "SENTINEL!")
         File.touch("public/app.js", source_mtime)
         cached_build
-        File.read("public/app.js").should eq("SENTINEL")
+        File.read("public/app.js").should eq("SENTINEL!")
       end
     end
   end

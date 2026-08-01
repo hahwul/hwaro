@@ -147,12 +147,15 @@ module Hwaro
                           else
                             (Time.instant - start).total_milliseconds.round(2)
                           end
+            # `pages_not_published` is ADDED, never a repurposing: every
+            # pre-existing key keeps its name, position and meaning.
             payload = {
               "status"              => "ok",
               "pages_generated"     => stats.try(&.pages_rendered) || 0,
               "duration_ms"         => duration_ms,
               "cache_hits"          => stats.try(&.cache_hits) || 0,
               "raw_files_processed" => stats.try(&.raw_files_processed) || 0,
+              "pages_not_published" => stats.try(&.pages_unpublished) || 0,
             }
             puts payload.to_json
           end

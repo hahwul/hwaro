@@ -33,7 +33,7 @@ module Hwaro
 
           # Introspection
           FlagInfo.new(short: nil, long: "--list-archetypes", description: "List archetypes available in the current project and exit"),
-          FlagInfo.new(short: "-j", long: "--json", description: "Emit machine-readable JSON output"),
+          JSON_FLAG,
 
           QUIET_FLAG,
           HELP_FLAG,
@@ -275,7 +275,7 @@ module Hwaro
             # typical Unix convention.
             parser.on("--bundle", "Create a leaf-bundle directory (foo/index.md)") { bundle = true }
             parser.on("--no-bundle", "Create a single file (foo.md)") { bundle = false }
-            parser.on("-j", "--json", "Emit machine-readable JSON output") { json_output = true }
+            CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
             # Introspection (acted on by #run after parsing).
             parser.on("--list-archetypes", "List archetypes available in the current project and exit") { @list_archetypes = true }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }

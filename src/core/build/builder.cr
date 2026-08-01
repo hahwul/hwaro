@@ -206,6 +206,20 @@ module Hwaro
         # rerenders all run with the flag false, i.e. the locked path.
         @crinja_caches_frozen : Bool = false
         # Mutex to protect created_dirs set during parallel rendering
+        # Pages the render loop counted but NO sink could publish (a URL with a
+        # traversing segment). Subtracted from `pages_rendered` so the build
+        # receipt cannot claim a page that never reached disk. Atomic because
+        # the render fan-out increments it from worker fibers.
+        # Memo for the listing-template source union (see Phases::Render).
+        # Keyed by the templates Hash identity so a template reload recomputes.
+        @listing_source_union_memo : String? = nil
+        @listing_source_union_memo_key : UInt64 = 0_u64
+        @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
+        # Pages that actually wrote a file. `process_files_*` returns a delta of
+        # this, so every caller (render phase, incremental rebuild, serve
+        # re-render, streaming batches) reports the same published-not-processed
+        # number instead of each keeping its own bookkeeping.
+        @published_pages : Atomic(Int32) = Atomic(Int32).new(0)
         @created_dirs_mutex : Mutex = Mutex.new
         # Explicit render-worker count from `--jobs` (0 = auto/CPU-based).
         # Set from BuildOptions at every build entry point and consumed by
@@ -1640,6 +1654,9 @@ module Hwaro
           receipt.row("render", render_val, detail: phase_detail(profiler, "Render"))
           receipt.row("write", stats.raw_files_processed > 0 ? "#{stats.raw_files_processed} raw files" : "",
             detail: phase_detail(profiler, "Write"))
+          if stats.pages_unpublished > 0
+            receipt.row("skipped", "#{stats.pages_unpublished} not published", emphasis: "see warnings above")
+          end
           receipt.outcome("built", "#{stats.pages_rendered} content pages#{raw_msg}", :result, elapsed_ms)
           receipt.emit
         end

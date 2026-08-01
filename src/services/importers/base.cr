@@ -65,6 +65,12 @@ module Hwaro
         # Recursively collect files under `dir` whose name ends with one of
         # `extensions`. `skip_dir`, when given, receives each subdirectory's
         # basename and skips recursion into it when it returns true.
+        #
+        # Entries are walked in sorted order. `Dir.each_child` yields in
+        # filesystem order, which varies by platform and by directory history
+        # — and since destination collisions are resolved in walk order, an
+        # unsorted walk made *which* file got the `-1` suffix differ between
+        # machines for the same source tree.
         protected def walk_files(dir : String, extensions : Array(String) = [".md", ".markdown"], skip_dir : Proc(String, Bool)? = nil) : Array(String)
           files = [] of String
           walk_files_into(dir, files, extensions, skip_dir)
@@ -72,7 +78,7 @@ module Hwaro
         end
 
         private def walk_files_into(dir : String, files : Array(String), extensions : Array(String), skip_dir : Proc(String, Bool)?)
-          Dir.each_child(dir) do |entry|
+          Dir.children(dir).sort!.each do |entry|
             full_path = File.join(dir, entry)
             if File.directory?(full_path)
               # A symlinked directory can close a cycle (`ln -s .. sub`), and
@@ -192,11 +198,30 @@ module Hwaro
         # while still being counted as imported.
         @claimed_paths = Set(String).new
 
+        # Last suffix handed out per colliding stem, so claiming is O(1)
+        # instead of rescanning `-1`, `-2`, … from the start for every
+        # collision (quadratic once a section has thousands of them).
+        @claim_suffixes = Hash(String, Int32).new
+
+        # Number of destinations disambiguated this run. Reported once in the
+        # summary rather than as one warning line per file — a large import
+        # with many collisions otherwise buries every other diagnostic.
+        @collision_count = 0
+
         # Reset per-run state. Importers call this at the top of `run` so a
         # reused importer instance doesn't disambiguate against a previous
         # run's destinations.
         protected def reset_written_paths : Nil
           @claimed_paths.clear
+          @claim_suffixes.clear
+          @collision_count = 0
+        end
+
+        # Emit the single end-of-run collision summary, if any. Importers call
+        # this from `run` alongside their other summary warnings.
+        protected def report_collisions : Nil
+          return if @collision_count == 0
+          Logger.warn "#{@collision_count} destination(s) renamed because an earlier source in this run claimed the same filename (re-run with --verbose to see each one)."
         end
 
         # Resolve the on-disk destination for a section/slug pair, or nil when
@@ -231,22 +256,30 @@ module Hwaro
         end
 
         # Claim `path` for this run, appending `-1`, `-2`, … when an earlier
-        # file already took it. Importers that disambiguate their own slugs
+        # source already took it. Importers that disambiguate their own slugs
         # (Jekyll's date re-attachment, Notion, Eleventy) hand over paths that
         # are already unique, so this never fires for them — it's the backstop
         # for the importers that don't.
+        #
+        # Claims are resolved in walk order, which `walk_files` sorts so a run
+        # is reproducible. Note the suffix namespace is shared with real
+        # slugs: sources `x`, `x`, `x-1` yield `x`, `x-1`, `x-1-1`, so the
+        # genuine `x-1` is the one that moves. Nothing is lost or overwritten
+        # either way, and resolving it properly would mean computing every
+        # destination before writing any — a two-pass restructure of all eight
+        # importers for a cosmetic difference.
         private def claim_path(path : String) : String
           return path if @claimed_paths.add?(path)
 
           ext = File.extname(path)
           stem = path.chomp(ext)
-          n = 1
-          until @claimed_paths.add?("#{stem}-#{n}#{ext}")
+          n = @claim_suffixes[stem]? || 0
+          loop do
             n += 1
+            break if @claimed_paths.add?("#{stem}-#{n}#{ext}")
           end
-          unique = "#{stem}-#{n}#{ext}"
-          Logger.warn "Destination collision: #{path} already written this run; writing #{File.basename(unique)} instead."
-          unique
+          @claim_suffixes[stem] = n
+          "#{stem}-#{n}#{ext}"
         end
 
         # Write a content file. Skips if it already exists unless `force`
@@ -268,25 +301,59 @@ module Hwaro
           verbose : Bool = false,
           force : Bool = false,
         ) : Bool
+          write_content_file_to(output_dir, section, slug, frontmatter, body, verbose, force)[0]
+        end
+
+        # Same as `write_content_file`, but also reports the destination it
+        # settled on — including when the write was skipped. Callers that
+        # manage sibling files (page-bundle assets) need the directory that
+        # was actually chosen, which `claim_path` and the slug sanitisers can
+        # move away from the naive `output_dir/section` guess.
+        protected def write_content_file_to(
+          output_dir : String,
+          section : String,
+          slug : String,
+          frontmatter : String,
+          body : String,
+          verbose : Bool = false,
+          force : Bool = false,
+        ) : {Bool, String?}
           resolved = resolve_content_path(output_dir, section, slug, verbose)
-          return false unless resolved
+          return {false, nil} unless resolved
 
           path = claim_path(resolved)
           dir = File.dirname(path)
 
           Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
 
+          # `within_output_dir?` above is lexical. If the section directory
+          # (or any ancestor) is a symlink pointing out of the tree, that
+          # check still passes and `File.write` follows the link straight out
+          # of `output_dir`. Re-check with symlinks resolved now that the
+          # directory exists.
+          unless Utils::PathUtils.resolves_within?(dir, output_dir)
+            Logger.warn "Skipped (destination directory resolves outside the output directory): #{dir}"
+            return {false, nil}
+          end
+
           if File.exists?(path) && !force
             Logger.warn "Skipped (already exists): #{path}" if verbose
-            return false
+            return {false, path}
           end
 
           content = "#{frontmatter}\n\n#{body}\n"
           File.write(path, content)
-          if verbose
-            Logger.debug(force ? "Overwrote: #{path}" : "Imported: #{path}")
+
+          # Only now is the rename real. Counting/announcing it at claim time
+          # asserted a write that never happened when the disambiguated
+          # destination also already existed on disk.
+          if path != resolved
+            @collision_count += 1
+            Logger.debug "Renamed: #{File.basename(resolved)} → #{File.basename(path)} (claimed by an earlier source in this run)" if verbose
           end
-          true
+
+          Logger.debug(force ? "Overwrote: #{path}" : "Imported: #{path}") if verbose
+          {true, path}
         end
 
         # Copy a page bundle's co-located assets — every non-Markdown sibling
@@ -305,14 +372,24 @@ module Hwaro
         ) : Int32
           return 0 unless Dir.exists?(source_dir)
           return 0 unless Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
+          # `within_output_dir?` is lexical. If the destination directory —
+          # or any ancestor — is a symlink out of the tree, `Dir.exists?`
+          # follows it and `File.copy` would write straight through it.
+          return 0 unless Utils::PathUtils.resolves_within?(dest_dir, output_dir)
 
           copied = 0
-          Dir.each_child(source_dir) do |entry|
+          Dir.children(source_dir).sort!.each do |entry|
             src = File.join(source_dir, entry)
             next if File.directory?(src) || File.symlink?(src)
             next if entry.ends_with?(".md") || entry.ends_with?(".markdown")
 
-            dest = File.join(dest_dir, safe_filename_component(entry))
+            # `entry` is a single directory component — it can never contain
+            # `/`, `.` or `..`, so the guard below is the real protection.
+            # Running it through `safe_filename_component` only split on `\`,
+            # renaming a legitimate `C:\photo.png` to `photo.png` and leaving
+            # the `![](C:\photo.png)` reference this copy exists to repair
+            # still broken. The exporter twin does the same.
+            dest = File.join(dest_dir, entry)
             next unless Utils::OutputGuard.within_output_dir?(dest, output_dir)
             next if File.exists?(dest) && !force
 

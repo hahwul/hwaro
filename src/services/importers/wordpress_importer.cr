@@ -61,6 +61,8 @@ module Hwaro
             Logger.warn "Error processing item: #{ex.message}"
           end
 
+          report_collisions
+
           ImportResult.new(
             success: imported > 0 || errors == 0,
             message: "Imported #{imported} items, skipped #{skipped}, errors #{errors}",

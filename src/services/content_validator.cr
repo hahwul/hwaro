@@ -217,7 +217,7 @@ module Hwaro
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))
         unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
           issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
-            message: "Date format may be invalid: \"#{Utils::TextUtils.strip_control(date_str)}\"")
+            message: "Date format may be invalid: \"#{date_str}\"")
           return
         end
 
@@ -249,7 +249,7 @@ module Hwaro
 
         unless parsed
           issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
-            message: "Date format may be invalid: \"#{Utils::TextUtils.strip_control(date_str)}\"")
+            message: "Date format may be invalid: \"#{date_str}\"")
         end
       end
 
@@ -258,7 +258,7 @@ module Hwaro
         mixed = tags.select { |tag| tag != tag.downcase && tag != tag.upcase }
         mixed.each do |tag|
           issues << Issue.new(id: "content-tag-mixed-case", level: :info, category: "content", file: file_path,
-            message: "Tag has mixed case: \"#{Utils::TextUtils.strip_control(tag)}\" (consider lowercase)")
+            message: "Tag has mixed case: \"#{tag}\" (consider lowercase)")
         end
       end
 
@@ -267,7 +267,7 @@ module Hwaro
         body = strip_code_blocks(extract_body(content))
         body.scan(/!\[\s*\]\([^\)]+\)/) do |match|
           issues << Issue.new(id: "content-alt-text-missing", level: :warning, category: "content", file: file_path,
-            message: "Image missing alt text: #{Utils::TextUtils.strip_control(match[0])}")
+            message: "Image missing alt text: #{match[0]}")
         end
       end
 
@@ -290,7 +290,7 @@ module Hwaro
 
           unless exists
             issues << Issue.new(id: "content-internal-link-broken", level: :warning, category: "content", file: file_path,
-              message: "Possible broken internal link: #{Utils::TextUtils.strip_control(raw_url)}")
+              message: "Possible broken internal link: #{raw_url}")
           end
         end
       end

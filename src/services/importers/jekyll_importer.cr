@@ -60,6 +60,8 @@ module Hwaro
             Logger.warn "#{wrapped} file(s) contained unconverted Liquid constructs. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
 
+          report_collisions
+
           ImportResult.new(
             success: imported > 0 || errors == 0,
             message: "Jekyll import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",

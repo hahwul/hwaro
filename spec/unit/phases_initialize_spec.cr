@@ -151,9 +151,12 @@ describe Hwaro::Core::Build::Phases::Initialize do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           FileUtils.mkdir_p("static")
-          File.write("static/a.txt", "src")
+          File.write("static/a.txt", "src!")
 
           FileUtils.mkdir_p("public")
+          # Same LENGTH as the source: the incremental skip now requires size
+          # equality as well as a matching mtime, so a differently-sized
+          # sentinel would legitimately be re-copied.
           File.write("public/a.txt", "dest")
           # A copy carries the SOURCE's mtime, so matching mtimes is what marks
           # the destination as already up to date. (A merely *newer* mtime is

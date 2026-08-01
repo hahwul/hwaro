@@ -129,7 +129,7 @@ hwaro build --cache
 hwaro build --cache --full
 
 # 다른 플래그와 조합
-hwaro build --cache --minify --parallel
+hwaro build --cache --minify
 ```
 
 ## 함께 보기

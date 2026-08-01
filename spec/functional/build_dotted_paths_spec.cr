@@ -158,6 +158,89 @@ describe "build: content paths that really would traverse" do
   end
 end
 
+describe "build: redirect_to pages take a second sink" do
+  # `render_page` short-circuits on `page.has_redirect?` and returns BEFORE
+  # `write_output`, so the refusal warning on the main sink never fired for a
+  # redirect page. Its stub was written to whatever `sanitize_path` collapsed
+  # the URL to: `/../` became `<output>/index.html`, so on a site with no
+  # `content/index.md` of its own the redirect stub BECAME the homepage.
+  it "refuses a redirect page whose slug traverses, loudly" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        File.write("content/zzslug.md",
+          "+++\ntitle = \"DotSlug\"\nslug = \"..\"\nredirect_to = \"/elsewhere/\"\n+++\n\nbody\n")
+
+        log = with_captured_log { dots_build }
+
+        log.should contain("Not publishing zzslug.md")
+        # The homepage keeps its own content, and no redirect stub is anywhere.
+        File.read("public/index.html").should contain("Homepage body")
+        Dir.glob("public/**/*.html").each do |path|
+          File.read(path).should_not contain("elsewhere")
+        end
+      end
+    end
+  end
+
+  it "does not turn the output root into the redirect stub when there is no homepage" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        File.delete("content/index.md")
+        File.write("content/zzslug.md",
+          "+++\ntitle = \"DotSlug\"\nslug = \"..\"\nredirect_to = \"/elsewhere/\"\n+++\n\nbody\n")
+
+        log = with_captured_log { dots_build }
+
+        log.should contain("Not publishing zzslug.md")
+        # Before the fix this file existed and was the redirect stub.
+        File.exists?("public/index.html").should be_false
+      end
+    end
+  end
+
+  it "still publishes a redirect page whose URL is fine" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        File.write("content/moved.md", "+++\ntitle = \"Moved\"\nredirect_to = \"/elsewhere/\"\n+++\n\n")
+
+        dots_build.should be_true
+
+        File.exists?("public/moved/index.html").should be_true
+        File.read("public/moved/index.html").should contain("/elsewhere/")
+      end
+    end
+  end
+end
+
+describe "build: the reported page count" do
+  it "does not count a page no sink could publish" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, highlight: false))
+        baseline = builder.context.not_nil!.stats.pages_rendered
+
+        File.write("content/zzslug.md",
+          "+++\ntitle = \"DotSlug\"\nslug = \"..\"\nredirect_to = \"/elsewhere/\"\n+++\n\nbody\n")
+
+        builder2 = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, highlight: false))
+
+        # The unpublishable page must not inflate the count.
+        builder2.context.not_nil!.stats.pages_rendered.should eq(baseline)
+      end
+    end
+  end
+end
+
 describe "build: dotted names outside content/" do
   it "publishes static files in and with dotted names" do
     Dir.mktmpdir do |dir|
@@ -185,6 +268,101 @@ describe "build: dotted names outside content/" do
         dots_build.should be_true
 
         File.read("public/raw..file.txt").should eq("CONTENT-RAW-DOTTED")
+      end
+    end
+  end
+end
+
+describe "build: alias targets that name the same file" do
+  # `/foo/`, `/foo/index.html` and `/foo/index.htm` are one file on disk, so
+  # they must share a collision key. `aliases = ["/index.html"]` kept its own
+  # key, never collided with the homepage's `/`, and wrote its redirect stub
+  # straight over `public/index.html`.
+  it "does not let /index.html alias overwrite the homepage" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        File.write("content/al.md", "+++\ntitle = \"Aliaser\"\naliases = [\"/index.html\"]\n+++\n\naliaser body\n")
+
+        dots_build.should be_true
+
+        home = File.read("public/index.html")
+        home.should contain("Homepage body")
+        home.should_not contain("http-equiv")
+      end
+    end
+  end
+
+  it "still writes a non-colliding .html alias" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        File.write("content/al.md", "+++\ntitle = \"Aliaser\"\naliases = [\"/legacy.html\"]\n+++\n\naliaser body\n")
+
+        dots_build.should be_true
+
+        File.read("public/legacy.html").should contain("http-equiv")
+        File.read("public/index.html").should contain("Homepage body")
+      end
+    end
+  end
+end
+
+describe "build: the receipt and JSON contracts" do
+  it "reports published pages and summarises skipped ones" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        File.write("content/ok.md", "---\ntitle: Ok\n---\nok body")
+        File.write("content/zz.md",
+          "+++\ntitle = \"DotSlug\"\nslug = \"..\"\nredirect_to = \"/elsewhere/\"\n+++\n\nbody\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, highlight: false))
+
+        stats = builder.context.not_nil!.stats
+        # index.md + ok.md wrote files; zz.md did not.
+        stats.pages_rendered.should eq(2)
+        stats.pages_unpublished.should eq(1)
+      end
+    end
+  end
+
+  it "reports nothing skipped on a healthy site" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        File.write("content/ok.md", "---\ntitle: Ok\n---\nok body")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, highlight: false))
+
+        stats = builder.context.not_nil!.stats
+        stats.pages_rendered.should eq(2)
+        stats.pages_unpublished.should eq(0)
+      end
+    end
+  end
+end
+
+describe "build: output directory is checked on the incremental path too" do
+  it "refuses -o content under --cache" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        dots_project
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        expect_raises(Hwaro::HwaroError) do
+          builder.run(Hwaro::Config::Options::BuildOptions.new(
+            output_dir: "content", parallel: false, highlight: false, cache: true))
+        end
+        # Sources untouched: no generated files scattered through content/.
+        Dir.glob("content/**/*.html").should be_empty
+        File.exists?("content/index.md").should be_true
       end
     end
   end

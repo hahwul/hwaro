@@ -24,31 +24,62 @@ module Hwaro
       # doesn't exist on disk — no separate rule needed.
       ENCODED_SEPARATOR = /%(?:2f|5c)/i
 
-      # A segment made of nothing but dots. `..` is the parent link; `...` and
-      # `....` are included because Windows strips trailing dots from a path
-      # component, which can collapse them onto a shorter one.
+      # Percent-encoded NUL. Deleting it (what the shared `sanitize_path` does)
+      # made `/index%00.html` serve the real homepage with a 200, while the
+      # StaticFileHandler sitting in the same chain answers a decoded NUL with
+      # 400 — an inconsistency inside one server. Fail closed instead.
+      ENCODED_NULL = /%00/i
+
+      # A segment that is nothing but dots and spaces. `..` is the parent link;
+      # `...`, `".. "` and `". "` are included because Windows strips BOTH
+      # trailing dots and trailing spaces from a path component, which can
+      # collapse them onto one that traverses. Same predicate the shared
+      # `PathUtils.sanitize_path` uses, so the two cannot drift.
       #
-      # Deliberately NOT "contains `..`": after a single decode only an
-      # all-dots segment can traverse, while `lib.v1..2.js` or a slug like
-      # `a..b` are ordinary filenames that a static host serves. Rejecting
-      # those would reintroduce — in the opposite direction — the dev/prod
-      # divergence this resolver exists to remove.
-      DOTS_ONLY = /\A\.+\z/
+      # Deliberately NOT "contains `..`": after a single decode only such a
+      # segment can traverse, while `lib.v1..2.js` or a slug like `a..b` are
+      # ordinary filenames that a static host serves. Rejecting those would
+      # reintroduce — in the opposite direction — the dev/prod divergence this
+      # resolver exists to remove.
+      def dots_only?(segment : String) : Bool
+        segment.rstrip(". ").empty?
+      end
 
       # Resolve a request path to a path relative to the output root, or nil
       # when the request must not be served from disk at all. An empty string
       # means "the output root itself" (e.g. `/`), which callers handle
       # separately from nil.
-      def safe_relative(path : String) : String?
-        return if path.includes?('\\')
-        return if ENCODED_SEPARATOR.matches?(path)
+      # True for request shapes no static host serves: a backslash separator,
+      # an encoded `/` or `\`, or a NUL in any form. Declining them in our own
+      # handlers is not enough — `HTTP::StaticFileHandler` decodes once too and
+      # would happily resolve `/%2Fguide%2Findex.html` to the real page — so
+      # `UnservablePathHandler` turns this predicate into an actual 404 before
+      # the request can reach it.
+      def unservable?(path : String) : Bool
+        # MUST come first: the regexes below run PCRE2 over the raw request
+        # bytes, and invalid UTF-8 makes that raise `ArgumentError` straight
+        # out of the handler — a 500 for a request a static host answers with
+        # a 404. Invalid bytes are unservable by definition.
+        return true unless path.valid_encoding?
 
-        # NUL bytes never reach the filesystem.
-        decoded = URI.decode(path).delete(Char::ZERO)
+        path.includes?('\\') ||
+          path.includes?(Char::ZERO) ||
+          ENCODED_SEPARATOR.matches?(path) ||
+          ENCODED_NULL.matches?(path)
+      end
+
+      def safe_relative(path : String) : String?
+        return if unservable?(path)
+
+        decoded = URI.decode(path)
+        # Percent-encoded invalid UTF-8 (`%c0%ae`, `%ff`) only becomes invalid
+        # after decoding, and every operation below would raise on it.
+        return unless decoded.valid_encoding?
+
         segments = decoded.split('/').reject { |segment| segment.empty? || segment == "." }
-        # Refuse any all-dots segment so nothing walks out of the output
-        # directory (see DOTS_ONLY).
-        return if segments.any? { |segment| DOTS_ONLY.matches?(segment) }
+        # Refuse any dots-and-spaces segment so nothing walks out of the
+        # output directory (see dots_only?).
+        return if segments.any? { |segment| dots_only?(segment) }
 
         segments.join("/")
       end

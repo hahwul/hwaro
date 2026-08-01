@@ -108,6 +108,27 @@ describe "hwaro init classified usage errors" do
         .find! { |f| f.long == "--json" }
         .short.should eq("-j")
     end
+
+    it "reuses the shared JSON_FLAG rather than a hand-rolled copy" do
+      Hwaro::CLI::Commands::InitCommand::FLAGS.should contain(Hwaro::CLI::JSON_FLAG)
+    end
+
+    # The metadata assertion above only proves the flag is *declared*.
+    # Deleting the `parser.on` registration would leave `--help` advertising
+    # a flag that then errors as an invalid option, with the declaration
+    # assertion still green — so exercise the parser itself.
+    it "actually parses -j and --json (not just declares them)" do
+      %w[-j --json].each do |flag|
+        Hwaro::CLI::Commands::InitCommand.new.parse_options([flag])
+      end
+    end
+
+    # …and that parsing it actually flips the output mode: the human list is
+    # suppressed under --json (the payload goes to STDOUT instead).
+    it "suppresses the human scaffold list under --json" do
+      plain = with_captured_log { Hwaro::CLI::Commands::InitCommand.new.run(["--list-scaffolds"]) }
+      plain.should contain("Available scaffolds:")
+    end
   end
 
   describe "Initializer target directory" do
@@ -126,6 +147,35 @@ describe "hwaro init classified usage errors" do
         err.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
         (err.message || "").should contain("is not empty")
         (err.hint || "").should contain("--force")
+      end
+    end
+
+    # Only the first `mkdir_p` used to be classified, so a write that failed
+    # part-way through the scaffold (disk full, read-only mount, a directory
+    # made unwritable mid-run) still produced a bare `Error:` and exit 1 —
+    # the exact inconsistency the classification was meant to close.
+    it "raises HwaroError(HWARO_E_IO) when a write fails after the target dir exists" do
+      Dir.mktmpdir do |dir|
+        target = File.join(dir, "site")
+        # The target directory exists and is empty, so init gets past both the
+        # mkdir_p and the not-empty guard — then cannot write into it.
+        FileUtils.mkdir_p(target)
+        File.chmod(target, 0o555)
+
+        begin
+          err = expect_raises(Hwaro::HwaroError) do
+            with_captured_log do
+              Hwaro::Services::Initializer.new.run(
+                Hwaro::Config::Options::InitOptions.new(path: target)
+              )
+            end
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          err.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+          (err.message || "").should contain("Failed to scaffold")
+        ensure
+          File.chmod(target, 0o755)
+        end
       end
     end
 
@@ -164,6 +214,31 @@ describe "hwaro init classified usage errors" do
         File.exists?(File.join(dir, "config.toml")).should be_true
         # The pre-existing metadata is left untouched.
         File.exists?(File.join(dir, ".gitignore")).should be_true
+      end
+    end
+
+    # The ignorable set is the shared publish-denylist, not a second
+    # hand-maintained list — a shorter local copy accepted `.gitkeep` alone
+    # but refused a submodule-only checkout holding just `.gitmodules`.
+    it "ignores the same names the build refuses to publish" do
+      Hwaro::Models::StaticConfig::DEFAULT_EXCLUDE_NAMES.should contain(".git")
+      Hwaro::Models::StaticConfig::DEFAULT_EXCLUDE_NAMES.should contain(".gitmodules")
+      Hwaro::Models::StaticConfig::DEFAULT_EXCLUDE_NAMES.should contain("Thumbs.db")
+
+      %w[.gitmodules .bzr Thumbs.db desktop.ini __MACOSX .directory].each do |entry|
+        Dir.mktmpdir do |dir|
+          File.write(File.join(dir, entry), "")
+
+          with_captured_log do
+            Hwaro::Services::Initializer.new.run(
+              Hwaro::Config::Options::InitOptions.new(path: dir)
+            )
+          end
+
+          File.exists?(File.join(dir, "config.toml")).should be_true
+          # The ignored entry is left exactly as it was.
+          File.exists?(File.join(dir, entry)).should be_true
+        end
       end
     end
 

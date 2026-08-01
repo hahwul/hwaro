@@ -6,6 +6,7 @@ require "../../utils/file_safe"
 require "../../utils/frontmatter_writer"
 require "../../utils/logger"
 require "../../utils/output_guard"
+require "../../utils/path_utils"
 require "../../utils/text_utils"
 
 module Hwaro
@@ -63,9 +64,13 @@ module Hwaro
         protected def copy_bundle_assets(source_dir : String, dest_dir : String, output_dir : String, verbose : Bool = false) : Int32
           return 0 unless Dir.exists?(source_dir)
           return 0 unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
+          # `within_output_dir?` is lexical. If the destination directory —
+          # or any ancestor — is a symlink out of the tree, `Dir.exists?`
+          # follows it and `File.copy` would write straight through it.
+          return 0 unless Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
 
           copied = 0
-          Dir.each_child(source_dir) do |entry|
+          Dir.children(source_dir).sort!.each do |entry|
             src = File.join(source_dir, entry)
             next if File.directory?(src) || File.symlink?(src)
             next if entry.ends_with?(".md") || entry.ends_with?(".markdown")

@@ -67,6 +67,8 @@ module Hwaro
             Logger.warn "#{wrapped} file(s) contained Nunjucks/Liquid template tags. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
 
+          report_collisions
+
           ImportResult.new(
             success: imported > 0 || errors == 0,
             message: "Eleventy import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",
@@ -183,12 +185,15 @@ module Hwaro
           # titled homepage (the normal case) fell through and was buried at
           # `content/posts/index.md`, leaving the site with no home page.
           #
-          #   - site root `index.md`   → hwaro's homepage, `content/index.md`
-          #   - collection `blog/index.md` → a section landing page, which
-          #     hwaro generates itself; skip it.
+          #   - site root `index.md`       → hwaro's homepage, `content/index.md`
+          #   - collection `blog/index.md` → the section landing page, which
+          #     is hwaro's `content/blog/_index.md`
+          #
+          # Neither is discarded: a landing page carries author-written copy
+          # (intro prose, a description) that has a real destination here, and
+          # dropping it lost content outright.
           is_site_root_index = basename == "index" && relative_dir.empty?
           is_collection_index = basename == "index" && !relative_dir.empty? && !relative_dir.includes?('/')
-          return :skipped if is_collection_index
 
           merged_yaml = merge_directory_data(dir_data, relative_dir, frontmatter_yaml)
 
@@ -295,7 +300,12 @@ module Hwaro
           # root, not under the default `posts` section.
           section = is_site_root_index ? "" : top_section_from_path(file_path, base_path, "posts")
 
-          slug = if basename == "index" && !is_site_root_index
+          slug = if is_collection_index
+                   # `blog/index.md` → `content/blog/_index.md`, hwaro's own
+                   # section landing page. `_index` is not slugified: it is a
+                   # structural filename, not a title.
+                   "_index"
+                 elsif basename == "index" && !is_site_root_index
                    slugify(File.basename(File.dirname(file_path)))
                  else
                    slugify(basename)

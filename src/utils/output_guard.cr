@@ -29,8 +29,13 @@ module Hwaro
       def within_output_dir?(output_path : String, output_dir : String) : Bool
         canonical_output = canonical(output_path)
         canonical_output_dir = canonical(output_dir)
-        canonical_output == canonical_output_dir ||
-          canonical_output.starts_with?(canonical_output_dir + File::SEPARATOR)
+        return true if canonical_output == canonical_output_dir
+        # Build the prefix from the canonical dir rather than always appending
+        # a separator: at the filesystem root `canonical` legitimately returns
+        # "/", and "/" + "/" would reintroduce the double-separator mismatch
+        # this method exists to avoid.
+        prefix = canonical_output_dir.ends_with?(File::SEPARATOR) ? canonical_output_dir : canonical_output_dir + File::SEPARATOR
+        canonical_output.starts_with?(prefix)
       end
 
       # Absolute, comparison-ready form of `path`.

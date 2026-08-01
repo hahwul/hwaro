@@ -82,9 +82,14 @@ describe Hwaro::Utils::PathUtils do
         "..\\x", "..%2f..%5cx", ". /x", ".. /x", "a/../../b",
       ].each do |input|
         result = sanitized(input)
-        result.split('/').should_not contain("..")
-        result.split('/').should_not contain(".")
         result.should_not start_with("/")
+        next if result.empty? # everything was neutralized away — the safest outcome
+        # Every surviving segment must be a real name, not a dots/spaces run
+        # that Win32 would trim back into `.` or `..`.
+        result.split('/').each do |segment|
+          segment.should_not be_empty
+          segment.rstrip(". ").should_not be_empty
+        end
       end
     end
   end
@@ -100,6 +105,15 @@ describe Hwaro::Utils::PathUtils do
       sanitized("..foo").should eq("..foo")
       sanitized("foo..").should eq("foo..")
       sanitized(".hidden").should eq(".hidden")
+    end
+
+    # Newly KEPT relative to the pre-2026-08 rule. Win32 trims trailing ASCII
+    # space and `.` only, so a tab / NBSP suffix leaves a distinct filename
+    # that cannot name the parent on any supported platform.
+    it "keeps dot runs suffixed with non-trimmed whitespace" do
+      sanitized("..\t").should eq("..\t")
+      sanitized("..\u00a0").should eq("..\u00a0")
+      sanitized("foo/..\t/bar").should eq("foo/..\t/bar")
     end
 
     it "keeps versioned and ranged directory names" do

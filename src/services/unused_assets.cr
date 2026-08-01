@@ -182,11 +182,7 @@ module Hwaro
 
         String.build do |sb|
           scan_files.each do |file|
-            text = begin
-              File.read(file)
-            rescue IO::Error
-              next
-            end
+            text = readable_scan_source(file) || next
             sb << text << '\n'
           end
 
@@ -198,6 +194,26 @@ module Hwaro
             end
           end
         end
+      end
+
+      # Read one reference source, or nil when it cannot be scanned.
+      #
+      # A file containing invalid UTF-8 makes every later PCRE2 operation on
+      # the concatenated corpus raise `ArgumentError`, which aborted the whole
+      # command with a bare "Error: Regex match error" and zero results. That
+      # got materially more likely once the scan widened to `.json`/`.xml`/
+      # `.svg`/`.txt`, which are often machine-generated. Skip the file with a
+      # warning instead — the same degradation `check-links` performs.
+      private def readable_scan_source(file : String) : String?
+        text = File.read(file)
+        # Force the decode failure here, where it can be attributed to a file,
+        # rather than later inside a regex over the whole corpus.
+        return text if text.valid_encoding?
+        Logger.warn "Skipping #{file}: not valid UTF-8"
+        nil
+      rescue ex : IO::Error | ArgumentError
+        Logger.warn "Skipping #{file}: #{ex.message}"
+        nil
       end
 
       # Extract referenced asset filenames from content and template files.

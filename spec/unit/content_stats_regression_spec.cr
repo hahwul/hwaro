@@ -103,7 +103,11 @@ describe "content analysis regressions" do
       Hwaro::Utils::TextUtils.strip_control("한글 제목").should eq("한글 제목")
     end
 
-    it "does not leak escapes through validator messages" do
+    it "keeps the author's bytes in the Issue model, and strips only on render" do
+      # Corrected after review: sanitising in the model corrupted
+      # `tool validate --json`, so a consumer could no longer locate the tag it
+      # was being told about. The model keeps the bytes; the human renderer
+      # strips them.
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(content_dir)
@@ -111,7 +115,12 @@ describe "content analysis regressions" do
           "+++\ntitle = \"A\"\ndescription = \"d\"\ntags = [\"\e[31mEvil\e[0m\"]\n+++\n![](\e[31m/x.png\e[0m)\n")
 
         messages = Hwaro::Services::ContentValidator.new(content_dir).run.map(&.message)
-        messages.each(&.should_not(contain("\e")))
+        messages.any?(&.includes?("\e")).should be_true
+
+        output = with_captured_log do
+          Hwaro::CLI::Commands::Tool::ValidateCommand.new.run(["-c", content_dir])
+        end
+        output.should_not contain("\e[31m")
       end
     end
 

@@ -58,6 +58,53 @@ describe "exporter regressions" do
         File.exists?(File.join(output_dir, "content", "posts", "bundle", "cover.png")).should be_true
       end
     end
+
+    # Review finding 7: `within_output_dir?` is lexical, so a symlinked
+    # destination directory pointed the copy straight out of the tree.
+    it "refuses to copy through a symlinked destination directory" do
+      Dir.mktmpdir do |dir|
+        bundle_dir = File.join(dir, "content", "posts", "bundle")
+        FileUtils.mkdir_p(bundle_dir)
+        File.write(File.join(bundle_dir, "index.md"), "+++\ntitle = \"Bundle\"\n+++\n\n![cover](cover.png)\n")
+        File.write(File.join(bundle_dir, "cover.png"), "notapng")
+
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(outside)
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(output_dir, "content", "posts"))
+        File.symlink(outside, File.join(output_dir, "content", "posts", "bundle"))
+
+        Hwaro::Services::Exporters::HugoExporter.new.run(
+          Hwaro::Config::Options::ExportOptions.new(
+            target_type: "hugo",
+            content_dir: File.join(dir, "content"),
+            output_dir: output_dir,
+          ))
+
+        Dir.glob(File.join(outside, "*.png")).should be_empty
+      end
+    end
+
+    # Review finding 5: the exporter must agree with the importer twin —
+    # names from `Dir.each_child` are single components, so no sanitising.
+    it "preserves a backslash in a legitimate asset filename" do
+      Dir.mktmpdir do |dir|
+        bundle_dir = File.join(dir, "content", "posts", "bundle")
+        FileUtils.mkdir_p(bundle_dir)
+        File.write(File.join(bundle_dir, "index.md"), "+++\ntitle = \"Bundle\"\n+++\n\n![c](C:\\\\photo.png)\n")
+        File.write(File.join(bundle_dir, "C:\\photo.png"), "notapng")
+
+        output_dir = File.join(dir, "export")
+        Hwaro::Services::Exporters::HugoExporter.new.run(
+          Hwaro::Config::Options::ExportOptions.new(
+            target_type: "hugo",
+            content_dir: File.join(dir, "content"),
+            output_dir: output_dir,
+          ))
+
+        File.exists?(File.join(output_dir, "content", "posts", "bundle", "C:\\photo.png")).should be_true
+      end
+    end
   end
 
   # (9) Hwaro's `template` is Jekyll's `layout` — the exact inverse of the

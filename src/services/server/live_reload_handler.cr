@@ -1,6 +1,5 @@
 require "http/server"
 require "http/web_socket"
-require "../../utils/path_utils"
 require "./dev_path"
 
 module Hwaro

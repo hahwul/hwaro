@@ -697,13 +697,32 @@ module Hwaro
         end
       end
 
-      # A required template is present when some file in `templates/` maps to
-      # its loader name — `page.html` itself, or `page.html.jinja`.
+      # A required template is present when some file in `templates/` loads
+      # under its NAME, exactly as `Phases::Initialize` computes it:
+      #
+      #   name = Path[path].relative_to("templates").gsub(TEMPLATE_EXTENSION_REGEX, "")
+      #
+      # Two consequences the previous version got wrong, both verified against
+      # the build with a marker in the template body:
+      #
+      #   * `page.jinja` / `page.j2` load as "page" and ARE applied; only
+      #     comparing against the required name with its extension still
+      #     attached (`"page.html"`) rejected them. `page.html.jinja` loads as
+      #     "page.html", is NOT applied (the build silently falls back to the
+      #     built-in default), and must therefore NOT satisfy the requirement.
+      #   * The name is the path RELATIVE to `templates/`, so
+      #     `partials/page.html` loads as "partials/page" and cannot satisfy a
+      #     root requirement. Matching on `File.basename` hid a build-blocking
+      #     error for a project whose only templates live in a subdirectory.
       private def template_present?(required : String) : Bool
-        return true if File.exists?(File.join(@templates_dir, required))
-        template_files.any? do |path|
-          File.basename(path).sub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, "") == required
-        end
+        wanted = required.gsub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, "")
+        template_files.any? { |path| template_name(path) == wanted }
+      end
+
+      # The loader key for a template file: path relative to `@templates_dir`,
+      # minus one trailing template extension.
+      private def template_name(path : String) : String
+        Path[path].relative_to(@templates_dir).to_s.gsub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, "")
       end
 
       # Template syntax check, delegated to the actual Crinja parser used

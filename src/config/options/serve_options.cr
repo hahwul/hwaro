@@ -68,7 +68,10 @@ module Hwaro
         def self.url_host(host : String) : String
           return host unless host.includes?(':')
           return host if host.starts_with?('[')
-          "[#{host}]"
+          # RFC 6874: a zone id's "%" separator must be percent-encoded inside
+          # a URI, so `fe80::1%en0` becomes `[fe80::1%25en0]`. The lookahead
+          # leaves an already-encoded host alone.
+          "[#{host.sub(/%(?!25)/, "%25")}]"
         end
 
         # Convert to BuildOptions for initial build

@@ -243,6 +243,19 @@ module Hwaro
           Logger.info "Run `hwaro build` to generate the site, then `hwaro serve` to preview."
           Logger.info "Set `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
         end
+      rescue ex : File::Error
+        # Every write after the target directory itself — content/, templates/,
+        # static/, archetypes/, config.toml, AGENTS.md — can fail the same way
+        # (disk full, read-only mount, a directory made unwritable mid-run).
+        # Classifying only the first `mkdir_p` left those on the unclassified
+        # `Error:` / exit 1 path, which is the exact inconsistency this was
+        # meant to close. `HwaroError` is not a `File::Error`, so the usage
+        # errors raised above pass through untouched.
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Failed to scaffold '#{target_path}': #{ex.os_error.try(&.message) || ex.message}",
+          hint: "Check free space and that every path under the target directory is writable, then re-run (existing files are kept).",
+        )
       end
 
       # Emit the collected scaffold writes. Plain output replays the exact
@@ -409,16 +422,24 @@ module Hwaro
       # itself. Refuses to touch a target that contains `.git/` so a
       # typo'd path or an accidental `--clean .` in a real repo can't
       # wipe the user's work.
-      # Entries that make a target directory count as "not empty". VCS and
-      # OS metadata are ignored: `git init && hwaro init .` is the canonical
-      # first-site workflow, and a stray `.DS_Store` (created by merely
-      # opening a folder in Finder) should not force `--force` on a
+      # Entries that do NOT make a target directory count as "not empty". VCS
+      # and OS metadata are ignored: `git init && hwaro init .` is the
+      # canonical first-site workflow, and a stray `.DS_Store` (created by
+      # merely opening a folder in Finder) should not force `--force` on a
       # directory that is otherwise pristine.
-      IGNORABLE_ENTRIES = %w[.git .gitignore .gitattributes .gitkeep .DS_Store .hg .svn]
-
+      #
+      # Deliberately the same set the build already refuses to publish, rather
+      # than a second hand-maintained list: a shorter local copy meant a
+      # submodule-only checkout holding just `.gitmodules` was refused while
+      # `.gitkeep` alone was accepted, with no rationale for the difference,
+      # and the two lists would have drifted. Broadening it is safe because
+      # `create_file`/`create_directory` never overwrite — an ignored entry is
+      # left untouched and the scaffold is written alongside it.
       private def occupied_entries(target_path : String) : Array(String)
         return [] of String unless Dir.exists?(target_path)
-        Dir.children(target_path).reject { |entry| IGNORABLE_ENTRIES.includes?(entry) }
+        Dir.children(target_path).reject do |entry|
+          Models::StaticConfig::DEFAULT_EXCLUDE_NAMES.includes?(entry)
+        end
       end
 
       private def clean_target(target_path : String)

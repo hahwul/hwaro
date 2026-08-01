@@ -64,6 +64,8 @@ module Hwaro
             Logger.warn "Error importing #{file_path}: #{ex.message}"
           end
 
+          report_collisions
+
           ImportResult.new(
             success: imported > 0 || errors == 0,
             message: "Obsidian import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",

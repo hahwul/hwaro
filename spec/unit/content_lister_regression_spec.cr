@@ -34,6 +34,29 @@ describe "tool list regressions" do
         output.should contain("한국어 제목")
       end
     end
+
+    it "preserves zero-width format characters inside titles" do
+      # Hangul alone could not catch this: `strip_control` used to delete Cf,
+      # so a ZWNJ/ZWJ/RLM title was silently rewritten into a different word.
+      {
+        "می\u{200C}رود",
+        "👨\u{200D}👩\u{200D}👧",
+        "שלום\u{200F}!",
+        "soft\u{00AD}hyphen",
+      }.each_with_index do |title, i|
+        Dir.mktmpdir do |dir|
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(content_dir)
+          File.write(File.join(content_dir, "t#{i}.md"), "+++\ntitle = \"#{title}\"\n+++\nBody")
+
+          output = with_captured_log do
+            Hwaro::Services::ContentLister.new(content_dir).display(Hwaro::Services::ContentFilter::All)
+          end
+
+          output.should contain(title)
+        end
+      end
+    end
   end
 
   # Finding 9: a missing content directory logged "not found" on stderr,

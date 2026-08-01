@@ -38,7 +38,7 @@ module Hwaro
 
           # Introspection
           FlagInfo.new(short: nil, long: "--list-scaffolds", description: "List available built-in scaffolds and exit"),
-          FlagInfo.new(short: "-j", long: "--json", description: "Emit machine-readable JSON output (with --list-scaffolds)"),
+          JSON_FLAG,
 
           # Wizard control
           FlagInfo.new(short: nil, long: "--wizard", description: "Run the interactive wizard (TTY only)"),
@@ -237,7 +237,7 @@ module Hwaro
             # Introspection (acted on by #run after parsing, so an unknown
             # flag alongside them is still a usage error).
             parser.on("--list-scaffolds", "List available built-in scaffolds and exit") { @list_scaffolds = true }
-            parser.on("-j", "--json", "Emit machine-readable JSON output (with --list-scaffolds)") { @json_output = true }
+            CLI.register_flag(parser, JSON_FLAG) { |_| @json_output = true }
 
             # Wizard control (acted on by #run after parsing).
             parser.on("--wizard", "Run the interactive wizard (TTY only)") { @wizard = true }

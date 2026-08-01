@@ -346,7 +346,8 @@ describe Hwaro::Services::Importers::EleventyImporter do
         FileUtils.mkdir_p(bundle_a)
         FileUtils.mkdir_p(bundle_b)
 
-        # File at root of collection posts/index.md (without title) should still be skipped
+        # A collection landing page (posts/index.md) carries author copy and
+        # maps to hwaro's section index, posts/_index.md — it is not dropped.
         File.write(File.join(posts_dir, "index.md"), "Content at root index.")
 
         # Files at nested folders posts/post-a/index.md should use parent dir name as slug and fallback title
@@ -364,8 +365,12 @@ describe Hwaro::Services::Importers::EleventyImporter do
         importer = Hwaro::Services::Importers::EleventyImporter.new
         result = importer.run(options)
 
-        result.imported_count.should eq(2) # post-a/index.md and post-b/index.md
-        result.skipped_count.should eq(1)  # root index.md skipped
+        result.imported_count.should eq(3) # post-a, post-b, and the landing page
+        result.skipped_count.should eq(0)
+
+        landing = File.join(output_dir, "posts", "_index.md")
+        File.exists?(landing).should be_true
+        File.read(landing).should contain("Content at root index.")
 
         File.exists?(File.join(output_dir, "posts", "post-a.md")).should be_true
         content_a = File.read(File.join(output_dir, "posts", "post-a.md"))

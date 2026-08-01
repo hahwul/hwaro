@@ -575,15 +575,25 @@ module Hwaro
         Logger.action :create, output_path if verbose
       end
 
+      # Refuse-outright, like every other writer (see
+      # `PathUtils.split_safe_segments`): sanitize-and-join would relocate the
+      # page onto the shortened path instead of skipping it. Reachable only if
+      # a term ever escapes `safe_slugify`, but every writer family must answer
+      # this question the same way.
       private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false)
-        url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
-        output_path = File.join(output_dir, url_path, "index.html")
+        segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
+        if refused
+          Logger.warn "Skipping taxonomy page #{page.url.inspect}: a path segment would escape the output directory."
+          return
+        end
+        output_path = File.join(output_dir, segments.join("/"), "index.html")
         write_to(output_path, output_dir, content, verbose)
       end
 
       private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false, paginate_path : String = "page")
-        url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
-        output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
+        segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
+        return if refused
+        output_path = File.join(output_dir, segments.join("/"), paginate_path, page_number.to_s, "index.html")
         write_to(output_path, output_dir, content, verbose)
       end
     end

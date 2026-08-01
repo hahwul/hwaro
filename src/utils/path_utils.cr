@@ -19,37 +19,63 @@ module Hwaro
       #   sanitize_path("....//etc/passwd")  # => "etc/passwd"
       #   sanitize_path("notes/v1..v2")      # => "notes/v1..v2"
       def sanitize_path(path : String) : String
-        # URL-decode repeatedly until stable to catch double/triple encoding
+        split_safe_segments(path)[0].join("/")
+      end
+
+      # ONE traversal predicate, TWO policies.
+      #
+      # Returns the safe segments of `path`, plus whether any segment had to be
+      # refused because it could name something other than a child of the
+      # directory it appears in. Callers pick a policy:
+      #
+      #   * neutralize-and-continue (`sanitize_path`) — for untrusted input
+      #     that must still yield a usable path: importer section names,
+      #     remote-scaffold archive entries.
+      #   * refuse-outright (the build's `url_output_path`) — for writers,
+      #     where dropping a segment does not sanitize anything, it RELOCATES
+      #     the page onto whatever already occupies the shortened path. That is
+      #     how `content/a..b/` came to overwrite the site's `index.html`.
+      #
+      # Both policies share this body deliberately. They were hand-copied
+      # before and drifted, which is precisely how one build writer
+      # (`generate_redirect_page`) kept the wrong policy and clobbered the
+      # homepage while its sibling refused the same URL.
+      #
+      # A segment is refused when it is nothing but dots and ASCII spaces.
+      # Windows' `RtlDosPathNameToNtPathName` trims trailing `.` and ASCII
+      # space and nothing else, so `..`, `.. `, `. ` and `...` all name `.`
+      # or `..` there. Segments that merely CONTAIN dots (`v1..v2`, `..foo`)
+      # are ordinary names and are kept.
+      #
+      # This is not identical to the pre-2026-08 rule, which refused any
+      # segment containing `..`. Newly KEPT are segments that contain `..` but
+      # cannot traverse on any supported platform — `a..b`, and the
+      # whitespace-suffixed forms `"..\t"`, `"..\u00a0"` (only ASCII space
+      # and `.` are trimmed by Win32, so these stay distinct filenames).
+      # Newly REFUSED are all-space segments such as `"   "`, which the old
+      # rule let through.
+      def split_safe_segments(path : String) : {Array(String), Bool}
+        # Decode repeatedly so percent-encoded traversal (`%2e%2e`,
+        # `%252e%252e`) is judged in its decoded form.
         decoded = path
         loop do
           next_decoded = URI.decode(decoded)
           break if next_decoded == decoded
           decoded = next_decoded
         end
+        decoded = decoded.gsub("\u0000", "")
 
-        # Remove null bytes
-        decoded = decoded.gsub("\0", "")
-
-        # Split into segments and drop every one that can name a directory
-        # OTHER than a child of the current one.
-        #
-        # The test is "is this segment nothing but dots and spaces", not "does
-        # it contain ..". Only a segment that IS `.`/`..` traverses; one that
-        # merely CONTAINS dots (`v1..v2`, `..foo`, `foo..`) is an ordinary
-        # name, and discarding it silently RELOCATED whatever was being
-        # addressed — a `content/a..b/` page collapsed to `""` and was written
-        # over the site's `index.html`, destroying the homepage.
-        #
-        # Windows strips trailing dots and spaces from path components, so
-        # `..`, `.. `, `. ` and `...` all normalize to `.` or `..` there.
-        # Rejecting any all-dots-and-spaces segment therefore neutralizes MORE
-        # traversal shapes than the old rule (which let `". "` through), while
-        # keeping every previously-neutralized form neutralized: `..`,
-        # `%2e%2e`, `%252e%252e`, `....//`, and the backslash variants all
-        # still collapse away.
-        parts = decoded.split(/[\/\\]/).reject { |seg| seg.empty? || seg.rstrip(". ").empty? }
-
-        parts.join("/")
+        segments = [] of String
+        refused = false
+        decoded.split(/[\/\\]/).each do |segment|
+          next if segment.empty?
+          if segment.rstrip(". ").empty?
+            refused = true
+            next
+          end
+          segments << segment
+        end
+        {segments, refused}
       end
 
       # True when `path`, with all symbolic links resolved, lies inside

@@ -18,23 +18,68 @@ private def build_options(**overrides)
 end
 
 describe Hwaro::Core::Build::Cache do
-  describe "#changed? across output directories" do
-    it "reports changed when the entry was recorded for another output dir" do
-      Dir.mktmpdir do |dir|
-        source = File.join(dir, "page.md")
-        File.write(source, "body")
-        out_a = File.join(dir, "A", "index.html")
-        out_b = File.join(dir, "B", "index.html")
-        [out_a, out_b].each do |path|
-          FileUtils.mkdir_p(File.dirname(path))
-          File.write(path, "rendered")
+  describe ".output_dir_key" do
+    it "is identical for the same relative output dir under different roots" do
+      keys = [] of String
+      2.times do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) { keys << Hwaro::Core::Build::Cache.output_dir_key("public") }
         end
+      end
+      # CI restoring .hwaro_cache.json under a different checkout path, Docker
+      # vs native, a renamed project directory: all must keep the cache warm.
+      keys[0].should eq(keys[1])
+      keys[0].should eq("public")
+    end
 
-        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, "c.json"))
-        cache.update(source, out_a)
+    it "distinguishes genuinely different output dirs" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Hwaro::Core::Build::Cache.output_dir_key("dist")
+            .should_not eq(Hwaro::Core::Build::Cache.output_dir_key("preview"))
+        end
+      end
+    end
 
-        cache.changed?(source, out_a).should be_false
-        cache.changed?(source, out_b).should be_true
+    it "normalizes equivalent spellings of one directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Hwaro::Core::Build::Cache.output_dir_key("./public")
+            .should eq(Hwaro::Core::Build::Cache.output_dir_key("public"))
+          Hwaro::Core::Build::Cache.output_dir_key("public/")
+            .should eq(Hwaro::Core::Build::Cache.output_dir_key("public"))
+        end
+      end
+    end
+  end
+
+  describe "#set_global_checksums output-directory tracking" do
+    it "invalidates every entry when the output directory changes" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("page.md", "body")
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.set_global_checksums("t", "c", output_dir: "dist")
+          cache.update("page.md", File.expand_path("dist/index.html"))
+          cache.stats[:total].should eq(1)
+
+          cache.set_global_checksums("t", "c", output_dir: "preview")
+          cache.stats[:total].should eq(0)
+        end
+      end
+    end
+
+    it "keeps entries when the output directory is unchanged" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("page.md", "body")
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.set_global_checksums("t", "c", output_dir: "dist")
+          cache.update("page.md", File.expand_path("dist/index.html"))
+
+          cache.set_global_checksums("t", "c", output_dir: "./dist")
+          cache.stats[:total].should eq(1)
+        end
       end
     end
 
@@ -47,23 +92,6 @@ describe Hwaro::Core::Build::Cache do
         cache.update(source)
 
         cache.changed?(source).should be_false
-      end
-    end
-
-    it "does not invalidate when the same output dir is spelled differently" do
-      Dir.mktmpdir do |dir|
-        Dir.cd(dir) do
-          File.write("page.md", "body")
-          FileUtils.mkdir_p("public")
-          File.write("public/index.html", "rendered")
-
-          absolute = File.expand_path("public/index.html")
-          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
-          cache.update("page.md", absolute)
-
-          # `-o public` and `-o ./public` both resolve here.
-          cache.changed?("page.md", File.expand_path("./public/index.html")).should be_false
-        end
       end
     end
   end

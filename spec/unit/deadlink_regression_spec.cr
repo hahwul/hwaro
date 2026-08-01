@@ -64,7 +64,11 @@ describe "check-links regressions" do
       end
     end
 
-    it "still reports a genuinely missing language-prefixed target" do
+    # NOTE: the real holes — default-language page present but translation
+    # absent, and a `content/<lang>/` section colliding with a language code —
+    # are covered in `deadlink_language_routes_spec.cr`. This example only
+    # pins the trivial case where nothing exists in any language.
+    it "still reports a language-prefixed target absent in every language" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "index.ko.md"), "---\ntitle: 홈\n---\nKO")
 

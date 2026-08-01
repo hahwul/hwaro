@@ -14,12 +14,16 @@ require "../../src/config/options/serve_options"
 module Hwaro
   module Services
     class Server
-      def dev_fixes_ready_signal_line(host : String, port : Int32) : String
-        ready_signal_line(host, port)
+      def dev_fixes_ready_signal_line(host : String, port : Int32, base_path : String = "") : String
+        ready_signal_line(host, port, base_path)
       end
 
-      def dev_fixes_ready_signal_json(host : String, port : Int32) : String
-        ready_signal_json(host, port)
+      def dev_fixes_ready_signal_json(host : String, port : Int32, base_path : String = "") : String
+        ready_signal_json(host, port, base_path)
+      end
+
+      def dev_fixes_serve_url(host : String, port : Int32, base_path : String = "") : String
+        serve_url(host, port, base_path)
       end
 
       def dev_fixes_push_build_error(message : String, overlay : Bool, handler : LiveReloadHandler)
@@ -32,6 +36,18 @@ module Hwaro
         @rebuild_failed = failed
         effective_strategy(changeset, output_dir)
       end
+
+      def dev_fixes_base_path_for(base_url : String?) : String
+        base_path_for(base_url)
+      end
+
+      def dev_fixes_build_handlers(output_dir : String, base_path : String) : Array(HTTP::Handler)
+        build_handlers(output_dir, "127.0.0.1", false, true, {} of String => String, base_path)
+      end
+
+      def dev_fixes_config_loaded? : Bool
+        !@builder.config.nil?
+      end
     end
   end
 end
@@ -42,6 +58,31 @@ private class RecordingLiveReloadHandler < Hwaro::Services::LiveReloadHandler
 
   def notify_build_error(message : String)
     @errors << message
+  end
+end
+
+# `register_utf8_mime_types` mutates the process-global MIME table and there
+# is no unregister, so without this every later spec in the process would see
+# `.txt`/`.json`/… carrying a charset and any future MIME assertion would be
+# order-dependent. `MIME.register` overwrites, so anything that already had a
+# mapping can be put back exactly.
+#
+# The three extensions stdlib does not map at all (`.md`, `.webmanifest`,
+# `.map`) cannot be restored — there is no API to remove a registration. They
+# are listed here so the residue is explicit rather than a surprise.
+private def with_utf8_mime_types(&)
+  snapshot = {} of String => String
+  Hwaro::Services::Server::UTF8_MIME_EXTENSIONS.each do |ext|
+    if existing = MIME.from_extension?(ext)
+      snapshot[ext] = existing
+    end
+  end
+
+  Hwaro::Services::Server.register_utf8_mime_types
+  begin
+    yield
+  ensure
+    snapshot.each { |ext, type| MIME.register(ext, type) }
   end
 end
 
@@ -75,6 +116,8 @@ private class ServeFixesSpy
   end
 end
 
+# Models IndexRewriteHandler: sets the header by hand and leaves the response
+# open, so BasePathHandler's post-call_next re-prefix can still reach it.
 private class ServeFixesRedirector
   include HTTP::Handler
 
@@ -84,6 +127,22 @@ private class ServeFixesRedirector
   def call(context)
     context.response.status_code = 302
     context.response.headers["Location"] = @location
+  end
+end
+
+# Models HTTP::StaticFileHandler: redirects through `Response#redirect`, which
+# CLOSES the response and flushes the headers. The suite previously had no
+# double of this shape, which is why the whole stdlib-redirect class of bugs
+# was structurally invisible to it.
+private class ServeFixesClosingRedirector
+  include HTTP::Handler
+
+  def initialize(@location : String)
+  end
+
+  def call(context)
+    context.response.redirect(@location)
+    context.response.close
   end
 end
 
@@ -148,8 +207,70 @@ describe Hwaro::Services::DevPath do
       Hwaro::Services::DevPath.safe_relative("/trailing../index.html").should eq("trailing../index.html")
     end
 
-    it "strips NUL bytes" do
-      Hwaro::Services::DevPath.safe_relative("/a#{Char::ZERO}b.html").should eq("ab.html")
+    # Review finding 6: the predicates run PCRE2 over raw request bytes, so
+    # invalid UTF-8 used to raise ArgumentError straight out of the handler and
+    # surface as 500 — for a request a static host answers with 404.
+    it "refuses invalid UTF-8 instead of raising" do
+      raw = String.new(Bytes[0x2f, 0xc0, 0xae, 0xc0, 0xae, 0x2f, 0x78])
+      raw.valid_encoding?.should be_false
+      Hwaro::Services::DevPath.safe_relative(raw).should be_nil
+      Hwaro::Services::DevPath.unservable?(raw).should be_true
+
+      lone = String.new(Bytes[0x2f, 0xff, 0xfe, 0x2e, 0x68, 0x74, 0x6d, 0x6c])
+      Hwaro::Services::DevPath.safe_relative(lone).should be_nil
+      Hwaro::Services::DevPath.unservable?(lone).should be_true
+    end
+
+    # …including bytes that only become invalid once decoded.
+    it "refuses percent-encoded invalid UTF-8" do
+      Hwaro::Services::DevPath.safe_relative("/%c0%ae%c0%ae/x.html").should be_nil
+      Hwaro::Services::DevPath.safe_relative("/%ff%fe.html").should be_nil
+    end
+
+    # Review finding 7: the shared sanitizer rejects dots AND spaces because
+    # Windows strips both from a trailing component; the dots-only rule let
+    # `".. "` through while claiming parity.
+    it "refuses segments of dots and spaces, not just dots" do
+      Hwaro::Services::DevPath.safe_relative("/.. /x").should be_nil
+      Hwaro::Services::DevPath.safe_relative("/. /x").should be_nil
+      Hwaro::Services::DevPath.safe_relative("/x/.. ").should be_nil
+      Hwaro::Services::DevPath.safe_relative("/ .. / x").should be_nil
+    end
+
+    # …without swallowing ordinary names that merely contain a dot or space.
+    it "still resolves names containing dots and spaces" do
+      Hwaro::Services::DevPath.safe_relative("/my page/a. b.html").should eq("my page/a. b.html")
+      Hwaro::Services::DevPath.safe_relative("/js/lib.v1..2.js").should eq("js/lib.v1..2.js")
+    end
+
+    # Finding 5: deleting the NUL made `/index%00.html` resolve to the real
+    # homepage while the StaticFileHandler in the same chain 400s a decoded
+    # NUL. Fail closed instead of papering over it.
+    it "refuses NUL in any form" do
+      Hwaro::Services::DevPath.safe_relative("/a#{Char::ZERO}b.html").should be_nil
+      Hwaro::Services::DevPath.safe_relative("/index%00.html").should be_nil
+      Hwaro::Services::DevPath.safe_relative("/index%00").should be_nil
+    end
+  end
+
+  # Finding 4: our handlers declining is not enough — StaticFileHandler
+  # decodes once too, so these need an explicit 404 upstream of it.
+  describe ".unservable?" do
+    it "flags encoded separators, backslashes and NUL" do
+      %w[/%2Fguide%2Findex.html /%2fguide%2f /guide%5Cindex.html /index%00.html].each do |path|
+        Hwaro::Services::DevPath.unservable?(path).should be_true
+      end
+      Hwaro::Services::DevPath.unservable?("/a\\b").should be_true
+      Hwaro::Services::DevPath.unservable?("/a#{Char::ZERO}b").should be_true
+    end
+
+    it "leaves ordinary and percent-encoded unicode paths alone" do
+      %w[/ /guide/index.html /%ED%95%9C%EA%B8%80/ /my%20page/ /js/lib.v1..2.js].each do |path|
+        Hwaro::Services::DevPath.unservable?(path).should be_false
+      end
+      # `..` is normalisation, not smuggling — stdlib canonicalises it and so
+      # does production; it must not be turned into a 404 here.
+      Hwaro::Services::DevPath.unservable?("/guide/../index.html").should be_false
     end
   end
 
@@ -450,6 +571,58 @@ describe Hwaro::Services::BasePathHandler do
     context.response.headers["Location"].should eq("/guide/")
   end
 
+  # Review finding 2 / test-shape: a closed response cannot be re-prefixed
+  # after the fact, which is precisely why BasePathHandler pre-empts stdlib's
+  # canonicalising redirect instead of trying to patch it up afterwards. This
+  # pins the constraint so nobody "simplifies" the pre-empt away.
+  it "cannot re-prefix a redirect from a handler that closed the response" do
+    handler = Hwaro::Services::BasePathHandler.new("/myblog")
+    handler.next = ServeFixesClosingRedirector.new("/posts/")
+
+    context, response, io = build_context("GET", "/myblog/posts")
+    handler.call(context)
+    response.close
+
+    # The header on the wire is the un-prefixed one the double wrote.
+    io.to_s.should contain("Location: /posts/")
+    io.to_s.should_not contain("Location: /myblog/posts/")
+  end
+
+  # Finding 12: the documented "no trailing slash" contract is now enforced,
+  # so a caller passing "/myblog/" behaves identically to "/myblog".
+  it "normalises a base path given with a trailing slash" do
+    handler = Hwaro::Services::BasePathHandler.new("/myblog/")
+    spy = ServeFixesSpy.new
+    handler.next = spy
+
+    context, response, _ = build_context("GET", "/myblog/posts/")
+    handler.call(context)
+    response.close
+
+    spy.seen_path.should eq("/posts/")
+
+    redirect_context, redirect_response, _ = build_context("GET", "/")
+    handler.call(redirect_context)
+    redirect_response.close
+    redirect_context.response.headers["Location"].should eq("/myblog/")
+  end
+
+  # Finding 9: LogHandler is outermost and reads request.resource AFTER
+  # call_next, so a stripped path made --access-log report the wrong URL.
+  it "restores the original request path after the chain runs" do
+    handler = Hwaro::Services::BasePathHandler.new("/myblog")
+    spy = ServeFixesSpy.new
+    handler.next = spy
+
+    context, response, _ = build_context("GET", "/myblog/posts/")
+    handler.call(context)
+    response.close
+
+    spy.seen_path.should eq("/posts/")
+    context.request.path.should eq("/myblog/posts/")
+    context.request.resource.should eq("/myblog/posts/")
+  end
+
   it "leaves a protocol-relative redirect alone" do
     handler = Hwaro::Services::BasePathHandler.new("/myblog")
     handler.next = ServeFixesRedirector.new("//cdn.example.com/x")
@@ -504,6 +677,16 @@ describe Hwaro::Config::Options::ServeOptions do
     it "does not double-bracket" do
       Hwaro::Config::Options::ServeOptions.url_host("[::1]").should eq("[::1]")
     end
+
+    # Review finding 10: RFC 6874 requires the zone-id separator to be
+    # percent-encoded inside a URI.
+    it "percent-encodes an IPv6 zone id" do
+      Hwaro::Config::Options::ServeOptions.url_host("fe80::1%en0").should eq("[fe80::1%25en0]")
+    end
+
+    it "does not double-encode an already-encoded zone id" do
+      Hwaro::Config::Options::ServeOptions.url_host("fe80::1%25en0").should eq("[fe80::1%25en0]")
+    end
   end
 
   it "derives a bracketed base_url for an IPv6 bind" do
@@ -527,6 +710,69 @@ describe Hwaro::Services::Server do
     parsed["url"].as_s.should eq("http://[::1]:3000")
     # The `host` field stays the literal address — it is not a URL.
     parsed["host"].as_s.should eq("::1")
+  end
+
+  # Review finding 8: the receipt included the mount point and the machine
+  # line did not, so a script blocking on the ready line fetched the bare
+  # origin and got a 302 it may not follow.
+  describe "#serve_url" do
+    it "is the single source of truth for the receipt and both ready signals" do
+      server = Hwaro::Services::Server.new
+      url = server.dev_fixes_serve_url("127.0.0.1", 3000, "/myblog")
+      url.should eq("http://127.0.0.1:3000/myblog/")
+
+      server.dev_fixes_ready_signal_line("127.0.0.1", 3000, "/myblog")
+        .should eq("hwaro serve: ready url=#{url} pid=#{Process.pid}")
+      JSON.parse(server.dev_fixes_ready_signal_json("127.0.0.1", 3000, "/myblog"))["url"]
+        .as_s.should eq(url)
+    end
+
+    it "leaves the bare origin untouched without a mount point" do
+      server = Hwaro::Services::Server.new
+      server.dev_fixes_serve_url("127.0.0.1", 3000).should eq("http://127.0.0.1:3000")
+      server.dev_fixes_ready_signal_line("127.0.0.1", 3000)
+        .should eq("hwaro serve: ready url=http://127.0.0.1:3000 pid=#{Process.pid}")
+    end
+  end
+
+  # Finding 1: the mount point must not depend on a config load that can fail.
+  describe "#base_path_for" do
+    it "derives the mount point from the effective base_url" do
+      server = Hwaro::Services::Server.new
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000/myblog/").should eq("/myblog")
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000/a/b/").should eq("/a/b")
+    end
+
+    it "yields an empty prefix for a domain-root or missing base_url" do
+      server = Hwaro::Services::Server.new
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000").should eq("")
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000/").should eq("")
+      server.dev_fixes_base_path_for(nil).should eq("")
+      server.dev_fixes_base_path_for("::::").should eq("")
+    end
+
+    # The regression itself: a server whose startup build never loaded a
+    # config (broken config.toml) still has to mount the subpath, and the
+    # chain is assembled exactly once so a later good rebuild cannot fix it.
+    it "still installs BasePathHandler when no config was ever loaded" do
+      Dir.mktmpdir do |dir|
+        server = Hwaro::Services::Server.new
+        server.dev_fixes_config_loaded?.should be_false
+
+        base_path = server.dev_fixes_base_path_for("http://127.0.0.1:3000/myblog/")
+        base_path.should eq("/myblog")
+        handlers = server.dev_fixes_build_handlers(dir, base_path)
+        handlers.any?(Hwaro::Services::BasePathHandler).should be_true
+      end
+    end
+
+    it "installs no BasePathHandler for a domain-root base_url" do
+      Dir.mktmpdir do |dir|
+        server = Hwaro::Services::Server.new
+        handlers = server.dev_fixes_build_handlers(dir, server.dev_fixes_base_path_for("http://127.0.0.1:3000"))
+        handlers.any?(Hwaro::Services::BasePathHandler).should be_false
+      end
+    end
   end
 
   # Finding 4
@@ -574,23 +820,59 @@ describe Hwaro::Services::Server do
   # Finding 2
   describe ".register_utf8_mime_types" do
     it "teaches the MIME table a UTF-8 charset for text extensions" do
-      Hwaro::Services::Server.register_utf8_mime_types
-      MIME.from_extension(".txt").should contain("charset=utf-8")
-      MIME.from_extension(".json").should contain("charset=utf-8")
-      MIME.from_extension(".xml").should contain("charset=utf-8")
-      MIME.from_extension(".svg").should contain("charset=utf-8")
+      with_utf8_mime_types do
+        MIME.from_extension(".txt").should contain("charset=utf-8")
+        MIME.from_extension(".json").should contain("charset=utf-8")
+        MIME.from_extension(".xml").should contain("charset=utf-8")
+        MIME.from_extension(".svg").should contain("charset=utf-8")
+      end
     end
 
     it "keeps the stdlib base type and is idempotent" do
-      Hwaro::Services::Server.register_utf8_mime_types
-      Hwaro::Services::Server.register_utf8_mime_types
-      MIME.from_extension(".txt").should eq("text/plain; charset=utf-8")
-      MIME.from_extension(".json").should eq("application/json; charset=utf-8")
+      with_utf8_mime_types do
+        Hwaro::Services::Server.register_utf8_mime_types
+        MIME.from_extension(".txt").should eq("text/plain; charset=utf-8")
+        MIME.from_extension(".json").should eq("application/json; charset=utf-8")
+      end
+    end
+
+    # Review finding 13: the registration is process-global and irreversible,
+    # so a spec that leaves it applied makes every later MIME assertion in the
+    # process order-dependent. The guard restores what it can.
+    it "does not leak the charset into later specs" do
+      before = MIME.from_extension(".txt")
+      with_utf8_mime_types do
+        MIME.from_extension(".txt").should contain("charset=utf-8")
+      end
+      MIME.from_extension(".txt").should eq(before)
+    end
+
+    # Finding 3: HTML is the site's primary content type and was missing, so
+    # a large page — exactly the case the charset fix exists for — still lost
+    # its encoding.
+    it "covers HTML" do
+      with_utf8_mime_types do
+        MIME.from_extension(".html").should eq("text/html; charset=utf-8")
+        MIME.from_extension(".htm").should eq("text/html; charset=utf-8")
+      end
+    end
+
+    # Finding 3: stdlib maps none of these, so appending to a nil base was a
+    # silent no-op and they were served as application/octet-stream.
+    it "registers a full type for extensions stdlib does not map" do
+      with_utf8_mime_types do
+        {".md", ".webmanifest", ".map"}.each do |ext|
+          type = MIME.from_extension(ext)
+          type.should contain("charset=utf-8")
+          type.should_not contain("octet-stream")
+        end
+      end
     end
 
     it "leaves binary types alone" do
-      Hwaro::Services::Server.register_utf8_mime_types
-      MIME.from_extension(".png").includes?("charset=").should be_false
+      with_utf8_mime_types do
+        MIME.from_extension(".png").includes?("charset=").should be_false
+      end
     end
   end
 end

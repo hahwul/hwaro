@@ -63,6 +63,8 @@ module Hwaro
             Logger.warn "#{wrapped} file(s) contained MDX components. Imports kept the raw markup — each will render as literal text until you hand-convert them."
           end
 
+          report_collisions
+
           ImportResult.new(
             success: imported > 0 || errors == 0,
             message: "Astro import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",
