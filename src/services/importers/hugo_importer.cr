@@ -13,6 +13,8 @@ module Hwaro
           verbose = options.verbose
           force = options.force
 
+          reset_written_paths
+
           content_dir = File.join(hugo_path, "content")
 
           unless Dir.exists?(content_dir)
@@ -46,6 +48,8 @@ module Hwaro
           if wrapped > 0
             Logger.warn "#{wrapped} file(s) contained Hugo shortcodes. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
+
+          report_collisions
 
           ImportResult.new(
             success: imported > 0 || errors == 0,
@@ -125,6 +129,14 @@ module Hwaro
             categories = array_string_value(data, "categories")
             fields["categories"] = categories unless categories.empty?
 
+            # authors — Hugo's `authors` list maps 1:1 onto hwaro's own
+            # `authors` front matter (the blog scaffold writes it, and the
+            # WordPress/Astro importers already populate it). Dropping it
+            # lost author attribution on every Hugo import and made
+            # `hwaro → hugo export → hugo import` non-round-tripping.
+            authors = array_string_value(data, "authors")
+            fields["authors"] = authors unless authors.empty?
+
             # series
             if series = string_value(data, "series")
               fields["series"] = series
@@ -176,7 +188,27 @@ module Hwaro
           end
 
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
-          written = write_content_file(output_dir, section, file_slug, frontmatter, body.strip, verbose, force)
+          written, dest_path = write_content_file_to(output_dir, section, file_slug, frontmatter, body.strip, verbose, force)
+
+          # Leaf bundle (`posts/my-post/index.md`): the co-located images
+          # belong beside the written `.md`, and were never copied at all —
+          # leaving every `![](cover.png)` in the imported post 404ing.
+          #
+          # The destination comes from the path `write_content_file_to`
+          # actually chose, not from `output_dir/section`: a front-matter
+          # `slug` or a claim collision moves the `.md` elsewhere, and the
+          # assets have to follow it. Assets are also copied when the `.md`
+          # was SKIPPED — on a re-import the post already exists, and
+          # requiring `--force` (which rewrites content) just to recover
+          # missing images was a trap.
+          #
+          # `section` must be non-empty: a bare `content/index.md` is the site
+          # root, not a bundle, and sweeping the whole content root's loose
+          # files into the output is not what the author asked for.
+          if dest_path && !section.empty? && (filename == "index.md" || filename == "index.markdown")
+            copy_bundle_assets(File.dirname(file_path), File.dirname(dest_path), output_dir, verbose, force)
+          end
+
           return :skipped unless written
           has_shortcodes ? :imported_wrapped : :imported
         end

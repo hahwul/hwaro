@@ -29,10 +29,22 @@ module Hwaro
         @@input
       end
 
+      @@interactive : Bool? = nil
+
+      # Force `interactive?` to a fixed answer (specs). `nil` restores the
+      # real TTY probe. Pairs with `input=` so a spec can drive a wizard flow
+      # end to end — including the `Prompt.interactive?` gate the command
+      # checks before running it — without allocating a pseudo-terminal.
+      def self.interactive=(value : Bool?) : Nil
+        @@interactive = value
+      end
+
       # True only when both ends are a real terminal. Commands gate interactive
       # flows on this so pipes, CI, and agents fall back to non-interactive
       # behaviour instead of blocking on a `gets` that will never arrive.
       def self.interactive? : Bool
+        forced = @@interactive
+        return forced unless forced.nil?
         STDIN.tty? && STDOUT.tty?
       end
 

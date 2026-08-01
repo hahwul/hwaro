@@ -30,6 +30,7 @@ module Hwaro
           end
 
           @used_slugs.clear
+          reset_written_paths
           files = collect_files(path, options.drafts)
 
           if files.empty?
@@ -58,6 +59,8 @@ module Hwaro
           if wrapped > 0
             Logger.warn "#{wrapped} file(s) contained unconverted Liquid constructs. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
+
+          report_collisions
 
           ImportResult.new(
             success: imported > 0 || errors == 0,

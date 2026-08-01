@@ -143,6 +143,16 @@ module Hwaro
           needs_seo : Bool,
           needs_jsonld : Bool,
           needs_section_pages : Bool
+        # Which page fields the site's LISTING templates can actually read.
+        # A field folded into the page/section-set fingerprint re-renders every
+        # listing whenever that field moves on any page, so `extra` and the
+        # content-derived trio (`summary`, `word_count`, `reading_time`) are
+        # only fingerprinted when some page-set-dependent template names them.
+        # Detection is substring-based over those templates' closure sources,
+        # so it only ever over-approximates: naming the field always keeps it.
+        record ListingPageFields,
+          extra : Bool,
+          content_derived : Bool
         # Keyed by entry template NAME (closure semantics are per-name).
         # Populated once in load_templates, read-only during render. Missing
         # key means "unknown": build everything, exactly as before.
@@ -196,6 +206,20 @@ module Hwaro
         # rerenders all run with the flag false, i.e. the locked path.
         @crinja_caches_frozen : Bool = false
         # Mutex to protect created_dirs set during parallel rendering
+        # Pages the render loop counted but NO sink could publish (a URL with a
+        # traversing segment). Subtracted from `pages_rendered` so the build
+        # receipt cannot claim a page that never reached disk. Atomic because
+        # the render fan-out increments it from worker fibers.
+        # Memo for the listing-template source union (see Phases::Render).
+        # Keyed by the templates Hash identity so a template reload recomputes.
+        @listing_source_union_memo : String? = nil
+        @listing_source_union_memo_key : UInt64 = 0_u64
+        @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
+        # Pages that actually wrote a file. `process_files_*` returns a delta of
+        # this, so every caller (render phase, incremental rebuild, serve
+        # re-render, streaming batches) reports the same published-not-processed
+        # number instead of each keeping its own bookkeeping.
+        @published_pages : Atomic(Int32) = Atomic(Int32).new(0)
         @created_dirs_mutex : Mutex = Mutex.new
         # Explicit render-worker count from `--jobs` (0 = auto/CPU-based).
         # Set from BuildOptions at every build entry point and consumed by
@@ -529,7 +553,7 @@ module Hwaro
             site.pages.reject! { |p| excluded_paths.includes?(p.path) }
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
-              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)]
+              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
               delete_orphaned_outputs(stale, output_dir)
             end
           end
@@ -798,7 +822,7 @@ module Hwaro
             site.pages.reject! { |p| excluded_paths.includes?(p.path) }
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
-              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)]
+              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
               delete_orphaned_outputs(stale, output_dir)
             end
           end
@@ -1295,7 +1319,9 @@ module Hwaro
                 # Section _index pages live in site.sections, not site.pages —
                 # deleting one used to leave its index.html served forever.
                 if page = site.pages.find { |p| p.path == rel } || site.sections.find { |s| s.path == rel }
-                  outputs << get_output_path(page, output_dir)
+                  if primary = get_output_path(page, output_dir)
+                    outputs << primary
+                  end
 
                   # Sibling output-format files (see `[outputs]`): prefer what
                   # the cache actually recorded for this source (the ground
@@ -1322,7 +1348,7 @@ module Hwaro
         # to prune the old files when an edit relocates the page's URL or
         # excludes the page from the site.
         private def collect_page_output_paths(page : Models::Page, output_dir : String) : Array(String)
-          paths = [get_output_path(page, output_dir)]
+          paths = [get_output_path(page, output_dir)].compact
           if cfg = @config
             paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
           end
@@ -1628,6 +1654,9 @@ module Hwaro
           receipt.row("render", render_val, detail: phase_detail(profiler, "Render"))
           receipt.row("write", stats.raw_files_processed > 0 ? "#{stats.raw_files_processed} raw files" : "",
             detail: phase_detail(profiler, "Write"))
+          if stats.pages_unpublished > 0
+            receipt.row("skipped", "#{stats.pages_unpublished} not published", emphasis: "see warnings above")
+          end
           receipt.outcome("built", "#{stats.pages_rendered} content pages#{raw_msg}", :result, elapsed_ms)
           receipt.emit
         end

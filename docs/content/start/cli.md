@@ -43,8 +43,10 @@ In text mode the error line is prefixed with the code:
 Error [HWARO_E_USAGE]: missing <path> argument
 ```
 
-Under `--json` (or `--quiet`) the classified error is emitted as a
-structured payload on stdout:
+Under `--json` the classified error is emitted as a structured payload
+on stdout instead. (`--quiet` only silences info output — errors keep
+the human `Error [CODE]: …` form on stderr, so pair it with `--json`
+when you want machine-readable failures.)
 
 ```json
 {
@@ -328,9 +330,9 @@ hwaro serve -i /path/to/my-site -p 8080
 | Flag | Description |
 |------|-------------|
 | -i, --input DIR | Project directory to serve (default: current directory) |
-| -b, --bind HOST | Bind address (default: 127.0.0.1) |
+| -b, --bind HOST | Bind address (default: 127.0.0.1). IPv6 literals are supported and appear bracketed in every generated URL (`-b ::1` → `http://[::1]:3000`) |
 | -p, --port PORT | Port number (default: 3000) |
-| --base-url URL | Temporarily override `base_url` from `config.toml` |
+| --base-url URL | Temporarily override `base_url` from `config.toml`. If the URL carries a path, the dev server mounts the site under that prefix (see below) |
 | -e, --env ENV | Environment name (loads `config.<env>.toml` override) |
 | --minify | Serve minified output |
 | --jobs N | Concurrent render workers (default: auto). Try `1`-`2` for template-heavy sites |
@@ -375,6 +377,26 @@ Pass `--no-live-reload` to disable this behaviour (useful for testing production
 
 When `-i` is specified, the server operates as if you had `cd`-ed into the given directory — watching and serving from that project root.
 
+**Subpath preview (`--base-url` with a path):**
+
+```bash
+hwaro serve --base-url http://localhost:3000/myblog/
+```
+
+The site is built with `/myblog/`-prefixed links and served under that same prefix, so a project-page deployment (GitHub Pages, GitLab Pages) can be previewed exactly as it will be published — instead of a homepage whose every link 404s locally.
+
+- `/` redirects to `/myblog/`.
+- Unprefixed requests still resolve, so hand-typed asset paths keep working.
+- Live reload, the file watcher, and the WebSocket endpoint all work under the prefix.
+
+**Request handling:**
+
+- The server answers `GET`, `HEAD`, and `OPTIONS`. Any other method returns `405 Method Not Allowed` with an `Allow: GET, HEAD, OPTIONS` header, rather than the 404 page.
+- Malformed request paths (for example a percent-encoded NUL byte) return `400 Bad Request`.
+- `HEAD` returns exactly the same headers as the matching `GET` — including the `Content-Length` of the live-reload-injected HTML — with no body.
+- Text responses (`.txt`, `.json`, `.xml`, `.js`, `.css`, `.svg`, …) always carry `; charset=utf-8`, regardless of file size.
+- Directory redirects emit a percent-encoded `Location` (`/my%20page/`, `/%ED%95%9C%EA%B8%80/`). Paths containing a backslash or an encoded separator (`%2F`, `%5C`) are not served, matching static-host behaviour.
+
 **Custom response headers (`--header` / `[serve.headers]`):**
 
 Use this to reproduce headers that your production reverse-proxy, CDN, or static hosting sets (security headers, `Cache-Control`, custom CORS, etc.) so you can test locally before deploying the static output.
@@ -392,7 +414,7 @@ hwaro serve --header "X-Custom: foo" --header "Cache-Control: no-store"
 ```
 
 - CLI `--header` values win over the same key in `config.toml`.
-- Headers are injected on **every** dev-server response (HTML, assets, 404s, redirects, live-reload injected pages).
+- Headers are injected on **every** dev-server response (HTML, assets, 404s, redirects, live-reload injected pages, CORS preflight (`OPTIONS`) responses).
 - This feature only affects `hwaro serve`. The files written to `public/` are untouched.
 
 ### deploy

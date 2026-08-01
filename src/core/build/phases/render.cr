@@ -29,7 +29,10 @@ module Hwaro::Core::Build::Phases::Render
     # archives, taxonomy widgets) render content derived from the global
     # page/section set even when their own source is unchanged, so fold a
     # fingerprint of those sets into the rebuild decision.
-    page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages) : ""
+    @unpublished_pages.set(0)
+    @published_pages.set(0)
+    listing_fields = cache_enabled ? listing_page_fields(templates) : Builder::ListingPageFields.new(false, false)
+    page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages, listing_fields) : ""
     section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
@@ -122,7 +125,12 @@ module Hwaro::Core::Build::Phases::Render
                 else
                   process_files_sequential(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                 end
+        # A page whose URL no sink could write is not a built page, however
+        # far it got through rendering.
+        # `count` is already the number of pages that wrote a file (see
+        # process_files_*); the refusals are surfaced separately.
         ctx.stats.pages_rendered = count
+        ctx.stats.pages_unpublished = @unpublished_pages.get
         # Strict [links] broken_internal = "error": fail the phase with one
         # aggregated error after the whole fan-out so every offender is
         # listed. The lifecycle manager re-raises HwaroError unchanged
@@ -289,7 +297,7 @@ module Hwaro::Core::Build::Phases::Render
     pages.select do |page|
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-      next true if cache.changed?(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths)
+      next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths)
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
       next false unless page_set_changed || section_set_changed
@@ -315,9 +323,151 @@ module Hwaro::Core::Build::Phases::Render
     {PAGE_SET_MARKERS.any? { |m| blob.includes?(m) }, SECTION_SET_MARKERS.any? { |m| blob.includes?(m) }}
   end
 
+  # Receivers that name the CURRENT page (or site-level config), never
+  # another page in a listing. A read off one of these moves only when that
+  # page itself changes, and the page already re-renders on its own account.
+  SELF_RECEIVERS = {"page", "section", "site", "config"}
+
+  # A listing reads a field off ANOTHER page: `p.summary`, `item.word_count`,
+  # `post.extra.badge`, `p["summary"]`, or `sort(attribute="word_count")`.
+  #
+  # The shape matters as much as the name. Matching bare words against raw
+  # template source scored a literal `<summary>` disclosure tag and a
+  # `class="extra-info"` as field reads, which silently turned `--cache` from
+  # "re-render the edited page" into "re-render every listing on every edit".
+  # Requiring `<receiver>.<field>` (or the bracket/`attribute=` spellings)
+  # keeps prose and markup out of the match.
+  CONTENT_DERIVED_ATTR_RE  = /(?<![\w.])(\w+)\.(?:summary|word_count|reading_time)\b/
+  CONTENT_DERIVED_INDEX_RE = /(?<![\w.])(\w+)\[\s*["'](?:summary|word_count|reading_time)["']\s*\]/
+  CONTENT_DERIVED_ARG_RE   = /attribute\s*=\s*["'](?:summary|word_count|reading_time)\b/
+  EXTRA_ATTR_RE            = /(?<![\w.])(\w+)\.extra\b/
+  EXTRA_INDEX_RE           = /(?<![\w.])(\w+)\[\s*["']extra["']\s*\]/
+  EXTRA_ARG_RE             = /attribute\s*=\s*["']extra\b/
+
+  # Anything that rebinds `page`/`section` to a DIFFERENT page, in which case
+  # a `page.`-qualified read is a read off another page after all. Covers the
+  # loop (including tuple unpacking, where the binding is followed by a comma
+  # rather than `in`), `set`, `with`, and macro parameters — a `card(page)`
+  # macro is one of the most common listing idioms there is.
+  REBINDS_SELF_RE = /\bfor\s+[^%{}]*\b(?:page|section)\b[^%{}]*\bin\b|\bset\s+(?:page|section)\s*=|\bwith\s+[^%{}]*\b(?:page|section)\s*=|\bmacro\s+\w+\s*\([^)]*\b(?:page|section)\b/
+
+  # Source union of every template that renders a global set (page OR
+  # section). Empty when no template iterates either.
+  #
+  # Gating on `page_dep || section_dep` matters: the result also decides what
+  # the SECTION fingerprint covers, and a nav that reads only `site.sections`
+  # scores `{false, true}` — it never entered the union, so a site whose only
+  # listing is a section nav saw no fields at all.
+  #
+  # Memoized per template set: this walks every template's closure and the
+  # render phase asks for it on every build, cached or not.
+  private def listing_source_union(templates : Hash(String, String)) : String
+    if (memo = @listing_source_union_memo) && @listing_source_union_memo_key == templates.object_id
+      return memo
+    end
+    result = compute_listing_source_union(templates)
+    @listing_source_union_memo_key = templates.object_id
+    @listing_source_union_memo = result
+    result
+  end
+
+  private def compute_listing_source_union(templates : Hash(String, String)) : String
+    deps = @template_deps
+    unless deps
+      # Tracking off: listing_template_deps already scans every template, so
+      # a page-set marker anywhere makes the whole set the listing surface.
+      blob = templates.values.join("\n")
+      relevant = PAGE_SET_MARKERS.any? { |m| blob.includes?(m) } ||
+                 SECTION_SET_MARKERS.any? { |m| blob.includes?(m) }
+      return relevant ? blob : ""
+    end
+
+    seen = Set(String).new
+    String.build do |io|
+      templates.each_key do |name|
+        page_dep, section_dep = listing_template_deps(name, templates)
+        next unless page_dep || section_dep
+        deps.closure(name).each do |dep|
+          next unless seen.add?(dep)
+          templates[dep]?.try { |src| io << src << '\n' }
+        end
+      end
+    end
+  end
+
+  # Decide which optional page fields the page-set fingerprint must cover for
+  # THIS site (see Builder::ListingPageFields).
+  private def listing_page_fields(templates : Hash(String, String)) : Builder::ListingPageFields
+    blob = listing_source_union(templates)
+    return Builder::ListingPageFields.new(false, false) if blob.empty?
+
+    rebound = blob.matches?(REBINDS_SELF_RE)
+    Builder::ListingPageFields.new(
+      extra: reads_other_page_field?(blob, EXTRA_ATTR_RE, EXTRA_INDEX_RE, EXTRA_ARG_RE, rebound),
+      content_derived: reads_other_page_field?(blob, CONTENT_DERIVED_ATTR_RE,
+        CONTENT_DERIVED_INDEX_RE, CONTENT_DERIVED_ARG_RE, rebound),
+    )
+  end
+
+  # True when some listing template reads the field off a page OTHER than the
+  # one being rendered — either through a non-self receiver, through a
+  # `attribute="..."` filter argument (always a read over a collection), or
+  # through any receiver at all once `page`/`section` has been rebound.
+  private def reads_other_page_field?(blob : String, attr_re : Regex, index_re : Regex,
+                                      arg_re : Regex, rebound : Bool) : Bool
+    return true if blob.matches?(arg_re)
+    {attr_re, index_re}.each do |re|
+      blob.scan(re) do |match|
+        receiver = match[1]
+        return true if rebound || !SELF_RECEIVERS.includes?(receiver)
+      end
+    end
+    false
+  end
+
+  # Fingerprint a page's `[extra]` table for the set fingerprints.
+  #
+  # Length-prefixed through DigestUtils, like `compute_config_hash` and
+  # `compute_templates_hash`, so adjacent fields cannot spell the same byte
+  # stream: plain `k=v;` concatenation made `{"a" => "b;c=d"}` and
+  # `{"a" => "b", "c" => "d"}` identical, hiding that `[extra]` edit from every
+  # listing. Nested hashes are sorted at every level, so re-ordering keys
+  # inside `[extra.foo]` no longer busts the fingerprint spuriously.
+  private def extra_fp(extra : Hash(String, Models::ExtraValue)) : String
+    digest = Digest::MD5.new
+    digest_extra_hash(digest, extra)
+    digest.final.hexstring
+  end
+
+  private def digest_extra_hash(digest : ::Digest, hash : Hash(String, Models::ExtraValue)) : Nil
+    Utils::DigestUtils.update_length_prefixed(digest, "h#{hash.size}")
+    hash.keys.sort!.each do |key|
+      Utils::DigestUtils.update_length_prefixed(digest, key)
+      digest_extra_value(digest, hash[key])
+    end
+  end
+
+  private def digest_extra_value(digest : ::Digest, value : Models::ExtraValue) : Nil
+    case value
+    when Hash
+      digest_extra_hash(digest, value)
+    when Array
+      Utils::DigestUtils.update_length_prefixed(digest, "a#{value.size}")
+      value.each { |item| digest_extra_value(digest, item) }
+    else
+      Utils::DigestUtils.update_length_prefixed(digest, value.to_s)
+    end
+  end
+
   # Fingerprint the global page set — the content-page metadata that listing
   # pages render (membership, urls, titles, dates, weights, draft, section).
-  private def compute_page_set_fingerprint(pages : Array(Models::Page)) : String
+  #
+  # `fields` widens the digest to cover `[extra]` and the content-derived
+  # values (`summary`, `word_count`, `reading_time`) when the site's listing
+  # templates actually read them. Without that, editing a post's body or its
+  # `[extra]` re-rendered only the post itself: every listing showing its
+  # excerpt, word count or badge kept the previous build's value forever.
+  private def compute_page_set_fingerprint(pages : Array(Models::Page), fields : Builder::ListingPageFields) : String
     Digest::MD5.hexdigest(String.build do |io|
       pages.each do |p|
         io << p.path << '\u0001' << p.url << '\u0001' << p.title << '\u0001'
@@ -327,12 +477,20 @@ module Hwaro::Core::Build::Phases::Render
         io << p.tags.join(',') << '\u0001'
         p.taxonomies.keys.sort!.each { |k| io << k << '=' << p.taxonomies[k].join(',') << ';' }
         p.menus.keys.sort!.each { |k| io << k << '=' << menu_registration_fp(p.menus[k]) << ';' }
+        io << extra_fp(p.extra) << '\u0001' if fields.extra
+        if fields.content_derived
+          io << (p.summary || "") << '\u0001' << p.word_count << '\u0001' << p.reading_time << '\u0001'
+        end
         io << '\u0002'
       end
     end)
   end
 
   # Fingerprint the section set — the metadata nav/menus render.
+  # No `fields` parameter: the `site.sections`/`get_section()` Crinja hash
+  # exposes no `extra` key at all, so a section's `[extra]` is unreachable
+  # from any section-set listing. Fingerprinting it could only ever cause
+  # spurious invalidation, never fix staleness.
   private def compute_section_set_fingerprint(sections : Array(Models::Section)) : String
     Digest::MD5.hexdigest(String.build do |io|
       sections.each do |s|
@@ -401,14 +559,43 @@ module Hwaro::Core::Build::Phases::Render
     hash
   end
 
-  private def get_output_path(page : Models::Page, output_dir : String, filename : String = "index.html") : String
-    url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
-    output_path = File.join(output_dir, url_path, filename)
-    Utils::OutputGuard.safe_output_path(output_path, output_dir) || File.join(output_dir, filename)
+  # A URL's relative output path, or nil when the URL cannot be published
+  # safely. The refuse-outright half of `PathUtils.split_safe_segments` (see
+  # there for why dropping a segment is not an option for a writer: it
+  # relocates the page onto whatever already occupies the shortened path).
+  private def url_output_path(url_path : String) : String?
+    segments, refused = Utils::PathUtils.split_safe_segments(url_path)
+    return if refused
+    segments.join("/")
   end
 
-  # Source + output path pair the cache keys a page by.
-  private def cache_paths_for(page : Models::Page, output_dir : String) : {String, String}
+  # Record that a page the render loop counted could not be published by any
+  # sink, so `pages_rendered` can be corrected before it reaches the receipt.
+  protected def note_unpublished_page
+    @unpublished_pages.add(1)
+  end
+
+  # Record that a page actually wrote its output file.
+  protected def note_published_page
+    @published_pages.add(1)
+  end
+
+  # Absolute output path for `page`, or nil when its URL cannot be published
+  # safely — either a segment would traverse (see `url_output_path`) or the
+  # result lands outside `output_dir`. It must stay nil rather than fall back
+  # to `output_dir/<filename>`: that fallback dropped EVERY rejected page onto
+  # the site root `index.html`, so the homepage ended up holding whichever
+  # page rendered last instead of the page being skipped.
+  private def get_output_path(page : Models::Page, output_dir : String, filename : String = "index.html") : String?
+    url_path = url_output_path(page.url.lchop("/"))
+    return unless url_path
+    output_path = File.join(output_dir, url_path, filename)
+    Utils::OutputGuard.safe_output_path(output_path, output_dir)
+  end
+
+  # Source + output path pair the cache keys a page by. The output path is
+  # nil for a page whose URL escapes the output directory (see above).
+  private def cache_paths_for(page : Models::Page, output_dir : String) : {String, String?}
     {File.join("content", page.path), get_output_path(page, output_dir)}
   end
 
@@ -428,6 +615,9 @@ module Hwaro::Core::Build::Phases::Render
     return unless cache.enabled?
     return if collision_suppressed?(page, page.url)
     source_path, output_path = cache_paths_for(page, output_dir)
+    # No output file was written for an escaping page, so recording it as
+    # up-to-date would let filter_changed_pages skip it forever.
+    return unless output_path
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
     cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths)
   end
@@ -477,6 +667,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Track the first classified error seen by any worker so the build
     # can abort deterministically after draining the result channel.
+    published_before = @published_pages.get
     classified_error : Hwaro::HwaroError? = nil
     error_mutex = Mutex.new
 
@@ -538,14 +729,14 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     # Collect results
-    count = 0
-    pages.size.times do
-      count += 1 if results.receive
-    end
+    pages.size.times { results.receive }
 
     finalize_render_failures(failures, classified_error, verbose)
 
-    count
+    # Published, not processed: a page whose URL no writer could accept must
+    # not be reported as built. Returned as a delta so streaming batches and
+    # the incremental/serve callers each get their own number.
+    @published_pages.get - published_before
   end
 
   # Shared failure epilogue for the parallel and sequential render loops —
@@ -629,7 +820,7 @@ module Hwaro::Core::Build::Phases::Render
     error_overlay : Bool = false,
     profiler : Profiler? = nil,
   ) : Int32
-    count = 0
+    published_before = @published_pages.get
     safe = site.config.markdown.safe
 
     # Mirror the parallel path's failure handling: render every page,
@@ -649,7 +840,6 @@ module Hwaro::Core::Build::Phases::Render
         profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
       end
       record_page_cache_entry(page, cache, templates, site, output_dir)
-      count += 1
     rescue ex : Hwaro::HwaroError
       classified_error ||= ex
       failures << {page_path: page.path, message: ex.message.to_s}
@@ -660,7 +850,7 @@ module Hwaro::Core::Build::Phases::Render
 
     finalize_render_failures(failures, classified_error, verbose)
 
-    count
+    @published_pages.get - published_before
   end
 
   private def render_page(
@@ -896,8 +1086,23 @@ module Hwaro::Core::Build::Phases::Render
 
   # Shared by collision detection and alias writing so the suppression keys
   # can never drift from the written paths.
+  # Collision key for an alias target.
+  #
+  # `/foo/`, `/foo/index.html` and `/foo/index.htm` all name the same file on
+  # disk, so they must collapse to ONE key or `collision_suppressed?` cannot
+  # see the conflict. `aliases = ["/index.html"]` kept its own key, never
+  # collided with the homepage's `/`, and its redirect stub was written
+  # straight over `public/index.html` — silently, and order-dependently under
+  # the parallel render.
   private def normalize_alias_url(alias_path : String) : String
     norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
+    {"index.html", "index.htm"}.each do |leaf|
+      if norm == "/#{leaf}"
+        return "/"
+      elsif norm.ends_with?("/#{leaf}")
+        return norm[0, norm.size - leaf.size]
+      end
+    end
     return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
     "#{norm}/"
   end
@@ -926,16 +1131,28 @@ module Hwaro::Core::Build::Phases::Render
     redirect_url = site.config.with_base_path(redirect_url)
     return if collision_suppressed?(page, page.url)
 
-    url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/"))
+    # Same refusal contract as the main page sink: a redirect stub is still a
+    # published file, so a traversing URL must be refused loudly rather than
+    # written to whatever `sanitize_path` collapses it to. `/../` collapsed to
+    # `""`, which put the redirect stub on `<output_dir>/index.html` — on a
+    # site without its own `content/index.md` that stub BECAME the homepage.
+    url_path = url_output_path(page.url.lchop("/"))
+    unless url_path
+      Logger.warn "Not publishing #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory (a path segment traverses or escapes it). Rename the file or set an explicit `slug`/`path` in its front matter."
+      note_unpublished_page
+      return
+    end
     candidate = File.join(output_dir, url_path, "index.html")
     output_path = Utils::OutputGuard.safe_output_path(candidate, output_dir)
     unless output_path
       Logger.warn "Skipping redirect outside output directory: #{candidate}"
+      note_unpublished_page
       return
     end
 
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
+    note_published_page
     Logger.action :create, output_path if verbose
   end
 
@@ -1006,7 +1223,8 @@ module Hwaro::Core::Build::Phases::Render
   private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool, paginate_path : String = "page")
     # /page/N/ outputs live under the section's claimed URL.
     return if collision_suppressed?(page, page.url)
-    url_path = Utils::PathUtils.sanitize_path(page.url.lchop("/").rstrip("/"))
+    url_path = url_output_path(page.url.lchop("/").rstrip("/"))
+    return unless url_path
     output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
     return unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
 
@@ -1068,7 +1286,12 @@ module Hwaro::Core::Build::Phases::Render
       next if norm == own_url
       next if collision_suppressed?(page, norm)
 
-      alias_clean = Utils::PathUtils.sanitize_path(alias_path.lchop("/"))
+      alias_clean = url_output_path(alias_path.lchop("/"))
+      unless alias_clean
+        Logger.warn "Skipping alias #{alias_path.inspect} on #{page.path}: a path segment would escape the output directory."
+        note_unpublished_page
+        next
+      end
       # An alias that already names an HTML file (`/legacy.html`,
       # `/old/index.html`) is written to that exact path; only "pretty"
       # aliases (`/old/`) get an `index.html` appended. Previously every

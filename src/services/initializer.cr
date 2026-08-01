@@ -91,16 +91,29 @@ module Hwaro
         end
 
         unless Dir.exists?(target_path)
-          Hwaro::Utils::FileSafe.mkdir_p(target_path)
+          begin
+            Hwaro::Utils::FileSafe.mkdir_p(target_path)
+          rescue ex : File::Error
+            # A target that is an existing file, or a parent the process
+            # cannot write to, is a filesystem failure — classify it so
+            # callers get HWARO_E_IO (6) instead of the generic exit 1.
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Cannot create project directory '#{target_path}': #{ex.os_error.try(&.message) || ex.message}",
+              hint: "Pick a path that is not an existing file and whose parent directory is writable.",
+            )
+          end
         end
 
         # --clean wipes the dir up front; --force allows non-empty target but
         # keeps any existing files in place (only adds missing scaffold files).
         # Neither blindly overwrites user content.
-        unless force || clean || Dir.empty?(target_path)
-          Logger.error "Directory '#{target_path}' is not empty."
-          Logger.error "Use --force to proceed (keeps existing files, adds missing scaffold files), or --clean to remove existing files first."
-          exit(1)
+        unless force || clean || occupied_entries(target_path).empty?
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Directory '#{target_path}' is not empty.",
+            hint: "Use --force to proceed (keeps existing files, adds missing scaffold files), or --clean to remove existing files first.",
+          )
         end
 
         # The wizard already rendered the heading and a scaffold/title receipt;
@@ -120,10 +133,6 @@ module Hwaro
 
         if multilingual_languages.size == 1
           Logger.warn "  --include-multilingual needs 2+ languages; '#{multilingual_languages.first}' alone is treated as non-multilingual."
-        end
-
-        if minimal_config && is_multilingual
-          Logger.warn "  --minimal-config does not include multilingual settings; ignoring --include-multilingual"
         end
 
         # Create content structure
@@ -234,6 +243,19 @@ module Hwaro
           Logger.info "Run `hwaro build` to generate the site, then `hwaro serve` to preview."
           Logger.info "Set `base_url` in config.toml before deploying (defaults to http://localhost:3000)."
         end
+      rescue ex : File::Error
+        # Every write after the target directory itself — content/, templates/,
+        # static/, archetypes/, config.toml, AGENTS.md — can fail the same way
+        # (disk full, read-only mount, a directory made unwritable mid-run).
+        # Classifying only the first `mkdir_p` left those on the unclassified
+        # `Error:` / exit 1 path, which is the exact inconsistency this was
+        # meant to close. `HwaroError` is not a `File::Error`, so the usage
+        # errors raised above pass through untouched.
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Failed to scaffold '#{target_path}': #{ex.os_error.try(&.message) || ex.message}",
+          hint: "Check free space and that every path under the target directory is writable, then re-run (existing files are kept).",
+        )
       end
 
       # Emit the collected scaffold writes. Plain output replays the exact
@@ -400,6 +422,26 @@ module Hwaro
       # itself. Refuses to touch a target that contains `.git/` so a
       # typo'd path or an accidental `--clean .` in a real repo can't
       # wipe the user's work.
+      # Entries that do NOT make a target directory count as "not empty". VCS
+      # and OS metadata are ignored: `git init && hwaro init .` is the
+      # canonical first-site workflow, and a stray `.DS_Store` (created by
+      # merely opening a folder in Finder) should not force `--force` on a
+      # directory that is otherwise pristine.
+      #
+      # Deliberately the same set the build already refuses to publish, rather
+      # than a second hand-maintained list: a shorter local copy meant a
+      # submodule-only checkout holding just `.gitmodules` was refused while
+      # `.gitkeep` alone was accepted, with no rationale for the difference,
+      # and the two lists would have drifted. Broadening it is safe because
+      # `create_file`/`create_directory` never overwrite — an ignored entry is
+      # left untouched and the scaffold is written alongside it.
+      private def occupied_entries(target_path : String) : Array(String)
+        return [] of String unless Dir.exists?(target_path)
+        Dir.children(target_path).reject do |entry|
+          Models::StaticConfig::DEFAULT_EXCLUDE_NAMES.includes?(entry)
+        end
+      end
+
       private def clean_target(target_path : String)
         if Dir.exists?(File.join(target_path, ".git"))
           raise Hwaro::HwaroError.new(

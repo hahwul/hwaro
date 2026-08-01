@@ -13,6 +13,7 @@
 # additionally routed to STDERR for easy redirection.
 
 require "colorize"
+require "./text_utils"
 
 module Hwaro
   class Logger
@@ -512,10 +513,14 @@ module Hwaro
         io.puts(Logger.color_enabled? ? render_tty : render_plain)
       end
 
+      # Column widths in terminal COLUMNS, not codepoints. A CJK title renders
+      # twice as wide as `String#size` reports, so measuring/padding by size
+      # left every row after a non-ASCII cell visibly out of line. ASCII-only
+      # tables measure identically to before.
       private def widths : Array(Int32)
         @headers.map_with_index do |header, i|
-          cell_max = @rows.max_of? { |cells| (cells[i]? || "").size } || 0
-          {header.size, cell_max}.max
+          cell_max = @rows.max_of? { |cells| Utils::TextUtils.display_width(cells[i]? || "") } || 0
+          {Utils::TextUtils.display_width(header), cell_max}.max
         end
       end
 
@@ -523,13 +528,13 @@ module Hwaro
         w = widths
         last = @headers.size - 1
         lines = [] of String
-        header = @headers.map_with_index { |h, i| i == last ? h : h.ljust(w[i]) }.join("  ")
+        header = @headers.map_with_index { |h, i| i == last ? h : Utils::TextUtils.pad_display(h, w[i]) }.join("  ")
         lines << "  #{paint ? Logger.paint(header, Role::Dim) : header}"
         @rows.each_with_index do |cells, ri|
           roles = @roles[ri]
           painted = cells.map_with_index do |cell, ci|
             # The last column stays unpadded so lines carry no trailing blanks.
-            padded = ci == last ? cell : cell.ljust(w[ci])
+            padded = ci == last ? cell : Utils::TextUtils.pad_display(cell, w[ci])
             next padded unless paint
             role = roles.try(&.[ci]?) || Role::Plain
             # Pad first, paint second: escapes would break ljust math.

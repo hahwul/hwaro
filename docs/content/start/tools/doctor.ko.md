@@ -124,12 +124,19 @@ ignore = [
 
 규칙 ID는 `hwaro doctor --json` 출력에서 확인하면 됩니다. 무시된 문제는 사람이 읽는 출력과 JSON 출력 모두에서 완전히 제외됩니다.
 
+> `ignore`는 **warning**과 **info** 수준의 문제만 숨깁니다. 아래 표에서 ✗로
+> 표시된 error 수준 규칙은 어차피 `hwaro build`를 실패시키는 문제라서 목록에
+> 넣어도 CI 게이트를 끌 수 없습니다 — doctor는 계속 보고하고, 해당 항목이
+> 효과가 없다는 경고를 출력합니다.
+
 ### 사용 가능한 규칙 ID
+
+✗ 표시가 있는 항목은 error 수준이며 무시할 수 **없습니다**.
 
 | ID | 분류 | 설명 |
 |----|----------|-------------|
-| `config-not-found` | config | 설정 파일을 찾을 수 없음 |
-| `config-parse-error` | config | 설정 파싱 실패 |
+| `config-not-found` | config | 설정 파일을 찾을 수 없음 ✗ |
+| `config-parse-error` | config | 설정 파싱 실패 ✗ |
 | `base-url-missing` | config | base_url이 설정되지 않음 |
 | `base-url-scheme` | config | base_url이 http(s)로 시작하지 않음 |
 | `base-url-trailing-slash` | config | base_url에 끝 슬래시가 있음 |
@@ -140,11 +147,11 @@ ignore = [
 | `search-format-invalid` | config | 지원하지 않는 search.format |
 | `language-duplicate` | config | 언어 코드 중복 |
 | `missing-config-*` | config_missing | 설정 섹션 누락 (예: `missing-config-pwa`) |
-| `template-dir-missing` | template | 템플릿 디렉터리를 찾을 수 없음 |
-| `template-required-missing` | template | 필수 템플릿 누락 |
-| `template-unclosed-block` | template | 닫히지 않은 블록 태그 |
-| `template-mismatched-vars` | template | 짝이 맞지 않는 변수 태그 |
-| `template-read-error` | template | 템플릿 읽기 실패 |
+| `template-dir-missing` | template | 템플릿 디렉터리를 찾을 수 없음 ✗ |
+| `template-required-missing` | template | 필수 템플릿 누락 ✗ |
+| `template-unclosed-block` | template | 닫히지 않은 블록 태그 ✗ |
+| `template-mismatched-vars` | template | 짝이 맞지 않는 변수 태그 ✗ |
+| `template-read-error` | template | 템플릿 읽기 실패 ✗ |
 | `structure-missing-index` | structure | `_index.md`가 없는 섹션 |
 
 ## JSON 출력

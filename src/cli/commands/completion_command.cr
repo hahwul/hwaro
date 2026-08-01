@@ -8,6 +8,7 @@
 
 require "option_parser"
 require "../metadata"
+require "../../utils/errors"
 require "../../utils/logger"
 
 module Hwaro
@@ -58,7 +59,11 @@ module Hwaro
 
           unless shell
             print_help
-            exit(1)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "missing <shell> argument",
+              hint: "Usage: hwaro completion <#{SHELLS.join("|")}>",
+            )
           end
 
           case shell.as(String).downcase
@@ -69,9 +74,11 @@ module Hwaro
           when "fish"
             puts generate_fish
           else
-            Logger.error "Unknown shell: #{shell}"
-            Logger.info "Supported shells: #{SHELLS.join(", ")}"
-            exit(1)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "unknown shell '#{shell}'",
+              hint: "Supported shells: #{SHELLS.join(", ")}",
+            )
           end
         end
 

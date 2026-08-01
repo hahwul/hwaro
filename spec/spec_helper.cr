@@ -13,6 +13,13 @@ Spec.after_each do
   Hwaro::Content::Processors::SyntaxHighlighter.server_mode = false
   Hwaro::Content::Processors::SyntaxHighlighter.default_line_numbers = false
   Hwaro::Content::Processors::SyntaxHighlighter.default_copy = false
+
+  # `Runner.enable_json_mode!` silences the Logger process-wide and never
+  # restores it, so an example that drives a command with `--json` used to
+  # blackhole every later example's log assertions. Reset both here rather
+  # than in each such example.
+  Hwaro::CLI::Runner.json_mode = false
+  Hwaro::Logger.quiet = false
 end
 
 # Helper for creating temp directories in tests

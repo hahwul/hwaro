@@ -50,11 +50,13 @@ module Hwaro
         # `bare` is intentionally minimal — taxonomies/search/highlight are
         # opt-in features that conflict with the "no batteries" promise of
         # this scaffold. Users who want them can copy from the simple
-        # scaffold or pass `--scaffold simple`. The `taxonomies_config`
-        # override above is therefore omitted from the default emit even
-        # when `--include-taxonomies` is set; we still ship the taxonomy
-        # templates below so users can wire them up later by adding
-        # `[[taxonomies]]` entries themselves.
+        # scaffold or pass `--scaffold simple`. `bare` therefore ships no
+        # taxonomy templates (see `template_files`) and no search UI, so
+        # emitting those config sections would generate output nothing links
+        # to: empty `/tags/` + `/categories/` + `/authors/` pages rendered by
+        # the `section.html` fallback, a `search.json` no page fetches, and a
+        # JSON-LD `SearchAction` pointing at a search endpoint that does not
+        # exist — all of them listed in `sitemap.xml`.
         def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           config = String.build do |str|
             str << base_config
@@ -64,6 +66,21 @@ module Hwaro
             str << feeds_config(feed_sections)
           end
           config
+        end
+
+        # `hwaro init`'s DEFAULT path (no `--full-config`) and
+        # `--minimal-config` both build on `minimal_config_content`, NOT
+        # `config_content` — without this override the opt-outs documented
+        # above only took effect under `--full-config`, so the common case
+        # shipped exactly the taxonomies/search/highlight sections `bare`
+        # promises to leave out. Mirrors the `Simple#minimal_config_content`
+        # precedent.
+        def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+          String.build do |str|
+            str << minimal_site_toml(skip_taxonomies, multilingual_languages)
+            str << minimal_plugins_toml
+            str << minimal_sitemap_feeds_toml
+          end
         end
 
         # Bare header: semantic HTML only, no styles. `page.title` and

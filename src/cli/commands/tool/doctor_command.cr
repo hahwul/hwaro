@@ -101,8 +101,37 @@ module Hwaro
             if fix_mode || approve_mode
               # `--fix` gates value normalization, `--approve` gates section
               # appends — a bare `--approve` must not silently edit values.
-              run_fix(doctor, fix_values: fix_mode, approve_sections: approve_mode, dry_run: dry_run_mode, json_output: json_output)
-              return
+              summary = doctor.fix_config(approve_sections: approve_mode, dry_run: dry_run_mode, apply_value_fixes: fix_mode)
+              remaining = doctor.run
+              code = exit_code_for(remaining, strict: strict_mode, max_warnings: max_warnings)
+
+              if json_output
+                # The payload has to explain the exit code on its own: a
+                # fix-mode run that exits 4 used to print only
+                # `{"sections_added":[],"value_fixes":[],"dry_run":false}` with
+                # an empty stderr, leaving a consumer no way to see WHY. Carry
+                # the same `issues`/`exit_code` fields the non-fix path emits.
+                puts({
+                  "schema_version" => JSON_SCHEMA_VERSION,
+                  "sections_added" => summary.sections_added,
+                  "value_fixes"    => summary.value_fixes,
+                  "dry_run"        => summary.dry_run,
+                  "issues"         => remaining,
+                  "summary"        => {
+                    "errors"   => remaining.count { |i| i.level == :error },
+                    "warnings" => remaining.count { |i| i.level == :warning },
+                    "infos"    => remaining.count { |i| i.level == :info },
+                    "total"    => remaining.size,
+                  },
+                  "exit_code" => code,
+                }.to_json)
+              else
+                render_fix_summary(summary, approve_sections: approve_mode, dry_run: dry_run_mode)
+                if code != Hwaro::Errors::EXIT_SUCCESS
+                  Logger.warn "#{remaining.count { |i| i.level != :info }} issue(s) remain — run '#{invocation}' for details."
+                end
+              end
+              exit(code)
             end
 
             issues = doctor.run
@@ -327,14 +356,10 @@ module Hwaro
             plain ? "[ok]" : Logger.paint("✓", Logger::Role::Success)
           end
 
-          private def run_fix(doctor : Services::Doctor, fix_values : Bool, approve_sections : Bool, dry_run : Bool, json_output : Bool)
-            summary = doctor.fix_config(approve_sections: approve_sections, dry_run: dry_run, apply_value_fixes: fix_values)
-
-            if json_output
-              puts summary.to_json
-              return
-            end
-
+          # Human rendering of a completed fix run. JSON mode composes its own
+          # payload in `run` so the fix result and the post-fix diagnosis ship
+          # as one document.
+          private def render_fix_summary(summary : Services::Doctor::FixSummary, approve_sections : Bool, dry_run : Bool)
             plain = plain_output?
 
             if summary.empty?

@@ -295,11 +295,18 @@ module Hwaro
         end
       end
 
+      # Strip front matter, if any. The TOML and YAML strips are mutually
+      # exclusive: chaining them let the `\A`-anchored YAML pattern eat a
+      # *body* that opens with a thematic break (`---\n…\n---`) once the TOML
+      # front matter had already been removed, so alt-text and broken-link
+      # findings inside that first block were silently dropped.
       private def extract_body(content : String) : String
         if content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
           content.byte_slice(end_idx)
+        elsif content.matches?(TOML_FRONTMATTER_RE)
+          content.sub(TOML_FRONTMATTER_RE, "")
         else
-          content.sub(TOML_FRONTMATTER_RE, "").sub(YAML_FRONTMATTER_RE, "")
+          content.sub(YAML_FRONTMATTER_RE, "")
         end
       end
 

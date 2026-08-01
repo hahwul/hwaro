@@ -16,6 +16,8 @@ module Hwaro
           errors = 0
           wrapped = 0
 
+          reset_written_paths
+
           unless Dir.exists?(path)
             return ImportResult.new(
               success: false,
@@ -60,6 +62,8 @@ module Hwaro
           if wrapped > 0
             Logger.warn "#{wrapped} file(s) contained MDX components. Imports kept the raw markup — each will render as literal text until you hand-convert them."
           end
+
+          report_collisions
 
           ImportResult.new(
             success: imported > 0 || errors == 0,

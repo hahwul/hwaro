@@ -61,11 +61,24 @@ module Hwaro
         )
         end
 
+        # Host as it must appear inside a URL. An IPv6 literal has to be
+        # bracketed (RFC 3986) — without this `hwaro serve -b ::1` produced
+        # `http://::1:3000`, which no browser can resolve, and baked that
+        # string into every link, canonical and OG URL of the served site.
+        def self.url_host(host : String) : String
+          return host unless host.includes?(':')
+          return host if host.starts_with?('[')
+          # RFC 6874: a zone id's "%" separator must be percent-encoded inside
+          # a URI, so `fe80::1%en0` becomes `[fe80::1%25en0]`. The lookahead
+          # leaves an already-encoded host alone.
+          "[#{host.sub(/%(?!25)/, "%25")}]"
+        end
+
         # Convert to BuildOptions for initial build
         def to_build_options : BuildOptions
           # When no explicit --base-url is provided, derive from serve host:port
           # so that generated URLs reflect the actual server address
-          effective_base_url = @base_url || "http://#{@host}:#{@port}"
+          effective_base_url = @base_url || "http://#{ServeOptions.url_host(@host)}:#{@port}"
 
           BuildOptions.new(
             output_dir: "public",

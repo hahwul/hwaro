@@ -157,7 +157,13 @@ module Hwaro
             config = load_config(project_root)
             taxonomy_names = config ? config.taxonomies.map(&.name) : [] of String
             base_path = config ? config.base_path : ""
-            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path)
+            # Non-default language codes are served under a `/<code>/` prefix
+            # (`content/about.ko.md` → `/ko/about/`), so the checker has to
+            # strip that segment before resolving — otherwise every link in a
+            # multilingual site resolves against `content/ko/…` and is
+            # reported dead.
+            language_codes = translation_language_codes(config)
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes)
 
             total = external_links.size + internal_links.size
             dead_total = dead_external.size + dead_internal.size
@@ -223,32 +229,102 @@ module Hwaro
           # non-greedy /```[\s\S]*?```/ mispaired nested fences — a 4-backtick
           # example wrapping a 3-backtick fence desynchronized every fence
           # after it, resurrecting example links as false positives.
+          # Also stripped: HTML comments and indented (4-space/tab) code
+          # blocks. Both hold example markup that is not a link — a
+          # `<!-- <img src="/old.png"> -->` note and an indented
+          # `<a href="/example/">` demo were each reported dead.
+          #
+          # Indented code is recognized conservatively, per CommonMark: a run
+          # only counts as code when it follows a blank line AND no list item
+          # is open. Without the list guard a 4-space list-item continuation
+          # would be swallowed, which is exactly the failure that made the
+          # sibling validator give up on indented blocks entirely.
           private def strip_code(content : String) : String
             result = String::Builder.new
             fence_char : Char? = nil
             fence_len = 0
+            in_comment = false
+            in_indented_code = false
+            in_list = false
+            prev_blank = true
 
             content.each_line(chomp: false) do |line|
+              blank = line.strip.empty?
+
+              # HTML comments span lines and can open/close mid-line.
+              if in_comment
+                if idx = line.index("-->")
+                  in_comment = false
+                  result << line[(idx + 3)..].gsub(/`[^`\n]*`/, "")
+                else
+                  result << '\n'
+                end
+                prev_blank = blank
+                next
+              end
+
               if m = line.match(/\A {0,3}(`{3,}|~{3,})/)
                 marker = m[1]
                 if fence_char.nil?
                   fence_char = marker[0]
                   fence_len = marker.size
+                  in_indented_code = false
                   result << '\n'
+                  prev_blank = false
                   next
                 elsif marker[0] == fence_char && marker.size >= fence_len
                   fence_char = nil
                   fence_len = 0
                   result << '\n'
+                  prev_blank = false
                   next
                 end
               end
 
               if fence_char
                 result << '\n'
-              else
-                result << line.gsub(/`[^`\n]*`/, "")
+                prev_blank = blank
+                next
               end
+
+              # Track list context so a 4-space continuation line is treated as
+              # prose, not code.
+              if line.matches?(/\A {0,3}(?:[-*+]|\d+[.)])\s/)
+                in_list = true
+              elsif blank
+                # A blank line alone does not close a list; a subsequent
+                # unindented non-list line does.
+              elsif !line.starts_with?(" ") && !line.starts_with?("\t")
+                in_list = false
+              end
+
+              indented = line.starts_with?("    ") || line.starts_with?("\t")
+              if in_indented_code
+                if blank || indented
+                  result << '\n'
+                  prev_blank = blank
+                  next
+                end
+                in_indented_code = false
+              elsif indented && prev_blank && !in_list && !blank
+                in_indented_code = true
+                result << '\n'
+                prev_blank = false
+                next
+              end
+
+              stripped = line.gsub(/`[^`\n]*`/, "")
+              # A comment opened on this line: keep the text before it.
+              if idx = stripped.index("<!--")
+                if close = stripped.index("-->", idx)
+                  stripped = stripped[0...idx] + stripped[(close + 3)..]
+                else
+                  in_comment = true
+                  stripped = stripped[0...idx] + "\n"
+                end
+              end
+              result << stripped
+              prev_blank = blank
             end
 
             result.to_s
@@ -268,12 +344,39 @@ module Hwaro
             link_regex = /(?:!\[[^\]]*?\]|\[[^\]]*?\])\((https?:\/\/(?:\([^\s()]*\)|[^\s()])+)\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
-              content = strip_code(File.read(file))
+              content = readable_markdown(file) || next
               content.scan(link_regex) do |match|
                 links << Link.new(file: file, url: match[1], kind: :external)
               end
+              scan_reference_definitions(content) do |url|
+                next unless url.starts_with?("http://") || url.starts_with?("https://")
+                links << Link.new(file: file, url: url, kind: :external)
+              end
             end
             links
+          end
+
+          # Read and code-strip one Markdown file, returning nil when the file
+          # cannot be scanned. A file containing invalid UTF-8 makes PCRE2
+          # raise `ArgumentError` mid-scan, which used to abort the whole run
+          # with a bare "Error: Regex match error" and exit 1 — the same code
+          # as "dead links found", so CI could not tell the two apart. Skip the
+          # file with a warning instead, matching how `tool list` and
+          # `tool validate` degrade on the same input.
+          # Memoized per invocation: `run` scans the same tree twice (once for
+          # external links, once for internal), and without this each file was
+          # read and code-stripped twice — and an unreadable one warned twice.
+          @scanned = {} of String => String?
+
+          private def readable_markdown(file : String) : String?
+            @scanned.fetch(file) { @scanned[file] = read_and_strip(file) }
+          end
+
+          private def read_and_strip(file : String) : String?
+            strip_code(File.read(file))
+          rescue ex : ArgumentError | IO::Error
+            Logger.warn "Skipping #{file}: #{ex.message}"
+            nil
           end
 
           # Markdown link/image destination, allowing ONE level of balanced
@@ -314,26 +417,125 @@ module Hwaro
             image_re = /!\[([^\]]*)\]\(#{LINK_DEST.source}\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
-              content = strip_code(File.read(file))
+              content = readable_markdown(file) || next
 
               # Regular links (exclude images by using negative lookbehind)
               content.scan(link_re) do |match|
                 url = clean_link_target(match[2])
-                next if url.empty? || url.starts_with?("#") || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
+                next if skip_internal?(url)
                 links << Link.new(file: file, url: url, kind: :internal)
               end
 
               # Image links
               content.scan(image_re) do |match|
                 url = clean_link_target(match[2])
-                next if url.empty? || url.starts_with?("//") || url =~ /\A[a-z][a-z0-9+.\-]*:/i
+                next if skip_internal?(url, allow_fragment: false)
                 links << Link.new(file: file, url: url, kind: :image)
+              end
+
+              # Reference-style links (`[text][id]` + `[id]: /target/`) and
+              # raw HTML anchors/images. Both render as real links, so a page
+              # written that way used to get a clean bill of health.
+              scan_reference_definitions(content) do |raw|
+                url = clean_link_target(raw)
+                next if skip_internal?(url)
+                links << Link.new(file: file, url: url, kind: :internal)
+              end
+
+              content.scan(HTML_TAG_RE) do |tag|
+                kind = tag[1].downcase == "a" ? :internal : :image
+                tag[2].scan(HTML_ATTR_RE) do |attr|
+                  raw = attr[2]? || attr[3]? || attr[4]?
+                  next unless raw
+                  html_link_targets(attr[1], raw).each do |candidate|
+                    url = clean_link_target(candidate)
+                    next if skip_internal?(url) || url.includes?("{{") || url.includes?("{%")
+                    links << Link.new(file: file, url: url, kind: kind)
+                  end
+                end
               end
             end
             links
           end
 
-          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "") : Array(Result)
+          # `<a href>` / `<img src|srcset>` / `<source src|srcset>` written
+          # directly in Markdown. `<source>` matters because `<picture>` and
+          # `<video>` blocks are the common hand-written HTML in docs content.
+          # The value may be unquoted (`href=/x/`), which stops at whitespace
+          # or `>`.
+          # Matched in two passes — tag, then each attribute inside it — because
+          # a single regex consumes the whole tag and so only ever reports the
+          # FIRST link attribute: `<img srcset="…" src="…">` lost its `src`.
+          HTML_TAG_RE  = /<(a|img|source)\b([^>]*)>/i
+          HTML_ATTR_RE = /\b(href|src|srcset)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
+
+          # One `srcset` entry is `url [descriptor]`, comma-separated.
+          private def html_link_targets(attribute : String, value : String) : Array(String)
+            return [value] unless attribute.downcase == "srcset"
+            value.split(',').compact_map do |candidate|
+              url = candidate.strip.split(/\s+/).first?
+              url if url && !url.empty?
+            end
+          end
+
+          # A Markdown link reference definition (`[id]: /target/ "title"`).
+          #
+          # Three guards keep this from inventing links: footnote definitions
+          # (`[^1]: …`) are skipped, the destination must look like a URL or
+          # path, and — decisively — the label must actually be USED somewhere
+          # in the document. Shape alone is not enough: the ordinary prose line
+          #
+          #     [Note]: /usr/bin is where the binary lives on most systems
+          #
+          # has a path-shaped first token and was reported as a dead link.
+          # CommonMark only treats such a line as a definition when a matching
+          # reference exists, so requiring one removes the whole false-positive
+          # class rather than blacklisting shapes.
+          REFERENCE_DEFINITION_RE = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(\S+)/m
+
+          # `[text][label]`, `[label][]`, and the shortcut form `[label]` — the
+          # last excluding anything followed by `(`, `[` or `:`, which is an
+          # inline link, a full reference, or another definition.
+          REFERENCE_USE_RES = {
+            /\]\[([^\]\n]+)\]/,
+            /\[([^\]\n]+)\]\[\]/,
+            /\[([^\]\n]+)\](?![\(\[:])/,
+          }
+
+          private def referenced_labels(content : String) : Set(String)
+            labels = Set(String).new
+            REFERENCE_USE_RES.each do |re|
+              content.scan(re) { |m| labels << m[1].strip.downcase }
+            end
+            labels
+          end
+
+          private def scan_reference_definitions(content : String, &)
+            used = referenced_labels(content)
+            content.scan(REFERENCE_DEFINITION_RE) do |match|
+              label = match[1]
+              next if label.starts_with?('^')
+              next unless used.includes?(label.strip.downcase)
+              dest = match[2]
+              dest = dest[1..-2] if dest.starts_with?('<') && dest.ends_with?('>')
+              next unless dest.starts_with?('/') || dest.starts_with?("./") ||
+                          dest.starts_with?("../") || dest.starts_with?("@/") ||
+                          dest =~ /\A[a-z][a-z0-9+.\-]*:/i
+              yield dest
+            end
+          end
+
+          # Destinations the filesystem check cannot say anything about:
+          # empty, protocol-relative, pure fragments, and anything carrying a
+          # URI scheme (`mailto:`, `tel:`, `javascript:`, `https:`, …).
+          private def skip_internal?(url : String, allow_fragment : Bool = true) : Bool
+            return true if url.empty?
+            return true if allow_fragment && url.starts_with?("#")
+            return true if url.starts_with?("//")
+            !!(url =~ /\A[a-z][a-z0-9+.\-]*:/i)
+          end
+
+          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String) : Array(Result)
             results = [] of Result
             project_root = find_project_root(content_dir)
 
@@ -349,43 +551,23 @@ module Hwaro
               end
 
               base_dir = File.dirname(link.file)
-              target = if resolved_url.starts_with?("@/")
-                         # Zola-style content-root link (`@/posts/hello.md`).
-                         # The build resolves these against the content dir,
-                         # so the checker must too — otherwise valid links
-                         # like `@/index.md` were reported dead (dogfooding find).
-                         File.join(content_dir, resolved_url[2..])
-                       elsif resolved_url.starts_with?("/")
-                         File.join(content_dir, resolved_url.lstrip("/"))
-                       else
-                         File.join(base_dir, resolved_url)
-                       end
 
-              # Most internal URLs are written with a trailing slash
-              # (`/about/`, `/posts/hello/`) — strip it before computing
-              # the leaf-file candidate so `target_no_slash + ".md"`
-              # resolves to `content/about.md` instead of the broken
-              # `content/about/.md` the old code produced. The directory
-              # candidates (`_index.md` / `index.md`) work either way.
-              target_no_slash = target.rstrip("/")
+              # Resolve the URL exactly as written FIRST. A leading segment
+              # that happens to match a language code may be a real section
+              # (`content/ko/posts/`), and that section outranks any
+              # translation reading — stripping unconditionally reported such
+              # links dead even though the build publishes them.
+              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names)
 
-              exists = File.exists?(target) ||
-                       File.exists?(target_no_slash + ".md") ||
-                       File.exists?(target_no_slash + ".markdown") ||
-                       File.exists?(File.join(target_no_slash, "_index.md")) ||
-                       File.exists?(File.join(target_no_slash, "index.md")) ||
-                       (link.kind != :image && taxonomy_url?(resolved_url, taxonomy_names))
-
-              # Also accept assets that live in static/ (source) or public/ (after build).
-              # This prevents false positives for:
-              # - Images and other files in static/images/, static/css/, etc.
-              # - Resized/LQIP versions generated by the image pipeline (in public/)
-              # - Any other files published via [content.files] or the asset pipeline.
-              unless exists
-                asset_path = resolved_url.lstrip("/")
-                static_candidate = File.join(project_root, "static", asset_path)
-                public_candidate = File.join(project_root, "public", asset_path)
-                exists = File.exists?(static_candidate) || File.exists?(public_candidate)
+              # Only when the literal path fails do we read the URL as a
+              # translation route (`/ko/about/` ← `content/about.ko.md`), and
+              # then ONLY language-qualified evidence counts. Accepting the
+              # default-language source here would pass `/ko/x/` for a site
+              # that never translated `x` — a link the build emits nothing for.
+              if !exists && (code = translatable_language_prefix(resolved_url, language_codes))
+                stripped = resolved_url[(code.size + 1)..]
+                stripped = "/" if stripped.empty?
+                exists = translated_source?(stripped, code, link, content_dir, base_dir, taxonomy_names)
               end
 
               unless exists
@@ -418,6 +600,91 @@ module Hwaro
           # generated by Hwaro at build time, so they have no source file to
           # check against. Match the URL's leading segment against the site's
           # declared taxonomy names and accept it when it lines up.
+          # Language codes that get a `/<code>/` URL prefix: every declared
+          # language except the default one, which is served at the root.
+          private def translation_language_codes(config : Models::Config?) : Array(String)
+            return [] of String unless config
+            config.languages.keys.reject { |code| code.empty? || code == config.default_language }
+          end
+
+          # The build only recognizes a language suffix in a content filename
+          # when the code is 2–3 lowercase letters (`ReadContent::
+          # LANGUAGE_FILENAME_PATTERN`). A declared `pt-BR` therefore never
+          # produces `/pt-BR/…` routes — `about.pt-BR.md` is read as an
+          # ordinary page and published at `/about.pt-BR/`. Mirroring that
+          # rule here keeps the checker from inventing a translation route the
+          # build will not serve.
+          TRANSLATABLE_CODE = /\A[a-z]{2,3}\z/
+
+          # Returns the leading language segment of an absolute URL when it
+          # names a non-default language the build can actually route, else nil.
+          private def translatable_language_prefix(url : String, codes : Array(String)) : String?
+            return if codes.empty?
+            return unless url.starts_with?("/")
+            segment = url.lstrip("/").split("/").first?
+            return unless segment
+            return unless codes.includes?(segment) && segment.matches?(TRANSLATABLE_CODE)
+            segment
+          end
+
+          # Does `url` resolve to a source file, taxonomy route, or shipped
+          # asset, read literally? This is the language-agnostic resolution the
+          # checker has always performed.
+          private def resolves?(url : String, link : Link, content_dir : String, base_dir : String,
+                                project_root : String, taxonomy_names : Array(String)) : Bool
+            target = content_target(url, content_dir, base_dir)
+            # Most internal URLs are written with a trailing slash (`/about/`,
+            # `/posts/hello/`) — strip it before computing the leaf-file
+            # candidate so `target_no_slash + ".md"` resolves to
+            # `content/about.md` instead of the broken `content/about/.md`.
+            # The directory candidates work either way.
+            target_no_slash = target.rstrip("/")
+
+            return true if File.exists?(target) ||
+                           File.exists?(target_no_slash + ".md") ||
+                           File.exists?(target_no_slash + ".markdown") ||
+                           File.exists?(File.join(target_no_slash, "_index.md")) ||
+                           File.exists?(File.join(target_no_slash, "index.md")) ||
+                           (link.kind != :image && taxonomy_url?(url, taxonomy_names))
+
+            # Also accept assets that live in static/ (source) or public/ (after
+            # build): images under static/images/, resized/LQIP variants the
+            # image pipeline emits into public/, and anything published via
+            # [content.files] or the asset pipeline. The public/ probe doubles
+            # as the oracle for generated routes on an already-built site.
+            asset_path = url.lstrip("/")
+            File.exists?(File.join(project_root, "static", asset_path)) ||
+              File.exists?(File.join(project_root, "public", asset_path))
+          end
+
+          # Language-qualified resolution for a `/<code>/…` URL whose literal
+          # path did not resolve. Deliberately narrow: only a `.<code>` source
+          # or a taxonomy route counts, never the default-language file.
+          private def translated_source?(url : String, code : String, link : Link,
+                                         content_dir : String, base_dir : String,
+                                         taxonomy_names : Array(String)) : Bool
+            target_no_slash = content_target(url, content_dir, base_dir).rstrip("/")
+
+            File.exists?("#{target_no_slash}.#{code}.md") ||
+              File.exists?("#{target_no_slash}.#{code}.markdown") ||
+              File.exists?(File.join(target_no_slash, "_index.#{code}.md")) ||
+              File.exists?(File.join(target_no_slash, "index.#{code}.md")) ||
+              (link.kind != :image && taxonomy_url?(url, taxonomy_names))
+          end
+
+          # Map a link destination onto a path under the content directory.
+          private def content_target(url : String, content_dir : String, base_dir : String) : String
+            if url.starts_with?("@/")
+              # Zola-style content-root link (`@/posts/hello.md`). The build
+              # resolves these against the content dir, so the checker must too.
+              File.join(content_dir, url[2..])
+            elsif url.starts_with?("/")
+              File.join(content_dir, url.lstrip("/"))
+            else
+              File.join(base_dir, url)
+            end
+          end
+
           private def taxonomy_url?(url : String, names : Array(String)) : Bool
             return false if names.empty?
             return false unless url.starts_with?("/")

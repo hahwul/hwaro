@@ -243,7 +243,14 @@ module Hwaro
         # Safe subdirectory under `output_dir` for a section/lang/taxonomy
         # feed. Returns nil (and warns) when the URL escapes the public tree.
         def self.feed_output_dir_for(output_dir : String, url : String) : String?
-          url_path = Utils::PathUtils.sanitize_path(url.lchop("/"))
+          # Refuse-outright, like every other writer: a collapsed path would
+          # put a section feed at the output root, over the site feed.
+          segments, refused = Utils::PathUtils.split_safe_segments(url.lchop("/"))
+          if refused
+            Logger.warn "Skipping feed output outside output directory: #{url}"
+            return
+          end
+          url_path = segments.join("/")
           candidate = url_path.empty? ? output_dir : File.join(output_dir, url_path)
           unless Utils::OutputGuard.within_output_dir?(candidate, output_dir)
             Logger.warn "Skipping feed output outside output directory: #{url}"

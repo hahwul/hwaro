@@ -14,6 +14,8 @@ module Hwaro
           verbose = options.verbose
           force = options.force
 
+          reset_written_paths
+
           unless File.exists?(wxr_path)
             return ImportResult.new(
               success: false,
@@ -58,6 +60,8 @@ module Hwaro
             errors += 1
             Logger.warn "Error processing item: #{ex.message}"
           end
+
+          report_collisions
 
           ImportResult.new(
             success: imported > 0 || errors == 0,

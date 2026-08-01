@@ -40,6 +40,19 @@ module Hwaro
 
       CONTENT_EXTENSIONS = Set{".md", ".markdown"}
 
+      # Template files that may reference an asset. `.html` alone was not
+      # enough: `Builder::TEMPLATE_EXTENSION_REGEX` also accepts `.j2`,
+      # `.jinja`, `.jinja2` and `.ecr`, and feed/manifest templates are
+      # authored as `rss.xml.jinja` / `site.webmanifest`. Anything missing
+      # here is invisible to the reference scan, so its assets are reported
+      # unused — and `--delete` removes files the build still needs.
+      TEMPLATE_SCAN_EXTENSIONS = %w[html j2 jinja jinja2 ecr css js xml json webmanifest svg txt]
+
+      # Static sources that reference other static files: Sass (`@font-face`
+      # / `url()` in a `.scss` that compiles to `.css`), PWA manifests
+      # (`site.webmanifest` icons), and `<image href>` inside an SVG.
+      STATIC_SCAN_EXTENSIONS = %w[css scss sass js json webmanifest xml svg txt]
+
       @content_dir : String
       @static_dir : String
       @templates_dir : String
@@ -155,9 +168,7 @@ module Hwaro
         end
 
         if Dir.exists?(@templates_dir)
-          Dir.glob(File.join(@templates_dir, "**", "*.html")) { |f| scan_files << f }
-          Dir.glob(File.join(@templates_dir, "**", "*.css")) { |f| scan_files << f }
-          Dir.glob(File.join(@templates_dir, "**", "*.js")) { |f| scan_files << f }
+          Dir.glob(File.join(@templates_dir, "**", "*.{#{TEMPLATE_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         # Stylesheets/scripts shipped under static/ commonly reference other
@@ -166,17 +177,12 @@ module Hwaro
         # them, those fonts are misreported as unused — and `--delete` would
         # remove in-use files (data loss).
         if Dir.exists?(@static_dir)
-          Dir.glob(File.join(@static_dir, "**", "*.css")) { |f| scan_files << f }
-          Dir.glob(File.join(@static_dir, "**", "*.js")) { |f| scan_files << f }
+          Dir.glob(File.join(@static_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         String.build do |sb|
           scan_files.each do |file|
-            text = begin
-              File.read(file)
-            rescue IO::Error
-              next
-            end
+            text = readable_scan_source(file) || next
             sb << text << '\n'
           end
 
@@ -188,6 +194,26 @@ module Hwaro
             end
           end
         end
+      end
+
+      # Read one reference source, or nil when it cannot be scanned.
+      #
+      # A file containing invalid UTF-8 makes every later PCRE2 operation on
+      # the concatenated corpus raise `ArgumentError`, which aborted the whole
+      # command with a bare "Error: Regex match error" and zero results. That
+      # got materially more likely once the scan widened to `.json`/`.xml`/
+      # `.svg`/`.txt`, which are often machine-generated. Skip the file with a
+      # warning instead — the same degradation `check-links` performs.
+      private def readable_scan_source(file : String) : String?
+        text = File.read(file)
+        # Force the decode failure here, where it can be attributed to a file,
+        # rather than later inside a regex over the whole corpus.
+        return text if text.valid_encoding?
+        Logger.warn "Skipping #{file}: not valid UTF-8"
+        nil
+      rescue ex : IO::Error | ArgumentError
+        Logger.warn "Skipping #{file}: #{ex.message}"
+        nil
       end
 
       # Extract referenced asset filenames from content and template files.

@@ -119,11 +119,14 @@ describe Hwaro::Services::Importers::Base do
       end
     end
 
+    # A second importer instance stands in for a re-import: "existing" means
+    # a file that was already on disk before this run, not one this same run
+    # just wrote (that case is a destination collision — see
+    # spec/unit/importer_regression_spec.cr).
     it "skips existing files" do
       Dir.mktmpdir do |dir|
-        importer = TestImporter.new
-        importer.test_write_content_file(dir, "", "existing", "+++\n+++", "First")
-        result = importer.test_write_content_file(dir, "", "existing", "+++\n+++", "Second")
+        TestImporter.new.test_write_content_file(dir, "", "existing", "+++\n+++", "First")
+        result = TestImporter.new.test_write_content_file(dir, "", "existing", "+++\n+++", "Second")
         result.should be_false
 
         content = File.read(File.join(dir, "existing.md"))
@@ -134,9 +137,8 @@ describe Hwaro::Services::Importers::Base do
 
     it "overwrites existing files when force is true" do
       Dir.mktmpdir do |dir|
-        importer = TestImporter.new
-        importer.test_write_content_file(dir, "", "existing", "+++\n+++", "First")
-        result = importer.test_write_content_file(dir, "", "existing", "+++\n+++", "Second", false, true)
+        TestImporter.new.test_write_content_file(dir, "", "existing", "+++\n+++", "First")
+        result = TestImporter.new.test_write_content_file(dir, "", "existing", "+++\n+++", "Second", false, true)
         result.should be_true
 
         content = File.read(File.join(dir, "existing.md"))

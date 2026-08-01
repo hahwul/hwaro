@@ -17,6 +17,12 @@ module Hwaro
         # Creator then consults the archetype directive and the config
         # default in that order (CLI > archetype > config > single).
         property bundle : Bool?
+        # True when the raw `<path>` ended in `/` (e.g. `hwaro new notes/`).
+        # Path normalization drops the separator, so the author's explicit
+        # "this is a directory" signal has to be carried alongside it —
+        # otherwise `notes/` scaffolds the page `content/notes.md` instead of
+        # a page inside `content/notes/`.
+        property path_is_dir : Bool
 
         def initialize(
           @path : String? = nil,
@@ -28,6 +34,7 @@ module Hwaro
           @tags : Array(String) = [] of String,
           @section : String? = nil,
           @bundle : Bool? = nil,
+          @path_is_dir : Bool = false,
         )
         end
       end

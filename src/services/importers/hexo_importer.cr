@@ -19,6 +19,8 @@ module Hwaro
           errors = 0
           wrapped = 0
 
+          reset_written_paths
+
           unless Dir.exists?(path)
             return ImportResult.new(
               success: false,
@@ -54,6 +56,8 @@ module Hwaro
           if wrapped > 0
             Logger.warn "#{wrapped} file(s) contained Hexo tag plugins. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
           end
+
+          report_collisions
 
           ImportResult.new(
             success: imported > 0 || errors == 0,

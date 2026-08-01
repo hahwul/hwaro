@@ -5,6 +5,9 @@ require "../../config/options/export_options"
 require "../../utils/file_safe"
 require "../../utils/frontmatter_writer"
 require "../../utils/logger"
+require "../../utils/output_guard"
+require "../../utils/path_utils"
+require "../../utils/text_utils"
 
 module Hwaro
   module Services
@@ -39,6 +42,50 @@ module Hwaro
           Dir.glob(File.join(content_dir, "**", "*.md")) { |f| files << f }
           Dir.glob(File.join(content_dir, "**", "*.markdown")) { |f| files << f }
           files.sort
+        end
+
+        # Read a content file for export, stripping a UTF-8 BOM. A leading
+        # U+FEFF defeats the `\A---` / `\A+++` anchors below, which silently
+        # produced an empty frontmatter block with the whole document — raw
+        # fences and all — dumped into the body, and (having lost `date`)
+        # misfiled posts as pages. `hwaro build` already strips it via
+        # `TextUtils.strip_bom`, so such a file builds fine and only breaks
+        # on export.
+        protected def read_content(path : String) : String
+          Hwaro::Utils::TextUtils.strip_bom(File.read(path))
+        end
+
+        # Copy a page bundle's co-located assets — every non-Markdown sibling
+        # of the bundle's `index.md` — into the bundle's export directory.
+        # The exporter preserves the bundle layout, so without this every
+        # `![](cover.png)` in the exported post points at a file that was
+        # never written. Symlinks are skipped and every destination is
+        # re-checked against `output_dir`.
+        protected def copy_bundle_assets(source_dir : String, dest_dir : String, output_dir : String, verbose : Bool = false) : Int32
+          return 0 unless Dir.exists?(source_dir)
+          return 0 unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
+          # `within_output_dir?` is lexical. If the destination directory —
+          # or any ancestor — is a symlink out of the tree, `Dir.exists?`
+          # follows it and `File.copy` would write straight through it.
+          return 0 unless Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
+
+          copied = 0
+          Dir.children(source_dir).sort!.each do |entry|
+            src = File.join(source_dir, entry)
+            next if File.directory?(src) || File.symlink?(src)
+            next if entry.ends_with?(".md") || entry.ends_with?(".markdown")
+
+            dest = File.join(dest_dir, entry)
+            next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest, output_dir)
+
+            Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
+            File.copy(src, dest)
+            Logger.debug "Exported bundle asset: #{dest}" if verbose
+            copied += 1
+          rescue ex
+            Logger.warn "Could not export bundle asset #{src}: #{ex.message}"
+          end
+          copied
         end
 
         # Parse frontmatter from content, returns {fields_hash, body}.

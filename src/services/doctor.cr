@@ -136,7 +136,15 @@ module Hwaro
         # `[doctor].ignore` exists to silence advisory noise. We refuse to
         # silence build-blocking errors here so a stray entry can't disable
         # CI gating — the `:error` level is reserved for issues that will
-        # later fail `hwaro build` regardless.
+        # later fail `hwaro build` regardless. Say so out loud, though:
+        # silently keeping a listed rule visible reads as a broken ignore
+        # list rather than a deliberate refusal.
+        unless ignore.empty?
+          issues.select { |i| i.level == :error && ignore.includes?(i.id) }
+            .map(&.id).uniq!.each do |id|
+            Logger.warn "[doctor] ignore entry '#{id}' names an error-level rule and cannot be silenced."
+          end
+        end
         issues.reject { |i| i.level != :error && ignore.includes?(i.id) }
       end
 
@@ -666,16 +674,55 @@ module Hwaro
 
         %w[page.html section.html].each do |required|
           path = File.join(@templates_dir, required)
-          unless File.exists?(path)
+          unless template_present?(required)
             issues << Issue.new(id: "template-required-missing", level: :error, category: "template", file: path,
               message: "Required template file missing: #{required}")
           end
         end
 
         # Check template files for basic syntax errors
-        Dir.glob(File.join(@templates_dir, "**", "*.html")) do |tpl_path|
+        template_files.each do |tpl_path|
           check_template_syntax(tpl_path, issues)
         end
+      end
+
+      # Every file the template loader would pick up. `.html` alone missed
+      # the other extensions `Builder::TEMPLATE_EXTENSION_REGEX` accepts
+      # (`.j2`, `.jinja`, `.jinja2`, `.ecr`), so a site whose templates are
+      # named `page.html.jinja` built fine but doctor reported the required
+      # templates as missing — and never syntax-checked any of them.
+      private def template_files : Array(String)
+        Dir.glob(File.join(@templates_dir, "**", "*")).select do |path|
+          !File.directory?(path) && path.matches?(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX)
+        end
+      end
+
+      # A required template is present when some file in `templates/` loads
+      # under its NAME, exactly as `Phases::Initialize` computes it:
+      #
+      #   name = Path[path].relative_to("templates").gsub(TEMPLATE_EXTENSION_REGEX, "")
+      #
+      # Two consequences the previous version got wrong, both verified against
+      # the build with a marker in the template body:
+      #
+      #   * `page.jinja` / `page.j2` load as "page" and ARE applied; only
+      #     comparing against the required name with its extension still
+      #     attached (`"page.html"`) rejected them. `page.html.jinja` loads as
+      #     "page.html", is NOT applied (the build silently falls back to the
+      #     built-in default), and must therefore NOT satisfy the requirement.
+      #   * The name is the path RELATIVE to `templates/`, so
+      #     `partials/page.html` loads as "partials/page" and cannot satisfy a
+      #     root requirement. Matching on `File.basename` hid a build-blocking
+      #     error for a project whose only templates live in a subdirectory.
+      private def template_present?(required : String) : Bool
+        wanted = required.gsub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, "")
+        template_files.any? { |path| template_name(path) == wanted }
+      end
+
+      # The loader key for a template file: path relative to `@templates_dir`,
+      # minus one trailing template extension.
+      private def template_name(path : String) : String
+        Path[path].relative_to(@templates_dir).to_s.gsub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, "")
       end
 
       # Template syntax check, delegated to the actual Crinja parser used

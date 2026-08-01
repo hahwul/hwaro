@@ -23,6 +23,233 @@ module Hwaro
         content.lchop('\uFEFF')
       end
 
+      # Remove terminal control characters (ANSI escapes, CR, BEL, \u2026) plus the
+      # Unicode line/paragraph separators.
+      #
+      # Titles, tags and link targets come from semi-trusted content \u2014 a docs
+      # or blog PR \u2014 and end up printed to a maintainer's terminal by the
+      # `tool` reports. Raw escape bytes there can repaint or spoof the
+      # console, and they wreck column alignment even when benign.
+      #
+      # Scope is deliberately Cc only. `Char#control?` is ALSO true for the Cf
+      # format category, and stripping that mangles real words: U+200C ZWNJ
+      # turns Persian `\u0645\u06cc\u200c\u0631\u0648\u062f` into the different word `\u0645\u06cc\u0631\u0648\u062f`, U+200D ZWJ
+      # splits `\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67` into three separate people, and dropping U+200F RLM
+      # flips where punctuation lands in a Hebrew line. Those codepoints are
+      # invisible, not dangerous \u2014 they carry no cursor movement \u2014 so they
+      # stay. Apply this at the RENDER layer only; a model or JSON payload
+      # must keep the author's bytes intact.
+      def strip_control(s : String) : String
+        return s unless s.each_char.any? { |c| strippable_control?(c) }
+        s.gsub { |c| strippable_control?(c) ? "" : c }
+      end
+
+      # C0 (U+0000\u2013001F), DEL + C1 (U+007F\u2013009F), and the LINE/PARAGRAPH
+      # SEPARATORs, which terminals treat as line breaks.
+      private def strippable_control?(c : Char) : Bool
+        ord = c.ord
+        ord <= 0x1F || (0x7F <= ord <= 0x9F) || ord == 0x2028 || ord == 0x2029
+      end
+
+      # Codepoint ranges that occupy two terminal columns: East Asian Wide (W)
+      # and Fullwidth (F) per UAX #11, plus the emoji blocks terminals render
+      # double-width. Ascending and non-overlapping, so `wide_char?` can stop
+      # as soon as a range starts past the codepoint. Anything outside is one
+      # column.
+      WIDE_RANGES = [
+        0x1100..0x115F,   # Hangul Jamo initial consonants
+        0x231A..0x231B,   # ⌚ ⌛
+        0x2329..0x232A,   # 〈 〉
+        0x23E9..0x23EC,   # ⏩–⏬
+        0x23F0..0x23F0,   # ⏰
+        0x23F3..0x23F3,   # ⏳
+        0x25FD..0x25FE,   # ◽ ◾
+        0x2614..0x2615,   # ☔ ☕
+        0x2648..0x2653,   # zodiac
+        0x267F..0x267F,   # ♿
+        0x2693..0x2693,   # ⚓
+        0x26A1..0x26A1,   # ⚡
+        0x26AA..0x26AB,   # ⚪ ⚫
+        0x26BD..0x26BE,   # ⚽ ⚾
+        0x26C4..0x26C5,   # ⛄ ⛅
+        0x26CE..0x26CE,   # ⛎
+        0x26D4..0x26D4,   # ⛔
+        0x26EA..0x26EA,   # ⛪
+        0x26F2..0x26F3,   # ⛲ ⛳
+        0x26F5..0x26F5,   # ⛵
+        0x26FA..0x26FA,   # ⛺
+        0x26FD..0x26FD,   # ⛽
+        0x2705..0x2705,   # ✅
+        0x270A..0x270B,   # ✊ ✋
+        0x2728..0x2728,   # ✨
+        0x274C..0x274C,   # ❌
+        0x274E..0x274E,   # ❎
+        0x2753..0x2755,   # ❓–❕
+        0x2757..0x2757,   # ❗
+        0x2795..0x2797,   # ➕–➗
+        0x27B0..0x27B0,   # ➰
+        0x27BF..0x27BF,   # ➿
+        0x2B1B..0x2B1C,   # ⬛ ⬜
+        0x2B50..0x2B50,   # ⭐
+        0x2B55..0x2B55,   # ⭕
+        0x2E80..0x303E,   # CJK radicals, Kangxi, CJK symbols & punctuation
+        0x3041..0x33FF,   # Hiragana, Katakana, Bopomofo, Hangul compat, CJK compat
+        0x3400..0x4DBF,   # CJK unified ideographs extension A
+        0x4E00..0x9FFF,   # CJK unified ideographs
+        0xA000..0xA4CF,   # Yi syllables & radicals
+        0xA960..0xA97F,   # Hangul Jamo extended-A
+        0xAC00..0xD7A3,   # Hangul syllables
+        0xD7B0..0xD7C6,   # Hangul Jamo extended-B (vowels)
+        0xD7CB..0xD7FB,   # Hangul Jamo extended-B (trailing consonants)
+        0xF900..0xFAFF,   # CJK compatibility ideographs
+        0xFE10..0xFE19,   # Vertical forms
+        0xFE30..0xFE6F,   # CJK compatibility & small form variants
+        0xFF00..0xFF60,   # Fullwidth ASCII variants
+        0xFFE0..0xFFE6,   # Fullwidth signs
+        0x16FE0..0x16FE4, # Tangut/Nushu marks
+        0x17000..0x18AFF, # Tangut
+        0x1B000..0x1B12F, # Kana supplement / extended
+        0x1F004..0x1F004, # 🀄
+        0x1F0CF..0x1F0CF, # 🃏
+        0x1F18E..0x1F18E, # 🆎
+        0x1F191..0x1F19A, # 🆑–🆚
+        0x1F200..0x1F2FF, # Enclosed ideographic supplement (🈚 …)
+        0x1F300..0x1F64F, # Misc symbols & pictographs, emoticons
+        0x1F680..0x1F6FF, # Transport & map symbols
+        0x1F7E0..0x1F7EB, # 🟠–🟫 coloured shapes
+        0x1F900..0x1F9FF, # Supplemental symbols & pictographs
+        0x1FA70..0x1FAFF, # Symbols & pictographs extended-A (🩴 …)
+        0x20000..0x2FFFD, # CJK extension B and beyond
+        0x30000..0x3FFFD,
+      ]
+
+      # Emoji modifiers (Fitzpatrick skin tones). They are category So, not a
+      # combining mark, but they recolour the preceding emoji rather than
+      # adding a cell: `👍🏽` renders in two columns, not four.
+      SKIN_TONE_RANGE = 0x1F3FB..0x1F3FF
+
+      # Zero-width joiner. `👨‍👩‍👧` is three wide emoji plus two joiners but
+      # renders as a single two-column glyph, so a joiner makes the codepoint
+      # that follows it contribute nothing.
+      ZWJ = 0x200D
+
+      # How many terminal columns a string occupies.
+      #
+      # `String#size` counts codepoints, which is the wrong unit for padding a
+      # column: a Hangul or CJK title renders twice as wide as its codepoint
+      # count, a combining mark renders in the previous cell, and a control
+      # byte renders as nothing — so `ljust` left every table row after a
+      # non-ASCII cell visibly misaligned.
+      #
+      # Printable ASCII returns exactly `size`, so ASCII-only output — every
+      # existing table — is unchanged. A TAB is deliberately counted as one
+      # column (what `ljust` charged it) rather than zero: its real width
+      # depends on the terminal's tab stops, and one keeps the "ASCII measures
+      # like `String#size`" invariant total rather than only-for-printable.
+      def display_width(s : String) : Int32
+        return s.bytesize if printable_ascii?(s)
+
+        width = 0
+        joined = false
+        s.each_char do |c|
+          ord = c.ord
+
+          if ord == ZWJ
+            joined = true
+            next
+          end
+
+          next if SKIN_TONE_RANGE.includes?(ord)
+          # `Char#control?` covers Cc *and* Cf, so ZWSP / RLM / BOM are zero
+          # too; `mark?` covers combining marks and variation selectors. Both
+          # are correct for WIDTH even though `strip_control` deliberately
+          # keeps Cf — an invisible character occupies no column either way.
+          next if ord == 0x2028 || ord == 0x2029
+          next if (c.control? && ord != 0x09) || c.mark?
+
+          wide = wide_char?(c)
+          # A joiner merges the following EMOJI into the preceding glyph
+          # (`👨‍👩‍👧` is one two-column cluster). It does not merge ordinary
+          # letters: `a‍b` still renders as two characters, so only a wide
+          # codepoint is absorbed.
+          if joined
+            joined = false
+            next if wide
+          end
+
+          width += wide ? 2 : 1
+        end
+        width
+      end
+
+      # Left-align `s` in a field `width` terminal columns across. The
+      # display-width counterpart of `String#ljust`; identical to it for
+      # ASCII-only input.
+      def pad_display(s : String, width : Int32) : String
+        pad = width - display_width(s)
+        pad > 0 ? "#{s}#{" " * pad}" : s
+      end
+
+      # Space through `~`: one byte, one codepoint, one column each — the
+      # overwhelmingly common case, and the one that must stay exact.
+      private def printable_ascii?(s : String) : Bool
+        s.each_byte { |b| return false if b < 0x20 || b > 0x7E }
+        true
+      end
+
+      # `WIDE_RANGES` is ascending and disjoint, so the scan can stop at the
+      # first range that begins past `ord` instead of testing all of them.
+      private def wide_char?(c : Char) : Bool
+        ord = c.ord
+        return false if ord < 0x1100
+        WIDE_RANGES.each do |range|
+          return false if range.begin > ord
+          return true if range.includes?(ord)
+        end
+        false
+      end
+
+      # Count words the way the build does.
+      #
+      # Single pass: skip HTML tags, and treat Markdown punctuation as a
+      # separator rather than a word so `## Heading` counts one word and a
+      # table row's pipes count none. This is the single source of truth
+      # behind both `page.word_count` / `page.reading_time` and
+      # `hwaro tool stats`, which previously split on whitespace alone and
+      # reported ~30% more words than the site itself rendered.
+      def count_words(text : String) : Int32
+        in_tag = false
+        in_word = false
+        count = 0
+
+        reader = Char::Reader.new(text)
+        while reader.has_next?
+          char = reader.current_char
+          if char == '<'
+            # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`).
+            # A bare `<` in prose/math ("n < 1000", "if 0 < x") is a literal
+            # less-than, not a tag \u2014 treating it as one set in_tag with no closing
+            # `>` and swallowed the rest of the document, collapsing the count.
+            nxt = reader.peek_next_char
+            in_tag = true if nxt.ascii_letter? || nxt == '/' || nxt == '!'
+            in_word = false
+          elsif char == '>'
+            in_tag = false
+          elsif !in_tag
+            is_word_char = !char.ascii_whitespace? && !char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '<', '|')
+            if is_word_char
+              count += 1 unless in_word
+              in_word = true
+            else
+              in_word = false
+            end
+          end
+          reader.next_char
+        end
+
+        count
+      end
+
       # Convert text to a URL-friendly slug
       #
       # Supports Unicode characters (CJK, Hangul, etc.) in addition to ASCII.

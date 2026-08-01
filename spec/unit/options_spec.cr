@@ -88,9 +88,10 @@ describe Hwaro::Config::Options::BuildOptions do
     end
 
     it "raises on invalid memory limit format" do
-      options = Hwaro::Config::Options::BuildOptions.new(memory_limit: "abc")
+      # Validated in the constructor now (it used to fire only in the render
+      # phase, after setup_output_dir had already wiped public/).
       expect_raises(Exception, /Invalid memory limit format/) do
-        options.batch_size
+        Hwaro::Config::Options::BuildOptions.new(memory_limit: "abc")
       end
     end
 

@@ -68,6 +68,18 @@ module Hwaro
               )
             end
 
+            # A missing content directory is a failure, not an empty listing:
+            # the command used to print "not found" on stderr, `[]` on stdout
+            # and still exit 0, so a script could not tell "no content" from
+            # "wrong directory". Matches `tool validate` / `tool check-links`.
+            unless Dir.exists?(content_dir)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONTENT,
+                message: "Content directory '#{content_dir}' does not exist",
+                hint: "Create it or pass --content-dir DIR to point at your content root.",
+              )
+            end
+
             lister = Services::ContentLister.new(content_dir)
 
             content_filter = case filter.as(String).downcase

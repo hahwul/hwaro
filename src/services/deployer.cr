@@ -377,6 +377,7 @@ module Hwaro
         effective : EffectiveOptions,
       ) : Bool
         Logger.heading("deploy", target.name)
+        warn_unapplied_target_options(target)
         expanded = expand_placeholders(command, source_dir, target)
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
@@ -770,6 +771,24 @@ module Hwaro
       private def warn_unapplied_matchers(deployment : Models::DeploymentConfig)
         return if deployment.matchers.none? { |m| m.cache_control || m.content_type || m.gzip }
         Logger.warn "deployment.matchers: cache_control/content_type/gzip are not applied by hwaro's built-in sync (only 'force' is). Configure headers/compression at your host or CDN."
+      end
+
+      # `include` / `exclude` / `strip_index_html` are applied by the built-in
+      # file sync (`#build_desired_map`), which only runs for local `file://`
+      # and `path` destinations. Command-driven targets — an explicit
+      # `command`, or the auto-generated `aws s3 sync` / `gsutil rsync` /
+      # `az storage blob sync` for `s3://`, `gs://`, `az://` — hand the whole
+      # source tree to an external tool, so those keys have no effect there.
+      # Silently dropping them uploaded files the author had explicitly
+      # excluded; warn instead (same contract as `#warn_unapplied_matchers`).
+      private def warn_unapplied_target_options(target : Models::DeploymentTarget)
+        unapplied = [] of String
+        unapplied << "include" if target.include
+        unapplied << "exclude" if target.exclude
+        unapplied << "strip_index_html" if target.strip_index_html
+        return if unapplied.empty?
+
+        Logger.warn "deployment target '#{target.name}': #{unapplied.join("/")} #{unapplied.size == 1 ? "is" : "are"} not applied to command-based targets (s3/gs/az/command) — express the filtering in the deploy command itself."
       end
 
       # Raise HWARO_E_CONFIG when the deploy source directory doesn't exist.

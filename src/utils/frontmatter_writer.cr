@@ -99,7 +99,34 @@ module Hwaro
       def self.yaml_scalar(str : String) : String
         bare_safe = str.matches?(/\A[A-Za-z_](?:[A-Za-z0-9 _.\/-]*[A-Za-z0-9_.\/-])?\z/) &&
                     !YAML_RESERVED_WORDS.includes?(str.downcase)
-        bare_safe ? str : str.inspect
+        return str if bare_safe
+
+        # Not `String#inspect`: Crystal escapes unprintable codepoints with the
+        # brace form (`\u{E0001}`), which YAML rejects — it only accepts the
+        # fixed-width `\xXX` / `\uXXXX` / `\UXXXXXXXX` forms.
+        String.build do |io|
+          io << '"'
+          str.each_char do |ch|
+            case ch
+            when '"'  then io << "\\\""
+            when '\\' then io << "\\\\"
+            when '\n' then io << "\\n"
+            when '\t' then io << "\\t"
+            when '\r' then io << "\\r"
+            else
+              if ch.printable?
+                io << ch
+              elsif ch.ord <= 0xFF
+                io << "\\x" << ch.ord.to_s(16, upcase: true).rjust(2, '0')
+              elsif ch.ord <= 0xFFFF
+                io << "\\u" << ch.ord.to_s(16, upcase: true).rjust(4, '0')
+              else
+                io << "\\U" << ch.ord.to_s(16, upcase: true).rjust(8, '0')
+              end
+            end
+          end
+          io << '"'
+        end
       end
 
       # Quote a frontmatter key that isn't a bare TOML key (spaces, dots,

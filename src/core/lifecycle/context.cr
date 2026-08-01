@@ -163,6 +163,10 @@ module Hwaro
         property pages_read : Int32
         property pages_rendered : Int32
         property pages_skipped : Int32
+        # Outputs an error route refused to publish (a URL whose segment
+        # traverses, a refused alias). Distinct from `pages_skipped`, which
+        # counts drafts/future/expired filtered out by design.
+        property pages_unpublished : Int32 = 0
         property pages_failed : Int32
         property files_written : Int32
         property cache_hits : Int32

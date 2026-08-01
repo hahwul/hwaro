@@ -62,7 +62,7 @@ module Hwaro
         # Jekyll page variable (Jekyll accepts arbitrary front-matter keys, so
         # dropping `slug`, `weight`, `layout`, `extra.*`, … was silent data
         # loss — the same bug class gh#527 fixed for the Hugo exporter).
-        HANDLED_KEYS = Set{"title", "date", "description", "draft", "tags", "categories", "authors", "image"}
+        HANDLED_KEYS = Set{"title", "date", "description", "draft", "tags", "categories", "authors", "image", "template"}
 
         private def export_file(
           file_path : String,
@@ -71,7 +71,7 @@ module Hwaro
           include_drafts : Bool,
           verbose : Bool,
         ) : Symbol
-          raw = File.read(file_path)
+          raw = read_content(file_path)
           fields, body = parse_content(raw)
 
           is_draft = fields["draft"]?.try(&.raw) == true
@@ -83,7 +83,7 @@ module Hwaro
           yaml_lines = [] of String
 
           if title = fields["title"]?.try(&.as_s?)
-            yaml_lines << "title: #{title.inspect}"
+            yaml_lines << "title: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(title)}"
           end
 
           if date = fields["date"]?.try(&.as_s?)
@@ -91,7 +91,15 @@ module Hwaro
           end
 
           if desc = fields["description"]?.try(&.as_s?)
-            yaml_lines << "description: #{desc.inspect}"
+            yaml_lines << "description: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(desc)}"
+          end
+
+          # Hwaro's `template` is Jekyll's `layout`, the exact inverse of the
+          # Jekyll importer's `layout` → `template` mapping. Passing the key
+          # through verbatim meant Jekyll ignored it (rendering the page with
+          # no layout at all) and a re-import dropped it entirely.
+          if layout = fields["template"]?.try(&.as_s?)
+            yaml_lines << "layout: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(layout)}"
           end
 
           # Jekyll uses `published: false` instead of `draft: true`

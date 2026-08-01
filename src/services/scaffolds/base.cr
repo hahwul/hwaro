@@ -405,8 +405,11 @@ module Hwaro
           [] of String
         end
 
-        # Returns a minimal config.toml without comments and optional sections
-        def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+        # Site identity + optional `[languages]` block. Split out of
+        # `minimal_config_content` so a scaffold that opts out of individual
+        # feature sections (see `Bare`) can recompose the same header instead
+        # of duplicating the multilingual logic.
+        protected def minimal_site_toml(skip_taxonomies : Bool, multilingual_languages : Array(String)) : String
           String.build do |str|
             str << "title = \"#{config_title}\"\n"
             str << "description = \"#{config_description}\"\n"
@@ -430,26 +433,47 @@ module Hwaro
               str << lang_blocks.join("\n\n")
               str << "\n\n"
             end
+          end
+        end
 
+        # `[plugins]` + `[content.files]` — the two sections every scaffold
+        # needs regardless of which features it opts into.
+        protected def minimal_plugins_toml : String
+          String.build do |str|
             str << "[plugins]\n"
             str << "processors = [\"markdown\"]\n"
             str << "\n[content.files]\n"
             str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
+          end
+        end
+
+        protected def minimal_highlight_toml : String
+          String.build do |str|
             str << "\n[highlight]\n"
             str << "enabled = true\n"
             str << "mode = \"server\"\n"
             str << "theme = \"github\"\n"
             str << "use_cdn = true\n"
             str << "copy = true\n"
-            unless skip_taxonomies
-              str << "\n[[taxonomies]]\n"
-              str << "name = \"tags\"\n"
-              str << "feed = true\n"
-              str << "\n[[taxonomies]]\n"
-              str << "name = \"categories\"\n"
-              str << "\n[[taxonomies]]\n"
-              str << "name = \"authors\"\n"
-            end
+          end
+        end
+
+        protected def minimal_taxonomies_toml(skip_taxonomies : Bool) : String
+          return "" if skip_taxonomies
+
+          String.build do |str|
+            str << "\n[[taxonomies]]\n"
+            str << "name = \"tags\"\n"
+            str << "feed = true\n"
+            str << "\n[[taxonomies]]\n"
+            str << "name = \"categories\"\n"
+            str << "\n[[taxonomies]]\n"
+            str << "name = \"authors\"\n"
+          end
+        end
+
+        protected def minimal_sitemap_feeds_toml : String
+          String.build do |str|
             str << "\n[sitemap]\n"
             str << "enabled = true\n"
             str << "\n[feeds]\n"
@@ -459,15 +483,32 @@ module Hwaro
             unless feed_sections.empty?
               str << "sections = [#{feed_sections.map { |s| %("#{s}") }.join(", ")}]\n"
             end
-            # `--minimal-config` previously dropped `[search]` entirely,
-            # which silently broke the search button in the blog/docs/
-            # book scaffolds (their JS still fetched `/search.json`).
-            # Keep search on so the scaffold templates work out of the
-            # box; users who don't want it can flip `enabled = false`
-            # (gh#528 B).
+          end
+        end
+
+        # `--minimal-config` previously dropped `[search]` entirely, which
+        # silently broke the search button in the blog/docs/book scaffolds
+        # (their JS still fetched `/search.json`). Keep search on so the
+        # scaffold templates work out of the box; users who don't want it can
+        # flip `enabled = false` (gh#528 B). Scaffolds that ship no search UI
+        # at all omit this fragment instead (see `Bare`).
+        protected def minimal_search_toml : String
+          String.build do |str|
             str << "\n[search]\n"
             str << "enabled = true\n"
             str << "format = \"fuse_json\"\n"
+          end
+        end
+
+        # Returns a minimal config.toml without comments and optional sections
+        def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+          String.build do |str|
+            str << minimal_site_toml(skip_taxonomies, multilingual_languages)
+            str << minimal_plugins_toml
+            str << minimal_highlight_toml
+            str << minimal_taxonomies_toml(skip_taxonomies)
+            str << minimal_sitemap_feeds_toml
+            str << minimal_search_toml
           end
         end
 

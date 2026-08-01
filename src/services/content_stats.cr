@@ -118,18 +118,28 @@ module Hwaro
         )
       end
 
+      # Strip front matter, if any. The TOML and YAML strips are mutually
+      # exclusive: chaining them let the `\A`-anchored YAML pattern eat a
+      # *body* that opens with a thematic break (`---\n…\n---`) once the TOML
+      # front matter had already been removed, silently dropping the first
+      # block of the document from the word count.
       private def extract_body(content : String) : String
         if content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
           content.byte_slice(end_idx)
+        elsif content.matches?(TOML_FRONTMATTER_RE)
+          content.sub(TOML_FRONTMATTER_RE, "")
         else
-          content.sub(TOML_FRONTMATTER_RE, "").sub(YAML_FRONTMATTER_RE, "")
+          content.sub(YAML_FRONTMATTER_RE, "")
         end
       end
 
       private def count_words(body : String) : Int32
-        # Strip code blocks, then count whitespace-separated tokens
+        # Strip code blocks, then count with the same tokenizer the build uses
+        # for `page.word_count` / `page.reading_time`. Splitting on whitespace
+        # alone counted `##`, `|` and `|-----|` as words, so the report
+        # disagreed with the numbers the site itself renders.
         stripped = body.gsub(/(?ms)^(`{3,}|~{3,})[^\n]*\n.*?^\1\s*$/, "")
-        stripped.split(/\s+/).count { |w| !w.empty? }
+        Utils::TextUtils.count_words(stripped)
       end
 
       private def extract_tags(content : String) : Array(String)

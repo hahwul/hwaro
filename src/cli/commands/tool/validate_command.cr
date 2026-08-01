@@ -11,6 +11,7 @@ require "../../metadata"
 require "../../../services/content_validator"
 require "../../../utils/errors"
 require "../../../utils/logger"
+require "../../../utils/text_utils"
 
 module Hwaro
   module CLI
@@ -101,7 +102,7 @@ module Hwaro
             by_file = issues.group_by(&.file)
 
             by_file.each do |file, file_issues|
-              Logger.section(file || "(unknown)")
+              Logger.section(Utils::TextUtils.strip_control(file || "(unknown)"))
               file_issues.each { |issue| print_issue(issue) }
               Logger.info ""
             end
@@ -121,13 +122,18 @@ module Hwaro
             exit(Hwaro::Errors::EXIT_CONTENT) if errors > 0
           end
 
+          # Issue messages quote author-controlled text (tags, link targets,
+          # image markup), so escapes are stripped HERE — at the render layer —
+          # and never in the model. `--json` above must emit the author's
+          # bytes verbatim, or a consumer cannot locate the tag it is being
+          # told about.
           private def print_issue(issue : Services::Issue)
             glyph = case issue.level
                     when :error   then :err
                     when :warning then :warn
                     else               :info
                     end
-            Logger.item(issue.message, glyph: glyph, indent: 4)
+            Logger.item(Utils::TextUtils.strip_control(issue.message), glyph: glyph, indent: 4)
           end
         end
       end

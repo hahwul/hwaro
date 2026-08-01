@@ -38,7 +38,7 @@ module Hwaro
 
           # Introspection
           FlagInfo.new(short: nil, long: "--list-scaffolds", description: "List available built-in scaffolds and exit"),
-          FlagInfo.new(short: nil, long: "--json", description: "Emit machine-readable JSON output (with --list-scaffolds)"),
+          JSON_FLAG,
 
           # Wizard control
           FlagInfo.new(short: nil, long: "--wizard", description: "Run the interactive wizard (TTY only)"),
@@ -58,12 +58,26 @@ module Hwaro
           )
         end
 
+        # Parser state that is not part of InitOptions. Set by #parse_options
+        # so #run can act on it after — rather than before — full option
+        # parsing, which is what makes invalid flags alongside
+        # `--list-scaffolds` an error instead of a silent no-op.
+        @list_scaffolds = false
+        @json_output = false
+        @wizard = false
+        # Whether the user actually supplied `<path>` / `--scaffold`. The
+        # wizard needs the distinction: `InitOptions` defaults both fields, so
+        # "not given" and "given the default value" are otherwise identical.
+        @path_given = false
+        @scaffold_given = false
+
         def run(args : Array(String))
-          # Handle introspection flags before full option parsing so users can
-          # list scaffolds without supplying any other arguments.
-          if args.includes?("--list-scaffolds")
-            json_mode = args.includes?("--json")
-            print_scaffolds(json_mode)
+          # Parse first: introspection and wizard eligibility are decided from
+          # parsed state, so an unknown flag is rejected in every mode.
+          options = parse_options(args)
+
+          if @list_scaffolds
+            print_scaffolds(@json_output)
             return
           end
 
@@ -71,36 +85,31 @@ module Hwaro
           # an interactive session. Every other invocation — bare `hwaro init`,
           # flags, pipes/CI, and `--quiet` — initializes immediately with
           # defaults (the former `-y`/`--yes` path).
-          if wizard_eligible?(args)
-            options = InitWizard.new.run(wizard_seed_path(args))
-            if options.nil?
+          if wizard_eligible?
+            # The wizard fills in only what the user did not already supply;
+            # every other flag (`--force`, `--clean`, `--skip-*`, config mode,
+            # `--agents`, `--include-multilingual`) rides along untouched.
+            wizard_options = InitWizard.new.run(
+              @path_given ? options.path : nil,
+              options,
+              @scaffold_given ? options.scaffold : nil,
+            )
+            if wizard_options.nil?
               Logger.info "Cancelled."
               return
             end
-            Services::Initializer.new.run(options)
+            Services::Initializer.new.run(wizard_options)
             return
           end
 
-          options = parse_options(args)
           Services::Initializer.new.run(options)
         end
 
-        private def wizard_eligible?(args : Array(String)) : Bool
-          return false unless args.any?(&.==("--wizard"))
+        private def wizard_eligible? : Bool
+          return false unless @wizard
           return false unless Prompt.interactive?
           return false if Logger.quiet?
           true
-        end
-
-        # First positional argument, ignoring flags — mirrors #parse_options'
-        # unknown_args handling so `hwaro init my-site --wizard` and
-        # `hwaro init --wizard my-site` both seed the directory prompt skip.
-        private def wizard_seed_path(args : Array(String)) : String?
-          args.each do |arg|
-            next if arg.starts_with?("-")
-            return arg
-          end
-          nil
         end
 
         # Print the list of built-in scaffolds.
@@ -158,19 +167,38 @@ module Hwaro
             parser.on("-f", "--force", "Allow init even if directory is not empty (keeps existing files)") { force = true }
             parser.on("--clean", "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git/)") { clean = true }
             parser.on("--scaffold TYPE", "Scaffold type or remote source (e.g., blog, github:user/repo)") do |type|
+              @scaffold_given = true
               if Services::Scaffolds::Remote.remote?(type)
+                # Validate the shorthand/URL now rather than at fetch time:
+                # a malformed source used to surface as an unclassified
+                # `Error: …` (exit 1) only *after* the target directory had
+                # been created.
+                begin
+                  Services::Scaffolds::Remote.parse_source(type)
+                rescue ex : ArgumentError
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: ex.message || "Invalid remote scaffold source",
+                    hint: "Use github:owner/repo[/path] or https://github.com/owner/repo[/tree/branch/path].",
+                  )
+                end
                 scaffold_remote = type
               else
                 begin
                   scaffold = Config::Options::ScaffoldType.from_string(type)
                 rescue ex : ArgumentError
-                  Logger.error(ex.message || "Unknown error")
+                  # Classify so the Runner emits `Error [HWARO_E_USAGE]: …`
+                  # and exits with the documented usage code (2).
                   log_scaffold_list
                   Logger.info ""
                   Logger.info "Remote scaffolds:"
                   Logger.info "  github:owner/repo[/path] - GitHub repository shorthand"
                   Logger.info "  https://github.com/...   - Full GitHub URL (with optional subpath)"
-                  exit(1)
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: ex.message || "Unknown scaffold type",
+                    hint: "Run 'hwaro init --list-scaffolds' to see every built-in scaffold.",
+                  )
                 end
               end
             end
@@ -194,11 +222,11 @@ module Hwaro
             parser.on("--agents MODE", "AGENTS.md content mode: remote (default) or local") do |mode|
               agents_mode = Config::Options::AgentsMode.from_string(mode)
             rescue ex : ArgumentError
-              Logger.error(ex.message || "Unknown error")
-              Logger.info "Available modes:"
-              Logger.info "  remote - Lightweight with links to online docs (default)"
-              Logger.info "  local  - Full embedded reference for offline use"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: ex.message || "Unknown agents mode",
+                hint: "remote = lightweight with links to online docs (default); local = full embedded reference for offline use.",
+              )
             end
 
             # Skip options
@@ -206,14 +234,13 @@ module Hwaro
             parser.on("--skip-sample-content", "Skip creating sample content files") { skip_sample_content = true }
             parser.on("--skip-taxonomies", "Skip taxonomies configuration and templates") { skip_taxonomies = true }
 
-            # Introspection (handled in #run before parsing; registered here so
-            # they appear in --help output).
-            parser.on("--list-scaffolds", "List available built-in scaffolds and exit") { }
-            parser.on("--json", "Emit machine-readable JSON output (with --list-scaffolds)") { }
+            # Introspection (acted on by #run after parsing, so an unknown
+            # flag alongside them is still a usage error).
+            parser.on("--list-scaffolds", "List available built-in scaffolds and exit") { @list_scaffolds = true }
+            CLI.register_flag(parser, JSON_FLAG) { |_| @json_output = true }
 
-            # Wizard control (handled in #run before full init; registered here
-            # so OptionParser accepts it and --help shows it).
-            parser.on("--wizard", "Run the interactive wizard (TTY only)") { }
+            # Wizard control (acted on by #run after parsing).
+            parser.on("--wizard", "Run the interactive wizard (TTY only)") { @wizard = true }
 
             # Debug & output
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
@@ -227,8 +254,27 @@ module Hwaro
               Logger.info "  https://github.com/...   - Full GitHub URL"
               exit
             end
-            parser.unknown_args do |unknown|
-              path = unknown.first if unknown.present?
+            parser.unknown_args do |before_dash, after_dash|
+              # Accept the single <path> from either side of `--` (the latter
+              # lets users target a leading-dash directory name). Anything
+              # beyond one positional is almost always an unquoted multi-word
+              # site name (`hwaro init My Blog Site`) — silently dropping the
+              # extras used to scaffold a whole project into a directory named
+              # `My`, so reject instead. Flag-looking leftovers are not
+              # positionals — leave them for OptionParser's invalid-option
+              # error, which names the actual offending flag.
+              positionals = before_dash.reject(&.starts_with?('-')) + after_dash
+              if positionals.size > 1
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "unexpected extra argument(s): '#{positionals[1..].join("', '")}'",
+                  hint: "hwaro init takes a single [path]. Quote multi-word values, e.g. hwaro init \"My Blog\".",
+                )
+              end
+              if first = positionals.first?
+                path = first
+                @path_given = true
+              end
             end
           end
 

@@ -83,15 +83,15 @@ module Hwaro
             when "to-yaml"
               result = converter.convert_to_yaml
               puts result.to_json if json_output
-              exit(1) unless result.success
+              fail_conversion(result, json_output) unless result.success
             when "to-toml"
               result = converter.convert_to_toml
               puts result.to_json if json_output
-              exit(1) unless result.success
+              fail_conversion(result, json_output) unless result.success
             when "to-json"
               result = converter.convert_to_json
               puts result.to_json if json_output
-              exit(1) unless result.success
+              fail_conversion(result, json_output) unless result.success
             else
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,
@@ -99,6 +99,27 @@ module Hwaro
                 hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
               )
             end
+          end
+
+          # Surface the converter's own message instead of exiting 1 in
+          # silence — a missing content directory used to produce no output
+          # at all in human mode, with the reason only ever reachable via
+          # `--json`.
+          #
+          # BOTH modes exit `HWARO_E_IO`. The `--json` payload was already
+          # printed by the caller, so this path only needs the status code —
+          # but it has to be the SAME code, or a machine consumer branching on
+          # exit status gets a different (and less classified) answer for the
+          # identical failure purely because it asked for JSON. The payload
+          # shape is untouched; only the process exit code changes.
+          private def fail_conversion(result : Services::ConversionResult, json_output : Bool) : NoReturn
+            exit(Hwaro::Errors::EXIT_IO) if json_output
+
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: result.message,
+              hint: "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
+            )
           end
         end
       end

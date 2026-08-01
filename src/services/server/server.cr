@@ -11,15 +11,16 @@
 
 require "http/server"
 require "json"
+require "mime"
 require "socket"
 require "../../core/build/builder"
 require "../../content/hooks"
 require "../../utils/errors"
 require "../../utils/logger"
-require "../../utils/path_utils"
 require "../../config/options/serve_options"
 require "../../config/options/build_options"
 require "../../utils/command_runner"
+require "./dev_path"
 require "./live_reload_handler"
 
 module Hwaro
@@ -41,8 +42,15 @@ module Hwaro
           # because stdlib's StaticFileHandler only appends the trailing
           # slash when directory_listing is on. What's on disk decides.
           #
-          # Sanitize to prevent directory traversal before filesystem access
-          sanitized = Utils::PathUtils.sanitize_path(path)
+          # Resolve strictly (see DevPath) to prevent directory traversal and
+          # separator smuggling before filesystem access. A nil result is a
+          # path we refuse to route; an empty one is the output root itself,
+          # which must not produce `Location: //`.
+          sanitized = DevPath.safe_relative(path)
+          if sanitized.nil? || sanitized.empty?
+            call_next(context)
+            return
+          end
           fs_path = Path[@public_dir, sanitized]
 
           # Verify resolved path is within public_dir.
@@ -67,12 +75,14 @@ module Hwaro
             # removed or renamed it (or after a different project reuses the
             # port) until the user clears their browser cache.
             context.response.status_code = 302
-            # Use the already-sanitized path for the Location header to prevent
-            # CRLF injection and path traversal in the redirect target. Keep
-            # the query string — /search?q=term must land on /search/?q=term,
-            # not an empty-query page. (A request-line query can't contain
-            # CR/LF; percent-encoded bytes stay encoded.)
-            location = "/" + sanitized + "/"
+            # Build the Location from the already-resolved path to prevent
+            # CRLF injection and path traversal in the redirect target, then
+            # re-encode it: resolution decodes, so `/my page` would otherwise
+            # emit a raw space (and `/한글` raw UTF-8) into the header, which
+            # is not a valid URI reference. Keep the query string — /search?q=term
+            # must land on /search/?q=term, not an empty-query page. (A
+            # request-line query can't contain CR/LF.)
+            location = "/" + DevPath.encode_relative(sanitized) + "/"
             if (query = context.request.query) && !query.empty?
               location += "?#{query}"
             end
@@ -93,10 +103,33 @@ module Hwaro
       # --fast-start deferred page) then refreshes itself the moment its
       # HTML lands on disk, and build-error overlays reach 404 tabs as well.
       # Without the script those tabs sat on the 404 forever.
+      # Methods the dev server actually answers. Anything else gets a 405 with
+      # an Allow header instead of a 404: `StaticFileHandler` is built with
+      # `fallthrough: true`, so a POST used to fall through to here and be
+      # reported as "no such page", which reads as a routing bug to anyone
+      # pointing a form or API mock at the dev server.
+      #
+      # OPTIONS is advertised because the server does answer it — just further
+      # up, where `DevCorsHandler` returns its 204 preflight without calling
+      # down the chain. It therefore never reaches the branch below, but the
+      # advertised `Allow` value has to tell the truth about the server.
+      ALLOWED_METHODS = "GET, HEAD, OPTIONS"
+
       def initialize(@public_dir : String, @injector : LiveReloadInjectHandler? = nil)
       end
 
       def call(context)
+        method = context.request.method
+        unless method == "GET" || method == "HEAD" || method == "OPTIONS"
+          # No HEAD guard needed here: HEAD is in the allowed set above, so it
+          # can never reach this branch.
+          context.response.status_code = 405
+          context.response.headers["Allow"] = ALLOWED_METHODS
+          context.response.content_type = "text/plain; charset=utf-8"
+          context.response.print "405 Method Not Allowed"
+          return
+        end
+
         context.response.status_code = 404
         context.response.content_type = "text/html; charset=utf-8"
 
@@ -105,6 +138,12 @@ module Hwaro
         if injector = @injector
           body = injector.inject_script(body)
         end
+        # HEAD must carry the headers of the matching GET but no body. Crystal
+        # never suppresses a handler-written body, so printing here desynced
+        # every keep-alive client: it read the 404 page as the start of the
+        # next response. Set the length explicitly and return.
+        context.response.content_length = body.bytesize
+        return if method == "HEAD"
         context.response.print body
       end
     end
@@ -116,8 +155,9 @@ module Hwaro
     # stale copy until a hard refresh. `no-store` matches what other SSG dev
     # servers ship. The header is set BEFORE call_next so it also reaches
     # responses that flush their headers mid-body (static files larger than
-    # the response's 8KB output buffer). Skipped entirely when the user
-    # supplies their own Cache-Control via [serve.headers]/--header.
+    # the response's output buffer — `IO::DEFAULT_BUFFER_SIZE`, 32 KiB).
+    # Skipped entirely when the user supplies their own Cache-Control via
+    # [serve.headers]/--header.
     class NoCacheHandler
       include HTTP::Handler
 
@@ -190,8 +230,15 @@ module Hwaro
     # charset parameter — so `robots.txt` / `llms.txt` / sitemap and
     # search index responses all advertise no charset, leaving UTF-8
     # bytes (e.g. Korean LLM-instructions) at the mercy of client-side
-    # heuristics. This handler runs after the static handler and
-    # appends `; charset=utf-8` to text-shaped responses.
+    # heuristics.
+    #
+    # The primary fix is `Server.register_utf8_mime_types`, which teaches the
+    # MIME table the charset up front so `StaticFileHandler` writes the right
+    # value at any response size. This handler stays as the safety net for
+    # types we don't enumerate there and for handlers that set a bare
+    # text-shaped Content-Type themselves — but note it can only work below
+    # the response output buffer (`IO::DEFAULT_BUFFER_SIZE`, 32 KiB): past
+    # that the headers are already on the wire when `call_next` returns.
     #
     # We only touch types we know are text. Binary types (image/png,
     # font/woff2, etc.) are left alone — adding a charset there would
@@ -248,15 +295,16 @@ module Hwaro
       def call(context)
         # Pre-set BEFORE call_next so the values survive responses that
         # flush their headers mid-body: files larger than the response's
-        # 8KB output buffer serialize headers at first flush, and
-        # post-call_next edits never reach the wire for those.
+        # output buffer (`IO::DEFAULT_BUFFER_SIZE`, 32 KiB) serialize
+        # headers at first flush, and post-call_next edits never reach the
+        # wire for those.
         apply_headers(context)
         call_next(context)
         # Re-assert after so user values still win over anything a
         # downstream handler set in between (Content-Type charset, CORS)
         # for the buffered small-response case. Only headers the static
         # handler itself overwrites (Content-Type, validators) remain
-        # theirs on >8KB responses.
+        # theirs on responses past the output buffer.
         apply_headers(context)
       end
 
@@ -267,6 +315,152 @@ module Hwaro
           next if name.each_char.any?(&.ascii_control?) || value.each_char.any?(&.ascii_control?)
           context.response.headers[name] = value
         end
+      end
+    end
+
+    # Answers 404 for the request shapes no static host serves (see
+    # `DevPath.unservable?`): an encoded `/` or `\`, a literal backslash, or a
+    # NUL in any form.
+    #
+    # Having our own handlers decline them was not enough — the request just
+    # fell through to `HTTP::StaticFileHandler`, which decodes once as well and
+    # resolved `/%2Fguide%2Findex.html` to the real page via a 302. That is the
+    # exact dev/prod divergence this module exists to remove: a link that works
+    # locally and 404s once deployed. Delegating to `NotFoundHandler` keeps the
+    # 404 body (and its live-reload script) identical to every other 404.
+    class UnservablePathHandler
+      include HTTP::Handler
+
+      def initialize(@not_found : NotFoundHandler)
+      end
+
+      def call(context)
+        # Only the path — a query string may legitimately carry `%2F`.
+        if DevPath.unservable?(context.request.path)
+          @not_found.call(context)
+          return
+        end
+
+        call_next(context)
+      end
+    end
+
+    # Mounts the built output under `base_url`'s path component.
+    #
+    # `hwaro serve --base-url http://localhost:3000/myblog/` builds a site
+    # whose every link, stylesheet and script is `/myblog/…`, but the dev
+    # server used to answer only at `/` — so the homepage loaded unstyled and
+    # every internal link 404'd. Requests carrying the prefix now have it
+    # stripped before routing, and `Location` headers produced downstream get
+    # it added back so the address bar stays coherent.
+    #
+    # Deliberately lenient: an unprefixed request is passed through untouched
+    # rather than 404'd, so `/css/style.css` typed by hand (or requested by an
+    # older cached page) still resolves. Only the bare root is redirected, so
+    # `--open` and manual browsing land on the prefixed site.
+    #
+    # A no-op when `base_path` is "" — the default, since serve derives
+    # `base_url` from host:port unless `--base-url` says otherwise.
+    class BasePathHandler
+      include HTTP::Handler
+
+      # Normalised here rather than assumed: a trailing slash made every
+      # `starts_with?("#{@base_path}/")` test unmatchable and produced
+      # `Location: /myblog//`, so the documented contract is now enforced.
+      def initialize(base_path : String)
+        @base_path = base_path.rstrip("/")
+      end
+
+      def call(context)
+        return call_next(context) if @base_path.empty?
+
+        path = context.request.path
+
+        if path == "/"
+          redirect(context, "#{@base_path}/")
+          return
+        end
+
+        if path == @base_path
+          redirect(context, "#{@base_path}/")
+          return
+        end
+
+        stripped = path.starts_with?("#{@base_path}/")
+        if stripped
+          context.request.path = path[@base_path.size..]
+
+          # `HTTP::StaticFileHandler` answers a non-canonical path (`//x`,
+          # `/./x`, `/a/../x`) with its own canonicalising redirect, emitted
+          # through `Response#redirect` — which CLOSES the response and flushes
+          # the headers. A post-`call_next` edit therefore never reaches the
+          # wire for those, so the mount point was silently dropped from the
+          # Location. (`//` is a routine artifact of `{{ base_url }}/…`
+          # concatenation, so this is reachable in ordinary use.) Issue the
+          # same redirect ourselves, prefixed, before it can.
+          if target = noncanonical_target(context.request.path)
+            redirect(context, "#{@base_path}#{target}")
+            return
+          end
+        end
+
+        call_next(context)
+
+        # Put the request back the way it arrived. `HTTP::LogHandler` sits
+        # outermost and reads `request.resource` AFTER call_next, so leaving it
+        # stripped made `--access-log` report `/posts/` for a request to
+        # `/myblog/posts/` — the access log was useless for debugging exactly
+        # the mount-point problems this handler can cause.
+        context.request.path = path if stripped
+
+        # Re-prefix a downstream redirect (e.g. IndexRewriteHandler's
+        # trailing-slash 302) so following it doesn't silently drop the mount
+        # point from the URL.
+        #
+        # Keyed on whether we actually stripped, NOT on what the outgoing
+        # Location looks like: a site with a top-level section named after the
+        # mount point (`content/myblog/` under `--base-url http://host/myblog/`)
+        # legitimately produces a downstream `/myblog/x` in stripped space, and
+        # an "already prefixed?" string test would read that as done and emit a
+        # Location that had lost the mount point. An unprefixed pass-through
+        # request keeps its unprefixed redirect, matching how it was routed.
+        return unless stripped
+
+        location = context.response.headers["Location"]?
+        if location && location.starts_with?("/") && !location.starts_with?("//")
+          context.response.headers["Location"] = "#{@base_path}#{location}"
+        end
+      end
+
+      # The path `HTTP::StaticFileHandler` would redirect to, or nil when it
+      # would not redirect at all. Mirrors its own logic exactly — decode once,
+      # `Path.posix(...).expand("/")`, compare as `Path` — so this fires when
+      # and only when stdlib would have.
+      private def noncanonical_target(path : String) : String?
+        # Never canonicalise a path the server refuses to serve. Independently
+        # of handler order this keeps two promises: an unservable path is
+        # 404'd by UnservablePathHandler rather than redirected, and nothing
+        # here raises — `Path.posix` throws on a NUL and the decode below can
+        # yield invalid UTF-8, either of which would escape as a 500.
+        return if DevPath.unservable?(path)
+
+        decoded = URI.decode(path)
+        return unless decoded.valid_encoding?
+
+        request_path = Path.posix(decoded)
+        expanded = request_path.expand("/")
+        return if request_path == expanded
+        URI.encode_path(expanded.to_s)
+      end
+
+      private def redirect(context, location : String)
+        # 302, matching IndexRewriteHandler: a permanent redirect would stick
+        # in the browser cache long after the prefix changes.
+        context.response.status_code = 302
+        if (query = context.request.query) && !query.empty?
+          location = "#{location}?#{query}"
+        end
+        context.response.headers["Location"] = location
       end
     end
 
@@ -502,6 +696,64 @@ module Hwaro
       # [serve] table captured at startup — the baseline for warning that a
       # config edit changed restart-only settings (headers, fast).
       @startup_serve_config : Models::ServeConfig? = nil
+      # Mirrors --no-error-overlay. The flag used to reach only BuildOptions
+      # (where it governs the per-page render-error HTML), so the full-screen
+      # overlay the live-reload client draws from an `error:` push kept
+      # appearing for users who had explicitly turned overlays off.
+      @error_overlay : Bool = true
+
+      # Extensions whose served bytes are UTF-8 text, each with the base type to
+      # assume when the platform's MIME database has no opinion.
+      #
+      # Registering the charset in the MIME table makes `HTTP::StaticFileHandler`
+      # emit it directly, which is the only thing that works for responses past
+      # the response output buffer (`IO::DEFAULT_BUFFER_SIZE`, 32 KiB) — a
+      # post-`call_next` header edit is too late there, so a 40 KB
+      # `search.json` used to lose its charset entirely. `.html`/`.htm` matter
+      # most: HTML is the site's primary content type and with
+      # `--no-live-reload` (or any page the injector doesn't match) it goes out
+      # through StaticFileHandler like any other file, so a 60 KB CJK page
+      # rendered as mojibake.
+      #
+      # One list with one rule — deliberately NOT split on "does stdlib map
+      # this extension?". That question has a platform-dependent answer:
+      # Crystal seeds `MIME::DEFAULT_TYPES` (which already carries charsets)
+      # and then lets the OS database override it, so macOS reads
+      # `/etc/apache2/mime.types` and reports `.md` as nil while Linux reads
+      # `/etc/mime.types` and reports `text/markdown`. Keying behaviour on that
+      # split left these extensions with no charset at all on Linux — the very
+      # bug the fallback existed to fix, invisible on macOS.
+      UTF8_MIME_TYPES = {
+        ".html"        => "text/html",
+        ".htm"         => "text/html",
+        ".txt"         => "text/plain",
+        ".json"        => "application/json",
+        ".xml"         => "application/xml",
+        ".js"          => "text/javascript",
+        ".mjs"         => "text/javascript",
+        ".css"         => "text/css",
+        ".svg"         => "image/svg+xml",
+        ".csv"         => "text/csv",
+        ".md"          => "text/markdown",
+        ".webmanifest" => "application/manifest+json",
+        ".map"         => "application/json",
+      }
+
+      # Ensure every listed extension carries `charset=utf-8` whatever the
+      # platform's database says: append to the system's base type when it has
+      # one, use ours when it does not. Never overrides a system type beyond
+      # adding the charset, never double-appends, and is idempotent — a second
+      # pass sees the charset already there and skips.
+      #
+      # Only ever called from the dev server, so the built output and every
+      # other command keep stdlib's MIME table untouched.
+      def self.register_utf8_mime_types
+        UTF8_MIME_TYPES.each do |ext, assumed|
+          base = MIME.from_extension?(ext) || assumed
+          next if base.includes?("charset=")
+          MIME.register(ext, "#{base}; charset=utf-8")
+        end
+      end
 
       # Debounce interval: after detecting changes, wait this long for
       # additional changes to settle before triggering a rebuild.
@@ -529,17 +781,15 @@ module Hwaro
         run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options, options.json, options.headers)
       end
 
-      def run(host : String = "127.0.0.1", port : Int32 = 3000, drafts : Bool = false)
-        build_options = Config::Options::BuildOptions.new(drafts: drafts)
-        build_options.serve_mode = true
-        run_with_options(host, port, false, false, false, build_options, false, {} of String => String)
-      end
-
       private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false, headers : Hash(String, String) = {} of String => String)
         # The env-specific config overlay (config.<env>.toml) feeds every
         # rebuild via Models::Config.load, so the watcher must see its edits
         # — scan_mtimes stats it alongside config.toml.
         @env_config_file = build_options.env.try { |e| "config.#{e}.toml" }
+        @error_overlay = build_options.error_overlay
+        # Must happen before any handler is built so StaticFileHandler picks
+        # the charset-bearing types up.
+        Server.register_utf8_mime_types
 
         # The initial build prints its own receipt; no preamble needed.
         #
@@ -587,52 +837,23 @@ module Hwaro
         # by the first successful config-changed rebuild in that case.
         @startup_serve_config = @builder.config.try(&.serve)
 
-        # Loopback literals plus the concrete bound host (a 0.0.0.0/:: wildcard
-        # bind has no single host, so it contributes nothing here). The
-        # DevCorsHandler reflects a request Origin only when its host is in
-        # this set.
-        cors_hosts = Set{"localhost", "127.0.0.1", "::1"}
-        cors_hosts << host unless host.empty? || host == "0.0.0.0" || host == "::"
+        # Path component of base_url, when the user pointed --base-url at a
+        # subpath. "" for the normal host:port-derived base_url.
+        #
+        # Derived from the options, NOT from `@builder.config`: a startup build
+        # that fails to load config (a TOML syntax error, say) leaves config
+        # nil, and the handler chain is assembled exactly once — so reading it
+        # there dropped the mount point for the whole session, and a later
+        # successful rebuild emitting `/prefix/`-linked pages could never get it
+        # back without a restart.
+        base_path = base_path_for(build_options.base_url)
 
-        handlers = [] of HTTP::Handler
-        handlers << HTTP::LogHandler.new if access_log
-        # Reflect CORS for loopback/bound origins first so it applies to every
-        # downstream response, including redirects from IndexRewriteHandler
-        # and 404s from NotFoundHandler. This preserves the localhost-vs-
-        # 127.0.0.1 fetch() ergonomic without granting arbitrary websites
-        # cross-origin read access (the old blanket `*`).
-        handlers << DevCorsHandler.new(cors_hosts)
-        # Dev cache-busting (see NoCacheHandler). A user-supplied
-        # Cache-Control from [serve.headers]/--header wins outright.
-        handlers << NoCacheHandler.new unless headers.keys.any? { |k| k.downcase == "cache-control" }
-        # Run before StaticFileHandler so we can append `; charset=utf-8`
-        # to text-shaped Content-Type headers after the static handler
-        # sets them — Crystal's `HTTP::Server::Response` buffers the
-        # response until first flush, so post-call_next header edits
-        # take effect for typical dev-site responses.
-        handlers << CharsetHandler.new
-        # User-provided headers (from config + CLI). Placed here so:
-        # - it wraps IndexRewrite / LiveReloadInject (catches their early returns)
-        # - it runs after DevCors + Charset on the return path (user values win)
-        handlers << CustomHeadersHandler.new(headers) unless headers.empty?
-        inject_handler : LiveReloadInjectHandler? = nil
-        if live_reload
-          lr_handler = LiveReloadHandler.new
-          @live_reload_handler = lr_handler
-          handlers << lr_handler
-          handlers << IndexRewriteHandler.new(output_dir)
-          inject_handler = LiveReloadInjectHandler.new(output_dir)
-          handlers << inject_handler
-        else
-          handlers << IndexRewriteHandler.new(output_dir)
-        end
-        handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
-        handlers << NotFoundHandler.new(output_dir, inject_handler)
+        handlers = build_handlers(output_dir, host, access_log, live_reload, headers, base_path)
 
         # Replay a startup failure to the first live-reload client(s) so the
         # browser shows the overlay instead of a bare 404/stale page.
-        if (msg = initial_error) && (lr = @live_reload_handler)
-          lr.notify_build_error(msg)
+        if msg = initial_error
+          push_build_error(msg)
         end
 
         server = HTTP::Server.new(handlers)
@@ -655,10 +876,11 @@ module Hwaro
           )
         end
 
-        url = "http://#{host}:#{port}"
+        url = serve_url(host, port, base_path)
         # Calm serve receipt: where it's live, reload state, what's watched,
-        # then the ember "ready" beat. The machine-readable ready line emitted
-        # later by `emit_ready_signal` is intentionally left untouched.
+        # then the ember "ready" beat. `emit_ready_signal` publishes the very
+        # same URL, so a script that blocks on the machine line and a human
+        # reading the receipt can never be sent to different places.
         serve_receipt = Logger::Receipt.new("serve")
         serve_receipt.row("url", url, Logger::Role::Accent)
         serve_receipt.row("reload", live_reload ? "enabled" : "disabled")
@@ -737,7 +959,7 @@ module Hwaro
               @rebuild_failed = true
               Logger.error "[Fast-start] Background render failed: #{ex.message}"
               Logger.debug "[Fast-start] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
-              @live_reload_handler.try(&.notify_build_error(ex.message || "Background render failed"))
+              push_build_error(ex.message || "Background render failed")
             ensure
               deferred_done.close
             end
@@ -754,10 +976,103 @@ module Hwaro
           watch_for_changes(watch_options)
         end
 
-        emit_ready_signal(host, port, json_output)
+        emit_ready_signal(host, port, json_output, base_path)
         # Block the main fiber on the listen fiber's completion so the
         # process stays alive for the lifetime of the server.
         listen_done.receive?
+      end
+
+      # Path component of `base_url`, mirroring `Models::Config#base_path`
+      # (trailing slashes stripped, domain-root deploys yield ""). Kept here so
+      # the mount point never depends on a config load that may have failed.
+      protected def base_path_for(base_url : String?) : String
+        return "" unless base_url
+        path = begin
+          URI.parse(base_url).path
+        rescue URI::Error
+          return ""
+        end
+        # A mount point is an absolute path component. `URI.parse` happily
+        # returns an opaque path for junk like "::::" — mounting the site under
+        # that would break every route, so only "/"-rooted paths count.
+        return "" unless path.starts_with?("/")
+        path = path.rstrip("/")
+        path == "/" ? "" : path
+      end
+
+      # Assemble the dev server's handler chain. Extracted from
+      # `run_with_options` so specs can drive the real chain over a fixture
+      # directory instead of re-deriving (and drifting from) the order here.
+      #
+      # Order matters:
+      # - NoCache / Charset / CustomHeaders sit outermost so their headers
+      #   also reach DevCors' 204 preflight, which short-circuits the chain.
+      # - CustomHeaders wraps everything below, so user values win on the way
+      #   back out.
+      # - BasePath sits above LiveReload so the WebSocket endpoint keeps its
+      #   unprefixed path, and above IndexRewrite so redirects are computed on
+      #   the stripped path and re-prefixed on the way out.
+      protected def build_handlers(
+        output_dir : String,
+        host : String,
+        access_log : Bool,
+        live_reload : Bool,
+        headers : Hash(String, String),
+        base_path : String,
+      ) : Array(HTTP::Handler)
+        # Loopback literals plus the concrete bound host (a 0.0.0.0/:: wildcard
+        # bind has no single host, so it contributes nothing here). The
+        # DevCorsHandler reflects a request Origin only when its host is in
+        # this set.
+        cors_hosts = Set{"localhost", "127.0.0.1", "::1"}
+        cors_hosts << host unless host.empty? || host == "0.0.0.0" || host == "::"
+
+        handlers = [] of HTTP::Handler
+        handlers << HTTP::LogHandler.new if access_log
+        # Dev cache-busting (see NoCacheHandler). A user-supplied
+        # Cache-Control from [serve.headers]/--header wins outright.
+        handlers << NoCacheHandler.new unless headers.keys.any? { |k| k.downcase == "cache-control" }
+        # Runs before StaticFileHandler so it can append `; charset=utf-8` to
+        # text-shaped Content-Type headers the static handler sets. See the
+        # class comment for why MIME registration, not this, is the primary
+        # mechanism.
+        handlers << CharsetHandler.new
+        handlers << CustomHeadersHandler.new(headers) unless headers.empty?
+        handlers << DevCorsHandler.new(cors_hosts)
+
+        # Built up front so UnservablePathHandler can delegate to it and reuse
+        # the real 404 body; it is still appended last as the fallthrough.
+        inject_handler = live_reload ? LiveReloadInjectHandler.new(output_dir) : nil
+        not_found = NotFoundHandler.new(output_dir, inject_handler)
+
+        # FIRST among the routing handlers, above BasePathHandler: the hard
+        # refusal has to win in both shapes. When it sat below the mount point,
+        # BasePathHandler's canonicalising pre-empt reached an unservable path
+        # first and answered `/myblog/%2Fguide%2Findex.html` with a 302 (404
+        # without a mount) and `/myblog/index%00.html` with a 500 — `Path.posix`
+        # raises on a NUL. Nothing here inspects or strips the prefix, so
+        # running before the mount is safe.
+        handlers << UnservablePathHandler.new(not_found)
+        handlers << BasePathHandler.new(base_path) unless base_path.empty?
+        if live_reload
+          lr_handler = LiveReloadHandler.new
+          @live_reload_handler = lr_handler
+          handlers << lr_handler
+        end
+        handlers << IndexRewriteHandler.new(output_dir)
+        handlers << inject_handler if inject_handler
+        handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
+        handlers << not_found
+        handlers
+      end
+
+      # Push a build failure to connected browsers so the live-reload client
+      # can draw its overlay. Silent under --no-error-overlay: that flag used
+      # to reach only the per-page render fallback, leaving the full-screen
+      # overlay in place for users who had asked for no overlays at all.
+      private def push_build_error(message : String)
+        return unless @error_overlay
+        @live_reload_handler.try(&.notify_build_error(message))
       end
 
       # Emit a single deterministic, machine-parseable line indicating the
@@ -778,8 +1093,8 @@ module Hwaro
       #   {"event":"ready","url":"...","host":"...","port":N,"pid":P}
       # Otherwise the human-readable `hwaro serve: ready url=... pid=...`
       # line from issue #360 is emitted.
-      private def emit_ready_signal(host : String, port : Int32, json : Bool = false)
-        line = json ? ready_signal_json(host, port) : ready_signal_line(host, port)
+      private def emit_ready_signal(host : String, port : Int32, json : Bool = false, base_path : String = "")
+        line = json ? ready_signal_json(host, port, base_path) : ready_signal_line(host, port, base_path)
         # On an interactive colored TTY the machine line is dimmed so it reads
         # as a footnote under the serve receipt; the bytes inside the escapes
         # are unchanged. Pipes and CI (non-TTY) get the raw line exactly as
@@ -789,19 +1104,29 @@ module Hwaro
         STDOUT.flush
       end
 
+      # The URL the site is actually reachable at. Single source of truth for
+      # the serve receipt and both ready signals: they used to compose it
+      # independently, and only the receipt learned about `base_path` — so a
+      # script blocking on the ready line fetched the bare origin and got a
+      # 302 it may not follow.
+      protected def serve_url(host : String, port : Int32, base_path : String = "") : String
+        origin = "http://#{Config::Options::ServeOptions.url_host(host)}:#{port}"
+        base_path.empty? ? origin : "#{origin}#{base_path}/"
+      end
+
       # Build the deterministic ready-signal line. Kept separate from
       # `emit_ready_signal` so specs can assert on the format without
       # capturing stdout.
-      protected def ready_signal_line(host : String, port : Int32) : String
-        "hwaro serve: ready url=http://#{host}:#{port} pid=#{Process.pid}"
+      protected def ready_signal_line(host : String, port : Int32, base_path : String = "") : String
+        "hwaro serve: ready url=#{serve_url(host, port, base_path)} pid=#{Process.pid}"
       end
 
       # JSON variant of the ready signal — single-line document on stdout so
       # CI scripts and agents can parse it with `jq` / `JSON.parse`.
-      protected def ready_signal_json(host : String, port : Int32) : String
+      protected def ready_signal_json(host : String, port : Int32, base_path : String = "") : String
         {
           "event" => "ready",
-          "url"   => "http://#{host}:#{port}",
+          "url"   => serve_url(host, port, base_path),
           "host"  => host,
           "port"  => port,
           "pid"   => Process.pid,
@@ -851,7 +1176,7 @@ module Hwaro
                   @rebuild_failed = true
                   Logger.error "[Watch] Build failed: #{ex.message}"
                   Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
-                  @live_reload_handler.try(&.notify_build_error(ex.message || "Build failed"))
+                  push_build_error(ex.message || "Build failed")
                 end
               end
             end
@@ -970,16 +1295,40 @@ module Hwaro
         end
       end
 
+      # The strategy the watcher will actually run: the changeset's own choice,
+      # escalated to a full rebuild when the cheap paths can't be trusted.
+      #
+      # - Missing output root: `rm -rf public` (or a stray `hwaro build -o …`)
+      #   mid-session used to poison the next save — the incremental
+      #   strategies only rewrite the pages that changed and never recreate
+      #   the directory tree around them, so every page raised "No such file
+      #   or directory" on its temp file and only the @rebuild_failed-forced
+      #   rebuild on the save AFTER that recovered.
+      # - Previous failure: the pages a failed rebuild left stale are not
+      #   re-selected when the next event touches an unrelated file.
+      private def effective_strategy(changeset : ChangeSet, output_dir : String) : Symbol
+        strategy = changeset.rebuild_strategy
+        return strategy if strategy == :full
+
+        unless Dir.exists?(output_dir)
+          Logger.info "  Output directory was missing — running a full rebuild to recover."
+          return :full
+        end
+
+        if @rebuild_failed
+          Logger.info "  Previous rebuild failed — running a full rebuild to recover."
+          return :full
+        end
+
+        strategy
+      end
+
       # Choose the cheapest rebuild strategy for a given ChangeSet and execute it.
       private def apply_changeset(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
-        strategy = changeset.rebuild_strategy
-        # After a failed rebuild the cheap strategies can't be trusted to
-        # cover the pages the failure left stale — rebuild everything once,
-        # then return to incremental strategies (see @rebuild_failed).
-        if @rebuild_failed && strategy != :full
-          Logger.info "  Previous rebuild failed — running a full rebuild to recover."
-          strategy = :full
-        end
+        output_dir = sanitize_output_dir(build_options.output_dir)
+        strategy = effective_strategy(changeset, output_dir)
+        # Recreate a vanished output root before anything writes into it.
+        Hwaro::Utils::FileSafe.mkdir_p(output_dir) unless Dir.exists?(output_dir)
         # Calm watch timeline: one "↻ <what> · time" event at column 0 (the ↻
         # glyph carries "changed"), then the rebuild's own spark "rebuilt …"
         # outcome line below it. The strategy is implied by that outcome
@@ -997,7 +1346,7 @@ module Hwaro
         stale_outputs = if changeset.removed_files.empty?
                           [] of String
                         else
-                          @builder.stale_outputs_for_removed(changeset.removed_files, sanitize_output_dir(build_options.output_dir))
+                          @builder.stale_outputs_for_removed(changeset.removed_files, output_dir)
                         end
 
         success = case strategy
@@ -1027,7 +1376,7 @@ module Hwaro
         # onto a half-built site with no visible error.
         unless success
           @rebuild_failed = true
-          @live_reload_handler.try(&.notify_build_error("Build failed — check the terminal for details."))
+          push_build_error("Build failed — check the terminal for details.")
           return
         end
 
@@ -1050,7 +1399,7 @@ module Hwaro
           copy_content_files(changeset, build_options)
         end
 
-        remove_stale_outputs(stale_outputs, sanitize_output_dir(build_options.output_dir))
+        remove_stale_outputs(stale_outputs, output_dir)
 
         @live_reload_handler.try(&.notify_reload)
       end

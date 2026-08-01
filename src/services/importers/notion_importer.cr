@@ -21,6 +21,7 @@ module Hwaro
           errors = 0
 
           @used_slugs.clear
+          reset_written_paths
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -50,6 +51,8 @@ module Hwaro
             errors += 1
             Logger.warn "Error importing #{file_path}: #{ex.message}"
           end
+
+          report_collisions
 
           ImportResult.new(
             success: imported > 0 || errors == 0,

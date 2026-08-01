@@ -151,18 +151,53 @@ describe Hwaro::Core::Build::Phases::Initialize do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           FileUtils.mkdir_p("static")
-          File.write("static/a.txt", "src")
+          File.write("static/a.txt", "src!")
 
           FileUtils.mkdir_p("public")
+          # Same LENGTH as the source: the incremental skip now requires size
+          # equality as well as a matching mtime, so a differently-sized
+          # sentinel would legitimately be re-copied.
           File.write("public/a.txt", "dest")
-          # Make destination newer than source so the incremental copy skips it.
-          newer = Time.utc + 1.hour
-          File.utime(newer, newer, "public/a.txt")
+          # A copy carries the SOURCE's mtime, so matching mtimes is what marks
+          # the destination as already up to date. (A merely *newer* mtime is
+          # not enough — see the regression below.)
+          File.utime(Time.utc, Time.utc, "static/a.txt")
+          src_mtime = File.info("static/a.txt").modification_time
+          File.utime(src_mtime, src_mtime, "public/a.txt")
 
           builder = Hwaro::Core::Build::Builder.new
           builder.test_copy_static_files("public", incremental: true)
 
           File.read("public/a.txt").should eq("dest")
+        end
+      end
+    end
+
+    # Regression: a source whose mtime moved BACKWARDS — what `git checkout`
+    # of an older revision, `git stash pop` and `rsync --times` all do — was
+    # skipped forever by the old "destination is newer" test, so `public/`
+    # kept serving the previous revision's asset on every incremental build.
+    it "re-copies a file whose source mtime moved backwards in incremental mode" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("public")
+          File.write("static/a.txt", "restored old revision")
+          File.write("public/a.txt", "previously published")
+
+          older = Time.utc(2020, 1, 1)
+          File.utime(older, older, "static/a.txt")
+          newer = Time.utc
+          File.utime(newer, newer, "public/a.txt")
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_copy_static_files("public", incremental: true)
+
+          File.read("public/a.txt").should eq("restored old revision")
+          # The copy is stamped with the source mtime, so the NEXT incremental
+          # build takes the equality fast path instead of copying again.
+          File.info("public/a.txt").modification_time
+            .should eq(File.info("static/a.txt").modification_time)
         end
       end
     end

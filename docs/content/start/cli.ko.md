@@ -42,8 +42,10 @@ NO_COLOR=1 hwaro doctor
 Error [HWARO_E_USAGE]: missing <path> argument
 ```
 
-`--json`(또는 `--quiet`)에서는 분류된 오류가 stdout에 구조화된
-페이로드로 출력됩니다:
+`--json`에서는 분류된 오류가 대신 stdout에 구조화된 페이로드로
+출력됩니다. (`--quiet`는 정보성 출력만 숨깁니다 — 오류는 그대로
+stderr에 사람이 읽는 `Error [CODE]: …` 형태로 남으므로, 기계가 읽을
+수 있는 실패 출력이 필요하면 `--json`과 함께 사용합니다.)
 
 ```json
 {
@@ -332,9 +334,9 @@ hwaro serve -i /path/to/my-site -p 8080
 | 플래그 | 설명 |
 |------|-------------|
 | -i, --input DIR | 서빙할 프로젝트 디렉터리 (기본값: 현재 디렉터리) |
-| -b, --bind HOST | 바인드 주소 (기본값: 127.0.0.1) |
+| -b, --bind HOST | 바인드 주소 (기본값: 127.0.0.1). IPv6 리터럴을 지원하며, 생성되는 모든 URL에서 대괄호로 감싸 표시됩니다(`-b ::1` → `http://[::1]:3000`) |
 | -p, --port PORT | 포트 번호 (기본값: 3000) |
-| --base-url URL | `config.toml`의 `base_url`을 일시적으로 오버라이드 |
+| --base-url URL | `config.toml`의 `base_url`을 일시적으로 오버라이드. URL에 경로가 있으면 개발 서버가 그 경로 아래에 사이트를 마운트합니다(아래 참고) |
 | -e, --env ENV | 환경 이름 (`config.<env>.toml` 오버라이드 로드) |
 | --minify | 압축된 출력 서빙 |
 | --jobs N | 동시 렌더 워커 수 (기본값: 자동). 템플릿이 많은 사이트는 `1`-`2` 시도 |
@@ -379,6 +381,26 @@ hwaro serve -i /path/to/my-site -p 8080
 
 `-i`를 지정하면 서버는 해당 디렉터리로 `cd`한 것처럼 동작합니다 — 그 프로젝트 루트를 감시하고 서빙합니다.
 
+**서브패스 미리보기 (`--base-url`에 경로 지정):**
+
+```bash
+hwaro serve --base-url http://localhost:3000/myblog/
+```
+
+사이트가 `/myblog/` 접두사가 붙은 링크로 빌드되고 같은 접두사 아래에서 서빙됩니다. 덕분에 프로젝트 페이지 배포(GitHub Pages, GitLab Pages)를 실제 게시될 모습 그대로 미리 볼 수 있습니다 — 모든 링크가 로컬에서 404가 되는 홈페이지를 보게 되는 대신에 말입니다.
+
+- `/`는 `/myblog/`로 리디렉션됩니다.
+- 접두사가 없는 요청도 그대로 해석되므로, 직접 입력한 에셋 경로가 계속 동작합니다.
+- 라이브 리로드, 파일 감시, WebSocket 엔드포인트 모두 접두사 아래에서 동작합니다.
+
+**요청 처리:**
+
+- 서버는 `GET`, `HEAD`, `OPTIONS`에 응답합니다. 그 외 메서드는 404 페이지가 아니라 `Allow: GET, HEAD, OPTIONS` 헤더와 함께 `405 Method Not Allowed`를 반환합니다.
+- 잘못된 형식의 요청 경로(예: 퍼센트 인코딩된 NUL 바이트)는 `400 Bad Request`를 반환합니다.
+- `HEAD`는 대응하는 `GET`과 정확히 같은 헤더를 반환하며 — 라이브 리로드가 주입된 HTML의 `Content-Length`까지 포함합니다 — 본문은 없습니다.
+- 텍스트 응답(`.txt`, `.json`, `.xml`, `.js`, `.css`, `.svg`, …)은 파일 크기와 관계없이 항상 `; charset=utf-8`을 포함합니다.
+- 디렉터리 리디렉션은 퍼센트 인코딩된 `Location`을 보냅니다(`/my%20page/`, `/%ED%95%9C%EA%B8%80/`). 백슬래시나 인코딩된 구분자(`%2F`, `%5C`)가 포함된 경로는 정적 호스트와 동일하게 서빙하지 않습니다.
+
 **커스텀 응답 헤더 (`--header` / `[serve.headers]`):**
 
 프로덕션 리버스 프록시, CDN, 정적 호스팅이 설정하는 헤더(보안 헤더, `Cache-Control`, 커스텀 CORS 등)를 재현해, 정적 출력을 배포하기 전에 로컬에서 테스트하는 용도입니다.
@@ -396,7 +418,7 @@ hwaro serve --header "X-Custom: foo" --header "Cache-Control: no-store"
 ```
 
 - CLI `--header` 값이 `config.toml`의 같은 키보다 우선합니다.
-- 헤더는 **모든** 개발 서버 응답(HTML, 에셋, 404, 리디렉션, 라이브 리로드가 주입된 페이지)에 붙습니다.
+- 헤더는 **모든** 개발 서버 응답(HTML, 에셋, 404, 리디렉션, 라이브 리로드가 주입된 페이지, CORS 프리플라이트(`OPTIONS`) 응답)에 붙습니다.
 - 이 기능은 `hwaro serve`에만 적용됩니다. `public/`에 쓰이는 파일은 그대로입니다.
 
 ### deploy

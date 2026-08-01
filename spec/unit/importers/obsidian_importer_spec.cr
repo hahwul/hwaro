@@ -378,7 +378,9 @@ describe Hwaro::Services::Importers::ObsidianImporter do
         ))
 
         content = File.read(File.join(output_dir, "posts", "embed-test.md"))
-        content.should contain("Image embed with width: ![400](photo.png)")
+        # `|400` on an image embed is Obsidian's display width, not an alias,
+        # so the filename stays as the alt text.
+        content.should contain("Image embed with width: ![photo.png](photo.png)")
         content.should contain("Note embed: [other-page](/posts/other-page/)")
         content.should contain("Note embed with section: [other-page#Section](/posts/other-page/#section)")
         content.should contain("Note embed with alias: [Some Display](/posts/other-page/)")

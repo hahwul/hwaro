@@ -49,7 +49,8 @@ describe Hwaro::Core::Build::Phases::Render do
           builder = Hwaro::Core::Build::Builder.new
           page = Hwaro::Models::Page.new("blog/post.md")
           page.url = "/blog/post/"
-          builder.test_get_output_path(page, "public").should end_with("public/blog/post/index.html")
+          builder.test_get_output_path(page, "public").not_nil!
+            .should end_with("public/blog/post/index.html")
         end
       end
     end
@@ -60,7 +61,8 @@ describe Hwaro::Core::Build::Phases::Render do
           builder = Hwaro::Core::Build::Builder.new
           page = Hwaro::Models::Page.new("index.md")
           page.url = "/"
-          builder.test_get_output_path(page, "public").should end_with("public/index.html")
+          builder.test_get_output_path(page, "public").not_nil!
+            .should end_with("public/index.html")
         end
       end
     end
@@ -72,7 +74,23 @@ describe Hwaro::Core::Build::Phases::Render do
           page = Hwaro::Models::Page.new("nested/page.md")
           page.url = "/nested/page/"
           result = builder.test_get_output_path(page, "public")
-          result.should contain("public/nested/page/index.html")
+          result.not_nil!.should contain("public/nested/page/index.html")
+        end
+      end
+    end
+
+    # Regression: an output directory written with a trailing separator must
+    # resolve exactly like one without it. It used to fail containment, and
+    # the rejected page then fell back to `<output_dir>/index.html` — every
+    # page in the site overwriting the homepage in turn.
+    it "resolves the same path when output_dir has a trailing separator" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          page = Hwaro::Models::Page.new("blog/post.md")
+          page.url = "/blog/post/"
+          builder.test_get_output_path(page, "public/")
+            .should eq(builder.test_get_output_path(page, "public"))
         end
       end
     end

@@ -11,6 +11,7 @@ require "../../metadata"
 require "../../../services/content_stats"
 require "../../../utils/errors"
 require "../../../utils/logger"
+require "../../../utils/text_utils"
 
 module Hwaro
   module CLI
@@ -104,7 +105,9 @@ module Hwaro
             unless result.tags.empty?
               Logger.info ""
               Logger.section("tags", result.tags.size > 15 ? "top 15" : nil)
-              top_tags = result.tags.first(15)
+              # Tag names come from semi-trusted front matter — strip control
+              # bytes so a crafted tag can't inject ANSI into the report.
+              top_tags = result.tags.first(15).map { |tag, count| {Utils::TextUtils.strip_control(tag), count} }
               max_count = top_tags.max_of { |_, count| count }
               label_width = top_tags.max_of { |tag, _| tag.size }.clamp(0, 20)
               top_tags.each do |tag, count|
