@@ -1861,6 +1861,12 @@ module Hwaro
       private def self.load_languages(config : Config)
         return unless s = config.raw["languages"]?.try(&.as_h?)
 
+        # Collect into a local hash and assign through `languages=` at the
+        # end: the setter invalidates the `multilingual?` memo, so the
+        # invariant holds structurally instead of depending on nothing
+        # having called `multilingual?` before this loader runs.
+        languages = config.languages.dup
+
         s.each do |lang_code, lang_data|
           next unless lang_hash = lang_data.as_h?
 
@@ -1891,8 +1897,10 @@ module Hwaro
           # signalling "inherit the global `[[menus.*]]` set wholesale" to
           # `Content::Menus.build`.
 
-          config.languages[lang_code] = lang_config
+          languages[lang_code] = lang_config
         end
+
+        config.languages = languages
       end
 
       private def self.load_build(config : Config)

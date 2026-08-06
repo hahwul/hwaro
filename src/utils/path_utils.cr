@@ -74,6 +74,13 @@ module Hwaro
         end
         decoded = decoded.gsub("\u0000", "")
 
+        # A percent-encoded overlong sequence (`%C0%AE`) decodes to invalid
+        # UTF-8, and PCRE2 raises on it — letting a hostile archive entry or
+        # importer path crash the CLI. Neutralize invalid bytes instead
+        # (scrub is a no-op for valid UTF-8); overlong ".." is not ".." to
+        # any filesystem, so this loses no traversal protection.
+        decoded = decoded.scrub
+
         collect_safe_segments(decoded.split(/[\/\\]/))
       end
 

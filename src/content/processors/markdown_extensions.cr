@@ -1177,11 +1177,14 @@ module Hwaro
           # rescanned the line once per span). An HTML code span stashed
           # second can contain a backtick-span placeholder stashed first
           # (`<code>` + "`x`" on one line); gsub does not rescan injected
-          # content, so loop until no token remains — depth is bounded by
-          # the two stash passes above. A counterfeit token (impossible in
-          # author input: NUL is illegal) restores nothing and exits via
-          # the no-change check.
-          while rewritten.includes?("\x00CS")
+          # content, so a second pass picks those up. The pass count is a
+          # HARD cap of 2, matching the two stash passes above — a span
+          # whose own content forges a valid token (raw NULs in the source
+          # file) would otherwise re-expand itself every pass and hang the
+          # build. An out-of-range counterfeit restores nothing and exits
+          # via the no-change check.
+          2.times do
+            break unless rewritten.includes?("\x00CS")
             replaced = rewritten.gsub(CODE_SPAN_TOKEN_RE) do |match|
               idx = $1.to_i?
               idx && idx < code_spans.size ? code_spans[idx] : match

@@ -700,14 +700,14 @@ module Hwaro
           # for colliding keys so nested/subsequent invocations see the
           # exact original context.
           saved : Hash(String, Crinja::Value)? = nil
-          args.each do |key, value|
-            if context.has_key?(key)
-              (saved ||= {} of String => Crinja::Value)[key] = context[key]
-            end
-            context[key] = Crinja::Value.new(value)
-          end
-
           begin
+            args.each do |key, value|
+              if context.has_key?(key)
+                (saved ||= {} of String => Crinja::Value)[key] = context[key]
+              end
+              context[key] = Crinja::Value.new(value)
+            end
+
             # Cache compiled shortcode templates by content hash to avoid
             # re-parsing the template AST on every shortcode invocation.
             # XOR with a salt to avoid collisions with page template cache entries
