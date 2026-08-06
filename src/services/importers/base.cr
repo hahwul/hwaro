@@ -1,6 +1,7 @@
 require "file_utils"
 require "set"
 require "../../config/options/import_options"
+require "../../utils/date_utils"
 require "../../utils/file_safe"
 require "../../utils/frontmatter_writer"
 require "../../utils/logger"
@@ -418,41 +419,8 @@ module Hwaro
         end
 
         # Parse a date string in common formats, returns nil on failure.
-        #
-        # Zone-bearing formats come FIRST: Crystal's `Time.parse` ignores
-        # trailing input, so a zone-less pattern would happily match
-        # `2026-07-01T10:00:00+09:00`, silently drop the `+09:00`, and shift
-        # the instant by the whole offset.
         protected def parse_date(date_str : String) : Time?
-          str = date_str.strip
-
-          begin
-            return Time.parse_rfc3339(str)
-          rescue Time::Format::Error
-            # Not RFC 3339; fall through to the lenient formats.
-          end
-
-          formats = [
-            "%Y-%m-%dT%H:%M:%S%:z",
-            "%Y-%m-%dT%H:%M:%S%z",
-            # Jekyll's conventional `2024-01-15 10:00:00 +0900`
-            "%Y-%m-%d %H:%M:%S %:z",
-            "%Y-%m-%d %H:%M:%S %z",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d",
-            "%B %d, %Y",
-            # RFC 822 (WordPress <pubDate>, RSS feeds)
-            "%a, %d %b %Y %H:%M:%S %z",
-          ]
-
-          formats.each do |fmt|
-            return Time.parse(str, fmt, Time::Location::UTC)
-          rescue Time::Format::Error | ArgumentError
-            next
-          end
-
-          nil
+          Utils::DateUtils.parse_lenient(date_str, Utils::DateUtils::IMPORT_FORMATS)
         end
 
         # Format a Time to the standard frontmatter date format, keeping the
@@ -461,6 +429,36 @@ module Hwaro
         # nine hours in feeds and sort order.
         protected def format_date(time : Time) : String
           Hwaro::Utils::FrontmatterWriter.serialize_time(time)
+        end
+
+        # YAML::Any scalar → String: string scalars pass through, anything
+        # else falls back to its raw representation.
+        protected def yaml_string(value : YAML::Any) : String
+          value.as_s? || value.raw.to_s
+        end
+
+        # Assign a date-valued frontmatter field that may be a YAML timestamp
+        # (already a Time) or a string in any of the lenient `parse_date`
+        # formats. An unparseable string leaves `fields[key]` unset.
+        protected def assign_date_field(fields : Hash(String, FieldValue), key : String, value : YAML::Any) : Nil
+          case raw = value.raw
+          when Time
+            fields[key] = format_date(raw)
+          when String
+            parsed = parse_date(raw)
+            fields[key] = format_date(parsed) if parsed
+          end
+        end
+
+        # Append entries from a list-valued frontmatter field that may be an
+        # array of scalars or a comma/space-separated string.
+        protected def collect_string_list(value : YAML::Any, into list : Array(String)) : Nil
+          case value.raw
+          when Array
+            value.as_a.each { |v| list << yaml_string(v) }
+          when String
+            value.as_s.split(/[\s,]+/).each { |v| list << v.strip unless v.strip.empty? }
+          end
         end
       end
     end

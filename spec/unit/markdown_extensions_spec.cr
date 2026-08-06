@@ -1761,4 +1761,24 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       toc[1].id.should eq("x-1")
     end
   end
+
+  describe "code-span stash restore" do
+    it "terminates when a code span forges its own placeholder token" do
+      # Raw NULs in the source file can forge the internal "\x00CS0\x00"
+      # stash token INSIDE the very code span that becomes index 0. An
+      # unbounded fixed-point restore re-expands the span into itself on
+      # every pass and hangs the build; the restore must hard-cap its
+      # passes instead.
+      content = "a `\u0000CS0\u0000` b ~~x~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("<del>x</del>")
+    end
+
+    it "restores a backtick span nested inside an HTML code span" do
+      content = "<code>`tick`</code> ~~x~~"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
+      result.should contain("<code>`tick`</code>")
+      result.should contain("<del>x</del>")
+    end
+  end
 end

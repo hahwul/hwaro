@@ -84,10 +84,19 @@ module Hwaro
       # page. Array (not Hash) to preserve PROTECTED_TAGS order — `style`
       # must be extracted before `script` (see comment above).
       private PROTECTED_PATTERNS = PROTECTED_TAGS.map do |tag|
-        {tag, Regex.new(
-          "<#{tag}\\b[^>]*>.*?</#{tag}\\s*>",
-          Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
-        )}
+        {tag,
+        # Cheap presence probe: most pages carry no <textarea>, <math>,
+        # <noscript>, …, and the heavy `.*?` extraction pattern below has
+        # no fast no-match path (every '<' in the document is a candidate
+        # start). The lowercase literal decides via memchr for the
+        # markdown-rendered common case; the case-insensitive probe covers
+        # author-written uppercase tags.
+         "<#{tag}",
+         Regex.new("<#{tag}", Regex::Options::IGNORE_CASE),
+         Regex.new(
+           "<#{tag}\\b[^>]*>.*?</#{tag}\\s*>",
+           Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
+         )}
       end
 
       # Sentinel format for protected blocks. `\x00` is illegal in HTML,
@@ -97,6 +106,8 @@ module Hwaro
       private PRESERVE_PREFIX_BLOCK  = "\x00HW_HTML_PB_"
       private PRESERVE_PREFIX_INLINE = "\x00HW_HTML_PI_"
       private PRESERVE_SUFFIX        = "\x00"
+      # Common prefix of both placeholder forms, for cheap presence probes.
+      private PRESERVE_TOKEN_PROBE = "\x00HW_HTML_P"
 
       # Regex constants
       private REGEX_COMMENTS       = /<!--(?!\[if|#|\s*more\s*-->).*?-->/m
@@ -157,7 +168,8 @@ module Hwaro
       # mixed both. One pass per tag avoids that whole class of bug.
       private def protect_sensitive_blocks(html : String, preserves : Array(String)) : String
         result = html
-        PROTECTED_PATTERNS.each do |(tag, pattern)|
+        PROTECTED_PATTERNS.each do |(tag, open_literal, probe, pattern)|
+          next unless result.includes?(open_literal) || result.matches?(probe)
           prefix = PROTECTED_INLINE.includes?(tag) ? PRESERVE_PREFIX_INLINE : PRESERVE_PREFIX_BLOCK
           result = result.gsub(pattern) do |match|
             idx = preserves.size
@@ -175,7 +187,11 @@ module Hwaro
       # HTML, which cannot contain a valid \x00-delimited token (NUL is illegal
       # in author input), and a dangling index returns $0 unchanged.
       private def restore_sensitive_blocks(html : String, preserves : Array(String)) : String
+        return html if preserves.empty?
         loop do
+          # memchr probe: once the last token is restored the loop used to
+          # pay one full confirming regex pass over the document.
+          break unless html.includes?(PRESERVE_TOKEN_PROBE)
           replaced = html.gsub(REGEX_PRESERVE_TOKEN) do
             # to_i? (not to_i) so a counterfeit token whose digits overflow
             # Int32 (e.g. \x00HW_HTML_PB_99999999999999999999\x00 forged in

@@ -754,6 +754,10 @@ module Hwaro
         # scan is quote-aware so a `>` inside a quoted value doesn't end
         # the opening tag early.
         HTML_CODE_SPAN_RE = /<code(?:\s(?:[^>"']|"[^"]*"|'[^']*')*)?>[^<]*<\/code>/
+
+        # Placeholder emitted by transform_outside_code_spans for a stashed
+        # code span; the capture is the span's index.
+        CODE_SPAN_TOKEN_RE = /\x00CS(\d+)\x00/
         # CommonMark "type 6" HTML-block start condition (common block tags,
         # including the <table>/<dl>/<div> markup hwaro itself generates).
         # A line opening one of these starts a raw-HTML block that runs to
@@ -1169,12 +1173,24 @@ module Hwaro
 
           rewritten = yield stashed
 
-          # Reverse order: an HTML code span stashed second can contain a
-          # backtick-span placeholder stashed first (`<code>` + "`x`" on one
-          # line); restoring highest-index first re-exposes the inner
-          # placeholder for its own restore.
-          (code_spans.size - 1).downto(0) do |idx|
-            rewritten = rewritten.sub("\x00CS#{idx}\x00", code_spans[idx])
+          # Single-pass restore per nesting level (the per-index `sub` loop
+          # rescanned the line once per span). An HTML code span stashed
+          # second can contain a backtick-span placeholder stashed first
+          # (`<code>` + "`x`" on one line); gsub does not rescan injected
+          # content, so a second pass picks those up. The pass count is a
+          # HARD cap of 2, matching the two stash passes above — a span
+          # whose own content forges a valid token (raw NULs in the source
+          # file) would otherwise re-expand itself every pass and hang the
+          # build. An out-of-range counterfeit restores nothing and exits
+          # via the no-change check.
+          2.times do
+            break unless rewritten.includes?("\x00CS")
+            replaced = rewritten.gsub(CODE_SPAN_TOKEN_RE) do |match|
+              idx = $1.to_i?
+              idx && idx < code_spans.size ? code_spans[idx] : match
+            end
+            break if replaced == rewritten
+            rewritten = replaced
           end
           rewritten
         end

@@ -11,6 +11,31 @@ module Hwaro
     module TextUtils
       extend self
 
+      # Display names for common language codes, used by scaffold configs
+      # for `--include-multilingual`. Unknown codes fall back to upcase.
+      LANGUAGE_DISPLAY_NAMES = {
+        "en" => "English",
+        "ko" => "한국어",
+        "ja" => "日本語",
+        "zh" => "中文",
+        "es" => "Español",
+        "fr" => "Français",
+        "de" => "Deutsch",
+        "pt" => "Português",
+        "ru" => "Русский",
+        "it" => "Italiano",
+        "nl" => "Nederlands",
+        "pl" => "Polski",
+        "vi" => "Tiếng Việt",
+        "th" => "ไทย",
+        "ar" => "العربية",
+        "hi" => "हिन्दी",
+      }
+
+      def language_display_name(code : String) : String
+        LANGUAGE_DISPLAY_NAMES[code.downcase]? || code.upcase
+      end
+
       # Strip a leading UTF-8 byte order mark.
       #
       # Windows editors (Notepad, PowerShell `>` redirection, "UTF-8 with BOM"

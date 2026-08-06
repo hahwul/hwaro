@@ -16,8 +16,12 @@ module Hwaro
       #   safe_path("public/blog/index.html", "public") # => "public/blog/index.html"
       #
       def safe_output_path(output_path : String, output_dir : String) : String?
-        if within_output_dir?(output_path, output_dir)
-          canonical(output_path)
+        # Canonicalize once — the previous within_output_dir? + canonical
+        # sequence expanded output_path twice (a getcwd syscall and several
+        # Path allocations each), and this runs for every written file.
+        canonical_output = canonical(output_path)
+        if contains?(canonical(output_dir), canonical_output)
+          canonical_output
         else
           Logger.warn "Skipping output outside output directory: #{output_path}"
           nil
@@ -27,14 +31,16 @@ module Hwaro
       # Check if a path is within the output directory.
       #
       def within_output_dir?(output_path : String, output_dir : String) : Bool
-        canonical_output = canonical(output_path)
-        canonical_output_dir = canonical(output_dir)
-        return true if canonical_output == canonical_output_dir
+        contains?(canonical(output_dir), canonical(output_path))
+      end
+
+      private def contains?(canonical_dir : String, canonical_output : String) : Bool
+        return true if canonical_output == canonical_dir
         # Build the prefix from the canonical dir rather than always appending
         # a separator: at the filesystem root `canonical` legitimately returns
         # "/", and "/" + "/" would reintroduce the double-separator mismatch
         # this method exists to avoid.
-        prefix = canonical_output_dir.ends_with?(File::SEPARATOR) ? canonical_output_dir : canonical_output_dir + File::SEPARATOR
+        prefix = canonical_dir.ends_with?(File::SEPARATOR) ? canonical_dir : canonical_dir + File::SEPARATOR
         canonical_output.starts_with?(prefix)
       end
 

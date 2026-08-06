@@ -20,6 +20,7 @@ require "./markdown_extensions"
 require "./heading_ids"
 require "./render_hooks"
 require "../../models/toc"
+require "../../utils/date_utils"
 require "../../utils/errors"
 require "../../utils/frontmatter_scanner"
 require "../../utils/logger"
@@ -46,9 +47,6 @@ module Hwaro
         IMG_LAZY_REGEX = /<img(?!(?:[^>"']|"[^"]*"|'[^']*')*(?<![\w-])loading\s*=)((?:[^>"']|"[^"]*"|'[^']*')*?)\s*\/?>/i
         # Extracts id="value" from an attribute string
         ID_ATTR_REGEX = /(?<![\w-])id\s*=\s*["']([^"']+)["']/
-        # Strips HTML tags to get plain text
-        HTML_TAG_STRIP_REGEX = /<[^>]+>/
-
         # Regex for TOML front matter
         TOML_FRONT_MATTER_REGEX = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m
 
@@ -885,39 +883,10 @@ module Hwaro
           end
         end
 
+        # Unparseable and out-of-range dates return nil so the rest of the
+        # front matter survives instead of the exception unwinding the parse.
         private def parse_time(time_str : String?) : Time?
-          return unless time_str
-          str = time_str.strip
-          return if str.empty?
-
-          # Select format based on string pattern to avoid exception-based control flow
-          fmt = if str.includes?('T')
-                  # Could be RFC 3339 (with timezone) or plain ISO
-                  if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
-                    begin
-                      return Time.parse_rfc3339(str)
-                    rescue Time::Format::Error | ArgumentError
-                      "%Y-%m-%dT%H:%M:%S"
-                    end
-                  else
-                    "%Y-%m-%dT%H:%M:%S"
-                  end
-                elsif str.size > 10
-                  "%Y-%m-%d %H:%M:%S"
-                else
-                  "%Y-%m-%d"
-                end
-
-          begin
-            Time.parse(str, fmt, Time::Location.local)
-          rescue Time::Format::Error | ArgumentError
-            # Time::Format::Error  → string doesn't match the format at all.
-            # ArgumentError        → format matches but the value is out of
-            #   range (e.g. "2024-13-45", "2024-02-30"). Both mean "no usable
-            #   date" — return nil so the rest of the front matter survives
-            #   instead of letting the exception unwind the whole parse.
-            nil
-          end
+          Utils::DateUtils.parse_content_date(time_str)
         end
 
         # Extract named-menu front-matter registrations. Accepts the plural

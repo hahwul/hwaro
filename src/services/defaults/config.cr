@@ -286,25 +286,7 @@ module Hwaro
 
         # Get display name for language code
         private def self.language_display_name(code : String) : String
-          case code.downcase
-          when "en" then "English"
-          when "ko" then "한국어"
-          when "ja" then "日本語"
-          when "zh" then "中文"
-          when "es" then "Español"
-          when "fr" then "Français"
-          when "de" then "Deutsch"
-          when "pt" then "Português"
-          when "ru" then "Русский"
-          when "it" then "Italiano"
-          when "nl" then "Nederlands"
-          when "pl" then "Polski"
-          when "vi" then "Tiếng Việt"
-          when "th" then "ไทย"
-          when "ar" then "العربية"
-          when "hi" then "हिन्दी"
-          else           code.upcase
-          end
+          Utils::TextUtils.language_display_name(code)
         end
       end
     end

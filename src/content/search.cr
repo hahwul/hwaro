@@ -1,4 +1,5 @@
 require "../models/page"
+require "./discovery_pages"
 require "../models/config"
 require "../utils/logger"
 require "../utils/text_utils"
@@ -29,21 +30,8 @@ module Hwaro
         # the guards sitemap.cr / feeds.cr / llms.cr already apply.
         search_pages = pages.reject { |p| !p.search_index_eligible? }
 
-        # Deduplicate by URL (keep last occurrence, matching build behavior)
-        seen_urls = Set(String).new
-        search_pages = search_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse!
-
-        # Filter out excluded paths
-        unless config.search.exclude.empty?
-          excluded_paths = config.search.exclude.map do |path|
-            path.starts_with?('/') ? path : "/#{path}"
-          end
-
-          search_pages.reject! do |page|
-            page_url = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-            excluded_paths.any? { |excluded| page_url == excluded || page_url.starts_with?(excluded.ends_with?("/") ? excluded : excluded + "/") }
-          end
-        end
+        search_pages = DiscoveryPages.dedupe_by_url(search_pages)
+        DiscoveryPages.reject_excluded!(search_pages, config.search.exclude)
 
         # Multilingual: honor each language's `build_search_index` toggle so a
         # language opted out is excluded from the index. Pages without an

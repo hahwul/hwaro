@@ -1,4 +1,5 @@
 require "../../models/page"
+require "../discovery_pages"
 require "../../models/site"
 require "../../utils/logger"
 require "../../utils/text_utils"
@@ -25,21 +26,8 @@ module Hwaro
           # run with the corresponding include flag.
           sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft && !p.unpublished }
 
-          # Deduplicate by URL (keep last occurrence, matching build behavior)
-          seen_urls = Set(String).new
-          sitemap_pages = sitemap_pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse!
-
-          # Filter out excluded paths
-          unless site.config.sitemap.exclude.empty?
-            excluded_paths = site.config.sitemap.exclude.map do |path|
-              path.starts_with?('/') ? path : "/#{path}"
-            end
-
-            sitemap_pages.reject! do |page|
-              page_url = page.url.starts_with?('/') ? page.url : "/#{page.url}"
-              excluded_paths.any? { |excluded| page_url == excluded || page_url.starts_with?(excluded.ends_with?("/") ? excluded : excluded + "/") }
-            end
-          end
+          sitemap_pages = DiscoveryPages.dedupe_by_url(sitemap_pages)
+          DiscoveryPages.reject_excluded!(sitemap_pages, site.config.sitemap.exclude)
 
           if sitemap_pages.empty?
             Logger.info "  No pages to include in sitemap."

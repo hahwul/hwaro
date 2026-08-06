@@ -100,6 +100,21 @@ describe Hwaro::Utils::PathUtils do
     it "strips dot-dot segments from deep paths" do
       Hwaro::Utils::PathUtils.sanitize_path("/a/b/c/../../d").should eq("a/b/c/d")
     end
+
+    it "neutralizes percent-encoded overlong UTF-8 instead of raising" do
+      # %C0%AE decodes to an overlong 2-byte "." — invalid UTF-8 that made
+      # the PCRE2 segment split raise, letting a hostile archive entry or
+      # importer path crash the CLI. It must neutralize, not raise, and an
+      # overlong ".." must still not survive as a traversal.
+      Hwaro::Utils::PathUtils.sanitize_path("%C0%AE%C0%AE/etc").should eq("����/etc")
+      Hwaro::Utils::PathUtils.split_safe_segments("%2e%2e/z").should eq({["z"], true})
+    end
+
+    it "keeps raw invalid-UTF-8 bytes as ordinary segments" do
+      segments, refused = Hwaro::Utils::PathUtils.split_safe_segments("\xC0\xAE/z")
+      segments.should eq(["\xC0\xAE", "z"])
+      refused.should be_false
+    end
   end
 
   describe ".resolves_within?" do

@@ -55,6 +55,15 @@ module Hwaro
       # Newly REFUSED are all-space segments such as `"   "`, which the old
       # rule let through.
       def split_safe_segments(path : String) : {Array(String), Bool}
+        # Fast path — no percent-encoding, no NUL, no backslash: the decode
+        # loop and NUL-strip are identity and the split needs no regex.
+        # This runs several times per page on every output-path computation.
+        # (A backslash can also arrive percent-encoded, but that input
+        # contains '%' and takes the slow path.)
+        unless path.includes?('%') || path.includes?('\u0000') || path.includes?('\\')
+          return collect_safe_segments(path.split('/'))
+        end
+
         # Decode repeatedly so percent-encoded traversal (`%2e%2e`,
         # `%252e%252e`) is judged in its decoded form.
         decoded = path
@@ -65,9 +74,20 @@ module Hwaro
         end
         decoded = decoded.gsub("\u0000", "")
 
+        # A percent-encoded overlong sequence (`%C0%AE`) decodes to invalid
+        # UTF-8, and PCRE2 raises on it — letting a hostile archive entry or
+        # importer path crash the CLI. Neutralize invalid bytes instead
+        # (scrub is a no-op for valid UTF-8); overlong ".." is not ".." to
+        # any filesystem, so this loses no traversal protection.
+        decoded = decoded.scrub
+
+        collect_safe_segments(decoded.split(/[\/\\]/))
+      end
+
+      private def collect_safe_segments(parts : Array(String)) : {Array(String), Bool}
         segments = [] of String
         refused = false
-        decoded.split(/[\/\\]/).each do |segment|
+        parts.each do |segment|
           next if segment.empty?
           if segment.rstrip(". ").empty?
             refused = true

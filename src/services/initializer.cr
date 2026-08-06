@@ -396,28 +396,6 @@ module Hwaro
         write_files(content_dir, scaffold.multilingual_content_files(languages, skip_taxonomies))
       end
 
-      private def language_display_name(code : String) : String
-        case code.downcase
-        when "en" then "English"
-        when "ko" then "한국어"
-        when "ja" then "日本語"
-        when "zh" then "中文"
-        when "es" then "Español"
-        when "fr" then "Français"
-        when "de" then "Deutsch"
-        when "pt" then "Português"
-        when "ru" then "Русский"
-        when "it" then "Italiano"
-        when "nl" then "Nederlands"
-        when "pl" then "Polski"
-        when "vi" then "Tiếng Việt"
-        when "th" then "ไทย"
-        when "ar" then "العربية"
-        when "hi" then "हिन्दी"
-        else           code.upcase
-        end
-      end
-
       # Remove every entry inside `target_path`, keeping the directory
       # itself. Refuses to touch a target that contains `.git/` so a
       # typo'd path or an accidental `--clean .` in a real repo can't

@@ -118,41 +118,24 @@ module Hwaro
           if yaml
             # Title
             if title = yaml["title"]?
-              fields["title"] = title.as_s? || title.raw.to_s
+              fields["title"] = yaml_string(title)
             end
 
             # Date
             if date_val = yaml["date"]?
-              case date_val.raw
-              when Time
-                fields["date"] = format_date(date_val.raw.as(Time))
-              when String
-                parsed = parse_date(date_val.as_s)
-                fields["date"] = format_date(parsed) if parsed
-              end
+              assign_date_field(fields, "date", date_val)
             end
 
             # Updated
             if updated = yaml["updated"]?
-              case updated.raw
-              when Time
-                fields["updated"] = format_date(updated.raw.as(Time))
-              when String
-                parsed = parse_date(updated.as_s)
-                fields["updated"] = format_date(parsed) if parsed
-              end
+              assign_date_field(fields, "updated", updated)
             end
 
             # Tags
             tags = [] of String
 
             if tags_val = yaml["tags"]?
-              case tags_val.raw
-              when Array
-                tags_val.as_a.each { |t| tags << (t.as_s? || t.raw.to_s) }
-              when String
-                tags_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
-              end
+              collect_string_list(tags_val, into: tags)
             end
 
             tags = tags.uniq
@@ -170,9 +153,9 @@ module Hwaro
                 cats.as_a.each do |c|
                   case c.raw
                   when Array
-                    c.as_a.each { |sub| categories << (sub.as_s? || sub.raw.to_s) }
+                    c.as_a.each { |sub| categories << yaml_string(sub) }
                   else
-                    categories << (c.as_s? || c.raw.to_s)
+                    categories << yaml_string(c)
                   end
                 end
               when String
@@ -185,16 +168,16 @@ module Hwaro
 
             # Description
             if desc = yaml["description"]?
-              fields["description"] = desc.as_s? || desc.raw.to_s
+              fields["description"] = yaml_string(desc)
             elsif excerpt = yaml["excerpt"]?
-              fields["description"] = excerpt.as_s? || excerpt.raw.to_s
+              fields["description"] = yaml_string(excerpt)
             end
 
             # Image / thumbnail
             if image = yaml["cover"]?
-              fields["image"] = image.as_s? || image.raw.to_s
+              fields["image"] = yaml_string(image)
             elsif image = yaml["thumbnail"]?
-              fields["image"] = image.as_s? || image.raw.to_s
+              fields["image"] = yaml_string(image)
             end
 
             # Permalink slug — normalize to safe filename

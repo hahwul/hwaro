@@ -6,6 +6,7 @@
 require "json"
 require "yaml"
 require "toml"
+require "../utils/date_utils"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
 require "../utils/text_utils"
@@ -199,7 +200,7 @@ module Hwaro
         date : Time? = nil
 
         # Try TOML Front Matter (+++)
-        if match = content.match(/\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?/m)
+        if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
           begin
             toml_fm = TOML.parse(match[1])
             title = toml_fm["title"]?.try(&.as_s?) || title
@@ -217,7 +218,7 @@ module Hwaro
             Logger.debug "TOML front matter parsing failed for #{file_path}: #{ex.message}"
           end
           # Try YAML Front Matter (---)
-        elsif match = content.match(/\A---\s*\n(.*?\n?)^---\s*$\n?/m)
+        elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
           begin
             yaml_fm = YAML.parse(match[1])
             if yaml_fm.as_h?
@@ -266,30 +267,7 @@ module Hwaro
 
       private def parse_time(time_str : String?) : Time?
         return unless time_str
-        str = time_str.strip
-
-        begin
-          return Time.parse_rfc3339(str)
-        rescue Time::Format::Error
-        end
-
-        formats = [
-          "%Y-%m-%dT%H:%M:%S%:z",
-          "%Y-%m-%dT%H:%M:%S%z",
-          "%Y-%m-%d %H:%M:%S %:z",
-          "%Y-%m-%d %H:%M:%S %z",
-          "%Y-%m-%dT%H:%M:%S",
-          "%Y-%m-%d %H:%M:%S",
-          "%Y-%m-%d",
-        ]
-
-        formats.each do |fmt|
-          return Time.parse(str, fmt, Time::Location::UTC)
-        rescue Time::Format::Error | ArgumentError
-          next
-        end
-
-        nil
+        Utils::DateUtils.parse_lenient(time_str)
       end
 
       # Cap a cell at `max_length` terminal COLUMNS. Measuring in codepoints

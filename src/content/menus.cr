@@ -13,6 +13,7 @@ require "../models/config"
 require "../models/page"
 require "../models/section"
 require "../utils/logger"
+require "./processors/internal_link_resolver"
 
 module Hwaro
   module Content
@@ -144,10 +145,8 @@ module Hwaro
       # True for absolute scheme URLs (`http:`, `mailto:`, `tel:`, …) and
       # protocol-relative `//host`. A bare scheme like `mailto:` used to be
       # treated as an internal path and rewritten to `/mailto:…/`.
-      SCHEME_URL_RE = /\A[a-z][a-z0-9+\-.]*:/i
-
       private def self.external_url?(url : String) : Bool
-        url.starts_with?("//") || !!url.matches?(SCHEME_URL_RE)
+        Processors::InternalLinkResolver.has_own_origin?(url)
       end
 
       # Assembles a flat entry list into a parent/child tree keyed by

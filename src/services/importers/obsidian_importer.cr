@@ -119,7 +119,7 @@ module Hwaro
               end
 
               if t = yaml["title"]?
-                title = t.as_s? || t.raw.to_s
+                title = yaml_string(t)
               end
               if a = yaml["aliases"]?
                 case a.raw
@@ -194,28 +194,16 @@ module Hwaro
           if frontmatter_yaml
             if yaml = YAML.parse(frontmatter_yaml).as_h?
               if title = yaml["title"]?
-                fields["title"] = title.as_s? || title.raw.to_s
+                fields["title"] = yaml_string(title)
               end
 
               if date_val = yaml["date"]?
-                case date_val.raw
-                when Time
-                  fields["date"] = format_date(date_val.raw.as(Time))
-                when String
-                  parsed = parse_date(date_val.as_s)
-                  fields["date"] = format_date(parsed) if parsed
-                end
+                assign_date_field(fields, "date", date_val)
               end
 
               if created = yaml["created"]?
                 unless fields.has_key?("date")
-                  case created.raw
-                  when Time
-                    fields["date"] = format_date(created.raw.as(Time))
-                  when String
-                    parsed = parse_date(created.as_s)
-                    fields["date"] = format_date(parsed) if parsed
-                  end
+                  assign_date_field(fields, "date", created)
                 end
               end
 
@@ -230,7 +218,7 @@ module Hwaro
               end
 
               if desc = yaml["description"]?
-                fields["description"] = desc.as_s? || desc.raw.to_s
+                fields["description"] = yaml_string(desc)
               end
 
               # Draft status
@@ -306,7 +294,7 @@ module Hwaro
           when Hash
             # Nested object: skip silently; tags/aliases don't carry objects.
           else
-            s = value.as_s? || value.raw.to_s
+            s = yaml_string(value)
             result << s unless s.empty?
           end
           result

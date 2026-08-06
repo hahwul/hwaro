@@ -201,7 +201,7 @@ module Hwaro
             if yaml_hash = YAML.parse(merged_yaml).as_h?
               # Title
               if title = yaml_hash["title"]?
-                fields["title"] = title.as_s? || title.raw.to_s
+                fields["title"] = yaml_string(title)
               end
 
               # Date
@@ -237,7 +237,7 @@ module Hwaro
                 case tags_val.raw
                 when Array
                   tags_val.as_a.each do |t|
-                    tag_str = t.as_s? || t.raw.to_s
+                    tag_str = yaml_string(t)
                     # Skip 11ty collection tags like "post", "posts", "all"
                     next if tag_str == "post" || tag_str == "posts" || tag_str == "all"
                     tags << tag_str
@@ -253,17 +253,17 @@ module Hwaro
 
               # Description
               if desc = yaml_hash["description"]? || yaml_hash["excerpt"]? || yaml_hash["summary"]?
-                fields["description"] = desc.as_s? || desc.raw.to_s
+                fields["description"] = yaml_string(desc)
               end
 
               # Image
               if image = yaml_hash["image"]? || yaml_hash["featuredImage"]? || yaml_hash["cover"]?
-                fields["image"] = image.as_s? || image.raw.to_s
+                fields["image"] = yaml_string(image)
               end
 
               # Template / layout
               if layout = yaml_hash["layout"]?
-                fields["template"] = layout.as_s? || layout.raw.to_s
+                fields["template"] = yaml_string(layout)
               end
             end
           end

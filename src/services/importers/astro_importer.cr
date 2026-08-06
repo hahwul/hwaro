@@ -98,29 +98,17 @@ module Hwaro
           if yaml
             # Title
             if title = yaml["title"]?
-              fields["title"] = title.as_s? || title.raw.to_s
+              fields["title"] = yaml_string(title)
             end
 
             # Date (pubDate is Astro's convention)
             if date_val = yaml["pubDate"]? || yaml["date"]? || yaml["publishDate"]?
-              case date_val.raw
-              when Time
-                fields["date"] = format_date(date_val.raw.as(Time))
-              when String
-                parsed = parse_date(date_val.as_s)
-                fields["date"] = format_date(parsed) if parsed
-              end
+              assign_date_field(fields, "date", date_val)
             end
 
             # Updated date
             if updated = yaml["updatedDate"]? || yaml["updated"]? || yaml["lastmod"]?
-              case updated.raw
-              when Time
-                fields["updated"] = format_date(updated.raw.as(Time))
-              when String
-                parsed = parse_date(updated.as_s)
-                fields["updated"] = format_date(parsed) if parsed
-              end
+              assign_date_field(fields, "updated", updated)
             end
 
             # Draft
@@ -135,25 +123,20 @@ module Hwaro
 
             # Description
             if desc = yaml["description"]?
-              fields["description"] = desc.as_s? || desc.raw.to_s
+              fields["description"] = yaml_string(desc)
             end
 
             # Tags
             tags = [] of String
             if tags_val = yaml["tags"]?
-              case tags_val.raw
-              when Array
-                tags_val.as_a.each { |t| tags << (t.as_s? || t.raw.to_s) }
-              when String
-                tags_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
-              end
+              collect_string_list(tags_val, into: tags)
             end
 
             # Categories
             if cats = yaml["categories"]?
               case cats.raw
               when Array
-                cats.as_a.each { |c| tags << (c.as_s? || c.raw.to_s) }
+                cats.as_a.each { |c| tags << yaml_string(c) }
               end
             end
 
@@ -168,7 +151,7 @@ module Hwaro
               when Hash
                 # Handle structured image objects (e.g., { src: "...", alt: "..." })
                 if src = image["src"]?
-                  fields["image"] = src.as_s? || src.raw.to_s
+                  fields["image"] = yaml_string(src)
                 end
               end
             end
@@ -180,9 +163,9 @@ module Hwaro
               authors = [] of String
               case author.raw
               when Array
-                author.as_a.each { |a| authors << (a.as_s? || a.raw.to_s) }
+                author.as_a.each { |a| authors << yaml_string(a) }
               else
-                authors << (author.as_s? || author.raw.to_s)
+                authors << yaml_string(author)
               end
               fields["authors"] = authors unless authors.empty?
             end

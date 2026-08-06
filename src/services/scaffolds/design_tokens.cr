@@ -19,12 +19,6 @@ module Hwaro
   module Services
     module Scaffolds
       module DesignTokens
-        # Exposed for specs and tooling that need the brand anchors.
-        PRIMARY_LIGHT = "#b35454"
-        PRIMARY_DARK  = "#ec7a66"
-        BG_LIGHT      = "#faf8f4"
-        BG_DARK       = "#141110"
-
         # The full shared `:root` prelude: color tokens (light-dark pairs),
         # the fluid type scale, the 8px spacing scale, shape/depth/motion
         # tokens, and the font stacks — plus a static-light fallback for

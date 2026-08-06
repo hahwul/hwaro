@@ -383,6 +383,11 @@ module Hwaro
         @summary || @description
       end
 
+      # plain_summary memo — see the method below. `@plain_summary_for`
+      # holds the exact String instance the text was derived from.
+      @plain_summary_for : String? = nil
+      @plain_summary_text : String? = nil
+
       # Plain-text rendering of the `<!-- more -->` summary, safe to embed
       # in single-line contexts like `og:description`,
       # `twitter:description`, or a feed `<description>`. Uses the
@@ -397,11 +402,23 @@ module Hwaro
         # strip_html still removes any inline HTML there.
         source = @summary_html || @summary
         return unless source
-        # Strip tags, then decode entities so escaped chars from rendered
-        # HTML (e.g. `&gt;` inside code blocks) become real characters —
-        # the meta-tag layer re-escapes them, avoiding `&amp;gt;` artifacts.
-        text = HTML.unescape(Hwaro::Utils::TextUtils.strip_html(source)).strip
-        return if text.empty?
+        # Memoize the strip/unescape (it runs per page for og:description
+        # AND again per feed item). Keyed on the source string's identity:
+        # any reassignment of summary_html/summary swaps in a different
+        # String instance and forces a recompute, so no setter hooks are
+        # needed for invalidation.
+        if @plain_summary_for.same?(source)
+          text = @plain_summary_text
+        else
+          # Strip tags, then decode entities so escaped chars from rendered
+          # HTML (e.g. `&gt;` inside code blocks) become real characters —
+          # the meta-tag layer re-escapes them, avoiding `&amp;gt;` artifacts.
+          stripped = HTML.unescape(Hwaro::Utils::TextUtils.strip_html(source)).strip
+          text = stripped.empty? ? nil : stripped
+          @plain_summary_text = text
+          @plain_summary_for = source
+        end
+        return unless text
         return text if text.size <= limit
 
         truncated = text[0, limit]

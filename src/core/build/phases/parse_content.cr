@@ -117,7 +117,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       else
         html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
       end
-      html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url)
+      html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
 
       page.summary_html = html
       recomputed_paths << page.path
@@ -145,7 +145,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       else
         fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
       end
-      fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url)
+      fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
       page.summary_html = fallback
       recomputed_paths << page.path
     end

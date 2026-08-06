@@ -82,32 +82,21 @@ module Hwaro
           if frontmatter_yaml
             if yaml_hash = YAML.parse(frontmatter_yaml).as_h?
               if title = yaml_hash["title"]?
-                fields["title"] = title.as_s? || title.raw.to_s
+                fields["title"] = yaml_string(title)
               end
 
               if date_val = yaml_hash["date"]?
-                case date_val.raw
-                when Time
-                  fields["date"] = format_date(date_val.raw.as(Time))
-                when String
-                  parsed = parse_date(date_val.as_s)
-                  fields["date"] = format_date(parsed) if parsed
-                end
+                assign_date_field(fields, "date", date_val)
               end
 
               if tags_val = yaml_hash["tags"]?
                 tags = [] of String
-                case tags_val.raw
-                when Array
-                  tags_val.as_a.each { |t| tags << (t.as_s? || t.raw.to_s) }
-                when String
-                  tags_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
-                end
+                collect_string_list(tags_val, into: tags)
                 fields["tags"] = tags unless tags.empty?
               end
 
               if desc = yaml_hash["description"]?
-                fields["description"] = desc.as_s? || desc.raw.to_s
+                fields["description"] = yaml_string(desc)
               end
             end
           end
