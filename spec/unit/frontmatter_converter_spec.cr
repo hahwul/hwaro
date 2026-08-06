@@ -912,16 +912,40 @@ describe Hwaro::Services::ConversionResult do
       end
     end
 
-    it "emits maps inside arrays as inline tables" do
+    it "emits maps nested inside arrays as inline tables" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
         file_path = File.join(dir, "inline.md")
-        File.write(file_path, "---\ntitle: I\nlinks:\n  - name: home\n    url: /\n  - plain\n---\n\nBody")
+        # An array OF arrays: the inner array is homogeneous, so its map member
+        # can keep inline-table form and still reparse.
+        File.write(file_path, "---\ntitle: I\ngroups:\n  - - name: home\n      url: /\n---\n\nBody")
 
         converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
 
         converted = File.read(file_path)
         converted.should contain("{name = \"home\", url = \"/\"}")
+        fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        TOML.parse(fm)["groups"].as_a.first.as_a.first.as_h["name"].should eq("home")
+      end
+    end
+
+    # Regression: a map mixed with a scalar used to keep its inline-table form,
+    # producing `["plain", {name = "home"}]` — the mixed array toml.cr refuses.
+    # The converted file then failed the very next build with "cannot mix types
+    # in array", so `tool convert to-toml` corrupted its own output.
+    it "keeps a map mixed with a scalar parseable rather than inline" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "mixed_inline.md")
+        File.write(file_path, "---\ntitle: I\nlinks:\n  - name: home\n    url: /\n  - plain\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        fm = File.read(file_path).match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        links = TOML.parse(fm)["links"].as_a
+        links.size.should eq(2)
+        links.last.should eq("plain")
+        links.first.as_s.should contain(%q("name":"home"))
       end
     end
 

@@ -6,6 +6,7 @@
 # identical across every tool that produces content files.
 
 require "yaml"
+require "json"
 require "toml"
 require "time"
 
@@ -296,8 +297,16 @@ module Hwaro
           else
             items.map do |v|
               case toml_kind(v)
-              when :array, :table, :string
+              when :string
                 to_toml_value(v)
+              when :array, :table
+                # A structured member inside an otherwise-scalar array cannot
+                # keep its TOML shape: `["plain", {k = "v"}]` is precisely the
+                # mixed array toml.cr refuses, so `tool convert to-toml` wrote
+                # a file the very next `hwaro build` failed to parse. Emit it
+                # as JSON text — lossy for the reader, but the document stays
+                # loadable instead of corrupting the round-trip.
+                "\"#{FrontmatterWriter.escape_toml_string(v.to_json)}\""
               when :time
                 "\"#{FrontmatterWriter.escape_toml_string(FrontmatterWriter.serialize_time(v.raw.as(Time)))}\""
               else
