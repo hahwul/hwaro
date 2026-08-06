@@ -238,7 +238,7 @@ module Hwaro
                 if h = yaml_data.as_h?
                   data = {} of String => TOML::Any
                   h.each do |k, v|
-                    key_str = k.as_s? || k.raw.to_s
+                    key_str = yaml_string(k)
                     data[key_str] = yaml_any_to_toml_any(v)
                   end
                   return {data, body}
@@ -280,7 +280,7 @@ module Hwaro
             hash = {} of String => TOML::Any
             raw.each do |k, v|
               k_any = k.as(YAML::Any)
-              key_str = k_any.as_s? || k_any.raw.to_s
+              key_str = yaml_string(k_any)
               hash[key_str] = yaml_any_to_toml_any(v.as(YAML::Any))
             end
             TOML::Any.new(hash)

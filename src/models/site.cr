@@ -117,10 +117,14 @@ module Hwaro
         # Normalize section name: remove leading/trailing slashes and handle root
         normalized_name = section_name.strip.strip('/')
 
-        # Guard against infinite recursion from circular transparent sections
-        seen = visited || Set(String).new
-        return [] of Page if seen.includes?(normalized_name)
-        seen.add(normalized_name)
+        # Guard against infinite recursion from circular transparent sections.
+        # The Set is created lazily at the first recursive call (below) — the
+        # top-level call was allocating one per invocation even on cache hits.
+        if visited
+          return [] of Page if visited.includes?(normalized_name)
+          visited.add(normalized_name)
+        end
+        seen = visited
 
         if @lookup_index_built && items.nil?
           cache_key = {normalized_name, language}
@@ -148,6 +152,7 @@ module Hwaro
                 subsection_name = Path[s.path].dirname.to_s
                 subsection_name = "" if subsection_name == "."
 
+                seen ||= Set{normalized_name}
                 result.concat(pages_for_section(subsection_name, language, nil, seen))
               else
                 # Non-transparent sections are included as Section (Page) objects
@@ -181,6 +186,7 @@ module Hwaro
             if parent_dir == normalized_name
               if p.transparent
                 # Recursive bubble up: get pages from this sub-section
+                seen ||= Set{normalized_name}
                 result.concat(pages_for_section(p_dirname, language, content_items, seen))
               else
                 # Non-transparent sections are included as Section (Page) objects

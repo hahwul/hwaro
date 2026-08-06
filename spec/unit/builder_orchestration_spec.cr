@@ -32,13 +32,14 @@ module Hwaro::Core::Build
       @series_crinja_cache["tutorial"] = Crinja::Value.new("series")
       # Seed with non-empty arrays so the eviction tests can distinguish
       # "key removed" from "key emptied". The ancestors cache is keyed by
-      # "section:language" (like section_pages), so it is invalidated by prefix.
-      @ancestors_crinja_cache["blog:en"] = [Crinja::Value.new("blog-en-anc")]
-      @ancestors_crinja_cache["blog:ko"] = [Crinja::Value.new("blog-ko-anc")]
-      @ancestors_crinja_cache["other:en"] = [Crinja::Value.new("other-en-anc")]
-      @section_pages_crinja_cache["blog:en"] = [Crinja::Value.new("blog-en-1")]
-      @section_pages_crinja_cache["blog:ko"] = [Crinja::Value.new("blog-ko-1")]
-      @section_pages_crinja_cache["other:en"] = [Crinja::Value.new("other-en-1")]
+      # {section, language} (like section_pages), so it is invalidated by
+      # the key's section component.
+      @ancestors_crinja_cache[{"blog", "en"}] = [Crinja::Value.new("blog-en-anc")]
+      @ancestors_crinja_cache[{"blog", "ko"}] = [Crinja::Value.new("blog-ko-anc")]
+      @ancestors_crinja_cache[{"other", "en"}] = [Crinja::Value.new("other-en-anc")]
+      @section_pages_crinja_cache[{"blog", "en"}] = [Crinja::Value.new("blog-en-1")]
+      @section_pages_crinja_cache[{"blog", "ko"}] = [Crinja::Value.new("blog-ko-1")]
+      @section_pages_crinja_cache[{"other", "en"}] = [Crinja::Value.new("other-en-1")]
       @section_assets_crinja_cache["blog"] = [Crinja::Value.new("blog-asset")]
       @section_assets_crinja_cache["other"] = [Crinja::Value.new("other-asset")]
     end
@@ -201,16 +202,16 @@ describe Hwaro::Core::Build::Builder do
       )
 
       caches = builder.test_get_internal_caches
-      caches[:ancestors].has_key?("blog:en").should be_false
-      caches[:ancestors].has_key?("blog:ko").should be_false
-      caches[:ancestors].has_key?("other:en").should be_true
-      caches[:section_pages].has_key?("blog:en").should be_false
-      caches[:section_pages].has_key?("blog:ko").should be_false
-      caches[:section_pages].has_key?("other:en").should be_true
+      caches[:ancestors].has_key?({"blog", "en"}).should be_false
+      caches[:ancestors].has_key?({"blog", "ko"}).should be_false
+      caches[:ancestors].has_key?({"other", "en"}).should be_true
+      caches[:section_pages].has_key?({"blog", "en"}).should be_false
+      caches[:section_pages].has_key?({"blog", "ko"}).should be_false
+      caches[:section_pages].has_key?({"other", "en"}).should be_true
       caches[:section_assets].has_key?("blog").should be_false
       caches[:section_assets].has_key?("other").should be_true
       # Untouched entries keep their seeded contents
-      caches[:section_pages]["other:en"].size.should eq(1)
+      caches[:section_pages][{"other", "en"}].size.should eq(1)
       caches[:section_assets]["other"].size.should eq(1)
     end
 

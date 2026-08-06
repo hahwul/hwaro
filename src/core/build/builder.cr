@@ -162,14 +162,16 @@ module Hwaro
         @shortcode_warnings_seen : Set(String)? = nil
         @pages_by_path : Hash(String, Models::Page)?
         @i18n_translations : Content::I18n::TranslationData = Content::I18n::TranslationData.new
-        # Per-section cache of Crinja::Value arrays, keyed by "section_name:language"
-        @section_pages_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
+        # Per-section cache of Crinja::Value arrays, keyed by
+        # {section_name, language} (a tuple, not an interpolated string —
+        # these lookups run per page in the render hot path).
+        @section_pages_crinja_cache : Hash({String, String?}, Array(Crinja::Value)) = {} of {String, String?} => Array(Crinja::Value)
         # Companion url→index map per section list, populated together with
         # (and invalidated exactly like) @section_pages_crinja_cache. Used
         # for O(1) current-page exclusion in build_template_variables —
         # the previous per-page linear Array#index scan made rendering a
         # flat N-page section O(N²).
-        @section_pages_url_index_cache : Hash(String, Hash(String, Int32)) = {} of String => Hash(String, Int32)
+        @section_pages_url_index_cache : Hash({String, String?}, Hash(String, Int32)) = {} of {String, String?} => Hash(String, Int32)
         # Per-section cache of Crinja::Value arrays for section assets, keyed by section name
         @section_assets_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
         # Track created directories to avoid redundant mkdir_p syscalls
@@ -178,8 +180,9 @@ module Hwaro
         # across build_global_vars, section page lists, and page_to_crinja_list_value
         @page_crinja_value_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
         @series_crinja_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
-        # Per-section ancestors Crinja::Value cache (pages in the same section share ancestors)
-        @ancestors_crinja_cache : Hash(String, Array(Crinja::Value)) = {} of String => Array(Crinja::Value)
+        # Per-section ancestors Crinja::Value cache, keyed by
+        # {section_name, language} (pages in the same section+language share ancestors)
+        @ancestors_crinja_cache : Hash({String, String?}, Array(Crinja::Value)) = {} of {String, String?} => Array(Crinja::Value)
         # Per-page related_posts Crinja::Value cache (avoids rebuilding the array on each build_template_variables call)
         @related_posts_crinja_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
         # Per-page template closure hash memo (page.path → hash). On cached
@@ -596,14 +599,15 @@ module Hwaro
 
             # A changed SECTION's title/url is embedded in every descendant's
             # breadcrumb, which is served from @ancestors_crinja_cache keyed
-            # "section:language". affected_sections only covers the section itself
-            # and its UPWARD ancestors, so drop the whole DESCENDANT subtree
-            # ("sec:..." and "sec/...") too, or re-rendered descendants would read
-            # a cached ancestors array still carrying the old title/url.
+            # {section, language}. affected_sections only covers the section
+            # itself and its UPWARD ancestors, so drop the whole DESCENDANT
+            # subtree ("sec" and "sec/...") too, or re-rendered descendants
+            # would read a cached ancestors array still carrying the old
+            # title/url.
             changed_pages.each do |page|
               next unless page.is_a?(Models::Section)
               sec = page.section
-              @ancestors_crinja_cache.reject! { |k, _| k.starts_with?("#{sec}:") || k.starts_with?("#{sec}/") }
+              @ancestors_crinja_cache.reject! { |k, _| k[0] == sec || k[0].starts_with?("#{sec}/") }
             end
           end
 
@@ -1620,11 +1624,11 @@ module Hwaro
             end
 
             affected_sections.each do |section_name|
-              # Keyed by "section:language" now (see build_template_variables), so
+              # Keyed by {section, language} (see build_template_variables), so
               # drop every language's entry for the section, like section_pages.
-              @ancestors_crinja_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
-              @section_pages_crinja_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
-              @section_pages_url_index_cache.reject! { |k, _| k.starts_with?("#{section_name}:") }
+              @ancestors_crinja_cache.reject! { |k, _| k[0] == section_name }
+              @section_pages_crinja_cache.reject! { |k, _| k[0] == section_name }
+              @section_pages_url_index_cache.reject! { |k, _| k[0] == section_name }
               @section_assets_crinja_cache.delete(section_name)
             end
           end

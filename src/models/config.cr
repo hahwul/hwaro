@@ -1163,6 +1163,7 @@ module Hwaro
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
       @base_path : String? = nil
+      @multilingual : Bool? = nil
 
       def initialize
         @title = "Hwaro Site"
@@ -1256,11 +1257,28 @@ module Hwaro
         "#{base_path}#{path}"
       end
 
-      # Check if site is multilingual
+      # Check if site is multilingual. Memoized — this runs several times
+      # per page during render, and the languages table only mutates during
+      # config load, before the first call. The `languages=` /
+      # `default_language=` setters invalidate; in-place mutation of the
+      # languages Hash after the first call would not (don't do that).
       def multilingual? : Bool
+        cached = @multilingual
+        return cached unless cached.nil?
+
         codes = @languages.keys
         codes << @default_language unless @default_language.empty?
-        codes.uniq.size > 1
+        @multilingual = codes.uniq.size > 1
+      end
+
+      def languages=(value : Hash(String, LanguageConfig))
+        @multilingual = nil
+        @languages = value
+      end
+
+      def default_language=(value : String)
+        @multilingual = nil
+        @default_language = value
       end
 
       # Get language config by code, returns nil if not found

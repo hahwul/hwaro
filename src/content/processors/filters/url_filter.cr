@@ -25,19 +25,23 @@ module Hwaro
             InternalLinkResolver.has_own_origin?(url)
           end
 
+          # Resolve `url` against `base_url` unless it already carries its
+          # own origin. Shared by the `absolute_url` filter and the
+          # `url_for`/`get_url` template functions.
+          def self.absolutize(url : String, base_url : String) : String
+            if has_own_origin?(url)
+              url
+            elsif url.starts_with?("/")
+              base_url.rstrip("/") + url
+            else
+              base_url.rstrip("/") + "/" + url
+            end
+          end
+
           def self.register(env : Crinja)
             # Absolute URL filter
             env.filters["absolute_url"] = Crinja.filter do
-              url = target.to_s
-              base_url = env.resolve("base_url").to_s
-
-              if UrlFilters.has_own_origin?(url)
-                url
-              elsif url.starts_with?("/")
-                base_url.rstrip("/") + url
-              else
-                base_url.rstrip("/") + "/" + url
-              end
+              UrlFilters.absolutize(target.to_s, env.resolve("base_url").to_s)
             end
 
             # Relative URL filter — returns path-only URL (no protocol/host)

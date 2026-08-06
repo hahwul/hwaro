@@ -140,11 +140,14 @@ module Hwaro
         # domain-root deploy), so root-relative links are preserved there.
         # Protocol-relative (`//host`), absolute (`http(s)://`), anchor (`#`),
         # and already-prefixed links are left untouched.
-        def prefix_root_relative_links(html : String, base_url : String) : String
+        # `base_path` short-circuits the per-call `URI.parse(base_url)` when
+        # the caller already holds the memoized `Config#base_path` (they are
+        # the same value by construction).
+        def prefix_root_relative_links(html : String, base_url : String, base_path : String? = nil) : String
           return html if base_url.empty?
           return html unless html.includes?("=\"/")
 
-          base_path = URI.parse(base_url).path.rstrip("/")
+          base_path ||= URI.parse(base_url).path.rstrip("/")
           return html if base_path.empty?
 
           prefix_slash = "#{base_path}/"

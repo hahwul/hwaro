@@ -388,7 +388,7 @@ module Hwaro
         private def self.absolutize_feed_html(html : String, page : Models::Page, config : Models::Config) : String
           base_url = config.base_url.rstrip('/')
           if base_url.empty?
-            Processors::InternalLinkResolver.prefix_root_relative_links(html, config.base_url)
+            Processors::InternalLinkResolver.prefix_root_relative_links(html, config.base_url, config.base_path)
           else
             Processors::InternalLinkResolver.absolutize_links(html, page_full_url(page, base_url))
           end

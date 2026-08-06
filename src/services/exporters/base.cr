@@ -3,6 +3,7 @@ require "yaml"
 require "toml"
 require "../../config/options/export_options"
 require "../../utils/file_safe"
+require "../../utils/frontmatter_scanner"
 require "../../utils/frontmatter_writer"
 require "../../utils/logger"
 require "../../utils/output_guard"
@@ -30,8 +31,8 @@ module Hwaro
       end
 
       abstract class Base
-        TOML_FRONTMATTER_RE = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?/m
-        YAML_FRONTMATTER_RE = /\A---\s*\n(.*?\n?)^---\s*$\n?/m
+        TOML_FRONTMATTER_RE = Utils::FrontmatterScanner::TOML_FRONTMATTER_RE
+        YAML_FRONTMATTER_RE = Utils::FrontmatterScanner::YAML_FRONTMATTER_RE
 
         abstract def run(options : Config::Options::ExportOptions) : ExportResult
 

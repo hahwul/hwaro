@@ -121,24 +121,18 @@ module Hwaro
           if yaml
             # Title
             if title = yaml["title"]?
-              fields["title"] = title.as_s? || title.raw.to_s
+              fields["title"] = yaml_string(title)
             end
 
             # Date from frontmatter (filename fallback below also covers an
             # unparseable frontmatter date, which used to suppress it)
             if date_val = yaml["date"]?
-              case date_val.raw
-              when Time
-                fields["date"] = format_date(date_val.raw.as(Time))
-              when String
-                parsed = parse_date(date_val.as_s)
-                fields["date"] = format_date(parsed) if parsed
-              end
+              assign_date_field(fields, "date", date_val)
             end
 
             # Layout -> template
             if layout = yaml["layout"]?
-              fields["template"] = layout.as_s? || layout.raw.to_s
+              fields["template"] = yaml_string(layout)
             end
 
             # Categories and tags are kept as separate taxonomies so the
@@ -147,12 +141,7 @@ module Hwaro
             categories = [] of String
 
             if cats = yaml["categories"]?
-              case cats.raw
-              when Array
-                cats.as_a.each { |c| categories << (c.as_s? || c.raw.to_s) }
-              when String
-                cats.as_s.split(/[\s,]+/).each { |c| categories << c.strip unless c.strip.empty? }
-              end
+              collect_string_list(cats, into: categories)
             end
 
             if cat = yaml["category"]?
@@ -166,12 +155,7 @@ module Hwaro
 
             tags = [] of String
             if tag_val = yaml["tags"]?
-              case tag_val.raw
-              when Array
-                tag_val.as_a.each { |t| tags << (t.as_s? || t.raw.to_s) }
-              when String
-                tag_val.as_s.split(/[\s,]+/).each { |t| tags << t.strip unless t.strip.empty? }
-              end
+              collect_string_list(tag_val, into: tags)
             end
 
             tags = tags.uniq
@@ -186,16 +170,16 @@ module Hwaro
 
             # Description
             if excerpt = yaml["excerpt"]?
-              fields["description"] = excerpt.as_s? || excerpt.raw.to_s
+              fields["description"] = yaml_string(excerpt)
             elsif description = yaml["description"]?
-              fields["description"] = description.as_s? || description.raw.to_s
+              fields["description"] = yaml_string(description)
             end
 
             # Image
             if image = yaml["image"]?
               case image.raw
               when String
-                fields["image"] = image.as_s? || image.raw.to_s
+                fields["image"] = yaml_string(image)
               when Hash
                 # Handle nested image object (e.g., image.path or similar)
               end
@@ -208,7 +192,7 @@ module Hwaro
             # first; indexing the YAML::Any is then safe (it's a hash).
             if (header = yaml["header"]?) && header.as_h?
               if header_image = header["image"]?
-                fields["image"] = (header_image.as_s? || header_image.raw.to_s) unless fields.has_key?("image")
+                fields["image"] = yaml_string(header_image) unless fields.has_key?("image")
               end
             end
           end

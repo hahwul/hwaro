@@ -3,6 +3,7 @@ require "json"
 require "time"
 require "../config/options/new_options"
 require "../models/config"
+require "../utils/date_utils"
 require "../utils/errors"
 require "../utils/file_safe"
 require "../utils/logger"
@@ -138,38 +139,12 @@ module Hwaro
       end
 
       # True when the build's front-matter date parser can produce a real
-      # `Time` from `value`. This mirrors `Processors::Markdown#parse_time`
-      # (format selection included — keep the two in sync) so `hwaro new`
-      # fails fast on a `--date` the build would silently drop (`2026-13-45`,
-      # `not-a-date`) or, worse, emit as an unquoted-but-invalid TOML
-      # datetime that breaks parsing of the whole generated file.
+      # `Time` from `value`, so `hwaro new` fails fast on a `--date` the
+      # build would silently drop (`2026-13-45`, `not-a-date`) or, worse,
+      # emit as an unquoted-but-invalid TOML datetime that breaks parsing
+      # of the whole generated file.
       def self.parseable_content_date?(value : String) : Bool
-        str = value.strip
-        return false if str.empty?
-
-        fmt = if str.includes?('T')
-                if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
-                  begin
-                    Time.parse_rfc3339(str)
-                    return true
-                  rescue Time::Format::Error | ArgumentError
-                    "%Y-%m-%dT%H:%M:%S"
-                  end
-                else
-                  "%Y-%m-%dT%H:%M:%S"
-                end
-              elsif str.size > 10
-                "%Y-%m-%d %H:%M:%S"
-              else
-                "%Y-%m-%d"
-              end
-
-        begin
-          Time.parse(str, fmt, Time::Location.local)
-          true
-        rescue Time::Format::Error | ArgumentError
-          false
-        end
+        !Utils::DateUtils.parse_content_date(value).nil?
       end
 
       private def self.sanitize_url_segment(segment : String) : String

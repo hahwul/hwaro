@@ -690,11 +690,22 @@ module Hwaro
         private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil, shortcode_name : String? = nil, warnings : Array(String)? = nil) : String
           env = crinja_env_override || crinja_env
 
-          # Use a local copy of context with args merged to avoid mutating
-          # shared state — the original inject-then-restore approach was unsafe
-          # under parallel builds where multiple fibers share the same context.
-          local_context = context.dup
-          args.each { |key, value| local_context[key] = Crinja::Value.new(value) }
+          # Inject the shortcode args into the caller's context and restore
+          # them after the render. The context hash is built fresh per page
+          # and owned by a single fiber (see the `build_template_variables`
+          # calls in render.cr / parse_content.cr), so in-place mutation is
+          # safe here — and it avoids duplicating the ~75-entry hash on
+          # every shortcode invocation, the densest allocation site in the
+          # parallel render fan-out. `saved` keeps any pre-existing values
+          # for colliding keys so nested/subsequent invocations see the
+          # exact original context.
+          saved : Hash(String, Crinja::Value)? = nil
+          args.each do |key, value|
+            if context.has_key?(key)
+              (saved ||= {} of String => Crinja::Value)[key] = context[key]
+            end
+            context[key] = Crinja::Value.new(value)
+          end
 
           begin
             # Cache compiled shortcode templates by content hash to avoid
@@ -731,7 +742,7 @@ module Hwaro
                                   end
                                 end
                               end
-            crinja_template.render(local_context)
+            crinja_template.render(context)
           rescue ex : Crinja::TemplateError
             label = shortcode_name ? "shortcode '#{shortcode_name}'" : "shortcode"
             Logger.warn "Template error in #{label}: #{ex.message}"
@@ -741,6 +752,9 @@ module Hwaro
             # trace in the HTML instead of an empty string.
             warnings.try(&.<< "Template error in #{label}: #{ex.message}")
             "<!-- hwaro: template error in #{label.gsub("--", "‐‐")} -->"
+          ensure
+            args.each_key { |key| context.delete(key) }
+            saved.try &.each { |k, v| context[k] = v }
           end
         end
 
@@ -758,6 +772,10 @@ module Hwaro
           return html if shortcode_results.empty?
           result = html
           (MAX_SHORTCODE_NESTING + 1).times do
+            # Substring probe before the regex pass: the typical page pays
+            # one confirming scan per nesting level otherwise, over the
+            # whole rendered HTML.
+            return result unless result.includes?(SHORTCODE_PLACEHOLDER_PREFIX)
             replaced = result.gsub(SHORTCODE_PLACEHOLDER_RE) do |match|
               shortcode_results[match]? || match
             end

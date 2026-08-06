@@ -334,18 +334,7 @@ module Hwaro
           @env.functions["url_for"] = Crinja.function({path: ""}) do
             path = arguments["path"].to_s
             base_url = env.resolve("base_url").to_s
-
-            # A value that already carries its own origin (any `scheme:` URL, or
-            # a protocol-relative `//host/…`) is returned untouched — prefixing
-            # base_url produced `https://site.com/mailto:a@b.com` and
-            # `https://site.com//cdn.example.com/x.js`. Matches `absolute_url`.
-            if Filters::UrlFilters.has_own_origin?(path)
-              Crinja::Value.new(path)
-            elsif path.starts_with?("/")
-              Crinja::Value.new(base_url.rstrip("/") + path)
-            else
-              Crinja::Value.new(base_url.rstrip("/") + "/" + path)
-            end
+            Crinja::Value.new(Filters::UrlFilters.absolutize(path, base_url))
           end
 
           # get_url() function - alias for url_for to match

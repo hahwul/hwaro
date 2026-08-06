@@ -964,7 +964,7 @@ module Hwaro::Core::Build::Phases::Render
     # base_url path so they resolve under a subpath deploy. No-op on root deploys;
     # also keeps RSS `<content:encoded>` and the search index subpath-correct
     # because both reuse `page.content` set below.
-    html_content = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html_content, site.config.base_url)
+    html_content = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html_content, site.config.base_url, site.config.base_path)
 
     # Make content images responsive: when image_processing generated width
     # variants for an <img>, add srcset/sizes so browsers pick an appropriate
@@ -1665,7 +1665,7 @@ module Hwaro::Core::Build::Phases::Render
     pages.each do |page|
       cached_page_crinja_value(page, default_lang)
 
-      ancestors_key = "#{page.section}:#{page.language}"
+      ancestors_key = {page.section, page.language}
       unless @ancestors_crinja_cache.has_key?(ancestors_key)
         @ancestors_crinja_cache[ancestors_key] = build_ancestors_crinja(page)
       end
@@ -1724,7 +1724,7 @@ module Hwaro::Core::Build::Phases::Render
     language : String?,
     site : Models::Site,
   ) : Array(Crinja::Value)
-    cache_key = "#{section_name}:#{language}"
+    cache_key = {section_name, language}
     if @crinja_caches_frozen
       if cached = @section_pages_crinja_cache[cache_key]?
         @cache_manager.record_hit("section_pages_crinja")
@@ -1773,7 +1773,7 @@ module Hwaro::Core::Build::Phases::Render
     language : String?,
     site : Models::Site,
   ) : {Array(Crinja::Value), Hash(String, Int32)}
-    cache_key = "#{section_name}:#{language}"
+    cache_key = {section_name, language}
     if @crinja_caches_frozen
       arr = cached_section_pages_crinja(section_name, language, site)
       if index = @section_pages_url_index_cache[cache_key]?
@@ -2325,7 +2325,7 @@ module Hwaro::Core::Build::Phases::Render
     # because a multilingual section has per-language ancestors; omitting it
     # served whichever language rendered first to every language (mirrors the
     # section_pages cache key).
-    ancestors_cache_key = "#{page.section}:#{page.language}"
+    ancestors_cache_key = {page.section, page.language}
     ancestors_array = if @crinja_caches_frozen
                         if cached = @ancestors_crinja_cache[ancestors_cache_key]?
                           @cache_manager.record_hit("ancestors_crinja")
