@@ -70,6 +70,9 @@ module Hwaro::Core::Build::Phases::Initialize
       # template checksum when dependency tracking is on AND every template
       # reference resolved statically (no variable includes).
       @global_templates_hash = Cache.compute_templates_hash(ctx.templates)
+      if (graph = @template_deps) && !graph.snapshot_escaping_refs.empty?
+        @global_templates_hash = fold_snapshot_escaping_refs(@global_templates_hash, graph.snapshot_escaping_refs)
+      end
       @per_page_template_hash = config.build.template_deps &&
                                 (@template_deps.try { |deps| !deps.dynamic? } || false)
       if (deps = @template_deps) && deps.dynamic? && config.build.template_deps
@@ -366,8 +369,11 @@ module Hwaro::Core::Build::Phases::Initialize
     @template_paths = template_paths
     @shadowed_template_hashes = shadowed_hashes
 
-    # (Re)build the template dependency graph for selective invalidation
-    @template_deps = TemplateDeps.new(templates)
+    # (Re)build the template dependency graph for selective invalidation.
+    # `template_paths` lets the graph detect literal refs the snapshot
+    # loader cannot serve (shadowed extension variants etc.) — see
+    # TemplateDeps#snapshot_escaping_refs.
+    @template_deps = TemplateDeps.new(templates, template_paths)
 
     # (Re)build the render-hook registry — nil when no templates/hooks/render-*
     # template exists, which is the zero-cost gate the render path checks
@@ -393,6 +399,31 @@ module Hwaro::Core::Build::Phases::Initialize
     @crinja_env = setup_crinja_env
 
     templates
+  end
+
+  # Templates referenced by literal name that the snapshot loader cannot
+  # serve (./-prefixed, non-template extensions, shadowed extension
+  # variants — see TemplateDeps#snapshot_escaping_refs) are read from DISK
+  # at render time: their bytes reach the output but live in no snapshot
+  # hash. Fold their current disk contents into the global templates
+  # checksum so editing one invalidates the `--cache` entries. The graph is
+  # dynamic whenever such refs exist, so this folded hash is exactly the
+  # one every page's cache entry stores and compares.
+  private def fold_snapshot_escaping_refs(base : String, refs : Set(String)) : String
+    digest = Digest::MD5.new
+    Utils::DigestUtils.update_length_prefixed(digest, base)
+    refs.to_a.sort!.each do |ref|
+      path = File.join("templates", ref)
+      content_hash = begin
+        File.exists?(path) ? Digest::MD5.hexdigest(File.read(path)) : "<absent>"
+      rescue
+        # Unreadable mid-save: treat as absent; the next build re-hashes.
+        "<absent>"
+      end
+      Utils::DigestUtils.update_length_prefixed(digest, ref)
+      Utils::DigestUtils.update_length_prefixed(digest, content_hash)
+    end
+    digest.final.hexstring
   end
 
   # How long `read_template_source` rides out a template file that a glob

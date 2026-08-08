@@ -48,6 +48,18 @@ module Hwaro
         # Bare names of user shortcode templates (templates/shortcodes/*).
         getter shortcode_names : Array(String)
 
+        # Literal references the snapshot loader cannot serve — `./`-prefixed
+        # names, names that keep a non-template extension (never loadable by
+        # the snapshot glob), and exact-extension refs to a shadowed variant
+        # (`foo.j2` while `foo.html` won the snapshot slot). The render reads
+        # these files from DISK via the loader fallback, so their edits are
+        # invisible to both the snapshot templates hash and this graph. The
+        # graph is marked dynamic whenever this set is non-empty; the builder
+        # additionally folds these files' disk contents into the global
+        # templates checksum so editing one invalidates the cache (see
+        # `fold_snapshot_escaping_refs` in phases/initialize.cr).
+        getter snapshot_escaping_refs : Set(String)
+
         @direct : Hash(String, Set(String))
         @content_hashes : Hash(String, String)
         @closures : Hash(String, Set(String))
@@ -58,13 +70,18 @@ module Hwaro
         # unsynchronized Hash insert under -Dpreview_mt.
         @lazy_mutex : Mutex
 
-        def initialize(templates : Hash(String, String))
+        # `template_paths` maps each snapshot name to the source file that
+        # won its slot ("partials/nav" => "templates/partials/nav.html");
+        # it's what detects shadowed-variant references. Callers without a
+        # snapshot (tests) may omit it — shadow detection is then skipped.
+        def initialize(templates : Hash(String, String), template_paths : Hash(String, String) = {} of String => String)
           @direct = {} of String => Set(String)
           @content_hashes = {} of String => String
           @closures = {} of String => Set(String)
           @closure_hashes = {} of String => String
           @lazy_mutex = Mutex.new
           @dynamic = false
+          @snapshot_escaping_refs = Set(String).new
 
           @shortcode_names = templates.keys
             .select(&.starts_with?("shortcodes/"))
@@ -93,7 +110,15 @@ module Hwaro
                         else                           FROM_ARG_RE.match(match[2])
                         end
               if literal
-                deps << normalize(literal[1]? || literal[2]? || "")
+                reference = literal[1]? || literal[2]? || ""
+                deps << normalize(reference)
+                unless snapshot_resolvable?(reference, template_paths)
+                  # The reference resolves through the loader's DISK
+                  # fallback, whose content this graph cannot hash — degrade
+                  # to whole-site invalidation (correctness over cleverness).
+                  @dynamic = true
+                  @snapshot_escaping_refs << reference
+                end
               else
                 @dynamic = true
               end
@@ -188,6 +213,34 @@ module Hwaro
 
         private def normalize(reference : String) : String
           reference.sub(Builder::TEMPLATE_EXTENSION_REGEX, "")
+        end
+
+        # True when the snapshot loader can serve `reference` from the same
+        # source this graph hashed. Three ways it cannot (see
+        # SnapshotTemplateLoader#get_source, which falls back to disk):
+        #   (i)   `./`-prefixed refs never match a snapshot key;
+        #   (ii)  a name that keeps a non-template extension after
+        #         normalization ("foo.txt") was never loadable by the
+        #         snapshot glob;
+        #   (iii) an exact-extension ref whose snapshot slot was won by a
+        #         DIFFERENT file (`include "foo.j2"` while foo.html won) —
+        #         the loader reads foo.j2 from disk but this graph hashed
+        #         foo.html.
+        private def snapshot_resolvable?(reference : String, template_paths : Hash(String, String)) : Bool
+          return false if reference.starts_with?("./")
+
+          normalized = normalize(reference)
+          if normalized == reference
+            # No template extension was stripped. A basename that still
+            # carries an extension names a file outside the snapshot glob.
+            # (Extension-less refs resolve against the literal file just as
+            # they always did — leave them alone.)
+            return false if File.basename(reference).includes?('.')
+          elsif path = template_paths[normalized]?
+            return false unless path == File.join("templates", reference)
+          end
+
+          true
         end
       end
     end

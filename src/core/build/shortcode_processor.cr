@@ -38,14 +38,6 @@ module Hwaro
         # form, block_depth would never return to zero and fence protection would
         # silently break for the rest of the document.
         BLOCK_ANY_CLOSE_RE = /\{\%\s*end[\s\w\-]*\%\}/i
-        # Crinja/Jinja control-statement tags (and their `end*` forms). These
-        # legitimately appear in markdown content (e.g. `{% set x = 1 %}`,
-        # `{% if c %}…{% endif %}`) and must NOT count toward block-shortcode
-        # depth — otherwise an unbalanced `{% set %}` would pin block_depth > 0
-        # and permanently disable fenced-code-block protection in the outer loop.
-        # `\b` keeps shortcodes that merely start with a keyword (e.g. `setup`,
-        # `endorsement`) from matching.
-        CRINJA_CONTROL_TAG_RE = /\A\{\%-?\s*(?:if|elif|else|endif|for|endfor|set|endset|with|endwith|raw|endraw|filter|endfilter|block|endblock|macro|endmacro|call|endcall|autoescape|endautoescape|trans|endtrans|pluralize|comment|endcomment|include|import|from|extends|do)\b/i
 
         # Placeholder left in the content stream for each rendered shortcode
         # before Markdown runs. HTML-comment form so CommonMark treats it as
@@ -153,16 +145,20 @@ module Hwaro
               # control tags (`{% set %}`, `{% if %}`/`{% endif %}`, …) are
               # ignored — counting them would desync the depth (an unbalanced
               # `{% set %}` would pin depth > 0 and break fence protection).
+              # Classification is EXACT-keyword (control_tag_open? /
+              # shortcode_closer?), the same rules as the block parser below —
+              # the prefix regex previously used here treated `-`/`(` as word
+              # boundaries, so a shortcode named `include-code` counted as a
+              # control tag and its fenced body split at the fence line.
               # Inline code spans are masked first for the same reason: a
               # literal `{% alert %}` in backticks must not count.
               scan_line = line.includes?('`') ? mask_inline_code(line)[0] : line
               scan_line.scan(BLOCK_OPEN_RE) do |m|
-                tag = m[0]
-                next if CRINJA_CONTROL_TAG_RE.matches?(tag) || BLOCK_ANY_CLOSE_RE.matches?(tag)
+                next if control_tag_open?(m) || BLOCK_ANY_CLOSE_RE.matches?(m[0])
                 block_depth += 1
               end
               scan_line.scan(BLOCK_ANY_CLOSE_RE) do |m|
-                next if CRINJA_CONTROL_TAG_RE.matches?(m[0])
+                next unless shortcode_closer?(m[0])
                 block_depth -= 1 if block_depth > 0
               end
 
@@ -243,6 +239,19 @@ module Hwaro
           end
         end
 
+        # True when a BLOCK_ANY_CLOSE_RE match closes a shortcode block rather
+        # than a Jinja control structure (`{% endif %}`, `{% endfor %}`, …).
+        # Bare `{% end %}` is always a shortcode closer; named closers are
+        # classified against CRINJA_CONTROL_KEYWORDS exactly, mirroring
+        # normalize_named_closers.
+        private def shortcode_closer?(tag : String) : Bool
+          if m = NAMED_CLOSER_RE.match(tag)
+            !CRINJA_CONTROL_KEYWORDS.includes?(m[1].downcase)
+          else
+            true
+          end
+        end
+
         # True when `text` carries at least one shortcode named closer (i.e.
         # one that `normalize_named_closers` would actually rewrite).
         private def named_closer?(text : String) : Bool
@@ -288,10 +297,14 @@ module Hwaro
           # 1. Block shortcodes
           processed = process_block_shortcodes(normalized, templates, context, shortcode_results, crinja_env_override, template_cache_override, depth, spans, warnings)
 
-          # 2. Explicit call: {{ shortcode("name", args) }}
-          processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*"([^"]+)"(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
-            args = $2?.try { |a| unmask_inline_code(a, spans) }
-            render_shortcode_result($1, args, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, warnings: warnings)
+          # 2. Explicit call: {{ shortcode("name", args) }} — the name accepts
+          # either quote style, matching the argument syntax docs; the
+          # single-quoted form previously fell through to the direct-call pass
+          # as a shortcode literally named "shortcode" and was warned+dropped.
+          processed = processed.gsub(/\{\{\s*shortcode\s*\(\s*(?:"([^"]+)"|'([^']+)')(?:\s*,\s*(.*?))?\s*\)\s*\}\}/) do |match|
+            name = $1? || $2? || ""
+            args = $3?.try { |a| unmask_inline_code(a, spans) }
+            render_shortcode_result(name, args, templates, context, shortcode_results, match, warn_missing: true, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, warnings: warnings)
           end
 
           # 3. Direct call: {{ name(args) }}
@@ -305,11 +318,12 @@ module Hwaro
           end
         end
 
-        # Jinja/Crinja control keywords, for exact-name matching in the block
-        # parser. Deliberately NOT the prefix-based CRINJA_CONTROL_TAG_RE: its
-        # `\b` treats a hyphen as a boundary, so a user shortcode named
-        # `include-code` (or `if-banner`, `do-not-translate`, …) would be
-        # misclassified as a control tag and silently stop expanding.
+        # Jinja/Crinja control keywords, for exact-name matching everywhere a
+        # tag must be classified (block parser AND the outer fence-loop depth
+        # scan). Deliberately not a prefix regex with `\b`: a word boundary at
+        # a hyphen means a user shortcode named `include-code` (or
+        # `if-banner`, `do-not-translate`, …) would be misclassified as a
+        # control tag and silently stop expanding.
         CRINJA_CONTROL_KEYWORDS = Set{
           "if", "elif", "else", "endif", "for", "endfor", "set", "endset",
           "with", "endwith", "raw", "endraw", "filter", "endfilter",

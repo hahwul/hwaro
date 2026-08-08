@@ -827,6 +827,9 @@ describe Hwaro::Core::Build::Builder do
     it "renders alert shortcode as block" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
+      # The builtin alert pipes `body` through markdownify (parity with the
+      # scaffold override), so the bare test env needs the HTML filters.
+      Hwaro::Content::Processors::Filters::HtmlFilters.register(env)
       templates = {} of String => String
       context = {} of String => Crinja::Value
 
@@ -840,6 +843,7 @@ describe Hwaro::Core::Build::Builder do
     it "renders callout shortcode as alias for alert" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
+      Hwaro::Content::Processors::Filters::HtmlFilters.register(env)
       templates = {} of String => String
       context = {} of String => Crinja::Value
 

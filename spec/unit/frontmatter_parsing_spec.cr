@@ -1841,6 +1841,81 @@ describe Hwaro::Content::Processors::Markdown do
   end
 
   # ---------------------------------------------------------------------------
+  # Content that merely RESEMBLES front matter
+  #
+  # Regression (P2/P3): a document may legitimately open with a `---`
+  # thematic break or a `{`-leading construct (shortcode, Jinja tag,
+  # attribute list). Those must parse as body content — the old code
+  # truncated the first block (YAML shape) or aborted the whole build
+  # (JSON shape).
+  # ---------------------------------------------------------------------------
+  describe "content that merely resembles front matter" do
+    it "keeps the full body when the file opens with a --- thematic break (scalar YAML)" do
+      raw = "---\n\nFirst paragraph block.\n\n---\n\nSecond block.\n"
+
+      result = processor.parse(raw, "content/breaks.md")
+      result[:title].should eq("Untitled")
+      result[:content].should contain("First paragraph block.")
+      result[:content].should contain("Second block.")
+    end
+
+    it "treats a YAML sequence between --- fences as content, not front matter" do
+      raw = "---\n- alpha\n- beta\n---\nrest of the document\n"
+
+      result = processor.parse(raw, "content/list.md")
+      result[:title].should eq("Untitled")
+      result[:content].should contain("- alpha")
+      result[:content].should contain("rest of the document")
+    end
+
+    it "does not abort on an invalid-YAML first block that does not look like front matter" do
+      # `*emphasis*` reads as a YAML alias and fails to parse, but nothing in
+      # the block is a `key:` line — this is a document opening with a
+      # thematic break, not broken front matter.
+      raw = "---\n*emphasis* opening line\n---\nbody text\n"
+
+      result = processor.parse(raw, "content/em.md")
+      result[:title].should eq("Untitled")
+      result[:content].should contain("*emphasis* opening line")
+      result[:content].should contain("body text")
+    end
+
+    it "still strips empty front matter fences (--- immediately closed)" do
+      raw = "---\n---\nbody only\n"
+
+      result = processor.parse(raw, "content/empty.md")
+      result[:title].should eq("Untitled")
+      result[:content].should_not contain("---")
+      result[:content].should contain("body only")
+    end
+
+    it "treats a body starting with {{ shortcode }} as content, not JSON front matter" do
+      raw = "{{ youtube(id=\"abc\") }}\n\nMore body\n"
+
+      result = processor.parse(raw, "content/sc.md")
+      result[:title].should eq("Untitled")
+      result[:content].should contain("{{ youtube(id=\"abc\") }}")
+      result[:content].should contain("More body")
+    end
+
+    it "treats a body starting with a {% ... %} tag as content" do
+      raw = "{% alert(type=\"info\") %}hey{% end %}\n"
+
+      result = processor.parse(raw, "content/tag.md")
+      result[:title].should eq("Untitled")
+      result[:content].should contain("{% alert")
+    end
+
+    it "treats a body starting with a {:...} attribute list as content" do
+      raw = "{:.lead}\nA styled opening paragraph.\n"
+
+      result = processor.parse(raw, "content/attr.md")
+      result[:title].should eq("Untitled")
+      result[:content].should contain("{:.lead}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # UTF-8 BOM
   #
   # Regression: the fences below are `\A`-anchored and the JSON test is a bare

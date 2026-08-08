@@ -193,9 +193,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     now = Time.utc
     soon = now + 7.days
 
-    # Warn about pages expiring soon (before filtering)
+    # Warn about pages expiring soon (before filtering). all_pages so
+    # section `_index` files with an `expires` date warn too.
     if filter_expired
-      ctx.pages.each do |p|
+      ctx.all_pages.each do |p|
         if exp = p.expires
           if exp > now && exp <= soon
             Logger.warn "Page '#{p.path}' expires on #{exp.to_s("%Y-%m-%d")} (within 7 days)"
@@ -284,7 +285,15 @@ module Hwaro::Core::Build::Phases::ParseContent
   # Parse a single page: read file, parse frontmatter, assign properties
   private def parse_single_page(page : Models::Page)
     source_path = File.join("content", page.path)
-    return unless File.exists?(source_path)
+    unless File.exists?(source_path)
+      # A dangling symlink (or a file deleted mid-rebuild) must be filtered
+      # like any parse failure. Returning silently left a ghost page with
+      # url "" whose output path resolves to <output>/index.html — silently
+      # clobbering the homepage, nondeterministically under parallel render.
+      page.parse_failed = true
+      Logger.warn "Failed to parse #{page.path}: source file missing (deleted mid-build or dangling symlink)"
+      return
+    end
 
     raw_content = File.read(source_path)
     data = Processor::Markdown.parse(raw_content, source_path)

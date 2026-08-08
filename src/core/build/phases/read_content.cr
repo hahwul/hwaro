@@ -5,7 +5,10 @@
 # raw files (JSON, XML) for later processing.
 
 module Hwaro::Core::Build::Phases::ReadContent
-  LANGUAGE_FILENAME_PATTERN = /^(.+)\.([a-z]{2,3})\.md$/
+  # Page source extensions. Must agree with the markdown processor's
+  # `extensions` declaration — a `.markdown` file the processor claims but
+  # this phase skips would silently vanish from the build.
+  PAGE_EXTENSIONS = {".md", ".markdown"}
 
   private def execute_read_content_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     profiler.start_phase("ReadContent")
@@ -32,23 +35,23 @@ module Hwaro::Core::Build::Phases::ReadContent
       relative_path = Path[file_path].relative_to("content").to_s
       ext = Path[file_path].extension.downcase
 
-      if ext == ".md"
+      if PAGE_EXTENSIONS.includes?(ext)
         # Process markdown file
         basename = Path[relative_path].basename
-        language = extract_language_from_filename(basename, config)
+        language = extract_language_from_filename(basename, config, ext)
 
         clean_basename = if language
-                           # basename is guaranteed to end with ".<language>.md"
-                           # (extract_language_from_filename just matched it), so
-                           # plain string surgery replaces what was a per-file
-                           # interpolated Regex compile.
-                           "#{basename.rchop(".#{language}.md")}.md"
+                           # basename is guaranteed to end with
+                           # ".<language><ext>" (extract_language_from_filename
+                           # just matched it), so plain string surgery replaces
+                           # what was a per-file interpolated Regex compile.
+                           "#{basename.rchop(".#{language}#{ext}")}#{ext}"
                          else
                            basename
                          end
 
-        is_section_index = clean_basename == "_index.md"
-        is_index = clean_basename == "index.md" || is_section_index
+        is_section_index = clean_basename == "_index#{ext}"
+        is_index = clean_basename == "index#{ext}" || is_section_index
 
         if is_section_index
           page = Models::Section.new(relative_path)
@@ -82,16 +85,24 @@ module Hwaro::Core::Build::Phases::ReadContent
     end
   end
 
-  # Extract language code from filename if it matches configured languages
-  private def extract_language_from_filename(basename : String, config : Models::Config?) : String?
+  # Extract the language code from a filename (`about.ko.md` -> "ko",
+  # `_index.zh-tw.md` -> "zh-tw"). The candidate is whatever sits between
+  # the last two dots and is matched against the DECLARED language codes
+  # (plus the default) — not a fixed `[a-z]{2,3}` alphabet, which silently
+  # read `about.zh-tw.md` as a regular page published at /about.zh-tw/.
+  # An undeclared suffix still means "no language" (regular page).
+  private def extract_language_from_filename(basename : String, config : Models::Config?, ext : String = ".md") : String?
     return unless config
     return unless config.multilingual?
+    return unless basename.size > ext.size && basename[-ext.size..].downcase == ext
 
-    # Match pattern: filename.lang.md (e.g., "about.ko.md" -> "ko", "_index.ko.md" -> "ko")
-    if match = basename.match(LANGUAGE_FILENAME_PATTERN)
-      lang_code = match[2]
-      return lang_code if config.languages.has_key?(lang_code) || lang_code == config.default_language
-    end
+    stem = basename[0, basename.size - ext.size]
+    idx = stem.rindex('.')
+    # idx > 0: a non-empty base name must remain (".ko.md" is not a translation)
+    return unless idx && idx > 0
+    lang_code = stem[(idx + 1)..]
+    return if lang_code.empty?
+    return lang_code if config.languages.has_key?(lang_code) || lang_code == config.default_language
 
     nil
   end

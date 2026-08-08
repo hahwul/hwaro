@@ -64,13 +64,21 @@ describe "check-links language routes" do
       end
     end
 
-    it "rejects a hyphenated locale prefix the build cannot route" do
-      # `ReadContent::LANGUAGE_FILENAME_PATTERN` only matches 2-3 lowercase
-      # letters, so `about.pt-BR.md` is read as an ordinary page published at
-      # `/about.pt-BR/` — `/pt-BR/about/` 404s.
+    it "accepts a declared hyphenated locale prefix the build now routes" do
+      # The build matches language suffixes against DECLARED codes (not the
+      # old 2-3 lowercase alphabet), so `about.pt-BR.md` IS the translation
+      # published at `/pt-BR/about/`.
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "about.md"), "---\ntitle: A\n---\nen")
         File.write(File.join(dir, "about.pt-BR.md"), "---\ntitle: A pt\n---\npt")
+
+        dead_urls(dir, "/pt-BR/about/", ["pt-BR"]).should be_empty
+      end
+    end
+
+    it "still reports an untranslated page under a hyphenated locale prefix" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "about.md"), "---\ntitle: A\n---\nen")
 
         dead_urls(dir, "/pt-BR/about/", ["pt-BR"]).should eq(["/pt-BR/about/"])
       end

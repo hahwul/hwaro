@@ -276,7 +276,11 @@ module Hwaro
       #      its own `index.md`/`_index.md` is a different page and publishes
       #      its own assets; descending into it made every ancestor index
       #      re-copy the same files.
-      def collect_assets(content_dir : String, content_files : ContentFilesConfig? = nil) : Array(String)
+      # `bundle_dirs` (content-relative directories that host their own bundle
+      # index, computed by Transform#collect_assets from the page set) extends
+      # nested-bundle detection to language-suffixed indexes
+      # (`photos/index.ko.md`) that the literal on-disk probe cannot see.
+      def collect_assets(content_dir : String, content_files : ContentFilesConfig? = nil, bundle_dirs : Set(String)? = nil) : Array(String)
         # Assets are only collected for page bundles (directories)
         # This usually means the page is an index.md (either _index.md or index.md)
         return [] of String unless @is_index
@@ -290,7 +294,7 @@ module Hwaro
         @assets = Dir.glob(File.join(page_dir, "**", "*")).compact_map do |file|
           next unless File.file?(file)
           next if file.ends_with?(".md") || file.ends_with?(".markdown")
-          next if nested_bundle?(page_dir, file)
+          next if nested_bundle?(page_dir, file, content_dir, bundle_dirs)
 
           relative = Path[file].relative_to(content_dir).to_s
           # Honor [content.files] allow/disallow rules when configured so the
@@ -304,14 +308,20 @@ module Hwaro
       end
 
       # True when `file` sits under a subdirectory of `page_dir` that carries
-      # its own `index.md`/`_index.md` — i.e. it is another page's asset, not
-      # this bundle's. Walks the intermediate directories from the bundle root
-      # down to the file's own directory.
-      private def nested_bundle?(page_dir : String, file : String) : Bool
+      # its own bundle index — i.e. it is another page's asset, not this
+      # bundle's. Walks the intermediate directories from the bundle root
+      # down to the file's own directory. Beyond the literal
+      # `index.md`/`_index.md` probe, `bundle_dirs` membership catches
+      # translated-only bundles (`index.ko.md`) whose assets would otherwise
+      # be re-published by every ancestor bundle.
+      private def nested_bundle?(page_dir : String, file : String, content_dir : String, bundle_dirs : Set(String)?) : Bool
         dir = File.dirname(file)
         while dir != page_dir && dir.size > page_dir.size
           return true if File.exists?(File.join(dir, "index.md")) ||
                          File.exists?(File.join(dir, "_index.md"))
+          if bundle_dirs
+            return true if bundle_dirs.includes?(Path[dir].relative_to(content_dir).to_s)
+          end
           parent = File.dirname(dir)
           break if parent == dir
           dir = parent

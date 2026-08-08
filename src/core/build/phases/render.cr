@@ -297,7 +297,7 @@ module Hwaro::Core::Build::Phases::Render
     pages.select do |page|
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-      next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths)
+      next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page))
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
       next false unless page_set_changed || section_set_changed
@@ -460,54 +460,108 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Fingerprint the global page set — the content-page metadata that listing
-  # pages render (membership, urls, titles, dates, weights, draft, section).
+  # pages render (membership, urls, titles, dates, updated, weights, draft,
+  # toc, section, image, series, authors, tags, bundle assets).
   #
   # `fields` widens the digest to cover `[extra]` and the content-derived
   # values (`summary`, `word_count`, `reading_time`) when the site's listing
   # templates actually read them. Without that, editing a post's body or its
   # `[extra]` re-rendered only the post itself: every listing showing its
   # excerpt, word count or badge kept the previous build's value forever.
+  # Every field is folded length-prefixed (see DigestUtils), and every
+  # list/map is size-prefixed, so adjacent values can never alias across
+  # boundaries: the previous bare `,`/`;`/`=` joins made `tags = ["a,b"]`
+  # and `tags = ["a", "b"]` fingerprint identically, hiding the edit from
+  # every listing.
   private def compute_page_set_fingerprint(pages : Array(Models::Page), fields : Builder::ListingPageFields) : String
-    Digest::MD5.hexdigest(String.build do |io|
-      pages.each do |p|
-        io << p.path << '\u0001' << p.url << '\u0001' << p.title << '\u0001'
-        io << (p.description || "") << '\u0001'
-        io << (p.date.try(&.to_unix) || 0_i64) << '\u0001' << p.weight << '\u0001'
-        io << (p.draft ? '1' : '0') << '\u0001' << p.section << '\u0001'
-        io << p.tags.join(',') << '\u0001'
-        p.taxonomies.keys.sort!.each { |k| io << k << '=' << p.taxonomies[k].join(',') << ';' }
-        p.menus.keys.sort!.each { |k| io << k << '=' << menu_registration_fp(p.menus[k]) << ';' }
-        io << extra_fp(p.extra) << '\u0001' if fields.extra
-        if fields.content_derived
-          io << (p.summary || "") << '\u0001' << p.word_count << '\u0001' << p.reading_time << '\u0001'
-        end
-        io << '\u0002'
+    digest = Digest::MD5.new
+    pages.each do |p|
+      fp_value(digest, p.path)
+      fp_value(digest, p.url)
+      fp_value(digest, p.title)
+      fp_value(digest, p.description || "")
+      fp_value(digest, (p.date.try(&.to_unix) || 0_i64).to_s)
+      fp_value(digest, (p.updated.try(&.to_unix) || 0_i64).to_s)
+      fp_value(digest, p.weight.to_s)
+      fp_value(digest, p.draft ? "1" : "0")
+      fp_value(digest, p.toc ? "1" : "0")
+      fp_value(digest, p.section)
+      fp_value(digest, p.image || "")
+      fp_value(digest, p.series || "")
+      fp_list(digest, p.authors)
+      fp_list(digest, p.tags)
+      fp_list(digest, p.assets.sort)
+      fp_value(digest, "t#{p.taxonomies.size}")
+      p.taxonomies.keys.sort!.each do |k|
+        fp_value(digest, k)
+        fp_list(digest, p.taxonomies[k])
       end
-    end)
+      fp_menus(digest, p.menus)
+      fp_value(digest, extra_fp(p.extra)) if fields.extra
+      if fields.content_derived
+        fp_value(digest, p.summary || "")
+        fp_value(digest, p.word_count.to_s)
+        fp_value(digest, p.reading_time.to_s)
+      end
+    end
+    digest.final.hexstring
   end
 
-  # Fingerprint the section set — the metadata nav/menus render.
-  # No `fields` parameter: the `site.sections`/`get_section()` Crinja hash
-  # exposes no `extra` key at all, so a section's `[extra]` is unreachable
-  # from any section-set listing. Fingerprinting it could only ever cause
-  # spurious invalidation, never fix staleness.
+  # Fingerprint the section set — the metadata nav/menus and section-set
+  # consumers render: identity fields plus `date`, `sort_by`, `reverse`,
+  # `transparent`, `paginate` and the section's bundle assets, all of which
+  # the `site.sections`/`get_section()` Crinja hash exposes.
+  # No `fields` parameter: that hash exposes no `extra` key at all, so a
+  # section's `[extra]` is unreachable from any section-set listing.
+  # Fingerprinting it could only ever cause spurious invalidation, never
+  # fix staleness.
   private def compute_section_set_fingerprint(sections : Array(Models::Section)) : String
-    Digest::MD5.hexdigest(String.build do |io|
-      sections.each do |s|
-        io << s.path << '\u0001' << s.url << '\u0001' << s.title << '\u0001'
-        io << (s.description || "") << '\u0001' << (s.draft ? '1' : '0') << '\u0001' << s.weight << '\u0001'
-        s.menus.keys.sort!.each { |k| io << k << '=' << menu_registration_fp(s.menus[k]) << ';' }
-        io << '\u0002'
-      end
-    end)
+    digest = Digest::MD5.new
+    sections.each do |s|
+      fp_value(digest, s.path)
+      fp_value(digest, s.url)
+      fp_value(digest, s.title)
+      fp_value(digest, s.description || "")
+      fp_value(digest, (s.date.try(&.to_unix) || 0_i64).to_s)
+      fp_value(digest, s.draft ? "1" : "0")
+      fp_value(digest, s.weight.to_s)
+      fp_value(digest, s.sort_by || "-")
+      reverse = s.reverse
+      fp_value(digest, reverse.nil? ? "-" : (reverse ? "1" : "0"))
+      fp_value(digest, s.transparent ? "1" : "0")
+      fp_value(digest, s.paginate.try(&.to_s) || "-")
+      fp_list(digest, s.assets.sort)
+      fp_menus(digest, s.menus)
+    end
+    digest.final.hexstring
   end
 
-  # Serializes a single front-matter menu registration for the page/section
-  # set fingerprints above. Any field change (including a page newly
-  # gaining/losing a registration) must bust the cache for pages whose
-  # template calls `get_menu` / `site.menus`.
-  private def menu_registration_fp(reg : Models::MenuRegistration) : String
-    "name=#{reg.name},weight=#{reg.weight},parent=#{reg.parent},identifier=#{reg.identifier}"
+  # Length-prefixed field fold for the set fingerprints (one scheme with
+  # every other fingerprint site — see DigestUtils).
+  private def fp_value(digest : ::Digest, value : String) : Nil
+    Utils::DigestUtils.update_length_prefixed(digest, value)
+  end
+
+  # Size-prefixed, element-length-prefixed list fold: `["a,b"]` and
+  # `["a", "b"]` must digest differently.
+  private def fp_list(digest : ::Digest, values : Array(String)) : Nil
+    Utils::DigestUtils.update_length_prefixed(digest, "a#{values.size}")
+    values.each { |v| Utils::DigestUtils.update_length_prefixed(digest, v) }
+  end
+
+  # Front-matter menu registrations for the set fingerprints. Any field
+  # change (including a page newly gaining/losing a registration) must bust
+  # the cache for pages whose template calls `get_menu` / `site.menus`.
+  private def fp_menus(digest : ::Digest, menus : Hash(String, Models::MenuRegistration)) : Nil
+    Utils::DigestUtils.update_length_prefixed(digest, "m#{menus.size}")
+    menus.keys.sort!.each do |k|
+      reg = menus[k]
+      fp_value(digest, k)
+      fp_value(digest, reg.name || "-")
+      fp_value(digest, reg.weight.try(&.to_s) || "-")
+      fp_value(digest, reg.parent || "-")
+      fp_value(digest, reg.identifier || "-")
+    end
   end
 
   # Template closure fingerprint stored in this page's cache entry. With
@@ -619,7 +673,18 @@ module Hwaro::Core::Build::Phases::Render
     # up-to-date would let filter_changed_pages skip it forever.
     return unless output_path
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths)
+    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page))
+  end
+
+  # Fingerprint of a page bundle's colocated asset names (see
+  # CacheEntry#assets_hash). Sorted and length-prefixed; "" for pages with
+  # no assets so legacy cache entries (which default to "") don't force a
+  # one-time rebuild of every asset-less page.
+  private def page_assets_hash(page : Models::Page) : String
+    return "" if page.assets.empty?
+    digest = Digest::MD5.new
+    page.assets.sort.each { |a| Utils::DigestUtils.update_length_prefixed(digest, a) }
+    digest.final.hexstring
   end
 
   private def process_files_parallel(

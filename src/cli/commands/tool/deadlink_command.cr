@@ -607,23 +607,18 @@ module Hwaro
             config.languages.keys.reject { |code| code.empty? || code == config.default_language }
           end
 
-          # The build only recognizes a language suffix in a content filename
-          # when the code is 2–3 lowercase letters (`ReadContent::
-          # LANGUAGE_FILENAME_PATTERN`). A declared `pt-BR` therefore never
-          # produces `/pt-BR/…` routes — `about.pt-BR.md` is read as an
-          # ordinary page and published at `/about.pt-BR/`. Mirroring that
-          # rule here keeps the checker from inventing a translation route the
-          # build will not serve.
-          TRANSLATABLE_CODE = /\A[a-z]{2,3}\z/
-
           # Returns the leading language segment of an absolute URL when it
-          # names a non-default language the build can actually route, else nil.
+          # names a non-default language the build can actually route, else
+          # nil. The build matches filename suffixes against DECLARED codes
+          # (ReadContent#extract_language_from_filename), so every declared
+          # non-default code — including hyphenated ones like `pt-BR` —
+          # produces `/<code>/…` routes.
           private def translatable_language_prefix(url : String, codes : Array(String)) : String?
             return if codes.empty?
             return unless url.starts_with?("/")
             segment = url.lstrip("/").split("/").first?
             return unless segment
-            return unless codes.includes?(segment) && segment.matches?(TRANSLATABLE_CODE)
+            return unless codes.includes?(segment)
             segment
           end
 
