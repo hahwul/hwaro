@@ -510,6 +510,12 @@ module Hwaro
               # consumers don't have to double-decode entities.
               if full_content
                 encoded = get_content_for_feed(page, config)
+                # truncate > 0 makes get_content_for_feed return
+                # entity-DECODED plain text, but feed readers parse
+                # <content:encoded> as HTML — re-escape it so a literal
+                # `<` or `&` can't break rendering. The full-HTML path
+                # (truncate = 0) must stay byte-identical.
+                encoded = Utils::TextUtils.escape_xml(encoded) if config.feeds.truncate > 0
                 unless encoded.empty?
                   str << "      <content:encoded><![CDATA[#{escape_cdata(encoded)}]]></content:encoded>\n"
                 end

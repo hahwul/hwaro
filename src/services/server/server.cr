@@ -510,8 +510,14 @@ module Hwaro
         # freshness bookkeeping is needed here. `partial: true`: a
         # single-page call must not truncate every other page's manifest
         # entry.
+        # The advertised URL carries the collision-disambiguated slug that
+        # assign_lazy_urls computed against the FULL page set — pass it
+        # through, because a single-page generate() call would recompute
+        # the slug with fresh collision state and collapse colliding pages
+        # (/posts/foo/ vs /posts-foo/) onto the same unsuffixed file.
+        slug = File.basename(sanitized, File.extname(sanitized))
         @mutex.synchronize do
-          Content::Seo::OgImage.generate([page], config, @output_dir, partial: true, parallel: false)
+          Content::Seo::OgImage.generate([page], config, @output_dir, partial: true, parallel: false, forced_slug: slug)
         rescue ex
           Logger.warn "On-demand OG image generation failed for #{url_path}: #{ex.message}"
         end

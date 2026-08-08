@@ -6,6 +6,16 @@ module Hwaro
     module Multilingual
       extend self
 
+      # Mirrors Core::Build::Phases::ReadContent::PAGE_EXTENSIONS (not
+      # required here to avoid pulling the build phases into the content
+      # layer). `.md` first so the common case short-circuits.
+      PAGE_EXTENSIONS = {".md", ".markdown"}
+
+      # The page extension of `path`, or nil when it is not a page source.
+      def page_extension(path : String) : String?
+        PAGE_EXTENSIONS.find { |ext| path.ends_with?(ext) }
+      end
+
       def multilingual?(config : Models::Config) : Bool
         config.multilingual?
       end
@@ -21,7 +31,8 @@ module Hwaro
       end
 
       def translation_key(page_path : String, config : Models::Config) : String
-        return page_path unless page_path.ends_with?(".md")
+        ext = page_extension(page_path)
+        return page_path unless ext
 
         relative_path = page_path.gsub('\\', '/')
         dir = Path[relative_path].dirname.to_s
@@ -32,17 +43,17 @@ module Hwaro
         # Uses string suffix check instead of per-call Regex compilation.
         cleaned = basename
         config.languages.each_key do |code|
-          suffix = ".#{code}.md"
+          suffix = ".#{code}#{ext}"
           if cleaned.ends_with?(suffix)
-            cleaned = "#{cleaned[0, cleaned.size - suffix.size]}.md"
+            cleaned = "#{cleaned[0, cleaned.size - suffix.size]}#{ext}"
             break
           end
         end
         # Also check default language if no match above
         if cleaned == basename
-          suffix = ".#{config.default_language}.md"
+          suffix = ".#{config.default_language}#{ext}"
           if cleaned.ends_with?(suffix)
-            cleaned = "#{cleaned[0, cleaned.size - suffix.size]}.md"
+            cleaned = "#{cleaned[0, cleaned.size - suffix.size]}#{ext}"
           end
         end
 
@@ -54,7 +65,7 @@ module Hwaro
 
         groups = Hash(String, Array(Models::Page)).new { |h, k| h[k] = [] of Models::Page }
         pages.each do |page|
-          next unless page.path.ends_with?(".md")
+          next unless page_extension(page.path)
           groups[translation_key(page.path, config)] << page
         end
 

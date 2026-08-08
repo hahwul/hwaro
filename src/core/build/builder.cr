@@ -1129,8 +1129,14 @@ module Hwaro
             # A layout-only template edit rightly skips the SEO surfaces
             # (their inputs didn't change) — but it DID rewrite page HTML,
             # and sw.js content-hashes the precached pages' bytes, so the
-            # service worker must still be refreshed.
-            Content::Seo::Pwa.generate(site, output_dir, verbose)
+            # service worker must still be refreshed. Warn-and-continue,
+            # matching regenerate_seo_surfaces: a transient failure here
+            # must not skip cache.save below.
+            begin
+              Content::Seo::Pwa.generate(site, output_dir, verbose)
+            rescue ex
+              Logger.warn "  PWA regeneration failed: #{ex.message}"
+            end
           end
 
           cache.save if options.cache
@@ -1441,7 +1447,7 @@ module Hwaro
               dest = File.join(output_dir, relative)
               outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
             elsif path.starts_with?("content/")
-              if path.downcase.ends_with?(".md")
+              if path.downcase.ends_with?(".md") || path.downcase.ends_with?(".markdown")
                 next unless site
                 rel = path.lchop("content/")
                 # Section _index pages live in site.sections, not site.pages —

@@ -286,6 +286,13 @@ module Hwaro
         # rather than overwriting; in full mode (default) we still
         # truncate so manifest entries — and the disk files they
         # describe — for deleted pages get pruned naturally.
+        #
+        # `forced_slug` is for single-page callers (the dev server's
+        # OgLazyImageHandler) whose page already advertises a slug computed
+        # by assign_lazy_urls against the FULL page set: recomputing the
+        # slug here with a fresh `seen_slugs` would collapse slug-colliding
+        # pages (/posts/foo/ vs /posts-foo/) onto one file. Only meaningful
+        # when `pages` holds exactly one page.
         def self.generate(
           pages : Array(Models::Page),
           config : Models::Config,
@@ -293,6 +300,7 @@ module Hwaro
           verbose : Bool = false,
           partial : Bool = false,
           parallel : Bool = true,
+          forced_slug : String? = nil,
         )
           ai = config.og.auto_image
           return {generated: 0, skipped: 0} unless ai.enabled
@@ -414,7 +422,7 @@ module Hwaro
             # through so the file gets (re)generated when the page changed.
             next if (img = page.image) && !auto_assigned?(img, ai)
 
-            slug = slug_for(page, seen_slugs)
+            slug = forced_slug || slug_for(page, seen_slugs)
             page_hash = compute_page_hash(page)
             new_entries[slug] = page_hash
 

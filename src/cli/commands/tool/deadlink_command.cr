@@ -639,7 +639,9 @@ module Hwaro
                            File.exists?(target_no_slash + ".md") ||
                            File.exists?(target_no_slash + ".markdown") ||
                            File.exists?(File.join(target_no_slash, "_index.md")) ||
+                           File.exists?(File.join(target_no_slash, "_index.markdown")) ||
                            File.exists?(File.join(target_no_slash, "index.md")) ||
+                           File.exists?(File.join(target_no_slash, "index.markdown")) ||
                            (link.kind != :image && taxonomy_url?(url, taxonomy_names))
 
             # Also accept assets that live in static/ (source) or public/ (after
@@ -663,7 +665,9 @@ module Hwaro
             File.exists?("#{target_no_slash}.#{code}.md") ||
               File.exists?("#{target_no_slash}.#{code}.markdown") ||
               File.exists?(File.join(target_no_slash, "_index.#{code}.md")) ||
+              File.exists?(File.join(target_no_slash, "_index.#{code}.markdown")) ||
               File.exists?(File.join(target_no_slash, "index.#{code}.md")) ||
+              File.exists?(File.join(target_no_slash, "index.#{code}.markdown")) ||
               (link.kind != :image && taxonomy_url?(url, taxonomy_names))
           end
 

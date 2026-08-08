@@ -304,6 +304,29 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    it "excludes /sw.js from its own precache list and converges across builds" do
+      Dir.mktmpdir do |dir|
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          precache_urls = ["/sw.js", "/index.html"]
+          TOML
+
+        File.write(File.join(dir, "index.html"), "<html>home</html>")
+
+        # First (clean) build: sw.js doesn't exist yet. Second build: it
+        # does — without the exclusion it would hash its own previous
+        # bytes and churn CACHE_NAME forever.
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+        first = File.read(File.join(dir, "sw.js"))
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+        second = File.read(File.join(dir, "sw.js"))
+
+        first.should_not contain(%("/sw.js"))
+        second.should eq(first)
+      end
+    end
+
     it "generates sw.js" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)

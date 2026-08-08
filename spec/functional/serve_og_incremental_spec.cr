@@ -163,6 +163,48 @@ describe "serve lazy OG generation (A9)" do
     end
   end
 
+  it "keeps slug-colliding pages on their own advertised files (review item 1)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_og_site(lazy: true)
+        # /posts/foo/ and /posts-foo/ both slugify to "posts-foo";
+        # assign_lazy_urls disambiguates the second with a URL-hash suffix.
+        File.write("content/posts/foo.md", "---\ntitle: Nested Foo\n---\nnested body")
+        File.write("content/posts-foo.md", "---\ntitle: Flat Foo\n---\nflat body")
+        builder = og_builder
+        builder.run(og_options).should be_true
+
+        site = builder.site.not_nil!
+        nested = site.pages.find! { |p| p.url == "/posts/foo/" }
+        flat = site.pages.find! { |p| p.url == "/posts-foo/" }
+        nested_url = nested.image.not_nil!
+        flat_url = flat.image.not_nil!
+        nested_url.should_not eq(flat_url)
+
+        handler = Hwaro::Services::OgLazyImageHandler.new(builder, "public")
+        og_request(handler, nested_url)
+        og_request(handler, flat_url)
+
+        nested_file = File.join("public", nested_url.lchop('/'))
+        flat_file = File.join("public", flat_url.lchop('/'))
+        File.exists?(nested_file).should be_true
+        File.exists?(flat_file).should be_true
+        File.read(nested_file).should contain("Nested Foo")
+        File.read(flat_file).should contain("Flat Foo")
+
+        # Repeat requests must hit the manifest cache, not regenerate
+        # (regeneration would rewrite the files and bump their mtimes).
+        stamp = Time.utc - 5.minutes
+        File.touch(nested_file, stamp)
+        File.touch(flat_file, stamp)
+        og_request(handler, nested_url)
+        og_request(handler, flat_url)
+        File.info(nested_file).modification_time.should be_close(stamp, 2.seconds)
+        File.info(flat_file).modification_time.should be_close(stamp, 2.seconds)
+      end
+    end
+  end
+
   it "passes unrelated requests through untouched" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

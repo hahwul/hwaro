@@ -568,16 +568,16 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
         "shortcodes/include-code" => %(<div class="inc">{{ body }}</div>),
       }
       content = <<-MD
-      {% include-code(lang="js") %}
-      before
+        {% include-code(lang="js") %}
+        before
 
-      ```
-      literal fence
-      ```
+        ```
+        literal fence
+        ```
 
-      after
-      {% end %}
-      MD
+        after
+        {% end %}
+        MD
       result = builder.test_sc_process(content, templates)
       result.should contain(%(<div class="inc">))
       result.should_not contain("{% include-code")

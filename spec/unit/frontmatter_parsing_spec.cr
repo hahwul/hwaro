@@ -1889,6 +1889,28 @@ describe Hwaro::Content::Processors::Markdown do
       result[:content].should contain("body only")
     end
 
+    it "keeps a lone ~ block as body content (YAML null scalar is not empty front matter)" do
+      # `~` parses to YAML null, but the block TEXT is not empty — treating
+      # a null-parse as empty front matter silently dropped the `~` line.
+      raw = "---\n~\n---\nbody text\n"
+
+      result = processor.parse(raw, "content/tilde.md")
+      result[:title].should eq("Untitled")
+      result[:content].should contain("~")
+      result[:content].should contain("body text")
+    end
+
+    it "raises HWARO_E_CONTENT for invalid YAML front matter with a Unicode key" do
+      # The `key:` heuristic must recognize non-ASCII keys, otherwise broken
+      # front matter with a Korean key silently renders as body text.
+      raw = "---\n제목: [broken\n---\nbody\n"
+
+      err = expect_raises(Hwaro::HwaroError) do
+        processor.parse(raw, "content/ko.md")
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+    end
+
     it "treats a body starting with {{ shortcode }} as content, not JSON front matter" do
       raw = "{{ youtube(id=\"abc\") }}\n\nMore body\n"
 

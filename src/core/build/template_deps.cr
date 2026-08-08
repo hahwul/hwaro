@@ -233,9 +233,13 @@ module Hwaro
           if normalized == reference
             # No template extension was stripped. A basename that still
             # carries an extension names a file outside the snapshot glob.
-            # (Extension-less refs resolve against the literal file just as
-            # they always did — leave them alone.)
             return false if File.basename(reference).includes?('.')
+            # Extension-less ref: when the snapshot is known and lacks the
+            # key, the loader serves a literal extension-less file
+            # (templates/partials/nav) from DISK — content this graph never
+            # hashed. Mark it escaping; refs to genuinely missing templates
+            # error at render anyway, so over-invalidation is safe.
+            return false if !template_paths.empty? && !template_paths.has_key?(normalized)
           elsif path = template_paths[normalized]?
             return false unless path == File.join("templates", reference)
           end

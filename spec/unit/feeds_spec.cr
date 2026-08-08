@@ -2652,5 +2652,33 @@ describe Hwaro::Content::Seo::Feeds do
         feed.should_not contain("truncated in the feed output")
       end
     end
+
+    it "HTML-escapes the truncated plain text so a literal < survives feed readers" do
+      # With truncate > 0 the CDATA carries entity-DECODED plain text, but
+      # consumers parse <content:encoded> as HTML — a literal `<`/`&` breaks
+      # rendering. The truncated text must be re-escaped before embedding.
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "rss"
+      config.feeds.filename = "rss.xml"
+      config.feeds.full_content = true
+      config.feeds.truncate = 10
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+
+      page = Hwaro::Models::Page.new("posts/code.md")
+      page.title = "Code Post"
+      page.url = "/posts/code/"
+      page.render = true
+      page.is_index = false
+      page.raw_content = "for n < 10 the loop keeps running and running"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([page], config, output_dir)
+
+        feed = File.read(File.join(output_dir, "rss.xml"))
+        feed.should contain("<content:encoded><![CDATA[for n &lt; 10...]]></content:encoded>")
+      end
+    end
   end
 end

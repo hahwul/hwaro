@@ -337,7 +337,10 @@ module Hwaro
         # A top-level `key:` line is what distinguishes broken front matter
         # (worth a hard error) from a document that merely opens with a `---`
         # thematic break (whose first block may fail YAML parsing entirely).
-        YAML_KEY_LINE_RE = /^[A-Za-z_][\w.-]*\s*:(\s|$)/
+        # `\p{L}` so non-ASCII keys (e.g. Korean `제목:`) count as front
+        # matter too — otherwise their invalid-YAML blocks silently render
+        # as body text instead of erroring.
+        YAML_KEY_LINE_RE = /^[\p{L}_][\p{L}\p{N}_.-]*\s*:(\s|$)/
 
         private def yaml_front_matter_like?(raw : String) : Bool
           raw.each_line do |line|
@@ -348,9 +351,16 @@ module Hwaro
 
         # True when the fenced block parses to YAML null — `---\n---` and
         # comment-only blocks. Those are empty front matter (fences stripped),
-        # unlike scalar/sequence blocks, which are document content.
+        # unlike scalar/sequence blocks, which are document content. A
+        # null-parse alone is not enough: `~` / `null` scalars ALSO parse to
+        # nil but are content, so the raw text must carry nothing beyond
+        # whitespace and comments.
         private def yaml_empty_front_matter?(raw : String) : Bool
-          YAML.parse(raw).raw.nil?
+          return false unless YAML.parse(raw).raw.nil?
+          raw.each_line.all? do |line|
+            stripped = line.strip
+            stripped.empty? || stripped.starts_with?('#')
+          end
         rescue
           false
         end

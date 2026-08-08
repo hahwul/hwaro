@@ -381,6 +381,25 @@ describe "TemplateDeps: refs the snapshot loader cannot serve (C3)" do
     deps.snapshot_escaping_refs.should be_empty
   end
 
+  it "marks the graph dynamic for extension-less references missing from the snapshot" do
+    # `{% include "partials/nav" %}` naming a literal extension-less file
+    # (templates/partials/nav) resolves via the disk loader but lives in no
+    # snapshot hash — its edits would be invisible to invalidation.
+    templates = {"page" => %({% include "partials/nav" %})}
+    paths = {"page" => "templates/page.html"}
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates, paths)
+    deps.dynamic?.should be_true
+    deps.snapshot_escaping_refs.should contain("partials/nav")
+  end
+
+  it "stays static for extension-less references to a real snapshot key" do
+    templates = {"page" => %({% include "partials/nav" %}), "partials/nav" => "n"}
+    paths = {"page" => "templates/page.html", "partials/nav" => "templates/partials/nav.html"}
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates, paths)
+    deps.dynamic?.should be_false
+    deps.snapshot_escaping_refs.should be_empty
+  end
+
   it "stays static for references to templates with dotted names (page.json.jinja)" do
     templates = {"page" => %({% include "page.json.jinja" %}), "page.json" => "{}"}
     paths = {"page" => "templates/page.html", "page.json" => "templates/page.json.jinja"}
