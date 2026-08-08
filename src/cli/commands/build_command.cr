@@ -235,6 +235,14 @@ module Hwaro
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
           end
 
+          # `--no-parallel` renders on a single fiber, so a worker count has
+          # nothing to size — surface the conflict instead of silently
+          # ignoring `--jobs` (the flags aren't contradictory enough to make
+          # this a usage error; the build proceeds single-threaded).
+          if !parallel && workers > 0
+            Logger.warn "--jobs #{workers} is ignored because --no-parallel disables parallel rendering."
+          end
+
           { {Config::Options::BuildOptions.new(
             output_dir: output_dir,
             base_url: base_url,

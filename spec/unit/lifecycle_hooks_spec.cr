@@ -281,7 +281,7 @@ describe Hwaro::Core::Lifecycle::Manager do
       result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
     end
 
-    it "stops on Skip result" do
+    it "skips remaining hooks at the point on Skip without failing the sequence" do
       manager = Hwaro::Core::Lifecycle::Manager.new
       second_called = false
 
@@ -297,7 +297,30 @@ describe Hwaro::Core::Lifecycle::Manager do
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
       result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
 
-      result.should eq(Hwaro::Core::Lifecycle::HookResult::Skip)
+      # Skip is scoped to the CURRENT hook point (per HookResult's doc):
+      # the second hook must not run, but phase sequencing continues — so
+      # trigger reports Continue rather than a phase-terminating result.
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+      second_called.should be_false
+    end
+
+    it "still propagates Abort from a hook" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      second_called = false
+
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 10, name: "aborter") do |_ctx|
+        Hwaro::Core::Lifecycle::HookResult::Abort
+      end
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 0, name: "second") do |_ctx|
+        second_called = true
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      options = Hwaro::Config::Options::BuildOptions.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Abort)
       second_called.should be_false
     end
   end

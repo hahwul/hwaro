@@ -331,35 +331,63 @@ module Hwaro
           self
         end
 
-        # Returns false when the build failed without raising (pre-hook
-        # failure or a phase abort) — the serve watcher branches on this to
-        # surface the failure instead of live-reloading onto a broken site.
-        def run(options : Config::Options::BuildOptions) : Bool
-          @render_workers = options.workers
-          run(
-            output_dir: options.output_dir,
-            base_url: options.base_url,
-            drafts: options.drafts,
-            include_expired: options.include_expired,
-            include_future: options.include_future,
-            minify: options.minify,
-            parallel: options.parallel,
-            cache: options.cache,
-            highlight: options.highlight,
-            verbose: options.verbose,
-            profile: options.profile,
-            debug: options.debug,
-            error_overlay: options.error_overlay,
-            stream: options.stream,
-            memory_limit: options.memory_limit,
-            env: options.env,
-            fast_start: options.fast_start,
-            fast_start_count: options.fast_start_count,
-            skip_og_image: options.skip_og_image,
-            skip_image_processing: options.skip_image_processing,
-            preserve_output: options.preserve_output,
-            cache_busting: options.cache_busting,
-          )
+        # Keyword-argument convenience form of `run`: packs the arguments
+        # into a BuildOptions and delegates to the struct overload, which is
+        # the REAL implementation. Callers holding a BuildOptions (the build
+        # command, the serve watcher) must call that overload directly so
+        # fields this form doesn't expose — `full`, `serve_mode`, `workers`
+        # — reach the build context verbatim instead of being silently
+        # dropped in a re-pack.
+        def run(
+          output_dir : String = "public",
+          base_url : String? = nil,
+          drafts : Bool = false,
+          include_expired : Bool = false,
+          include_future : Bool = false,
+          minify : Bool = false,
+          parallel : Bool = true,
+          cache : Bool = false,
+          full : Bool = false,
+          highlight : Bool = true,
+          verbose : Bool = false,
+          profile : Bool = false,
+          debug : Bool = false,
+          error_overlay : Bool = false,
+          stream : Bool = false,
+          memory_limit : String? = nil,
+          env : String? = nil,
+          fast_start : Bool = false,
+          fast_start_count : Int32 = 20,
+          skip_og_image : Bool = false,
+          skip_image_processing : Bool = false,
+          preserve_output : Bool = false,
+          cache_busting : Bool = true,
+        ) : Bool
+          run(Config::Options::BuildOptions.new(
+            output_dir: output_dir,
+            base_url: base_url,
+            drafts: drafts,
+            include_expired: include_expired,
+            include_future: include_future,
+            minify: minify,
+            parallel: parallel,
+            cache: cache,
+            full: full,
+            highlight: highlight,
+            verbose: verbose,
+            profile: profile,
+            debug: debug,
+            error_overlay: error_overlay,
+            stream: stream,
+            memory_limit: memory_limit,
+            env: env,
+            fast_start: fast_start,
+            fast_start_count: fast_start_count,
+            skip_og_image: skip_og_image,
+            skip_image_processing: skip_image_processing,
+            preserve_output: preserve_output,
+            cache_busting: cache_busting,
+          ))
         end
 
         # Drop unresolved-link records from the previous pass so a fixed
@@ -561,12 +589,16 @@ module Hwaro
             end
           end
 
-          # Delete originals of pages whose edit relocated their output file
-          # (slug/custom_path change) — excluded pages were handled above.
+          # Delete outputs the edit orphaned — a relocation (slug/custom_path
+          # change) moves EVERY output, but a front-matter edit can also drop
+          # just a sibling format (`outputs = ["json"]` removed) while the
+          # primary path stays put, so diff the full old/new path sets
+          # instead of comparing only the primary path. Excluded pages were
+          # handled above.
           relocated = [] of String
           changed_pages.each do |page|
             next unless olds = old_output_paths[page.path]?
-            relocated.concat(olds) if olds.first? != get_output_path(page, output_dir)
+            relocated.concat(olds - collect_page_output_paths(page, output_dir))
           end
           delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
 
@@ -831,12 +863,12 @@ module Hwaro
             end
           end
 
-          # Delete originals of pages whose edit relocated their output file
-          # (slug/custom_path change) — mirrors run_incremental.
+          # Delete outputs the edit orphaned (relocation or a dropped sibling
+          # output format) — set diff, mirrors run_incremental.
           relocated = [] of String
           changed_pages.each do |page|
             next unless olds = old_output_paths[page.path]?
-            relocated.concat(olds) if olds.first? != get_output_path(page, output_dir)
+            relocated.concat(olds - collect_page_output_paths(page, output_dir))
           end
           delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
 
@@ -884,9 +916,17 @@ module Hwaro
           templates = load_templates
           @templates = templates
 
-          # Refresh invalidation mode for the reloaded template set
+          # Refresh invalidation mode for the reloaded template set. Mirror
+          # phases/initialize.cr: snapshot-escaping refs (./-prefixed,
+          # non-template extensions, shadowed exact-ext variants) are read
+          # from disk at render time, so their contents must be folded into
+          # the global hash here too — otherwise serve rerenders and
+          # `build --cache` disagree on every page's cache entry.
           deps = @template_deps
           @global_templates_hash = Cache.compute_templates_hash(templates)
+          if (graph = deps) && !graph.snapshot_escaping_refs.empty?
+            @global_templates_hash = fold_snapshot_escaping_refs(@global_templates_hash, graph.snapshot_escaping_refs)
+          end
           @per_page_template_hash = config.build.template_deps &&
                                     (deps.try { |d| !d.dynamic? } || false)
 
@@ -1197,8 +1237,26 @@ module Hwaro
           sass_on = config.try(&.sass.enabled) || false
           copied = 0
           changed_files.each do |src_path|
-            next unless File.exists?(src_path)
-            next if File.directory?(src_path)
+            # lstat first — mirrors the full build's collect_static_files
+            # (phases/initialize.cr): a symlinked file whose target escapes
+            # the project must not be published into the output during
+            # serve (e.g. `static/leak -> ~/.ssh/id_rsa` whose target's
+            # mtime change trips the watcher). Dangling symlinks and
+            # directories are skipped like before.
+            lstat = File.info?(src_path, follow_symlinks: false)
+            next if lstat.nil?
+
+            if lstat.symlink?
+              info = File.info?(src_path, follow_symlinks: true)
+              next if info.nil? || info.directory?
+
+              unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
+                Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
+                next
+              end
+            else
+              next if lstat.directory?
+            end
 
             relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)
@@ -1215,6 +1273,13 @@ module Hwaro
               end
             end
             dest_path = File.join(output_dir, relative)
+            # Parity with copy_changed_content_files: a watcher path outside
+            # static/ yields a `../`-relative destination that must never be
+            # written outside the output directory.
+            unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
+              Logger.warn "Skipping static file outside output directory: #{relative}"
+              next
+            end
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
             FileUtils.cp(src_path, dest_path)
@@ -1380,37 +1445,23 @@ module Hwaro
           end
         end
 
-        def run(
-          output_dir : String = "public",
-          base_url : String? = nil,
-          drafts : Bool = false,
-          include_expired : Bool = false,
-          include_future : Bool = false,
-          minify : Bool = false,
-          parallel : Bool = true,
-          cache : Bool = false,
-          full : Bool = false,
-          highlight : Bool = true,
-          verbose : Bool = false,
-          profile : Bool = false,
-          debug : Bool = false,
-          error_overlay : Bool = false,
-          stream : Bool = false,
-          memory_limit : String? = nil,
-          env : String? = nil,
-          fast_start : Bool = false,
-          fast_start_count : Int32 = 20,
-          skip_og_image : Bool = false,
-          skip_image_processing : Bool = false,
-          preserve_output : Bool = false,
-          cache_busting : Bool = true,
-        ) : Bool
+        # Full build — the real implementation behind both `run` forms.
+        # The incoming struct is stored on the BuildContext verbatim, so
+        # fields the keyword form doesn't expose (`full`, `serve_mode`)
+        # survive to the phases and hooks that branch on them (`--full`
+        # cache clearing, `[og.image] lazy_generate` under serve).
+        #
+        # Returns false when the build failed without raising (pre-hook
+        # failure or a phase abort) — the serve watcher branches on this to
+        # surface the failure instead of live-reloading onto a broken site.
+        def run(options : Config::Options::BuildOptions) : Bool
+          @render_workers = options.workers
           # Load config once and reuse throughout the build.
           # `Models::Config.load` raises `HwaroError(HWARO_E_CONFIG)` directly
           # for missing files and TOML parse failures, so callers (and
           # `--json` consumers) can branch on HWARO_E_CONFIG without the
           # build pipeline rewrapping the exception.
-          config = Models::Config.load(env: env)
+          config = Models::Config.load(env: options.env)
           @config = config
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post
@@ -1428,36 +1479,10 @@ module Hwaro
           start_time = Time.instant
 
           # Initialize profiler
-          profiler = Profiler.new(enabled: profile)
+          profiler = Profiler.new(enabled: options.profile)
           @profiler = profiler
           profiler.start
 
-          # Create build context for lifecycle
-          options = Config::Options::BuildOptions.new(
-            output_dir: output_dir,
-            base_url: base_url,
-            drafts: drafts,
-            include_expired: include_expired,
-            include_future: include_future,
-            minify: minify,
-            parallel: parallel,
-            cache: cache,
-            full: full,
-            highlight: highlight,
-            verbose: verbose,
-            profile: profile,
-            debug: debug,
-            error_overlay: error_overlay,
-            stream: stream,
-            memory_limit: memory_limit,
-            env: env,
-            fast_start: fast_start,
-            fast_start_count: fast_start_count,
-            skip_og_image: skip_og_image,
-            skip_image_processing: skip_image_processing,
-            preserve_output: preserve_output,
-            cache_busting: cache_busting,
-          )
           if options.streaming?
             Logger.info "  Streaming mode enabled (batch size: #{options.batch_size})"
           end

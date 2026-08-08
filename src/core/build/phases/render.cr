@@ -1530,6 +1530,12 @@ module Hwaro::Core::Build::Phases::Render
     # Build template variables — reuse prebuilt_vars if available (shortcode path)
     vars = if pv = prebuilt_vars
              update_content_vars(pv, content, section_list, toc, toc_headers, pagination, pagination_seo_links)
+             # The prebuilt hash is the shortcode pre-render context, built
+             # with content="" — its per-fence copy probe saw nothing. Re-run
+             # it against the FINAL rendered content, otherwise a
+             # `{copy=true}` fence on any page that also uses a shortcode
+             # ships no copy runtime.
+             inject_per_fence_copy_runtime(pv, site.config, content)
              pv
            else
              build_template_variables(page, site, content, section_list, toc, toc_headers, pagination, page_url_override, paginator, global_vars, pagination_seo_links: pagination_seo_links,
@@ -1730,9 +1736,18 @@ module Hwaro::Core::Build::Phases::Render
     pages.each do |page|
       cached_page_crinja_value(page, default_lang)
 
-      ancestors_key = {page.section, page.language}
-      unless @ancestors_crinja_cache.has_key?(ancestors_key)
-        @ancestors_crinja_cache[ancestors_key] = build_ancestors_crinja(page)
+      # Member pages sharing {section, language} have identical ancestors,
+      # so one cache entry serves them all. Section-index pages must NOT
+      # share it: their ancestors exclude themselves (transform.cr), so a
+      # shared key either put a section into its own breadcrumb or stripped
+      # the section from every member page — whichever prewarmed first won.
+      # Sections bypass the cache (see build_template_variables): each one
+      # renders exactly once, so caching buys nothing.
+      unless page.is_a?(Models::Section)
+        ancestors_key = {page.section, page.language}
+        unless @ancestors_crinja_cache.has_key?(ancestors_key)
+          @ancestors_crinja_cache[ancestors_key] = build_ancestors_crinja(page)
+        end
       end
 
       unless page.section.empty?
@@ -1819,9 +1834,13 @@ module Hwaro::Core::Build::Phases::Render
   ) : Array(Crinja::Value)
     pages = site.pages_for_section(section_name, language)
 
-    # Use section's sort_by setting if available, otherwise sort by title
+    # Use section's sort_by setting if available, otherwise sort by date
+    # (newest first) — the SAME default the paginator (paginator.cr) and the
+    # prev/next navigation (transform.cr) use, and the one the docs promise.
+    # A "title" fallback here made `get_section(...).pages` and member-page
+    # `section.pages` disagree with the section template's own listing order.
     section = site.section_for(section_name, language)
-    sort_by = section.try(&.sort_by) || "title"
+    sort_by = section.try(&.sort_by) || "date"
     reverse = section.try(&.reverse) || false
     pages = Utils::SortUtils.sort_pages(pages, sort_by, reverse)
 
@@ -2385,13 +2404,20 @@ module Hwaro::Core::Build::Phases::Render
     lower_obj = page.lower.try { |l| cached_page_crinja_value(l, default_lang) }
     higher_obj = page.higher.try { |h| cached_page_crinja_value(h, default_lang) }
 
-    # Build ancestors array (cached per section+language — pages in the same
-    # section AND language share ancestors). The language is part of the key
-    # because a multilingual section has per-language ancestors; omitting it
-    # served whichever language rendered first to every language (mirrors the
-    # section_pages cache key).
+    # Build ancestors array (cached per section+language — MEMBER pages in
+    # the same section AND language share ancestors). The language is part of
+    # the key because a multilingual section has per-language ancestors;
+    # omitting it served whichever language rendered first to every language
+    # (mirrors the section_pages cache key). Section-index pages bypass the
+    # cache entirely: their ancestors EXCLUDE themselves (transform.cr) while
+    # member pages' ancestors include the section, so sharing the key let the
+    # first writer poison the other kind — a section listing itself in its
+    # own breadcrumb, or members losing their parent. Each section renders
+    # once, so building directly costs nothing.
     ancestors_cache_key = {page.section, page.language}
-    ancestors_array = if @crinja_caches_frozen
+    ancestors_array = if page.is_a?(Models::Section)
+                        build_ancestors_crinja(page)
+                      elsif @crinja_caches_frozen
                         if cached = @ancestors_crinja_cache[ancestors_cache_key]?
                           @cache_manager.record_hit("ancestors_crinja")
                           cached
@@ -2547,13 +2573,17 @@ module Hwaro::Core::Build::Phases::Render
       paginate_path_var = page.paginate_path
       redirect_to_var = page.redirect_to || ""
 
-      # Build subsections array
+      # Build subsections array. `Models::Section#pages` is NEVER populated
+      # by the build pipeline (it stays []) — the live page list is the
+      # per-section Crinja cache, the same source `get_section(...).pages`
+      # uses in build_global_vars. Reading `sub.pages.size` here reported 0
+      # for every subsection.
       subsections_array = page.subsections.map do |sub|
         Crinja::Value.new({
           "title"       => Crinja::Value.new(sub.title),
           "description" => Crinja::Value.new(sub.description || ""),
           "url"         => Crinja::Value.new(sub.url),
-          "pages_count" => Crinja::Value.new(sub.pages.size),
+          "pages_count" => Crinja::Value.new(cached_section_pages_crinja(sub.section, sub.language, site).size),
         })
       end
 
@@ -2774,23 +2804,38 @@ module Hwaro::Core::Build::Phases::Render
     gv = global_vars || build_global_vars(site)
     gv.each { |k, v| vars[k] = v unless vars.has_key?(k) }
 
-    # Per-fence copy opt-in (`{copy=true}`) with the global `[highlight]
-    # copy` default off: the site-wide `highlight_js` (computed once in
-    # build_global_vars) ships no copy runtime, so a page whose rendered
-    # body carries an opted-in block appends it here — after the merge, so
-    # the page-level value wins. The probe can't false-positive on fenced
-    # documentation examples: the escape pipeline turns their `"` into
-    # `&quot;`. With the global flag ON the runtime is already in `gv`.
-    if config.highlight.enabled && !config.highlight.copy && content.includes?(%(data-copy="true"))
-      snippet = Models::HighlightConfig::COPY_SNIPPET
-      base_js = vars["highlight_js"]?.try(&.raw).as?(String) || ""
-      js = base_js.empty? ? snippet : "#{base_js}\n#{snippet}"
-      vars["highlight_js"] = Crinja::Value.new(js)
-      base_css = vars["highlight_css"]?.try(&.raw).as?(String) || ""
-      vars["highlight_tags"] = Crinja::Value.new(base_css.empty? ? js : "#{base_css}\n#{js}")
-    end
+    # Per-fence copy opt-in probe — NOTE: for pages WITH shortcodes this
+    # hash is built as the shortcode pre-render context with content="",
+    # so apply_template re-runs the probe against the FINAL rendered
+    # content (see inject_per_fence_copy_runtime).
+    inject_per_fence_copy_runtime(vars, config, content)
 
     vars
+  end
+
+  # Per-fence copy opt-in (`{copy=true}`) with the global `[highlight]
+  # copy` default off: the site-wide `highlight_js` (computed once in
+  # build_global_vars) ships no copy runtime, so a page whose rendered
+  # body carries an opted-in block appends it here — after the global-vars
+  # merge, so the page-level value wins. The probe can't false-positive on
+  # fenced documentation examples: the escape pipeline turns their `"` into
+  # `&quot;`. With the global flag ON the runtime is already in the global
+  # vars. Idempotent: a hash that already carries the snippet (a prebuilt
+  # vars hash reused across passes) is left untouched.
+  private def inject_per_fence_copy_runtime(
+    vars : Hash(String, Crinja::Value),
+    config : Models::Config,
+    content : String,
+  ) : Nil
+    return if !config.highlight.enabled || config.highlight.copy
+    return unless content.includes?(%(data-copy="true"))
+    snippet = Models::HighlightConfig::COPY_SNIPPET
+    base_js = vars["highlight_js"]?.try(&.raw).as?(String) || ""
+    return if base_js.includes?(snippet)
+    js = base_js.empty? ? snippet : "#{base_js}\n#{snippet}"
+    vars["highlight_js"] = Crinja::Value.new(js)
+    base_css = vars["highlight_css"]?.try(&.raw).as?(String) || ""
+    vars["highlight_tags"] = Crinja::Value.new(base_css.empty? ? js : "#{base_css}\n#{js}")
   end
 
   private def build_jsonld_vars(
@@ -2866,7 +2911,19 @@ module Hwaro::Core::Build::Phases::Render
 
   private def warn_hugo_shortcode_syntax(raw : String, path : String) : Nil
     names = Set(String).new
-    raw.scan(HUGO_SHORTCODE_RE) { |m| names << m[1] }
+    # Only `{{<` OUTSIDE fenced code blocks and inline code spans reaches
+    # Markdown as live (escaped) text — fenced examples are the documented
+    # way to SHOW Hugo syntax and must not warn. Reuse the same
+    # FenceTracker + inline-code masking the shortcode pre-filter uses
+    # (content_may_contain_shortcodes?) so the two can't disagree about
+    # what is fenced.
+    tracker = Content::Processors::FenceTracker.new
+    raw.each_line(chomp: false) do |line|
+      next if tracker.fence_line?(line)
+      next unless line.includes?("{{<")
+      scan_line = line.includes?('`') ? mask_inline_code(line)[0] : line
+      scan_line.scan(HUGO_SHORTCODE_RE) { |m| names << m[1] }
+    end
     return if names.empty?
     sorted = names.to_a.sort
     Logger.warn "Hugo-style shortcode syntax `{{< … >}}` is not supported and will render as literal text in #{path}. " \

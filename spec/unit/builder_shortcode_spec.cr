@@ -1043,6 +1043,73 @@ describe Hwaro::Core::Build::Builder do
       output.should contain("{% name(arg=\"v\") %}")
     end
 
+    # Regression: documented Hugo-migration examples live in fenced code
+    # blocks and inline code spans; scanning the raw source without fence
+    # awareness warned on every such page even though the fenced `{{<` never
+    # reaches Markdown as a live shortcode.
+    it "does not warn when {{< appears only inside a fenced code block" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        raw = <<-MD
+          # Migrating from Hugo
+
+          Hugo used this syntax:
+
+          ```
+          {{< youtube id="abc" >}}
+          {{< alert type="info" >}}body{{< /alert >}}
+          ```
+
+          Done.
+          MD
+        builder.test_warn_hugo_shortcode_syntax(raw, "content/doc.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      io.to_s.should be_empty
+    end
+
+    it "does not warn when {{< appears only inside inline code" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        builder.test_warn_hugo_shortcode_syntax(
+          "Hugo's `{{< youtube id=\"abc\" >}}` form is not supported.",
+          "content/doc.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      io.to_s.should be_empty
+    end
+
+    it "still warns for a real Hugo shortcode outside fences on a page that also has fenced examples" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        raw = <<-MD
+          ```
+          {{< fencedname id="x" >}}
+          ```
+
+          {{< youtube id="abc" >}}
+          MD
+        builder.test_warn_hugo_shortcode_syntax(raw, "content/mixed.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      output = io.to_s
+      output.should contain("Hugo-style shortcode syntax")
+      output.should contain("youtube")
+      output.should_not contain("fencedname")
+    end
+
     it "stays silent when content has no Hugo-style shortcodes" do
       builder = Hwaro::Core::Build::Builder.new
       io = IO::Memory.new
