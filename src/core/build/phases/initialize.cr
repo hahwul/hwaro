@@ -480,6 +480,10 @@ module Hwaro::Core::Build::Phases::Initialize
                    union.includes?("seo"),
         needs_jsonld: union.includes?("jsonld"),
         needs_section_pages: union.includes?("section"),
+        # Targeted on purpose — see the record's doc comment. These feed the
+        # render worker heuristic, where a false positive costs parallelism.
+        listing_fanout_site: union.includes?("site.pages"),
+        listing_fanout_section: union.includes?("section.pages"),
       )
     end
   end

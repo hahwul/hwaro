@@ -12,6 +12,37 @@ module Hwaro::Core::Build::Phases::Render
   # memory vs. speed on very large sites.
   private STREAMING_CLEAR_INTERVAL = 4
 
+  # Auto render-worker thresholds.
+  #
+  # What actually caps useful render parallelism is not the CPU count but how
+  # many page objects a single page render materializes from a site-wide
+  # collection: every `{% for p in site.pages %}` / `section.pages` iteration
+  # allocates a Crinja::Value per item, and past a small worker count Boehm's
+  # global allocation lock serializes that fan-out while the extra fibers add
+  # pure contention. Measured on an M4 Max (14 cores), release binaries,
+  # min-of-N, output verified byte-identical at every worker count:
+  #
+  #   corpus (5000 pages)         fan-out/page   j1      j2      j4      j8
+  #   harsh (site.pages loop)          5625    18.4s   26.0s   42.8s   50.1s
+  #   harsh minus site.pages            625     3.02s   2.80s   4.23s   5.17s
+  #   public (ssg-benchmark)              0     1.45s   1.00s   0.73s   0.91s
+  #
+  # The curves invert, so no single constant wins: the old `cpu_count * 2`
+  # default (28 fibers) cost 2.4x on the first corpus and 2.2x on the third.
+  # Syntax highlighting was measured and ruled out as a factor (the same
+  # corpora with `--skip-highlighting` are within noise of the rows above).
+  # The low-fan-out ceiling is 4 rather than the core count: sweeping 3-6 on
+  # every low-fan-out corpus (docs, public at 50/500/5000 pages, 9-12 timed
+  # runs each, interleaved) put 4 first or within 2% of first on all of them,
+  # while 6 cost 3% on docs and 5000-page public alike.
+  private RENDER_FANOUT_SERIAL    = 500 # >= this many items/page -> 1 worker
+  private RENDER_FANOUT_LIMITED   = 100 # >= this many items/page -> 2 workers
+  private RENDER_WORKERS_AUTO_CAP =   4 # ceiling for low-fan-out sites
+  private RENDER_WORKERS_UNKNOWN  =   2 # templates unanalyzable -> hedge
+  # Below this share of analyzed pages the mean is not representative of the
+  # render, so the hedge is used instead of a fan-out that ignored most pages.
+  private RENDER_FANOUT_MIN_KNOWN_RATIO = 0.5
+
   private def execute_render_phase(ctx : Lifecycle::BuildContext, profiler : Profiler) : Lifecycle::HookResult
     site = @site || raise "Site not initialized"
     templates = @templates || raise "Templates not loaded"
@@ -235,7 +266,7 @@ module Hwaro::Core::Build::Phases::Render
     env_pool : Array(Crinja)? = nil
     template_cache_pool : Array(Hash(UInt64, Crinja::Template))? = nil
     if parallel && pages.size > 1
-      pool_size = ParallelConfig.new(enabled: true, max_workers: @render_workers).calculate_workers(Math.min(batch_size, pages.size))
+      pool_size = render_worker_count(pages, site, templates, Math.min(batch_size, pages.size))
       env_pool = Array.new(pool_size) { create_fresh_crinja_env }
       template_cache_pool = Array.new(pool_size) { {} of UInt64 => Crinja::Template }
     end
@@ -708,8 +739,7 @@ module Hwaro::Core::Build::Phases::Render
     # fibers. Fewer fibers means fewer of the runtime's worker threads render
     # at once, which on allocation-heavy template sites reduces GC-allocator
     # lock contention. Output is identical regardless of the count.
-    config = ParallelConfig.new(enabled: true, max_workers: @render_workers)
-    worker_count = config.calculate_workers(pages.size)
+    worker_count = render_worker_count(pages, site, templates, pages.size)
     safe = site.config.markdown.safe
 
     # Per-worker Crinja environments and template caches avoid shared mutable
@@ -1306,6 +1336,62 @@ module Hwaro::Core::Build::Phases::Render
     Logger.warn msg
     page.build_warnings << msg unless page.build_warnings.includes?(msg)
     html_content
+  end
+
+  # Concurrent render fibers for `pages`. `--jobs N` wins outright; otherwise
+  # the count comes from the site's listing fan-out (see the RENDER_FANOUT_*
+  # constants). Never affects output — only how many pages render at once.
+  private def render_worker_count(
+    pages : Array(Models::Page),
+    site : Models::Site,
+    templates : Hash(String, String),
+    item_count : Int32,
+  ) : Int32
+    if @render_workers > 0
+      return ParallelConfig.new(enabled: true, max_workers: @render_workers).calculate_workers(item_count)
+    end
+    return 1 if item_count <= 1
+    Math.min(auto_render_workers(pages, site, templates), item_count).clamp(1, MAX_PARALLEL_WORKERS)
+  end
+
+  # Mean number of page objects one page render materializes from a site-wide
+  # collection, mapped onto a worker count.
+  #
+  # The mean (not the max) is what the allocator sees: a homepage that lists
+  # every page is one expensive render among thousands of cheap ones and must
+  # not drag the whole site down to a single worker, whereas a `page` template
+  # with the same loop makes every render expensive. Templates whose static
+  # closure could not be resolved are excluded from the mean; if they are the
+  # majority, the fan-out is unknowable and the hedge applies.
+  private def auto_render_workers(
+    pages : Array(Models::Page),
+    site : Models::Site,
+    templates : Hash(String, String),
+  ) : Int32
+    features = @template_var_features
+    return RENDER_WORKERS_UNKNOWN if features.empty?
+
+    site_pages = site.pages.size
+    # Upper bound over sections rather than each page's own section: the
+    # thresholds are coarse, and this avoids depending on the language-keyed
+    # section lookup semantics for what is only a sizing hint.
+    largest_section = site.pages_by_section.each_value.max_of?(&.size) || 0
+
+    total = 0_i64
+    known = 0
+    pages.each do |page|
+      feature = features[determine_template(page, templates, site)]?
+      next unless feature
+      known += 1
+      total += site_pages if feature.listing_fanout_site
+      total += largest_section if feature.listing_fanout_section
+    end
+    return RENDER_WORKERS_UNKNOWN if known < (pages.size * RENDER_FANOUT_MIN_KNOWN_RATIO).ceil
+
+    mean_fanout = total // known
+    return 1 if mean_fanout >= RENDER_FANOUT_SERIAL
+    return RENDER_WORKERS_UNKNOWN if mean_fanout >= RENDER_FANOUT_LIMITED
+    Math.min(System.cpu_count.to_i, RENDER_WORKERS_AUTO_CAP)
   end
 
   private def determine_template(page : Models::Page, templates : Hash(String, String), site : Models::Site) : String

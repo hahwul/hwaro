@@ -236,7 +236,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | --include-future | Include future-dated content |
 | --minify | Minify output files (see below) |
 | --no-parallel | Disable parallel processing |
-| --jobs N | Concurrent render workers (default: auto). Try `1`-`2` for template-heavy sites (see below) |
+| --jobs N | Concurrent render workers. Default: auto, derived from the site listing fan-out (see below) |
 | --cache | Enable incremental build caching (see below) |
 | --full | Force a complete rebuild, clearing the cache |
 | --skip-highlighting | Disable syntax highlighting |
@@ -294,15 +294,23 @@ See [Incremental Build](/features/incremental-build/) for details.
 
 **About `--jobs` (render concurrency):**
 
-By default Hwaro renders pages with an automatic, CPU-based number of concurrent workers. `--jobs N` caps that number. It never changes the generated output — only how many pages render at once.
+By default Hwaro picks the number of concurrent render workers from your site's **listing fan-out** — how many page objects a single page render materializes from a site-wide collection. `--jobs N` overrides that. It never changes the generated output, only how many pages render at once.
 
-Lowering it can make **template/Crinja-heavy** sites build faster: those pages allocate many small objects, and beyond ~2 workers the garbage collector's allocation lock contends more than the extra cores help. **Markdown-heavy** sites (large page bodies) keep scaling, so the default stays automatic.
+Fan-out is what caps useful parallelism, not the core count. Every `{% for p in site.pages %}` or `{% for p in section.pages %}` iteration allocates one object per item, and past a small worker count the garbage collector's global allocation lock serializes that work while extra workers add only contention. So the automatic count is:
+
+| Items materialized per page render | Workers |
+|---|---|
+| 500 or more (e.g. a `page` template listing every page on a large site) | 1 |
+| 100–499 | 2 |
+| Under 100 (most sites) | up to 4 |
+
+A homepage that lists every page does not count against this — the estimate is the mean across rendered pages, so one expensive listing page among thousands of cheap ones leaves the site on the fast path.
 
 ```bash
-hwaro build --jobs 2   # try this if your build is template/shortcode heavy
+hwaro build --jobs 4   # override the automatic count
 ```
 
-Leave it unset for the automatic default. `--jobs` has no effect together with `--no-parallel`.
+Leave it unset unless you are benchmarking; the automatic count is within a few percent of the best fixed value on every corpus we measure. `--jobs` has no effect together with `--no-parallel`.
 
 **About `-i, --input`:**
 
@@ -337,7 +345,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --base-url URL | Temporarily override `base_url` from `config.toml`. If the URL carries a path, the dev server mounts the site under that prefix (see below) |
 | -e, --env ENV | Environment name (loads `config.<env>.toml` override) |
 | --minify | Serve minified output |
-| --jobs N | Concurrent render workers (default: auto). Try `1`-`2` for template-heavy sites |
+| --jobs N | Concurrent render workers. Default: auto, derived from the site listing fan-out |
 | --open | Open browser after starting |
 | -d, --drafts | Include draft content |
 | --include-expired | Include expired content |
