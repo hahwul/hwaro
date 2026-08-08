@@ -17,6 +17,8 @@ and AI agents that want clean output.
 |----------------|-------------|
 | `-q`, `--quiet` | Suppress informational output and the startup banner. Warnings and errors still appear on stderr. |
 | `NO_COLOR` (env) | When set to any non-empty value, suppresses ANSI color codes from every command's output. Follows the [no-color.org](https://no-color.org) cross-tool convention. |
+| `GC_MARKERS` (env) | GC marker-thread count. For `hwaro build` only, Hwaro defaults this to `1` (measured 3-5x faster on allocation-heavy sites); export it to override. Other commands keep the garbage collector's stock behavior. |
+| `GC_INITIAL_HEAP_SIZE` (env) | Initial GC heap size. For `hwaro build` only, Hwaro defaults this to `256M` to avoid repeated grow-collect cycles; export it to override. Skipped automatically when `--memory-limit` / `HWARO_MEMORYLIMIT` is set. |
 
 Colors are also disabled automatically when stdout is not a TTY (for
 example when piping to `cat`, redirecting to a file, or running inside

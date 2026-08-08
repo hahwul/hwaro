@@ -106,6 +106,14 @@ The binary is created at `./bin/hwaro`.
 > flag needed. Set `CRYSTAL_WORKERS=N` to override the worker count (it
 > defaults to the CPU count). Do not pass the old `-Dpreview_mt` flag:
 > Crystal 1.21 deprecated it and its scheduler can hang at process exit.
+>
+> For `hwaro build` (any install method, not just source builds), Hwaro
+> tunes the Boehm GC at startup (`GC_MARKERS=1` and
+> `GC_INITIAL_HEAP_SIZE=256M`) — measured 3-5x faster builds on
+> allocation-heavy sites, at the cost of a higher peak memory floor during
+> the build. Exporting either variable overrides the built-in default, and
+> the heap presize is skipped when `--memory-limit` is used. See the
+> [global flags table](@/start/cli.md) for details.
 
 ### Add to PATH (Optional)
 

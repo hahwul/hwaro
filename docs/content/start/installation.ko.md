@@ -106,6 +106,14 @@ shards build --release --no-debug
 > 필요 없습니다. 워커 수는 `CRYSTAL_WORKERS=N`으로 조정할 수 있습니다(기본값은
 > CPU 코어 수). 예전 `-Dpreview_mt` 플래그는 넣지 마세요. Crystal 1.21에서
 > deprecated 되었고, 해당 스케줄러는 프로세스 종료 시 멈출 수 있습니다.
+>
+> `hwaro build` 실행 시(소스 빌드뿐 아니라 모든 설치 방식에서) Hwaro는
+> Boehm GC를 함께 튜닝합니다(`GC_MARKERS=1`, `GC_INITIAL_HEAP_SIZE=256M`).
+> 할당이 많은 사이트에서 빌드가 3~5배 빨라지는 것을 측정했으며, 대신
+> 빌드 중 피크 메모리 사용량이 늘어납니다. 두 환경 변수를 직접
+> export하면 내장 기본값보다 우선하고, `--memory-limit` 사용 시 힙
+> 프리사이즈는 자동으로 비활성화됩니다. 자세한 내용은
+> [전역 플래그 표](@/start/cli.md)를 참고하세요.
 
 ### PATH 등록 (선택)
 
