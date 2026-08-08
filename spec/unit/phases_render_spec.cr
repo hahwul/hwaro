@@ -38,7 +38,44 @@ module Hwaro::Core::Build
     def test_split_priority_pages(pages : Array(Models::Page), count : Int32)
       split_priority_pages(pages, count)
     end
+
+    def test_auto_render_workers(pages : Array(Models::Page), site : Models::Site,
+                                 templates : Hash(String, String),
+                                 features : Hash(String, TemplateVarFeatures))
+      @template_var_features = features
+      auto_render_workers(pages, site, templates)
+    end
+
+    def test_render_worker_count(pages : Array(Models::Page), site : Models::Site,
+                                 templates : Hash(String, String),
+                                 features : Hash(String, TemplateVarFeatures),
+                                 item_count : Int32, jobs : Int32)
+      @template_var_features = features
+      @render_workers = jobs
+      render_worker_count(pages, site, templates, item_count)
+    end
   end
+end
+
+# Builds a site whose `page` template renders every page, with `page_count`
+# pages spread over one section.
+private def fanout_site(page_count : Int32) : {Hwaro::Models::Site, Array(Hwaro::Models::Page)}
+  site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+  pages = Array.new(page_count) do |i|
+    page = Hwaro::Models::Page.new("posts/post-#{i}.md")
+    page.url = "/posts/post-#{i}/"
+    page.section = "posts"
+    page
+  end
+  site.pages = pages
+  site.pages_by_section = {"posts" => pages}
+  {site, pages}
+end
+
+private def features_for(site_loop : Bool, section_loop : Bool)
+  {"page" => Hwaro::Core::Build::Builder::TemplateVarFeatures.new(
+    needs_seo: false, needs_jsonld: false, needs_section_pages: section_loop,
+    listing_fanout_site: site_loop, listing_fanout_section: section_loop)}
 end
 
 describe Hwaro::Core::Build::Phases::Render do
@@ -93,6 +130,108 @@ describe Hwaro::Core::Build::Phases::Render do
             .should eq(builder.test_get_output_path(page, "public"))
         end
       end
+    end
+  end
+
+  # Regression: the auto worker count used to be `cpu_count * 2` regardless of
+  # workload. On a 5000-page site whose `page` template iterates `site.pages`
+  # that cost 2.4x (18.4s at 1 worker vs 44.4s at the old default), while on a
+  # site with no per-page listing it cost 2.2x to run too FEW workers. The two
+  # curves invert, so the count has to follow the site's listing fan-out.
+  describe "#auto_render_workers" do
+    templates = {"page" => "{{ content }}"}
+
+    it "serializes when every page materializes the whole site" do
+      site, pages = fanout_site(5000)
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_auto_render_workers(pages, site, templates, features_for(true, false))
+        .should eq(1)
+    end
+
+    it "serializes when every page materializes a large section" do
+      site, pages = fanout_site(600)
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_auto_render_workers(pages, site, templates, features_for(false, true))
+        .should eq(1)
+    end
+
+    it "limits workers for a mid-sized per-page listing" do
+      site, pages = fanout_site(200)
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_auto_render_workers(pages, site, templates, features_for(true, false))
+        .should eq(2)
+    end
+
+    it "uses the full auto cap when no page template lists anything" do
+      site, pages = fanout_site(5000)
+      builder = Hwaro::Core::Build::Builder.new
+      expected = Math.min(System.cpu_count.to_i, 4)
+      builder.test_auto_render_workers(pages, site, templates, features_for(false, false))
+        .should eq(expected)
+    end
+
+    # A homepage that lists every page is one expensive render among thousands
+    # of cheap ones. Taking the max fan-out instead of the mean would drop the
+    # entire site to a single worker for that one page.
+    it "is not dragged down by a single site-wide listing page" do
+      site, pages = fanout_site(5000)
+      index = Hwaro::Models::Page.new("index.md")
+      index.url = "/"
+      index.is_index = true
+      site.pages = pages + [index]
+      all = pages + [index]
+      features = features_for(false, false).merge({
+        "index" => Hwaro::Core::Build::Builder::TemplateVarFeatures.new(
+          needs_seo: false, needs_jsonld: false, needs_section_pages: false,
+          listing_fanout_site: true, listing_fanout_section: false),
+      })
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_auto_render_workers(all, site, {"page" => "x", "index" => "y"}, features)
+        .should eq(Math.min(System.cpu_count.to_i, 4))
+    end
+
+    it "hedges when no template closure could be analyzed" do
+      site, pages = fanout_site(100)
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_auto_render_workers(pages, site, templates,
+        {} of String => Hwaro::Core::Build::Builder::TemplateVarFeatures)
+        .should eq(2)
+    end
+
+    it "hedges when most pages use an unanalyzable template" do
+      site, pages = fanout_site(100)
+      # Only "other" is analyzed; every page resolves to "page".
+      features = {"other" => Hwaro::Core::Build::Builder::TemplateVarFeatures.new(
+        needs_seo: false, needs_jsonld: false, needs_section_pages: false,
+        listing_fanout_site: false, listing_fanout_section: false)}
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_auto_render_workers(pages, site, templates, features).should eq(2)
+    end
+  end
+
+  describe "#render_worker_count" do
+    templates = {"page" => "{{ content }}"}
+
+    it "lets an explicit --jobs override the fan-out heuristic" do
+      site, pages = fanout_site(5000)
+      builder = Hwaro::Core::Build::Builder.new
+      # The heuristic would pick 1 here; --jobs 8 must win.
+      builder.test_render_worker_count(pages, site, templates, features_for(true, false), 5000, 8)
+        .should eq(8)
+    end
+
+    it "never exceeds the item count" do
+      site, pages = fanout_site(3)
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_render_worker_count(pages, site, templates, features_for(false, false), 3, 0)
+        .should be <= 3
+    end
+
+    it "returns 1 for a single item" do
+      site, pages = fanout_site(1)
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_render_worker_count(pages, site, templates, features_for(false, false), 1, 0)
+        .should eq(1)
     end
   end
 

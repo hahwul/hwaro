@@ -12,12 +12,11 @@ module Hwaro
         property minify : Bool
         property parallel : Bool
         # Number of concurrent render workers (fibers) for the parallel render
-        # phase. 0 = auto (CPU-based, the default). Lowering it (e.g. `--jobs 2`)
-        # reduces effective render parallelism, which on template/Crinja-heavy
-        # sites is often FASTER: those pages allocate many small objects, and
-        # past ~2 workers Boehm's global allocation lock contends harder than
-        # the extra cores help. Markdown-heavy sites keep scaling, so the
-        # default stays auto. Never changes output — only render concurrency.
+        # phase. 0 = auto (the default), which derives the count from the
+        # site's per-page listing fan-out rather than the CPU count — see
+        # Phases::Render#auto_render_workers for the measurements behind it.
+        # An explicit value overrides that heuristic outright, which is what
+        # benchmarking wants. Never changes output — only render concurrency.
         property workers : Int32
         property cache : Bool
         property full : Bool

@@ -141,10 +141,19 @@ module Hwaro
         # the variable. A template is only gated when its whole closure is
         # statically resolvable AND it cannot contain shortcodes (template
         # shortcodes render with the same vars hash and could read anything).
+        #
+        # `listing_fanout_*` are the exception: they gate no output at all,
+        # only the render phase's auto worker count (see
+        # Phases::Render#auto_render_workers). They therefore use TARGETED
+        # substrings (`site.pages` / `section.pages`) rather than the
+        # deliberately over-broad ones above — over-approximating here costs
+        # render parallelism on every site that merely mentions "section".
         record TemplateVarFeatures,
           needs_seo : Bool,
           needs_jsonld : Bool,
-          needs_section_pages : Bool
+          needs_section_pages : Bool,
+          listing_fanout_site : Bool,
+          listing_fanout_section : Bool
         # Which page fields the site's LISTING templates can actually read.
         # A field folded into the page/section-set fingerprint re-renders every
         # listing whenever that field moves on any page, so `extra` and the
