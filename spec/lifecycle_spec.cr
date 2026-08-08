@@ -105,8 +105,10 @@ describe Hwaro::Core::Lifecycle do
         Hwaro::Core::Lifecycle::HookResult::Skip
       end
 
+      # Skip only suppresses the remaining hooks at this hook point; the
+      # phase sequence continues, so trigger reports Continue.
       result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, ctx)
-      result.should eq(Hwaro::Core::Lifecycle::HookResult::Skip)
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
     end
 
     it "handles HookResult::Abort" do
