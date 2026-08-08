@@ -51,6 +51,8 @@ hwaro build
 
 The CLI `--memory-limit` flag always overrides the environment variable.
 
+Setting either also disables the GC heap presize that `hwaro build` normally applies (`GC_INITIAL_HEAP_SIZE=256M`): a presized heap never shrinks below its floor, which would work against the memory cap you asked for.
+
 ### Combined flags
 
 You can combine `--stream` with `--memory-limit`. When `--memory-limit` is provided, it determines the batch size regardless of `--stream`:

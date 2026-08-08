@@ -19,13 +19,77 @@ require "./hwaro"
 #     for growing the heap from Boehm's tiny default via repeated collect +
 #     expand cycles. Presizing (with markers=1) reached 13.6s.
 #
+# Scope: `hwaro build` only, and the heap presize additionally steps aside
+# for --memory-limit / HWARO_MEMORYLIMIT (the presized floor never shrinks,
+# which would defeat the documented memory-cap contract). Every other
+# command keeps Boehm's stock behavior on purpose:
+#
+#   - `serve` is a long-lived process holding page/template caches; the
+#     presize would become an all-day RSS floor, and single-threaded
+#     marking over its large live set is an unbenchmarked latency risk.
+#     Its watch rebuilds simply keep the pre-tuning performance.
+#   - If the 256M reservation cannot be satisfied (tight RLIMIT_AS),
+#     bdwgc's GC_init aborts the process — that must not be able to take
+#     down `--version` or the shell-rc `completion` path.
+#
 # Only raw LibC calls are safe here: the GC is not initialized yet, so
 # anything that allocates (ENV, String interpolation, exceptions) would
 # crash. String literals live in static memory and allocate nothing.
+# HWARO_GC_TUNED records which variables were injected so top-level code
+# can scrub them from the child-process environment after GC_init consumed
+# them (setenv would otherwise leak build-shaped GC tuning into user hook
+# and deploy commands).
+lib LibCExt
+  fun strcmp(s1 : UInt8*, s2 : UInt8*) : LibC::Int
+  fun strncmp(s1 : UInt8*, s2 : UInt8*, n : LibC::SizeT) : LibC::Int
+end
+
 fun main(argc : Int32, argv : UInt8**) : Int32
-  LibC.setenv("GC_MARKERS", "1", 0)
-  LibC.setenv("GC_INITIAL_HEAP_SIZE", "256M", 0)
-  Crystal.main(argc, argv)
+  command = Pointer(UInt8).null
+  memory_limited = !LibC.getenv("HWARO_MEMORYLIMIT").null?
+  i = 1
+  while i < argc
+    arg = argv[i]
+    if LibCExt.strncmp(arg, "--memory-limit", 14) == 0
+      memory_limited = true
+    elsif command.null? && LibCExt.strcmp(arg, "-q") != 0 && LibCExt.strcmp(arg, "--quiet") != 0
+      # First non-quiet argument is the command name (mirrors Runner#run,
+      # which strips -q/--quiet globally and then shifts the command).
+      command = arg
+    end
+    i += 1
+  end
+
+  if !command.null? && LibCExt.strcmp(command, "build") == 0
+    set_markers = LibC.getenv("GC_MARKERS").null?
+    set_heap = !memory_limited && LibC.getenv("GC_INITIAL_HEAP_SIZE").null?
+    LibC.setenv("GC_MARKERS", "1", 0) if set_markers
+    LibC.setenv("GC_INITIAL_HEAP_SIZE", "256M", 0) if set_heap
+    if set_markers && set_heap
+      LibC.setenv("HWARO_GC_TUNED", "mh", 1)
+    elsif set_markers
+      LibC.setenv("HWARO_GC_TUNED", "m", 1)
+    elsif set_heap
+      LibC.setenv("HWARO_GC_TUNED", "h", 1)
+    end
+  end
+
+  # Crystal's Unix main shim ends with LibC.exit so the main fiber may
+  # resume on any thread of the parallel execution context; a plain return
+  # here would re-enter the C startup frame from whichever thread ran the
+  # final continuation. Mirror the shim, never return.
+  LibC.exit(Crystal.main(argc, argv))
+end
+
+# GC_init has consumed the injected variables above; scrub exactly the ones
+# this process injected (HWARO_GC_TUNED says which) so spawned children —
+# user build hooks, deploy commands — inherit a clean environment instead
+# of build-shaped GC tuning they never asked for. User-exported values were
+# never overwritten and are left untouched.
+if tuned = ENV["HWARO_GC_TUNED"]?
+  ENV.delete("GC_MARKERS") if tuned.includes?('m')
+  ENV.delete("GC_INITIAL_HEAP_SIZE") if tuned.includes?('h')
+  ENV.delete("HWARO_GC_TUNED")
 end
 
 # Size the default execution context so the build's fiber fan-out actually
