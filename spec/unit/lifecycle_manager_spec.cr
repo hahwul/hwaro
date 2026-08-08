@@ -63,7 +63,7 @@ describe Hwaro::Core::Lifecycle::Manager do
       end
 
       result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, ctx)
-      result.should eq(Hwaro::Core::Lifecycle::HookResult::Skip)
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
       second_ran.should be_false
     end
   end
@@ -182,7 +182,7 @@ describe Hwaro::Core::Lifecycle::Manager do
       order.should eq(["before", "action", "after"])
     end
 
-    it "skips action when before hook returns Skip" do
+    it "runs the action when a before hook returns Skip (only remaining hooks are skipped)" do
       manager = Hwaro::Core::Lifecycle::Manager.new
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
       action_ran = false
@@ -195,8 +195,8 @@ describe Hwaro::Core::Lifecycle::Manager do
         action_ran = true
       end
 
-      result.should eq(Hwaro::Core::Lifecycle::HookResult::Skip)
-      action_ran.should be_false
+      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+      action_ran.should be_true
     end
 
     it "skips action and after hooks when before hook returns Abort" do

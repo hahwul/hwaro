@@ -8,11 +8,21 @@ module Hwaro
     module DiscoveryPages
       extend self
 
-      # Deduplicate by URL, keeping the LAST occurrence — matching build
-      # behavior, where the page rendered last wins the output path.
+      # Deduplicate by URL, keeping the page the build actually wrote: the
+      # render phase resolves an output-URL collision in source-path sort
+      # order, first claim wins (render.cr#compute_output_url_winners), so
+      # the winner is the page whose `path` sorts FIRST. Original list
+      # order is preserved.
       def dedupe_by_url(pages : Array(Models::Page)) : Array(Models::Page)
-        seen_urls = Set(String).new
-        pages.reverse.select { |p| seen_urls.add?(p.url) }.reverse!
+        winners = {} of String => Models::Page
+        pages.each do |p|
+          if prev = winners[p.url]?
+            winners[p.url] = p if p.path < prev.path
+          else
+            winners[p.url] = p
+          end
+        end
+        pages.select { |p| winners[p.url].same?(p) }
       end
 
       # Drop pages whose URL equals an excluded path or lives under an

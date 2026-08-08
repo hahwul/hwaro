@@ -358,6 +358,89 @@ describe Hwaro::Content::Seo::Llms do
         File.exists?(File.join(output_dir, "llms-full.txt")).should be_true
       end
     end
+
+    it "lists only the path-sort-first collision winner in llms.txt and llms-full.txt" do
+      # Regression (A18): on a URL collision the render phase writes the
+      # page whose source path sorts FIRST; llms.txt listed both pages and
+      # llms-full.txt dumped the unwritten loser's content too.
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.llms.full_enabled = true
+      config.title = "Test Site"
+      config.base_url = "https://example.com"
+
+      winner = Hwaro::Models::Page.new("posts/a.md")
+      winner.title = "Winner Page"
+      winner.url = "/posts/same/"
+      winner.section = "posts"
+      winner.render = true
+      winner.raw_content = "winner body"
+
+      loser = Hwaro::Models::Page.new("posts/z.md")
+      loser.title = "Loser Page"
+      loser.url = "/posts/same/"
+      loser.section = "posts"
+      loser.render = true
+      loser.raw_content = "loser body"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [winner, loser], output_dir)
+
+        index = File.read(File.join(output_dir, "llms.txt"))
+        index.should contain("Winner Page")
+        index.should_not contain("Loser Page")
+
+        full = File.read(File.join(output_dir, "llms-full.txt"))
+        full.should contain("winner body")
+        full.should_not contain("loser body")
+      end
+    end
+
+    it "regenerates when skip_if_unchanged finds llms.txt but llms-full.txt is missing" do
+      # Regression (A18): the warm-build skip probe only checked llms.txt,
+      # so a missing llms-full.txt was never re-emitted on warm builds.
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.llms.full_enabled = true
+      config.title = "Test Site"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.render = true
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        File.write(File.join(output_dir, "llms.txt"), "stale")
+
+        Hwaro::Content::Seo::Llms.generate(config, [page], output_dir, skip_if_unchanged: true)
+
+        File.exists?(File.join(output_dir, "llms-full.txt")).should be_true
+      end
+    end
+
+    it "still skips on warm builds when both llms outputs exist" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.llms.full_enabled = true
+      config.title = "Test Site"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.render = true
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        File.write(File.join(output_dir, "llms.txt"), "sentinel-index")
+        File.write(File.join(output_dir, "llms-full.txt"), "sentinel-full")
+
+        Hwaro::Content::Seo::Llms.generate(config, [page], output_dir, skip_if_unchanged: true)
+
+        File.read(File.join(output_dir, "llms.txt")).should eq("sentinel-index")
+        File.read(File.join(output_dir, "llms-full.txt")).should eq("sentinel-full")
+      end
+    end
   end
 
   describe ".generate_full" do

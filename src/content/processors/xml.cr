@@ -38,10 +38,25 @@ module Hwaro
           ProcessorResult.error("XML processing failed: #{ex.message}")
         end
 
+        # CDATA sections and comments extracted as opaque placeholders
+        # before minification. `\x00` is illegal in XML, so the token
+        # cannot collide with author content.
+        private CDATA_COMMENT_RE  = /<!\[CDATA\[.*?\]\]>|<!--.*?-->/m
+        private PRESERVE_TOKEN_RE = /\x00HWXMLP(\d+)\x00/
+
         # Simple XML minification - removes excess whitespace
         # Only removes whitespace-only text nodes between tags (preserves mixed content)
         private def minify_xml(xml : String) : String
-          xml
+          # CDATA sections and comments are raw character data — the
+          # cross-line collapse below must never reach inside them (a
+          # CDATA body containing `</a>\n<em>` is content, not markup).
+          # Stash them behind placeholders and restore verbatim at the end.
+          preserved = [] of String
+          work = xml.gsub(CDATA_COMMENT_RE) do |m|
+            preserved << m
+            "\x00HWXMLP#{preserved.size - 1}\x00"
+          end
+          result = work
             .gsub(/>\s*\n\s*</, "><") # Remove whitespace-only text between tags (cross-line only)
             .gsub(/<[^>]+>/) do |tag|
               # Never touch comments or CDATA sections: their bytes are
@@ -57,6 +72,13 @@ module Hwaro
               end
             end
             .strip
+          return result if preserved.empty?
+          result.gsub(PRESERVE_TOKEN_RE) do
+            # to_i? bounds-guards a counterfeit token (NUL is illegal in
+            # XML, but be defensive): emit it unchanged instead of raising.
+            idx = $1.to_i?
+            idx && idx < preserved.size ? preserved[idx] : $0
+          end
         end
       end
 

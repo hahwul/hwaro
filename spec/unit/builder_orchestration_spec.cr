@@ -174,6 +174,80 @@ describe Hwaro::Core::Build::Builder do
         end
       end
     end
+
+    it "skips a symlink whose target resolves outside the project" do
+      Dir.mktmpdir do |outside_dir|
+        secret = File.join(outside_dir, "secret.txt")
+        File.write(secret, "SECRET")
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("static")
+            FileUtils.mkdir_p("public")
+            File.symlink(secret, "static/leak.txt")
+
+            builder = Hwaro::Core::Build::Builder.new
+            log = with_captured_log do
+              builder.copy_changed_static(["static/leak.txt"], "public")
+            end
+
+            File.exists?("public/leak.txt").should be_false
+            log.should contain("Skipping static symlink pointing outside the project")
+          end
+        end
+      end
+    end
+
+    it "copies a symlink that resolves within the project" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("public")
+          File.write("real.txt", "REAL")
+          File.symlink(File.join(Dir.current, "real.txt"), "static/ok.txt")
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.copy_changed_static(["static/ok.txt"], "public")
+
+          File.exists?("public/ok.txt").should be_true
+          File.read("public/ok.txt").should eq("REAL")
+        end
+      end
+    end
+
+    it "skips a dangling symlink without raising" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("public")
+          File.symlink(File.join(Dir.current, "missing.txt"), "static/gone.txt")
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.copy_changed_static(["static/gone.txt"], "public")
+          File.exists?("public/gone.txt").should be_false
+        end
+      end
+    end
+
+    it "refuses a destination that escapes the output directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("sub")
+          FileUtils.mkdir_p("public/out")
+          File.write("sub/evil.txt", "x")
+
+          builder = Hwaro::Core::Build::Builder.new
+          # Path outside static/ → relative becomes "../sub/evil.txt" via
+          # the lchop fallback → dest "public/out/../sub/evil.txt", which
+          # escapes the output dir and must be refused, not written.
+          log = with_captured_log do
+            builder.copy_changed_static(["sub/evil.txt"], "public/out")
+          end
+
+          File.exists?("public/sub/evil.txt").should be_false
+          log.should contain("outside output directory")
+        end
+      end
+    end
   end
 
   describe "#invalidate_caches_for_pages" do

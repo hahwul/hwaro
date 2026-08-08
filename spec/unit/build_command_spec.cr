@@ -107,6 +107,26 @@ describe Hwaro::CLI::Commands::BuildCommand do
       options.workers.should eq(2)
     end
 
+    it "warns that --jobs is ignored when combined with --no-parallel" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      log = with_captured_log do
+        result, _ = cmd.parse_options(["--no-parallel", "--jobs", "4"])
+        options, _ = result
+        options.parallel.should be_false
+        options.workers.should eq(4)
+      end
+      log.should contain("--jobs")
+      log.should contain("--no-parallel")
+    end
+
+    it "does not warn about --jobs when parallel rendering is enabled" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      log = with_captured_log do
+        cmd.parse_options(["--jobs", "4"])
+      end
+      log.should_not contain("--no-parallel")
+    end
+
     it "raises HwaroError(HWARO_E_USAGE) when --jobs is not a positive integer" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
 

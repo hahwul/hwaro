@@ -63,7 +63,13 @@ module Hwaro
         # Hook Execution API
         # ========================================
 
-        # Trigger all hooks at a specific point
+        # Trigger all hooks at a specific point.
+        #
+        # `Skip` is scoped to the CURRENT hook point (see HookResult's doc:
+        # "skip remaining hooks in current phase"): the remaining hooks at
+        # this point don't run, but the result is Continue so the phase body
+        # and subsequent phases proceed. Only `Abort` (or a raised
+        # HwaroError) terminates the build.
         def trigger(point : HookPoint, context : BuildContext) : HookResult
           hooks = @hooks[point]
           return HookResult::Continue if hooks.empty?
@@ -86,8 +92,8 @@ module Hwaro
 
               case result
               when HookResult::Skip
-                Logger.info "  ⏭ Phase skipped by hook: #{hook.name}" if @debug
-                return result
+                Logger.info "  ⏭ Remaining hooks at #{point} skipped by hook: #{hook.name}" if @debug
+                return HookResult::Continue
               when HookResult::Abort
                 Logger.error "  ✖ Build aborted by hook: #{hook.name}"
                 return result

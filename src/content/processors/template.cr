@@ -354,7 +354,7 @@ module Hwaro
               raw_map = pages_map.raw.as(Hash)
               if found = raw_map[path_arg]?
                 return found
-              elsif found = raw_map["/#{path_arg.chomp(".md")}/"]?
+              elsif found = raw_map["/#{path_arg.chomp(".markdown").chomp(".md")}/"]?
                 return found
               end
               # If map is present but page not found, return nil (miss)
@@ -375,7 +375,7 @@ module Hwaro
                   page_path = raw_page["path"]?.try(&.to_s) || ""
                   page_url = raw_page["url"]?.try(&.to_s) || ""
 
-                  if page_path == path_arg || page_url == path_arg || page_url == "/#{path_arg.chomp(".md")}/"
+                  if page_path == path_arg || page_url == path_arg || page_url == "/#{path_arg.chomp(".markdown").chomp(".md")}/"
                     result = page_val
                     break
                   end

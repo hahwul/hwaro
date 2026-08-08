@@ -105,6 +105,37 @@ describe "check-links regressions" do
     end
   end
 
+  # `.markdown` is a first-class page extension (read_content
+  # PAGE_EXTENSIONS), so the resolver must probe the same section-index and
+  # translated-source candidates it probes for `.md`.
+  describe ".markdown source resolution" do
+    it "resolves a section index backed by _index.markdown" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "guides"))
+        File.write(File.join(dir, "guides", "_index.markdown"), "---\ntitle: Guides\n---\n")
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "index.md"), url: "/guides/", kind: :internal)
+
+        cmd.resolve_internal_for_test([link], dir, [] of String, "", [] of String).should be_empty
+      end
+    end
+
+    it "resolves a language-prefixed section index backed by _index.<code>.markdown" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "guides"))
+        File.write(File.join(dir, "guides", "_index.ko.markdown"), "---\ntitle: 안내\n---\n")
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "index.ko.md"), url: "/ko/guides/", kind: :internal)
+
+        cmd.resolve_internal_for_test([link], dir, [] of String, "", ["ko"]).should be_empty
+      end
+    end
+  end
+
   # Finding 6: PCRE2 raises ArgumentError on invalid UTF-8, which used to abort
   # the whole run with a bare "Error: Regex match error" and exit 1 — the same
   # code as "dead links found".

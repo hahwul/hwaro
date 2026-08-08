@@ -827,6 +827,9 @@ describe Hwaro::Core::Build::Builder do
     it "renders alert shortcode as block" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
+      # The builtin alert pipes `body` through markdownify (parity with the
+      # scaffold override), so the bare test env needs the HTML filters.
+      Hwaro::Content::Processors::Filters::HtmlFilters.register(env)
       templates = {} of String => String
       context = {} of String => Crinja::Value
 
@@ -840,6 +843,7 @@ describe Hwaro::Core::Build::Builder do
     it "renders callout shortcode as alias for alert" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new
+      Hwaro::Content::Processors::Filters::HtmlFilters.register(env)
       templates = {} of String => String
       context = {} of String => Crinja::Value
 
@@ -1037,6 +1041,73 @@ describe Hwaro::Core::Build::Builder do
       # self-closing shortcode yields an unclosed tag that renders literally.
       output.should contain("{{ name(arg=\"v\") }}")
       output.should contain("{% name(arg=\"v\") %}")
+    end
+
+    # Regression: documented Hugo-migration examples live in fenced code
+    # blocks and inline code spans; scanning the raw source without fence
+    # awareness warned on every such page even though the fenced `{{<` never
+    # reaches Markdown as a live shortcode.
+    it "does not warn when {{< appears only inside a fenced code block" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        raw = <<-MD
+          # Migrating from Hugo
+
+          Hugo used this syntax:
+
+          ```
+          {{< youtube id="abc" >}}
+          {{< alert type="info" >}}body{{< /alert >}}
+          ```
+
+          Done.
+          MD
+        builder.test_warn_hugo_shortcode_syntax(raw, "content/doc.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      io.to_s.should be_empty
+    end
+
+    it "does not warn when {{< appears only inside inline code" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        builder.test_warn_hugo_shortcode_syntax(
+          "Hugo's `{{< youtube id=\"abc\" >}}` form is not supported.",
+          "content/doc.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      io.to_s.should be_empty
+    end
+
+    it "still warns for a real Hugo shortcode outside fences on a page that also has fenced examples" do
+      builder = Hwaro::Core::Build::Builder.new
+      io = IO::Memory.new
+      original_io = Hwaro::Logger.io
+      Hwaro::Logger.io = io
+      begin
+        raw = <<-MD
+          ```
+          {{< fencedname id="x" >}}
+          ```
+
+          {{< youtube id="abc" >}}
+          MD
+        builder.test_warn_hugo_shortcode_syntax(raw, "content/mixed.md")
+      ensure
+        Hwaro::Logger.io = original_io
+      end
+      output = io.to_s
+      output.should contain("Hugo-style shortcode syntax")
+      output.should contain("youtube")
+      output.should_not contain("fencedname")
     end
 
     it "stays silent when content has no Hugo-style shortcodes" do

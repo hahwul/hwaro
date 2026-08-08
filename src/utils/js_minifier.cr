@@ -119,14 +119,37 @@ module Hwaro
               end
 
               if next_c == '*'
-                # Multi-line comment
+                # Multi-line comment. Removing it must leave a separator
+                # behind: a comment is a token boundary (`return/*x*/g`
+                # must not fuse into `returng`), and a comment containing
+                # a line terminator counts as one for automatic semicolon
+                # insertion (`return /*\n*/ 42` must keep the line break).
+                prev_char = i > 0 ? chars[i - 1] : nil
                 i += 2
+                had_newline = false
                 while i + 1 < len
                   if chars[i] == '*' && chars[i + 1] == '/'
                     i += 2
                     break
                   end
+                  had_newline = true if chars[i] == '\n' || chars[i] == '\r'
                   i += 1
+                end
+                if had_newline
+                  # Always re-emit the line break: adjacent spaces do not
+                  # preserve ASI semantics. The later per-line cleanup
+                  # rstrips and drops blank lines but never joins lines,
+                  # so the separation survives.
+                  io << '\n'
+                else
+                  # A single space, and only when both neighbours are
+                  # non-whitespace tokens that would otherwise fuse — this
+                  # keeps output byte-identical for the common
+                  # `a = /* c */ 1` shape where separation already exists.
+                  next_char = i < len ? chars[i] : nil
+                  if prev_char && next_char && !prev_char.whitespace? && !next_char.whitespace?
+                    io << ' '
+                  end
                 end
                 next
               end

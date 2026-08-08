@@ -197,14 +197,25 @@ module Hwaro
           raw_content = Utils::TextUtils.strip_bom(raw_content)
           markdown_content = raw_content
 
-          # Try TOML (+++), YAML (---), then JSON ({...}) front matter
+          # Try TOML (+++), YAML (---), then JSON ({...}) front matter.
+          # The body is only truncated to match[2] when the fenced block really
+          # WAS front matter: `---` doubles as a Markdown thematic break, so a
+          # document opening with one (scalar/sequence YAML, or invalid YAML
+          # with no `key:` line) must keep its FULL content — assigning
+          # match[2] up front silently dropped the first block.
           if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
-            result = extract_from_toml(match[1], file_path)
-            markdown_content = match[2]
+            if result = extract_from_toml(match[1], file_path)
+              markdown_content = match[2]
+            end
           elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
-            result = extract_from_yaml(match[1], file_path)
-            markdown_content = match[2]
-          elsif raw_content.starts_with?('{')
+            if result = extract_from_yaml(match[1], file_path)
+              markdown_content = match[2]
+            elsif yaml_empty_front_matter?(match[1])
+              # `---\n---` / comment-only blocks are EMPTY front matter:
+              # strip the fences and fall through to defaults.
+              markdown_content = match[2]
+            end
+          elsif raw_content.starts_with?('{') && json_front_matter_start?(raw_content)
             # A leading `{` signals JSON frontmatter intent. If the scanner can
             # locate a balanced object we parse it; if not, the file is almost
             # certainly a truncated/mistyped JSON header — surface it as a
@@ -306,6 +317,54 @@ module Hwaro
           end
         end
 
+        # A `{` also opens shortcodes (`{{ … }}`), Jinja tags (`{% … %}`) and
+        # attribute lists (`{:.class}`) — constructs that legitimately start a
+        # body. Only a `"` (first key) or `}` (empty object) after the leading
+        # brace plausibly starts a JSON front-matter object; anything else is
+        # content, not a broken JSON header worth aborting the build over.
+        private def json_front_matter_start?(raw : String) : Bool
+          reader = Char::Reader.new(raw)
+          reader.next_char # skip the leading '{'
+          while reader.has_next?
+            ch = reader.current_char
+            return true if ch == '"' || ch == '}'
+            return false unless ch.whitespace?
+            reader.next_char
+          end
+          false
+        end
+
+        # A top-level `key:` line is what distinguishes broken front matter
+        # (worth a hard error) from a document that merely opens with a `---`
+        # thematic break (whose first block may fail YAML parsing entirely).
+        # `\p{L}` so non-ASCII keys (e.g. Korean `제목:`) count as front
+        # matter too — otherwise their invalid-YAML blocks silently render
+        # as body text instead of erroring.
+        YAML_KEY_LINE_RE = /^[\p{L}_][\p{L}\p{N}_.-]*\s*:(\s|$)/
+
+        private def yaml_front_matter_like?(raw : String) : Bool
+          raw.each_line do |line|
+            return true if line.matches?(YAML_KEY_LINE_RE)
+          end
+          false
+        end
+
+        # True when the fenced block parses to YAML null — `---\n---` and
+        # comment-only blocks. Those are empty front matter (fences stripped),
+        # unlike scalar/sequence blocks, which are document content. A
+        # null-parse alone is not enough: `~` / `null` scalars ALSO parse to
+        # nil but are content, so the raw text must carry nothing beyond
+        # whitespace and comments.
+        private def yaml_empty_front_matter?(raw : String) : Bool
+          return false unless YAML.parse(raw).raw.nil?
+          raw.each_line.all? do |line|
+            stripped = line.strip
+            stripped.empty? || stripped.starts_with?('#')
+          end
+        rescue
+          false
+        end
+
         # Extract front matter fields from TOML content
         private def extract_from_toml(raw : String, file_path : String)
           toml_fm = begin
@@ -373,6 +432,11 @@ module Hwaro
               Logger.warn "Invalid YAML: #{ex.message}"
               return
             end
+            # A document opening with a `---` thematic break can put ANY prose
+            # in the "front matter" slot; only abort when the block plausibly
+            # is front matter (carries a top-level `key:` line). Otherwise the
+            # caller keeps the full content as body text.
+            return unless yaml_front_matter_like?(raw)
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_CONTENT,
               message: "Invalid YAML frontmatter in #{file_path}: #{ex.message}",

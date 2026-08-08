@@ -604,6 +604,32 @@ describe Hwaro::Utils::JsMinifier do
       result.should contain("(a + b) / c")
     end
 
+    # =========================================================================
+    # Block-comment removal must leave a token separator (A1)
+    # =========================================================================
+    it "keeps tokens separated when a block comment sits between them" do
+      result = Hwaro::Utils::JsMinifier.minify("return/*x*/g(1)")
+      result.should eq("return g(1)")
+    end
+
+    it "keeps the function keyword separated from its name across a block comment" do
+      result = Hwaro::Utils::JsMinifier.minify("function/*c*/name(){}")
+      result.should eq("function name(){}")
+    end
+
+    it "emits a newline for a block comment containing a line terminator (ASI)" do
+      # A multi-line comment counts as a LineTerminator for automatic
+      # semicolon insertion, so `return /*\n*/ 42` must stay `return` and
+      # `42` on separate lines — collapsing to one line changes semantics.
+      result = Hwaro::Utils::JsMinifier.minify("return /*\n*/ 42")
+      result.should eq("return\n 42")
+    end
+
+    it "handles terser-style pure annotations without fusing tokens" do
+      result = Hwaro::Utils::JsMinifier.minify("return/*#__PURE__*/e(t)")
+      result.should eq("return e(t)")
+    end
+
     it "leaves a counterfeit out-of-range JSPL placeholder token intact" do
       # A real template literal makes protected_spans non-empty so the restore
       # gsub actually runs; the bogus \x00JSPL999\x00 token has an out-of-range

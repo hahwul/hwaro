@@ -261,9 +261,9 @@ module Hwaro
           # resize_and_lqip clamps any requested width larger than the source to
           # the source's true width (writing a single `_<src_w>w` variant), so a
           # `_<width>w` file does NOT exist for every configured width. Read the
-          # variants that ARE on disk, infer the clamp ceiling from the largest
-          # one, then require the on-disk set to match exactly what the CURRENT
-          # config would produce — otherwise the config changed and we reprocess.
+          # variants that ARE on disk, then require the set to match exactly
+          # what the CURRENT config would produce — otherwise the config
+          # changed and we reprocess.
           variant_re = /\A#{Regex.escape(basename)}_(\d+)w#{Regex.escape(ext)}\z/
           on_disk = {} of Int32 => String
           Dir.each_child(dest_dir) do |name|
@@ -273,7 +273,14 @@ module Hwaro
           end
           return if on_disk.empty?
 
-          src_w = on_disk.keys.max
+          # The clamp ceiling must come from the SOURCE image's intrinsic
+          # width. Inferring it from the largest on-disk variant silently
+          # ignored a newly configured larger width: variants from the old
+          # config "satisfied" the new one after clamping to the stale
+          # inferred ceiling, so e.g. adding 1024 to `widths = [320]` never
+          # generated the 1024 variant on warm builds. The old inference
+          # stays as the fallback for headers we can't read.
+          src_w = Processors::ImageProcessor.dimensions(source_path).try(&.[0]) || on_disk.keys.max
           expected = widths.map { |w| Math.min(w, src_w) }.uniq!
           return unless expected.sort == on_disk.keys.sort!
 
@@ -413,11 +420,122 @@ module Hwaro
           end
         end
 
+        # --- Serve-time targeted reprocessing (A12) ---
+
+        # The `image:resize` hook only runs on full builds, so modified image
+        # BYTES under serve's :static / :content_files change paths left the
+        # resized variants (and LQIP data) stale — the watcher only re-copied
+        # the original. Re-runs the resize pipeline for exactly the changed
+        # images and folds the results into the class-level maps.
+        #
+        # `pages` (when given) also covers page-bundle assets: an image
+        # inside a page bundle publishes its variants under the owning
+        # page's URL, not its content-relative path.
+        #
+        # Returns the number of variant sets regenerated.
+        def self.reprocess_changed_images(
+          changed_paths : Array(String),
+          config : Models::Config,
+          output_dir : String,
+          pages : Array(Models::Page)? = nil,
+        ) : Int32
+          ip = config.image_processing
+          return 0 unless ip.enabled
+          return 0 if ip.widths.empty?
+
+          resolved_output = File.expand_path(output_dir)
+          count = 0
+          changed_paths.each do |src_path|
+            next unless Processors::ImageProcessor.image?(src_path)
+            next unless File.file?(src_path)
+
+            if src_path.starts_with?("static/")
+              next unless safe_source_path?(src_path, "static")
+              relative = Path[src_path].relative_to("static").to_s
+              next if config.static.excluded?(relative)
+              count += reprocess_published(src_path, relative, config, output_dir, resolved_output)
+            elsif src_path.starts_with?("content/")
+              next unless safe_source_path?(src_path, "content")
+              relative = Path[src_path].relative_to("content").to_s
+              if config.content_files.enabled? && config.content_files.publish?(relative)
+                count += reprocess_published(src_path, relative, config, output_dir, resolved_output)
+              end
+              if bundle_pages = pages
+                count += reprocess_bundle_asset(src_path, relative, config, output_dir, resolved_output, bundle_pages)
+              end
+            end
+          end
+          Logger.outcome("resized", "#{count} image variant set#{count == 1 ? "" : "s"}") if count > 0
+          count
+        end
+
+        # Variants published at the file's own relative path (static/ and
+        # [content.files] images) — mirrors collect_static_jobs /
+        # collect_content_file_jobs URL derivation.
+        private def self.reprocess_published(src_path : String, relative : String, config : Models::Config, output_dir : String, resolved_output : String) : Int32
+          dest_dir = File.join(output_dir, File.dirname(relative))
+          return 0 unless safe_dest_path?(dest_dir, resolved_output)
+
+          dir_part = File.dirname(relative)
+          url_prefix = dir_part == "." ? "/" : "/#{dir_part}/"
+          run_targeted_resize(src_path, dest_dir, "/" + relative, url_prefix, config)
+        end
+
+        # Variants published under the owning page's URL (page-bundle
+        # assets) — mirrors collect_page_asset_jobs.
+        private def self.reprocess_bundle_asset(src_path : String, relative : String, config : Models::Config, output_dir : String, resolved_output : String, pages : Array(Models::Page)) : Int32
+          count = 0
+          pages.each do |page|
+            next if page.assets.empty?
+            next unless page.assets.includes?(relative)
+
+            page_bundle_dir = File.dirname(page.path)
+            url_path = page.url.lchop("/")
+            relative_to_bundle = begin
+              Path[relative].relative_to(page_bundle_dir).to_s
+            rescue ArgumentError
+              next
+            end
+            original_url = "/" + url_path + relative_to_bundle
+            asset_dest_dir = File.join(output_dir, url_path, File.dirname(relative_to_bundle))
+            next unless safe_dest_path?(asset_dest_dir, resolved_output)
+
+            url_prefix = "/" + url_path + File.dirname(relative_to_bundle).rstrip(".") + "/"
+            url_prefix = url_prefix.gsub("//", "/")
+
+            count += run_targeted_resize(src_path, asset_dest_dir, original_url, url_prefix, config)
+          end
+          count
+        end
+
+        # One resize_and_lqip pass for a single image, updating the
+        # class-level maps in place (unlike process_images, which rebuilds
+        # them wholesale — a targeted pass must not drop other entries).
+        private def self.run_targeted_resize(src_path : String, dest_dir : String, original_url : String, url_prefix : String, config : Models::Config) : Int32
+          ip = config.image_processing
+          lqip_width = ip.lqip_enabled ? ip.lqip_width : 0
+          path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
+            src_path, dest_dir, ip.widths, ip.quality, lqip_width, ip.lqip_quality
+          )
+          return 0 if path_map.empty?
+
+          width_urls = {} of Int32 => String
+          path_map.each { |width, dest| width_urls[width] = url_prefix + File.basename(dest) }
+          @@resize_map_mutex.synchronize { @@resize_map[original_url] = width_urls }
+          if lqip_uri
+            @@lqip_map_mutex.synchronize { @@lqip_map[original_url] = {"lqip" => lqip_uri, "dominant_color" => dom_color} }
+          end
+          1
+        rescue ex
+          Logger.warn "  Image reprocess failed for #{src_path}: #{ex.message}"
+          0
+        end
+
         # --- Security helpers ---
 
         # Verify that a source path resolves within the expected base directory.
         # Uses File.realpath to resolve symlinks before the boundary check.
-        private def safe_path?(path : String, base : String) : Bool
+        def self.safe_source_path?(path : String, base : String) : Bool
           resolved = begin
             File.realpath(path)
           rescue File::Error
@@ -432,9 +550,17 @@ module Hwaro
         end
 
         # Verify destination directory is within output (dest may not exist yet)
-        private def safe_path_dest?(path : String, resolved_output : String) : Bool
+        def self.safe_dest_path?(path : String, resolved_output : String) : Bool
           resolved = File.expand_path(path)
           resolved == resolved_output || resolved.starts_with?(resolved_output + "/")
+        end
+
+        private def safe_path?(path : String, base : String) : Bool
+          ImageHooks.safe_source_path?(path, base)
+        end
+
+        private def safe_path_dest?(path : String, resolved_output : String) : Bool
+          ImageHooks.safe_dest_path?(path, resolved_output)
         end
       end
     end

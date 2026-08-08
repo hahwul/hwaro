@@ -388,6 +388,54 @@ describe Hwaro::Core::Build::Phases::Render do
       posts_val["pages"].raw.as(Array).size.should eq(2)
     end
 
+    # Regression: the fallback for a section without `sort_by` must be "date"
+    # (newest first) — the same default the paginator (paginator.cr), the
+    # prev/next navigation (transform.cr), and the docs promise. It used to
+    # be "title", so `get_section(...).pages` and `section.pages` on member
+    # pages disagreed with the section template's own listing order.
+    it "defaults section page order to date (newest first) when sort_by is unset" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "http://example.com"
+      site = Hwaro::Models::Site.new(config)
+
+      posts = Hwaro::Models::Section.new("posts/_index.md")
+      posts.title = "Posts"
+      posts.section = "posts"
+      posts.url = "/posts/"
+      posts.language = "en"
+      # No sort_by / reverse set — exercise the default.
+
+      # Title order (Alpha, Zulu) is the REVERSE of date order (Zulu is
+      # newer) so the title fallback and the date default can't coincide.
+      older = Hwaro::Models::Page.new("posts/older.md")
+      older.title = "Alpha"
+      older.section = "posts"
+      older.url = "/posts/older/"
+      older.language = "en"
+      older.date = Time.utc(2024, 1, 1)
+
+      newer = Hwaro::Models::Page.new("posts/newer.md")
+      newer.title = "Zulu"
+      newer.section = "posts"
+      newer.url = "/posts/newer/"
+      newer.language = "en"
+      newer.date = Time.utc(2024, 12, 1)
+
+      site.sections << posts
+      site.pages << older << newer
+      site.build_lookup_index
+
+      builder = Hwaro::Core::Build::Builder.new
+      vars = builder.test_build_global_vars(site)
+      sections_by_key = vars["__sections_by_key__"].raw.as(Hash)
+      posts_val = sections_by_key["posts"].raw.as(Hash)
+
+      titles = posts_val["pages"].raw.as(Array).map do |v|
+        v.raw.as(Hash)["title"].to_s
+      end
+      titles.should eq(["Zulu", "Alpha"])
+    end
+
     it "exposes subsections so {{ section.subsections }} works inside get_section()" do
       config = Hwaro::Models::Config.new
       config.base_url = "http://example.com"

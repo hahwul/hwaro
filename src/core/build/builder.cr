@@ -43,6 +43,8 @@ require "../../content/seo/robots"
 require "../../content/seo/llms"
 require "../../content/seo/tags"
 require "../../content/seo/jsonld"
+require "../../content/seo/pwa"
+require "../../content/seo/og_image"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
@@ -288,6 +290,13 @@ module Hwaro
           @config
         end
 
+        # The most recently built site (nil before the first build). The dev
+        # server's lazy OG handler reads it to match a requested image path
+        # back to the page that owns it.
+        def site : Models::Site?
+          @site
+        end
+
         # Register all cache layers with the unified manager
         private def setup_cache_manager
           @cache_manager.register("compiled_templates", "Compiled Crinja template ASTs", runtime: true) do
@@ -331,35 +340,63 @@ module Hwaro
           self
         end
 
-        # Returns false when the build failed without raising (pre-hook
-        # failure or a phase abort) — the serve watcher branches on this to
-        # surface the failure instead of live-reloading onto a broken site.
-        def run(options : Config::Options::BuildOptions) : Bool
-          @render_workers = options.workers
-          run(
-            output_dir: options.output_dir,
-            base_url: options.base_url,
-            drafts: options.drafts,
-            include_expired: options.include_expired,
-            include_future: options.include_future,
-            minify: options.minify,
-            parallel: options.parallel,
-            cache: options.cache,
-            highlight: options.highlight,
-            verbose: options.verbose,
-            profile: options.profile,
-            debug: options.debug,
-            error_overlay: options.error_overlay,
-            stream: options.stream,
-            memory_limit: options.memory_limit,
-            env: options.env,
-            fast_start: options.fast_start,
-            fast_start_count: options.fast_start_count,
-            skip_og_image: options.skip_og_image,
-            skip_image_processing: options.skip_image_processing,
-            preserve_output: options.preserve_output,
-            cache_busting: options.cache_busting,
-          )
+        # Keyword-argument convenience form of `run`: packs the arguments
+        # into a BuildOptions and delegates to the struct overload, which is
+        # the REAL implementation. Callers holding a BuildOptions (the build
+        # command, the serve watcher) must call that overload directly so
+        # fields this form doesn't expose — `full`, `serve_mode`, `workers`
+        # — reach the build context verbatim instead of being silently
+        # dropped in a re-pack.
+        def run(
+          output_dir : String = "public",
+          base_url : String? = nil,
+          drafts : Bool = false,
+          include_expired : Bool = false,
+          include_future : Bool = false,
+          minify : Bool = false,
+          parallel : Bool = true,
+          cache : Bool = false,
+          full : Bool = false,
+          highlight : Bool = true,
+          verbose : Bool = false,
+          profile : Bool = false,
+          debug : Bool = false,
+          error_overlay : Bool = false,
+          stream : Bool = false,
+          memory_limit : String? = nil,
+          env : String? = nil,
+          fast_start : Bool = false,
+          fast_start_count : Int32 = 20,
+          skip_og_image : Bool = false,
+          skip_image_processing : Bool = false,
+          preserve_output : Bool = false,
+          cache_busting : Bool = true,
+        ) : Bool
+          run(Config::Options::BuildOptions.new(
+            output_dir: output_dir,
+            base_url: base_url,
+            drafts: drafts,
+            include_expired: include_expired,
+            include_future: include_future,
+            minify: minify,
+            parallel: parallel,
+            cache: cache,
+            full: full,
+            highlight: highlight,
+            verbose: verbose,
+            profile: profile,
+            debug: debug,
+            error_overlay: error_overlay,
+            stream: stream,
+            memory_limit: memory_limit,
+            env: env,
+            fast_start: fast_start,
+            fast_start_count: fast_start_count,
+            skip_og_image: skip_og_image,
+            skip_image_processing: skip_image_processing,
+            preserve_output: preserve_output,
+            cache_busting: cache_busting,
+          ))
         end
 
         # Drop unresolved-link records from the previous pass so a fixed
@@ -561,12 +598,16 @@ module Hwaro
             end
           end
 
-          # Delete originals of pages whose edit relocated their output file
-          # (slug/custom_path change) — excluded pages were handled above.
+          # Delete outputs the edit orphaned — a relocation (slug/custom_path
+          # change) moves EVERY output, but a front-matter edit can also drop
+          # just a sibling format (`outputs = ["json"]` removed) while the
+          # primary path stays put, so diff the full old/new path sets
+          # instead of comparing only the primary path. Excluded pages were
+          # handled above.
           relocated = [] of String
           changed_pages.each do |page|
             next unless olds = old_output_paths[page.path]?
-            relocated.concat(olds) if olds.first? != get_output_path(page, output_dir)
+            relocated.concat(olds - collect_page_output_paths(page, output_dir))
           end
           delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
 
@@ -719,7 +760,7 @@ module Hwaro
           seo_pages = taxonomy_sections.empty? ? all_pages : all_pages + taxonomy_sections
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
-          regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
+          regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true, options: options)
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{render_list.size}/#{all_pages.size} pages", :result, elapsed.total_milliseconds)
@@ -831,12 +872,12 @@ module Hwaro
             end
           end
 
-          # Delete originals of pages whose edit relocated their output file
-          # (slug/custom_path change) — mirrors run_incremental.
+          # Delete outputs the edit orphaned (relocation or a dropped sibling
+          # output format) — set diff, mirrors run_incremental.
           relocated = [] of String
           changed_pages.each do |page|
             next unless olds = old_output_paths[page.path]?
-            relocated.concat(olds) if olds.first? != get_output_path(page, output_dir)
+            relocated.concat(olds - collect_page_output_paths(page, output_dir))
           end
           delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
 
@@ -848,7 +889,16 @@ module Hwaro
           # Re-render with reloaded templates. The selective path inside
           # run_rerender only covers template-affected pages, so the content
           # pages re-parsed above must be forced into the render set.
-          run_rerender(options, force_pages: changed_pages)
+          #
+          # membership_changed: a page whose draft/expired/future status just
+          # flipped it OUT of the built set leaves changed_pages (so
+          # force_pages can't carry the signal), yet sitemap/feeds/search and
+          # taxonomy pages still list it — run_rerender must refresh those
+          # surfaces even when the template edit itself was layout-only (or a
+          # bare mtime touch). Flips INTO the set escalate to a full rebuild
+          # via the pages_map miss above, so exclusions are the only
+          # membership change this path can see.
+          run_rerender(options, force_pages: changed_pages, membership_changed: !excluded_pages.empty?)
         end
 
         # Re-render pages using reloaded templates without re-parsing content.
@@ -863,7 +913,12 @@ module Hwaro
         # the selective path can't skip a content-changed page. Their taxonomy
         # membership may have changed too, so taxonomy pages regenerate
         # whenever force_pages are present.
-        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil) : Bool
+        #
+        # `membership_changed` signals that pages left the built set in this
+        # pass (a draft/expired/future flip): the SEO surfaces and taxonomy
+        # pages must refresh even when no template content changed, and the
+        # identical-templates early return must not skip that work.
+        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil, membership_changed : Bool = false) : Bool
           @render_workers = options.workers
           config = @config
           site = @site
@@ -884,9 +939,17 @@ module Hwaro
           templates = load_templates
           @templates = templates
 
-          # Refresh invalidation mode for the reloaded template set
+          # Refresh invalidation mode for the reloaded template set. Mirror
+          # phases/initialize.cr: snapshot-escaping refs (./-prefixed,
+          # non-template extensions, shadowed exact-ext variants) are read
+          # from disk at render time, so their contents must be folded into
+          # the global hash here too — otherwise serve rerenders and
+          # `build --cache` disagree on every page's cache entry.
           deps = @template_deps
           @global_templates_hash = Cache.compute_templates_hash(templates)
+          if (graph = deps) && !graph.snapshot_escaping_refs.empty?
+            @global_templates_hash = fold_snapshot_escaping_refs(@global_templates_hash, graph.snapshot_escaping_refs)
+          end
           @per_page_template_hash = config.build.template_deps &&
                                     (deps.try { |d| !d.dynamic? } || false)
 
@@ -917,7 +980,7 @@ module Hwaro
               changed << name if old_templates[name]? != source
             end
             changed_template_names = changed
-            if changed.empty? && (force_pages.nil? || force_pages.empty?)
+            if changed.empty? && (force_pages.nil? || force_pages.empty?) && !membership_changed
               Logger.info "Template change detected, but contents are identical — nothing to re-render."
               return true
             end
@@ -1041,6 +1104,7 @@ module Hwaro
           # pages may have changed taxonomy membership — regenerate then too.
           taxonomy_sections = if affected_templates.nil? ||
                                  (force_pages && !force_pages.empty?) ||
+                                 membership_changed ||
                                  feed_templates_affected ||
                                  ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
                                 Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
@@ -1054,11 +1118,25 @@ module Hwaro
           # search, and llms embed. Refresh those surfaces. A pure layout
           # edit still skips this — template output doesn't feed them —
           # UNLESS the edit touched a user feed template, whose output IS a
-          # generated surface (see feed_templates_affected above).
-          if summaries_affected || feed_templates_affected
+          # generated surface (see feed_templates_affected above) — or pages
+          # LEFT the built set this pass (membership_changed): sitemap,
+          # feeds, search and llms would keep listing them otherwise.
+          if summaries_affected || feed_templates_affected || membership_changed
             seo_pages = (site.pages + site.sections).as(Array(Models::Page))
             seo_pages += taxonomy_sections unless taxonomy_sections.empty?
-            regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
+            regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true, options: options)
+          elsif site.config.pwa.enabled
+            # A layout-only template edit rightly skips the SEO surfaces
+            # (their inputs didn't change) — but it DID rewrite page HTML,
+            # and sw.js content-hashes the precached pages' bytes, so the
+            # service worker must still be refreshed. Warn-and-continue,
+            # matching regenerate_seo_surfaces: a transient failure here
+            # must not skip cache.save below.
+            begin
+              Content::Seo::Pwa.generate(site, output_dir, verbose)
+            rescue ex
+              Logger.warn "  PWA regeneration failed: #{ex.message}"
+            end
           end
 
           cache.save if options.cache
@@ -1172,7 +1250,7 @@ module Hwaro
           # had no effect on this deferred pass).
           taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
           all_pages = (site.pages + site.sections + taxonomy_sections).as(Array(Models::Page))
-          regenerate_seo_surfaces(all_pages, site, output_dir, verbose, options.parallel)
+          regenerate_seo_surfaces(all_pages, site, output_dir, verbose, options.parallel, options: options)
 
           # Persist cache updates from the deferred pass. The initial build
           # already saved once; without this second save, killing the server
@@ -1197,8 +1275,26 @@ module Hwaro
           sass_on = config.try(&.sass.enabled) || false
           copied = 0
           changed_files.each do |src_path|
-            next unless File.exists?(src_path)
-            next if File.directory?(src_path)
+            # lstat first — mirrors the full build's collect_static_files
+            # (phases/initialize.cr): a symlinked file whose target escapes
+            # the project must not be published into the output during
+            # serve (e.g. `static/leak -> ~/.ssh/id_rsa` whose target's
+            # mtime change trips the watcher). Dangling symlinks and
+            # directories are skipped like before.
+            lstat = File.info?(src_path, follow_symlinks: false)
+            next if lstat.nil?
+
+            if lstat.symlink?
+              info = File.info?(src_path, follow_symlinks: true)
+              next if info.nil? || info.directory?
+
+              unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
+                Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
+                next
+              end
+            else
+              next if lstat.directory?
+            end
 
             relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)
@@ -1215,6 +1311,13 @@ module Hwaro
               end
             end
             dest_path = File.join(output_dir, relative)
+            # Parity with copy_changed_content_files: a watcher path outside
+            # static/ yields a `../`-relative destination that must never be
+            # written outside the output directory.
+            unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
+              Logger.warn "Skipping static file outside output directory: #{relative}"
+              next
+            end
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
             FileUtils.cp(src_path, dest_path)
@@ -1226,9 +1329,13 @@ module Hwaro
         # Recompile all SCSS entries into the output directory. Used by
         # serve mode when a `.scss` source changes — such files publish as
         # compiled `.css`, never verbatim. No-ops unless [sass] is enabled.
-        def recompile_sass(output_dir : String)
+        #
+        # Returns true when reprocessing the asset bundles changed the
+        # manifest (a fingerprinted filename moved) — see
+        # reprocess_asset_bundles for what callers must do then.
+        def recompile_sass(output_dir : String) : Bool
           config = @config
-          return unless config && config.sass.enabled
+          return false unless config && config.sass.enabled
 
           compiler = Assets::SassCompiler.new(config.sass, config.static)
           count = compiler.compile_all(output_dir)
@@ -1237,22 +1344,45 @@ module Hwaro
           # Bundle entries with `.scss` sources only recompile inside the asset
           # pipeline (AfterInitialize on a full build). Static-only serve
           # reloads would otherwise leave fingerprinted bundles stale.
-          reprocess_asset_bundles(output_dir) if config.assets.enabled
+          config.assets.enabled ? reprocess_asset_bundles(output_dir) : false
+        end
+
+        # True when a watcher-relative path (e.g. "static/js/app.js") is a
+        # source file of a configured [assets] bundle. The serve watcher uses
+        # this to know a plain (non-Sass) static save must re-run the bundle
+        # pipeline — bundle inputs are `source_dir`-joined `bundle.files`,
+        # exactly how Assets::Pipeline reads them.
+        def asset_bundle_source?(path : String) : Bool
+          config = @config
+          return false unless config && config.assets.enabled
+
+          normalized = Path[path].normalize.to_s
+          config.assets.bundles.any? do |bundle|
+            bundle.files.any? do |file|
+              Path[config.assets.source_dir, file].normalize.to_s == normalized
+            end
+          end
         end
 
         # Re-run the asset pipeline so SCSS (or plain CSS/JS) bundle sources
         # refresh under serve. Updates the AssetHooks class-level manifest so
         # subsequent renders see new fingerprint paths.
-        def reprocess_asset_bundles(output_dir : String)
+        #
+        # Returns true when the manifest changed — with fingerprinting on,
+        # every already-rendered page still references the OLD hashed
+        # filename, so callers must follow up with a page re-render.
+        def reprocess_asset_bundles(output_dir : String) : Bool
           config = @config
-          return unless config && config.assets.enabled
+          return false unless config && config.assets.enabled
 
+          old_manifest = Content::Hooks::AssetHooks.manifest
           pipeline = Assets::Pipeline.new(config.assets, config.base_url, config.sass.enabled)
           pipeline.process(output_dir)
           Content::Hooks::AssetHooks.replace_manifest(pipeline.manifest)
           if pipeline.manifest.size > 0
             Logger.outcome("bundled", "#{pipeline.manifest.size} asset #{pipeline.manifest.size == 1 ? "bundle" : "bundles"}")
           end
+          pipeline.manifest != old_manifest
         end
 
         # Republish non-Markdown content assets (images, etc.) to the output
@@ -1317,7 +1447,7 @@ module Hwaro
               dest = File.join(output_dir, relative)
               outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
             elsif path.starts_with?("content/")
-              if path.downcase.ends_with?(".md")
+              if path.downcase.ends_with?(".md") || path.downcase.ends_with?(".markdown")
                 next unless site
                 rel = path.lchop("content/")
                 # Section _index pages live in site.sections, not site.pages —
@@ -1346,6 +1476,23 @@ module Hwaro
             end
           end
           outputs
+        end
+
+        # Every output file the CURRENT site claims — primary page outputs
+        # plus output-format siblings, computed exactly like
+        # collect_page_output_paths so the two can never drift. The serve
+        # watcher filters its pre-rebuild stale list through this AFTER the
+        # rebuild: a source deleted and re-created under a different path in
+        # one changeset (foo.md → foo/index.md) maps to the same output file,
+        # which the rebuild just rewrote and must not be deleted.
+        def owned_output_paths(output_dir : String) : Set(String)
+          owned = Set(String).new
+          if site = @site
+            (site.pages + site.sections).each do |page|
+              collect_page_output_paths(page, output_dir).each { |path| owned << path }
+            end
+          end
+          owned
         end
 
         # Primary output file plus output-format siblings for a page — used
@@ -1380,37 +1527,23 @@ module Hwaro
           end
         end
 
-        def run(
-          output_dir : String = "public",
-          base_url : String? = nil,
-          drafts : Bool = false,
-          include_expired : Bool = false,
-          include_future : Bool = false,
-          minify : Bool = false,
-          parallel : Bool = true,
-          cache : Bool = false,
-          full : Bool = false,
-          highlight : Bool = true,
-          verbose : Bool = false,
-          profile : Bool = false,
-          debug : Bool = false,
-          error_overlay : Bool = false,
-          stream : Bool = false,
-          memory_limit : String? = nil,
-          env : String? = nil,
-          fast_start : Bool = false,
-          fast_start_count : Int32 = 20,
-          skip_og_image : Bool = false,
-          skip_image_processing : Bool = false,
-          preserve_output : Bool = false,
-          cache_busting : Bool = true,
-        ) : Bool
+        # Full build — the real implementation behind both `run` forms.
+        # The incoming struct is stored on the BuildContext verbatim, so
+        # fields the keyword form doesn't expose (`full`, `serve_mode`)
+        # survive to the phases and hooks that branch on them (`--full`
+        # cache clearing, `[og.image] lazy_generate` under serve).
+        #
+        # Returns false when the build failed without raising (pre-hook
+        # failure or a phase abort) — the serve watcher branches on this to
+        # surface the failure instead of live-reloading onto a broken site.
+        def run(options : Config::Options::BuildOptions) : Bool
+          @render_workers = options.workers
           # Load config once and reuse throughout the build.
           # `Models::Config.load` raises `HwaroError(HWARO_E_CONFIG)` directly
           # for missing files and TOML parse failures, so callers (and
           # `--json` consumers) can branch on HWARO_E_CONFIG without the
           # build pipeline rewrapping the exception.
-          config = Models::Config.load(env: env)
+          config = Models::Config.load(env: options.env)
           @config = config
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post
@@ -1428,36 +1561,10 @@ module Hwaro
           start_time = Time.instant
 
           # Initialize profiler
-          profiler = Profiler.new(enabled: profile)
+          profiler = Profiler.new(enabled: options.profile)
           @profiler = profiler
           profiler.start
 
-          # Create build context for lifecycle
-          options = Config::Options::BuildOptions.new(
-            output_dir: output_dir,
-            base_url: base_url,
-            drafts: drafts,
-            include_expired: include_expired,
-            include_future: include_future,
-            minify: minify,
-            parallel: parallel,
-            cache: cache,
-            full: full,
-            highlight: highlight,
-            verbose: verbose,
-            profile: profile,
-            debug: debug,
-            error_overlay: error_overlay,
-            stream: stream,
-            memory_limit: memory_limit,
-            env: env,
-            fast_start: fast_start,
-            fast_start_count: fast_start_count,
-            skip_og_image: skip_og_image,
-            skip_image_processing: skip_image_processing,
-            preserve_output: preserve_output,
-            cache_busting: cache_busting,
-          )
           if options.streaming?
             Logger.info "  Streaming mode enabled (batch size: #{options.batch_size})"
           end
@@ -1584,7 +1691,7 @@ module Hwaro
         # deferred-pages cleanup, and the live-reload signal even though
         # every page rendered fine. The cold-build Generate phase keeps the
         # fail-loud default via its own ParallelHelper.execute call.
-        private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false)
+        private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false, options : Config::Options::BuildOptions? = nil)
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
             -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose, templates: @templates, renderer: feed_template_renderer); nil },
@@ -1595,7 +1702,41 @@ module Hwaro
           seo_tasks << -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil } if include_robots
           seo_tasks << -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil }
           seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil }
+          # Auto-OG images: the incremental/rerender passes never run the
+          # BeforeRender `og_image:generate` hook, so a re-parsed page's
+          # OG file went stale even though its HTML keeps the auto-assigned
+          # URL (see ParseContent#parse_single_page). The manifest hash makes
+          # this a near no-op when no title/description changed. Lazy serve
+          # mode keeps its on-request contract (OgLazyImageHandler), and
+          # --skip-og-image is honored like the hook does. Runs BEFORE the
+          # surface pool (not inside it): generate assigns page.image, which
+          # the feed/search tasks read.
+          if opts = options
+            ai = site.config.og.auto_image
+            if ai.enabled && !opts.skip_og_image && !(ai.lazy_generate && opts.serve_mode)
+              begin
+                Content::Seo::OgImage.generate(pages, site.config, output_dir, verbose, parallel: false)
+              rescue ex
+                # Same warn-and-continue contract as the surface pool below —
+                # a transient OG failure must not skip cache.save / reload.
+                Logger.warn "  OG image regeneration failed: #{ex.message}"
+              end
+            end
+          end
           ParallelHelper.execute(seo_tasks, parallel, raise_on_error: false)
+          # PWA sw.js content-hashes the bytes of the files it precaches —
+          # including the search index the tasks above just rewrote — so it
+          # regenerates AFTER they finish, mirroring the full build's
+          # AfterWrite hook. Without this no serve incremental path ever
+          # rewrote sw.js and registered service workers kept serving stale
+          # bytes through live reloads.
+          if site.config.pwa.enabled
+            begin
+              Content::Seo::Pwa.generate(site, output_dir, verbose)
+            rescue ex
+              Logger.warn "  PWA regeneration failed: #{ex.message}"
+            end
+          end
         end
 
         # Emit the end-of-build cache statistics at the requested verbosity.

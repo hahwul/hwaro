@@ -49,6 +49,33 @@ describe Hwaro::Content::Seo::Sitemap do
       end
     end
 
+    it "rewrites sitemap.xml as an empty urlset when no eligible pages remain" do
+      # Drafting the last sitemap-eligible page used to leave the previous
+      # sitemap.xml on disk untouched (early return) — stale URLs kept being
+      # served/deployed. An empty (valid) urlset is written instead.
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        page = Hwaro::Models::Page.new("blog/hello.md")
+        page.url = "/blog/hello/"
+        page.in_sitemap = true
+        page.render = true
+
+        Hwaro::Content::Seo::Sitemap.generate([page], site, dir)
+        File.read(File.join(dir, "sitemap.xml")).should contain("<url>")
+
+        page.draft = true
+        Hwaro::Content::Seo::Sitemap.generate([page], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("<urlset")
+        content.should_not contain("<url>")
+      end
+    end
+
     it "skips when sitemap is disabled" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
@@ -105,7 +132,12 @@ describe Hwaro::Content::Seo::Sitemap do
 
         Hwaro::Content::Seo::Sitemap.generate([page], site, dir)
 
-        File.exists?(File.join(dir, "sitemap.xml")).should be_false
+        # An (empty, valid) sitemap is still written — a stale previous
+        # sitemap must never survive on disk — but the filtered page is not
+        # in it.
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("<urlset")
+        content.should_not contain("<url>")
       end
     end
 
@@ -278,6 +310,72 @@ describe Hwaro::Content::Seo::Sitemap do
         content.should start_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
         content.should contain("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">")
         content.should end_with("</urlset>\n")
+      end
+    end
+
+    it "keeps the path-sort-first collision winner, matching the render phase" do
+      # Regression (A6): on a URL collision the render phase writes the page
+      # whose source path sorts FIRST (compute_output_url_winners); the
+      # sitemap kept the LAST occurrence, advertising lastmod from the
+      # unwritten loser.
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        winner = Hwaro::Models::Page.new("blog/a.md")
+        winner.url = "/blog/same/"
+        winner.in_sitemap = true
+        winner.render = true
+        winner.date = Time.utc(2024, 1, 1)
+
+        loser = Hwaro::Models::Page.new("blog/z.md")
+        loser.url = "/blog/same/"
+        loser.in_sitemap = true
+        loser.render = true
+        loser.date = Time.utc(2025, 12, 31)
+
+        Hwaro::Content::Seo::Sitemap.generate([winner, loser], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.scan("<loc>").size.should eq(1)
+        content.should contain("<lastmod>2024-01-01</lastmod>")
+        content.should_not contain("<lastmod>2025-12-31</lastmod>")
+      end
+    end
+
+    it "excludes render=false translations from hreflang alternates" do
+      # Regression (A17): a translation with render=false has no written
+      # output; advertising it as an hreflang alternate points crawlers at
+      # a 404.
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        en_page = Hwaro::Models::Page.new("about.md")
+        en_page.url = "/about/"
+        en_page.in_sitemap = true
+        en_page.render = true
+        en_page.translations = [
+          Hwaro::Models::TranslationLink.new(code: "en", url: "/about/", title: "About", is_current: true, is_default: true),
+          Hwaro::Models::TranslationLink.new(code: "ko", url: "/ko/about/", title: "소개"),
+        ]
+
+        ko_page = Hwaro::Models::Page.new("about.ko.md")
+        ko_page.url = "/ko/about/"
+        ko_page.language = "ko"
+        ko_page.in_sitemap = true
+        ko_page.render = false
+
+        Hwaro::Content::Seo::Sitemap.generate([en_page, ko_page], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("hreflang=\"en\"")
+        content.should_not contain("hreflang=\"ko\"")
+        content.should_not contain("/ko/about/")
       end
     end
   end

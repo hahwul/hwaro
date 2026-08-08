@@ -683,6 +683,23 @@ describe "stale output cleanup on file removal" do
     builder.stale_outputs_for_removed(["content/posts/gone.md"], "public").should be_empty
   end
 
+  it "maps a removed .markdown page to its rendered output file" do
+    config = Hwaro::Models::Config.new
+    site = Hwaro::Models::Site.new(config)
+    page = Hwaro::Models::Page.new("about.markdown")
+    page.url = "/about/"
+    site.pages << page
+
+    builder = Hwaro::Core::Build::Builder.new
+    builder.test_set_site(site)
+    builder.test_set_config(config)
+
+    outputs = builder.stale_outputs_for_removed(["content/about.markdown"], "public")
+    outputs.any?(&.ends_with?(File.join("public", "about", "index.html"))).should be_true
+    # Never the raw source copied verbatim — .markdown is a page source.
+    outputs.any?(&.ends_with?("about.markdown")).should be_false
+  end
+
   it "includes cache-recorded sibling output-format files for a removed page" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

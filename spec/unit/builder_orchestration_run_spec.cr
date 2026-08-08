@@ -17,6 +17,10 @@ module Hwaro::Core::Build
     def test_set_orch_run_config(config : Models::Config?)
       @config = config
     end
+
+    def test_global_templates_hash : String
+      @global_templates_hash
+    end
   end
 end
 
@@ -91,6 +95,98 @@ describe Hwaro::Core::Build::Builder do
     end
   end
 
+  describe "#run(options) option fidelity" do
+    it "passes full and serve_mode through to the build context verbatim" do
+      with_minimal_site do
+        builder = Hwaro::Core::Build::Builder.new
+        captured = nil.as(Hwaro::Config::Options::BuildOptions?)
+        builder.lifecycle.before(
+          Hwaro::Core::Lifecycle::Phase::Initialize, name: "capture-options"
+        ) do |ctx|
+          captured = ctx.options
+          Hwaro::Core::Lifecycle::HookResult::Continue
+        end
+
+        options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, cache: true, full: true,
+          highlight: false, serve_mode: true,
+        )
+        builder.run(options).should be_true
+
+        captured.should_not be_nil
+        opts = captured.not_nil!
+        opts.full.should be_true
+        opts.serve_mode.should be_true
+        opts.cache.should be_true
+      end
+    end
+
+    it "clears the cache when full: true so unchanged pages re-render" do
+      with_minimal_site do
+        seed = Hwaro::Core::Build::Builder.new
+        seed.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, cache: true, highlight: false,
+        )).should be_true
+        File.exists?(".hwaro_cache.json").should be_true
+
+        # Sanity: without full the second build serves the page from cache.
+        warm = Hwaro::Core::Build::Builder.new
+        warm.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, cache: true, highlight: false,
+        )).should be_true
+        warm_ctx = warm.context.not_nil!
+        warm_ctx.stats.cache_hits.should eq(1)
+        warm_ctx.stats.pages_rendered.should eq(0)
+
+        # full: true must ignore/clear that cache and re-render everything.
+        full = Hwaro::Core::Build::Builder.new
+        full.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, cache: true, full: true, highlight: false,
+        )).should be_true
+        full_ctx = full.context.not_nil!
+        full_ctx.stats.pages_rendered.should eq(1)
+        full_ctx.stats.cache_hits.should eq(0)
+      end
+    end
+  end
+
+  describe "HookResult::Skip phase semantics" do
+    it "skips remaining hooks of the phase but completes the build" do
+      with_minimal_site do
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_orch_run_config(Hwaro::Models::Config.new)
+
+        # Transform has no hook-override semantics (unlike ParseContent/
+        # Generate, whose default body is replaced when before-hooks are
+        # registered), so the phase body still runs after the Skip.
+        second_ran = false
+        builder.lifecycle.before(
+          Hwaro::Core::Lifecycle::Phase::Transform, priority: 10, name: "skipper"
+        ) do |_ctx|
+          Hwaro::Core::Lifecycle::HookResult::Skip
+        end
+        builder.lifecycle.before(
+          Hwaro::Core::Lifecycle::Phase::Transform, priority: 0, name: "second"
+        ) do |_ctx|
+          second_ran = true
+          Hwaro::Core::Lifecycle::HookResult::Continue
+        end
+
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+        profiler = Hwaro::Profiler.new(enabled: false)
+
+        result = builder.test_execute_phases(ctx, profiler)
+        # Skip is documented as "skip remaining hooks in current phase" —
+        # the phase body and every subsequent phase still run.
+        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+        second_ran.should be_false
+        File.exists?("public/about/index.html").should be_true
+        ctx.stats.pages_rendered.should eq(1)
+      end
+    end
+  end
+
   describe "#run_incremental" do
     it "falls back to a full build when no prior state exists" do
       with_minimal_site do
@@ -130,6 +226,89 @@ describe Hwaro::Core::Build::Builder do
           # The nested SUBSECTION index (a site.sections page, not a site.pages
           # page) must pick up the parent's new title in its breadcrumb.
           File.read("public/blog/news/index.html").should contain("BC:BlogNew;")
+        end
+      end
+    end
+  end
+
+  describe "#run_incremental orphaned output pruning" do
+    it "deletes the orphaned sibling format file when front matter drops the format" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\noutputs: [json]\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "<p>{{ content }}</p>")
+          File.write("templates/page.json.jinja", %({"v": 1}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.exists?("public/about/index.json").should be_true
+
+          # Drop the format. The primary output path is UNCHANGED, so a
+          # primary-path-only relocation check would leave index.json
+          # orphaned — served and deployed forever.
+          File.write("content/about.md", "---\ntitle: About\n---\nbody")
+          builder.run_incremental(["content/about.md"], options)
+
+          File.exists?("public/about/index.html").should be_true
+          File.exists?("public/about/index.json").should be_false
+        end
+      end
+    end
+
+    it "still prunes the old output on a pure relocation (slug change)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\nslug: old-place\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "<p>{{ content }}</p>")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.exists?("public/old-place/index.html").should be_true
+
+          File.write("content/about.md", "---\ntitle: About\nslug: new-place\n---\nbody")
+          builder.run_incremental(["content/about.md"], options)
+
+          File.exists?("public/new-place/index.html").should be_true
+          File.exists?("public/old-place/index.html").should be_false
+        end
+      end
+    end
+  end
+
+  describe "#run_rerender global templates hash" do
+    it "matches the initial build's folded hash when snapshot-escaping refs exist" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          # nav.j2 is shadowed by nav.html in the snapshot; the exact-ext
+          # include reads it from DISK — a snapshot-escaping ref that the
+          # initial build folds into the global templates hash.
+          File.write("templates/nav.html", "NAV-HTML")
+          File.write("templates/nav.j2", "NAV-J2")
+          File.write("templates/page.html", %({% include "nav.j2" %}|{{ content }}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options).should be_true
+          initial_hash = builder.test_global_templates_hash
+          initial_hash.should_not be_empty
+
+          # Nothing changed on disk — a serve-triggered rerender must land
+          # on the SAME folded hash, or build --cache and serve disagree on
+          # every page's cache entry.
+          builder.run_rerender(options).should be_true
+          builder.test_global_templates_hash.should eq(initial_hash)
         end
       end
     end
@@ -185,6 +364,34 @@ describe Hwaro::Core::Build::Builder do
           builder.run_incremental_then_rerender(["content/about.md"], options)
 
           File.read("public/search.json").should contain("Refreshed")
+        end
+      end
+    end
+
+    it "deletes the orphaned sibling format file when front matter drops the format" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content")
+          File.write("content/about.md", "---\ntitle: About\noutputs: [json]\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "<p>{{ content }}</p>")
+          File.write("templates/page.json.jinja", %({"v": 1}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.exists?("public/about/index.json").should be_true
+
+          # Content edit drops the format; template edit forces the
+          # combined content+template path (mirrors the watcher's
+          # :content_and_template strategy).
+          File.write("content/about.md", "---\ntitle: About\n---\nbody")
+          File.write("templates/page.html", "<div>{{ content }}</div>")
+          builder.run_incremental_then_rerender(["content/about.md"], options)
+
+          File.exists?("public/about/index.html").should be_true
+          File.exists?("public/about/index.json").should be_false
         end
       end
     end

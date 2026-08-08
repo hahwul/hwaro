@@ -201,6 +201,25 @@ describe Hwaro::Services::PlatformConfig do
         end
       end
 
+      it "routes aliases for declared hyphenated language codes (zh-tw)" do
+        # Mirror of the build's declared-code suffix matching: a declared
+        # `zh-tw` produces `/zh-tw/…` URLs, so the redirect target must too.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/hello.zh-tw.md", "---\ntitle: Hello TW\naliases:\n  - /old-tw-url/\n---\nContent here\n")
+
+            config = Hwaro::Models::Config.new
+            config.languages["zh-tw"] = Hwaro::Models::LanguageConfig.new("zh-tw")
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = generator.generate("netlify")
+
+            result.should contain("from = \"/old-tw-url/\"")
+            result.should contain("to = \"/zh-tw/posts/hello/\"")
+          end
+        end
+      end
+
       it "includes redirects in vercel JSON format" do
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do

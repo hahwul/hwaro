@@ -351,3 +351,60 @@ describe "Template deps: review regressions" do
     end
   end
 end
+
+describe "TemplateDeps: refs the snapshot loader cannot serve (C3)" do
+  it "marks the graph dynamic for ./-prefixed references" do
+    deps = Hwaro::Core::Build::TemplateDeps.new({"page" => %({% include "./partials/nav.html" %}), "partials/nav" => "n"})
+    deps.dynamic?.should be_true
+    deps.snapshot_escaping_refs.should contain("./partials/nav.html")
+  end
+
+  it "marks the graph dynamic for non-template-extension references" do
+    deps = Hwaro::Core::Build::TemplateDeps.new({"page" => %({% include "partials/legal.txt" %})})
+    deps.dynamic?.should be_true
+    deps.snapshot_escaping_refs.should contain("partials/legal.txt")
+  end
+
+  it "marks the graph dynamic for shadowed extension-variant references" do
+    templates = {"page" => %({% include "partials/note.j2" %}), "partials/note" => "html variant"}
+    paths = {"page" => "templates/page.html", "partials/note" => "templates/partials/note.html"}
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates, paths)
+    deps.dynamic?.should be_true
+    deps.snapshot_escaping_refs.should contain("partials/note.j2")
+  end
+
+  it "stays static for exact-extension references matching their snapshot source" do
+    templates = {"page" => %({% include "partials/note.html" %}), "partials/note" => "html variant"}
+    paths = {"page" => "templates/page.html", "partials/note" => "templates/partials/note.html"}
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates, paths)
+    deps.dynamic?.should be_false
+    deps.snapshot_escaping_refs.should be_empty
+  end
+
+  it "marks the graph dynamic for extension-less references missing from the snapshot" do
+    # `{% include "partials/nav" %}` naming a literal extension-less file
+    # (templates/partials/nav) resolves via the disk loader but lives in no
+    # snapshot hash — its edits would be invisible to invalidation.
+    templates = {"page" => %({% include "partials/nav" %})}
+    paths = {"page" => "templates/page.html"}
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates, paths)
+    deps.dynamic?.should be_true
+    deps.snapshot_escaping_refs.should contain("partials/nav")
+  end
+
+  it "stays static for extension-less references to a real snapshot key" do
+    templates = {"page" => %({% include "partials/nav" %}), "partials/nav" => "n"}
+    paths = {"page" => "templates/page.html", "partials/nav" => "templates/partials/nav.html"}
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates, paths)
+    deps.dynamic?.should be_false
+    deps.snapshot_escaping_refs.should be_empty
+  end
+
+  it "stays static for references to templates with dotted names (page.json.jinja)" do
+    templates = {"page" => %({% include "page.json.jinja" %}), "page.json" => "{}"}
+    paths = {"page" => "templates/page.html", "page.json" => "templates/page.json.jinja"}
+    deps = Hwaro::Core::Build::TemplateDeps.new(templates, paths)
+    deps.dynamic?.should be_false
+    deps.snapshot_escaping_refs.should be_empty
+  end
+end

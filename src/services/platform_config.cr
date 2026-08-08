@@ -280,26 +280,38 @@ module Hwaro
         redirects
       end
 
+      # Page extensions mirror Core::Build::Phases::ReadContent::PAGE_EXTENSIONS
+      # so alias generation sees exactly the pages the build publishes.
+      PAGE_EXTENSIONS = {".md", ".markdown"}
+
       private def scan_content_for_aliases(dir : String, redirects : Array(Tuple(String, String)))
         Dir.each_child(dir) do |entry|
           path = File.join(dir, entry)
           if File.directory?(path)
             scan_content_for_aliases(path, redirects)
-          elsif entry.ends_with?(".md")
+          elsif PAGE_EXTENSIONS.includes?(Path[entry].extension.downcase)
             extract_aliases_from_file(path, redirects)
           end
         end
       end
 
-      LANGUAGE_FILENAME_PATTERN = /^(.+)\.([a-z]{2,3})\.md$/
-
+      # Mirror of ReadContent#extract_language_from_filename: the suffix
+      # between the last two dots is matched against DECLARED language codes
+      # (plus the default), so declared keys like `zh-tw`/`pt-BR` route the
+      # same way here as in the build.
       private def extract_language_from_filename(basename : String) : String?
         return unless @config.multilingual?
 
-        if match = basename.match(LANGUAGE_FILENAME_PATTERN)
-          lang_code = match[2]
-          return lang_code if @config.languages.has_key?(lang_code) || lang_code == @config.default_language
-        end
+        ext = Path[basename].extension.downcase
+        return unless PAGE_EXTENSIONS.includes?(ext)
+        return unless basename.size > ext.size
+
+        stem = basename[0, basename.size - ext.size]
+        idx = stem.rindex('.')
+        return unless idx && idx > 0
+        lang_code = stem[(idx + 1)..]
+        return if lang_code.empty?
+        return lang_code if @config.languages.has_key?(lang_code) || lang_code == @config.default_language
 
         nil
       end

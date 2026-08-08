@@ -70,6 +70,26 @@ describe Hwaro::Core::Build::Phases::ReadContent do
       config.languages["ko"] = Hwaro::Models::LanguageConfig.new(code: "ko")
       builder.test_extract_language_from_filename("about.md", config).should be_nil
     end
+
+    it "matches declared language keys outside the 2-3 lowercase alphabet (zh-tw)" do
+      # Language suffixes are matched against DECLARED codes, not a fixed
+      # [a-z]{2,3} pattern — a declared `zh-tw` must produce a translation
+      # instead of a regular page published at /about.zh-tw/.
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.languages["zh-tw"] = Hwaro::Models::LanguageConfig.new(code: "zh-tw")
+      builder.test_extract_language_from_filename("about.zh-tw.md", config).should eq("zh-tw")
+      builder.test_extract_language_from_filename("_index.zh-tw.md", config).should eq("zh-tw")
+    end
+
+    it "keeps an undeclared long suffix as no language (regular page)" do
+      builder = Hwaro::Core::Build::Builder.new
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new(code: "ko")
+      builder.test_extract_language_from_filename("about.zh-tw.md", config).should be_nil
+    end
   end
 
   describe "#collect_content_paths" do
@@ -155,6 +175,68 @@ describe Hwaro::Core::Build::Phases::ReadContent do
           builder.test_collect_content_paths(ctx)
           page = ctx.pages.first
           page.language.should eq("ko")
+        end
+      end
+    end
+
+    it "collects .markdown files as pages, sections, and bundles" do
+      # The markdown processor declares [".md", ".markdown"]; read_content
+      # must agree, or `.markdown` sources silently vanish from the build.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/blog")
+          FileUtils.mkdir_p("content/bundle")
+          File.write("content/notes.markdown", "---\ntitle: Notes\n---\nbody")
+          File.write("content/blog/_index.markdown", "---\ntitle: Blog\n---\n")
+          File.write("content/bundle/index.markdown", "---\ntitle: B\n---\nbody")
+
+          builder = Hwaro::Core::Build::Builder.new
+          ctx = make_ctx(Hwaro::Models::Config.new)
+          builder.test_collect_content_paths(ctx)
+
+          ctx.pages.map(&.path).sort!.should eq(["bundle/index.markdown", "notes.markdown"])
+          ctx.sections.map(&.path).should eq(["blog/_index.markdown"])
+          ctx.sections.first.is_index.should be_true
+          ctx.pages.find! { |p| p.path == "bundle/index.markdown" }.is_index.should be_true
+          ctx.pages.find! { |p| p.path == "notes.markdown" }.is_index.should be_false
+          # .markdown sources are pages, never raw files
+          ctx.raw_files.should be_empty
+        end
+      end
+    end
+
+    it "strips the language suffix from .markdown files too" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          File.write("content/about.ko.markdown", "---\ntitle: 소개\n---\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          config = Hwaro::Models::Config.new
+          config.default_language = "en"
+          config.languages["ko"] = Hwaro::Models::LanguageConfig.new(code: "ko")
+          ctx = make_ctx(config)
+
+          builder.test_collect_content_paths(ctx)
+          ctx.pages.first.language.should eq("ko")
+        end
+      end
+    end
+
+    it "routes a declared hyphenated language code (zh-tw) as a translation" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          File.write("content/about.zh-tw.md", "---\ntitle: TW\n---\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          config = Hwaro::Models::Config.new
+          config.default_language = "en"
+          config.languages["zh-tw"] = Hwaro::Models::LanguageConfig.new(code: "zh-tw")
+          ctx = make_ctx(config)
+
+          builder.test_collect_content_paths(ctx)
+          ctx.pages.first.language.should eq("zh-tw")
         end
       end
     end

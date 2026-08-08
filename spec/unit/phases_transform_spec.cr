@@ -368,6 +368,35 @@ describe Hwaro::Core::Build::Phases::Transform do
       site.taxonomies["tags"]["crystal"].size.should eq(1)
     end
 
+    it "skips empty and whitespace-only terms like the taxonomy generator" do
+      # Content::Taxonomies.build_taxonomy_index guards `term.strip.empty?`;
+      # the render-phase map must match, or get_taxonomy exposes a "" term
+      # whose get_taxonomy_url link 404s (no term page is ever written).
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      page = make_page("p.md")
+      page.taxonomies = {"tags" => ["", "  ", "real"]}
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_rebuild_taxonomies(site, [page])
+
+      site.taxonomies["tags"].keys.should eq(["real"])
+    end
+
+    it "skips empty terms in the incremental update path too" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      page = make_page("p.md")
+      page.taxonomies = {"tags" => ["real"]}
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_rebuild_taxonomies(site, [page])
+
+      snapshot = {"p.md" => {"tags" => ["real"]}}
+      page.taxonomies = {"tags" => ["", "real"]}
+      builder.test_update_taxonomies_incremental(site, [page], snapshot)
+
+      site.taxonomies["tags"].keys.should eq(["real"])
+    end
+
     it "populates taxonomies via the context-aware variant" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -596,6 +625,43 @@ describe Hwaro::Core::Build::Phases::Transform do
           builder.test_collect_assets(ctx)
 
           page.assets.any?(&.ends_with?("cover.png")).should be_true
+        end
+      end
+    end
+
+    it "does not re-collect a translated-only bundle's assets into the ancestor section" do
+      # `photos/` holds only `index.ko.md` — a bundle by ReadContent's
+      # language-stripped rule. A literal index.md/_index.md probe misses
+      # it, so the ancestor section re-published `pic.jpg` under its own
+      # URL alongside the bundle's copy.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/gallery/photos")
+          File.write("content/gallery/_index.md", "---\ntitle: G\n---\n")
+          File.write("content/gallery/photos/index.ko.md", "---\ntitle: P\n---\nbody")
+          File.write("content/gallery/photos/pic.jpg", "jpg")
+
+          config = Hwaro::Models::Config.new
+          config.default_language = "en"
+          config.languages["ko"] = Hwaro::Models::LanguageConfig.new(code: "ko")
+
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+          ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+          ctx.config = config
+
+          section = make_section("gallery/_index.md", "gallery")
+          section.is_index = true
+          bundle = make_page("gallery/photos/index.ko.md", "gallery")
+          bundle.is_index = true
+          bundle.language = "ko"
+          ctx.sections = [section]
+          ctx.pages = [bundle]
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_collect_assets(ctx)
+
+          bundle.assets.should contain("gallery/photos/pic.jpg")
+          section.assets.should_not contain("gallery/photos/pic.jpg")
         end
       end
     end

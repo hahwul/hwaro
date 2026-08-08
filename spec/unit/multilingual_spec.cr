@@ -24,6 +24,27 @@ describe Hwaro::Content::Multilingual do
     ko.translations.map(&.url).should eq(["/about/", "/ko/about/"])
   end
 
+  it "links translation variants on .markdown pages" do
+    config = Hwaro::Models::Config.new
+    config.default_language = "en"
+    config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+
+    en = Hwaro::Models::Page.new("about.markdown")
+    en.title = "About"
+    en.url = "/about/"
+
+    ko = Hwaro::Models::Page.new("about.ko.markdown")
+    ko.title = "소개"
+    ko.url = "/ko/about/"
+    ko.language = "ko"
+
+    Hwaro::Content::Multilingual.link_translations!([en, ko], config)
+
+    en.translations.map(&.code).should eq(["en", "ko"])
+    ko.translations.map(&.code).should eq(["en", "ko"])
+    ko.translations.map(&.url).should eq(["/about/", "/ko/about/"])
+  end
+
   # Regression for https://github.com/hahwul/hwaro/issues/486
   # `link_translations!` used to populate `page.translations` with a
   # single self-entry for pages that have no actual cross-language

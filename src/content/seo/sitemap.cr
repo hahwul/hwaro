@@ -30,7 +30,18 @@ module Hwaro
           DiscoveryPages.reject_excluded!(sitemap_pages, site.config.sitemap.exclude)
 
           if sitemap_pages.empty?
-            Logger.info "  No pages to include in sitemap."
+            # Still (re)write the file: returning here left a PREVIOUS
+            # build's sitemap on disk when the last eligible page was
+            # drafted/excluded — stale URLs kept being served and deployed.
+            # An empty urlset is valid per the sitemap protocol.
+            Logger.info "  No pages to include in sitemap — writing an empty sitemap."
+            empty_xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
+                        "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n" \
+                        "</urlset>\n"
+            filename = File.basename(site.config.sitemap.filename)
+            sitemap_path = Path[output_dir, filename].to_s
+            Hwaro::Utils::FileSafe.atomic_write(sitemap_path, empty_xml)
+            Logger.action :create, sitemap_path if verbose
             return
           end
 
@@ -50,11 +61,22 @@ module Hwaro
           priority = site.config.sitemap.priority.clamp(0.0, 1.0)
           priority_str = "    <priority>#{priority}</priority>\n"
 
+          # A translation link whose target page is never written (render =
+          # false, or a draft/preview-only unpublished page) would advertise
+          # a 404 to crawlers. Build the set of URLs that actually get output
+          # (same eligibility the <loc> entries use, minus in_sitemap — an
+          # in_sitemap=false page is still written and is a valid alternate)
+          # and filter hreflang alternates through it.
+          written_urls = Set(String).new
+          pages.each do |p|
+            written_urls << p.url if p.render && !p.draft && !p.unpublished
+          end
+
           # Multilingual sites benefit from `<xhtml:link rel="alternate"
           # hreflang="...">` entries on every translated URL — Google's
           # recommended way to expose hreflang in sitemaps. Only declare
           # the namespace when we'll actually use it (#486).
-          has_translations = sitemap_pages.any? { |p| !p.translations.empty? }
+          has_translations = sitemap_pages.any? { |p| p.translations.any? { |t| written_urls.includes?(t.url) } }
 
           xml_content = String.build(sitemap_pages.size * 256) do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -79,6 +101,7 @@ module Hwaro
               # the current page itself; Google's spec asks for a self-
               # referencing entry).
               page.translations.each do |t|
+                next unless written_urls.includes?(t.url)
                 t_path = t.url.starts_with?('/') ? t.url : "/#{t.url}"
                 t_full = base.empty? ? t_path : base + t_path
                 str << "    <xhtml:link rel=\"alternate\" hreflang=\""

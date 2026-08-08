@@ -265,12 +265,22 @@ module Hwaro::Core::Build::Phases::Transform
   private def collect_assets(ctx : Lifecycle::BuildContext)
     content_files = ctx.config.try(&.content_files)
 
+    # Content-relative directories that host their own bundle index,
+    # INCLUDING language-suffixed variants (`photos/index.ko.md`) — the
+    # on-disk probe in Page#nested_bundle? only sees literal
+    # index.md/_index.md, so a translated-only bundle's assets were also
+    # collected (and published) by every ancestor bundle.
+    bundle_dirs = Set(String).new
+    ctx.all_pages.each do |p|
+      bundle_dirs << Path[p.path].dirname.to_s if p.is_index
+    end
+
     ctx.sections.each do |section|
-      section.collect_assets("content", content_files)
+      section.collect_assets("content", content_files, bundle_dirs)
     end
 
     ctx.pages.each do |page|
-      page.collect_assets("content", content_files)
+      page.collect_assets("content", content_files, bundle_dirs)
     end
   end
 
@@ -296,6 +306,10 @@ module Hwaro::Core::Build::Phases::Transform
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)
         terms.each do |term|
+          # Match the generator (Content::Taxonomies.build_taxonomy_index):
+          # an empty/whitespace term never gets a written page, so exposing
+          # it through get_taxonomy yields a 404 term link.
+          next if term.strip.empty?
           site.taxonomies[name][term] ||= [] of Models::Page
           site.taxonomies[name][term] << page
         end
@@ -404,6 +418,9 @@ module Hwaro::Core::Build::Phases::Transform
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)
         terms.each do |term|
+          # Same empty-term guard as rebuild_taxonomies — a serve-mode edit
+          # must not introduce a "" term the full rebuild would drop.
+          next if term.strip.empty?
           site.taxonomies[name][term] ||= [] of Models::Page
           site.taxonomies[name][term] << page
           affected_tax_keys << {name, term}

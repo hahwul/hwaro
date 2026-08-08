@@ -464,6 +464,84 @@ module Hwaro
       end
     end
 
+    # Dev-only on-demand OG image generation for `[og.auto_image]
+    # lazy_generate = true` under `hwaro serve`.
+    #
+    # Lazy serve builds assign each eligible page its predicted og:image URL
+    # without rendering the file (OgImage.assign_lazy_urls) — this handler
+    # fulfills the promised "generated on first request" contract that
+    # previously didn't exist (the URLs 404'd all session). A request for a
+    # path under the OG output directory generates the owning page's image,
+    # then falls through to the static file handler to serve it from disk.
+    #
+    # Only ever mounted in the dev handler chain; a no-op unless the current
+    # config enables auto-OG with lazy_generate.
+    class OgLazyImageHandler
+      include HTTP::Handler
+
+      def initialize(@builder : Core::Build::Builder, @output_dir : String)
+        @mutex = Mutex.new
+      end
+
+      def call(context)
+        method = context.request.method
+        return call_next(context) unless method == "GET" || method == "HEAD"
+
+        config = @builder.config
+        site = @builder.site
+        return call_next(context) unless config && site
+        ai = config.og.auto_image
+        return call_next(context) unless ai.enabled && ai.lazy_generate
+
+        sanitized = DevPath.safe_relative(context.request.path)
+        return call_next(context) if sanitized.nil? || sanitized.empty?
+        return call_next(context) unless sanitized.starts_with?("#{ai.output_dir.strip("/")}/")
+        return call_next(context) unless sanitized.ends_with?(".png") || sanitized.ends_with?(".svg")
+
+        url_path = "/#{sanitized}"
+        page = site.pages.find { |p| p.image == url_path } ||
+               site.sections.find { |s| s.image == url_path }
+        return call_next(context) unless page
+
+        # Serialize generation: the og:image and twitter:image fetches of one
+        # link preview land together and must not render the file twice.
+        # generate() is manifest-cached — when the file exists and the page
+        # hash matches, a repeat request costs a hash + stat, so no extra
+        # freshness bookkeeping is needed here. `partial: true`: a
+        # single-page call must not truncate every other page's manifest
+        # entry.
+        # The advertised URL carries the collision-disambiguated slug that
+        # assign_lazy_urls computed against the FULL page set — pass it
+        # through, because a single-page generate() call would recompute
+        # the slug with fresh collision state and collapse colliding pages
+        # (/posts/foo/ vs /posts-foo/) onto the same unsuffixed file.
+        slug = File.basename(sanitized, File.extname(sanitized))
+        @mutex.synchronize do
+          Content::Seo::OgImage.generate([page], config, @output_dir, partial: true, parallel: false, forced_slug: slug)
+        rescue ex
+          Logger.warn "On-demand OG image generation failed for #{url_path}: #{ex.message}"
+        end
+
+        # PNG rendering can fall back to SVG (no usable font). The advertised
+        # .png path then has no backing file, but the page's updated image
+        # URL does — serve those bytes under the requested path (dev-only
+        # pragmatism: the preview still shows an image).
+        requested = File.join(@output_dir, sanitized)
+        if !File.exists?(requested) && (fallback = page.image) && fallback != url_path
+          fallback_path = File.join(@output_dir, fallback.lchop('/'))
+          if File.exists?(fallback_path) && Utils::OutputGuard.within_output_dir?(fallback_path, @output_dir)
+            data = File.read(fallback_path)
+            context.response.content_type = fallback.ends_with?(".svg") ? "image/svg+xml" : "image/png"
+            context.response.content_length = data.bytesize
+            context.response.print(data) unless method == "HEAD"
+            return
+          end
+        end
+
+        call_next(context)
+      end
+    end
+
     # Categorised set of file-system changes detected by the watcher.
     #
     # Changes are split into five buckets so the server can pick the
@@ -701,6 +779,12 @@ module Hwaro
       # overlay the live-reload client draws from an `error:` push kept
       # appearing for users who had explicitly turned overlays off.
       @error_overlay : Bool = true
+      # Watcher baseline captured BEFORE the initial build (and before any
+      # --fast-start deferred render). The watcher used to take its first
+      # snapshot only when its loop started — after both — so any edit made
+      # during that window was absorbed into the baseline and never rebuilt.
+      # Consumed once by the watch loop; nil afterwards.
+      @watch_baseline : Hash(String, FileStamp)? = nil
 
       # Extensions whose served bytes are UTF-8 text, each with the base type to
       # assume when the platform's MIME database has no opinion.
@@ -800,6 +884,11 @@ module Hwaro
         # Start anyway: @rebuild_failed forces the first watch rebuild to be
         # a full one, and the error is replayed to the first live-reload
         # client so the browser shows the overlay instead of a bare 404.
+        # Snapshot the watcher baseline BEFORE the initial build: edits saved
+        # while the build (or the fast-start deferred render) runs must land
+        # in the watcher's first diff instead of vanishing into it.
+        capture_watch_baseline
+
         initial_error : String? = nil
         begin
           unless @builder.run(build_options)
@@ -925,8 +1014,14 @@ module Hwaro
         # to run — TCP connects succeeded (OS-level backlog) but HTTP
         # responses sat indefinitely.
         listen_done = Channel(Nil).new
+        # Captured from the listen fiber so a crashed accept loop can't turn
+        # into a clean exit: `ensure` alone closed the channel and the main
+        # fiber returned normally — exit 0 — with the server dead.
+        listen_error : Exception? = nil
         spawn do
           server.listen
+        rescue error
+          listen_error = error
         ensure
           listen_done.close
         end
@@ -980,6 +1075,18 @@ module Hwaro
         # Block the main fiber on the listen fiber's completion so the
         # process stays alive for the lifetime of the server.
         listen_done.receive?
+
+        # The listen fiber died with an exception — serve must exit nonzero,
+        # matching how a bind failure is reported (a classified HwaroError
+        # that the CLI runner maps to a failure exit code).
+        if failure = listen_error
+          classified = failure.as?(Hwaro::HwaroError) || Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Dev server stopped unexpectedly: #{failure.message}",
+            hint: "This is likely a bug or an OS-level socket failure — rerun `hwaro serve` and report the error if it persists.",
+          )
+          raise classified
+        end
       end
 
       # Path component of `base_url`, mirroring `Models::Config#base_path`
@@ -1061,6 +1168,10 @@ module Hwaro
         end
         handlers << IndexRewriteHandler.new(output_dir)
         handlers << inject_handler if inject_handler
+        # Just above the static handler: generates a lazily-deferred OG image
+        # on first request, then lets StaticFileHandler serve it from disk.
+        # A no-op unless [og.auto_image] lazy_generate is enabled.
+        handlers << OgLazyImageHandler.new(@builder, output_dir)
         handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
         handlers << not_found
         handlers
@@ -1142,9 +1253,24 @@ module Hwaro
         normalized
       end
 
+      # Snapshot the watcher baseline. Called by run_with_options BEFORE the
+      # initial build so files edited while it runs still diff as changed.
+      private def capture_watch_baseline
+        @watch_baseline = scan_mtimes
+      end
+
+      # The mtime snapshot the watch loop starts from: the pre-build baseline
+      # when one was captured (consumed here — it is only valid once), a
+      # fresh scan otherwise.
+      private def initial_watch_mtimes : Hash(String, FileStamp)
+        baseline = @watch_baseline
+        @watch_baseline = nil
+        baseline || scan_mtimes
+      end
+
       private def watch_for_changes(build_options : Config::Options::BuildOptions)
         # Watched roots are shown in the serve receipt's "watch" row.
-        last_mtimes = scan_mtimes
+        last_mtimes = initial_watch_mtimes
 
         loop do
           sleep POLL_INTERVAL
@@ -1166,8 +1292,13 @@ module Hwaro
                 changeset, last_mtimes = debounce_changes(changeset, last_mtimes)
 
                 begin
+                  # apply_changeset owns the @rebuild_failed reset: it clears
+                  # the flag only after a SUCCESSFUL rebuild. Resetting here
+                  # unconditionally used to clobber the flag apply_changeset
+                  # had just set for a Bool-failure build (pre-hook failure /
+                  # phase abort return false without raising), breaking the
+                  # full-rebuild-recovery contract for that path.
                   apply_changeset(changeset, build_options)
-                  @rebuild_failed = false
                 rescue ex
                   # Surface the failure both in the terminal and the
                   # browser. Without the WS push the developer sees the
@@ -1360,7 +1491,6 @@ module Hwaro
                     @builder.run_incremental_then_rerender(changeset.modified_content, build_options)
                   when :static
                     copy_static(changeset, build_options)
-                    true
                   when :content_files
                     copy_content_files(changeset, build_options)
                     true
@@ -1380,6 +1510,11 @@ module Hwaro
           return
         end
 
+        # Clear the failure escalation HERE, where success is actually known.
+        # The watch loop must not reset it — apply_changeset returns normally
+        # after a Bool-failure build too (see the `unless success` guard).
+        @rebuild_failed = false
+
         # A config edit rebuilt the site with the new values, but [serve.*]
         # keys were consumed at startup — warn instead of silently looking
         # like they applied.
@@ -1387,7 +1522,11 @@ module Hwaro
 
         # Copy static files if they changed alongside content/template changes
         if strategy != :static && strategy != :full && !changeset.modified_static.empty?
-          copy_static(changeset, build_options)
+          unless copy_static(changeset, build_options)
+            @rebuild_failed = true
+            push_build_error("Build failed — check the terminal for details.")
+            return
+          end
         end
 
         # Republish non-Markdown content assets whenever they accompany any
@@ -1399,6 +1538,16 @@ module Hwaro
           copy_content_files(changeset, build_options)
         end
 
+        # The stale list was mapped through the PRE-rebuild site, but a
+        # single changeset can delete one source and re-create the same URL
+        # from another (foo.md removed + foo/index.md added). The rebuild
+        # just wrote that output for the NEW owner — deleting it here would
+        # 404 the page until an unrelated rebuild. Skip anything the rebuilt
+        # site still claims.
+        unless stale_outputs.empty?
+          owned = @builder.owned_output_paths(output_dir)
+          stale_outputs = stale_outputs.reject { |path| owned.includes?(path) }
+        end
         remove_stale_outputs(stale_outputs, output_dir)
 
         @live_reload_handler.try(&.notify_reload)
@@ -1441,31 +1590,77 @@ module Hwaro
         end
       end
 
-      private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
+      # Returns false when an escalated re-render failed (bundle fingerprint
+      # moved and the page re-render below reported failure); true otherwise.
+      private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        # Changed image BYTES need their resized variants/LQIP regenerated
+        # too — the resize hook only runs on full builds, so the copy above
+        # alone left variants stale for the whole serve session (A12).
+        unless build_options.skip_image_processing
+          if config = @builder.config
+            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changeset.modified_static, config, output_dir)
+          end
+        end
         # SCSS sources never publish verbatim — when one changed, recompile
         # the entries instead. A partial edit must rebuild every entry that
         # imports it, and there is no dependency graph, so the whole tree
         # recompiles (cheap at static-site scale). Compile errors raise and
         # reach the watcher rescue → browser overlay. The predicate is the
         # same one the copy paths use, so the gate can't drift.
+        bundles_changed = false
         if (config = @builder.config) && changeset.modified_static.any? { |p| config.sass_source?(p) }
-          @builder.recompile_sass(output_dir)
+          bundles_changed = @builder.recompile_sass(output_dir)
+        elsif changeset.modified_static.any? { |p| @builder.asset_bundle_source?(p) }
+          # Plain (non-Sass) CSS/JS bundle sources only ever rebuilt inside
+          # the full-build asset pipeline — a static-only save left the
+          # fingerprinted bundle stale for the whole serve session.
+          bundles_changed = @builder.reprocess_asset_bundles(output_dir)
         end
+
+        # A changed fingerprint means every page referencing the bundle via
+        # `asset()` still points at the OLD hash — rebuild so the HTML on
+        # disk picks the new path up (covers the Sass path too). A full
+        # rebuild, not run_rerender: templates are byte-identical here, so
+        # the rerender's selective path would (correctly, by its own
+        # contract) re-render nothing. Correctness over cleverness — the
+        # rebuild reuses the same options the watcher's :full strategy runs.
+        if bundles_changed
+          Logger.info "  Asset bundle fingerprints changed — rebuilding pages to update references."
+          return @builder.run(build_options)
+        end
+        true
       end
 
       private def copy_content_files(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_content_files(changeset.modified_content_files, output_dir, build_options.verbose)
+        # Mirror copy_static: modified image bytes under content/ (published
+        # via [content.files] or as page-bundle assets) must refresh their
+        # resized variants/LQIP too (A12).
+        unless build_options.skip_image_processing
+          if config = @builder.config
+            pages = @builder.site.try { |s| (s.pages + s.sections).as(Array(Models::Page)) }
+            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changeset.modified_content_files, config, output_dir, pages: pages)
+          end
+        end
+      end
+
+      # Allowlist for URLs handed to the OS opener. Serve's own URLs can
+      # carry bracketed IPv6 hosts (`http://[::1]:3000`, from `-b ::1`) and
+      # percent-encoded path bytes (`/my%20blog/` base paths), so `[`, `]`
+      # and `%` are part of the safe set alongside host/path characters.
+      protected def url_openable?(url : String) : Bool
+        (url.starts_with?("http://") || url.starts_with?("https://")) &&
+          url.matches?(/\Ahttps?:\/\/[a-zA-Z0-9.:\/\-_\[\]%]+\z/)
       end
 
       private def open_browser_url(url : String)
-        unless url.starts_with?("http://") || url.starts_with?("https://")
-          return
-        end
-
-        unless url.matches?(/\Ahttps?:\/\/[a-zA-Z0-9.:\/\-_]+\z/)
+        unless url_openable?(url)
+          # Say why nothing opened instead of silently returning — the user
+          # asked for --open and got no browser.
+          Logger.debug "Not opening browser: URL contains characters outside the safe allowlist: #{url}"
           return
         end
 

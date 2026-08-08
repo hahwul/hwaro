@@ -76,6 +76,15 @@ module Hwaro::Core::Build::Phases::Write
         next
       end
 
+      # FileUtils.cp (and File.read) follow symlinks, so a raw-file symlink
+      # whose target escapes the project would publish a file from outside
+      # the site. Skip it — mirrors the bundle-asset guard in process_assets
+      # and the static copy guard. In-repo symlinks resolve within and pass.
+      if File.symlink?(raw_file.source_path) && !Hwaro::Utils::PathUtils.resolves_within?(raw_file.source_path, Dir.current)
+        Logger.warn "Skipping raw file symlink pointing outside the project: #{raw_file.source_path}"
+        next
+      end
+
       # Get appropriate processor
       processor = Content::Processors::Registry.for_file(raw_file.source_path).first?
 

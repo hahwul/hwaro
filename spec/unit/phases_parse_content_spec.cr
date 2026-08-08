@@ -124,14 +124,17 @@ describe Hwaro::Core::Build::Phases::ParseContent do
       end
     end
 
-    it "is a no-op when the source file is missing" do
+    it "marks the page parse-failed when the source file is missing" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           builder = Hwaro::Core::Build::Builder.new
           builder.test_set_parse_config(Hwaro::Models::Config.new)
           page = Hwaro::Models::Page.new("missing.md")
-          # Should not raise
+          # Should not raise — but must NOT pass silently either: a ghost
+          # page with url "" resolves to <output>/index.html and clobbers
+          # the homepage nondeterministically under parallel render.
           builder.test_parse_single_page(page)
+          page.parse_failed.should be_true
           page.title.should eq("Untitled")
         end
       end
@@ -153,8 +156,9 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         builder.test_parse_content_sequential([good, missing])
         good.title.should eq("Good")
         good.parse_failed.should be_false
-        # Missing file is silently skipped (parse_single_page returns early)
-        missing.parse_failed.should be_false
+        # A missing file (dangling symlink, deleted mid-rebuild) is a parse
+        # failure — the page must be filtered out, not become a ghost page.
+        missing.parse_failed.should be_true
       end
     end
 
@@ -279,6 +283,27 @@ describe Hwaro::Core::Build::Phases::ParseContent do
 
         builder.test_parse_content_default(ctx)
         ctx.pages.map(&.title).sort!.should eq(["Now"])
+      end
+    end
+
+    it "warns about sections expiring soon, not only pages" do
+      soon = (Time.utc + 3.days).to_s("%Y-%m-%dT%H:%M:%SZ")
+      with_content_dir({
+        "notice/_index.md" => %(---\ntitle: Notice\nexpires: "#{soon}"\n---\nbody),
+      }) do
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_parse_config(Hwaro::Models::Config.new)
+
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+        ctx.config = Hwaro::Models::Config.new
+        ctx.sections = [Hwaro::Models::Section.new("notice/_index.md")]
+
+        log = with_captured_log do
+          builder.test_parse_content_default(ctx)
+        end
+        log.should contain("expires on")
+        log.should contain("notice/_index.md")
       end
     end
 

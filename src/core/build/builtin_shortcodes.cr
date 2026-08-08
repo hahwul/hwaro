@@ -97,11 +97,14 @@ module Hwaro
           #        {% alert(type="info", title="Note") %}Some info{% end %}
           #        {% alert(type="tip") %}Named closer recommended{% endalert %}
           # Types: info, warning, danger, tip, success
+          # The body is markdownified so **bold**/`code`/[links](…) render as
+          # HTML — parity with the scaffold override (scaffolds/base.cr),
+          # which has always piped `body | markdownify`.
           t["shortcodes/alert"] = <<-HTML
             {% set tone = type | default(value="info") | lower %}
             <div class="sc-alert sc-alert--{{ tone | e }}" role="alert">
               {% if title %}<div class="sc-alert__title">{{ title | e }}</div>{% endif %}
-              <div class="sc-alert__body">{{ body }}</div>
+              <div class="sc-alert__body">{{ body | markdownify }}</div>
             </div>
             HTML
 

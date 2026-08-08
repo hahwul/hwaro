@@ -146,6 +146,39 @@ describe Hwaro::Utils::HtmlMinifier do
       end
     end
 
+    describe "inline replaced elements (A14)" do
+      # iframe/video/audio/canvas (and embed/object) default to
+      # display:inline — whitespace adjacent to them is a rendered
+      # space and must survive minification.
+      it "keeps a space between an inline closer and a video element" do
+        html = "<a>x</a>\n<video src=\"v.mp4\"></video>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<a>x</a> <video src=\"v.mp4\"></video>")
+      end
+
+      it "treats iframe, audio and canvas as inline" do
+        Hwaro::Utils::HtmlMinifier.minify("<span>see</span>\n<iframe src=\"x\"></iframe>")
+          .should eq("<span>see</span> <iframe src=\"x\"></iframe>")
+        Hwaro::Utils::HtmlMinifier.minify("<em>a</em>  <audio controls></audio>")
+          .should eq("<em>a</em> <audio controls></audio>")
+        Hwaro::Utils::HtmlMinifier.minify("<b>x</b>\n<canvas></canvas>")
+          .should eq("<b>x</b> <canvas></canvas>")
+      end
+
+      it "treats embed and object as inline" do
+        Hwaro::Utils::HtmlMinifier.minify("<em>a</em>\n<embed src=\"x\">")
+          .should eq("<em>a</em> <embed src=\"x\">")
+        Hwaro::Utils::HtmlMinifier.minify("<em>a</em>\n<object data=\"x\"></object>")
+          .should eq("<em>a</em> <object data=\"x\"></object>")
+      end
+
+      it "still strips whitespace between a block neighbour and a video element" do
+        html = "<div>\n  <video src=\"v.mp4\"></video>\n</div>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<div><video src=\"v.mp4\"></video></div>")
+      end
+    end
+
     describe "protected blocks (whitespace-sensitive elements)" do
       it "preserves content inside <pre><code> unchanged" do
         html = "<pre><code>  line1\n    line2\n  line3</code></pre>"

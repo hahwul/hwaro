@@ -2,6 +2,7 @@ require "../../models/config"
 require "../../models/page"
 require "../../models/section"
 require "../../utils/logger"
+require "../discovery_pages"
 
 module Hwaro
   module Content
@@ -21,7 +22,13 @@ module Hwaro
 
           if skip_if_unchanged
             filename = File.basename(config.llms.filename.empty? ? "llms.txt" : config.llms.filename)
-            if File.exists?(File.join(output_dir, filename))
+            # The probe must cover every file this generator writes: when
+            # full output is enabled, a present llms.txt with a missing
+            # llms-full.txt must NOT skip, or the full document is never
+            # re-emitted on warm builds.
+            full_present = !config.llms.full_enabled ||
+                           File.exists?(File.join(output_dir, full_output_filename(config)))
+            if File.exists?(File.join(output_dir, filename)) && full_present
               Logger.debug "  LLMs.txt unchanged (cache hit), skipping."
               return
             end
@@ -56,7 +63,10 @@ module Hwaro
         private def self.build_index(config : Models::Config, pages : Array(Models::Page)) : String
           base_url = config.base_url.rstrip('/')
 
-          eligible = pages.select(&.search_index_eligible?)
+          # Dedupe URL collisions to the page the build actually wrote
+          # (path-sort-first winner, same rule as sitemap/search/feeds) so
+          # the index never lists an unwritten loser.
+          eligible = DiscoveryPages.dedupe_by_url(pages.select(&.search_index_eligible?))
 
           # Group by section, keyed by display heading. A section's heading
           # comes from its `_index.md`, which is the only page modeled as a
@@ -134,13 +144,19 @@ module Hwaro
           end
         end
 
+        # Resolved output basename for llms-full.txt — shared by the writer
+        # and the warm-build skip probe so they can never drift.
+        private def self.full_output_filename(config : Models::Config) : String
+          filename = config.llms.full_filename
+          filename = "llms-full.txt" if filename.empty?
+          File.basename(filename)
+        end
+
         def self.generate_full(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false)
           return unless config.llms.enabled
           return unless config.llms.full_enabled
 
-          filename = config.llms.full_filename
-          filename = "llms-full.txt" if filename.empty?
-          filename = File.basename(filename)
+          filename = full_output_filename(config)
 
           file_path = File.join(output_dir, filename)
           content = build_full_document(pages, config)
@@ -156,7 +172,11 @@ module Hwaro
           # author excluded via `in_search_index = false` must not have its
           # entire raw markdown dumped into llms-full.txt either — previously
           # only render/draft were checked here, leaking opted-out pages.
-          eligible_pages = pages.select { |page| page.search_index_eligible? && !page.raw_content.empty? }.sort_by!(&.url)
+          # Dedupe collisions to the written winner BEFORE the raw-content
+          # filter so an unwritten loser's body never leaks in.
+          eligible_pages = DiscoveryPages.dedupe_by_url(pages.select(&.search_index_eligible?))
+            .reject!(&.raw_content.empty?)
+            .sort_by!(&.url)
 
           base_url = config.base_url
           base_url = base_url.rstrip('/') unless base_url.empty?

@@ -80,6 +80,17 @@ module Hwaro
             precache_urls << resolved_offline unless precache_urls.includes?(resolved_offline)
           end
 
+          # sw.js can never precache itself: on a clean build the file does
+          # not exist yet (so it would be dropped), and on a warm build the
+          # hash below would fold the PREVIOUS build's sw.js bytes into
+          # CACHE_NAME — changing sw.js, which changes the next build's
+          # hash, churning the cache name forever.
+          sw_url = config.with_base_path("/sw.js")
+          if precache_urls.includes?(sw_url)
+            Logger.warn "PWA: sw.js cannot precache itself — dropping #{sw_url.inspect} from the sw.js precache list"
+            precache_urls = precache_urls.reject { |u| u == sw_url }
+          end
+
           # cache.addAll() is all-or-nothing: a single 404 aborts the whole
           # service-worker install. Drop any site-internal precache URL whose
           # resolved output file does not exist (external http(s):// URLs are

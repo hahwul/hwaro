@@ -78,7 +78,28 @@ module Hwaro
           pages.each do |page|
             # Check if it's a section and has feed generation enabled
             if page.is_a?(Models::Section) && page.generate_feeds && page.render && !page.draft && !page.unpublished
-              section_pages = dedupe_by_output_url(pages_by_section[page.section]? || [] of Models::Page)
+              section_pages = pages_by_section[page.section]? || [] of Models::Page
+
+              # A section feed is a per-language surface: the section object
+              # for each language carries that language's URL (e.g. /posts/
+              # vs /ko/posts/), so its feed must not interleave other
+              # languages. The default-language section feed follows the
+              # same `default_language_only` rule as the main feed; a
+              # non-default-language section feed only ever carries its own
+              # language.
+              if config.multilingual?
+                default_lang = config.default_language
+                section_lang = page.language || default_lang
+                if section_lang == default_lang
+                  if config.feeds.default_language_only
+                    section_pages = section_pages.select { |p| (p.language || default_lang) == default_lang }
+                  end
+                else
+                  section_pages = section_pages.select { |p| p.language == section_lang }
+                end
+              end
+
+              section_pages = dedupe_by_output_url(section_pages)
 
               # Construct output path for section feed
               # e.g., output_dir/posts/rss.xml — sanitize + OutputGuard so a
@@ -94,8 +115,10 @@ module Hwaro
             end
           end
 
-          # 3. Generate Language-specific Feeds (for non-default languages)
-          if config.multilingual?
+          # 3. Generate Language-specific Feeds (for non-default languages).
+          # Global `[feeds] enabled = false` disables these too — per-language
+          # `generate_feed` only opts OUT within a globally-enabled config.
+          if config.feeds.enabled && config.multilingual?
             generate_language_feeds(pages, config, output_dir, verbose, templates, renderer)
           end
         end
@@ -307,9 +330,12 @@ module Hwaro
 
           # Deterministic feed timestamp: newest content date across entries
           # (same rule as the Atom generator) so identical input renders
-          # byte-identical output.
-          newest = pages.compact_map { |p| p.updated || p.date }.max?
-          feed_updated = newest ? normalize_feed_time(newest) : Utils::SortUtils::FALLBACK_DATE
+          # byte-identical output. Normalize BEFORE taking the max — the
+          # timezone re-anchor can reorder instants (a date-only +09:00
+          # midnight normalizes 9h forward), and the feed <updated> must
+          # never be older than its newest entry's <updated>.
+          newest = pages.compact_map { |p| (src = p.updated || p.date) ? normalize_feed_time(src) : nil }.max?
+          feed_updated = newest || Utils::SortUtils::FALLBACK_DATE
           feed_author = config.title.empty? ? feed_title : config.title
 
           page_values = pages.map do |page|
@@ -474,13 +500,24 @@ module Hwaro
               summary = summary_for_feed(page, config)
               str << "      <description>#{Utils::TextUtils.escape_xml(summary)}</description>\n"
 
-              # Emit the full body in `<content:encoded>` when the user
-              # opts into full content (default). CDATA so consumers
-              # don't have to double-decode entities.
+              # Emit the body in `<content:encoded>` when the user opts
+              # into full content (default). `feeds.truncate` applies here
+              # too — it is documented as "truncate content to N characters
+              # (0 = full content)" and the Atom generator already honors it
+              # under full_content via get_content_for_feed, so RSS routes
+              # through the same helper (truncated plain text when
+              # truncate > 0, full absolutized HTML otherwise). CDATA so
+              # consumers don't have to double-decode entities.
               if full_content
-                full_html = full_content_for_feed(page, config)
-                unless full_html.empty?
-                  str << "      <content:encoded><![CDATA[#{escape_cdata(full_html)}]]></content:encoded>\n"
+                encoded = get_content_for_feed(page, config)
+                # truncate > 0 makes get_content_for_feed return
+                # entity-DECODED plain text, but feed readers parse
+                # <content:encoded> as HTML — re-escape it so a literal
+                # `<` or `&` can't break rendering. The full-HTML path
+                # (truncate = 0) must stay byte-identical.
+                encoded = Utils::TextUtils.escape_xml(encoded) if config.feeds.truncate > 0
+                unless encoded.empty?
+                  str << "      <content:encoded><![CDATA[#{escape_cdata(encoded)}]]></content:encoded>\n"
                 end
               end
 
@@ -520,9 +557,13 @@ module Hwaro
           # Atom <updated> must be deterministic: derive it from the newest
           # content date (updated||date) across entries rather than the build
           # wall-clock, so two builds of identical input stay byte-identical.
-          # Falls back to the epoch sentinel when no entry carries a date.
-          newest = pages.compact_map { |p| p.updated || p.date }.max?
-          feed_updated = newest ? normalize_feed_time(newest) : Utils::SortUtils::FALLBACK_DATE
+          # Normalize BEFORE taking the max — the timezone re-anchor can
+          # reorder instants (a date-only +09:00 midnight normalizes 9h
+          # forward), and the feed <updated> must never be older than its
+          # newest entry's <updated>. Falls back to the epoch sentinel when
+          # no entry carries a date.
+          newest = pages.compact_map { |p| (src = p.updated || p.date) ? normalize_feed_time(src) : nil }.max?
+          feed_updated = newest || Utils::SortUtils::FALLBACK_DATE
           # RFC 4287 §4.1.1: a feed MUST carry an author unless every entry
           # does. Emit a feed-level author unconditionally using the site title.
           feed_author = config.title.empty? ? feed_title : config.title

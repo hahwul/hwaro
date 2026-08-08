@@ -111,6 +111,48 @@ describe Hwaro::Core::Build::Phases::Write do
       end
     end
 
+    it "skips a raw-file symlink pointing outside the project" do
+      # Mirrors the bundle-asset guard in process_assets: FileUtils.cp
+      # follows symlinks, so a `content/leak.json -> /outside/secret.json`
+      # link would publish a file from outside the site.
+      Dir.mktmpdir do |dir|
+        outside = File.join(dir, "outside.json")
+        File.write(outside, %({"secret": true}))
+        project = File.join(dir, "proj")
+        FileUtils.mkdir_p(File.join(project, "content"))
+        FileUtils.mkdir_p(File.join(project, "public"))
+        Dir.cd(project) do
+          File.symlink(outside, "content/leak.json")
+          raw = Hwaro::Core::Lifecycle::RawFile.new("content/leak.json", "leak.json")
+          builder = Hwaro::Core::Build::Builder.new
+
+          log = with_captured_log do
+            builder.test_process_raw_files([raw], "public", false, false).should eq(0)
+          end
+
+          File.exists?("public/leak.json").should be_false
+          log.should contain("symlink")
+        end
+      end
+    end
+
+    it "still copies an in-project raw-file symlink" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("public")
+          File.write("content/real.json", "{}")
+          File.symlink(File.expand_path("content/real.json"), "content/link.json")
+
+          raw = Hwaro::Core::Lifecycle::RawFile.new("content/link.json", "link.json")
+          builder = Hwaro::Core::Build::Builder.new
+
+          builder.test_process_raw_files([raw], "public", false, false).should eq(1)
+          File.exists?("public/link.json").should be_true
+        end
+      end
+    end
+
     it "returns zero when no raw files are provided" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

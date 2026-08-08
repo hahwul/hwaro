@@ -555,4 +555,70 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       builder.test_content_may_contain_shortcodes?(content).should be_true
     end
   end
+
+  describe "fence protection with hyphenated keyword-prefixed block names" do
+    it "keeps a fenced code block inside a {% include-code %} body intact" do
+      # The outer depth scan must classify openers/closers with the same
+      # EXACT keyword matching as the block parser. The old prefix regex
+      # treated `-` as a word boundary, so `include-code` read as the Jinja
+      # `include` control tag: the fence line split the buffer and both the
+      # opener and `{% end %}` leaked into the output as literal text.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/include-code" => %(<div class="inc">{{ body }}</div>),
+      }
+      content = <<-MD
+        {% include-code(lang="js") %}
+        before
+
+        ```
+        literal fence
+        ```
+
+        after
+        {% end %}
+        MD
+      result = builder.test_sc_process(content, templates)
+      result.should contain(%(<div class="inc">))
+      result.should_not contain("{% include-code")
+      result.should_not contain("{% end %}")
+    end
+  end
+
+  describe "explicit shortcode() call with single-quoted name" do
+    it "renders {{ shortcode('name', args) }} like the double-quoted form" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => %(<em>{{ text }}</em>)}
+      result = builder.test_sc_process(%({{ shortcode('note', text="hi") }}), templates)
+      result.should contain("<em>hi</em>")
+      result.should_not contain("missing shortcode")
+    end
+
+    it "renders a single-quoted name with no further args" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/hr" => %(<hr class="fancy">)}
+      result = builder.test_sc_process(%({{ shortcode('hr') }}), templates)
+      result.should contain(%(<hr class="fancy">))
+    end
+  end
+
+  describe "builtin alert markdown body" do
+    it "markdownifies the builtin alert body (parity with the scaffold override)" do
+      builder = Hwaro::Core::Build::Builder.new
+      result = builder.test_sc_process(
+        %({% alert(type="info") %}some **bold** text{% end %}),
+        {} of String => String,
+      )
+      result.should contain("<strong>bold</strong>")
+    end
+
+    it "markdownifies the builtin callout body" do
+      builder = Hwaro::Core::Build::Builder.new
+      result = builder.test_sc_process(
+        %({% callout(type="tip") %}a [link](https://example.com){% end %}),
+        {} of String => String,
+      )
+      result.should contain(%(<a href="https://example.com">link</a>))
+    end
+  end
 end

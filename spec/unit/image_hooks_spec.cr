@@ -428,5 +428,65 @@ describe Hwaro::Content::Hooks::ImageHooks do
           .should be_nil
       end
     end
+
+    # A11: the source width used to be inferred from the LARGEST on-disk
+    # variant, so adding a bigger width to [image_processing] widths was
+    # silently "satisfied" by clamping to the old largest variant — the new
+    # variant never got generated on warm builds. The true source width now
+    # comes from the image file itself.
+    it "does not reuse when the config gains a width the true source can satisfy (A11)" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.png")
+        pixels = Array(UInt8).new(1200 * 8 * 3, 128_u8)
+        LibStb.stbi_write_png(source, 1200, 8, 3, pixels.to_unsafe.as(Void*), 1200 * 3)
+
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        # Only the old config's [320] variant exists. The source is 1200px
+        # wide, so a newly configured 1024 variant is NOT a clamp — the set
+        # must be reprocessed.
+        File.write(File.join(dest_dir, "photo_320w.png"), "320")
+
+        Hwaro::Content::Hooks::ImageHooks
+          .reusable_widths(source, dest_dir, [320, 1024])
+          .should be_nil
+      end
+    end
+
+    it "still reuses when the on-disk variants cover the config for the true source width (A11)" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.png")
+        pixels = Array(UInt8).new(1200 * 8 * 3, 128_u8)
+        LibStb.stbi_write_png(source, 1200, 8, 3, pixels.to_unsafe.as(Void*), 1200 * 3)
+
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "photo_320w.png"), "320")
+        File.write(File.join(dest_dir, "photo_1024w.png"), "1024")
+
+        result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 1024])
+        result.should_not be_nil
+        result.not_nil!.should eq({320 => "photo_320w.png", 1024 => "photo_1024w.png"})
+      end
+    end
+
+    it "reuses the clamped variant when a configured width exceeds the TRUE source width (A11)" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.png")
+        pixels = Array(UInt8).new(640 * 8 * 3, 128_u8)
+        LibStb.stbi_write_png(source, 640, 8, 3, pixels.to_unsafe.as(Void*), 640 * 3)
+
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        # 1280 clamps to the 640px source, so the on-disk {320, 640} set is
+        # exactly what the current config produces → reuse.
+        File.write(File.join(dest_dir, "photo_320w.png"), "320")
+        File.write(File.join(dest_dir, "photo_640w.png"), "640")
+
+        result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 1280])
+        result.should_not be_nil
+        result.not_nil!.should eq({320 => "photo_320w.png", 640 => "photo_640w.png"})
+      end
+    end
   end
 end

@@ -414,6 +414,42 @@ describe "Fence options — server mode" do
     reset_highlight_mode
   end
 
+  # Regression: the per-fence copy probe used to run inside
+  # build_template_variables, where pages WITH shortcodes pass content=""
+  # (the shortcode pre-render context). The probe never re-ran against the
+  # final rendered content, so a `{copy=true}` fence on any page that also
+  # used a shortcode silently shipped no copy runtime.
+  it "per-fence {copy=true} still ships the runtime when the page also uses a shortcode" do
+    opted = <<-MD
+      +++
+      title = "Opted"
+      +++
+      {{ badge(label="x") }}
+
+      ```python {copy=true}
+      pass
+      ```
+      MD
+
+    build_site(
+      SERVER_HIGHLIGHT_CONFIG,
+      content_files: {"opted.md" => opted},
+      template_files: {
+        "page.html"             => HIGHLIGHT_TEMPLATE,
+        "shortcodes/badge.html" => %(<span class="badge">{{ label }}</span>),
+      },
+      highlight: true,
+    ) do
+      html = File.read("public/opted/index.html")
+      # The shortcode itself rendered (proves the shortcode path was taken).
+      html.should contain(%(<span class="badge">x</span>))
+      html.should contain(%(<pre data-copy="true">))
+      html.scan("code-copy-btn").size.should be > 0
+    end
+  ensure
+    reset_highlight_mode
+  end
+
   it "the global [highlight] line_numbers default wraps a bare fence, and a per-block override opts out" do
     config = <<-TOML
       title = "Test Site"
