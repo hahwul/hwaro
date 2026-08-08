@@ -880,7 +880,16 @@ module Hwaro
           # Re-render with reloaded templates. The selective path inside
           # run_rerender only covers template-affected pages, so the content
           # pages re-parsed above must be forced into the render set.
-          run_rerender(options, force_pages: changed_pages)
+          #
+          # membership_changed: a page whose draft/expired/future status just
+          # flipped it OUT of the built set leaves changed_pages (so
+          # force_pages can't carry the signal), yet sitemap/feeds/search and
+          # taxonomy pages still list it — run_rerender must refresh those
+          # surfaces even when the template edit itself was layout-only (or a
+          # bare mtime touch). Flips INTO the set escalate to a full rebuild
+          # via the pages_map miss above, so exclusions are the only
+          # membership change this path can see.
+          run_rerender(options, force_pages: changed_pages, membership_changed: !excluded_pages.empty?)
         end
 
         # Re-render pages using reloaded templates without re-parsing content.
@@ -895,7 +904,12 @@ module Hwaro
         # the selective path can't skip a content-changed page. Their taxonomy
         # membership may have changed too, so taxonomy pages regenerate
         # whenever force_pages are present.
-        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil) : Bool
+        #
+        # `membership_changed` signals that pages left the built set in this
+        # pass (a draft/expired/future flip): the SEO surfaces and taxonomy
+        # pages must refresh even when no template content changed, and the
+        # identical-templates early return must not skip that work.
+        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil, membership_changed : Bool = false) : Bool
           @render_workers = options.workers
           config = @config
           site = @site
@@ -957,7 +971,7 @@ module Hwaro
               changed << name if old_templates[name]? != source
             end
             changed_template_names = changed
-            if changed.empty? && (force_pages.nil? || force_pages.empty?)
+            if changed.empty? && (force_pages.nil? || force_pages.empty?) && !membership_changed
               Logger.info "Template change detected, but contents are identical — nothing to re-render."
               return true
             end
@@ -1081,6 +1095,7 @@ module Hwaro
           # pages may have changed taxonomy membership — regenerate then too.
           taxonomy_sections = if affected_templates.nil? ||
                                  (force_pages && !force_pages.empty?) ||
+                                 membership_changed ||
                                  feed_templates_affected ||
                                  ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
                                 Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
@@ -1094,8 +1109,10 @@ module Hwaro
           # search, and llms embed. Refresh those surfaces. A pure layout
           # edit still skips this — template output doesn't feed them —
           # UNLESS the edit touched a user feed template, whose output IS a
-          # generated surface (see feed_templates_affected above).
-          if summaries_affected || feed_templates_affected
+          # generated surface (see feed_templates_affected above) — or pages
+          # LEFT the built set this pass (membership_changed): sitemap,
+          # feeds, search and llms would keep listing them otherwise.
+          if summaries_affected || feed_templates_affected || membership_changed
             seo_pages = (site.pages + site.sections).as(Array(Models::Page))
             seo_pages += taxonomy_sections unless taxonomy_sections.empty?
             regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
@@ -1291,9 +1308,13 @@ module Hwaro
         # Recompile all SCSS entries into the output directory. Used by
         # serve mode when a `.scss` source changes — such files publish as
         # compiled `.css`, never verbatim. No-ops unless [sass] is enabled.
-        def recompile_sass(output_dir : String)
+        #
+        # Returns true when reprocessing the asset bundles changed the
+        # manifest (a fingerprinted filename moved) — see
+        # reprocess_asset_bundles for what callers must do then.
+        def recompile_sass(output_dir : String) : Bool
           config = @config
-          return unless config && config.sass.enabled
+          return false unless config && config.sass.enabled
 
           compiler = Assets::SassCompiler.new(config.sass, config.static)
           count = compiler.compile_all(output_dir)
@@ -1302,22 +1323,45 @@ module Hwaro
           # Bundle entries with `.scss` sources only recompile inside the asset
           # pipeline (AfterInitialize on a full build). Static-only serve
           # reloads would otherwise leave fingerprinted bundles stale.
-          reprocess_asset_bundles(output_dir) if config.assets.enabled
+          config.assets.enabled ? reprocess_asset_bundles(output_dir) : false
+        end
+
+        # True when a watcher-relative path (e.g. "static/js/app.js") is a
+        # source file of a configured [assets] bundle. The serve watcher uses
+        # this to know a plain (non-Sass) static save must re-run the bundle
+        # pipeline — bundle inputs are `source_dir`-joined `bundle.files`,
+        # exactly how Assets::Pipeline reads them.
+        def asset_bundle_source?(path : String) : Bool
+          config = @config
+          return false unless config && config.assets.enabled
+
+          normalized = Path[path].normalize.to_s
+          config.assets.bundles.any? do |bundle|
+            bundle.files.any? do |file|
+              Path[config.assets.source_dir, file].normalize.to_s == normalized
+            end
+          end
         end
 
         # Re-run the asset pipeline so SCSS (or plain CSS/JS) bundle sources
         # refresh under serve. Updates the AssetHooks class-level manifest so
         # subsequent renders see new fingerprint paths.
-        def reprocess_asset_bundles(output_dir : String)
+        #
+        # Returns true when the manifest changed — with fingerprinting on,
+        # every already-rendered page still references the OLD hashed
+        # filename, so callers must follow up with a page re-render.
+        def reprocess_asset_bundles(output_dir : String) : Bool
           config = @config
-          return unless config && config.assets.enabled
+          return false unless config && config.assets.enabled
 
+          old_manifest = Content::Hooks::AssetHooks.manifest
           pipeline = Assets::Pipeline.new(config.assets, config.base_url, config.sass.enabled)
           pipeline.process(output_dir)
           Content::Hooks::AssetHooks.replace_manifest(pipeline.manifest)
           if pipeline.manifest.size > 0
             Logger.outcome("bundled", "#{pipeline.manifest.size} asset #{pipeline.manifest.size == 1 ? "bundle" : "bundles"}")
           end
+          pipeline.manifest != old_manifest
         end
 
         # Republish non-Markdown content assets (images, etc.) to the output
@@ -1411,6 +1455,23 @@ module Hwaro
             end
           end
           outputs
+        end
+
+        # Every output file the CURRENT site claims — primary page outputs
+        # plus output-format siblings, computed exactly like
+        # collect_page_output_paths so the two can never drift. The serve
+        # watcher filters its pre-rebuild stale list through this AFTER the
+        # rebuild: a source deleted and re-created under a different path in
+        # one changeset (foo.md → foo/index.md) maps to the same output file,
+        # which the rebuild just rewrote and must not be deleted.
+        def owned_output_paths(output_dir : String) : Set(String)
+          owned = Set(String).new
+          if site = @site
+            (site.pages + site.sections).each do |page|
+              collect_page_output_paths(page, output_dir).each { |path| owned << path }
+            end
+          end
+          owned
         end
 
         # Primary output file plus output-format siblings for a page — used

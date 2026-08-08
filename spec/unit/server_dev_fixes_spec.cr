@@ -48,6 +48,10 @@ module Hwaro
       def dev_fixes_config_loaded? : Bool
         !@builder.config.nil?
       end
+
+      def dev_fixes_url_openable?(url : String) : Bool
+        url_openable?(url)
+      end
     end
   end
 end
@@ -466,6 +470,52 @@ describe Hwaro::Services::LiveReloadInjectHandler do
     end
   end
 
+  # S7: a non-canonical path (`//`, `/./` segments) must not be served with
+  # a 200 — StaticFileHandler (and the base-path mount) answer it with a
+  # canonicalising 302, so the injector defers instead of short-circuiting.
+  it "defers non-canonical paths to the next handler" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "guide"))
+      File.write(File.join(dir, "guide", "index.html"), "<html><body>g</body></html>")
+      handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+
+      ["/guide//index.html", "/./guide/index.html", "/guide/./index.html"].each do |path|
+        spy = ServeFixesSpy.new
+        handler.next = spy
+        context, response, io = build_context("GET", path)
+        handler.call(context)
+        response.close
+
+        spy.called.should be_true
+        io.to_s.includes?("__hwaro_livereload").should be_false
+      end
+    end
+  end
+
+  # S7: chained with the real static handler, the deferral becomes the same
+  # canonicalising redirect production hosts issue — while the canonical
+  # path keeps its 200 + injection.
+  it "redirects non-canonical paths when chained with the static handler" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "guide"))
+      File.write(File.join(dir, "guide", "index.html"), "<html><body>g</body></html>")
+      handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+      handler.next = HTTP::StaticFileHandler.new(dir, directory_listing: false, fallthrough: true)
+
+      context, response, _ = build_context("GET", "/guide//index.html")
+      handler.call(context)
+      response.close
+      context.response.status_code.should eq(302)
+      context.response.headers["Location"].should eq("/guide/index.html")
+
+      ok_context, ok_response, ok_io = build_context("GET", "/guide/index.html")
+      handler.call(ok_context)
+      ok_response.close
+      ok_context.response.status_code.should eq(200)
+      ok_io.to_s.should contain("__hwaro_livereload")
+    end
+  end
+
   # Finding 10: the strictness must not cost unicode routes.
   it "still serves percent-encoded and raw unicode paths" do
     Dir.mktmpdir do |dir|
@@ -774,6 +824,28 @@ describe Hwaro::Services::Server do
         handlers = server.dev_fixes_build_handlers(dir, server.dev_fixes_base_path_for("http://127.0.0.1:3000"))
         handlers.any?(Hwaro::Services::BasePathHandler).should be_false
       end
+    end
+  end
+
+  # S4: the --open allowlist must accept serve's own URL shapes — a
+  # bracketed IPv6 bind (`-b ::1`) and percent-encoded base paths — while
+  # still refusing shell metacharacters and non-http schemes.
+  describe "#url_openable?" do
+    it "accepts bracketed IPv6 hosts and percent-encoded paths" do
+      server = Hwaro::Services::Server.new
+      server.dev_fixes_url_openable?("http://[::1]:3000").should be_true
+      server.dev_fixes_url_openable?("http://[fe80::1]:8080/blog/").should be_true
+      server.dev_fixes_url_openable?("http://127.0.0.1:3000/my%20blog/").should be_true
+      server.dev_fixes_url_openable?("http://127.0.0.1:3000").should be_true
+    end
+
+    it "still refuses shell metacharacters and non-http schemes" do
+      server = Hwaro::Services::Server.new
+      server.dev_fixes_url_openable?("http://localhost:3000/$(touch pwned)").should be_false
+      server.dev_fixes_url_openable?("http://localhost:3000/a;b").should be_false
+      server.dev_fixes_url_openable?("http://localhost:3000/`id`").should be_false
+      server.dev_fixes_url_openable?("file:///etc/passwd").should be_false
+      server.dev_fixes_url_openable?("ftp://example.com").should be_false
     end
   end
 

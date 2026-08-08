@@ -252,6 +252,18 @@ module Hwaro
           return
         end
 
+        # A non-canonical path (`//` or `/./` segments — `/guide//index.html`)
+        # is answered by HTTP::StaticFileHandler with a canonicalising 302,
+        # and the base-path mount pre-empts the same redirect. Serving it
+        # here with a 200 (DevPath.safe_relative collapses those segments)
+        # made dev accept URLs production redirects or 404s. Defer to the
+        # next handler so the request gets the same treatment as everywhere
+        # else in the chain.
+        if noncanonical_request?(path)
+          call_next(context)
+          return
+        end
+
         # Resolve strictly (see DevPath): routing through the lenient
         # `sanitize_path` made `/a%5Cb.html` and `/%2Fa%2Fb.html` serve pages
         # that every static host 404s.
@@ -293,6 +305,22 @@ module Hwaro
         context.response.content_length = injected.bytesize
         return if method == "HEAD"
         context.response.print(injected)
+      end
+
+      # Mirrors HTTP::StaticFileHandler's own canonicalisation test (decode
+      # once, `Path.posix(...).expand("/")`, compare as Path) — the same
+      # shape as BasePathHandler#noncanonical_target — so this defers when
+      # and only when stdlib would redirect. Unservable paths are refused
+      # upstream (and `Path.posix` raises on NUL), so they are excluded
+      # before anything here can raise.
+      private def noncanonical_request?(path : String) : Bool
+        return false if DevPath.unservable?(path)
+
+        decoded = URI.decode(path)
+        return false unless decoded.valid_encoding?
+
+        request_path = Path.posix(decoded)
+        request_path != request_path.expand("/")
       end
 
       def inject_script(html : String) : String
