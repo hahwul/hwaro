@@ -43,6 +43,8 @@ require "../../content/seo/robots"
 require "../../content/seo/llms"
 require "../../content/seo/tags"
 require "../../content/seo/jsonld"
+require "../../content/seo/pwa"
+require "../../content/seo/og_image"
 require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
@@ -286,6 +288,13 @@ module Hwaro
         # after a config-triggered rebuild.
         def config : Models::Config?
           @config
+        end
+
+        # The most recently built site (nil before the first build). The dev
+        # server's lazy OG handler reads it to match a requested image path
+        # back to the page that owns it.
+        def site : Models::Site?
+          @site
         end
 
         # Register all cache layers with the unified manager
@@ -751,7 +760,7 @@ module Hwaro
           seo_pages = taxonomy_sections.empty? ? all_pages : all_pages + taxonomy_sections
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
-          regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
+          regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true, options: options)
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{render_list.size}/#{all_pages.size} pages", :result, elapsed.total_milliseconds)
@@ -1115,7 +1124,13 @@ module Hwaro
           if summaries_affected || feed_templates_affected || membership_changed
             seo_pages = (site.pages + site.sections).as(Array(Models::Page))
             seo_pages += taxonomy_sections unless taxonomy_sections.empty?
-            regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true)
+            regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true, options: options)
+          elsif site.config.pwa.enabled
+            # A layout-only template edit rightly skips the SEO surfaces
+            # (their inputs didn't change) — but it DID rewrite page HTML,
+            # and sw.js content-hashes the precached pages' bytes, so the
+            # service worker must still be refreshed.
+            Content::Seo::Pwa.generate(site, output_dir, verbose)
           end
 
           cache.save if options.cache
@@ -1229,7 +1244,7 @@ module Hwaro
           # had no effect on this deferred pass).
           taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
           all_pages = (site.pages + site.sections + taxonomy_sections).as(Array(Models::Page))
-          regenerate_seo_surfaces(all_pages, site, output_dir, verbose, options.parallel)
+          regenerate_seo_surfaces(all_pages, site, output_dir, verbose, options.parallel, options: options)
 
           # Persist cache updates from the deferred pass. The initial build
           # already saved once; without this second save, killing the server
@@ -1670,7 +1685,7 @@ module Hwaro
         # deferred-pages cleanup, and the live-reload signal even though
         # every page rendered fine. The cold-build Generate phase keeps the
         # fail-loud default via its own ParallelHelper.execute call.
-        private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false)
+        private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false, options : Config::Options::BuildOptions? = nil)
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
             -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose, templates: @templates, renderer: feed_template_renderer); nil },
@@ -1681,7 +1696,41 @@ module Hwaro
           seo_tasks << -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil } if include_robots
           seo_tasks << -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil }
           seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil }
+          # Auto-OG images: the incremental/rerender passes never run the
+          # BeforeRender `og_image:generate` hook, so a re-parsed page's
+          # OG file went stale even though its HTML keeps the auto-assigned
+          # URL (see ParseContent#parse_single_page). The manifest hash makes
+          # this a near no-op when no title/description changed. Lazy serve
+          # mode keeps its on-request contract (OgLazyImageHandler), and
+          # --skip-og-image is honored like the hook does. Runs BEFORE the
+          # surface pool (not inside it): generate assigns page.image, which
+          # the feed/search tasks read.
+          if opts = options
+            ai = site.config.og.auto_image
+            if ai.enabled && !opts.skip_og_image && !(ai.lazy_generate && opts.serve_mode)
+              begin
+                Content::Seo::OgImage.generate(pages, site.config, output_dir, verbose, parallel: false)
+              rescue ex
+                # Same warn-and-continue contract as the surface pool below —
+                # a transient OG failure must not skip cache.save / reload.
+                Logger.warn "  OG image regeneration failed: #{ex.message}"
+              end
+            end
+          end
           ParallelHelper.execute(seo_tasks, parallel, raise_on_error: false)
+          # PWA sw.js content-hashes the bytes of the files it precaches —
+          # including the search index the tasks above just rewrote — so it
+          # regenerates AFTER they finish, mirroring the full build's
+          # AfterWrite hook. Without this no serve incremental path ever
+          # rewrote sw.js and registered service workers kept serving stale
+          # bytes through live reloads.
+          if site.config.pwa.enabled
+            begin
+              Content::Seo::Pwa.generate(site, output_dir, verbose)
+            rescue ex
+              Logger.warn "  PWA regeneration failed: #{ex.message}"
+            end
+          end
         end
 
         # Emit the end-of-build cache statistics at the requested verbosity.

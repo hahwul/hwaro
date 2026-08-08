@@ -298,9 +298,26 @@ module Hwaro::Core::Build::Phases::ParseContent
     raw_content = File.read(source_path)
     data = Processor::Markdown.parse(raw_content, source_path)
 
+    # A serve incremental re-parse works on the LIVE page object, and
+    # `og_image:generate` (a BeforeRender hook the incremental paths never
+    # run) previously stored the auto-OG image URL on it. Resetting
+    # page.image from front matter alone erased the og:image meta from the
+    # edited page for the rest of the session. Preserve the auto-assigned
+    # URL when the front matter still declares no image; the OG file itself
+    # is refreshed by regenerate_seo_surfaces after the re-render (or on
+    # request under lazy serve mode). On a cold build pages are fresh
+    # (page.image nil), so this is a no-op there. A front-matter image the
+    # edit just added still wins.
+    previous_image = page.image
+
     page.title = data[:title]
     page.description = data[:description]
     page.image = data[:image]
+    if data[:image].nil? && (prev = previous_image)
+      if (cfg = @config) && cfg.og.auto_image.enabled && Content::Seo::OgImage.auto_assigned?(prev, cfg.og.auto_image)
+        page.image = prev
+      end
+    end
     page.raw_content = data[:content]
     page.draft = data[:draft]
     page.template = normalize_template_name(data[:template])

@@ -49,6 +49,25 @@ module Hwaro
           dir == "." ? name : File.join(dir, name)
         end
 
+        # Read the intrinsic {width, height} of an image from its file header
+        # without decoding pixel data (pure Crystal, no stb round-trip).
+        # Supports the formats `image?` accepts (PNG/JPEG/BMP); returns nil
+        # for anything unreadable so callers can fall back to other
+        # heuristics. Used by the warm-build variant-reuse check: inferring
+        # the source width from the largest on-disk variant silently ignored
+        # newly configured LARGER widths (the variant set "matched" after
+        # clamping to the stale inferred width).
+        def dimensions(path : String) : {Int32, Int32}?
+          return unless File.file?(path)
+          case File.extname(path).downcase
+          when ".png"          then png_dimensions(path)
+          when ".jpg", ".jpeg" then jpeg_dimensions(path)
+          when ".bmp"          then bmp_dimensions(path)
+          end
+        rescue IO::Error | File::Error
+          nil
+        end
+
         # Resize a single image to the given width, preserving aspect ratio.
         # Returns the output path on success, nil on failure.
         def resize(source : String, dest : String, width : Int32, height : Int32 = 0, quality : Int32 = 85) : String?
@@ -372,6 +391,66 @@ module Hwaro
         end
 
         # --- Private helpers ---
+
+        PNG_SIGNATURE = Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+        # PNG: width/height are big-endian UInt32s at offsets 16/20 (IHDR).
+        private def png_dimensions(path : String) : {Int32, Int32}?
+          header = Bytes.new(24)
+          read = File.open(path, &.read(header))
+          return if read < 24
+          return unless header[0, 8] == PNG_SIGNATURE
+          width = IO::ByteFormat::BigEndian.decode(UInt32, header[16, 4])
+          height = IO::ByteFormat::BigEndian.decode(UInt32, header[20, 4])
+          return if width == 0 || height == 0 || width > Int32::MAX || height > Int32::MAX
+          {width.to_i32, height.to_i32}
+        end
+
+        # JPEG: scan the marker stream for the first SOF frame header
+        # (C0–CF, excluding the non-frame C4/C8/CC markers); height/width are
+        # big-endian UInt16s at offsets 3/5 of its payload.
+        private def jpeg_dimensions(path : String) : {Int32, Int32}?
+          File.open(path) do |io|
+            return unless io.read_byte == 0xFF && io.read_byte == 0xD8
+            loop do
+              byte = io.read_byte
+              return if byte.nil?
+              next unless byte == 0xFF
+              marker = io.read_byte
+              return if marker.nil?
+              next if marker == 0xFF               # fill bytes
+              next if marker == 0x00               # stuffed byte (not a marker)
+              next if (0xD0..0xD9).covers?(marker) # RST/SOI/EOI: no payload
+              length = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+              return if length < 2
+              if (0xC0..0xCF).covers?(marker) && marker != 0xC4 && marker != 0xC8 && marker != 0xCC
+                return if length < 7
+                io.read_byte # sample precision
+                height = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+                width = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+                return if width == 0 || height == 0
+                return {width.to_i32, height.to_i32}
+              end
+              io.skip(length - 2)
+            end
+          end
+        end
+
+        # BMP: signature "BM"; width/height are little-endian Int32s at
+        # offsets 18/22 (BITMAPINFOHEADER). Height may be negative
+        # (top-down rows) — the magnitude is the pixel height.
+        private def bmp_dimensions(path : String) : {Int32, Int32}?
+          header = Bytes.new(26)
+          read = File.open(path, &.read(header))
+          return if read < 26
+          return unless header[0] == 0x42 && header[1] == 0x4D
+          width = IO::ByteFormat::LittleEndian.decode(Int32, header[18, 4])
+          height = IO::ByteFormat::LittleEndian.decode(Int32, header[22, 4])
+          return if height == Int32::MIN # .abs would overflow
+          height = height.abs
+          return if width <= 0 || height == 0
+          {width, height}
+        end
 
         # Calculate output dimensions preserving aspect ratio.
         # Returns {0, 0} for invalid inputs to signal caller to skip.

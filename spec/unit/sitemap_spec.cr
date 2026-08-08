@@ -49,6 +49,33 @@ describe Hwaro::Content::Seo::Sitemap do
       end
     end
 
+    it "rewrites sitemap.xml as an empty urlset when no eligible pages remain" do
+      # Drafting the last sitemap-eligible page used to leave the previous
+      # sitemap.xml on disk untouched (early return) — stale URLs kept being
+      # served/deployed. An empty (valid) urlset is written instead.
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        page = Hwaro::Models::Page.new("blog/hello.md")
+        page.url = "/blog/hello/"
+        page.in_sitemap = true
+        page.render = true
+
+        Hwaro::Content::Seo::Sitemap.generate([page], site, dir)
+        File.read(File.join(dir, "sitemap.xml")).should contain("<url>")
+
+        page.draft = true
+        Hwaro::Content::Seo::Sitemap.generate([page], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("<urlset")
+        content.should_not contain("<url>")
+      end
+    end
+
     it "skips when sitemap is disabled" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
@@ -105,7 +132,12 @@ describe Hwaro::Content::Seo::Sitemap do
 
         Hwaro::Content::Seo::Sitemap.generate([page], site, dir)
 
-        File.exists?(File.join(dir, "sitemap.xml")).should be_false
+        # An (empty, valid) sitemap is still written — a stale previous
+        # sitemap must never survive on disk — but the filtered page is not
+        # in it.
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("<urlset")
+        content.should_not contain("<url>")
       end
     end
 

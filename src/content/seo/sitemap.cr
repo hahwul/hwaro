@@ -30,7 +30,18 @@ module Hwaro
           DiscoveryPages.reject_excluded!(sitemap_pages, site.config.sitemap.exclude)
 
           if sitemap_pages.empty?
-            Logger.info "  No pages to include in sitemap."
+            # Still (re)write the file: returning here left a PREVIOUS
+            # build's sitemap on disk when the last eligible page was
+            # drafted/excluded — stale URLs kept being served and deployed.
+            # An empty urlset is valid per the sitemap protocol.
+            Logger.info "  No pages to include in sitemap — writing an empty sitemap."
+            empty_xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
+                        "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n" \
+                        "</urlset>\n"
+            filename = File.basename(site.config.sitemap.filename)
+            sitemap_path = Path[output_dir, filename].to_s
+            Hwaro::Utils::FileSafe.atomic_write(sitemap_path, empty_xml)
+            Logger.action :create, sitemap_path if verbose
             return
           end
 

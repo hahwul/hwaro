@@ -406,29 +406,15 @@ module Hwaro
           # slug => page.url that owns it, so colliding slugs get disambiguated.
           seen_slugs = {} of String => String
           pages.each do |page|
-            next if page.draft
-            next if page.generated
-            next unless page.render
-            next if page.image # Skip pages that already have a custom image
+            next unless eligible_for_auto_image?(page)
+            # Skip pages that carry a CUSTOM image (front matter / default).
+            # An image pointing into our own output_dir was assigned by a
+            # previous auto-OG pass (a serve incremental re-parse preserves
+            # it, and lazy serve mode pre-assigns the URL) — those must fall
+            # through so the file gets (re)generated when the page changed.
+            next if (img = page.image) && !auto_assigned?(img, ai)
 
-            # Use URL-based slug to avoid collisions between pages with the same title
-            # in different sections (e.g., /posts/hello/ and /guides/hello/)
-            url_slug = page.url.gsub("/", "-").strip("-")
-            slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
-            slug = "page" if slug.empty?
-
-            # The gsub("/", "-") collapses distinct URLs that differ only in
-            # slash-vs-hyphen placement (e.g. /posts/foo/ and /posts-foo/) onto
-            # the same slug. Left unresolved, the second page overwrites the
-            # first's manifest entry and both Pass-2 workers issue a concurrent
-            # File.write to the SAME .png/.svg path (torn file under -Dpreview_mt),
-            # and one page advertises an OG image rendered for the other. Append
-            # a short stable hash of the URL so each distinct URL owns a path.
-            if (owner = seen_slugs[slug]?) && owner != page.url
-              slug = "#{slug}-#{Digest::SHA256.hexdigest(page.url)[0, 8]}"
-            end
-            seen_slugs[slug] = page.url
-
+            slug = slug_for(page, seen_slugs)
             page_hash = compute_page_hash(page)
             new_entries[slug] = page_hash
 
@@ -526,6 +512,79 @@ module Hwaro
           end
 
           {generated: generated, skipped: skipped}
+        end
+
+        # Pages auto-OG generation applies to (mirrors the Pass-1 filters,
+        # minus the custom-image skip which callers evaluate themselves).
+        def self.eligible_for_auto_image?(page : Models::Page) : Bool
+          !page.draft && !page.generated && page.render
+        end
+
+        # True when `image` was assigned by auto-OG generation — it points
+        # into the auto-OG output directory — rather than set by the user.
+        # Used by the serve incremental re-parse to preserve the assignment
+        # (front matter alone can't restore it) and by Pass 1 above so a
+        # preserved URL doesn't read as a "custom image" that blocks
+        # regeneration.
+        def self.auto_assigned?(image : String?, ai : Models::AutoImageConfig) : Bool
+          return false unless image
+          image.starts_with?("/#{ai.output_dir.strip("/")}/")
+        end
+
+        # The OG image slug for a page. Uses the URL-based slug to avoid
+        # collisions between pages with the same title in different sections
+        # (e.g. /posts/hello/ and /guides/hello/).
+        #
+        # The gsub("/", "-") collapses distinct URLs that differ only in
+        # slash-vs-hyphen placement (e.g. /posts/foo/ and /posts-foo/) onto
+        # the same slug. Left unresolved, the second page overwrites the
+        # first's manifest entry and both Pass-2 workers issue a concurrent
+        # File.write to the SAME .png/.svg path (torn file under -Dpreview_mt),
+        # and one page advertises an OG image rendered for the other. Append
+        # a short stable hash of the URL so each distinct URL owns a path.
+        # `seen_slugs` (slug => owning page.url) carries that disambiguation
+        # state across calls within one pass.
+        def self.slug_for(page : Models::Page, seen_slugs : Hash(String, String)) : String
+          url_slug = page.url.gsub("/", "-").strip("-")
+          slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
+          slug = "page" if slug.empty?
+
+          if (owner = seen_slugs[slug]?) && owner != page.url
+            slug = "#{slug}-#{Digest::SHA256.hexdigest(page.url)[0, 8]}"
+          end
+          seen_slugs[slug] = page.url
+          slug
+        end
+
+        # Lazy serve mode (`[og.auto_image] lazy_generate = true`): assign
+        # each eligible page the URL its OG image WILL live at without
+        # rendering anything, so page HTML carries the same og:image meta a
+        # full build would emit. The dev server's OgLazyImageHandler
+        # generates the file on first request. Returns the number of pages
+        # assigned.
+        #
+        # The extension assumes PNG rendering will be available when the
+        # format asks for it; if font initialization fails at request time
+        # the handler serves the SVG fallback bytes under the advertised
+        # path (dev-only pragmatism).
+        def self.assign_lazy_urls(pages : Array(Models::Page), config : Models::Config) : Int32
+          ai = config.og.auto_image
+          return 0 unless ai.enabled
+
+          # Mirrors generate's format validation: anything but "png" (unknown
+          # formats included) renders as SVG.
+          ext = ai.format == "png" ? "png" : "svg"
+          seen_slugs = {} of String => String
+          count = 0
+          pages.each do |page|
+            next unless eligible_for_auto_image?(page)
+            next if (img = page.image) && !auto_assigned?(img, ai)
+
+            slug = slug_for(page, seen_slugs)
+            page.image = "/#{ai.output_dir}/#{slug}.#{ext}"
+            count += 1
+          end
+          count
         end
 
         # Font stacks for the SVG fallback renderer. They lead with the

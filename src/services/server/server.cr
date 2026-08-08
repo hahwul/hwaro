@@ -464,6 +464,78 @@ module Hwaro
       end
     end
 
+    # Dev-only on-demand OG image generation for `[og.auto_image]
+    # lazy_generate = true` under `hwaro serve`.
+    #
+    # Lazy serve builds assign each eligible page its predicted og:image URL
+    # without rendering the file (OgImage.assign_lazy_urls) — this handler
+    # fulfills the promised "generated on first request" contract that
+    # previously didn't exist (the URLs 404'd all session). A request for a
+    # path under the OG output directory generates the owning page's image,
+    # then falls through to the static file handler to serve it from disk.
+    #
+    # Only ever mounted in the dev handler chain; a no-op unless the current
+    # config enables auto-OG with lazy_generate.
+    class OgLazyImageHandler
+      include HTTP::Handler
+
+      def initialize(@builder : Core::Build::Builder, @output_dir : String)
+        @mutex = Mutex.new
+      end
+
+      def call(context)
+        method = context.request.method
+        return call_next(context) unless method == "GET" || method == "HEAD"
+
+        config = @builder.config
+        site = @builder.site
+        return call_next(context) unless config && site
+        ai = config.og.auto_image
+        return call_next(context) unless ai.enabled && ai.lazy_generate
+
+        sanitized = DevPath.safe_relative(context.request.path)
+        return call_next(context) if sanitized.nil? || sanitized.empty?
+        return call_next(context) unless sanitized.starts_with?("#{ai.output_dir.strip("/")}/")
+        return call_next(context) unless sanitized.ends_with?(".png") || sanitized.ends_with?(".svg")
+
+        url_path = "/#{sanitized}"
+        page = site.pages.find { |p| p.image == url_path } ||
+               site.sections.find { |s| s.image == url_path }
+        return call_next(context) unless page
+
+        # Serialize generation: the og:image and twitter:image fetches of one
+        # link preview land together and must not render the file twice.
+        # generate() is manifest-cached — when the file exists and the page
+        # hash matches, a repeat request costs a hash + stat, so no extra
+        # freshness bookkeeping is needed here. `partial: true`: a
+        # single-page call must not truncate every other page's manifest
+        # entry.
+        @mutex.synchronize do
+          Content::Seo::OgImage.generate([page], config, @output_dir, partial: true, parallel: false)
+        rescue ex
+          Logger.warn "On-demand OG image generation failed for #{url_path}: #{ex.message}"
+        end
+
+        # PNG rendering can fall back to SVG (no usable font). The advertised
+        # .png path then has no backing file, but the page's updated image
+        # URL does — serve those bytes under the requested path (dev-only
+        # pragmatism: the preview still shows an image).
+        requested = File.join(@output_dir, sanitized)
+        if !File.exists?(requested) && (fallback = page.image) && fallback != url_path
+          fallback_path = File.join(@output_dir, fallback.lchop('/'))
+          if File.exists?(fallback_path) && Utils::OutputGuard.within_output_dir?(fallback_path, @output_dir)
+            data = File.read(fallback_path)
+            context.response.content_type = fallback.ends_with?(".svg") ? "image/svg+xml" : "image/png"
+            context.response.content_length = data.bytesize
+            context.response.print(data) unless method == "HEAD"
+            return
+          end
+        end
+
+        call_next(context)
+      end
+    end
+
     # Categorised set of file-system changes detected by the watcher.
     #
     # Changes are split into five buckets so the server can pick the
@@ -1090,6 +1162,10 @@ module Hwaro
         end
         handlers << IndexRewriteHandler.new(output_dir)
         handlers << inject_handler if inject_handler
+        # Just above the static handler: generates a lazily-deferred OG image
+        # on first request, then lets StaticFileHandler serve it from disk.
+        # A no-op unless [og.auto_image] lazy_generate is enabled.
+        handlers << OgLazyImageHandler.new(@builder, output_dir)
         handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
         handlers << not_found
         handlers
@@ -1513,6 +1589,14 @@ module Hwaro
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        # Changed image BYTES need their resized variants/LQIP regenerated
+        # too — the resize hook only runs on full builds, so the copy above
+        # alone left variants stale for the whole serve session (A12).
+        unless build_options.skip_image_processing
+          if config = @builder.config
+            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changeset.modified_static, config, output_dir)
+          end
+        end
         # SCSS sources never publish verbatim — when one changed, recompile
         # the entries instead. A partial edit must rebuild every entry that
         # imports it, and there is no dependency graph, so the whole tree
@@ -1546,6 +1630,15 @@ module Hwaro
       private def copy_content_files(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_content_files(changeset.modified_content_files, output_dir, build_options.verbose)
+        # Mirror copy_static: modified image bytes under content/ (published
+        # via [content.files] or as page-bundle assets) must refresh their
+        # resized variants/LQIP too (A12).
+        unless build_options.skip_image_processing
+          if config = @builder.config
+            pages = @builder.site.try { |s| (s.pages + s.sections).as(Array(Models::Page)) }
+            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changeset.modified_content_files, config, output_dir, pages: pages)
+          end
+        end
       end
 
       # Allowlist for URLs handed to the OS opener. Serve's own URLs can

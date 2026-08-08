@@ -29,10 +29,16 @@ module Hwaro
           ai = site.config.og.auto_image
 
           # Lazy mode: skip automatic bulk generation during `hwaro serve`.
-          # OG images will be generated on first request instead (much faster
-          # initial dev server startup on large sites).
+          # OG images are generated on first request instead (much faster
+          # initial dev server startup on large sites) — but pages must still
+          # ADVERTISE their og:image URL, or every page ships without the
+          # meta tag for the whole session. Assign the predicted URLs without
+          # rendering; the dev server's OgLazyImageHandler creates the files
+          # on demand.
           if ai.lazy_generate && ctx.options.serve_mode
-            Logger.debug "  Skipping OG image generation (lazy_generate enabled in serve mode)"
+            lazy_pages = ctx.priority_pages || ctx.all_pages
+            assigned = Content::Seo::OgImage.assign_lazy_urls(lazy_pages, site.config)
+            Logger.debug "  Skipping OG image generation (lazy_generate enabled in serve mode); assigned #{assigned} on-demand URL(s)"
             return
           end
 

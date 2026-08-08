@@ -7,12 +7,12 @@ require "../../src/config/options/build_options"
 
 describe Hwaro::Content::Hooks::PwaHooks do
   describe "#register_hooks" do
-    it "registers a BeforeGenerate hook" do
+    it "registers an AfterWrite hook" do
       manager = Hwaro::Core::Lifecycle::Manager.new
       hooks = Hwaro::Content::Hooks::PwaHooks.new
       hooks.register_hooks(manager)
 
-      manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate).should be_true
+      manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::AfterWrite).should be_true
     end
 
     it "registers hook named pwa:generate" do
@@ -20,7 +20,7 @@ describe Hwaro::Content::Hooks::PwaHooks do
       hooks = Hwaro::Content::Hooks::PwaHooks.new
       hooks.register_hooks(manager)
 
-      registered = manager.hooks_at(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate)
+      registered = manager.hooks_at(Hwaro::Core::Lifecycle::HookPoint::AfterWrite)
       registered.any? { |h| h.name == "pwa:generate" }.should be_true
     end
 
@@ -29,7 +29,7 @@ describe Hwaro::Content::Hooks::PwaHooks do
       hooks = Hwaro::Content::Hooks::PwaHooks.new
       hooks.register_hooks(manager)
 
-      registered = manager.hooks_at(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate)
+      registered = manager.hooks_at(Hwaro::Core::Lifecycle::HookPoint::AfterWrite)
       hook = registered.find { |h| h.name == "pwa:generate" }
       hook.should_not be_nil
       hook.not_nil!.priority.should eq(50)
@@ -42,6 +42,7 @@ describe Hwaro::Content::Hooks::PwaHooks do
 
       manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::AfterRender).should be_false
       manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeRender).should be_false
+      manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate).should be_false
     end
   end
 
@@ -57,7 +58,7 @@ describe Hwaro::Content::Hooks::PwaHooks do
         hooks = Hwaro::Content::Hooks::PwaHooks.new
         hooks.register_hooks(manager)
 
-        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate, ctx)
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::AfterWrite, ctx)
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
       end
     end
@@ -80,7 +81,7 @@ describe Hwaro::Content::Hooks::PwaHooks do
         hooks = Hwaro::Content::Hooks::PwaHooks.new
         hooks.register_hooks(manager)
 
-        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate, ctx)
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::AfterWrite, ctx)
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
 
         # PWA manifest should be generated
@@ -104,7 +105,7 @@ describe Hwaro::Content::Hooks::PwaHooks do
         hooks = Hwaro::Content::Hooks::PwaHooks.new
         hooks.register_hooks(manager)
 
-        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate, ctx)
+        result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::AfterWrite, ctx)
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
 
         # PWA manifest should NOT be generated when disabled
