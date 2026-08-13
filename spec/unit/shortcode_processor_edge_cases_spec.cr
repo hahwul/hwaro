@@ -249,6 +249,36 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should_not contain("<span>fenced</span>")
     end
 
+    it "keeps fence protection after an unclosed block shortcode opener" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      results = {} of String => String
+      # The only `{% end %}` on the page is documentation inside a fenced
+      # example. Counting the opener the author never closed used to pin the
+      # depth counter above zero, so the fence was never recognized again:
+      # the fenced example expanded and Markd escaped its placeholder
+      # comment inside <pre><code>, where the restore pass can't find it.
+      content = "{% note %}\nforgot the closer\n\n```markdown\n{% note %}Hello{% end %}\n```\n"
+      result = builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
+      result.should contain("{% note %}Hello{% end %}")
+      result.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+      results.should be_empty
+    end
+
+    it "leaves a shortcode inside indented code that follows a heading untouched" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/t" => "<b>{{ _0 }}</b>"}
+      results = {} of String => String
+      # Indented code may not interrupt a paragraph, but it may follow a
+      # heading with no blank line — Markd opens <pre><code> here, so
+      # expanding the call stranded an escaped placeholder inside it.
+      content = %(## Example\n    {{ t("hello") }}\n\ntext\n)
+      result = builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
+      result.should contain(%({{ t("hello") }}))
+      result.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+      results.should be_empty
+    end
+
     it "does not count a fence opener's info string toward block depth" do
       builder = Hwaro::Core::Build::Builder.new
       templates = {"shortcodes/note" => "<span>{{ body }}</span>"}

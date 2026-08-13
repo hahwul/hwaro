@@ -665,26 +665,39 @@ module Hwaro::Core::Build::Phases::Transform
     # We expect site.data["authors"] to be a Hash(String, Crinja::Value)
     # where keys match author IDs
     if authors_data = site.data["authors"]?
-      temp_authors.each_key do |id|
-        author_info = authors_data[id]
-        next if author_info.raw.nil?
+      # Check the SHAPE before indexing: `authors_data[id]` goes through
+      # `Crinja::Value#[]` → `Crinja::Resolver.resolve_attribute`, which raises
+      # UndefinedError for attribute access on a scalar (see
+      # src/ext/crinja_resolve_fix.cr). A `data/authors.yml` holding a bare
+      # string ("see AUTHORS.md") therefore killed the build with "<author id>
+      # is undefined. / template: <unknown>" — an unclassified error that named
+      # an author as a template variable, implied a template was involved, and
+      # never mentioned the data file. Enrichment is optional metadata, so a
+      # wrong shape degrades to a warning naming the file instead.
+      if authors_data.raw.is_a?(Hash)
+        temp_authors.each_key do |id|
+          author_info = authors_data[id]
+          next if author_info.raw.nil?
 
-        # Normalize Crinja hash entries to {String, Crinja::Value} pairs
-        pairs = [] of {String, Crinja::Value}
-        if info_hash = author_info.raw.as?(Hash(Crinja::Value, Crinja::Value))
-          info_hash.each { |k_val, v| pairs << {k_val.to_s, v} }
-        elsif info_hash = author_info.raw.as?(Hash(String, Crinja::Value))
-          info_hash.each { |k, v| pairs << {k, v} }
-        end
+          # Normalize Crinja hash entries to {String, Crinja::Value} pairs
+          pairs = [] of {String, Crinja::Value}
+          if info_hash = author_info.raw.as?(Hash(Crinja::Value, Crinja::Value))
+            info_hash.each { |k_val, v| pairs << {k_val.to_s, v} }
+          elsif info_hash = author_info.raw.as?(Hash(String, Crinja::Value))
+            info_hash.each { |k, v| pairs << {k, v} }
+          end
 
-        pairs.each do |k, v|
-          if k == "name"
-            current = temp_authors[id]
-            temp_authors[id] = {name: v.to_s, pages: current[:pages], extra: current[:extra]}
-          else
-            temp_authors[id][:extra][k] = v
+          pairs.each do |k, v|
+            if k == "name"
+              current = temp_authors[id]
+              temp_authors[id] = {name: v.to_s, pages: current[:pages], extra: current[:extra]}
+            else
+              temp_authors[id][:extra][k] = v
+            end
           end
         end
+      else
+        Logger.warn "data/authors.*: expected a mapping of author id to details; skipping author enrichment."
       end
     end
 

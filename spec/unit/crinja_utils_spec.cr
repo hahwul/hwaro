@@ -125,6 +125,23 @@ describe Hwaro::Utils::CrinjaUtils do
       render(vars, "{{ items[0] }}").should eq("hello")
       render(vars, "{{ items[1] }}").should eq("42")
     end
+
+    # Regression: an unquoted ISO date resolves to a `Time` node, which matched
+    # none of the accessors, so the value fell through to nil and templates
+    # rendered `none` — while the identical TOML data file rendered the date.
+    it "converts an unquoted YAML date instead of dropping it" do
+      yaml = YAML.parse("d: 2021-01-02")
+      result = Hwaro::Utils::CrinjaUtils.from_yaml(yaml["d"])
+      vars = {"val" => result}
+      render(vars, "{{ val }}").should eq("2021-01-02 00:00:00 UTC")
+    end
+
+    it "converts a nested YAML date" do
+      yaml = YAML.parse("meta:\n  updated: 2021-01-02\n")
+      result = Hwaro::Utils::CrinjaUtils.from_yaml(yaml)
+      vars = {"data" => result}
+      render(vars, "{{ data.meta.updated }}").should_not eq("none")
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -288,6 +305,25 @@ describe Hwaro::Utils::CrinjaUtils do
       vars = {"data" => result}
       render(vars, "{{ data.items | length }}").should eq("2")
       render(vars, "{% for item in data.items %}{{ item.name }},{% endfor %}").should eq("first,second,")
+    end
+
+    # Regression: TOML integers are 64-bit, but the converter narrowed through
+    # `as_i?` (a type guard with no range guard), so a 13-digit value raised
+    # OverflowError and the caller's rescue dropped the WHOLE data file —
+    # sibling keys and all — from site.data.
+    it "converts a TOML integer above Int32::MAX without raising" do
+      toml = TOML.parse("name = \"Acme\"\ndownloads = 4200000000\n")
+      result = Hwaro::Utils::CrinjaUtils.from_toml(toml)
+      vars = {"data" => result}
+      render(vars, "{{ data.downloads }}").should eq("4200000000")
+      render(vars, "{{ data.name }}").should eq("Acme")
+    end
+
+    it "converts a standalone oversized TOML integer value" do
+      toml = TOML.parse("n = 4200000000")
+      result = Hwaro::Utils::CrinjaUtils.from_toml(toml["n"])
+      vars = {"val" => result}
+      render(vars, "{{ val }}").should eq("4200000000")
     end
   end
 

@@ -350,7 +350,13 @@ module Hwaro
           full_path = File.join(base_dir, filename)
         end
 
-        ensure_dir!(base_dir)
+        # NOTE: the target directory is deliberately NOT created here. For a
+        # dir-ish path (`hwaro new zz --bundle`) `base_dir` is already the
+        # bundle directory at this point, so creating it up front left
+        # `content/zz/` on disk even when the bundle was rejected below for
+        # colliding with `content/zz.md` — an empty directory the user never
+        # asked for, which then surfaces as a doctor finding. Every mkdir now
+        # happens after the last validation, immediately before the write.
 
         # Draft: CLI flag > path-based detection. Match a path SEGMENT, not a
         # raw substring — `base_dir.includes?("drafts")` flagged unrelated dirs
@@ -429,7 +435,6 @@ module Hwaro
           end
           full_path = candidate
           base_dir = File.dirname(full_path)
-          ensure_dir!(base_dir)
         end
 
         content = if archetype_content
@@ -493,6 +498,10 @@ module Hwaro
             )
           end
         end
+
+        # Last step before the write, so a rejected create never leaves a
+        # directory behind (see the note where the path is resolved).
+        ensure_dir!(base_dir)
 
         begin
           File.write(full_path, content)

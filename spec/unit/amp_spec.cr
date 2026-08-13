@@ -564,6 +564,43 @@ describe Hwaro::Content::Seo::Amp do
       end
     end
 
+    # A dot-segment prefix (".", "./", "a/..") is not empty, so the emptiness
+    # guard above never fires, yet File.join resolves it right back onto the
+    # canonical path — the AMP variant would overwrite the page it was
+    # converted from and point rel="amphtml" at itself.
+    [".", "./", "a/.."].each do |traversing_prefix|
+      it "skips generation when path_prefix is #{traversing_prefix.inspect} to avoid clobbering canonical pages" do
+        Dir.mktmpdir do |dir|
+          config = make_amp_config(<<-TOML)
+            [amp]
+            enabled = true
+            path_prefix = "#{traversing_prefix}"
+            TOML
+
+          page = Hwaro::Models::Page.new("test.md")
+          page.url = "/posts/hello/"
+          page.section = "posts"
+          page.render = true
+
+          canonical_dir = File.join(dir, "posts", "hello")
+          FileUtils.mkdir_p(canonical_dir)
+          original = "<html><head></head><body><p>Hello World</p></body></html>"
+          canonical_path = File.join(canonical_dir, "index.html")
+          File.write(canonical_path, original)
+
+          log = with_captured_log do
+            Hwaro::Content::Seo::Amp.generate([page], config, dir)
+          end
+
+          content = File.read(canonical_path)
+          content.should eq(original)
+          content.should_not contain("<html amp")
+          content.should_not contain("amphtml")
+          log.should contain("path_prefix")
+        end
+      end
+    end
+
     it "skips draft pages" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)

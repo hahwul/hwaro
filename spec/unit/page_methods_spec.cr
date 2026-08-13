@@ -275,6 +275,49 @@ describe Hwaro::Models::Page do
     end
   end
 
+  # `#` and `?` end the path component of a URL, so a page whose filename (or
+  # slug/path) contains one published to `public/posts/a#b/index.html` while
+  # every link, permalink and sitemap <loc> hwaro emitted for it pointed at
+  # `/posts/a` — a 404.
+  describe "#url=" do
+    it "percent-encodes a fragment or query delimiter in the path" do
+      page = Hwaro::Models::Page.new("posts/a#b.md")
+      page.url = "/posts/a#b/"
+      page.url.should eq("/posts/a%23b/")
+      page.generate_permalink("https://example.com").should eq("https://example.com/posts/a%23b/")
+
+      page.url = "/posts/a?b/"
+      page.url.should eq("/posts/a%3Fb/")
+    end
+
+    it "leaves an ordinary URL byte-identical" do
+      page = Hwaro::Models::Page.new("posts/a.md")
+      ["/posts/hello-world/", "/ko/posts/한글/", "/404.html", "/"].each do |url|
+        page.url = url
+        page.url.should eq(url)
+      end
+    end
+
+    # `%` itself is deliberately untouched, so assigning an already-encoded
+    # URL back onto the page cannot grow a `%2523`.
+    it "is idempotent" do
+      page = Hwaro::Models::Page.new("posts/a#b.md")
+      page.url = "/posts/a#b/"
+      page.url = page.url
+      page.url.should eq("/posts/a%23b/")
+    end
+
+    # The escaped URL must still resolve to the directory the page actually
+    # writes to, which the output-path computation reaches by decoding again.
+    it "still names the directory the page is written to" do
+      page = Hwaro::Models::Page.new("posts/a#b.md")
+      page.url = "/posts/a#b/"
+      segments, refused = Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
+      refused.should be_false
+      segments.should eq(["posts", "a#b"])
+    end
+  end
+
   describe "#generate_permalink" do
     it "generates permalink from base_url and page url" do
       page = Hwaro::Models::Page.new("test.md")

@@ -346,3 +346,76 @@ describe "Pagination: Disabled pagination" do
     end
   end
 end
+
+describe "Pagination: unusable paginate_path" do
+  # `paginate_path` is both the output path component and the URL the pager
+  # links advertise. A traversing value made the output-dir guard refuse every
+  # pager write in silence while the section index still linked to
+  # /blog/../../2/ — the only navigation to pages that were never written.
+  it "falls back to \"page\" and warns for a traversing paginate_path" do
+    log = with_captured_log do
+      build_site(
+        PAGINATION_CONFIG,
+        content_files: {
+          "blog/_index.md" => "---\ntitle: Blog\npaginate_path: \"../..\"\n---\n",
+          "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+          "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+          "blog/p3.md"     => "---\ntitle: P3\n---\nP3",
+        },
+        template_files: {
+          "page.html"    => "{{ content }}",
+          "section.html" => "next=[{{ paginator.next }}]|last=[{{ paginator.last }}]",
+        },
+      ) do
+        # Every advertised pager page exists on disk.
+        page1 = File.read("public/blog/index.html")
+        page1.should contain("next=[/blog/page/2/]")
+        page1.should contain("last=[/blog/page/2/]")
+        File.exists?("public/blog/page/2/index.html").should be_true
+      end
+    end
+
+    log.should contain("paginate_path")
+    log.should contain("_index.md")
+  end
+
+  it "falls back to \"page\" for an empty paginate_path instead of emitting //" do
+    build_site(
+      PAGINATION_CONFIG,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\npaginate_path: \"\"\n---\n",
+        "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+        "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+        "blog/p3.md"     => "---\ntitle: P3\n---\nP3",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "next=[{{ paginator.next }}]",
+      },
+    ) do
+      page1 = File.read("public/blog/index.html")
+      page1.should_not contain("/blog//2/")
+      page1.should contain("next=[/blog/page/2/]")
+      File.exists?("public/blog/page/2/index.html").should be_true
+    end
+  end
+
+  it "keeps a custom paginate_path working" do
+    build_site(
+      PAGINATION_CONFIG,
+      content_files: {
+        "blog/_index.md" => "---\ntitle: Blog\npaginate_path: \"sida\"\n---\n",
+        "blog/p1.md"     => "---\ntitle: P1\n---\nP1",
+        "blog/p2.md"     => "---\ntitle: P2\n---\nP2",
+        "blog/p3.md"     => "---\ntitle: P3\n---\nP3",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "next=[{{ paginator.next }}]",
+      },
+    ) do
+      File.read("public/blog/index.html").should contain("next=[/blog/sida/2/]")
+      File.exists?("public/blog/sida/2/index.html").should be_true
+    end
+  end
+end

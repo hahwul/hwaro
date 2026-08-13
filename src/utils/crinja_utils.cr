@@ -35,6 +35,13 @@ module Hwaro
           Crinja::Value.new(f)
         elsif b = value.as_bool?
           Crinja::Value.new(b)
+        elsif (t = value.raw).is_a?(Time)
+          # Crystal's YAML core-schema resolver turns an unquoted ISO date
+          # (`released: 2021-01-02`) into a `Time` node, which matches none of
+          # the accessors above — without this branch the value fell through to
+          # NIL_VALUE and the template rendered `none` while the identical TOML
+          # data file rendered the date. Mirrors `from_toml` below.
+          Crinja::Value.new(t.to_s)
         else
           NIL_VALUE
         end
@@ -61,8 +68,14 @@ module Hwaro
           Crinja::Value.new(converted)
         elsif s = value.as_s?
           Crinja::Value.new(s)
-        elsif i = value.as_i?
-          Crinja::Value.new(i.to_i64)
+        elsif i = value.as_i64?
+          # TOML integers are 64-bit. `as_i?` is a TYPE guard with no RANGE
+          # guard (`@raw.as(Int).to_i`), so `downloads = 4200000000` raised
+          # OverflowError out of a nil-safe accessor; the caller's blanket
+          # rescue then dropped the WHOLE data file from site.data and blamed
+          # a parse error that never happened. The Int32 hop was pure loss
+          # anyway — the value was widened straight back to Int64.
+          Crinja::Value.new(i)
         elsif f = value.as_f?
           Crinja::Value.new(f)
         elsif b = value.as_bool?

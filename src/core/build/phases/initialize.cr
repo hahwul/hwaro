@@ -108,8 +108,55 @@ module Hwaro::Core::Build::Phases::Initialize
     guard_output_dir!(output_dir)
     # In incremental mode (--cache), keep existing output to avoid
     # re-generating unchanged pages and re-copying unchanged static files.
-    FileUtils.rm_rf(output_dir) if Dir.exists?(output_dir) && !incremental
-    Hwaro::Utils::FileSafe.mkdir_p(output_dir)
+    if !incremental && Dir.exists?(output_dir)
+      # Trailing separators are stripped for the symlink test only: `-o public/`
+      # is what shell completion types, and lstat on a path ending in `/`
+      # follows the final link, so `public/` would report as a plain directory.
+      if File.symlink?(output_dir.rstrip(File::SEPARATOR))
+        # A symlinked output directory (`ln -s /var/www/site public`) is a
+        # deliberate publish-through-the-link setup, but `rm_rf` deletes the
+        # LINK, not the tree behind it: Crystal's `rm_r` only recurses when
+        # the path is a directory AND not a symlink, otherwise it unlinks.
+        # The cold build therefore replaced `public` with a real directory —
+        # silently, exit 0 — and every later build published somewhere nobody
+        # deploys. Clear the contents behind the link instead: same clean
+        # slate for the build, link (and deploy target) intact.
+        entries = begin
+          Dir.children(output_dir)
+        rescue File::Error
+          # Unreadable output directory: nothing we can clear here. The write
+          # phase reports the real permission failure with a classified error.
+          [] of String
+        end
+        # Say WHERE, once, before deleting anything. Publishing through a link
+        # is the intended setup, but it also means a mis-aimed link makes the
+        # cold build delete a tree the previous behavior never touched — and
+        # the deletion is otherwise completely silent (build output is
+        # identical either way, exit 0). Naming the resolved destination is
+        # what lets an author notice the link points somewhere unexpected.
+        unless entries.empty?
+          Logger.info "Output directory #{output_dir} -> #{Hwaro::Utils::PathUtils.resolved_real_path(output_dir)} (clearing #{entries.size} entries behind the symlink)"
+        end
+        FileUtils.rm_rf(entries.map { |entry| File.join(output_dir, entry) })
+      else
+        FileUtils.rm_rf(output_dir)
+      end
+    end
+    begin
+      Hwaro::Utils::FileSafe.mkdir_p(output_dir)
+    rescue ex : File::Error
+      # `-o` pointing at an existing plain file (or /dev/null), a read-only
+      # parent, a name the filesystem rejects: ordinary misconfiguration the
+      # user can fix. Unclassified it reached the CLI as HWARO_E_INTERNAL /
+      # exit 70 — the code reserved for hwaro bugs — so CI that alerts on
+      # internal faults fired on a typo. Name the path and say what to do.
+      raise Hwaro::HwaroError.new(
+        code: Hwaro::Errors::HWARO_E_IO,
+        message: "Cannot create output directory #{output_dir.inspect}: #{ex.message}",
+        hint: "Remove or rename whatever occupies that path, or build into a different directory with -o/--output.",
+        cause: ex,
+      )
+    end
   end
 
   # Directories a build READS. `output_dir` is wiped before a cold build, so
@@ -132,12 +179,22 @@ module Hwaro::Core::Build::Phases::Initialize
     # expand_path keeps a trailing separator, and `content/` must be
     # recognized as the same directory as `content`.
     expanded = expanded.rstrip(File::SEPARATOR) unless expanded == File::SEPARATOR_STRING
-    cwd = File.expand_path(Dir.current)
+    # expand_path is also purely LEXICAL — it never follows symlinks — so a
+    # single symlinked component hid the real destination from every rule
+    # below: `ln -s content pub && hwaro build -o pub/archive` passed the
+    # guard and let the cold `rm_rf` delete `content/archive`, and
+    # `ln -s templates public && hwaro build --cache` overwrote the site's
+    # own templates with rendered HTML. Judge the RESOLVED destination.
+    expanded = resolved_real_path(expanded)
+    cwd = resolved_real_path(File.expand_path(Dir.current))
 
     reason =
       if expanded == "/" || Path[expanded].parent.to_s == expanded
         "the filesystem root"
-      elsif expanded == Path.home.to_s
+      elsif expanded == resolved_real_path(Path.home.to_s)
+        # Resolved on both sides: `$HOME` is itself a symlink on plenty of
+        # setups (/home/u -> /data/u), and comparing a resolved destination
+        # against the unresolved `Path.home` would let `-o $HOME` through.
         "the home directory"
       elsif cwd == expanded || cwd.starts_with?(expanded + File::SEPARATOR)
         "the project directory (or a parent of it)"
@@ -159,11 +216,38 @@ module Hwaro::Core::Build::Phases::Initialize
   end
 
   # The project input directory `expanded` is, or lives inside, if any.
+  # `expanded` arrives symlink-resolved, so the roots must be resolved too:
+  # a project whose `content/` is itself a symlink (a shared content tree)
+  # would otherwise never match the lexical `<cwd>/content`.
   private def protected_input_dir(expanded : String, cwd : String) : String?
     PROTECTED_INPUT_DIRS.find do |dir|
-      root = File.join(cwd, dir)
+      root = resolved_real_path(File.join(cwd, dir))
       expanded == root || expanded.starts_with?(root + File::SEPARATOR)
     end
+  end
+
+  # `path` with every symlink resolved, including when it does not exist yet:
+  # resolve the deepest existing ancestor and re-append the missing tail. A
+  # not-yet-created output directory is the normal case (`-o public` on a
+  # fresh checkout), so bailing out on a missing leaf would leave exactly the
+  # paths this guard exists for unresolved. Falls back to the given path when
+  # resolution fails (broken link, symlink loop, unreadable ancestor) —
+  # lexical matching is what we had before, so a failure never loosens the
+  # guard below the old behavior.
+  private def resolved_real_path(path : String) : String
+    suffix = [] of String
+    current = path
+    until File.exists?(current)
+      parent = File.dirname(current)
+      return path if parent == current
+      suffix << File.basename(current)
+      current = parent
+    end
+    real = File.realpath(current)
+    suffix.reverse_each { |part| real = File.join(real, part) }
+    real
+  rescue File::Error | IO::Error
+    path
   end
 
   private def copy_static_files(output_dir : String, verbose : Bool, incremental : Bool = false)
@@ -189,6 +273,24 @@ module Hwaro::Core::Build::Phases::Initialize
   # build and the serve-watch copy so they filter identically.
   private def static_publish_config : Models::StaticConfig
     @config.try(&.static) || Models::StaticConfig.new
+  end
+
+  # `File.info?` on a symlink target, with an unresolvable link reported the
+  # same way as a dangling one (nil) instead of raising.
+  #
+  # `File.info?` only swallows ENOENT/ENOTDIR; a symlink cycle
+  # (`ln -s loop static/loop`) fails with ELOOP, which raises `File::Error`.
+  # Nothing between here and the phase runner caught it, so a single bad link
+  # aborted the entire build as `HWARO_E_INTERNAL` with an EMPTY output
+  # directory, and under `serve` it wedged the watcher into an endless
+  # "Watcher iteration failed" retry from which no rebuild could recover.
+  # A link we cannot resolve is simply not publishable — skip it and say so.
+  private def static_target_info(src_path : String) : File::Info?
+    File.info?(src_path, follow_symlinks: true)
+  rescue ex : File::Error
+    Logger.warn "Skipping unresolvable static symlink: #{src_path}"
+    Logger.debug "Static symlink stat failed: #{ex.message}"
+    nil
   end
 
   # Walk `static/` and return the `{src, dest}` pairs that need copying.
@@ -222,7 +324,9 @@ module Hwaro::Core::Build::Phases::Initialize
       if lstat.symlink?
         # Skip dangling symlinks (`info?` nil when the target is missing) so
         # the copy worker doesn't log a spurious failure, and directories.
-        info = File.info?(src_path, follow_symlinks: true)
+        # Unresolvable links (symlink cycles) also come back nil here — see
+        # `static_target_info`.
+        info = static_target_info(src_path)
         next if info.nil? || info.directory?
 
         # A symlinked file whose target escapes the project would publish
@@ -236,6 +340,18 @@ module Hwaro::Core::Build::Phases::Initialize
       else
         next if lstat.directory?
         info = lstat
+      end
+
+      # Only regular files are publishable. `static/` can also hold a FIFO, a
+      # unix socket or a device node (a stray `mkfifo`, an editor/daemon
+      # socket left in the tree): `FileUtils.cp` opens the source for reading
+      # and `open(2)` on a FIFO with no writer BLOCKS FOREVER, so one such
+      # entry hung the whole build with no output at all. Directories are
+      # already filtered above, so anything reaching here that isn't a file is
+      # unpublishable and worth saying out loud.
+      unless info.type.file?
+        Logger.warn "Skipping non-regular static file: #{src_path}"
+        next
       end
 
       relative = Path[src_path].relative_to(src_dir).to_s
@@ -389,6 +505,28 @@ module Hwaro::Core::Build::Phases::Initialize
       @template_shortcode_scan[source.hash] = shortcode_scan_needed?(source)
     end
 
+    # Precompute the Crinja-owned regions masked out of each template that the
+    # shortcode pass will actually touch. Two reasons this belongs here rather
+    # than in apply_template:
+    #
+    #   * cost — masking is a pure function of the source but ran once per
+    #     rendered PAGE, which is a fixed per-page overhead on the layout every
+    #     page in a section shares;
+    #   * correctness — a macro declared in a base layout and called from the
+    #     template that `{% extends %}` it is invisible to a single-source
+    #     scan, and the whole template set is only in hand here.
+    #
+    # Rebuilt alongside the templates hash so a serve-mode edit can't read a
+    # stale mask, and written single-threaded before any render worker spawns.
+    @template_literal_masks.clear
+    callable_memo = {} of String => Set(String)
+    chain = [] of String
+    templates.each do |name, source|
+      next if @template_shortcode_scan[source.hash]? == false
+      callables = inherited_template_callables(name, templates, callable_memo, chain)
+      @template_literal_masks[source.hash] = mask_template_literals(source, callables)
+    end
+
     compute_template_var_features(templates)
 
     # Publish the snapshot BEFORE (re)building the Crinja environment so its
@@ -440,7 +578,20 @@ module Hwaro::Core::Build::Phases::Initialize
   private def read_template_source(path : String) : String?
     attempts = 0
     loop do
-      return File.read(path)
+      source = File.read(path)
+      # `File.read` does not validate UTF-8, so a single stray byte (0xff from
+      # a latin-1 paste, a truncated multi-byte sequence) used to travel into
+      # the templates hash intact — and the first PCRE2 pass over it
+      # (TemplateDeps' reference scan) aborted the whole Initialize phase with
+      # "Regex match error: UTF-8 error: illegal byte", reported as an
+      # internal error naming no file. Content, data files and SCSS all
+      # degrade per-file here, so templates must too: scrub the offending
+      # bytes and name the template so the user can find it.
+      unless source.valid_encoding?
+        Logger.warn "Template #{path} contains invalid UTF-8; the offending bytes were replaced."
+        source = source.scrub
+      end
+      return source
     rescue ex : IO::Error
       attempts += 1
       if attempts >= TEMPLATE_READ_RETRIES
@@ -675,7 +826,12 @@ module Hwaro::Core::Build::Phases::Initialize
       Utils::CrinjaUtils.from_toml(TOML.parse(content))
     end
   rescue ex
-    Logger.warn "Failed to parse data file #{path}: #{ex.message}"
+    # This rescue also covers read errors and value-conversion failures, not
+    # just parse errors, so it must not assert the file is malformed — it once
+    # blamed the author for a "parse error" on a TOML file that parsed
+    # perfectly. Name the consequence instead: the key disappears from
+    # site.data, and templates dereferencing it then fail the whole render.
+    Logger.warn "Skipping data file #{path} (site.data entry dropped): #{ex.message}"
     nil
   end
 end

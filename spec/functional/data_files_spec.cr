@@ -177,6 +177,95 @@ describe "Data Files: Subdirectory data loading" do
   end
 end
 
+describe "Data Files: out-of-Int32-range values" do
+  # Regression: TOML integers are 64-bit, but the Crinja converter narrowed
+  # them through `as_i?`. A 13-digit download counter raised OverflowError,
+  # the loader warned "Failed to parse data file" for a file that parsed
+  # fine, and the ENTIRE key vanished from site.data — taking its sibling
+  # string keys with it and leaving templates dereferencing `undefined`.
+  it "keeps a TOML data file whose integer exceeds Int32::MAX" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {
+        "page.html" => "N={{ site.data.site_meta.name }}|D={{ site.data.site_meta.downloads }}",
+      },
+      data_files: {
+        "site_meta.toml" => "name = \"Acme\"\ndownloads = 4200000000\n",
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("N=Acme")
+      html.should contain("D=4200000000")
+    end
+  end
+
+  # Regression: an unquoted YAML date resolves to a `Time` node that the
+  # converter had no branch for, so it rendered as `none` while the same
+  # date in a TOML data file rendered fine.
+  it "renders an unquoted date from a YAML data file" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {
+        "page.html" => "R=[{{ site.data.rel.released }}]",
+      },
+      data_files: {
+        "rel.yml" => "released: 2021-01-02\n",
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("R=[2021-01-02")
+      html.should_not contain("R=[none]")
+    end
+  end
+end
+
+describe "Data Files: pathologically nested TOML" do
+  # Regression for ext/toml_nesting_limit_fix.cr: the vendored toml parser
+  # recursed once per nesting level with no cap, so a deeply nested array
+  # exhausted the native stack — SIGSEGV, exit 11, walking straight through
+  # the rescue that is supposed to turn a bad data file into a warning.
+  # Crystal's own JSON/YAML parsers cap nesting at 512 and degrade to a
+  # catchable error; TOML now does the same.
+  it "drops the key and keeps building on an 8000-deep TOML array" do
+    # 8000 is the depth that reproducibly took the process down before the
+    # cap; the parser now stops at 512 without reading the rest.
+    depth = 8000
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"index.md" => "---\ntitle: Home\n---\nHome"},
+      template_files: {"page.html" => "OK={{ site.data.ok.name }}"},
+      data_files: {
+        "deep.toml" => "x = #{"[" * depth}#{"]" * depth}\n",
+        "ok.toml"   => "name = \"fine\"\n",
+      },
+    ) do
+      # The build finished, and the sibling data file still loaded.
+      File.read("public/index.html").should contain("OK=fine")
+    end
+  end
+
+  # Same parser, the other call site: front matter surfaces as a classified
+  # content error (exit 5) instead of taking the process down.
+  it "reports a 20000-deep TOML front matter as a content error" do
+    depth = 20_000
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {
+          "index.md" => "---\ntitle: Home\n---\nHome",
+          "deep.md"  => "+++\ntitle = \"Deep\"\nx = #{"[" * depth}#{"]" * depth}\n+++\nbody\n",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+    err.message.not_nil!.should contain("too deep")
+  end
+end
+
 describe "Data Files: No data directory" do
   it "builds successfully without data directory" do
     build_site(

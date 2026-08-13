@@ -862,6 +862,28 @@ describe Hwaro::Services::Server do
       Hwaro::Services::Server.new.dev_fixes_push_build_error("boom", false, handler)
       handler.errors.should be_empty
     end
+
+    # Crinja quotes the offending source lines, so a syntax error next to one
+    # very long line produced a multi-megabyte message that was pushed over the
+    # live-reload socket on every save (and printed to the terminal, which grew
+    # a serve log to 12 MB with no client attached at all).
+    it "caps a runaway build-error payload" do
+      handler = RecordingLiveReloadHandler.new
+      message = "Template error: #{"x" * 3_000_000}"
+      Hwaro::Services::Server.new.dev_fixes_push_build_error(message, true, handler)
+
+      pushed = handler.errors.first
+      pushed.size.should be <= Hwaro::Services::Server::MAX_BUILD_ERROR_CHARS + 64
+      # The head of the message — the part that names the error — survives.
+      pushed.should start_with("Template error: ")
+      pushed.should contain("truncated")
+    end
+
+    it "leaves a normal-sized message byte-identical" do
+      handler = RecordingLiveReloadHandler.new
+      Hwaro::Services::Server.new.dev_fixes_push_build_error("Template error: unterminated tag", true, handler)
+      handler.errors.should eq(["Template error: unterminated tag"])
+    end
   end
 
   # Finding 12

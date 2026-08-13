@@ -24,6 +24,7 @@ require "../../utils/date_utils"
 require "../../utils/errors"
 require "../../utils/frontmatter_scanner"
 require "../../utils/logger"
+require "../../utils/path_utils"
 require "../../utils/text_utils"
 
 module Hwaro
@@ -406,7 +407,7 @@ module Hwaro
 
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
-          tags = fm_string_array(toml_fm, "tags")
+          tags = fm_string_array(toml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
@@ -415,8 +416,21 @@ module Hwaro
         rescue ex : Hwaro::HwaroError
           raise ex
         rescue ex
-          Logger.warn "Invalid TOML in #{file_path}: #{ex.message}" unless file_path.empty?
-          nil
+          # Reaching here means the fence PARSED as TOML but a value could not
+          # be converted. Degrading to nil tells the caller "this file has no
+          # front matter", which is the worst possible answer: `draft = true`
+          # is lost so the page ships, and the raw `+++` block is rendered as
+          # body text. Fail with a classified content error instead. Library
+          # use (no file_path) keeps the graceful nil.
+          if file_path.empty?
+            Logger.warn "Invalid TOML: #{ex.message}"
+            return
+          end
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONTENT,
+            message: "Invalid TOML frontmatter in #{file_path}: #{ex.message}",
+            hint: "Check TOML frontmatter between `+++` fences",
+          )
         end
 
         # Extract front matter fields from YAML content
@@ -472,7 +486,7 @@ module Hwaro
 
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
-          tags = fm_string_array(yaml_fm, "tags")
+          tags = fm_string_array(yaml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
@@ -481,8 +495,19 @@ module Hwaro
         rescue ex : Hwaro::HwaroError
           raise ex
         rescue ex
-          Logger.warn "Invalid YAML in #{file_path}: #{ex.message}" unless file_path.empty?
-          nil
+          # The block already parsed into a YAML mapping (see the `as_h?` guard
+          # above), so this is a value-conversion failure, not a "maybe it was
+          # a thematic break" case. Silently returning nil would drop `draft`,
+          # date and taxonomies and publish the raw `---` block as body text.
+          if file_path.empty?
+            Logger.warn "Invalid YAML: #{ex.message}"
+            return
+          end
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONTENT,
+            message: "Invalid YAML frontmatter in #{file_path}: #{ex.message}",
+            hint: "Check YAML frontmatter between `---` fences",
+          )
         end
 
         # Extract front matter fields from JSON content
@@ -524,7 +549,7 @@ module Hwaro
 
           front_matter_keys = fm_hash.keys
           taxonomies = extract_taxonomies(json_fm, front_matter_keys)
-          tags = fm_string_array(json_fm, "tags")
+          tags = fm_string_array(json_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
 
@@ -533,8 +558,18 @@ module Hwaro
         rescue ex : Hwaro::HwaroError
           raise ex
         rescue ex
-          Logger.warn "Invalid JSON in #{file_path}: #{ex.message}" unless file_path.empty?
-          nil
+          # Same reasoning as the TOML/YAML extractors: the object parsed, so a
+          # failure here is a value-conversion problem and must not masquerade
+          # as "no front matter" (which would publish drafts verbatim).
+          if file_path.empty?
+            Logger.warn "Invalid JSON: #{ex.message}"
+            return
+          end
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONTENT,
+            message: "Invalid JSON frontmatter in #{file_path}: #{ex.message}",
+            hint: "Check JSON frontmatter object at start of file",
+          )
         end
 
         # Shared helper: extract a Bool from a front matter value, returning the
@@ -553,12 +588,66 @@ module Hwaro
 
         # Shared helper: extract a nilable Int32 from a front matter value.
         private def fm_int?(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Int32?
-          fm[key]?.try(&.as_i?)
+          fm[key]?.try { |val| fm_int_value?(val) }
+        end
+
+        # Narrow a single front matter number to Int32.
+        #
+        # Goes through the 64-bit accessor and clamps, mirroring
+        # `Models::Config#int_value`: `as_i?` on TOML/YAML/JSON `Any` is a TYPE
+        # guard with no RANGE guard (`@raw.as(Int).to_i`), so `weight =
+        # 3000000000` — perfectly valid TOML/YAML, in range for the Int64 these
+        # parsers actually produce — raised OverflowError from a *nil-safe*
+        # accessor. That unwound the whole front matter extraction, and the
+        # document was then treated as having NO front matter at all: `draft`,
+        # title, date and taxonomies were lost in one go and a draft page
+        # shipped with its raw `+++` block rendered as body text.
+        private def fm_int_value?(value : TOML::Any | YAML::Any | JSON::Any) : Int32?
+          value.as_i64?.try(&.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32)
         end
 
         # Shared helper: extract a String with a default from a front matter value.
         private def fm_string(fm : TOML::Table | YAML::Any | JSON::Any, key : String, default : String) : String
           fm[key]?.try(&.as_s?) || default
+        end
+
+        # `paginate_path` is used twice over, unescaped: the render phase joins
+        # it into `<output>/<section>/<paginate_path>/<n>/index.html`, and the
+        # paginator interpolates the same string into `paginator.next`/`last`.
+        # A traversing value (`"../.."`) therefore made the output-dir guard
+        # refuse every pager write — and that guard is silent — while the
+        # section index still advertised `/blog/../../2/` as the only link to
+        # the pages that were never written. An empty value wrote the pagers
+        # but advertised `/blog//2/`. Normalize to safe path segments and fall
+        # back to the documented default rather than ship either shape.
+        private def fm_paginate_path(fm : TOML::Table | YAML::Any | JSON::Any, file_path : String) : String
+          raw = fm_string(fm, "paginate_path", "page")
+          segments, refused = Utils::PathUtils.split_safe_segments(raw)
+          if refused || segments.empty?
+            Logger.warn "#{file_path}: `paginate_path` #{raw.inspect} is not a usable path segment — using \"page\"." unless file_path.empty?
+            return "page"
+          end
+          segments.join("/")
+        end
+
+        # Shared helper: extract a nilable String from a front matter value.
+        #
+        # A non-string scalar (`title = 2024`, `slug = 7`) used to be dropped in
+        # silence, so the page shipped as "Untitled" with no slug and no hint of
+        # why — and that bogus title propagated into <title>, feeds, llms.txt
+        # and every listing. Warn in the same shape as the `cascade` type
+        # warning below, but stay quiet for an explicitly empty key
+        # (`description:` with no value), which is a placeholder rather than a
+        # type mistake. The value is still ignored: this classifies the mistake,
+        # it does not coerce it, so output for valid front matter is unchanged.
+        private def fm_string?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : String?
+          val = fm[key]?
+          return unless val
+          if str = val.as_s?
+            return str
+          end
+          Logger.warn "#{file_path}: `#{key}` must be a string — ignored." unless file_path.empty? || val.raw.nil?
+          nil
         end
 
         # Shared helper: extract a string array from a front matter value.
@@ -569,8 +658,19 @@ module Hwaro
         # SAME term as `"crystal"` — untrimmed values leaked verbatim into
         # term-page titles/RSS and split one term into two slug-disambiguated
         # term pages (slugification already trimmed; identity/display didn't).
-        private def fm_string_array(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Array(String)
-          fm[key]?.try(&.as_a?.try { |a| a.compact_map(&.as_s?).map(&.strip) }) || [] of String
+        #
+        # A bare scalar (`tags = "solo"`) is NOT silently coerced to a
+        # one-element list — that would invent taxonomy term pages for sites
+        # that build fine today — but it is no longer silent either: the key is
+        # named in a warning so the author sees why the list came out empty.
+        private def fm_string_array(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : Array(String)
+          val = fm[key]?
+          return [] of String unless val
+          if arr = val.as_a?
+            return arr.compact_map(&.as_s?).map(&.strip)
+          end
+          Logger.warn "#{file_path}: `#{key}` must be a list of strings — ignored." unless file_path.empty? || val.raw.nil?
+          [] of String
         end
 
         # Build the front matter result NamedTuple from any front matter source.
@@ -588,7 +688,7 @@ module Hwaro
         )
           # Authors may arrive via the top-level `authors` key or a Zola-style
           # `[taxonomies]` table — mirror the tags fallback at the call sites.
-          authors = fm_string_array(fm, "authors")
+          authors = fm_string_array(fm, "authors", file_path)
           authors = taxonomies["authors"]? || authors if authors.empty?
 
           # Section [cascade] table — defaults inherited by descendant pages.
@@ -601,19 +701,19 @@ module Hwaro
             end
           end
           {
-            title:          fm["title"]?.try(&.as_s?) || "Untitled",
-            description:    fm["description"]?.try(&.as_s?),
-            image:          fm["image"]?.try(&.as_s?),
+            title:          fm_string?(fm, "title", file_path) || "Untitled",
+            description:    fm_string?(fm, "description", file_path),
+            image:          fm_string?(fm, "image", file_path),
             draft:          fm_bool(fm, "draft", false),
-            template:       fm["template"]?.try(&.as_s?),
+            template:       fm_string?(fm, "template", file_path),
             in_sitemap:     fm_bool(fm, "in_sitemap", true),
             toc:            fm_bool(fm, "toc", false),
             date:           date,
             updated:        updated,
             render:         fm_bool(fm, "render", true),
-            slug:           fm["slug"]?.try(&.as_s?),
-            custom_path:    fm["path"]?.try(&.as_s?),
-            aliases:        fm_string_array(fm, "aliases"),
+            slug:           fm_string?(fm, "slug", file_path),
+            custom_path:    fm_string?(fm, "path", file_path),
+            aliases:        fm_string_array(fm, "aliases", file_path),
             transparent:    fm_bool(fm, "transparent", false),
             generate_feeds: fm_bool(fm, "generate_feeds", false),
             # `paginate_by` is Zola's spelling (also exposed on `paginator` in
@@ -621,17 +721,17 @@ module Hwaro
             # instead of silently rendering one unbounded page.
             paginate:            fm_int?(fm, "paginate") || fm_int?(fm, "paginate_by"),
             pagination_enabled:  fm_bool?(fm, "pagination_enabled"),
-            sort_by:             fm["sort_by"]?.try(&.as_s?),
+            sort_by:             fm_string?(fm, "sort_by", file_path),
             reverse:             fm_bool?(fm, "reverse"),
             authors:             authors,
             extra:               extra,
             in_search_index:     fm_bool(fm, "in_search_index", true),
             insert_anchor_links: fm_bool?(fm, "insert_anchor_links"),
-            page_template:       fm["page_template"]?.try(&.as_s?),
-            paginate_path:       fm_string(fm, "paginate_path", "page"),
-            redirect_to:         fm["redirect_to"]?.try(&.as_s?),
+            page_template:       fm_string?(fm, "page_template", file_path),
+            paginate_path:       fm_paginate_path(fm, file_path),
+            redirect_to:         fm_string?(fm, "redirect_to", file_path),
             weight:              fm_int?(fm, "weight") || 0,
-            series:              fm["series"]?.try(&.as_s?),
+            series:              fm_string?(fm, "series", file_path),
             series_weight:       fm_int?(fm, "series_weight") || 0,
             expires:             nil.as(Time?),
             front_matter_keys:   front_matter_keys,
@@ -658,8 +758,11 @@ module Hwaro
             str
           elsif (bool_val = value.as_bool?) != nil
             bool_val.as(Bool)
-          elsif int = value.as_i?
-            int.to_i64
+          elsif int = value.as_i64?
+            # 64-bit accessor, matching the YAML/JSON siblings below: `as_i?`
+            # raised OverflowError on `[extra] build_id = 1755043200000` and
+            # took the entire front matter down with it.
+            int
           elsif float = value.as_f?
             float
           else
@@ -729,6 +832,40 @@ module Hwaro
           {html_with_anchors, toc}
         end
 
+        # Byte spans covered by `<!-- … -->` comments in the rendered HTML.
+        #
+        # A heading that lives inside a comment is invisible in the browser, so
+        # the heading passes below must leave it alone: otherwise a
+        # commented-out section shows up in the VISIBLE table of contents and
+        # links to an anchor the reader can never reach, and the comment body
+        # gets an `id=` and a 🔗 anchor injected into it. Headings inside fenced
+        # code blocks and code spans are already immune — markd entity-escapes
+        # `<` there, so `&lt;h2&gt;` never matches and `&lt;!--` never opens a
+        # span here either.
+        private def html_comment_spans(html : String) : Array(Range(Int32, Int32))
+          spans = [] of Range(Int32, Int32)
+          pos = 0
+          while open = html.byte_index("<!--", pos)
+            close = html.byte_index("-->", open + 4)
+            # An UNTERMINATED `<!--` is deliberately NOT treated as a comment
+            # running to end of input. In practice a lone `<!--` this deep in
+            # rendered HTML is far more likely to be a stray sequence inside a
+            # raw attribute value — which browsers do not treat as a comment at
+            # all — than a runaway comment, and masking to EOF there would strip
+            # ids and TOC entries from headings that render perfectly well.
+            break unless close
+            spans << (open...(close + 3))
+            pos = close + 3
+          end
+          spans
+        end
+
+        # True when a match starting at `offset` (a BYTE offset, as reported by
+        # `Regex::MatchData#byte_begin`) opens inside one of `spans`.
+        private def in_comment?(spans : Array(Range(Int32, Int32)), offset : Int32) : Bool
+          spans.any?(&.includes?(offset))
+        end
+
         # Insert anchor links into headings
         # Note: This modifies the HTML string directly since XML node manipulation is limited
         private def insert_anchor_links_to_html(html : String, style : String = "heading") : String
@@ -736,8 +873,16 @@ module Hwaro
 
           result = html
 
+          # A page with no comment at all costs one extra `byte_index` scan
+          # here and an empty array to test against per heading.
+          comment_spans = html_comment_spans(html)
+
           # Match h1-h6 tags with id attributes and insert anchor links
-          result = result.gsub(ANCHOR_LINK_REGEX) do |_|
+          result = result.gsub(ANCHOR_LINK_REGEX) do |match|
+            # Never inject a 🔗 anchor into a heading that only exists inside
+            # an HTML comment (see `html_comment_spans`).
+            next match if in_comment?(comment_spans, $~.byte_begin(0))
+
             tag = $1
             attrs = $2
             id = $3
@@ -783,7 +928,15 @@ module Hwaro
             used_ids = Set(String).new
             id_counters = Hash(String, Int32).new(0)
 
+            # Spans are measured against the post-lazy-load `result`, which is
+            # exactly the string this gsub scans, so the byte offsets line up.
+            comment_spans = html_comment_spans(result)
+
             result = result.gsub(HEADING_TAG_REGEX) do |match|
+              # A commented-out heading is invisible: it gets no id, and no TOC
+              # entry (see `html_comment_spans`).
+              next match if in_comment?(comment_spans, $~.byte_begin(0))
+
               tag_name = $1     # e.g. "h2"
               level = $2.to_i   # e.g. 2
               attrs = $3? || "" # existing attributes (may be empty)
@@ -853,7 +1006,13 @@ module Hwaro
                 if id == existing_id
                   match
                 else
-                  new_attrs = attrs.sub(ID_ATTR_REGEX, %(id="#{id}"))
+                  # `backreferences: false`: `id` derives from the author's own
+                  # `id="..."` attribute (plus a dedup suffix) and may contain a
+                  # backslash. `String#sub(Regex, String)` expands `\0`-`\9` and
+                  # `\k<name>` inside the REPLACEMENT, so two headings sharing
+                  # an id like `a\k<x>` would raise `IndexError` mid-render and
+                  # abort the build, while `a\1` would silently lose the `\1`.
+                  new_attrs = attrs.sub(ID_ATTR_REGEX, %(id="#{id}"), backreferences: false)
                   "<#{tag_name}#{new_attrs}>#{inner_html}</#{tag_name}>"
                 end
               else
@@ -1006,7 +1165,9 @@ module Hwaro
 
           Models::MenuRegistration.new(
             name: entry["name"]?.try(&.as_s?),
-            weight: entry["weight"]?.try(&.as_i?),
+            # Same clamped 64-bit read as `fm_int?`: a menu weight above
+            # Int32::MAX must not raise OverflowError out of the parse.
+            weight: entry["weight"]?.try { |val| fm_int_value?(val) },
             parent: entry["parent"]?.try(&.as_s?),
             identifier: entry["identifier"]?.try(&.as_s?),
           )

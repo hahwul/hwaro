@@ -6,6 +6,7 @@ require "../../core/build/parallel"
 require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
+require "../../utils/output_guard"
 require "../../utils/text_utils"
 require "./og_png_renderer"
 
@@ -305,6 +306,15 @@ module Hwaro
           ai = config.og.auto_image
           return {generated: 0, skipped: 0} unless ai.enabled
 
+          # Containment guard for the `img_dir` built further down
+          # (File.join(output_dir, ai.output_dir)). Checked here, before the
+          # font loading and base-layer rendering, because an escaping value
+          # produces nothing worth doing that work for.
+          if output_dir_escapes?(ai, output_dir)
+            Logger.warn "  Skipping OG image generation: [og.auto_image] output_dir '#{ai.output_dir}' escapes the output directory."
+            return {generated: 0, skipped: 0}
+          end
+
           # Validate and resolve output format
           format = ai.format
           unless {"svg", "png"}.includes?(format)
@@ -379,6 +389,7 @@ module Hwaro
             base_layer = OgPngRenderer.build_base_layer(config, bg_abs_path, cached_bg)
           end
 
+          # Guarded by output_dir_escapes? at the top of this method.
           img_dir = File.join(output_dir, ai.output_dir)
           Hwaro::Utils::FileSafe.mkdir_p(img_dir) unless Dir.exists?(img_dir)
 
@@ -522,6 +533,26 @@ module Hwaro
           {generated: generated, skipped: skipped}
         end
 
+        # Stand-in output directory for callers that don't know the real one
+        # (assign_lazy_urls receives only the config). Containment is decided
+        # lexically — File.expand_path resolves "."/".." without touching the
+        # filesystem — so any sufficiently deep absolute root gives the same
+        # verdict a real output directory would.
+        LEXICAL_OUTPUT_ROOT = "/hwaro-output-root"
+
+        # True when `[og.auto_image] output_dir` would put generated images
+        # outside the build output directory once joined onto it.
+        #
+        # The value is both a filesystem component and the `og:image` URL
+        # prefix, so "../oops" wrote the PNGs above the site root while every
+        # page still advertised a meta tag nothing serves. It is refused rather
+        # than rewritten: a rewritten directory would stop matching
+        # `auto_assigned?`, and the serve re-parse would then mistake generated
+        # images for author-supplied ones.
+        private def self.output_dir_escapes?(ai : Models::AutoImageConfig, output_dir : String = LEXICAL_OUTPUT_ROOT) : Bool
+          !Utils::OutputGuard.within_output_dir?(File.join(output_dir, ai.output_dir), output_dir)
+        end
+
         # Pages auto-OG generation applies to (mirrors the Pass-1 filters,
         # minus the custom-image skip which callers evaluate themselves).
         def self.eligible_for_auto_image?(page : Models::Page) : Bool
@@ -578,6 +609,14 @@ module Hwaro
         def self.assign_lazy_urls(pages : Array(Models::Page), config : Models::Config) : Int32
           ai = config.og.auto_image
           return 0 unless ai.enabled
+
+          # Mirrors generate's refusal: advertising a URL under a directory the
+          # generator (and the on-demand handler behind it) will refuse to write
+          # is a guaranteed broken og:image tag.
+          if output_dir_escapes?(ai)
+            Logger.warn "  Skipping OG image URLs: [og.auto_image] output_dir '#{ai.output_dir}' escapes the output directory."
+            return 0
+          end
 
           # Mirrors generate's format validation: anything but "png" (unknown
           # formats included) renders as SVG.

@@ -136,6 +136,22 @@ describe Hwaro::Models::Config do
         Hwaro::Models::Config.validate_base_url!("not a valid url")
       end
     end
+
+    it "rejects embedded whitespace and control characters" do
+      # URI.parse accepts these, and the RAW string (not the parsed URI) is what
+      # gets concatenated with every page URL — so they were copied verbatim
+      # into <loc> in sitemap.xml, rss.xml, canonicals, og:url and llms.txt.
+      [
+        "https://exam ple.com",
+        "https://example.com ",
+        "https://example.com\n<x>",
+        "https://example.com/\tsub",
+      ].each do |value|
+        expect_raises(ArgumentError, /whitespace or control characters/) do
+          Hwaro::Models::Config.validate_base_url!(value)
+        end
+      end
+    end
   end
 
   describe "#base_url= normalization" do
@@ -1917,6 +1933,20 @@ describe Hwaro::Models::Config do
       end
       ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
     end
+
+    it "raises a classified config error for a token mixed into a segment" do
+      # Only whole-segment tokens expand, so this used to load fine and emit a
+      # directory literally named `post-:slug`.
+      ex = expect_raises(Hwaro::HwaroError, /'post-:slug'/) do
+        load_config(<<-TOML)
+          title = "Test"
+
+          [permalinks]
+          "posts" = "/:year/post-:slug/"
+          TOML
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -2616,6 +2646,46 @@ describe "Hwaro::Models::Config" do
 
     it "clamps an oversized integer [deployment] max_deletes to Int32::MAX (int_or_nil)" do
       load_config("[deployment]\nmax_deletes = 99999999999").deployment.max_deletes.should eq(Int32::MAX)
+    end
+
+    it "rejects a generated-file filename that does not name a file" do
+      # Every emitter writes to Path[output_dir, File.basename(filename)], and
+      # "", "." and "/" all basename back to the output DIRECTORY itself. The
+      # atomic write then tried to rename its temp file onto a directory and
+      # died with a raw IO::Error naming an internal `.<pid>.<fiber>.tmp` path
+      # under exit 70 — the code reserved for internal bugs. Classify it here.
+      {
+        "[sitemap]\nfilename = \"\"",
+        "[search]\nfilename = \".\"",
+        "[robots]\nfilename = \"/\"",
+        "[feeds]\nfilename = \"..\"",
+        "[llms]\nfilename = \"/\"",
+        "[llms]\nfull_filename = \".\"",
+      }.each do |toml|
+        err = expect_raises(Hwaro::HwaroError) { load_config(toml) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        err.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+        (err.message || "").should contain("filename")
+      end
+    end
+
+    it "keeps the empty filename default for [feeds] and [llms]" do
+      # `[feeds] filename = ""` is what the scaffolds ship (the name is derived
+      # from `type`), and llms.cr substitutes llms.txt / llms-full.txt for an
+      # empty value — both build correctly today and must keep loading.
+      load_config("[feeds]\nfilename = \"\"").feeds.filename.should eq("")
+      load_config("[llms]\nfilename = \"\"").llms.filename.should eq("")
+      load_config("[llms]\nfull_filename = \"\"").llms.full_filename.should eq("")
+    end
+
+    it "clamps [og.auto_image] font_size to the OG canvas" do
+      # A font_size far past the 1200x630 canvas makes stbtt_Rasterize write
+      # past its glyph bitmap: 150000 crashed the build with SIGSEGV, and under
+      # `lazy_generate` one HTTP GET took `hwaro serve` down with it.
+      load_config("[og.auto_image]\nfont_size = 150000").og.auto_image.font_size.should eq(630)
+      load_config("[og.auto_image]\nfont_size = -5").og.auto_image.font_size.should eq(8)
+      # A usable size is untouched.
+      load_config("[og.auto_image]\nfont_size = 72").og.auto_image.font_size.should eq(72)
     end
   end
 

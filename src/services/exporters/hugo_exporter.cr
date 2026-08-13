@@ -96,7 +96,10 @@ module Hwaro
           relative = file_path.sub(content_dir, "").lstrip('/')
           out_path = File.join(output_dir, "content", relative)
 
-          write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", verbose)
+          # A refused destination (outside `output_dir`) is reported as
+          # skipped, and its bundle assets are not copied either — there is no
+          # exported post for them to sit next to.
+          return :skipped unless write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", output_dir, verbose)
 
           # Leaf bundle (`posts/my-post/index.md`): Hugo reads the bundle's
           # co-located resources out of this same directory, so carry them

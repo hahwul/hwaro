@@ -1088,6 +1088,31 @@ describe Hwaro::Services::Creator do
         end
       end
 
+      it "leaves no stray directory behind when it refuses the bundle" do
+        # Regression: `ensure_dir!` ran before the sibling check, and for a
+        # dir-ish path (`hwaro new zz --bundle`) `base_dir` is already the
+        # bundle directory at that point — so the command created
+        # `content/zz/` and then reported that it could not create a bundle
+        # there. The empty directory survived the failure and later surfaced
+        # as a doctor finding ("Section directory missing _index.md").
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            File.write("content/zz.md", "+++\ntitle = \"Z\"\n+++\nz\n")
+
+            options = Hwaro::Config::Options::NewOptions.new(
+              path: "zz", title: "T", bundle: true)
+            err = expect_raises(Hwaro::HwaroError) do
+              Hwaro::Services::Creator.new.run(options)
+            end
+            err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+
+            Dir.exists?("content/zz").should be_false
+            File.read("content/zz.md").should contain("title = \"Z\"")
+          end
+        end
+      end
+
       it "warns and ignores unknown hwaro directives" do
         # Typos like `<!-- hwaro: bundlr=true -->` used to silently no-op.
         # Now they warn and bundle mode is not activated (behaviour check

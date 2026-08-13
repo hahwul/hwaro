@@ -353,6 +353,65 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
+    it "counts a leaf bundle's un-exported assets as skipped" do
+      # Jekyll's flat `_posts/` layout has no destination that keeps a bare
+      # `![](cover.png)` resolving, so the assets stay behind — but the export
+      # used to report "1 exported, 0 skipped" and exit 0 for a post whose
+      # every image link was dead. The sibling Hugo exporter, whose layout is
+      # preserved, copies them across.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts", "my-post"))
+
+        File.write(File.join(content_dir, "posts", "my-post", "index.md"), "+++\ntitle = \"Bundle\"\ndate = \"2024-01-15\"\n+++\n\n![cover](cover.png)\n")
+        File.write(File.join(content_dir, "posts", "my-post", "cover.png"), "PNG")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = exporter.run(options)
+
+        result.exported_count.should eq(1)
+        result.skipped_count.should eq(1)
+      end
+    end
+
+    it "names the bundle assets it could not export" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts", "my-post"))
+
+        File.write(File.join(content_dir, "posts", "my-post", "index.md"), "+++\ntitle = \"Bundle\"\ndate = \"2024-01-15\"\n+++\n\n![cover](cover.png)\n")
+        File.write(File.join(content_dir, "posts", "my-post", "cover.png"), "PNG")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+
+        output = with_captured_log { exporter.run(options) }
+
+        output.should contain("cover.png")
+        output.should contain("not exported")
+      end
+    end
+
+    it "reports nothing skipped for a leaf bundle with no co-located assets" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts", "plain"))
+
+        File.write(File.join(content_dir, "posts", "plain", "index.md"), "+++\ntitle = \"Plain\"\ndate = \"2024-01-15\"\n+++\n\nBody\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = exporter.run(options)
+
+        result.exported_count.should eq(1)
+        result.skipped_count.should eq(0)
+      end
+    end
+
     it "disambiguates colliding destinations instead of overwriting" do
       # Two same-day leaf bundles with identical directory names in nested
       # subsections both flatten to the same `_posts/<date>-<slug>.md` —

@@ -105,7 +105,11 @@ module Hwaro
             # Skip resize if output would be larger than source
             if out_w >= src_w && out_h >= src_h
               Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
-              FileUtils.cp(source, dest)
+              # Atomic copy: variants are regenerated on serve rebuilds while
+              # HTTP fibers stream the same `_640w.jpg` to the browser, and a
+              # truncate-and-stream copy would answer those requests with a
+              # zero-length or half-written image that nothing retries.
+              Hwaro::Utils::FileSafe.atomic_copy(source, dest)
               return dest
             end
 
@@ -331,7 +335,10 @@ module Hwaro
                 actual = src_w.to_i32
                 unless result_map.has_key?(actual)
                   dest = File.join(dest_dir, "#{basename}_#{actual}w#{ext}")
-                  FileUtils.cp(source, dest)
+                  # Atomic for the same reason as `resize`: a serve rebuild
+                  # must never expose a truncated variant to an in-flight
+                  # request for that path.
+                  Hwaro::Utils::FileSafe.atomic_copy(source, dest)
                   result_map[actual] = dest
                 end
                 next
@@ -500,17 +507,50 @@ module Hwaro
           value.round.to_i32.clamp(1, Int32::MAX)
         end
 
-        # Write image in the appropriate format based on extension
+        # Write image in the appropriate format based on extension.
+        #
+        # The encode goes to a same-directory temp file that is renamed into
+        # place, mirroring `FileSafe.atomic_write`/`atomic_copy`. stb's writers
+        # open the destination with O_TRUNC and then stream the encoded bytes,
+        # so a variant being regenerated (serve rebuild, warm `--cache` build)
+        # was observably 0 bytes and then every intermediate size while the
+        # encoder ran — and `hwaro serve` answers requests for that very
+        # `_640w.jpg` from fibers of this process, handing the browser a
+        # truncated image that nothing retries. Rename is atomic within a
+        # filesystem, so a reader sees the old variant or the new one. A failed
+        # encode now also leaves the previous variant intact instead of a
+        # half-written file. The output format still comes from `ext`, never
+        # from the temp file's name, so the `.tmp` suffix changes nothing.
         private def write_image(path : String, ext : String, w : Int32, h : Int32, channels : Int32, data : UInt8*, quality : Int32) : Bool
-          case ext
-          when ".png"
-            LibStb.stbi_write_png(path, w, h, channels, data.as(Void*), w * channels) != 0
-          when ".jpg", ".jpeg"
-            LibStb.stbi_write_jpg(path, w, h, channels, data.as(Void*), quality) != 0
-          when ".bmp"
-            LibStb.stbi_write_bmp(path, w, h, channels, data.as(Void*)) != 0
-          else
+          tmp = "#{path}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+          begin
+            ok = case ext
+                 when ".png"
+                   LibStb.stbi_write_png(tmp, w, h, channels, data.as(Void*), w * channels) != 0
+                 when ".jpg", ".jpeg"
+                   LibStb.stbi_write_jpg(tmp, w, h, channels, data.as(Void*), quality) != 0
+                 when ".bmp"
+                   LibStb.stbi_write_bmp(tmp, w, h, channels, data.as(Void*)) != 0
+                 else
+                   false
+                 end
+            return false unless ok
+
+            File.rename(tmp, path)
+            true
+          rescue ex : File::Error
+            # A destination that cannot be replaced (a stale directory sitting
+            # on the variant's name, a read-only output tree) used to surface
+            # as "the encoder returned 0". Keep that shape: callers already
+            # treat false as "skip this variant" and log it, so the rename must
+            # not turn it into a raw exception that aborts the build.
+            Logger.debug "Failed to publish resized image '#{path}': #{ex.message}"
             false
+          ensure
+            # Removes the temp file on every path that did not rename it away
+            # (unsupported extension, encoder failure, a rename that raised).
+            # After a successful rename it is already gone, so this is a no-op.
+            File.delete?(tmp)
           end
         end
       end

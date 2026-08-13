@@ -268,7 +268,17 @@ module Hwaro
           on_disk = {} of Int32 => String
           Dir.each_child(dest_dir) do |name|
             if m = variant_re.match(name)
-              on_disk[m[1].to_i] = name
+              # `to_i?`, not `to_i`: the capture is unbounded, so a stray
+              # `hero_9999999999w.png` in the output directory (a copied
+              # static file, a leftover from another tool) overflowed Int32
+              # and raised ArgumentError out of the `image:resize` hook —
+              # aborting every build and rebuild with exit 70 until the file
+              # was found and deleted. A width that doesn't fit Int32 can
+              # never match a configured width, so ignoring it is exactly
+              # right: the image simply gets reprocessed.
+              if width = m[1].to_i?
+                on_disk[width] = name
+              end
             end
           end
           return if on_disk.empty?

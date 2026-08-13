@@ -3,6 +3,7 @@ require "uri"
 require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
+require "../../utils/path_utils"
 
 module Hwaro
   module Content
@@ -33,6 +34,20 @@ module Hwaro
 
           amp_config = config.amp
           prefix = amp_config.path_prefix.strip('/')
+          # A "."/".." prefix is not empty, so the emptiness guard below never
+          # fires for it, yet File.join resolves it straight back to the
+          # canonical path: the AMP variant would overwrite the very page it was
+          # converted from, with a rel="amphtml" pointing at itself. Refuse
+          # outright — the way every other emitter refuses a traversing output
+          # path — rather than reinterpreting the author's intent. The prefix
+          # itself is left verbatim (it is also a URL segment, so a literal
+          # percent-encoded directory name must survive unchanged); only the
+          # decision to proceed is taken on the traversal-safe reading of it.
+          _prefix_segments, prefix_refused = Utils::PathUtils.split_safe_segments(prefix)
+          if prefix_refused
+            Logger.warn "AMP path_prefix '#{amp_config.path_prefix}' resolves onto the canonical output path; skipping AMP generation to avoid overwriting canonical pages."
+            return
+          end
           # A blank/slash-only prefix would make amp_output_path collapse to the
           # canonical path (File.join drops empty components), overwriting every
           # canonical page with its AMP variant. Refuse rather than destroy output.
@@ -59,6 +74,15 @@ module Hwaro
             amp_output = amp_output_path(page, output_dir, prefix)
             unless Utils::OutputGuard.within_output_dir?(amp_output, output_dir)
               Logger.warn "Skipping AMP output outside output directory: #{amp_output}"
+              next
+            end
+            # Last line of defence behind the prefix guards above: a containment
+            # check passes for a path that collapses ONTO the canonical file (it
+            # really is inside the output dir), so compare the resolved paths as
+            # well. Writing there would destroy the page this conversion was
+            # just read from.
+            if File.expand_path(amp_output) == File.expand_path(canonical_path)
+              Logger.warn "Skipping AMP output that resolves onto the canonical page: #{canonical_path}"
               next
             end
             dir = File.dirname(amp_output)

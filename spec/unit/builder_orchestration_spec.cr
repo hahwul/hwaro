@@ -214,6 +214,53 @@ describe Hwaro::Core::Build::Builder do
       end
     end
 
+    it "skips an unresolvable symlink without raising" do
+      # `ln -s loop static/loop` fails with ELOOP, which `File.info?` RAISES
+      # (only a missing target comes back nil). Escaping here killed the whole
+      # watcher iteration, and every retry hit the same link — the dev server
+      # could never rebuild again.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("public")
+          File.symlink("loop", "static/loop")
+
+          builder = Hwaro::Core::Build::Builder.new
+          log = with_captured_log do
+            builder.copy_changed_static(["static/loop"], "public")
+          end
+
+          File.exists?("public/loop").should be_false
+          log.should contain("Skipping unresolvable static symlink")
+        end
+      end
+    end
+
+    it "skips a non-regular file without opening it" do
+      # A unix socket stands in for a FIFO: copying either is meaningless, and
+      # `open(2)` on a writer-less FIFO would block the watcher forever. (The
+      # FIFO itself can't be used in a spec — a regression would hang the
+      # suite instead of failing it.)
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("public")
+          server = UNIXServer.new("static/s.sock")
+          begin
+            builder = Hwaro::Core::Build::Builder.new
+            log = with_captured_log do
+              builder.copy_changed_static(["static/s.sock"], "public")
+            end
+
+            File.exists?("public/s.sock").should be_false
+            log.should contain("Skipping non-regular static file")
+          ensure
+            server.close
+          end
+        end
+      end
+    end
+
     it "skips a dangling symlink without raising" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

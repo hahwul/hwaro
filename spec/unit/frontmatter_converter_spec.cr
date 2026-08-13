@@ -285,6 +285,29 @@ describe Hwaro::Services::FrontmatterConverter do
       result.success.should be_false
       result.message.should contain("not found")
     end
+
+    it "skips unfollowable symlinks instead of counting them as errors" do
+      # Regression: `Dir.glob` hands a symlink cycle back as a plain path, so
+      # `File.read` failed with ELOOP and the file landed in `error_count` —
+      # `tool convert` reported failure (exit non-zero) on a content tree
+      # `hwaro build` walks fine.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "post.md"), "+++\ntitle = \"Post\"\n+++\n\n# Post")
+        File.symlink("loop.md", File.join(content_dir, "loop.md"))
+        File.symlink("gone.md", File.join(content_dir, "dangling.md"))
+
+        converter = Hwaro::Services::FrontmatterConverter.new(content_dir)
+        result = converter.convert_to_yaml
+
+        result.success.should be_true
+        result.converted_count.should eq(1)
+        result.error_count.should eq(0)
+        File.read(File.join(content_dir, "post.md")).should start_with("---\n")
+      end
+    end
   end
 
   describe "#convert_to_toml" do
@@ -893,6 +916,44 @@ describe Hwaro::Services::ConversionResult do
         converted.should contain("miss = nan")
         fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
         TOML.parse(fm)["score"].raw.as(Float64).infinite?.should eq(1)
+      end
+    end
+
+    # This in-place rewrite must never hand the next build front matter hwaro
+    # can no longer read. Int64::MIN is legal TOML but the only in-range
+    # integer toml.cr overflows on (it accumulates the digits positively and
+    # applies the sign last), and it used to be emitted verbatim: the draft
+    # below was correctly skipped by the build, then `convert to-toml`
+    # reported success and left a file whose whole front matter — `draft`
+    # included — no longer parsed.
+    it "keeps a draft readable after converting an Int64::MIN value" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "min.md")
+        File.write(file_path, "---\ntitle: D\ndraft: true\noffset: -9223372036854775808\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        parsed = TOML.parse(fm)
+        parsed["draft"].raw.should be_true
+        parsed["offset"].raw.should eq("-9223372036854775808")
+      end
+    end
+
+    it "keeps a large int promoted into a float array reparseable" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "promoted.md")
+        File.write(file_path, "---\ntitle: P\nratio:\n  - 9223372036854775807\n  - 2.5\n---\n\nBody")
+
+        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        converted = File.read(file_path)
+        fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
+        TOML.parse(fm)["ratio"].raw.as(Array).map(&.as(TOML::Any).raw)
+          .should eq([Int64::MAX.to_f64, 2.5])
       end
     end
 

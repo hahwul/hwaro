@@ -2845,6 +2845,82 @@ describe "watcher ignore patterns" do
   end
 end
 
+# Regression: a symlink cycle under a watched root permanently broke the
+# watcher. `scan_mtimes` classified entries with `File.directory?` — which
+# FOLLOWS symlinks — OUTSIDE its per-file rescue, so `ln -s loop static/loop`
+# raised ELOOP out of the whole scan: `hwaro serve` died on the pre-build
+# baseline scan, and a cycle appearing mid-session turned every poll into
+# "[Watch] Watcher iteration failed … (retrying)" with no rebuild ever running
+# again. The scan now lstats first and stamps only regular files, the same
+# classification the build side's collect_static_files uses.
+describe "watcher symlink and non-regular entry handling" do
+  it "skips a symlink cycle under a watched root and keeps scanning" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("static")
+        File.write("content/posts/hello.md", "real")
+        # Self-referential link: stat fails with ELOOP, which `File.info?`
+        # raises instead of reporting as a missing target.
+        File.symlink("loop", "static/loop")
+
+        mtimes = Hwaro::Services::Server.new.test_scan_mtimes
+        mtimes.keys.should contain("content/posts/hello.md")
+        mtimes.keys.should_not contain("static/loop")
+      end
+    end
+  end
+
+  it "skips a watched root that is itself an unresolvable symlink" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content")
+        File.write("content/index.md", "home")
+        File.symlink("static", "static")
+
+        mtimes = Hwaro::Services::Server.new.test_scan_mtimes
+        mtimes.keys.should contain("content/index.md")
+      end
+    end
+  end
+
+  it "still watches a symlink that resolves to a regular file" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("static")
+        File.write("static/real.css", "body{}")
+        File.symlink("real.css", "static/alias.css")
+        File.symlink("gone.css", "static/dangling.css")
+
+        mtimes = Hwaro::Services::Server.new.test_scan_mtimes
+        mtimes.keys.should contain("static/real.css")
+        mtimes.keys.should contain("static/alias.css")
+        mtimes.keys.should_not contain("static/dangling.css")
+      end
+    end
+  end
+
+  it "skips non-regular entries under a watched root" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("static")
+        File.write("static/real.css", "body{}")
+        # A unix socket stands in for `mkfifo static/pipe`, as in the static
+        # copy specs: both are non-regular entries with no content to rebuild
+        # from, and the FIFO itself would block a reader forever.
+        server = UNIXServer.new("static/s.sock")
+        begin
+          mtimes = Hwaro::Services::Server.new.test_scan_mtimes
+          mtimes.keys.should contain("static/real.css")
+          mtimes.keys.should_not contain("static/s.sock")
+        ensure
+          server.close
+        end
+      end
+    end
+  end
+end
+
 describe "bind failure handling" do
   it "raises HwaroError(HWARO_E_IO) when the port is already in use" do
     Dir.mktmpdir do |project_dir|

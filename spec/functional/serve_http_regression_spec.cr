@@ -50,7 +50,9 @@ private def with_dev_server(
     File.write(File.join(dir, "large.html"), "<html><body>#{"한" * 20_000}</body></html>")
 
     Hwaro::Services::Server.register_utf8_mime_types
-    server = HTTP::Server.new(
+    # DevHTTPServer, exactly as `Server#run_with_options` builds it — the
+    # malformed-request rescue lives there, not in the handler chain.
+    server = Hwaro::Services::DevHTTPServer.new(
       Hwaro::Services::Server.new.serve_http_build_handlers(dir, base_path, headers, live_reload)
     )
     address = server.bind_unused_port("127.0.0.1")
@@ -368,6 +370,53 @@ describe "hwaro serve with a base_url subpath" do
     with_dev_server(base_path: "/myblog") do |port, _|
       location = dev_client(port, &.get("/myblog//small.txt")).headers["Location"]
       dev_client(port, &.get(location)).status_code.should eq(200)
+    end
+  end
+end
+
+# `HTTP::Request.from_io` parses Content-Length eagerly and strictly, and it
+# runs above every rescue in `HTTP::Server::RequestProcessor#process` — so a
+# malformed value used to raise ArgumentError straight out of the connection
+# fiber: the client got zero bytes (not even a status line) and the developer's
+# terminal was repainted with a Crystal backtrace for every such request.
+describe "hwaro serve malformed request handling" do
+  # Sends a raw request and returns its status line ("" when the server closed
+  # the connection without answering, which is the pre-fix behaviour).
+  status_line = ->(port : Int32, request : String) do
+    socket = TCPSocket.new("127.0.0.1", port)
+    socket.read_timeout = 5.seconds
+    begin
+      socket << request
+      socket.flush
+      socket.gets || ""
+    ensure
+      socket.close
+    end
+  end
+
+  it "answers 400 to a Content-Length the parser refuses" do
+    with_dev_server do |port, _|
+      ["abc", "0x5", "99999999999999999999999"].each do |value|
+        line = status_line.call(port, "POST / HTTP/1.1\r\nHost: h\r\nContent-Length: #{value}\r\nConnection: close\r\n\r\n")
+        unless line.includes?("400")
+          fail "Content-Length: #{value} should answer 400, got #{line.inspect}"
+        end
+      end
+    end
+  end
+
+  it "answers 400 to duplicated, disagreeing Content-Length headers" do
+    with_dev_server do |port, _|
+      line = status_line.call(port, "POST / HTTP/1.1\r\nHost: h\r\nContent-Length: 0\r\nContent-Length: 5\r\nConnection: close\r\n\r\n")
+      line.should contain("400")
+    end
+  end
+
+  # The rescue must not swallow ordinary traffic: a well-formed request on the
+  # same server still gets its real response.
+  it "still answers a well-formed request normally" do
+    with_dev_server do |port, _|
+      dev_client(port, &.get("/")).body.should contain("HOME")
     end
   end
 end

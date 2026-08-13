@@ -11,6 +11,9 @@ just fix            # crystal tool format
 just dev            # Serve docs site locally (bin/hwaro serve -i docs)
 just clean          # Remove bin/, lib/, stb_impl.o
 ```
+
+Run the suite as a **single** `crystal spec` process. `crystal spec` links every run to the same fixed path (`~/.cache/crystal/crystal-run-spec.tmp`), so two concurrent invocations clobber each other's binary and produce results that look plausible and are not — a single-example run reporting another file's example count, or `Error: you've found a bug in the Crystal compiler`. If you must fan out per file, give each invocation its own `CRYSTAL_CACHE_DIR`.
+
 Dependencies (shard.yml): `markd` (Markdown), `toml` (TOML parsing), `crinja` (Jinja2 templates), `emoji`.
 
 Hwaro requires Crystal >= 1.21 and gets its parallelism from Crystal's **execution contexts**: `src/main.cr` resizes the default `Fiber::ExecutionContext::Parallel` to `default_workers_count` (which honours `CRYSTAL_WORKERS`, defaulting to the CPU count). Do NOT reintroduce `-Dpreview_mt` — Crystal 1.21 deprecated it, and its legacy MT scheduler can spin forever at process exit (all `CRYSTAL-MT-*` threads stuck in `Crystal::SpinLock#lock` inside the event loop), so `hwaro build` never returns. Every `spawn` lands in the default context, so the build still runs fibers across cores: new code that mutates shared state from worker fibers must guard with a `Mutex` or use the existing `@crinja_cache_mutex`; new directory creation must go through `Hwaro::Utils::FileSafe.mkdir_p` rather than `FileUtils.mkdir_p` (the latter has a check-then-create race that fires under parallelism).

@@ -451,6 +451,28 @@ describe Hwaro::Core::Build::Builder do
       output.should eq("<b>found</b> <!--HWARO-SHORTCODE-PLACEHOLDER-99-->")
     end
 
+    it "does not restore a placeholder comment the author wrote in the source" do
+      # The token is a plain in-band HTML comment, so a literal copy in
+      # markdown (an imported WordPress/Jekyll post, a page documenting
+      # hwaro) is byte-identical to one we emitted and used to be swapped
+      # for an UNRELATED shortcode's rendered HTML. Processing drops the
+      # authored copy instead, so only the emitted token is restored.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/t" => "<b>SECRET-{{ _0 }}</b>"}
+      results = {} of String => String
+      literal = "#{Hwaro::Core::Build::ShortcodeProcessor::SHORTCODE_PLACEHOLDER_PREFIX}0" \
+                "#{Hwaro::Core::Build::ShortcodeProcessor::SHORTCODE_PLACEHOLDER_SUFFIX}"
+      processed = builder.test_process_shortcodes_jinja(
+        %(Literal in source: #{literal}\n\nReal call: {{ t("real") }}\n),
+        templates,
+        {} of String => Crinja::Value,
+        results,
+      )
+      output = builder.test_replace_shortcode_placeholders(processed, results)
+      output.scan("<b>SECRET-real</b>").size.should eq(1)
+      output.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+    end
+
     it "aliases the placeholder regex that InlineMarkdown stashes" do
       # InlineMarkdown owns the matching regex; the processor owns the
       # emitted text. Pin them together so neither can drift.

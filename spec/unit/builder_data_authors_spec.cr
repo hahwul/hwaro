@@ -86,5 +86,48 @@ module Hwaro::Core::Build
         end
       end
     end
+
+    # A data/authors.* holding a SCALAR (a note to self, a stray "see
+    # AUTHORS.md") killed the build: `authors_data[id]` resolves an attribute
+    # on a String, which raises Crinja::UndefinedError. The build died with
+    # "alice is undefined. / template: <unknown>" — no error code, no
+    # category, no mention of the data file, and a template blamed where none
+    # was involved. Enrichment is optional metadata, so it must degrade.
+    it "warns and skips enrichment when data/authors.* is not a mapping" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "Test"))
+
+          FileUtils.mkdir_p("data")
+          File.write("data/authors.yml", "see AUTHORS.md\n")
+
+          FileUtils.mkdir_p("content")
+          File.write("content/post1.md", <<-MARKDOWN
+            ---
+            title: "Post 1"
+            date: 2023-01-01
+            authors: ["alice"]
+            ---
+            Content 1
+            MARKDOWN
+          )
+
+          options = Config::Options::BuildOptions.new(output_dir: "public")
+          builder = Builder.new
+
+          built = false
+          log = with_captured_log { built = builder.run(options) }
+
+          built.should be_true
+          log.should contain("data/authors")
+          log.should contain("author enrichment")
+
+          # The author still comes from the page's own front matter.
+          site = builder.site.not_nil!
+          site.authors.has_key?("alice").should be_true
+          site.authors["alice"]["pages"].as_a.size.should eq(1)
+        end
+      end
+    end
   end
 end

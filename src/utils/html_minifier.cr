@@ -150,7 +150,41 @@ module Hwaro
       #
       #   minify("<span>x</span>\n<span>y</span>")
       #   # => "<span>x</span> <span>y</span>"
+      # Drop every NUL byte from a rendered document.
+      #
+      # NUL is not valid in HTML text (parsers replace it with U+FFFD), and it
+      # never appears in author input — but it does reach the rendered page
+      # through a data-file value (data/x.json, data/x.yml), and its absence is
+      # the ONLY thing that makes the `\x00`-delimited sentinels below
+      # collision-proof: a forged `\x00HW_HTML_PB_0\x00` arriving that way made
+      # restore_sensitive_blocks substitute a preserved block into itself, the
+      # string grew by one copy per pass, and the fixed point never converged —
+      # `hwaro build --minify` hung forever.
+      #
+      # Applied by the RENDER phase to every page, minified or not, so the two
+      # build modes cannot disagree on page bytes: scrubbing only inside
+      # `minify` made an optional whitespace pass silently delete a byte of
+      # author-controlled content that a plain build emitted. Dropping (rather
+      # than substituting U+FFFD) is deliberate — the byte carries no meaning
+      # here and a replacement character in the page would be a worse surprise
+      # than its absence.
+      #
+      # Filtered byte-wise rather than with `String#delete` so that invalid
+      # UTF-8 elsewhere in the page survives verbatim instead of being folded
+      # to U+FFFD; NUL never appears inside a multi-byte sequence, so this is
+      # safe.
+      def scrub_nul(html : String) : String
+        return html unless html.byte_index(0)
+        String.build(html.bytesize) do |io|
+          html.each_byte { |b| io.write_byte(b) unless b == 0 }
+        end
+      end
+
       def minify(html : String) : String
+        # Re-established here too, not only at the call site: this module's
+        # placeholder scheme must not depend on a caller having scrubbed for
+        # it. The probe is a single memchr on the common (clean) page.
+        html = scrub_nul(html)
         preserves = [] of String
         result = protect_sensitive_blocks(html, preserves)
         result = result.gsub(REGEX_COMMENTS, "")
@@ -185,12 +219,32 @@ module Hwaro
       # Restore in a fixed-point loop: a protected block (e.g. a `<style>`
       # extracted before `<script>`) can be captured *inside* a later block, so
       # the first restore leaves an inner placeholder behind. Re-scan until no
-      # token remains. Terminates because restored content is original author
-      # HTML, which cannot contain a valid \x00-delimited token (NUL is illegal
-      # in author input), and a dangling index returns $0 unchanged.
-      private def restore_sensitive_blocks(html : String, preserves : Array(String)) : String
+      # token remains; a dangling index returns $0 unchanged. The original
+      # termination argument — "restored content is author HTML, which cannot
+      # contain a valid \x00-delimited token because NUL is illegal in author
+      # input" — turned out to be false (NUL reaches the rendered page through
+      # data-file values), so termination now rests on minify()'s NUL scrub
+      # plus the hard pass cap below rather than on that invariant alone.
+      #
+      # Public (not private) so the counterfeit-token guards below stay
+      # testable: with `minify`'s NUL scrub in front of it, no forged token can
+      # reach this method through the public entry point any more, and a spec
+      # that goes through `minify` therefore exercises neither guard — a
+      # mutation that deletes both still passes. They are defence-in-depth for
+      # any future caller, and dead guards nobody can test are how they rot.
+      def restore_sensitive_blocks(html : String, preserves : Array(String)) : String
         return html if preserves.empty?
-        loop do
+        # Hard bound on the fixed point, belt-and-braces behind the NUL
+        # scrub in minify(). Legitimate re-expansion only ever chains
+        # "outer block hands back an inner placeholder", and extraction
+        # hands out strictly increasing indices, so a nesting chain is at
+        # most `preserves.size` links long and that many passes always
+        # suffice. Anything still substituting past it is a self-referential
+        # token (a caller that reached this module with NUL still in the
+        # document), which would otherwise grow the page by one copy per
+        # pass forever — the same hazard the placeholder restore in
+        # src/content/processors/markdown_extensions.cr caps at 2 passes.
+        preserves.size.times do
           # memchr probe: once the last token is restored the loop used to
           # pay one full confirming regex pass over the document.
           break unless html.includes?(PRESERVE_TOKEN_PROBE)

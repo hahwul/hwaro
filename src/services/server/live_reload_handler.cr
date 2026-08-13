@@ -9,14 +9,38 @@ module Hwaro
 
       LIVE_RELOAD_PATH = "/__hwaro_livereload"
 
-      # A connected client: the socket plus a per-socket write mutex.
-      # HTTP::WebSocket::Protocol#send has no internal lock, so the
-      # connect-time replay (connection fiber) and the watcher fiber's
-      # broadcast could interleave frame bytes on the same socket under
-      # -Dpreview_mt — a WebSocket protocol error that drops the client.
+      # How many outbound messages one client may fall behind by. Broadcast
+      # enqueues here instead of writing to the socket, so a tab that
+      # handshakes and then stops reading (suspended laptop, paused debugger,
+      # a hand-rolled client left open) can absorb this many messages before
+      # we give up on it. The watcher emits at most one message per rebuild,
+      # so a client this far behind is wedged, not merely slow.
+      QUEUE_LIMIT = 32
+
+      # A connected client: the socket, the bounded queue its writer fiber
+      # drains, and a teardown flag.
+      #
+      # HTTP::WebSocket::Protocol#send has no internal lock, so the socket must
+      # have exactly ONE writer or frames from two fibers interleave their
+      # bytes — a WebSocket protocol error. That single writer is the client's
+      # writer fiber, which is why `dropped` exists instead of a second fiber
+      # closing the socket: a close frame is itself a blocking write, and the
+      # only situation `drop_client` fires in is a peer that has stopped
+      # reading, i.e. the writer fiber is *inside* `send` on that socket. A
+      # would-be closer therefore has nothing to serialize against — it can
+      # only wait for the writer, which is exactly what handing the teardown to
+      # the writer does, without leaking a parked fiber for the rest of the
+      # serve session.
       private class Client
         getter socket : HTTP::WebSocket
-        getter write_mutex : Mutex = Mutex.new
+        # Outbound messages waiting for this client's writer fiber, which is
+        # the only thing that ever writes to `socket`. Bounded — see
+        # QUEUE_LIMIT.
+        getter queue : Channel(String) = Channel(String).new(QUEUE_LIMIT)
+        # Set by `drop_client` (under @sockets_mutex): close the socket when
+        # the writer fiber retires, so the browser's `onclose` fires and its
+        # reconnect replays the current build state.
+        property? dropped : Bool = false
 
         def initialize(@socket)
         end
@@ -81,38 +105,103 @@ module Hwaro
           end
 
           ws = HTTP::WebSocketHandler.new do |socket, _ctx|
-            client = Client.new(socket)
-            message = @sockets_mutex.synchronize do
-              @clients << client
-              @current_error
-            end
-            # Replay the current build-error so a tab opened while the
-            # build is broken sees the overlay immediately instead of
-            # silently rendering whatever stale HTML happens to be on
-            # disk. With NO pending error, send an explicit clear instead:
-            # a tab that showed the overlay, lost its socket (laptop sleep,
-            # the long recovery rebuild), and reconnected after the fix
-            # would otherwise display "Build failed" forever over a healthy
-            # site — the successful build's `reload` broadcast is long gone.
-            begin
-              client.write_mutex.synchronize do
-                if message
-                  socket.send("error:#{{"message" => message}.to_json}")
-                else
-                  socket.send("clear-error")
-                end
-              end
-            rescue IO::Error | Socket::Error
-              # Connection torn down before the replay; harmless.
-            end
-            socket.on_close do
-              @sockets_mutex.synchronize { @clients.delete(client) }
-            end
+            register_client(socket)
           end
           ws.call(context)
         else
           call_next(context)
         end
+      end
+
+      # Track a freshly handshaken live-reload socket: start its writer fiber,
+      # register it for broadcasts, and queue the connect-time replay.
+      private def register_client(socket : HTTP::WebSocket)
+        client = Client.new(socket)
+        # Started before the client is visible to broadcast: nothing else ever
+        # writes to the socket, so a queued message with no writer is a message
+        # that never arrives.
+        spawn_writer(client)
+        @sockets_mutex.synchronize do
+          @clients << client
+          # Replay the current build-error so a tab opened while the
+          # build is broken sees the overlay immediately instead of
+          # silently rendering whatever stale HTML happens to be on
+          # disk. With NO pending error, send an explicit clear instead:
+          # a tab that showed the overlay, lost its socket (laptop sleep,
+          # the long recovery rebuild), and reconnected after the fix
+          # would otherwise display "Build failed" forever over a healthy
+          # site — the successful build's `reload` broadcast is long gone.
+          #
+          # Enqueued while holding the lock so the replay is guaranteed to be
+          # this client's FIRST message; the queue is empty and bounded at
+          # QUEUE_LIMIT, so the send cannot block here.
+          if message = @current_error
+            client.queue.send("error:#{{"message" => message}.to_json}")
+          else
+            client.queue.send("clear-error")
+          end
+        end
+        socket.on_close do
+          @sockets_mutex.synchronize { @clients.delete(client) }
+          # Let the writer fiber retire: `receive?` returns nil once the queue
+          # is closed and drained.
+          client.queue.close
+        end
+      end
+
+      # Drain one client's queue on its own fiber — the ONLY place this handler
+      # writes to a socket. `HTTP::WebSocket#send` blocks until the kernel
+      # accepts the frame, and `broadcast` runs on the WATCHER fiber, so
+      # writing there let one tab that stopped reading freeze every rebuild for
+      # the rest of the serve session: the HTTP server kept answering from the
+      # frozen output, so the session looked perfectly healthy while no save
+      # took effect.
+      private def spawn_writer(client : Client)
+        spawn do
+          while message = client.queue.receive?
+            begin
+              client.socket.send(message)
+            rescue IO::Error | Socket::Error
+              # Peer is gone. `on_close` normally unregisters the client, but a
+              # write error can beat the read loop to it.
+              @sockets_mutex.synchronize { @clients.delete(client) }
+              break
+            end
+          end
+
+          # Sole owner of the socket, so the teardown for a dropped client
+          # belongs here: nothing else can be mid-`send` at this point.
+          if @sockets_mutex.synchronize { client.dropped? }
+            begin
+              client.socket.close
+            rescue IO::Error | Socket::Error
+              # Already gone.
+            end
+          end
+        end
+      end
+
+      # Give up on a client whose queue overflowed: unregister it so no further
+      # broadcast targets it, then retire its writer fiber, which closes the
+      # socket on its way out (see spawn_writer). Closing is what keeps this
+      # recoverable — the client script reconnects on `onclose` and a fresh
+      # connection replays the current build state, so a tab that was merely
+      # suspended catches up instead of silently going stale.
+      #
+      # Handing the close to the writer rather than spawning one here is not a
+      # style choice: a close frame is a blocking write on a socket whose peer
+      # has stopped reading, so a second fiber could only block too — either on
+      # the socket or (worse) on a lock the wedged writer holds, parking a
+      # fiber for the rest of the serve session. Residual: while the peer stays
+      # wedged the writer stays inside `send`, so the close lands when that
+      # write finally completes or errors, not immediately. Forcing it sooner
+      # needs the raw IO, which HTTP::WebSocket does not expose.
+      private def drop_client(client : Client)
+        @sockets_mutex.synchronize do
+          @clients.delete(client)
+          client.dropped = true
+        end
+        client.queue.close
       end
 
       def notify_reload
@@ -143,20 +232,25 @@ module Hwaro
 
       private def broadcast(message : String)
         # Snapshot under the lock: a connection fiber may `<<`/`delete` from
-        # @clients concurrently. We send outside the global lock so a slow/
-        # blocked socket doesn't stall connection handling; the per-client
-        # write mutex only serializes writes to that one socket (against the
-        # connect-time replay).
+        # @clients concurrently. Nothing below can wait on a socket — the
+        # enqueue is non-blocking and each client's writer fiber owns the
+        # actual write — because this runs on the watcher fiber.
         snapshot = @sockets_mutex.synchronize { @clients.dup }
-        dead = [] of Client
+        overflowed = [] of Client
         snapshot.each do |client|
-          client.write_mutex.synchronize { client.socket.send(message) }
-        rescue IO::Error | Socket::Error
-          dead << client
+          # `select` with an `else` branch is the non-blocking send: a full
+          # queue means the client is too far behind to be worth keeping.
+          select
+          when client.queue.send(message)
+            # Handed off to that client's writer fiber.
+          else
+            overflowed << client
+          end
+        rescue Channel::ClosedError
+          # Socket closed between the snapshot and the send; its `on_close`
+          # has already unregistered it.
         end
-        unless dead.empty?
-          @sockets_mutex.synchronize { dead.each { |c| @clients.delete(c) } }
-        end
+        overflowed.each { |client| drop_client(client) }
       end
     end
 

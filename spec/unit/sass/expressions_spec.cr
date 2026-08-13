@@ -208,6 +208,24 @@ describe "Sass grouping parentheses" do
     css.should contain("calc(100% - 10px)")
     css.should contain("url(a.png)")
   end
+
+  # The expression parser is recursive descent, so one nesting level costs one
+  # native stack frame: a generated or corrupted stylesheet with a few thousand
+  # nested parens used to take the whole build down with SIGSEGV. The depth cap
+  # demotes it to an ordinary unparsable expression, which the lenient value
+  # path already handles by emitting the text verbatim.
+  it "caps nesting depth instead of overflowing the native stack" do
+    depth = 2000
+    css = Hwaro::Assets::Sass.compile("a { width: #{"(" * depth}1#{")" * depth}; }")
+    css.should contain("width: (((")
+    css.should_not contain("width: 1;")
+  end
+
+  it "still evaluates nesting far below the cap" do
+    depth = 100
+    css = Hwaro::Assets::Sass.compile("a { width: #{"(" * depth}1px + 1px#{")" * depth}; }")
+    css.should contain("width: 2px;")
+  end
 end
 
 private def capture_warnings(&) : String

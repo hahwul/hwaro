@@ -290,6 +290,17 @@ describe "StringFilters" do
       render_filter("{{ text | truncate_words(length=0) }}", vars).strip.should eq("...")
       render_filter("{{ text | truncate_words(length=-1) }}", vars).strip.should eq("...")
     end
+
+    it "returns the text unchanged for an out-of-range length" do
+      # to_count saturates over-large input at its `max` instead of raising,
+      # but the filter then splits at `length + 1` to detect truncation — with
+      # the clamp sitting on Int32::MAX that increment raised
+      # `Arithmetic overflow` and aborted the render of the whole page.
+      vars = {"text" => Crinja::Value.new("a b c d")}
+      render_filter("{{ text | truncate_words(length=2147483647) }}", vars).strip.should eq("a b c d")
+      # Same value arriving as a string, which is all a shortcode can forward.
+      render_filter(%({{ text | truncate_words(length="2147483647") }}), vars).strip.should eq("a b c d")
+    end
   end
 
   describe "slugify" do

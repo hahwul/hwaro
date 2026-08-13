@@ -20,10 +20,13 @@ require "yaml"
 require "file_utils"
 require "crinja"
 require "./ext/crinja_resolve_fix"
+require "./ext/crinja_include_depth_fix"
 require "http/server"
 require "markd"
 require "./ext/markd_entity_fix"
+require "./ext/markd_list_fix"
 require "toml"
+require "./ext/toml_nesting_limit_fix"
 require "emoji"
 
 # Load utilities

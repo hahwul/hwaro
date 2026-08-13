@@ -7,6 +7,7 @@
 require "json"
 require "yaml"
 require "toml"
+require "./content_lister"
 require "./doctor"
 require "../utils/errors"
 require "../utils/frontmatter_scanner"
@@ -47,10 +48,16 @@ module Hwaro
         issues
       end
 
+      # Unfollowable symlinks are dropped here (see `ContentWalk`): there is no
+      # frontmatter to judge behind a link that resolves to nothing, and
+      # reporting one as an author-fixable `content-read-error` made
+      # `hwaro tool validate` fail (exit 5) on a tree `hwaro build` publishes
+      # fine. The skip is announced by `ContentWalk`, so the summary's counts
+      # are never quietly short of a file the caller can see on disk.
       private def find_content_files : Array(String)
         files = [] of String
-        Dir.glob(File.join(@content_dir, "**", "*.md")) { |f| files << f }
-        Dir.glob(File.join(@content_dir, "**", "*.markdown")) { |f| files << f }
+        Dir.glob(File.join(@content_dir, "**", "*.md")) { |f| files << f if ContentWalk.readable_file?(f) }
+        Dir.glob(File.join(@content_dir, "**", "*.markdown")) { |f| files << f if ContentWalk.readable_file?(f) }
         files.sort
       end
 
@@ -144,8 +151,12 @@ module Hwaro
                   result[k] = s
                 elsif b = value.as_bool?
                   result[k] = b
-                elsif i = value.as_i?
-                  result[k] = i.to_i64
+                elsif i = value.as_i64?
+                  # 64-bit accessor: `as_i?` only type-checks (`@raw.as(Int).to_i`),
+                  # so a YAML integer above Int32::MAX raised OverflowError and the
+                  # rescue below reported a bogus "YAML frontmatter parse error"
+                  # for a file that parsed perfectly well.
+                  result[k] = i
                 elsif f = value.as_f?
                   result[k] = f
                 elsif t = value.as_time?
@@ -189,8 +200,9 @@ module Hwaro
                   result[k] = s
                 elsif b = value.as_bool?
                   result[k] = b
-                elsif i = value.as_i?
-                  result[k] = i.to_i64
+                elsif i = value.as_i64?
+                  # Same Int32 overflow hazard as the YAML branch above.
+                  result[k] = i
                 elsif f = value.as_f?
                   result[k] = f
                 end

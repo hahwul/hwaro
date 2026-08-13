@@ -129,6 +129,22 @@ module Hwaro
             # Classified phase-action errors propagate to the CLI so exit
             # code + JSON payload stay stable; don't downgrade to Abort.
             raise ex
+          rescue ex : IO::Error
+            # Ordinary filesystem trouble — a plain file squatting on the
+            # output directory name, a permission denial, a name the
+            # filesystem rejects, a full disk — is an environment problem,
+            # not a hwaro bug. Swallowing the exception TYPE here (returning
+            # Abort) made the CLI report every one of them as
+            # HWARO_E_INTERNAL / exit 70, the code documented as
+            # "unrecoverable bug or unexpected state", and dropped the only
+            # useful detail (which path, which errno) from the --json
+            # payload. Re-raise classified so it exits 6 with the real
+            # message; genuine internal faults still fall through to Abort.
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Phase #{phase} failed: #{ex.message}",
+              cause: ex,
+            )
           rescue ex
             Logger.error "Phase #{phase} failed: #{ex.message}"
             Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"

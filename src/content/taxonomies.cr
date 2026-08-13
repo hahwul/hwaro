@@ -9,6 +9,7 @@ require "../models/site"
 require "../models/page"
 require "../models/section"
 require "../models/config"
+require "../utils/errors"
 require "../utils/logger"
 require "../utils/path_utils"
 require "../utils/text_utils"
@@ -141,6 +142,17 @@ module Hwaro
           # helper backs the get_taxonomy / get_taxonomy_url template functions
           # (via build_global_vars) so their links match these written paths.
           slug_map = Utils::TextUtils.disambiguated_slugs(terms_map.keys)
+
+          # A term too long to be a path segment is shortened (and digest-
+          # suffixed) rather than crashing the build — but that moves its
+          # published URL, so it must never be silent. This is the one place
+          # the term set is enumerated once per taxonomy per build, so the
+          # warning belongs here and not in `safe_slugify`, which runs per
+          # link.
+          terms_map.each_key do |term|
+            next unless Utils::TextUtils.slug_truncated?(term)
+            Logger.warn "Taxonomy term #{term.inspect} is too long for a path segment — its URL was shortened to /#{taxonomy.name}/#{slug_map[term]? || Utils::TextUtils.safe_slugify(term)}/. Shorten the term in the front matter of the pages that use it."
+          end
 
           # Only list terms whose term pages are actually written for this
           # language, so the index never links to a term page that the
@@ -570,8 +582,25 @@ module Hwaro
           return
         end
 
-        Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
-        Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+        begin
+          Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
+          Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+        rescue ex : File::Error
+          # Term slugs are unbounded (a pasted phrase in `tags` becomes a
+          # 300-character directory name), so this writer is where a term the
+          # filesystem cannot represent surfaces — ENAMETOOLONG. Unclassified
+          # the File::Error escaped the `taxonomy:generate` hook and the CLI
+          # blamed an internal hwaro fault (exit 70) for what is a content
+          # problem the author can fix in front matter. Everything else
+          # (permissions, full disk) stays an IO error.
+          too_long = ex.os_error == Errno::ENAMETOOLONG
+          raise Hwaro::HwaroError.new(
+            code: too_long ? Hwaro::Errors::HWARO_E_CONTENT : Hwaro::Errors::HWARO_E_IO,
+            message: "Failed to write taxonomy page #{output_path.inspect}: #{ex.message}",
+            hint: too_long ? "A taxonomy term is too long for this filesystem — shorten the term in the front matter of the pages that use it." : nil,
+            cause: ex,
+          )
+        end
         Logger.action :create, output_path if verbose
       end
 

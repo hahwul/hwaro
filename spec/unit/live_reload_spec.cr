@@ -1,6 +1,34 @@
 require "../spec_helper"
 require "../../src/services/server/live_reload_handler"
 
+# Reopened to register a client without a real WebSocket upgrade — what's under
+# test is the broadcast path, not the handshake.
+module Hwaro
+  module Services
+    class LiveReloadHandler
+      def test_register_client(socket : HTTP::WebSocket)
+        register_client(socket)
+      end
+    end
+  end
+end
+
+# A socket that completes the handshake and then never reads: every write
+# blocks forever. Models the tab hwaro cannot control — a suspended laptop, a
+# paused debugger, a hand-rolled client left open.
+private class WedgedIO < IO
+  @gate = Channel(Nil).new
+
+  def read(slice : Bytes) : Int32
+    @gate.receive
+    0
+  end
+
+  def write(slice : Bytes) : Nil
+    @gate.receive
+  end
+end
+
 # Runs the handler against a synthetic livereload request carrying the given
 # Origin (no real server needed) and returns the response status code.
 private def livereload_status_for_origin(origin : String) : Int32
@@ -101,6 +129,35 @@ describe Hwaro::Services::LiveReloadHandler do
       handler.notify_build_error("first")
       handler.notify_build_error("second")
       handler.@current_error.should eq("second")
+    end
+  end
+
+  # `broadcast` runs on the WATCHER fiber (apply_changeset → notify_reload, and
+  # the watch-loop rescue → push_build_error). While it wrote to the sockets
+  # itself, a single client that stopped reading blocked that fiber and EVERY
+  # rebuild stopped for the rest of the serve session — invisibly, because the
+  # HTTP server kept answering from the frozen output.
+  describe "#broadcast" do
+    it "never waits on a client that stopped reading" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      handler.test_register_client(HTTP::WebSocket.new(WedgedIO.new))
+
+      done = Channel(Nil).new
+      spawn do
+        # More messages than the per-client queue holds, so the wedged client
+        # is dropped rather than the sender waiting on it.
+        (Hwaro::Services::LiveReloadHandler::QUEUE_LIMIT * 4).times { handler.notify_reload }
+        done.send(nil)
+      end
+
+      select
+      when done.receive
+        # Reached only if no broadcast waited on the socket.
+      when timeout(5.seconds)
+        fail "broadcast blocked on a client that stopped reading"
+      end
+
+      handler.@clients.should be_empty
     end
   end
 

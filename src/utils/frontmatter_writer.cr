@@ -230,15 +230,60 @@ module Hwaro
         # The TOML type family a value serializes to; toml.cr rejects arrays
         # that mix families, so array emission needs to know them.
         private def toml_kind(value : YAML::Any) : Symbol
-          case value.raw
-          when Bool             then :bool
-          when Int32, Int64     then :int
+          case raw = value.raw
+          when Bool then :bool
+          when Int32, Int64
+            # Int64::MIN is the one integer `to_toml_value` cannot spell as a
+            # TOML integer the reader accepts, so it serializes as a quoted
+            # string (see `toml_int_literal`) and belongs to the STRING family
+            # here. Calling it an :int would emit `["-9223372036854775808", 1]`
+            # for an all-integer array — precisely the mixed array toml.cr
+            # refuses, reintroducing the unreadable file this guard prevents.
+            raw == Int64::MIN ? :string : :int
           when Float32, Float64 then :float
           when Time             then :time
           when Array            then :array
           when Hash             then :table
           else                       :string
           end
+        end
+
+        # Decimal literal for an integer, in a spelling this codebase's TOML
+        # reader can read back.
+        #
+        # TOML's integer range is exactly Int64's, but toml.cr accumulates the
+        # digits POSITIVELY and only applies the sign afterwards
+        # (`num = num * 10 + digit`, lib/toml/src/toml/lexer.cr:374), so the
+        # one in-range value it cannot reparse is Int64::MIN — reading back
+        # `-9223372036854775808` raises OverflowError. Emitting it verbatim
+        # turned a document hwaro had just parsed into one it can no longer
+        # parse: `tool convert to-toml` rewrote the file in place, reported
+        # success, and the next build died on its own output. (Before the front
+        # matter extractors were hardened the failure was silent and worse —
+        # the whole block was discarded, so a `draft = true` page shipped.)
+        # Keep the exact digits as a quoted string instead: lossy in type, but
+        # the document stays loadable, the same trade `array_items` already
+        # makes for structured members of a mixed array.
+        private def toml_int_literal(int : Int) : String
+          return "\"#{int}\"" if int == Int64::MIN
+          int.to_s
+        end
+
+        # `N.0` form of an integer being promoted into a float array (see
+        # `array_items`), likewise in a spelling toml.cr can read back: its
+        # float reader keeps accumulating into the same Int64 integer part,
+        # one `integer *= 10` per fractional digit
+        # (lib/toml/src/toml/lexer.cr:427), so `[9223372036854775807, 1.5]`
+        # was emitted as `9223372036854775807.0` and overflowed on the way in.
+        # Past a tenth of Int64::MAX — the point where appending `.0` no
+        # longer survives that multiplication — emit the shortest round-trip
+        # float instead (`9.223372036854776e+18`), which the reader takes
+        # through its exponent path. Everything below keeps the `N.0` spelling
+        # it has always had.
+        private def toml_promoted_float_literal(int : Int) : String
+          limit = Int64::MAX // 10
+          return "#{int}.0" if int >= -limit && int <= limit
+          int.to_f64.to_s
         end
 
         private def to_toml_value(value : YAML::Any) : String
@@ -248,7 +293,7 @@ module Hwaro
           when Bool
             raw.to_s
           when Int32, Int64
-            raw.to_s
+            toml_int_literal(raw)
           when Float32, Float64
             # TOML spells non-finite floats `inf`/`nan`; Crystal's `to_s`
             # ("Infinity"/"NaN") doesn't reparse.
@@ -292,7 +337,7 @@ module Hwaro
           elsif kinds.sort == [:float, :int]
             items.map do |v|
               raw = v.raw
-              raw.is_a?(Int) ? "#{raw}.0" : to_toml_value(v)
+              raw.is_a?(Int) ? toml_promoted_float_literal(raw) : to_toml_value(v)
             end
           else
             items.map do |v|

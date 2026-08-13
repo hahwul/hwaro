@@ -806,6 +806,53 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
+    # `output_dir` is joined onto the build output directory AND pasted into the
+    # og:image URL, so a traversing value used to write PNGs above the site root
+    # while every meta tag advertised a literal "/../…" that resolves nowhere.
+    it "refuses an output_dir that escapes the output directory" do
+      Dir.mktmpdir do |dir|
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(output_dir)
+
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg"
+        config.og.auto_image.output_dir = "../oops"
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Escape"
+        page.url = "/posts/escape/"
+        page.render = true
+
+        log = with_captured_log do
+          Hwaro::Content::Seo::OgImage.generate([page], config, output_dir)
+        end
+
+        # Nothing written outside the output directory, and no og:image URL
+        # carrying the traversal.
+        Dir.exists?(File.join(dir, "oops")).should be_false
+        page.image.should be_nil
+        log.should contain("output_dir")
+      end
+    end
+
+    it "refuses to advertise lazy OG URLs for an escaping output_dir" do
+      config = Hwaro::Models::Config.new
+      config.og.auto_image.enabled = true
+      config.og.auto_image.output_dir = "../oops"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Escape"
+      page.url = "/posts/escape/"
+      page.render = true
+
+      with_captured_log do
+        Hwaro::Content::Seo::OgImage.assign_lazy_urls([page], config).should eq(0)
+      end
+
+      page.image.should be_nil
+    end
+
     it "skips draft pages" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new

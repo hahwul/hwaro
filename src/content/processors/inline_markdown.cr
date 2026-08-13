@@ -233,7 +233,18 @@ module Hwaro
         # The unsafe regexes are anchored at `^`, so stripping these from the
         # whole string only affects scheme detection, never legitimate URLs.
         def safe_url?(url : String) : Bool
-          decoded = URI.decode(url.strip).gsub(/[\x00-\x20\x7f]/, "")
+          # `URI.decode` turns every `%XX` into a raw byte, so a legacy latin-1
+          # escape (`/caf%E9.html`, exactly what an old CMS or an importer
+          # emits) or a truncated `%FF` yields an invalid-UTF-8 String. Crystal's
+          # PCRE2 runs in UTF mode and RAISES `ArgumentError: Regex match error`
+          # the moment such a subject reaches a regex — which would abort the
+          # whole build from a single table cell, footnote body, or `redirect_to`
+          # front-matter value. Scrub first (a no-op that returns `self` for
+          # valid UTF-8, so existing output stays byte-identical); U+FFFD can
+          # never spell `javascript:`/`vbscript:`/`file:`/`data:`, so no
+          # sanitization strength is lost. Same guard, same reason, as
+          # `PathUtils.split_safe_segments`.
+          decoded = URI.decode(url.strip).scrub.gsub(/[\x00-\x20\x7f]/, "")
           return true if UNSAFE_DATA_PROTOCOL_RE.matches?(decoded)
           !UNSAFE_PROTOCOL_RE.matches?(decoded)
         end

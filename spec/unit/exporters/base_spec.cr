@@ -15,8 +15,8 @@ private class TestExporter < Hwaro::Services::Exporters::Base
     parse_content(content)
   end
 
-  def test_write_file(path : String, content : String, verbose : Bool = false)
-    write_file(path, content, verbose)
+  def test_write_file(path : String, content : String, output_dir : String, verbose : Bool = false) : Bool
+    write_file(path, content, output_dir, verbose)
   end
 
   def test_rewrite_internal_links(body : String) : String
@@ -171,7 +171,7 @@ describe Hwaro::Services::Exporters::Base do
     it "creates parent directories and writes the content" do
       Dir.mktmpdir do |dir|
         path = File.join(dir, "deeply", "nested", "out.md")
-        TestExporter.new.test_write_file(path, "hello")
+        TestExporter.new.test_write_file(path, "hello", dir).should be_true
         File.exists?(path).should be_true
         File.read(path).should eq("hello")
       end
@@ -181,8 +181,36 @@ describe Hwaro::Services::Exporters::Base do
       Dir.mktmpdir do |dir|
         path = File.join(dir, "out.md")
         File.write(path, "old")
-        TestExporter.new.test_write_file(path, "new")
+        TestExporter.new.test_write_file(path, "new", dir).should be_true
         File.read(path).should eq("new")
+      end
+    end
+
+    # Second, independent layer under `ExportCommand`'s `--output` check: the
+    # command only ever validates the directory the user typed, while the
+    # destinations reaching here are that directory string-joined with a
+    # content-derived relative path. A `..` surviving in the relative half
+    # used to reach `File.write` unchecked, so an exporter could overwrite a
+    # file outside its own destination.
+    it "refuses a destination that escapes the output directory" do
+      Dir.mktmpdir do |dir|
+        output_dir = File.join(dir, "export")
+        Dir.mkdir(output_dir)
+        outside = File.join(dir, "source.md")
+        File.write(outside, "original")
+
+        escaping = File.join(output_dir, "..", "source.md")
+        TestExporter.new.test_write_file(escaping, "clobbered", output_dir).should be_false
+        File.read(outside).should eq("original")
+      end
+    end
+
+    it "accepts a destination nested inside the output directory" do
+      Dir.mktmpdir do |dir|
+        output_dir = File.join(dir, "export")
+        path = File.join(output_dir, "content", "posts", "a.md")
+        TestExporter.new.test_write_file(path, "kept", output_dir).should be_true
+        File.read(path).should eq("kept")
       end
     end
   end
@@ -233,6 +261,184 @@ describe Hwaro::Services::Exporters::Base do
         "[x](@/page.md?ref=home)"
       )
       out.should eq("[x](/page?ref=home)")
+    end
+  end
+
+  # Regression: `tool export` stored `-o` verbatim, so `-o .` / `-o ""` /
+  # `-o content` made the destination collapse back onto the source file and
+  # the exporter rewrote the project's own content/ in place, exit 0.
+  #
+  # Characterisation coverage for API this guard introduced: `guard_output_dir!`
+  # does not exist before the fix, so these examples cannot be run against the
+  # pre-fix tree. The end-to-end pre-fix proof for the same defect lives in
+  # spec/unit/export_command_spec.cr ("refuses to export into the project
+  # directory" / "refuses to export into the content directory"), which drives
+  # the CLI and fails without the guard.
+  describe ".guard_output_dir!" do
+    it "accepts a dedicated sibling directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          # An accepting example must assert acceptance, not merely "did not
+          # raise" — an empty method body passes that.
+          accepted = begin
+            Hwaro::Services::Exporters::Base.guard_output_dir!("export", "content")
+            true
+          rescue Hwaro::HwaroError
+            false
+          end
+          accepted.should be_true
+        end
+      end
+    end
+
+    it "accepts a directory outside the project, including another repo root" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "project", "content"))
+        FileUtils.mkdir_p(File.join(dir, "hugo-site", ".git"))
+        Dir.cd(File.join(dir, "project")) do
+          accepted = begin
+            Hwaro::Services::Exporters::Base.guard_output_dir!(File.join(dir, "hugo-site"), "content")
+            true
+          rescue Hwaro::HwaroError
+            false
+          end
+          accepted.should be_true
+        end
+      end
+    end
+
+    it "rejects the project directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!(".", "content")
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          ex.message.to_s.should contain("project directory")
+        end
+      end
+    end
+
+    it "rejects an empty output directory the same way as \".\"" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!("", "content")
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        end
+      end
+    end
+
+    it "rejects the content directory itself" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!("content", "content")
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        end
+      end
+    end
+
+    it "rejects other project input directories" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          %w[templates static data i18n themes].each do |input_dir|
+            ex = expect_raises(Hwaro::HwaroError) do
+              Hwaro::Services::Exporters::Base.guard_output_dir!(input_dir, "content")
+            end
+            # Per-value assertions: a bare expect_raises passes even when four
+            # of the five are refused for the wrong reason.
+            ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+            ex.message.to_s.should contain(input_dir.inspect)
+          end
+        end
+      end
+    end
+
+    it "rejects an output directory that contains the content directory" do
+      # `<output>/content/<rel>` (Hugo) lands back on the sources when the
+      # output directory is an ancestor of the content directory.
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "site", "content"))
+        Dir.cd(dir) do
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!("site", File.join("site", "content"))
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        end
+      end
+    end
+
+    it "rejects the filesystem root" do
+      # Hermetic like its siblings: the second argument is resolved against the
+      # process working directory, so without a mktmpdir + cd this example's
+      # result depends on wherever the suite happens to be running from.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!("/", "content")
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          ex.message.to_s.should contain("filesystem root")
+        end
+      end
+    end
+
+    # The guard compared LEXICAL paths, so a symlink was the way past every
+    # rule above: `ln -s . selfdir` + `-o selfdir` read as a dedicated sibling
+    # directory while naming the project root, and the exporter rewrote
+    # content/ in place (YAML front matter → TOML, comment lines dropped,
+    # `@/x.md#i` links rewritten) — irreversible, exit 0. The build guard
+    # already resolved symlinks; this one must too.
+    it "rejects a symlink pointing at the project directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          File.symlink(".", "selfdir")
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!("selfdir", "content")
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          ex.message.to_s.should contain("project directory")
+        end
+      end
+    end
+
+    it "rejects a symlink pointing at the content directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          File.symlink("content", "clink")
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!("clink", "content")
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          ex.message.to_s.should contain("content directory")
+        end
+      end
+    end
+
+    it "rejects a destination inside a symlink pointing at a protected input directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          File.symlink("templates", "tlink")
+          ex = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Exporters::Base.guard_output_dir!(File.join("tlink", "out"), "content")
+          end
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          ex.message.to_s.should contain("templates")
+        end
+      end
     end
   end
 end

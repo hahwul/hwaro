@@ -6,6 +6,7 @@
 
 require "json"
 require "uri"
+require "./content_lister"
 require "../models/config"
 require "../utils/logger"
 
@@ -51,7 +52,20 @@ module Hwaro
       # Static sources that reference other static files: Sass (`@font-face`
       # / `url()` in a `.scss` that compiles to `.css`), PWA manifests
       # (`site.webmanifest` icons), and `<image href>` inside an SVG.
-      STATIC_SCAN_EXTENSIONS = %w[css scss sass js json webmanifest xml svg txt]
+      #
+      # `html`/`htm` belong here too. Hand-written pages under `static/` are
+      # copied into the output verbatim by the build, so an `<img src=...>`
+      # inside one is a fully static, literal reference — yet without the
+      # extension the scan never read the file and reported its images as
+      # unused, which `--delete` then removed (real data loss).
+      STATIC_SCAN_EXTENSIONS = %w[css scss sass js json webmanifest xml svg txt html htm]
+
+      # Data and translation sources that can name an asset (`logo: /img/a.png`
+      # in `data/site.yml`, an icon path in `i18n/en.toml`). `data/` is loaded
+      # by `Phases::Initialize#load_data_files` with exactly this extension
+      # set, and i18n locale files are TOML; templates render whatever those
+      # hold, so a path that only ever appears there is still in use.
+      DATA_SCAN_EXTENSIONS = %w[yml yaml json toml]
 
       @content_dir : String
       @static_dir : String
@@ -131,25 +145,36 @@ module Hwaro
         end
       end
 
+      # Walk `static/` and `content/` for candidate asset files.
+      #
+      # The extension test now runs BEFORE the filesystem test, and the old
+      # `File.directory?` guard is gone: `File.directory?` resolves the path,
+      # and on a symlink cycle (`ln -s loop.png static/img/loop.png`) that
+      # raises `File::Error` (ELOOP) — nothing here caught it, so the whole
+      # command died with a raw "Unable to get file info" on a tree `hwaro
+      # build` walks fine. `ContentWalk.readable_file?` skips directories the
+      # same way while surviving links it cannot follow, and testing the
+      # extension first keeps that check (and its warning) off the thousands of
+      # non-asset entries a content tree contains.
       private def collect_assets : Array(String)
         assets = [] of String
 
         # Static directory assets
         if Dir.exists?(@static_dir)
           Dir.glob(File.join(@static_dir, "**", "*")) do |path|
-            next if File.directory?(path)
             ext = File.extname(path).downcase
-            assets << path if ASSET_EXTENSIONS.includes?(ext)
+            next unless ASSET_EXTENSIONS.includes?(ext)
+            assets << path if ContentWalk.readable_file?(path)
           end
         end
 
         # Co-located assets in content directory
         if Dir.exists?(@content_dir)
           Dir.glob(File.join(@content_dir, "**", "*")) do |path|
-            next if File.directory?(path)
             ext = File.extname(path).downcase
             next if CONTENT_EXTENSIONS.includes?(ext)
-            assets << path if ASSET_EXTENSIONS.includes?(ext)
+            next unless ASSET_EXTENSIONS.includes?(ext)
+            assets << path if ContentWalk.readable_file?(path)
           end
         end
 
@@ -178,6 +203,17 @@ module Hwaro
         # remove in-use files (data loss).
         if Dir.exists?(@static_dir)
           Dir.glob(File.join(@static_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+        end
+
+        # `data/` and `i18n/` are build inputs too — templates read them as
+        # `site.data.*` / translation strings, so an asset path that lives only
+        # in a data or locale file is genuinely referenced. Neither directory
+        # was scanned at all, so those assets were reported unused and
+        # `--delete` removed them.
+        {"data", "i18n"}.each do |rel_dir|
+          dir = File.join(@project_root, rel_dir)
+          next unless Dir.exists?(dir)
+          Dir.glob(File.join(dir, "**", "*.{#{DATA_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         String.build do |sb|
@@ -256,7 +292,12 @@ module Hwaro
           dir = File.join(@static_dir, rel_dir)
           next unless Dir.exists?(dir)
           Dir.glob(File.join(dir, "**", "*")) do |path|
-            next if File.directory?(path)
+            # `File.directory?` raises on a symlink cycle, and the blanket
+            # rescue below would have swallowed it — dropping EVERY
+            # config-declared reference, so `--delete` removed bundle and
+            # auto-include files the build still reads. Resolve the entry the
+            # way the asset walk does instead.
+            next unless ContentWalk.readable_file?(path)
             refs << File.basename(path)
           end
         end

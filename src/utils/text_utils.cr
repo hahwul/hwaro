@@ -4,12 +4,32 @@
 # - slugify: Convert text to URL-friendly slugs
 # - escape_xml: Escape XML special characters
 
+require "digest/sha1"
 require "uri"
 
 module Hwaro
   module Utils
     module TextUtils
       extend self
+
+      # Longest error message any console emitter prints on one line.
+      #
+      # A template error carries Crinja's source excerpt, so a single
+      # minified/one-line template turns one failure into a multi-megabyte
+      # console line: a 3 MB `{% if %}` line produced a 6 MB log, and in serve
+      # mode every rebuild repeated it. The clamp has to be applied by each
+      # emitter (rather than inside Logger) because the machine-readable
+      # contracts hwaro prints elsewhere are byte-preserved.
+      MAX_ERROR_CHARS = 4000
+
+      # Clamp `message` to `max` CHARACTERS (not bytes — the count is what the
+      # suffix reports, and slicing on a character boundary can never split a
+      # codepoint in the terminal). Returns the message untouched when it fits,
+      # which is every ordinary error.
+      def truncate_error(message : String, max : Int32 = MAX_ERROR_CHARS) : String
+        return message if message.size <= max
+        "#{message[0, max]}… (truncated, #{message.size} characters)"
+      end
 
       # Display names for common language codes, used by scaffold configs
       # for `--include-multilingual`. Unknown codes fall back to upcase.
@@ -314,15 +334,95 @@ module Hwaro
         end.rstrip('-')
       end
 
-      # Like `slugify` but never returns "". An all-symbol/emoji input (e.g. a
-      # tag of "!!!" or "🎉") slugifies to "", which would make distinct terms
-      # collide onto the same URL/output path and create a `//` path segment.
-      # Falls back to a deterministic, stable token derived from the input's
-      # UTF-8 bytes so distinct inputs stay distinct and the slug is identical
-      # across builds (unlike `String#hash`, which is per-process seeded).
+      # Longest slug `safe_slugify` returns, in bytes.
+      #
+      # A taxonomy term becomes one path segment (`public/tags/<slug>/`), and
+      # nothing bounded it: pasting a phrase into `tags` produced a 300-byte
+      # directory name and the build died at the first mkdir with ENAMETOOLONG.
+      # The two filesystem limits that matter disagree on their UNIT — ext4
+      # caps a name at 255 bytes, APFS at 255 characters — which is why a
+      # 264-byte / 88-character Korean tag builds on macOS but not on Linux. A
+      # byte bound satisfies both, because a string's character count is never
+      # greater than its byte count.
+      #
+      # The bound is set as close to 255 as the `-N` disambiguation suffix
+      # `disambiguated_slugs` may append allows (10 bytes of headroom, enough
+      # for `-999999999`), deliberately NOT lower: a slug of 201..245 bytes
+      # publishes fine on every mainstream filesystem, so a tighter cap would
+      # silently move the URL of a term that works today — `page.url`, the
+      # sitemap `<loc>`, the feeds and every `get_taxonomy_url` link with it —
+      # and 404 anything already indexed. Only terms that could not have been
+      # written at all are rewritten.
+      MAX_SLUG_BYTES = 245
+
+      # Hex characters of the term digest appended to a truncated slug — enough
+      # that two terms sharing a long prefix keep separate URLs.
+      SLUG_DIGEST_CHARS = 8
+
+      # Like `slugify` but never returns "" and never exceeds `MAX_SLUG_BYTES`.
+      # An all-symbol/emoji input (e.g. a tag of "!!!" or "🎉") slugifies to "",
+      # which would make distinct terms collide onto the same URL/output path
+      # and create a `//` path segment. Falls back to a deterministic, stable
+      # token derived from the input's UTF-8 bytes so distinct inputs stay
+      # distinct and the slug is identical across builds (unlike `String#hash`,
+      # which is per-process seeded).
       def safe_slugify(text : String) : String
         s = slugify(text)
-        s.empty? ? "term-#{text.to_slice.hexstring}" : s
+        # Two hex characters per input byte, so this fallback is the *longer*
+        # of the two paths for a long emoji-only term — it needs bounding too.
+        s = "term-#{text.to_slice.hexstring}" if s.empty?
+        bound_slug(s, text)
+      end
+
+      # Cap `slug` at `MAX_SLUG_BYTES`, keeping distinct terms on distinct URLs.
+      #
+      # Truncating alone would fold every term sharing a long prefix onto one
+      # slug — two tags silently rendering as one page — so the kept head is
+      # followed by a digest of the WHOLE source term. SHA-1 is an identifier
+      # here, not a security primitive; what it buys is determinism across
+      # runs, processes and platforms, which `String#hash` (per-process seeded)
+      # does not give. That matters because this is the single source of truth
+      # for term slugs: bounding here means the on-disk path, `page.url`, the
+      # sitemap, the feeds and the `get_taxonomy_url` helper all shorten
+      # together. Bounding at the filesystem layer instead would leave every
+      # generated link pointing at the un-truncated path — a site of dead
+      # links, worse than the crash.
+      #
+      # Slugs at or under the bound — every term on every existing site — are
+      # returned untouched, so no published URL moves.
+      # True when `safe_slugify(term)` had to shorten the term to fit
+      # `MAX_SLUG_BYTES`, i.e. its published URL is not derived from the whole
+      # term. `safe_slugify` itself is called many times per term (index links,
+      # term pages, template helpers), so it must stay silent; callers that
+      # enumerate the term set ONCE per build use this to warn exactly once.
+      def slug_truncated?(term : String) : Bool
+        s = slugify(term)
+        s = "term-#{term.to_slice.hexstring}" if s.empty?
+        s.bytesize > MAX_SLUG_BYTES
+      end
+
+      private def bound_slug(slug : String, source : String) : String
+        return slug if slug.bytesize <= MAX_SLUG_BYTES
+
+        suffix = "-#{Digest::SHA1.hexdigest(source)[0, SLUG_DIGEST_CHARS]}"
+        head = truncate_bytes(slug, MAX_SLUG_BYTES - suffix.bytesize)
+        # The cut can land right after a separator ("...-word-"); dropping it
+        # keeps the result shaped like any other slug, which never ends in "-".
+        "#{head.rstrip('-')}#{suffix}"
+      end
+
+      # Longest prefix of `s` that fits in `max_bytes`, cut on a character
+      # boundary. Slicing UTF-8 at an arbitrary byte offset would leave half a
+      # codepoint in a directory name and in every link that points at it, so
+      # the width of each character is charged whole or not at all.
+      private def truncate_bytes(s : String, max_bytes : Int32) : String
+        kept = 0
+        s.each_char do |char|
+          width = char.bytesize
+          break if kept + width > max_bytes
+          kept += width
+        end
+        s.byte_slice(0, kept)
       end
 
       # Map a set of terms to UNIQUE slugs. Distinct terms can slugify to the
@@ -336,6 +436,9 @@ module Hwaro
       # generator (term-page paths + index links) and the `get_taxonomy` /
       # `get_taxonomy_url` template helpers must all run terms through here so the
       # links they emit point at the pages that were actually written.
+      #
+      # Bases arrive already capped by `safe_slugify`; the few bytes a `-N`
+      # suffix adds on top are what `MAX_SLUG_BYTES`' headroom under 255 is for.
       def disambiguated_slugs(terms : Array(String)) : Hash(String, String)
         slug_map = {} of String => String
         used = Set(String).new
@@ -400,21 +503,55 @@ module Hwaro
       # protocol and RSS require RFC 3986 URIs, so non-ASCII paths like
       # `/posts/한글/` must become `/posts/%ED%95%9C%EA%B8%80/`.
       #
-      # The scheme/host prefix (if any) is left untouched, and paths that
-      # already contain a percent-escape are passed through unchanged so
-      # pre-encoded URLs don't get double-encoded.
+      # The scheme/host prefix (if any) is left untouched, and escapes that are
+      # already present are stepped over so pre-encoded URLs don't get
+      # double-encoded.
       def encode_url_path(url : String) : String
         return url if url.ascii_only? && !url.includes?(' ')
-        return url if url.matches?(/%[0-9A-Fa-f]{2}/)
 
         if scheme_end = url.index("://")
           host_end = url.index('/', scheme_end + 3)
           return url unless host_end
           prefix = url[0...host_end]
           path = url[host_end..]
-          prefix + URI.encode_path(path)
+          prefix + encode_path_preserving_escapes(path)
         else
-          URI.encode_path(url)
+          encode_path_preserving_escapes(url)
+        end
+      end
+
+      # `URI.encode_path`, except that a `%XX` escape already in the input is
+      # copied through instead of having its `%` escaped again.
+      #
+      # The old rule bailed out of encoding entirely at the first escape it
+      # saw. That is right for a fully pre-encoded URL, but "contains an
+      # escape" is not "is fully escaped": a page whose filename holds both a
+      # non-ASCII word and a `#` reaches here as `/posts/한글%23x/`, and
+      # passing that straight through emitted raw UTF-8 into a sitemap `<loc>`
+      # and an RSS `<link>`, which the sitemap protocol and RFC 3986 forbid.
+      # Same for a URL mixing a raw space with an escape (`/a b%20c/`).
+      private def encode_path_preserving_escapes(path : String) : String
+        return URI.encode_path(path) unless path.matches?(/%[0-9A-Fa-f]{2}/)
+
+        bytes = path.to_slice
+        String.build(path.bytesize + 8) do |io|
+          index = 0
+          run_start = 0
+          while index < bytes.size
+            # `%` + two hex digits: an escape to preserve verbatim. Encode the
+            # run of ordinary bytes before it as one chunk so multi-byte UTF-8
+            # characters are never split across two encode calls.
+            if bytes[index] == 0x25 && index + 2 < bytes.size &&
+               bytes[index + 1].unsafe_chr.hex? && bytes[index + 2].unsafe_chr.hex?
+              URI.encode_path(io, String.new(bytes[run_start, index - run_start])) if index > run_start
+              io.write(bytes[index, 3])
+              index += 3
+              run_start = index
+            else
+              index += 1
+            end
+          end
+          URI.encode_path(io, String.new(bytes[run_start, bytes.size - run_start])) if run_start < bytes.size
         end
       end
 

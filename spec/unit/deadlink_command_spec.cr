@@ -542,6 +542,49 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
+    # Regression: `URI.decode` turns `%00` into a real NUL byte, and the first
+    # `File.exists?` probe in `resolves?` then raised
+    # `ArgumentError: String contains null byte` out of libc. That aborted the
+    # entire run with exit 1 — the same code as "links are dead", so CI could
+    # not tell the two apart — and left `--json` writing zero bytes to stdout.
+    # The hostile link must degrade on its own, like an unreadable file does.
+    it "reports a percent-encoded NUL as a dead link and keeps checking the others" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "content")
+        nul_link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/a%00b", kind: :internal
+        )
+        dead_link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/does-not-exist/", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([nul_link, dead_link], dir)
+
+        results.size.should eq(2)
+        results[0].link.url.should eq("/a%00b")
+        results[0].error.not_nil!.should contain("Invalid link target")
+        # The genuinely dead link that used to be swallowed by the abort.
+        results[1].link.url.should eq("/does-not-exist/")
+        results[1].error.not_nil!.should contain("not found")
+      end
+    end
+
+    it "reports a percent-encoded NUL in an image path as dead" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "test.md"), "content")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "test.md"), url: "/a%00b.png", kind: :image
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
+        results.size.should eq(1)
+        results[0].error.not_nil!.should contain("Invalid link target")
+      end
+    end
+
     it "does not treat taxonomy names as valid image paths" do
       # Images shouldn't fall through the taxonomy shortcut — an image
       # reference under `/tags/header.png` still has to exist on disk.

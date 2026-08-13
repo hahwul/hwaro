@@ -153,6 +153,43 @@ describe Hwaro::Core::Build::Phases::Write do
       end
     end
 
+    # Regression: the copy-as-is branch used FileUtils.cp, which truncates the
+    # destination and then streams it. `hwaro serve` re-runs the Write phase on
+    # every rebuild while HTTP fibers stream those same files to the browser, so
+    # a request landing mid-copy was answered with a zero-length or partial body
+    # that nothing retried. The window is not deterministic in a spec, so assert
+    # the property behind it: a reader holding the destination open across a
+    # re-copy must keep seeing one complete revision. Both revisions have the
+    # same length, so only atomicity can satisfy it.
+    it "replaces a raw file atomically instead of truncating it in place" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("public")
+          old_bytes = %({"a":"#{"x" * 4000}"})
+          new_bytes = %({"a":"#{"y" * 4000}"})
+          File.write("content/data.json", old_bytes)
+
+          raw = Hwaro::Core::Lifecycle::RawFile.new("content/data.json", "data.json")
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_process_raw_files([raw], "public", false, false)
+
+          reader = File.open("public/data.json")
+          begin
+            File.write("content/data.json", new_bytes)
+            builder.test_process_raw_files([raw], "public", false, false)
+
+            reader.gets_to_end.should eq(old_bytes)
+          ensure
+            reader.close
+          end
+
+          File.read("public/data.json").should eq(new_bytes)
+          Dir.glob("public/*.tmp").should be_empty
+        end
+      end
+    end
+
     it "returns zero when no raw files are provided" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
@@ -209,6 +246,47 @@ describe Hwaro::Core::Build::Phases::Write do
 
           File.exists?("public/blog/post/cover.png").should be_true
           File.read("public/blog/post/cover.png").should eq("image-bytes")
+        end
+      end
+    end
+
+    # Same atomicity invariant as the raw-file copy above: bundle assets are
+    # re-copied on every serve rebuild while the browser streams them, and
+    # FileUtils.cp truncated the live destination before streaming into it.
+    it "replaces a changed bundle asset atomically instead of truncating it" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/blog/post")
+          File.write("content/blog/post/index.md", "---\ntitle: Post\n---\n")
+          old_bytes = "old-image-bytes" * 500
+          new_bytes = "new-image-bytes" * 500
+          File.write("content/blog/post/cover.png", old_bytes)
+          FileUtils.mkdir_p("public")
+
+          page = Hwaro::Models::Page.new("blog/post/index.md")
+          page.url = "/blog/post/"
+          page.assets = ["blog/post/cover.png"]
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_process_assets([page], "public", false)
+
+          reader = File.open("public/blog/post/cover.png")
+          begin
+            File.write("content/blog/post/cover.png", new_bytes)
+            # Both revisions are the same size, so the skip-unchanged check
+            # would compare mtimes that could land in the same filesystem tick.
+            # Backdate the source to make "changed" unambiguous and keep the
+            # test about atomicity rather than timing.
+            File.utime(Time.utc, Time.utc - 1.hour, "content/blog/post/cover.png")
+            builder.test_process_assets([page], "public", false)
+
+            reader.gets_to_end.should eq(old_bytes)
+          ensure
+            reader.close
+          end
+
+          File.read("public/blog/post/cover.png").should eq(new_bytes)
+          Dir.glob("public/blog/post/*.tmp").should be_empty
         end
       end
     end

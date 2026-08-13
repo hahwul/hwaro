@@ -108,4 +108,35 @@ describe "tool list regressions" do
       end
     end
   end
+
+  # `hwaro build` learned to walk a symlink cycle in content/ (see
+  # core/build/phases/read_content.cr), but the tool services kept feeding the
+  # raw glob output to `File.read`: every unfollowable link came back as a
+  # per-file "Failed to read content file" failure on a tree the build
+  # publishes without complaint.
+  describe "unfollowable symlinks in content/" do
+    it "skips cycles and dangling links instead of reporting read failures" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "real.md"), "+++\ntitle = \"Real\"\n+++\nBody")
+        # Self-referential link, mutually-referential pair, dangling link.
+        File.symlink("loop.md", File.join(content_dir, "loop.md"))
+        File.symlink("b.md", File.join(content_dir, "a.md"))
+        File.symlink("a.md", File.join(content_dir, "b.md"))
+        File.symlink("gone.md", File.join(content_dir, "dangling.md"))
+
+        result = [] of Hwaro::Services::ContentInfo
+        output = with_captured_log do
+          result = Hwaro::Services::ContentLister.new(content_dir).list_content(Hwaro::Services::ContentFilter::All)
+        end
+
+        result.map(&.title).should eq(["Real"])
+        output.should_not contain("Failed to read content file")
+        # Skipped, but never silently: each link is named once.
+        output.should contain("loop.md")
+        output.should contain("dangling.md")
+      end
+    end
+  end
 end

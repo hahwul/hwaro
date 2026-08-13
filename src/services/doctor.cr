@@ -801,6 +801,18 @@ module Hwaro
         Dir.each_child(root) do |entry|
           next if entry.starts_with?(".") || entry.starts_with?("_")
           child = File.join(root, entry)
+          # A symlinked directory can close a cycle (`ln -s .. content/x/y`),
+          # and this walk follows it: `File.directory?` resolves the link, so
+          # the recursion only stops when the kernel gives up at MAXSYMLINKS
+          # and `File.info?` raises ELOOP — which used to escape the whole
+          # doctor run, printing a raw filesystem error and zero diagnostics.
+          # Skip, don't descend, exactly like Importers::Base#walk_files_into.
+          # `Dir.glob` (used by the markdown probes below) never follows
+          # symlinked directories either, so this keeps the two consistent.
+          if File.symlink?(child)
+            Logger.debug "Doctor: skipping symlinked content entry #{child}"
+            next
+          end
           next unless File.directory?(child)
           next unless dir_contains_markdown?(child)
 
@@ -821,6 +833,12 @@ module Hwaro
 
           walk_section_dirs(child, issues)
         end
+      rescue ex : File::Error
+        # Belt and braces: an unreadable (or concurrently removed) directory
+        # must not take the whole doctor run down. This check is advisory
+        # (`:info` level), so a missing sub-branch is far better than no
+        # report at all.
+        Logger.debug "Doctor: cannot walk #{root}: #{ex.message}"
       end
 
       # Quick "is there content under here?" check used to filter out

@@ -97,5 +97,23 @@ describe Hwaro::Config::Options::ServeOptions do
       build = serve.to_build_options
       build.base_url.should eq("https://example.com")
     end
+
+    # `hwaro serve -b ""` bound fine and derived `http://:3000`, an authority
+    # with no host, which every canonical/OG/feed URL of the previewed site
+    # then carried. A blank bind has no meaningful host, so the URL falls back
+    # to the loopback name instead of being unusable.
+    it "never derives an empty authority from a blank --bind" do
+      ["", "   "].each do |host|
+        build = Hwaro::Config::Options::ServeOptions.new(host: host, port: 42734).to_build_options
+        build.base_url.should eq("http://localhost:42734")
+      end
+    end
+  end
+
+  describe ".url_host" do
+    it "falls back to the loopback name for a blank host" do
+      Hwaro::Config::Options::ServeOptions.url_host("").should eq("localhost")
+      Hwaro::Config::Options::ServeOptions.url_host(" ").should eq("localhost")
+    end
   end
 end

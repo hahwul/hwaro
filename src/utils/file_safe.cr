@@ -12,6 +12,7 @@
 # `mkdir -p` semantics promise anyway.
 
 require "file_utils"
+require "./errors"
 
 module Hwaro
   module Utils
@@ -47,7 +48,34 @@ module Hwaro
         return if Dir.exists?(path)
         Dir.mkdir(path, mode)
       rescue ex : File::AlreadyExistsError
-        raise ex unless Dir.exists?(path)
+        return if Dir.exists?(path)
+        # `Dir.exists?` resolves symlinks, so a link whose target is missing
+        # (or is not a directory) reads as "does not exist" while `mkdir` still
+        # hits EEXIST on the link itself. `output_dir` pointing at a dangling
+        # symlink (`public -> nowhere`) therefore reached here and re-raised a
+        # bare `File::AlreadyExistsError` — an unclassified crash with no hint
+        # about which path was at fault. Refuse with a classified error naming
+        # the link instead. We deliberately do NOT create the link's target:
+        # it can point anywhere on the filesystem, and a build must never
+        # materialize (or disturb) directories outside the project on its own.
+        # Only an already-failed `mkdir` reaches this rescue, so the extra
+        # `symlink?` stat costs nothing on the hot path.
+        raise dangling_symlink_error(path, ex) if File.symlink?(path)
+        raise ex
+      end
+
+      # Classified error for `mkdir_p` running into a symlink that does not
+      # resolve to a usable directory. Names the link *and* its target so the
+      # user can tell which of the two is missing.
+      private def self.dangling_symlink_error(path : Path, cause : Exception) : Hwaro::HwaroError
+        target = File.readlink?(path)
+        described = target ? "#{path} -> #{target}" : path.to_s
+        Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Cannot create directory '#{described}': the path is a symbolic link that does not point at an existing directory",
+          hint: "Create the directory the link points at, repoint the link, or remove the link. Hwaro will not create or delete anything on the far side of it.",
+          cause: cause
+        )
       end
 
       # Write `content` to `path` atomically: write to a same-directory
@@ -68,6 +96,50 @@ module Hwaro
         rescue ex
           # Never leave the temp file behind — a failed write must look
           # exactly like the old non-atomic failure (target unchanged).
+          File.delete(tmp) if File.exists?(tmp)
+          raise ex
+        end
+      end
+
+      # Copy `src` onto `dest` atomically: copy into a same-directory temp
+      # file, then rename it into place. Same invariant as `atomic_write`, for
+      # the paths that publish bytes from a source file instead of a rendered
+      # string.
+      #
+      # `FileUtils.cp` is `File.copy`, which opens the destination with
+      # O_TRUNC and then streams — so while a copy runs the destination is
+      # observably 0 bytes and then every intermediate size. `hwaro serve`
+      # answers HTTP requests for those very paths from fibers of the same
+      # process, so a request landing in that window gets a truncated body
+      # whose header agrees with the short length, which means nothing
+      # retries. `rename` is atomic within a filesystem, so a reader sees
+      # either the old bytes or the new ones.
+      #
+      # Permissions carry over from the source exactly as with `FileUtils.cp`
+      # (`File.copy` opens the destination with the source's mode); callers
+      # that also want the source mtime keep stamping it after the copy.
+      #
+      # The temp name is unique per process AND fiber so parallel copies of
+      # sibling files can't collide on it.
+      def self.atomic_copy(src : String | Path, dest : String | Path) : Nil
+        source = src.to_s
+        target = dest.to_s
+
+        # `FileUtils.cp` copies INTO a directory of that name; there is no
+        # single file to replace atomically then, so keep the old behaviour
+        # instead of failing the rename on it.
+        if Dir.exists?(target)
+          FileUtils.cp(source, target)
+          return
+        end
+
+        tmp = "#{target}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+        begin
+          File.copy(source, tmp)
+          File.rename(tmp, target)
+        rescue ex
+          # Never leave the temp file behind — a failed copy must look exactly
+          # like the old non-atomic failure (destination unchanged).
           File.delete(tmp) if File.exists?(tmp)
           raise ex
         end

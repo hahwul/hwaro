@@ -2112,3 +2112,29 @@ describe "Build Integration: Static file nested directories" do
     end
   end
 end
+
+# ---------------------------------------------------------------------------
+# 56. Root-level page bundles are not the homepage
+# ---------------------------------------------------------------------------
+describe "Build Integration: root-level page bundle template" do
+  it "renders content/about/index.md with page.html, not the homepage template" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "index.md"       => "---\ntitle: Home\n---\nHome body",
+        "about/index.md" => "---\ntitle: About\n---\nAbout body",
+      },
+      template_files: {
+        "index.html" => "HOME|{{ content }}",
+        "page.html"  => "PAGE|{{ page.title }}|{{ content }}",
+      },
+    ) do
+      File.read("public/index.html").should contain("HOME|")
+
+      about = File.read("public/about/index.html")
+      about.should contain("PAGE|About|")
+      about.should contain("About body")
+      about.should_not contain("HOME|")
+    end
+  end
+end

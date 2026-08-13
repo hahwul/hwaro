@@ -132,6 +132,13 @@ module Hwaro
         # strings that contain no shortcode tokens. A missing key means
         # "unknown": process as before.
         @template_shortcode_scan : Hash(UInt64, Bool) = {} of UInt64 => Bool
+        # Crinja-owned regions (raw blocks, macro invocations) masked out of a
+        # template source, keyed by that source's hash. Masking is a pure
+        # function of the string but used to run once per rendered PAGE; like
+        # the scan above it is populated once in load_templates and read-only
+        # during render. Also the only place a macro inherited through
+        # `{% extends %}` can be seen, since that needs the whole template set.
+        @template_literal_masks : Hash(UInt64, {String, Array(String)}) = {} of UInt64 => {String, Array(String)}
         # Which expensive per-page template variables a template's static
         # closure can actually reach. build_template_variables skips building
         # the ones it provably can't (SEO/OG strings, JSON-LD strings, the
@@ -1276,6 +1283,40 @@ module Hwaro
           count
         end
 
+        # Copy `src_path` onto `dest_path` atomically: copy into a
+        # same-directory temp file first, then rename it into place.
+        #
+        # Both callers below run on the serve watcher while HTTP fibers stream
+        # the very same paths to the browser, and `FileUtils.cp` opens the
+        # destination with O_TRUNC and then streams — so the destination is
+        # observably 0 bytes and then every intermediate size, and a request
+        # landing in that window is answered with a truncated body (a 21 MB
+        # stylesheet was served at 0.5 MB, header and body agreeing on the short
+        # length) that nothing retries. `rename` is atomic within a filesystem,
+        # so a reader sees either the old bytes or the new ones. Same invariant
+        # — and the same pid+fiber temp naming, so parallel copies of sibling
+        # files cannot collide — as `FileSafe.atomic_write`.
+        private def atomic_copy(src_path : String, dest_path : String) : Nil
+          # `FileUtils.cp` copies INTO a directory of that name; there is no
+          # file to replace atomically then, so keep the old behaviour instead
+          # of failing the rename on it.
+          if Dir.exists?(dest_path)
+            FileUtils.cp(src_path, dest_path)
+            return
+          end
+
+          tmp = "#{dest_path}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+          begin
+            File.copy(src_path, tmp)
+            File.rename(tmp, dest_path)
+          rescue ex
+            # Never leave the temp file behind — a failed copy must look
+            # exactly like the old non-atomic failure (destination unchanged).
+            File.delete(tmp) if File.exists?(tmp)
+            raise ex
+          end
+        end
+
         # Copy only the specified static files to the output directory.
         # Used by serve mode when only static files have changed.
         def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false)
@@ -1294,7 +1335,12 @@ module Hwaro
             next if lstat.nil?
 
             if lstat.symlink?
-              info = File.info?(src_path, follow_symlinks: true)
+              # `static_target_info` (phases/initialize.cr) turns an
+              # unresolvable link — a symlink cycle raises ELOOP out of a bare
+              # `File.info?` — into a skip. Raising here escaped into the
+              # watcher loop, which then failed every single iteration and
+              # could never rebuild again.
+              info = static_target_info(src_path)
               next if info.nil? || info.directory?
 
               unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
@@ -1303,6 +1349,15 @@ module Hwaro
               end
             else
               next if lstat.directory?
+              info = lstat
+            end
+
+            # FIFOs, sockets and device nodes are not publishable and hang the
+            # copy forever (`open(2)` on a writer-less FIFO blocks) — same
+            # guard as the full build's collect_static_files.
+            unless info.type.file?
+              Logger.warn "Skipping non-regular static file: #{src_path}"
+              next
             end
 
             relative = path_relative_to(src_path, "static")
@@ -1329,7 +1384,7 @@ module Hwaro
             end
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-            FileUtils.cp(src_path, dest_path)
+            atomic_copy(src_path, dest_path)
             copied += 1
           end
           Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
@@ -1429,7 +1484,7 @@ module Hwaro
             end
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-            FileUtils.cp(src_path, dest_path)
+            atomic_copy(src_path, dest_path)
             Logger.action :copy, dest_path, Logger::Role::Dim if verbose
             copied += 1
           end
