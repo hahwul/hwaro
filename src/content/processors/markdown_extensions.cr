@@ -258,7 +258,12 @@ module Hwaro
             if rel_match = new_attrs.match(EXISTING_REL_RE)
               existing = rel_match[1].split
               merged = existing + rel_tokens.reject { |token| existing.includes?(token) }
-              new_attrs = new_attrs.sub(EXISTING_REL_RE, %(rel="#{merged.join(' ')}"))
+              # `backreferences: false`: `merged` starts with the author's own
+              # rel tokens, and `String#sub(Regex, String)` expands `\0`-`\9` /
+              # `\k<name>` inside the REPLACEMENT. Without the flag a literal
+              # `rel="a\1b"` would splice the match back in, and `rel="\k<g>"`
+              # would raise `IndexError` and abort the build.
+              new_attrs = new_attrs.sub(EXISTING_REL_RE, %(rel="#{merged.join(' ')}"), backreferences: false)
             else
               new_attrs = %(#{new_attrs.rstrip} rel="#{rel_tokens.join(' ')}")
             end
@@ -1215,8 +1220,13 @@ module Hwaro
               id = hid_match[1]
               cleaned_inner = inner.sub(hid_match[0], "").rstrip
 
+              # `backreferences: false`: `HID_MARKER_RE`'s grammar already
+              # excludes `\`, so no id can carry one today — but the guard
+              # keeps that invariant local, so loosening the marker grammar
+              # later can't turn an id into a replacement backreference (see
+              # the same guard in `postprocess_external_links`).
               new_attrs = if attrs.matches?(ANY_ID_ATTR_PRESENT_RE)
-                            attrs.sub(EXISTING_ID_RE, %(id="#{id}"))
+                            attrs.sub(EXISTING_ID_RE, %(id="#{id}"), backreferences: false)
                           else
                             "#{attrs.rstrip} id=\"#{id}\""
                           end

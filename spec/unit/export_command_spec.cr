@@ -43,6 +43,40 @@ describe Hwaro::CLI::Commands::Tool::ExportCommand do
       ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
       ex.message.to_s.should contain("unknown target type")
     end
+
+    # Regression: `-o .` (and `-o ""`) used to resolve every destination back
+    # onto the source file the exporter had just read, so the command rewrote
+    # the project's own content/ in place — YAML front matter re-emitted as
+    # TOML, comment lines dropped, `@/` links flattened — and still exited 0.
+    it "refuses to export into the project directory and leaves content untouched" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          source = File.join("content", "post.md")
+          original = "---\ntitle: My Post\n# a comment explaining the next key\ncustom_field: keep-me\n---\n\nSee [the guide](@/guide.md#intro).\n"
+          File.write(source, original)
+
+          cmd = Hwaro::CLI::Commands::Tool::ExportCommand.new
+          ex = expect_raises(Hwaro::HwaroError) { cmd.run(["hugo", "-o", "."]) }
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+
+          File.read(source).should eq(original)
+        end
+      end
+    end
+
+    it "refuses to export into the content directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          File.write(File.join("content", "post.md"), "+++\ntitle = \"P\"\n+++\n\nbody\n")
+
+          cmd = Hwaro::CLI::Commands::Tool::ExportCommand.new
+          ex = expect_raises(Hwaro::HwaroError) { cmd.run(["jekyll", "-o", "content"]) }
+          ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        end
+      end
+    end
   end
 
   describe "#run success path" do

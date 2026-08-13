@@ -24,7 +24,10 @@ module Hwaro
           # unpublished pages (--include-future/--include-expired) are
           # excluded from public discovery surfaces even when the build is
           # run with the corresponding include flag.
-          sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft && !p.unpublished }
+          # `output_suppressed` too: a page the render phase declined to write
+          # because another page owns its output file must not be advertised
+          # as a URL — on a case-folding host it is a guaranteed 404.
+          sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft && !p.unpublished && !p.output_suppressed }
 
           sitemap_pages = DiscoveryPages.dedupe_by_url(sitemap_pages)
           DiscoveryPages.reject_excluded!(sitemap_pages, site.config.sitemap.exclude)

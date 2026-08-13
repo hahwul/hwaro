@@ -79,7 +79,7 @@ module Hwaro
           word_counts << wc
 
           # Extract tags
-          extract_tags(content).each do |tag|
+          extract_tags(content, item.path).each do |tag|
             tags[tag] = (tags[tag]? || 0) + 1
           end
 
@@ -131,7 +131,18 @@ module Hwaro
         Utils::TextUtils.count_words(stripped)
       end
 
-      private def extract_tags(content : String) : Array(String)
+      # Front matter that does not parse costs this file its tags, never the
+      # whole report: `tool stats` is a read-only summary of a tree the author
+      # is still editing, and one typo used to abort it.
+      #
+      # `ArgumentError` is rescued alongside the parse exceptions because both
+      # front-matter parsers build values eagerly: an out-of-range but
+      # syntactically valid date (`date = 2024-02-30`) raises Crystal's
+      # `ArgumentError("Invalid time")` from `Time.new`, not a
+      # `TOML::ParseException`, so the narrow rescue let it unwind the run.
+      # The file is named on the way past so the omission is not silent —
+      # `tool validate` reports the same file with the same message.
+      private def extract_tags(content : String, path : String) : Array(String)
         if match = content.match(TOML_FRONTMATTER_RE)
           begin
             toml_data = TOML.parse(match[1])
@@ -141,8 +152,8 @@ module Hwaro
                 return raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) }
               end
             end
-          rescue TOML::ParseException
-            # Malformed TOML front matter — treat as no tags.
+          rescue ex : TOML::ParseException | ArgumentError
+            warn_unparsed_frontmatter(path, "TOML", ex)
           end
         elsif match = content.match(YAML_FRONTMATTER_RE)
           begin
@@ -154,12 +165,16 @@ module Hwaro
                 end
               end
             end
-          rescue YAML::ParseException
-            # Malformed YAML front matter — treat as no tags.
+          rescue ex : YAML::ParseException | ArgumentError
+            warn_unparsed_frontmatter(path, "YAML", ex)
           end
         end
 
         [] of String
+      end
+
+      private def warn_unparsed_frontmatter(path : String, dialect : String, ex : Exception) : Nil
+        Logger.warn "#{path}: #{dialect} frontmatter parse error: #{ex.message}; tags not counted."
       end
     end
   end

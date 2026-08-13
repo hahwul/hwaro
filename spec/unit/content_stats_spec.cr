@@ -286,6 +286,48 @@ describe Hwaro::Services::ContentStats do
       end
     end
 
+    # Regression: `TOML.parse` builds the date eagerly, so an out-of-range but
+    # syntactically valid date raised Crystal's `ArgumentError("Invalid time")`
+    # — which the `rescue TOML::ParseException` did not catch. One typo aborted
+    # the whole report ("Error: Invalid time", exit 1) without naming the file,
+    # while every sibling command (`tool list`, `tool validate`) survived the
+    # same tree.
+    it "survives an out-of-range TOML date and still reports the other files" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "good.md"),
+          "+++\ntitle = \"Good\"\ndate = 2024-01-01\ntags = [\"kept\"]\n+++\n\nhello world\n")
+        File.write(File.join(content_dir, "bad.md"),
+          "+++\ntitle = \"Typo\"\ndate = 2024-02-30\n+++\n\nhello\n")
+
+        result = Hwaro::Services::ContentStats.new(content_dir).run
+
+        result.total.should eq(2)
+        result.words_total.should eq(3)
+        result.tags["kept"].should eq(1)
+        result.monthly["2024-01"].should eq(1)
+      end
+    end
+
+    it "names the file whose front matter could not be parsed" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "bad.md"),
+          "+++\ntitle = \"Typo\"\ndate = 2024-02-30\n+++\n\nhello\n")
+
+        output = with_captured_log do
+          Hwaro::Services::ContentStats.new(content_dir).run
+        end
+
+        output.should contain("bad.md")
+        output.should contain("Invalid time")
+      end
+    end
+
     it "excludes JSON frontmatter from word count (regression)" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

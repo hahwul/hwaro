@@ -542,6 +542,64 @@ module Hwaro
       end
     end
 
+    # The dev server's `HTTP::Server`, hardened against requests the stdlib
+    # refuses to parse.
+    #
+    # `HTTP::Request.from_io` runs at the very top of
+    # `HTTP::Server::RequestProcessor#process` — outside that method's
+    # `rescue IO::Error` and outside the per-handler 500 rescue — and it parses
+    # `Content-Length` eagerly and strictly. So `Content-Length: abc`, `0x5`, a
+    # value past UInt64, or two Content-Length headers that disagree raise
+    # `ArgumentError` straight out of the fiber `HTTP::Server#dispatch` spawned:
+    # the client received zero bytes (not even a status line) and the
+    # developer's terminal was repainted with an "Unhandled exception in spawn"
+    # backtrace for every such request. No handler in hwaro's chain runs early
+    # enough to catch it — the request object does not exist yet — so the only
+    # place to intervene is around the processor itself.
+    class DevHTTPServer < HTTP::Server
+      BAD_REQUEST_BODY = "400 Bad Request\n"
+
+      # Mirrors `HTTP::Server#handle_client` minus its TLS branch (the dev
+      # server only ever binds plain TCP) plus the ArgumentError rescue.
+      # Wrapping `super` instead would not work: the parent's `ensure` closes
+      # the connection before the rescue could answer on it.
+      private def handle_client(io : IO)
+        if io.is_a?(IO::Buffered)
+          io.sync = false
+        end
+
+        begin
+          @processor.process(io, io)
+        rescue ex : ArgumentError
+          # Only the request parser can raise out here — an exception from a
+          # handler is already turned into a 500 inside the processor — so this
+          # is a malformed request, not an internal error. Debug level: the
+          # console belongs to the build output.
+          Logger.debug "Malformed request answered with 400: #{ex.message}"
+          respond_bad_request(io)
+        end
+      ensure
+        begin
+          io.close
+        rescue IO::Error
+        end
+      end
+
+      # Written by hand because the connection never produced an
+      # `HTTP::Server::Response` to write through.
+      private def respond_bad_request(io : IO)
+        io << "HTTP/1.1 400 Bad Request\r\n"
+        io << "Content-Type: text/plain; charset=utf-8\r\n"
+        io << "Content-Length: #{BAD_REQUEST_BODY.bytesize}\r\n"
+        io << "Connection: close\r\n"
+        io << "\r\n"
+        io << BAD_REQUEST_BODY
+        io.flush
+      rescue IO::Error
+        # Peer hung up first; nothing to report.
+      end
+    end
+
     # Categorised set of file-system changes detected by the watcher.
     #
     # Changes are split into five buckets so the server can pick the
@@ -850,6 +908,17 @@ module Hwaro
       # Polling interval for the file watcher.
       POLL_INTERVAL = 500.milliseconds
 
+      # Cap on the build-failure text that reaches the terminal and the browser
+      # overlay. Crinja quotes the offending source lines in its message, so a
+      # single very long line near a syntax error (a minified vendor bundle
+      # inlined in a template, a generated data blob) produces a multi-megabyte
+      # message: the watcher repainted the console with it on every save — one
+      # broken template grew a serve log to 12 MB — and pushed the same payload
+      # over the live-reload socket. A few thousand characters is far more than
+      # the overlay can usefully show and still carries the error type, file
+      # and position, which is what the developer actually reads.
+      MAX_BUILD_ERROR_CHARS = 4000
+
       def initialize
         @builder = Core::Build::Builder.new
 
@@ -896,7 +965,7 @@ module Hwaro
           end
         rescue ex : Hwaro::HwaroError
           initial_error = ex.message || "Initial build failed"
-          Logger.error "Initial build failed: #{ex.message}"
+          Logger.error "Initial build failed: #{truncate_build_error(initial_error)}"
           ex.hint.try { |hint| Logger.info "  Hint: #{hint}" }
         end
         if initial_error
@@ -945,7 +1014,10 @@ module Hwaro
           push_build_error(msg)
         end
 
-        server = HTTP::Server.new(handlers)
+        # DevHTTPServer, not HTTP::Server: see the class comment — a malformed
+        # Content-Length must answer 400 instead of killing the connection
+        # fiber with a raw backtrace on the developer's terminal.
+        server = DevHTTPServer.new(handlers)
 
         # Bind BEFORE emitting any "Serving site at …" / "Live reload
         # enabled" / "Watching for changes …" banners. Previously those
@@ -1052,7 +1124,7 @@ module Hwaro
               # first watch rebuild escalates to a full one (the watcher only
               # starts after this fiber signals done, so no race on the flag).
               @rebuild_failed = true
-              Logger.error "[Fast-start] Background render failed: #{ex.message}"
+              Logger.error "[Fast-start] Background render failed: #{truncate_build_error(ex.message || "")}"
               Logger.debug "[Fast-start] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
               push_build_error(ex.message || "Background render failed")
             ensure
@@ -1183,7 +1255,15 @@ module Hwaro
       # overlay in place for users who had asked for no overlays at all.
       private def push_build_error(message : String)
         return unless @error_overlay
-        @live_reload_handler.try(&.notify_build_error(message))
+        @live_reload_handler.try(&.notify_build_error(truncate_build_error(message)))
+      end
+
+      # Clamp a build-failure message to MAX_BUILD_ERROR_CHARS. Counted in
+      # characters, not bytes: the message is rendered as text in the overlay
+      # and printed to the terminal, and a byte slice can split a UTF-8
+      # sequence.
+      private def truncate_build_error(message : String) : String
+        Hwaro::Utils::TextUtils.truncate_error(message, MAX_BUILD_ERROR_CHARS)
       end
 
       # Emit a single deterministic, machine-parseable line indicating the
@@ -1305,7 +1385,7 @@ module Hwaro
                   # stale page and keeps editing on top of a broken
                   # build until they happen to glance at the terminal.
                   @rebuild_failed = true
-                  Logger.error "[Watch] Build failed: #{ex.message}"
+                  Logger.error "[Watch] Build failed: #{truncate_build_error(ex.message || "")}"
                   Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
                   push_build_error(ex.message || "Build failed")
                 end
@@ -1714,22 +1794,58 @@ module Hwaro
         WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
       end
 
+      # Is this watch root a directory we can actually walk?
+      #
+      # `Dir.exists?` answers `false` only for ENOENT/ENOTDIR — every other
+      # stat failure raises. A root that is itself an unresolvable symlink
+      # (a cycle, or a link whose target sits behind a directory we may not
+      # traverse) therefore threw out of scan_mtimes and wedged the watcher
+      # exactly as the per-file case below did. A root we cannot stat has
+      # nothing watchable under it, so treat it like a missing one.
+      private def watchable_root?(dir : String) : Bool
+        Dir.exists?(dir)
+      rescue ex : File::Error
+        Logger.debug "Skipping unwatchable directory #{dir}: #{ex.message}"
+        false
+      end
+
       private def scan_mtimes : Hash(String, FileStamp)
         mtimes = {} of String => FileStamp
         dirs_to_watch = ["content", "templates", "static", "data", "i18n"]
 
         dirs_to_watch.each do |dir|
-          next unless Dir.exists?(dir)
+          next unless watchable_root?(dir)
           # DotFiles: the build publishes hidden files (static/.well-known/*,
           # see the equivalent build-side fix), so the watcher must see their
           # edits too — a default glob never descends into dot-directories,
           # leaving those files permanently stale during serve. Editor/VCS
           # noise stays filtered by watcher_ignored?.
           Dir.glob(File.join(dir, "**", "*"), match: File::MatchOptions.glob_default | File::MatchOptions::DotFiles) do |file|
-            next if File.directory?(file)
             next if Server.watcher_ignored?(file)
             begin
-              info = File.info(file)
+              # Deciding whether an entry is watchable must NOT raise, and it
+              # must happen inside this rescue. `File.directory?` used to stand
+              # ahead of it: that call follows symlinks, and `File.info?` only
+              # swallows ENOENT/ENOTDIR, so a symlink cycle under a watched
+              # root (`ln -s a b; ln -s b a` in static/) threw ELOOP straight
+              # out of scan_mtimes. One bad link then broke every scan for the
+              # rest of the session — `hwaro serve` died at startup in
+              # capture_watch_baseline, or, once watching, logged "[Watch]
+              # Watcher iteration failed … (retrying)" on every poll with no
+              # rebuild ever running again.
+              #
+              # lstat first, the same shape collect_static_files uses on the
+              # build side so both agree on what a file is: it never follows,
+              # so a cycle is just a symlink here, and only real symlinks pay
+              # the extra target stat. Only regular files get stamped —
+              # directories, dangling links and non-regular entries (FIFO,
+              # socket, device node) carry nothing the build can read, and the
+              # build skips them too. Failures stay at debug: this loop runs
+              # every POLL_INTERVAL, so a warn would repeat forever.
+              info = File.info?(file, follow_symlinks: false)
+              next if info.nil?
+              info = File.info?(file, follow_symlinks: true) if info.symlink?
+              next if info.nil? || !info.type.file?
               mtimes[file] = {info.modification_time, info.size.to_i64}
             rescue ex
               Logger.debug "Failed to read file info for #{file}: #{ex.message}"

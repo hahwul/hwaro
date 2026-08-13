@@ -566,6 +566,100 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    # A term the filesystem cannot store surfaces as ENAMETOOLONG from the
+    # taxonomy writer's mkdir. The raw File::Error escaped the
+    # `taxonomy:generate` hook and the CLI blamed an internal hwaro fault
+    # (HWARO_E_INTERNAL / exit 70) for a content problem the author can fix in
+    # front matter.
+    #
+    # The per-NAME limit (255) is no longer reachable from a term — safe_slugify
+    # caps every slug at MAX_SLUG_BYTES — but the total-path limit still is, and
+    # that is the case this rescue has to classify. So the output directory is
+    # nested to just under PATH_MAX here: `<deep>/tags/index.html` still fits
+    # (the index page writes fine) and `<deep>/tags/<245-byte slug>/index.html`
+    # does not.
+    it "reports a term the filesystem cannot store as a classified content error" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.tags = ["a" * 1000]
+      page.draft = false
+      page.generated = false
+
+      site.pages = [page]
+
+      Dir.mktmpdir do |root|
+        # Descend in short steps until the filesystem refuses, then back off one
+        # step. PATH_MAX differs by platform (1024 on macOS, 4096 on Linux), so
+        # it is probed rather than assumed; the back-off leaves 41..81 bytes of
+        # headroom — room for "tags/index.html", not for a 245-byte term slug.
+        component = "d" * 40
+        output_dir = root
+        parent = root
+        loop do
+          candidate = File.join(output_dir, component)
+          begin
+            Dir.mkdir(candidate)
+          rescue File::Error
+            break
+          end
+          parent = output_dir
+          output_dir = candidate
+        end
+        output_dir = parent
+
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+
+        err = expect_raises(Hwaro::HwaroError) do
+          Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+        err.exit_code.should eq(5)
+        (err.hint || "").should contain("too long")
+      end
+    end
+
+    # Control for the cap that makes the case above unreachable from the term
+    # alone: an absurd term must not abort a build into an ordinary output
+    # directory — it publishes under a shortened, digest-suffixed slug.
+    it "publishes an over-long term under a bounded slug instead of failing" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.tags = ["a" * 1000]
+      page.draft = false
+      page.generated = false
+
+      site.pages = [page]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        written = Dir.children(File.join(output_dir, "tags")).reject { |e| e == "index.html" }
+        written.size.should eq(1)
+        written.first.bytesize.should be <= Hwaro::Utils::TextUtils::MAX_SLUG_BYTES
+        File.exists?(File.join(output_dir, "tags", written.first, "index.html")).should be_true
+      end
+    end
+
     # Regression for https://github.com/hahwul/hwaro/issues/485
     # `authors` is stored on a dedicated `page.authors` property (so the
     # `site.authors` aggregation can use it) rather than in `page.taxonomies`.

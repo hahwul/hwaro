@@ -164,6 +164,68 @@ describe Hwaro::Content::Processors::ImageProcessor do
       end
     end
 
+    # Regression: stb's writers open the destination with O_TRUNC and then
+    # stream the encoded bytes, so a variant being regenerated (serve rebuild,
+    # warm `--cache` build) was observably 0 bytes and then every intermediate
+    # size — and `hwaro serve` streams that very `_32w.png` to the browser from
+    # a fiber of the same process. The window is not deterministic in a spec, so
+    # assert the property behind it: a reader holding the old variant open
+    # across the regeneration must keep seeing it whole. The second run encodes
+    # different pixels, so a truncate-in-place writer would hand the reader the
+    # new bytes.
+    it "replaces an existing variant atomically instead of truncating it" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "photo.png")
+        dest = File.join(dir, "photo_32w.png")
+
+        white = Bytes.new(64 * 64 * 3, 255_u8)
+        LibStb.stbi_write_png(src, 64, 64, 3, white.to_unsafe.as(Void*), 64 * 3)
+        Hwaro::Content::Processors::ImageProcessor.resize(src, dest, 32, 0, 85).should eq(dest)
+        first = File.open(dest, &.getb_to_end)
+
+        reader = File.open(dest)
+        begin
+          black = Bytes.new(64 * 64 * 3, 0_u8)
+          LibStb.stbi_write_png(src, 64, 64, 3, black.to_unsafe.as(Void*), 64 * 3)
+          Hwaro::Content::Processors::ImageProcessor.resize(src, dest, 32, 0, 85).should eq(dest)
+
+          reader.getb_to_end.should eq(first)
+        ensure
+          reader.close
+        end
+
+        File.open(dest, &.getb_to_end).should_not eq(first)
+        Dir.glob(File.join(dir, "*.tmp")).should be_empty
+      end
+    end
+
+    # Same invariant for the no-upscale branch, which copies the source
+    # verbatim instead of encoding.
+    it "replaces a copied too-small variant atomically" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "small.png")
+        dest = File.join(dir, "small_1000w.png")
+
+        white = Bytes.new(8 * 8 * 3, 255_u8)
+        LibStb.stbi_write_png(src, 8, 8, 3, white.to_unsafe.as(Void*), 8 * 3)
+        Hwaro::Content::Processors::ImageProcessor.resize(src, dest, 1000, 0, 85).should eq(dest)
+        first = File.open(dest, &.getb_to_end)
+
+        reader = File.open(dest)
+        begin
+          black = Bytes.new(8 * 8 * 3, 0_u8)
+          LibStb.stbi_write_png(src, 8, 8, 3, black.to_unsafe.as(Void*), 8 * 3)
+          Hwaro::Content::Processors::ImageProcessor.resize(src, dest, 1000, 0, 85).should eq(dest)
+
+          reader.getb_to_end.should eq(first)
+        ensure
+          reader.close
+        end
+
+        Dir.glob(File.join(dir, "*.tmp")).should be_empty
+      end
+    end
+
     it "clamps quality to valid range" do
       Dir.mktmpdir do |dir|
         src = File.join(dir, "test.jpg")

@@ -259,6 +259,17 @@ describe Hwaro::Core::Build::Phases::Render do
       builder.test_determine_template(page, templates).should eq("index")
     end
 
+    it "does not treat a one-level page bundle as the homepage" do
+      builder = Hwaro::Core::Build::Builder.new
+      # content/about/index.md — an index page whose section also resolves to
+      # "", so only the path distinguishes it from the root index page.
+      page = Hwaro::Models::Page.new("about/index.md")
+      page.is_index = true
+      page.section = ""
+      templates = {"page" => "p", "index" => "i"}
+      builder.test_determine_template(page, templates).should eq("page")
+    end
+
     it "honors a page-level custom template when present" do
       builder = Hwaro::Core::Build::Builder.new
       page = Hwaro::Models::Page.new("about.md")

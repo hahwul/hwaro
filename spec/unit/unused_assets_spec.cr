@@ -418,5 +418,144 @@ describe Hwaro::Services::UnusedAssets do
         result.unused_count.should eq(0)
       end
     end
+
+    # Regression: `html`/`htm` were missing from STATIC_SCAN_EXTENSIONS, so a
+    # hand-written page under static/ — which the build copies into the output
+    # verbatim, `<img src>` and all — was never read. Every image it referenced
+    # was reported unused and `--delete` removed it (real data loss).
+    it "treats an asset referenced only from a static HTML page as referenced" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          FileUtils.mkdir_p(File.join("static", "img"))
+          FileUtils.mkdir_p(File.join("static", "legacy"))
+
+          File.write(File.join("static", "img", "legacy.png"), "png data")
+          File.write(
+            File.join("static", "legacy", "index.html"),
+            "<html><body><img src=\"/img/legacy.png\"></body></html>\n"
+          )
+
+          service = Hwaro::Services::UnusedAssets.new(
+            content_dir: "content",
+            static_dir: "static",
+            templates_dir: "templates",
+          )
+          result = service.run
+
+          result.total_assets.should eq(1)
+          result.referenced_count.should eq(1)
+          result.unused_count.should eq(0)
+        end
+      end
+    end
+
+    # Regression: `data/` and `i18n/` are build inputs — templates render
+    # `site.data.*` and translation strings — but neither directory was
+    # globbed, so an asset whose only reference lived there was reported
+    # unused and deleted.
+    it "treats assets referenced only from data/ or i18n/ as referenced" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("data")
+          FileUtils.mkdir_p("i18n")
+
+          File.write(File.join("static", "sponsor.png"), "png data")
+          File.write(File.join("static", "flag-en.svg"), "<svg/>")
+          File.write(File.join("data", "sponsors.yml"), "- name: Acme\n  logo: /sponsor.png\n")
+          File.write(File.join("i18n", "en.toml"), "flag = \"/flag-en.svg\"\n")
+
+          service = Hwaro::Services::UnusedAssets.new(
+            content_dir: "content",
+            static_dir: "static",
+            templates_dir: "templates",
+          )
+          result = service.run
+
+          result.total_assets.should eq(2)
+          result.unused_count.should eq(0)
+        end
+      end
+    end
+
+    # Regression: the asset walk called `File.directory?` on every globbed
+    # path, and that RAISES `File::Error` (ELOOP) on a symlink cycle — nothing
+    # caught it, so `hwaro tool unused-assets` died with a raw "Unable to get
+    # file info" on a tree `hwaro build` already walks fine.
+    it "survives symlink cycles and dangling links while walking assets" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        static_dir = File.join(dir, "static")
+        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(static_dir)
+
+        File.write(File.join(static_dir, "orphan.png"), "png data")
+        File.symlink("loop.png", File.join(static_dir, "loop.png"))
+        File.symlink("gone.png", File.join(static_dir, "dangling.png"))
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\n---\n\nBody\n")
+        File.symlink("loop.md", File.join(content_dir, "loop.md"))
+
+        result = nil
+        output = with_captured_log do
+          result = Hwaro::Services::UnusedAssets.new(
+            content_dir: content_dir,
+            static_dir: static_dir,
+            templates_dir: File.join(dir, "templates"),
+          ).run
+        end
+
+        r = result.not_nil!
+        # Only the real file is an asset; the links are skipped, not counted
+        # and — critically — never handed to `--delete`.
+        r.total_assets.should eq(1)
+        r.unused_files.should eq([File.join(static_dir, "orphan.png")])
+        output.should contain("loop.png")
+      end
+    end
+
+    # The same `File.directory?` call sat inside `add_config_references`, whose
+    # blanket rescue turned the ELOOP into "no config references at all" — so a
+    # single bad link in an auto-include directory made every bundled and
+    # auto-included file look unused, and `--delete` removed files the build
+    # reads on the next run.
+    it "keeps config-declared references when an auto-include dir holds a cycle" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p(File.join("static", "assets", "css"))
+          FileUtils.mkdir_p("templates")
+
+          File.write(File.join("static", "assets", "css", "01-reset.css"), "*{}")
+          File.write(File.join("static", "assets", "css", "02-typography.css"), "p{}")
+          File.symlink("loop.css", File.join("static", "assets", "css", "loop.css"))
+
+          File.write("config.toml", <<-TOML)
+            title = "T"
+            base_url = "http://x"
+
+            [auto_includes]
+            enabled = true
+            dirs = ["assets/css"]
+            TOML
+
+          result = nil
+          with_captured_log do
+            result = Hwaro::Services::UnusedAssets.new(
+              content_dir: "content",
+              static_dir: "static",
+              templates_dir: "templates",
+            ).run
+          end
+
+          r = result.not_nil!
+          r.total_assets.should eq(2)
+          r.unused_files.should be_empty
+        end
+      end
+    end
   end
 end

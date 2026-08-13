@@ -130,6 +130,27 @@ describe Hwaro::Content::Processors::MarkdownAttributes do
       result.should contain("&lt;script&gt;")
       result.should_not contain("<script>")
     end
+
+    # `String#sub(Regex, String)` expands `\0`-`\9` / `\k<name>` found inside
+    # the REPLACEMENT; author text ends up there, so the replace-in-place
+    # branches must opt out of backreferences.
+    it "keeps a literal id backreference instead of expanding it" do
+      parsed = Hwaro::Content::Processors::MarkdownAttributes.parse(%(id="a\\1b")).not_nil!
+      result = Hwaro::Content::Processors::MarkdownAttributes.apply_to_tag_attrs(%( id="old"), parsed)
+      result.should eq(%( id="a\\1b"))
+    end
+
+    it "keeps a literal class backreference instead of splicing the existing class" do
+      parsed = Hwaro::Content::Processors::MarkdownAttributes.parse(%(class="b\\1")).not_nil!
+      result = Hwaro::Content::Processors::MarkdownAttributes.apply_to_tag_attrs(%( class="a"), parsed)
+      result.should eq(%( class="a b\\1"))
+    end
+
+    it "keeps a literal \\0 instead of splicing the whole matched attribute" do
+      parsed = Hwaro::Content::Processors::MarkdownAttributes.parse(%(title="a\\0b")).not_nil!
+      result = Hwaro::Content::Processors::MarkdownAttributes.apply_to_tag_attrs(%( title="old"), parsed)
+      result.should eq(%( title="a\\0b"))
+    end
   end
 
   describe ".apply_to_img" do
@@ -137,6 +158,12 @@ describe Hwaro::Content::Processors::MarkdownAttributes do
       parsed = Hwaro::Content::Processors::MarkdownAttributes.parse(".r width=300").not_nil!
       result = Hwaro::Content::Processors::MarkdownAttributes.apply_to_img(%(<img src="p.png" alt="a"), parsed)
       result.should eq(%(<img src="p.png" alt="a" class="r" width="300"))
+    end
+
+    it "round-trips a literal backslash-digit in a replaced attribute value" do
+      parsed = Hwaro::Content::Processors::MarkdownAttributes.parse(%(alt="use \\1 for the first group")).not_nil!
+      result = Hwaro::Content::Processors::MarkdownAttributes.apply_to_img(%(<img src="a.png" alt="alt text"), parsed)
+      result.should eq(%(<img src="a.png" alt="use \\1 for the first group"))
     end
   end
 end

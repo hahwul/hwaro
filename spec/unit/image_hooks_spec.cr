@@ -332,6 +332,27 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
+    # A `_<width>w` sibling whose number does not fit Int32 (a stray file
+    # copied in from static/, a leftover from another tool) used to raise
+    # `ArgumentError: Invalid Int32` out of the `image:resize` hook and abort
+    # the build with exit 70 — on every cold build and every serve rebuild,
+    # until the file was found and deleted.
+    it "ignores a variant whose width overflows Int32 instead of raising" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        File.write(source, "src")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
+        File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
+        File.write(File.join(dest_dir, "photo_9999999999w.jpg"), "bogus")
+
+        result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640])
+        result.should_not be_nil
+        result.not_nil!.keys.sort!.should eq([320, 640])
+      end
+    end
+
     it "returns nil when a non-clamped variant is missing (config/output mismatch)" do
       Dir.mktmpdir do |dir|
         source = File.join(dir, "photo.jpg")

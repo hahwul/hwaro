@@ -142,13 +142,21 @@ module Hwaro
         # Every emitted value is HTML-escaped — this is the only place raw
         # `{...}` payload text reaches tag output, so nothing here may trust
         # it verbatim.
+        #
+        # Every `sub` below passes `backreferences: false`. The replacement
+        # string carries author text, and `String#sub(Regex, String)` expands
+        # `\0`-`\9` (and `\k<name>`) found INSIDE the replacement against the
+        # match. `HTML.escape` neutralises `<`/`>`/`&` but NOT a backslash, so
+        # without the flag `{alt="use \1 here"}` silently loses the `\1` and
+        # `{class="a\1"}`/`{k="a\0"}` splice a capture group — the tag's own
+        # existing class, or the whole matched attribute — into the value.
         private def merge_attrs(attrs : String, parsed : Parsed) : String
           result = attrs
 
           if id = parsed.id
             escaped_id = HTML.escape(id)
             result = if result.matches?(ID_PRESENT_RE)
-                       result.sub(ID_ATTR_RE, %(id="#{escaped_id}"))
+                       result.sub(ID_ATTR_RE, %(id="#{escaped_id}"), backreferences: false)
                      else
                        %(#{result.rstrip} id="#{escaped_id}")
                      end
@@ -158,7 +166,7 @@ module Hwaro
             escaped_classes = parsed.classes.map { |c| HTML.escape(c) }.join(" ")
             result = if class_match = result.match(CLASS_ATTR_RE)
                        merged = "#{class_match[1]} #{escaped_classes}".strip
-                       result.sub(CLASS_ATTR_RE, %(class="#{merged}"))
+                       result.sub(CLASS_ATTR_RE, %(class="#{merged}"), backreferences: false)
                      else
                        %(#{result.rstrip} class="#{escaped_classes}")
                      end
@@ -168,7 +176,7 @@ module Hwaro
             escaped_value = HTML.escape(value)
             key_re = /\b#{Regex.escape(key)}\s*=\s*"[^"]*"/i
             result = if result.matches?(key_re)
-                       result.sub(key_re, %(#{key}="#{escaped_value}"))
+                       result.sub(key_re, %(#{key}="#{escaped_value}"), backreferences: false)
                      else
                        %(#{result.rstrip} #{key}="#{escaped_value}")
                      end

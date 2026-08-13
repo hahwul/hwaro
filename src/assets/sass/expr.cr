@@ -189,6 +189,18 @@ module Hwaro
         class ParseFailure < Exception
         end
 
+        # A ParseFailure raised specifically by the MAX_DEPTH guard.
+        #
+        # Distinguished from an ordinary unparsable expression because the two
+        # deserve different handling in lenient contexts: an unparsable value
+        # falls back to verbatim text on purpose (that fallback is what keeps
+        # hwaro's Sass output byte-compatible), whereas hitting the depth cap
+        # means the declaration ships literally — `a{width:((((…}` — which is
+        # not valid CSS. The build must not do that silently just because it no
+        # longer crashes.
+        class DepthExceeded < ParseFailure
+        end
+
         # ---------------------------------------------------------------
         # Lexer: TextTemplate pieces -> token list
         # ---------------------------------------------------------------
@@ -585,8 +597,26 @@ module Hwaro
         #   unary (-, +, not) > concat/primary
         # :nodoc:
         class Parser
+          # Cap on expression nesting depth. This is a recursive-descent
+          # parser, so every level of `(`, `[`, call argument or unary
+          # operator in the source maps 1:1 onto native stack frames — a
+          # stylesheet with a few thousand nested parens
+          # (`width: ((((…1…))))`) exhausted the stack and killed the whole
+          # build with SIGSEGV, where every other Sass limit
+          # (MAX_INCLUDE_DEPTH, MAX_CALL_DEPTH, MAX_WHILE_ITERATIONS in the
+          # evaluator) reports a clean located error. Counted in parse_unary
+          # because every path from parse_comma down to a primary passes
+          # through it exactly once per nesting level, so one counter bounds
+          # parens, brackets, call arguments and unary chains alike. 512 is
+          # far past anything a hand-written or generated stylesheet nests,
+          # and exceeding it degrades to the same outcome as any other
+          # unparsable expression: verbatim text in lenient value contexts,
+          # a located error where `parse!` is used.
+          MAX_DEPTH = 512
+
           def initialize(@toks : Array(Tok))
             @pos = 0
+            @depth = 0
           end
 
           def parse : Node
@@ -774,15 +804,22 @@ module Hwaro
           # not `not (1 == 2)`. Parsing it between `and` and `==` inverted
           # the result of any `not` applied to a comparison.
           private def parse_unary : Node
-            if (tok = peek) && tok.kind.ident? && tok.text == "not"
-              @pos += 1
-              Unary.new(:not, parse_unary)
-            elsif accept(TokKind::Minus)
-              Unary.new(:minus, parse_unary)
-            elsif accept(TokKind::Plus)
-              Unary.new(:plus, parse_unary)
-            else
-              parse_concat
+            # Sole recursion choke point — see MAX_DEPTH.
+            @depth += 1
+            begin
+              raise DepthExceeded.new("expression nesting exceeds #{MAX_DEPTH}") if @depth > MAX_DEPTH
+              if (tok = peek) && tok.kind.ident? && tok.text == "not"
+                @pos += 1
+                Unary.new(:not, parse_unary)
+              elsif accept(TokKind::Minus)
+                Unary.new(:minus, parse_unary)
+              elsif accept(TokKind::Plus)
+                Unary.new(:plus, parse_unary)
+              else
+                parse_concat
+              end
+            ensure
+              @depth -= 1
             end
           end
 
@@ -958,6 +995,13 @@ module Hwaro
           toks = Lexer.new(template).lex
           return if toks.empty?
           Parser.new(toks).parse
+        rescue DepthExceeded
+          # The lenient fallback ships the value's raw lexeme, which for a
+          # deeply nested expression is `((((…1…))))` — syntactically invalid
+          # CSS. Silence here is how an author deploys a broken stylesheet
+          # after a build that exited 0 with no diagnostic at all.
+          Logger.warn "Sass expression nesting exceeds #{Parser::MAX_DEPTH} levels; the value is emitted verbatim and may not be valid CSS. Simplify the nested parentheses/calls in this declaration."
+          nil
         rescue ParseFailure
           nil
         end

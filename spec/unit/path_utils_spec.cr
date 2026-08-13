@@ -249,10 +249,48 @@ describe Hwaro::Utils::PathUtils do
       refused.should be_false
     end
 
-    it "treats a backslash as a separator too" do
+    # Was "treats a backslash as a separator too". Splitting on `\` here gave
+    # a content file named `a\b.md` — a perfectly legal POSIX filename — the
+    # output path `posts/a/b/index.html`, which silently overwrote the page
+    # that owns it. The writer cannot resolve the ambiguity (POSIX says one
+    # segment, Windows says two, and browsers rewrite `\` to `/` in a URL
+    # path), so it refuses. `sanitize_path` still normalizes it — see below.
+    it "refuses a segment containing a backslash instead of splitting on it" do
       segments, refused = Hwaro::Utils::PathUtils.split_safe_segments("foo\\bar")
-      segments.should eq(["foo", "bar"])
+      segments.should be_empty
+      refused.should be_true
+    end
+
+    # The high-severity half of the same defect: a percent-encoded separator.
+    # Decoding the whole path before splitting turned `%2f` into a real
+    # directory level, so `posts/a%2fb.md` claimed `/posts/a%2fb/` but wrote
+    # `posts/a/b/index.html` over the real `posts/a/b.md`.
+    it "refuses a segment whose decoded form still contains a separator" do
+      segments, refused = Hwaro::Utils::PathUtils.split_safe_segments("posts/a%2fb")
+      segments.should eq(["posts"])
+      refused.should be_true
+
+      _, double_refused = Hwaro::Utils::PathUtils.split_safe_segments("posts/a%252fb")
+      double_refused.should be_true
+
+      _, encoded_backslash_refused = Hwaro::Utils::PathUtils.split_safe_segments("posts/a%5cb")
+      encoded_backslash_refused.should be_true
+    end
+
+    # Only separators are refused: any other escape still decodes to the
+    # directory name the URL addresses, which is what keeps `page.url`'s
+    # `%23` pointing at the `a#b` directory on disk.
+    it "decodes a non-separator escape into the segment it names" do
+      segments, refused = Hwaro::Utils::PathUtils.split_safe_segments("posts/a%23b")
+      segments.should eq(["posts", "a#b"])
       refused.should be_false
+    end
+
+    # The neutralize policy keeps normalizing separators — a Windows-authored
+    # archive entry must still extract to the nested path it names.
+    it "keeps sanitize_path normalizing separators the writer refuses" do
+      Hwaro::Utils::PathUtils.sanitize_path("foo\\bar").should eq("foo/bar")
+      Hwaro::Utils::PathUtils.sanitize_path("posts/a%2fb").should eq("posts/a/b")
     end
 
     it "strips null bytes without flagging a refusal" do
@@ -271,6 +309,73 @@ describe Hwaro::Utils::PathUtils do
       ["foo/../bar", "a/   /b", "notes/v1..v2", "%2e%2e/etc", "//a//b//"].each do |path|
         segments, _ = Hwaro::Utils::PathUtils.split_safe_segments(path)
         segments.join("/").should eq(Hwaro::Utils::PathUtils.sanitize_path(path))
+      end
+    end
+  end
+
+  # Collision keys for the Render phase. Two URL strings that name one file
+  # must share a key, or the second page overwrites the first with no warning.
+  #
+  # Characterisation coverage: `output_file_key` / `output_fold_key` /
+  # `case_folding_fs?` are introduced by this fix, so these examples cannot be
+  # run against the pre-fix tree at all. The pre-fix proof for the defect they
+  # serve is end-to-end in spec/functional/edge_cases_spec.cr ("does not
+  # silently overwrite a page whose output path differs only in case"), which
+  # fails without them.
+  describe ".output_file_key" do
+    it "maps URL spellings of one file onto one key" do
+      key = Hwaro::Utils::PathUtils.output_file_key("/posts/a/b/")
+      key.should eq("posts/a/b")
+      Hwaro::Utils::PathUtils.output_file_key("/posts//a/b//").should eq(key)
+      Hwaro::Utils::PathUtils.output_file_key("posts/a/b").should eq(key)
+    end
+
+    it "gives the site root an empty key" do
+      Hwaro::Utils::PathUtils.output_file_key("/").should eq("")
+    end
+
+    it "returns nil for a URL that cannot be published at all" do
+      Hwaro::Utils::PathUtils.output_file_key("/posts/a%2fb/").should be_nil
+      Hwaro::Utils::PathUtils.output_file_key("/../etc/").should be_nil
+    end
+  end
+
+  describe ".output_fold_key" do
+    it "folds letter case" do
+      upper = Hwaro::Utils::PathUtils.output_fold_key("Foo/Bar")
+      upper.should eq(Hwaro::Utils::PathUtils.output_fold_key("foo/bar"))
+    end
+
+    it "folds NFD and NFC spellings of the same name together" do
+      # "cafe" + COMBINING ACUTE ACCENT, built from the codepoint so the
+      # decomposed form survives any editor that normalizes on save.
+      nfd = "cafe" + 0x0301.chr
+      nfc = nfd.unicode_normalize(:nfc)
+      nfc.should_not eq(nfd)
+      Hwaro::Utils::PathUtils.output_fold_key(nfc).should eq(Hwaro::Utils::PathUtils.output_fold_key(nfd))
+    end
+  end
+
+  describe ".case_folding_fs?" do
+    it "answers case-sensitive for a path with no ASCII letters to flip" do
+      Hwaro::Utils::PathUtils.case_folding_fs?("/").should be_false
+    end
+
+    it "answers case-sensitive for an unreadable path rather than raising" do
+      Dir.mktmpdir do |root|
+        Hwaro::Utils::PathUtils.case_folding_fs?(File.join(root, "Nope")).should be_false
+      end
+    end
+
+    # The answer itself is filesystem-dependent (true on a stock macOS/Windows
+    # volume, false on ext4), so assert only that the probe is consistent with
+    # what the filesystem actually does with the two spellings.
+    it "agrees with the filesystem it probed" do
+      Dir.mktmpdir do |root|
+        dir = File.join(root, "CaseProbe")
+        Dir.mkdir(dir)
+        folded = File.exists?(File.join(root, "caseprobe"))
+        Hwaro::Utils::PathUtils.case_folding_fs?(dir).should eq(folded)
       end
     end
   end

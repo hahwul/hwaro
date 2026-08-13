@@ -67,6 +67,13 @@ module Hwaro
                          )
                        end
 
+            # `-o` was stored verbatim, so `-o .` (or `-o ""`, or `-o content`)
+            # made every destination collapse back onto the source file the
+            # exporter had just read — rewriting the project's own content/ in
+            # place and still exiting 0. Validate before the receipt so the
+            # failure is reported instead of a bogus "exported" header.
+            Services::Exporters::Base.guard_output_dir!(options.output_dir, options.content_dir)
+
             Logger::Receipt.new(NAME, options.target_type)
               .row("source", options.content_dir)
               .row("output", options.output_dir)

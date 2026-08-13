@@ -8,6 +8,7 @@ require "file_utils"
 require "../utils/css_minifier"
 require "../utils/js_minifier"
 require "../utils/logger"
+require "../utils/output_guard"
 require "../utils/path_utils"
 require "../models/config"
 require "./sass_compiler"
@@ -31,6 +32,16 @@ module Hwaro
         return unless @config.enabled
 
         assets_output = File.join(output_dir, @config.output_dir)
+        # `[assets] output_dir` is joined onto the build output directory and,
+        # unchanged, becomes the manifest URL every page links. A traversing
+        # value ("../../oops") published the fingerprinted bundles above the
+        # site root — public/ ended up with no CSS at all and every page linked
+        # a 404. The source side is already validated in process_bundle; this is
+        # the missing check on the destination side.
+        unless Utils::OutputGuard.within_output_dir?(assets_output, output_dir)
+          Logger.warn "Asset pipeline: output_dir '#{@config.output_dir}' escapes the output directory; skipping asset processing."
+          return
+        end
         Hwaro::Utils::FileSafe.mkdir_p(assets_output)
 
         @config.bundles.each do |bundle|
@@ -98,6 +109,13 @@ module Hwaro
 
         # Write the bundle
         output_path = File.join(assets_output, output_name)
+        # A bundle `name` may legitimately carry a subdirectory ("vendor/x.css"),
+        # so it is joined rather than basenamed — which means it can also carry
+        # "..". Bound it to the asset output directory before writing.
+        unless Utils::OutputGuard.within_output_dir?(output_path, assets_output)
+          Logger.warn "Asset pipeline: bundle '#{bundle.name}' resolves outside the asset output directory; skipping."
+          return
+        end
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
         File.write(output_path, contents)
 

@@ -45,3 +45,58 @@ describe "Parallel write race: colliding output directories" do
     end
   end
 end
+
+# =============================================================================
+# Regression test for the non-atomic serve-watcher static copy.
+#
+# `copy_changed_static` / `copy_changed_content_files` ran `FileUtils.cp`
+# straight onto the live destination, and Crystal's copy opens the destination
+# with O_TRUNC and then streams — so `hwaro serve`, which runs these on the
+# watcher while HTTP fibers stream the same paths, answered GETs mid-copy with
+# zero-length or truncated bodies (a 21 MB stylesheet observed at 0.5 MB, with
+# header and body agreeing on the short length, so nothing retried).
+#
+# The race window itself is not deterministic in a spec, so the invariant is
+# asserted through the property that produces it: a reader holding the file
+# open across the copy must keep seeing one complete revision. That holds for a
+# temp-file-plus-rename replacement and fails for a truncate-and-stream copy.
+# =============================================================================
+
+describe "Serve watcher file copies" do
+  it "replaces a static file atomically instead of truncating it in place" do
+    Dir.mktmpdir do |dir|
+      static_dir = File.join(dir, "static")
+      output_dir = File.join(dir, "public")
+      FileUtils.mkdir_p(static_dir)
+      FileUtils.mkdir_p(output_dir)
+
+      src = File.join(static_dir, "big.css")
+      dest = File.join(output_dir, "big.css")
+      # Same length on both revisions so the assertion can only be satisfied by
+      # atomicity, never by a size difference.
+      old_bytes = "a{color:red }" * 40_000
+      new_bytes = "a{color:blue}" * 40_000
+      File.write(src, old_bytes)
+
+      Dir.cd(dir) do
+        builder = Hwaro::Core::Build::Builder.new
+        builder.copy_changed_static(["static/big.css"], output_dir, false)
+
+        # Stands in for an in-flight HTTP response streaming the file.
+        reader = File.open(dest)
+        begin
+          File.write(src, new_bytes)
+          builder.copy_changed_static(["static/big.css"], output_dir, false)
+
+          reader.gets_to_end.should eq(old_bytes)
+        ensure
+          reader.close
+        end
+
+        File.read(dest).should eq(new_bytes)
+        # The temp file must never survive the copy.
+        Dir.glob(File.join(output_dir, "*.tmp")).should be_empty
+      end
+    end
+  end
+end

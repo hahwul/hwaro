@@ -221,6 +221,34 @@ describe "SEO: Sitemap with custom configuration" do
       sitemap.should_not contain("/secret/")
     end
   end
+
+  # A `#` in a content filename is legal on disk but ends the path component
+  # of a URL: the page was written to `public/posts/a#b/index.html` while the
+  # sitemap advertised `http://localhost/posts/a#b/`, which every crawler
+  # reads as `/posts/a` plus a fragment — a 404 published as canonical.
+  it "percent-encodes a fragment delimiter in the sitemap <loc>" do
+    config = <<-TOML
+      title = "Test"
+      base_url = "http://localhost"
+
+      [sitemap]
+      enabled = true
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "posts/a#b.md" => "---\ntitle: Hash\n---\nHash body",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      File.exists?("public/posts/a#b/index.html").should be_true
+
+      sitemap = File.read("public/sitemap.xml")
+      sitemap.should contain("<loc>http://localhost/posts/a%23b/</loc>")
+      sitemap.should_not contain("<loc>http://localhost/posts/a#b/</loc>")
+    end
+  end
 end
 
 describe "SEO: Robots.txt with custom rules" do

@@ -22,10 +22,12 @@ module Hwaro
       # - Lines indented 4+ spaces (or starting with a tab) are indented-code
       #   context where ```/~~~ is literal text, never a delimiter. Whole
       #   indented-code *runs* are tracked as verbatim too: a 4+-indented
-      #   non-blank line after a blank line opens a run — unless a list is
-      #   open, where the same indent is item continuation, not code — and
-      #   the run survives blanks until the first non-blank line back under
-      #   4 columns. The list heuristic is deliberately sticky (a marker
+      #   non-blank line opens a run when nothing before it can absorb the
+      #   indent — after a blank line, or directly after an ATX heading,
+      #   which CommonMark (and Markd) let indented code follow with no
+      #   blank line in between — unless a list is open, where the same
+      #   indent is item continuation, not code. The run survives blanks
+      #   until the first non-blank line back under 4 columns. The list heuristic is deliberately sticky (a marker
       #   opens it; only a blank followed by a flush-left non-marker line
       #   closes it): staying "in list" too long merely keeps today's
       #   under-protective behavior, while leaving it too early would newly
@@ -49,6 +51,20 @@ module Hwaro
         # keeps the list heuristic closed in a case too rare to matter.
         LIST_MARKER_RE = /\A {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/
 
+        # An ATX heading at up to 3 spaces indent: 1-6 `#` followed by a
+        # space/tab or nothing but the line ending. Only used to let an
+        # indented-code run open on the line right after a heading — the
+        # blank line the run otherwise needs is what CommonMark requires to
+        # keep indented code from interrupting a *paragraph*, and a heading
+        # is not a paragraph. Markd opens the code block there, so without
+        # this the walkers transformed lines Markd renders verbatim (a
+        # shortcode expanded on such a line left an escaped placeholder
+        # comment stranded inside `<pre><code>`). The other paragraph-ending
+        # blocks (setext underlines, thematic breaks, HTML blocks) are not
+        # recognized here: they are ambiguous line-locally, and missing them
+        # only keeps today's under-protective behavior.
+        ATX_HEADING_RE = /\A {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)/
+
         @in_fence = false
         @fence_char = '`'
         @fence_len = 0
@@ -56,6 +72,7 @@ module Hwaro
         @in_indented_code = false
         @in_list = false
         @prev_blank = true
+        @prev_atx_heading = false
 
         # True while inside an open fence: after the opener line was fed,
         # until (and excluding) the line after the closer. Lets callers
@@ -69,6 +86,12 @@ module Hwaro
         # Returns true when the line must pass through verbatim: a fence
         # delimiter or any line inside an open fence.
         def fence_line?(line : String) : Bool
+          # Consumed and cleared up front so every early return below (fence
+          # content, an ongoing indented-code run) leaves the flag false —
+          # only the plain-text tail re-arms it.
+          prev_atx_heading = @prev_atx_heading
+          @prev_atx_heading = false
+
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
             if depth == @fence_bq_depth
@@ -98,7 +121,7 @@ module Hwaro
             @in_indented_code = false
           end
 
-          if !blank && indented?(content) && @prev_blank && !@in_list
+          if !blank && indented?(content) && (@prev_blank || prev_atx_heading) && !@in_list
             @in_indented_code = true
             @prev_blank = false
             return true
@@ -122,6 +145,7 @@ module Hwaro
             true
           else
             @prev_blank = blank
+            @prev_atx_heading = ATX_HEADING_RE.matches?(content)
             false
           end
         end

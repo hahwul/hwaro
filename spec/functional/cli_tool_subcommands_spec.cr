@@ -390,6 +390,26 @@ describe "hwaro tool export" do
       err.should contain("unknown target type")
     end
   end
+
+  # Regression: `-o .` made every destination collapse back onto the source
+  # file the exporter had just read, so the command rewrote the project's own
+  # content/ in place (front matter re-serialized, comments dropped, `@/`
+  # links flattened) and reported success. `hwaro build -o .` already
+  # refused; export must too.
+  it "exits with HWARO_E_CONFIG on -o . and leaves content byte-identical" do
+    with_initialized_project do |project_dir|
+      before = Dir.glob(File.join(project_dir, "content", "**", "*.md")).sort.map { |f| {f, File.read(f)} }
+      before.should_not be_empty
+
+      status, _, err = run_hwaro(["tool", "export", "hugo", "-o", "."], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+      err.should contain("HWARO_E_CONFIG")
+
+      before.each do |(path, content)|
+        File.read(path).should eq(content)
+      end
+    end
+  end
 end
 
 describe "hwaro tool convert" do

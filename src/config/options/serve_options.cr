@@ -66,6 +66,16 @@ module Hwaro
         # `http://::1:3000`, which no browser can resolve, and baked that
         # string into every link, canonical and OG URL of the served site.
         def self.url_host(host : String) : String
+          # `hwaro serve -b ""` (and any whitespace-only bind) is accepted by
+          # the socket layer, but an empty host produces the authority-less
+          # `http://:3000` — which then becomes the derived base_url and is
+          # baked into every canonical, OG and feed URL of the previewed site.
+          # "localhost", not a literal: an empty bind host is resolved by
+          # `bind_tcp`, which lands on whichever loopback the resolver prefers
+          # (`[::1]` on macOS), so a hard-coded 127.0.0.1 would point at an
+          # address nothing is listening on. "localhost" follows the same
+          # resolution the bind did.
+          return "localhost" if host.blank?
           return host unless host.includes?(':')
           return host if host.starts_with?('[')
           # RFC 6874: a zone id's "%" separator must be percent-encoded inside

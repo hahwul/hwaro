@@ -581,6 +581,125 @@ describe "Edge Cases: Duplicate output path detection" do
       html.should contain("OWN-BODY")
     end
   end
+
+  # `posts/a%2fb.md` claims the URL `/posts/a%2fb/`, but the output path was
+  # computed by decoding the WHOLE URL first, which turned `%2f` into a real
+  # directory level: the page landed on `posts/a/b/index.html` and destroyed
+  # the rendered output of the file that owns it. The build exited 0 and
+  # reported "render: 2 pages" with one file on disk.
+  it "refuses a page whose URL hides a separator instead of overwriting another page" do
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {
+          "posts/a/b.md"   => "---\ntitle: Real\n---\nREAL-PAGE-BODY",
+          "posts/a%2fb.md" => "---\ntitle: Injected\n---\nINJECTED-BODY",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        html = File.read("public/posts/a/b/index.html")
+        html.should contain("REAL-PAGE-BODY")
+        html.should_not contain("INJECTED-BODY")
+      end
+    end
+
+    log.should contain("Not publishing posts/a%2fb.md")
+  end
+
+  # A literal backslash is a legal POSIX filename character but a separator on
+  # Windows, and browsers rewrite it to `/` inside a URL path — so it too used
+  # to split into directories and clobber the real page.
+  it "refuses a page whose URL contains a backslash" do
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {
+          "posts/a/b.md"  => "---\ntitle: Real\n---\nREAL-PAGE-BODY",
+          "posts/a\\b.md" => "---\ntitle: Backslash\n---\nBACKSLASH-BODY",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        html = File.read("public/posts/a/b/index.html")
+        html.should contain("REAL-PAGE-BODY")
+        html.should_not contain("BACKSLASH-BODY")
+      end
+    end
+
+    log.should contain("Not publishing")
+  end
+
+  # `/Foo/` and `/foo/` are two files on ext4 and ONE file on APFS/NTFS, so
+  # the exact-string collision map never saw the conflict and the second page
+  # silently overwrote the first on the project's primary dev platform. The
+  # warning is unconditional so a case-sensitive CI still reports it; only the
+  # skip is gated on what the filesystem actually does.
+  it "warns when two pages differ only by letter case in their URL" do
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {
+          "a.md" => "---\ntitle: Upper\nslug: Foo\n---\nUPPER-BODY",
+          "b.md" => "---\ntitle: Lower\nslug: foo\n---\nLOWER-BODY",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+
+    log.should contain("Duplicate output path")
+    log.should contain("a.md")
+    log.should contain("b.md")
+  end
+
+  # Two URL strings, one file: the exact-string map treated them as separate
+  # claims, so both pages wrote to `public/dup/index.html` in render order.
+  it "detects a collision between two URL spellings of one output file" do
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {
+          "a.md" => "---\ntitle: A\npath: /dup/\n---\nAAA-WINNER",
+          "b.md" => "---\ntitle: B\npath: //dup//\n---\nBBB-LOSER",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        html = File.read("public/dup/index.html")
+        html.should contain("AAA-WINNER")
+        html.should_not contain("BBB-LOSER")
+      end
+    end
+
+    log.should contain("Duplicate output path")
+  end
+
+  # Detecting the collision and declining to write the loser is only half a
+  # fix: the build then advertised the URL it had just refused to write in
+  # sitemap.xml, llms.txt, the feeds and the search index — trading a silent
+  # overwrite for a dead link the site's own sitemap points at.
+  it "does not advertise the URL of a page whose write was suppressed" do
+    with_captured_log do
+      build_site(
+        <<-TOML,
+          title = "Test Site"
+          base_url = "http://localhost"
+          [sitemap]
+          enabled = true
+          TOML
+        content_files: {
+          "a.md" => "---\ntitle: A\npath: /dup/\n---\nAAA-WINNER",
+          "b.md" => "---\ntitle: B\npath: //dup//\n---\nBBB-LOSER",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        sitemap = File.read("public/sitemap.xml")
+        sitemap.scan(/<loc>[^<]*dup[^<]*<\/loc>/).size.should eq(1)
+
+        llms = File.read("public/llms.txt")
+        llms.scan(/\/dup\//).size.should eq(1)
+        llms.should contain("[A]")
+        llms.should_not contain("[B]")
+      end
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------
@@ -612,5 +731,154 @@ describe "Edge Cases: sequential render failure aggregation" do
 
     err.not_nil!.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
     log.should contain("Render failed for 2 pages")
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 15. Symlinks and non-regular files in the source tree
+#
+# One unreadable entry must cost exactly that entry — never the whole build.
+# These cases used to abort Initialize with a raw `File::Error` (mapped to
+# HWARO_E_INTERNAL, leaving public/ EMPTY), hang the copy forever, or publish
+# a file from outside the project.
+# ---------------------------------------------------------------------------
+private def run_symlink_build(output_dir : String = "public")
+  builder = Hwaro::Core::Build::Builder.new
+  Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+  builder.run(Hwaro::Config::Options::BuildOptions.new(
+    output_dir: output_dir, parallel: false, highlight: false, verbose: false))
+end
+
+# Minimal project written directly (not via build_site) because the symlinks
+# and sockets below have to exist BEFORE the build runs.
+private def symlink_project
+  File.write("config.toml", BASIC_CONFIG)
+  FileUtils.mkdir_p("content")
+  FileUtils.mkdir_p("templates")
+  FileUtils.mkdir_p("static")
+  File.write("content/index.md", "---\ntitle: Home\n---\nHOME-BODY")
+  File.write("templates/index.html", "{{ content }}")
+  File.write("templates/page.html", "{{ content }}")
+  File.write("templates/section.html", "{{ content }}")
+  File.write("static/keep.txt", "KEEP")
+end
+
+describe "Edge Cases: symlinks and non-regular files" do
+  it "skips a symlink cycle under static/ and still publishes the site" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        symlink_project
+        # Self-referential link: stat fails with ELOOP, which `File.info?`
+        # raises instead of reporting as a missing target.
+        File.symlink("loop", "static/loop")
+
+        built = false
+        log = with_captured_log { built = run_symlink_build }
+
+        built.should be_true
+        File.read("public/index.html").should contain("HOME-BODY")
+        File.read("public/keep.txt").should eq("KEEP")
+        File.exists?("public/loop").should be_false
+        log.should contain("Skipping unresolvable static symlink")
+      end
+    end
+  end
+
+  it "skips a non-regular file under static/ and still publishes the site" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        symlink_project
+        # A unix socket stands in for the `mkfifo static/pipe` of the original
+        # report: both are non-regular files that the copy must never open.
+        # The FIFO itself cannot be used in a spec — without the guard,
+        # `open(2)` on it blocks forever, which would HANG this suite rather
+        # than fail it. The socket exercises the identical `type.file?` guard
+        # and fails fast if it ever regresses.
+        server = UNIXServer.new("static/s.sock")
+        begin
+          log = with_captured_log { run_symlink_build }
+
+          File.read("public/index.html").should contain("HOME-BODY")
+          File.read("public/keep.txt").should eq("KEEP")
+          File.exists?("public/s.sock").should be_false
+          log.should contain("Skipping non-regular static file")
+        ensure
+          server.close
+        end
+      end
+    end
+  end
+
+  it "skips a content symlink whose target lives outside the project" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "outside.md"), "---\ntitle: Leak\n---\nSECRET-BODY")
+      project = File.join(dir, "site")
+      FileUtils.mkdir_p(project)
+      Dir.cd(project) do
+        symlink_project
+        File.symlink(File.join("..", "..", "outside.md"), "content/leak.md")
+
+        log = with_captured_log { run_symlink_build }
+
+        File.read("public/index.html").should contain("HOME-BODY")
+        File.exists?("public/leak/index.html").should be_false
+        log.should contain("Skipping content symlink that does not resolve inside the project")
+      end
+    end
+  end
+
+  it "skips a symlink cycle under content/ and still publishes the site" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        symlink_project
+        File.symlink("loop.md", "content/loop.md")
+
+        built = false
+        log = with_captured_log { built = run_symlink_build }
+
+        built.should be_true
+        File.read("public/index.html").should contain("HOME-BODY")
+        log.should contain("Skipping content symlink that does not resolve inside the project")
+      end
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 16. Invalid UTF-8 in a template
+#
+# `File.read` does not validate UTF-8, so a single stray byte travelled into
+# the templates hash and the first PCRE2 pass over it (the TemplateDeps
+# reference scan) aborted the Initialize phase with "Regex match error: UTF-8
+# error: illegal byte" — reported as HWARO_E_INTERNAL / exit 70, and naming
+# no file, so on a site with dozens of templates the offender was unfindable.
+# Content and data files already degrade per-file; templates must too.
+# ---------------------------------------------------------------------------
+describe "Edge Cases: invalid UTF-8 in a template" do
+  it "scrubs the bad bytes, names the template, and still builds" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        symlink_project
+        # 0xff is illegal in UTF-8 anywhere (a latin-1 paste, a truncated
+        # multi-byte sequence). Written as raw bytes because the invalid
+        # sequence cannot survive a Crystal string literal.
+        File.open("templates/page.html", "wb") do |io|
+          io.write("<p>".to_slice)
+          io.write(Bytes[0xff])
+          io.write("{{ content }}</p>".to_slice)
+        end
+        File.write("content/about.md", "---\ntitle: About\n---\nABOUT-BODY")
+
+        built = false
+        log = with_captured_log { built = run_symlink_build }
+
+        built.should be_true
+        log.should contain("templates/page.html")
+        log.should contain("invalid UTF-8")
+        # The template still renders — only the offending byte was replaced.
+        html = File.read("public/about/index.html")
+        html.should contain("ABOUT-BODY")
+      end
+    end
   end
 end

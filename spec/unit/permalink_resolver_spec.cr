@@ -34,6 +34,24 @@ describe Hwaro::Utils::PermalinkResolver do
       Hwaro::Utils::PermalinkResolver.pattern?("archive/2023").should be_false
       Hwaro::Utils::PermalinkResolver.pattern?("").should be_false
     end
+
+    it "detects a token buried in a compound segment" do
+      # These are not expandable (see validate_pattern!), but they must be seen
+      # as patterns so they get rejected instead of shipping a literal colon.
+      Hwaro::Utils::PermalinkResolver.pattern?("/:year/post-:slug/").should be_true
+      Hwaro::Utils::PermalinkResolver.pattern?("/blog-:slug/").should be_true
+    end
+
+    # A colon is legal inside a URL path segment. Treating any `:identifier`
+    # as a token made a plain directory remap look like a malformed pattern,
+    # and `validate_pattern!` aborted the build with HWARO_E_CONFIG on config
+    # that had published fine — for a target containing no hwaro token at all.
+    it "treats a colon inside a segment as a literal remap, not a token" do
+      Hwaro::Utils::PermalinkResolver.pattern?("/wiki/pros:cons/").should be_false
+      Hwaro::Utils::PermalinkResolver.pattern?("notes/a:b").should be_false
+      # `:slugs` is not `:slug` — the embedded match is closed with \b.
+      Hwaro::Utils::PermalinkResolver.pattern?("/docs/faq:slugs/").should be_false
+    end
   end
 
   describe ".validate_pattern!" do
@@ -48,6 +66,28 @@ describe Hwaro::Utils::PermalinkResolver do
         Hwaro::Utils::PermalinkResolver.validate_pattern!("posts", "/:yaer/:slug/")
       end
       ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
+
+    it "raises a classified config error for a token mixed into a segment" do
+      # expand_pattern substitutes whole segments only, so `post-:slug` used to
+      # sail through both checks and ship a directory literally named
+      # `post-:slug` (illegal on NTFS, unescaped in the URLs pointing at it).
+      ex = expect_raises(Hwaro::HwaroError, /'post-:slug'/) do
+        Hwaro::Utils::PermalinkResolver.validate_pattern!("posts", "/:year/post-:slug/")
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+      (ex.hint || "").should contain("whole path segments")
+
+      expect_raises(Hwaro::HwaroError, /'blog-:slug'/) do
+        Hwaro::Utils::PermalinkResolver.validate_pattern!("blog", "/blog-:slug/")
+      end
+    end
+
+    it "accepts a literal colon inside a segment" do
+      # Control for the check above: only a KNOWN token embedded in a larger
+      # segment is a mistake. `cons` is not a token, so this is a directory.
+      Hwaro::Utils::PermalinkResolver.validate_pattern!("notes", "/wiki/pros:cons/")
+      Hwaro::Utils::PermalinkResolver.validate_pattern!("docs", "/docs/faq:slugs/")
     end
   end
 

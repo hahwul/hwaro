@@ -283,22 +283,72 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should_not contain("\n  <button")
       end
 
-      it "leaves a counterfeit out-of-range preserve token intact without raising" do
-        # A real <pre> makes the preserves array non-empty so the restore gsub
-        # actually runs; the forged token's index (999) is out of range, so it
-        # must be emitted unchanged rather than indexing past the array.
+      it "scrubs a counterfeit preserve token's NUL delimiters on entry" do
+        # This is a NUL-SCRUB assertion, not a guard assertion: minify() strips
+        # every NUL before extraction, so the forged sentinel is inert literal
+        # text by the time restore runs and neither the to_i? nor the bounds
+        # branch is reached. (Asserting otherwise here is what let a mutation
+        # delete both guards with the whole file still green — the guards are
+        # pinned directly, in ".restore_sensitive_blocks" below.)
         html = "<pre>real</pre><p>\u{0}HW_HTML_PB_999\u{0}</p>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
-        result.should contain("<pre>real</pre>")
-        result.should contain("\u{0}HW_HTML_PB_999\u{0}")
+        result.should eq("<pre>real</pre><p>HW_HTML_PB_999</p>")
+        result.should_not contain("\u{0}")
       end
 
-      it "does not raise on a counterfeit token whose index overflows Int32" do
-        # $1.to_i would raise ArgumentError on a 20-digit index; to_i? makes it
-        # fall through to $0 (the token left verbatim).
+      it "scrubs the NUL delimiters of an index that would overflow Int32" do
+        # Same: what this pins is that minification completes and emits the
+        # digits as inert text, with the delimiters gone.
         html = "<pre>real</pre><p>\u{0}HW_HTML_PB_99999999999999999999\u{0}</p>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
-        result.should contain("\u{0}HW_HTML_PB_99999999999999999999\u{0}")
+        result.should eq("<pre>real</pre><p>HW_HTML_PB_99999999999999999999</p>")
+      end
+
+      it "emits the same bytes with and without minification for a NUL-bearing page" do
+        # The scrub used to live only inside minify(), so `hwaro build` wrote
+        # the raw NUL while `hwaro build --minify` dropped it — an optional
+        # whitespace pass silently changing author-controlled page content.
+        # scrub_nul is now applied by the render phase on both paths.
+        html = "<p>a\u{0}b</p>"
+        Hwaro::Utils::HtmlMinifier.scrub_nul(html).should eq("<p>ab</p>")
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(Hwaro::Utils::HtmlMinifier.scrub_nul(html))
+      end
+    end
+
+    # Counterfeit-token guards, pinned directly. They are unreachable through
+    # `minify` (its NUL scrub defuses any forged sentinel first), so driving
+    # them through the public entry point tests nothing — a mutation deleting
+    # both `to_i?` and the bounds check kept all 65 examples of this file green.
+    describe ".restore_sensitive_blocks" do
+      it "leaves an out-of-range token untouched instead of indexing past the array" do
+        html = "<p>\u{0}HW_HTML_PB_999\u{0}</p>"
+        result = Hwaro::Utils::HtmlMinifier.restore_sensitive_blocks(html, ["<pre>real</pre>"])
+        result.should eq(html)
+      end
+
+      it "leaves a token whose index overflows Int32 untouched instead of raising" do
+        # `$1.to_i` would raise ArgumentError here and abort the page.
+        html = "<p>\u{0}HW_HTML_PB_99999999999999999999\u{0}</p>"
+        result = Hwaro::Utils::HtmlMinifier.restore_sensitive_blocks(html, ["<pre>real</pre>"])
+        result.should eq(html)
+      end
+
+      it "restores a real token" do
+        # Control: the guards must not break the substitution they wrap.
+        result = Hwaro::Utils::HtmlMinifier.restore_sensitive_blocks(
+          "<p>\u{0}HW_HTML_PB_0\u{0}</p>", ["<pre>real</pre>"]
+        )
+        result.should eq("<p><pre>real</pre></p>")
+      end
+
+      it "terminates on a self-referential token instead of growing forever" do
+        # The pass cap is the second layer behind the NUL scrub: a preserved
+        # block that expands to a token pointing back at itself would otherwise
+        # add one copy per pass and never reach a fixed point.
+        result = Hwaro::Utils::HtmlMinifier.restore_sensitive_blocks(
+          "<p>\u{0}HW_HTML_PB_0\u{0}</p>", ["x\u{0}HW_HTML_PB_0\u{0}"]
+        )
+        result.size.should be < 200
       end
     end
 
@@ -437,6 +487,39 @@ describe Hwaro::Utils::HtmlMinifier do
         html = "<p>A</p>\n\n\n\n<p>B</p>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should eq("<p>A</p><p>B</p>")
+      end
+    end
+
+    describe "forged protected-block placeholders" do
+      # The protected-block sentinels are `\x00`-delimited on the assumption
+      # that NUL never reaches the rendered page. It does: a NUL inside a
+      # data-file value (data/*.json, data/*.yml) is emitted verbatim by the
+      # template, so author-controlled text can forge a real token.
+      it "does not expand a forged token into a preserved block" do
+        html = "<div>\u0000HW_HTML_PB_0\u0000</div><script>x</script>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        # Previously the forged token was indistinguishable from the sentinel
+        # minted for the <script>, so the restore pass injected a second copy
+        # of the script into the <div>.
+        result.should eq("<div>HW_HTML_PB_0</div><script>x</script>")
+      end
+
+      it "terminates when a forged token names the block that contains it" do
+        # NOTE: on the unfixed minifier this call never returns — restoring
+        # index 0 re-emits the token, so each pass wraps another <script>
+        # around it and the fixed-point loop grows the string forever.
+        html = "<script>\u0000HW_HTML_PB_0\u0000</script>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<script>HW_HTML_PB_0</script>")
+      end
+
+      it "still restores legitimately nested protected blocks" do
+        # `style` is extracted before `script`, so the script's preserved body
+        # holds a style placeholder that only a second restore pass resolves.
+        # The pass cap must stay wide enough for that (depth <= preserves.size).
+        html = "<div> <script>var x = \"<style>body{}</style>\";</script> </div>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<div><script>var x = \"<style>body{}</style>\";</script></div>")
       end
     end
   end

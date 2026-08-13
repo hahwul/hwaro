@@ -31,7 +31,45 @@ module Hwaro::Core::Build::Phases::ReadContent
 
     # Single pass over content directory for both markdown and raw files
     Dir.glob("content/**/*") do |file_path|
-      next if File.directory?(file_path)
+      # lstat, not `File.directory?`: that follows symlinks, and following a
+      # symlink cycle (`ln -s loop content/loop`) fails with ELOOP, which
+      # `File.info?` raises as `File::Error` — aborting the whole build with a
+      # raw filesystem error. lstat never follows, so a cycle is just an
+      # ordinary symlink entry here.
+      lstat = File.info?(file_path, follow_symlinks: false)
+      next if lstat.nil? || lstat.directory?
+
+      if lstat.symlink?
+        # A content symlink whose target lives outside the project would
+        # publish a file from outside the site — `content/leak.md ->
+        # ../../secrets.env` rendered straight into public/leak/index.html.
+        # This is the same policy already applied to static files
+        # (phases/initialize.cr), raw files and page-bundle assets
+        # (phases/write.cr). In-project symlinks resolve back within the root
+        # and keep working; `resolves_within?` also answers false for dangling
+        # links and cycles (realpath fails), so those are skipped here instead
+        # of failing later in the parse phase's `File.read` — hence the
+        # "does not resolve inside" wording, which covers all three.
+        unless Hwaro::Utils::PathUtils.resolves_within?(file_path, Dir.current)
+          Logger.warn "Skipping content symlink that does not resolve inside the project: #{file_path}"
+          next
+        end
+        # `resolves_within?` already resolved the link (realpath succeeded),
+        # so this stat cannot hit the ELOOP the lstat above avoids.
+        target = File.info?(file_path, follow_symlinks: true)
+        next if target.nil?
+      else
+        target = lstat
+      end
+
+      # Only regular files are readable content. A FIFO or socket dropped into
+      # content/ would otherwise reach the parse phase's `File.read`, and
+      # `open(2)` on a writer-less FIFO blocks forever — a build that hangs
+      # with no output and no error. Directories were dropped above; a symlink
+      # to an in-project directory lands here (the glob does not descend into
+      # it either) and is skipped by the same test.
+      next unless target.file?
+
       relative_path = Path[file_path].relative_to("content").to_s
       ext = Path[file_path].extension.downcase
 

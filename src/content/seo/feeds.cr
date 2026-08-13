@@ -43,7 +43,10 @@ module Hwaro
 
           # 1. Generate Main Site Feed
           if config.feeds.enabled
-            site_pages = pages.reject { |p| p.draft || p.unpublished || !p.render || p.is_a?(Models::Section) }
+            # `output_suppressed`: the render phase declined to write this
+            # page's file (another page owns it), so a feed entry pointing at
+            # its URL is a dead link.
+            site_pages = pages.reject { |p| p.draft || p.unpublished || !p.render || p.output_suppressed || p.is_a?(Models::Section) }
             site_pages = dedupe_by_output_url(site_pages)
 
             # Filter by section if configured for main feed
@@ -137,7 +140,7 @@ module Hwaro
 
             # Filter pages for this language (single pass)
             lang_pages = pages.select { |p|
-              !p.draft && !p.unpublished && p.render && !p.is_a?(Models::Section) && p.language == lang_code
+              !p.draft && !p.unpublished && p.render && !p.output_suppressed && !p.is_a?(Models::Section) && p.language == lang_code
             }
             lang_pages = dedupe_by_output_url(lang_pages)
 

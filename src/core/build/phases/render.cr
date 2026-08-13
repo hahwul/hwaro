@@ -859,7 +859,7 @@ module Hwaro::Core::Build::Phases::Render
       first = failures.first
       raise Hwaro::HwaroError.new(
         code: Hwaro::Errors::HWARO_E_TEMPLATE,
-        message: "Render failed for #{failures.size} page(s); first failure on #{first[:page_path]}: #{first[:message]}",
+        message: "Render failed for #{failures.size} page(s); first failure on #{first[:page_path]}: #{Utils::TextUtils.truncate_error(first[:message])}",
       )
     end
   end
@@ -871,9 +871,15 @@ module Hwaro::Core::Build::Phases::Render
     failures : Array(NamedTuple(page_path: String, message: String)),
     verbose : Bool,
   )
+    # A template error carries Crinja's source excerpt, so ONE failure in a
+    # minified (single-line) template printed a multi-megabyte console line —
+    # a 3 MB `{% if %}` line produced a 6 MB log, repeated on every serve
+    # rebuild. `hwaro serve` already clamped the watcher line and the overlay
+    # payload; these are the emitters it did not cover, and they fire with zero
+    # clients attached (plain `hwaro build` too).
     if verbose
       failures.each do |f|
-        Logger.error "Parallel render failed for #{f[:page_path]}: #{f[:message]}"
+        Logger.error "Parallel render failed for #{f[:page_path]}: #{Utils::TextUtils.truncate_error(f[:message])}"
       end
       return
     end
@@ -881,9 +887,9 @@ module Hwaro::Core::Build::Phases::Render
     grouped = failures.group_by { |f| render_error_signature(f[:message]) }
     grouped.each do |signature, group|
       if group.size == 1
-        Logger.error "Render failed for #{group.first[:page_path]}: #{group.first[:message]}"
+        Logger.error "Render failed for #{group.first[:page_path]}: #{Utils::TextUtils.truncate_error(group.first[:message])}"
       else
-        Logger.error "Render failed for #{group.size} pages: #{signature}"
+        Logger.error "Render failed for #{group.size} pages: #{Utils::TextUtils.truncate_error(signature)}"
         group.first(5).each { |f| Logger.error "  - #{f[:page_path]}" }
         if group.size > 5
           Logger.error "  … and #{group.size - 5} more"
@@ -1102,6 +1108,12 @@ module Hwaro::Core::Build::Phases::Render
         final_html = inject_error_overlay(final_html, page.build_warnings)
       end
 
+      # Scrubbed on BOTH paths, before the optional minify pass: a NUL that
+      # reaches the page through a data-file value is invalid HTML text and is
+      # what makes the minifier's `\x00`-delimited sentinels forgeable, but
+      # scrubbing it only under --minify made the two build modes emit
+      # different page bytes for the same source.
+      final_html = Utils::HtmlMinifier.scrub_nul(final_html)
       final_html = minify_html(final_html) if minify
 
       write_output(page, output_dir, final_html, verbose)
@@ -1150,15 +1162,70 @@ module Hwaro::Core::Build::Phases::Render
   # a stale winner suppressing writes until restart.
   private def compute_output_url_winners(all_pages : Array(Models::Page)) : Hash(String, String)
     winners = Hash(String, String).new
+
+    # Second index, keyed by the output FILE rather than the URL string. Two
+    # different URLs can name one file — `/foo/` and `/foo//`, or a pair whose
+    # difference decodes away — and keying only on the string let the second
+    # page overwrite the first with no warning and an exit code of 0.
+    by_file = Hash(String, String).new
+
+    # Third index, case- and NFC-folded, because `/Foo/` and `/foo/` ARE the
+    # same file on macOS and Windows. The WARNING fires everywhere (a
+    # case-sensitive Linux CI must still tell the author their site loses a
+    # page on a contributor's Mac), but the write is only suppressed where the
+    # filesystem actually folds — suppressing on a case-sensitive host would
+    # stop publishing a page that legitimately has both spellings there.
+    by_fold = Hash(String, String).new
+    folds_case : Bool? = nil
+
     writers = all_pages.select(&.render).sort_by!(&.path)
+
+    # Cleared before every pass, not just set: this runs again on incremental
+    # and serve rerenders, so a collision the author has since resolved must
+    # stop suppressing the page (and its sitemap/feed/search entries).
+    all_pages.each(&.output_suppressed=(false))
 
     writers.each do |page|
       url = page.url
       if prev_path = winners[url]?
         Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
-      else
-        winners[url] = page.path
+        page.output_suppressed = true
+        next
       end
+
+      # nil = this URL is unpublishable (a segment traverses or hides a
+      # separator); write_output refuses it by itself and it claims nothing.
+      if file_key = Utils::PathUtils.output_file_key(url)
+        if prev_path = by_file[file_key]?
+          Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
+          # Point the loser's own URL key at the winner: every sink asks
+          # `collision_suppressed?(page, page.url)`, so this is what makes the
+          # warning true instead of merely informative.
+          winners[url] = prev_path
+          page.output_suppressed = true
+          next
+        end
+
+        fold_key = Utils::PathUtils.output_fold_key(file_key)
+        if prev_path = by_fold[fold_key]?
+          Logger.warn "Duplicate output path '#{url}' — '#{page.path}' differs from '#{prev_path}' only in letter case or Unicode form, which name the same file on macOS and Windows"
+          # Probed lazily: a collision like this is rare, and the probe costs
+          # two stat calls. `Dir.current` stands in for the output directory,
+          # which hwaro always writes inside the project it was invoked on.
+          folds_case = Utils::PathUtils.case_folding_fs?(Dir.current) if folds_case.nil?
+          if folds_case
+            winners[url] = prev_path
+            page.output_suppressed = true
+            next
+          end
+        else
+          by_fold[fold_key] = page.path
+        end
+
+        by_file[file_key] = page.path
+      end
+
+      winners[url] = page.path
     end
 
     writers.each do |page|
@@ -1170,9 +1237,34 @@ module Hwaro::Core::Build::Phases::Render
           unless prev_path == page.path
             Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{prev_path}' and is not written"
           end
-        else
-          winners[norm] = page.path
+          next
         end
+
+        # A redirect stub is a published file too, so it goes through the same
+        # file/fold identity check a page URL does.
+        if file_key = Utils::PathUtils.output_file_key(norm)
+          if (prev_path = by_file[file_key]?) && prev_path != page.path
+            Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{prev_path}' and is not written"
+            winners[norm] = prev_path
+            next
+          end
+
+          fold_key = Utils::PathUtils.output_fold_key(file_key)
+          if (prev_path = by_fold[fold_key]?) && prev_path != page.path
+            Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' differs from '#{prev_path}' only in letter case or Unicode form, which name the same file on macOS and Windows"
+            folds_case = Utils::PathUtils.case_folding_fs?(Dir.current) if folds_case.nil?
+            if folds_case
+              winners[norm] = prev_path
+              next
+            end
+          else
+            by_fold[fold_key] = page.path
+          end
+
+          by_file[file_key] = page.path
+        end
+
+        winners[norm] = page.path
       end
     end
 
@@ -1304,6 +1396,12 @@ module Hwaro::Core::Build::Phases::Render
         final_html = inject_error_overlay(final_html, section.build_warnings)
       end
 
+      # Scrubbed on BOTH paths, before the optional minify pass: a NUL that
+      # reaches the page through a data-file value is invalid HTML text and is
+      # what makes the minifier's `\x00`-delimited sentinels forgeable, but
+      # scrubbing it only under --minify made the two build modes emit
+      # different page bytes for the same source.
+      final_html = Utils::HtmlMinifier.scrub_nul(final_html)
       final_html = minify_html(final_html) if minify
 
       # Write output - first page uses section URL, subsequent pages use /page/N/
@@ -1410,7 +1508,14 @@ module Hwaro::Core::Build::Phases::Render
       return "section" if templates.has_key?("section")
     end
 
-    if page.is_index && page.section.empty? && templates.has_key?("index")
+    # Only the site (or per-language) homepage renders with the `index`
+    # template — see `home?`. The older test here (`page.is_index &&
+    # page.section.empty?`) also matched one-level page bundles like
+    # `content/about/index.md`, whose section resolves to "" as well: those
+    # pages were rendered with the homepage template, silently discarding
+    # their own title and body (the gh#601 fix landed on `home?` but never
+    # reached this call site).
+    if home?(page) && templates.has_key?("index")
       return "index"
     end
 
@@ -1430,11 +1535,23 @@ module Hwaro::Core::Build::Phases::Render
 
   private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)
     own_url = normalize_alias_url(page.url)
+    # The page's own output FILE, not just its URL string: `/about/`,
+    # `/about//` and `/about/index.html` are three spellings of
+    # `about/index.html`, and only the last one normalizes back to `own_url`.
+    # A raw string compare therefore let `aliases = ["/about//"]` through on
+    # the page whose url is `/about/`, and the self-redirect stub was written
+    # straight over that page's own rendered HTML — exit 0, no warning, the
+    # body gone. (`compute_output_url_winners` cannot catch it either: the
+    # alias and the page share a path, so it reads as the same claimant.)
+    # nil = the page's URL is unpublishable, in which case there is no file
+    # for an alias to destroy and only the string compare applies.
+    own_file_key = Utils::PathUtils.output_file_key(own_url)
     page.aliases.each do |alias_path|
       norm = normalize_alias_url(alias_path)
       # An alias pointing at the page's own URL would overwrite the real
       # content with a redirect stub to itself.
       next if norm == own_url
+      next if own_file_key && Utils::PathUtils.output_file_key(norm) == own_file_key
       next if collision_suppressed?(page, norm)
 
       alias_clean = url_output_path(alias_path.lchop("/"))
@@ -1636,9 +1753,14 @@ module Hwaro::Core::Build::Phases::Render
       processed_template = if @template_shortcode_scan[template.hash]? == false
                              template
                            else
-                             process_shortcodes_in_text(template, templates, vars,
+                             # Hide the constructs Crinja owns (raw blocks, macro
+                             # invocations) from that pass and restore them
+                             # afterwards — see `mask_template_literals`.
+                             masked, literals = masked_template(template)
+                             expanded = process_shortcodes_in_text(masked, templates, vars,
                                crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
                                warnings: page.build_warnings)
+                             unmask_template_literals(expanded, literals)
                            end
 
       # Cache compiled Crinja templates by content hash.
@@ -1662,10 +1784,192 @@ module Hwaro::Core::Build::Phases::Render
       # templates from scripts and CI.
       raise Hwaro::HwaroError.new(
         code: Hwaro::Errors::HWARO_E_TEMPLATE,
-        message: "Template error for #{page.path}: #{ex.message}",
+        # Clamped at construction, not just where it is logged: this message
+        # is what the CLI prints and what `--json` emits, and Crinja attaches a
+        # source excerpt to it — so a single minified (one-line) template made
+        # one failure a multi-megabyte console line and a multi-megabyte JSON
+        # field. 4000 characters is far more than any readable excerpt.
+        message: "Template error for #{page.path}: #{Utils::TextUtils.truncate_error(ex.message || "")}",
         cause: ex,
       )
     end
+  end
+
+  # ---------------------------------------------------------------------
+  # Protecting Crinja-owned syntax from the shortcode pass.
+  #
+  # `apply_template` expands shortcodes over the RAW template source, before
+  # Crinja parses it, so that pass has no notion of Jinja block structure:
+  # every `{{ name(...) }}` looks like a direct shortcode call, and text
+  # inside `{% raw %}` … `{% endraw %}` looks like ordinary template text.
+  # Two constructs the template language owns were destroyed by it:
+  #
+  #   * a macro invocation (`{{ nav_item("/", "Home") }}`, `{{ caller() }}`,
+  #     `{% from "m.html" import btn %}{{ btn("Go") }}`) became
+  #     `<!-- hwaro: missing shortcode 'nav_item' -->` plus a bogus warning.
+  #     The `crinja_function?` escape hatch could not save it: a macro is a
+  #     value bound into the render-time CONTEXT, never a registered env
+  #     function.
+  #   * a `{% raw %}` example was expanded (or deleted) instead of staying
+  #     literal, which is exactly the construct raw blocks exist for.
+  #
+  # Both are swapped for NUL-delimited tokens before the shortcode pass and
+  # restored right after, so what Crinja finally compiles is byte-identical
+  # to the author's source for those regions. NUL never appears in a template
+  # read as UTF-8 source, the same reasoning `mask_inline_code` relies on.
+  #
+  # The raw-block shape itself is owned by ShortcodeProcessor, which masks the
+  # same regions on the CONTENT path (`mask_raw_blocks`): a hand-copied second
+  # regex here would let the two paths drift, and a raw block that protects an
+  # example in a template has to protect the same example in a markdown body.
+  private TEMPLATE_RAW_BLOCK_RE = ShortcodeProcessor::RAW_BLOCK_RE
+  private TEMPLATE_MACRO_DEF_RE = /\{\%-?\s*macro\s+([a-zA-Z_]\w*)\s*\(/
+  private TEMPLATE_IMPORT_RE    = /\{\%-?\s*from\s+[^%]*?\bimport\s+([^%]*?)-?\%\}/
+  # Mirrors the direct-call regex in ShortcodeProcessor (single line, same
+  # name alphabet), so a masked call covers exactly what that pass would
+  # otherwise have rewritten.
+  private TEMPLATE_CALL_RE        = /\{\{\s*([a-zA-Z_][\w\-]*)\s*\(.*?\)\s*\}\}/
+  private TEMPLATE_MASK_RE        = /\x00HWARO-TEMPLATE-LITERAL-(\d+)\x00/
+  private TEMPLATE_IMPORT_NAME_RE = /\A[a-zA-Z_]\w*\z/
+
+  # Masked form of a layout source, from the per-build cache when possible.
+  #
+  # Masking is a pure function of the template STRING, but it ran once per
+  # rendered PAGE: four full-source `includes?` probes, a tuple allocation and
+  # (whenever the source declares or imports a macro) a full `gsub` over the
+  # layout — for the one template every page in a section shares. On a
+  # page-count-heavy site that fixed per-page overhead is visible in the Render
+  # phase; the cache is filled single-threaded in `load_templates`, before any
+  # render worker spawns, and read-only here.
+  #
+  # The miss path is not dead: `apply_template` is also reached with sources
+  # that never entered the templates hash (rerender paths, synthesized
+  # layouts). Those pay what they paid before.
+  private def masked_template(template : String) : {String, Array(String)}
+    if cached = @template_literal_masks[template.hash]?
+      return cached
+    end
+    mask_template_literals(template)
+  end
+
+  # `callables` lets the caller supply a set the source alone cannot produce —
+  # macros a parent layout declares, which this template can call only because
+  # it `{% extends %}` it. Defaults to the source's own declarations.
+  private def mask_template_literals(template : String, callables : Set(String)? = nil) : {String, Array(String)}
+    spans = [] of String
+    masked = template
+
+    # Substring probes first: the overwhelming majority of templates use
+    # neither construct.
+    if template.includes?("raw")
+      masked = masked.gsub(TEMPLATE_RAW_BLOCK_RE) do |region|
+        spans << region
+        "\x00HWARO-TEMPLATE-LITERAL-#{spans.size - 1}\x00"
+      end
+    end
+
+    # Macro names are collected from the raw-masked source: a `{% macro %}`
+    # shown inside a raw block is documentation, not a definition.
+    names = callables || template_local_callables(masked)
+    unless names.empty?
+      masked = masked.gsub(TEMPLATE_CALL_RE) do |invocation|
+        next invocation unless names.includes?($1)
+        spans << invocation
+        "\x00HWARO-TEMPLATE-LITERAL-#{spans.size - 1}\x00"
+      end
+    end
+
+    {masked, spans}
+  end
+
+  # `{% extends "base.html" %}` — the one reference that puts a macro declared
+  # elsewhere in scope for THIS template's body. Mirrors TemplateDeps' literal
+  # form; a computed `{% extends var %}` cannot be followed and falls back to
+  # the template's own declarations.
+  private TEMPLATE_EXTENDS_RE = /\{\%-?\s*extends\s+["']([^"']+)["']/
+
+  # Callables a template source declares by itself, with `{% raw %}` regions
+  # removed first (a `{% macro %}` shown inside a raw block is documentation,
+  # not a definition).
+  private def own_template_callables(source : String) : Set(String)
+    scrubbed = source.includes?("raw") ? source.gsub(TEMPLATE_RAW_BLOCK_RE, "") : source
+    template_local_callables(scrubbed)
+  end
+
+  # Everything `{{ name(...) }}` can resolve to when `name` renders: its own
+  # declarations unioned with those of every layout it extends, transitively.
+  #
+  # Scanning one template in isolation missed the single most common Jinja
+  # idiom — shared macros declared in a base layout and called from the child
+  # that extends it. The child's body has no `{% macro %}`, so the call looked
+  # like a shortcode: the invocation was replaced with
+  # `<!-- hwaro: missing shortcode 'shared' -->` and the build warned about a
+  # shortcode template that was never missing.
+  private def inherited_template_callables(
+    name : String,
+    templates : Hash(String, String),
+    memo : Hash(String, Set(String)),
+    chain : Array(String),
+  ) : Set(String)
+    if cached = memo[name]?
+      return cached
+    end
+    source = templates[name]?
+    return Set(String).new unless source
+    # An `{% extends %}` cycle is Crinja's error to report, not a reason to
+    # recurse forever here.
+    return Set(String).new if chain.includes?(name)
+
+    chain.push(name)
+    names = own_template_callables(source)
+    if match = source.match(TEMPLATE_EXTENDS_RE)
+      parent = match[1].sub(Builder::TEMPLATE_EXTENSION_REGEX, "")
+      names.concat(inherited_template_callables(parent, templates, memo, chain))
+    end
+    chain.pop
+
+    memo[name] = names
+    names
+  end
+
+  # Names that resolve to a macro when this template renders: locally defined
+  # macros, names (or aliases) pulled in by `{% from "x" import a, b as c %}`,
+  # and `caller`, which `{% call %}` binds around a macro body. A namespaced
+  # call (`{{ ui.btn() }}`, after `{% import "x" as ui %}`) needs no entry —
+  # the dot keeps it out of the shortcode processor's name alphabet.
+  private def template_local_callables(template : String) : Set(String)
+    names = Set(String).new
+
+    if template.includes?("macro")
+      template.scan(TEMPLATE_MACRO_DEF_RE) { |m| names << m[1] }
+    end
+
+    if template.includes?("import")
+      template.scan(TEMPLATE_IMPORT_RE) do |m|
+        m[1].split(',').each do |part|
+          # Bare `split` drops the surrounding whitespace and empty tokens.
+          tokens = part.split
+          next if tokens.empty?
+          # `btn as tile` binds `tile`; a trailing `with context` /
+          # `without context` modifier is a modifier, not a name.
+          idx = tokens.index("as")
+          name = idx ? tokens[idx + 1]? : tokens[0]
+          next unless name
+          names << name if name.matches?(TEMPLATE_IMPORT_NAME_RE)
+        end
+      end
+    end
+
+    names << "caller" if template.includes?("caller")
+    names
+  end
+
+  private def unmask_template_literals(text : String, spans : Array(String)) : String
+    return text if spans.empty?
+    return text unless text.includes?('\u{0}')
+    # to_i? (not to_i): a counterfeit token whose digit run overflows Int32
+    # must not raise out of the render.
+    text.gsub(TEMPLATE_MASK_RE) { |tok| $1.to_i?.try { |i| spans[i]? } || tok }
   end
 
   # Compile a template string, attaching its source filename when the template

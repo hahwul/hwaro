@@ -1308,6 +1308,19 @@ module Hwaro
       def self.validate_base_url!(value : String) : Nil
         return if value.empty?
 
+        # Crystal's URI parser is lenient about whitespace and control
+        # characters: `https://exam ple.com` and a value with an embedded
+        # newline both parse with a non-empty host and pass every check below.
+        # The RAW string — not the parsed URI — is what gets concatenated with
+        # each page URL, so such a value is copied verbatim into <loc> in
+        # sitemap.xml, into rss.xml, into every canonical/og:url and into
+        # llms.txt. No absolute URL can legally contain these characters
+        # (RFC 3986 requires them percent-encoded), so reject them here rather
+        # than emit a whole site of unusable links.
+        if value.each_char.any? { |c| c.ascii_whitespace? || c.ascii_control? }
+          raise ArgumentError.new("Invalid base_url: #{value.inspect}. It must not contain whitespace or control characters.")
+        end
+
         uri = begin
           URI.parse(value)
         rescue URI::Error
@@ -1546,6 +1559,38 @@ module Hwaro
           [] of String
       end
 
+      # Basenames that do not name a file. Every generated-file emitter
+      # (sitemap, robots, search, feeds, llms) writes to
+      # `Path[output_dir, File.basename(configured_filename)]`, and
+      # `File.basename` maps each of these back to itself — so the write target
+      # collapses onto the output DIRECTORY instead of a file inside it. The
+      # atomic writer then tries to rename its temp file onto a directory and
+      # the build dies with a raw `IO::Error` naming an internal
+      # `.<pid>.<fiber>.tmp` path under exit 70, the code this project reserves
+      # for internal bugs.
+      NON_FILE_BASENAMES = {"", ".", "..", "/"}
+
+      # Reject a `[<table>] <key>` value that cannot become a file inside the
+      # output directory, with a classified config error naming the key instead
+      # of the internal temp-file IO::Error the emitters would otherwise raise.
+      #
+      # `allow_empty` is for the two keys where the empty string already means
+      # "use the built-in default" (`[feeds] filename` defaults to `""`, and
+      # llms.cr substitutes its defaults for an empty value) — rejecting those
+      # would break configs that build correctly today.
+      private def self.validate_output_filename!(table : String, key : String, value : String, example : String, allow_empty : Bool) : Nil
+        return if allow_empty && value.empty?
+        # A NUL byte survives both TOML and File.basename, and then raises a
+        # bare `ArgumentError: String contains null byte` out of the writer.
+        return unless NON_FILE_BASENAMES.includes?(File.basename(value)) || value.includes?(Char::ZERO)
+
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Invalid [#{table}] #{key} = #{value.inspect}: it does not name a file.",
+          hint: "Set #{key} to a plain filename such as \"#{example}\", or remove the key to use the default.",
+        )
+      end
+
       # --- Private section loaders ---------------------------------------------------
 
       private def self.load_sitemap(config : Config)
@@ -1555,6 +1600,7 @@ module Hwaro
         elsif s = config.raw["sitemap"]?.try(&.as_h?)
           config.sitemap.enabled = bool_value(s["enabled"]?, config.sitemap.enabled)
           config.sitemap.filename = s["filename"]?.try(&.as_s?) || config.sitemap.filename
+          validate_output_filename!("sitemap", "filename", config.sitemap.filename, "sitemap.xml", allow_empty: false)
           config.sitemap.changefreq = s["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
           # Keep the priority raw here (NOT clamped) so `hwaro doctor` can detect
           # an out-of-range value and warn/offer a fix. The sitemap EMITTER
@@ -1576,6 +1622,7 @@ module Hwaro
 
         config.robots.enabled = bool_value(s["enabled"]?, config.robots.enabled)
         config.robots.filename = s["filename"]?.try(&.as_s?) || config.robots.filename
+        validate_output_filename!("robots", "filename", config.robots.filename, "robots.txt", allow_empty: false)
 
         if rules = s["rules"]?.try(&.as_a?)
           config.robots.rules = rules.compact_map do |rule_any|
@@ -1598,6 +1645,10 @@ module Hwaro
         config.llms.instructions = s["instructions"]?.try(&.as_s?) || config.llms.instructions
         config.llms.full_enabled = bool_value(s["full_enabled"]?, config.llms.full_enabled)
         config.llms.full_filename = s["full_filename"]?.try(&.as_s?) || config.llms.full_filename
+        # Empty stays legal here: llms.cr already substitutes llms.txt /
+        # llms-full.txt for an empty value, so those configs build today.
+        validate_output_filename!("llms", "filename", config.llms.filename, "llms.txt", allow_empty: true)
+        validate_output_filename!("llms", "full_filename", config.llms.full_filename, "llms-full.txt", allow_empty: true)
       end
 
       private def self.load_feeds(config : Config)
@@ -1614,6 +1665,9 @@ module Hwaro
         end
 
         config.feeds.filename = s["filename"]?.try(&.as_s?) || config.feeds.filename
+        # Empty is the shipped default (safe_feed_filename derives rss.xml /
+        # atom.xml from `type`), so only non-file values are rejected.
+        validate_output_filename!("feeds", "filename", config.feeds.filename, "rss.xml", allow_empty: true)
         config.feeds.type = s["type"]?.try(&.as_s?) || config.feeds.type
         config.feeds.truncate = int_value(s["truncate"]?, config.feeds.truncate)
         config.feeds.limit = int_value(s["limit"]?, config.feeds.limit)
@@ -1630,6 +1684,7 @@ module Hwaro
         config.search.enabled = bool_value(s["enabled"]?, config.search.enabled)
         config.search.format = s["format"]?.try(&.as_s?) || config.search.format
         config.search.filename = s["filename"]?.try(&.as_s?) || config.search.filename
+        validate_output_filename!("search", "filename", config.search.filename, "search.json", allow_empty: false)
         if fields = s["fields"]?.try(&.as_a?)
           config.search.fields = fields.compact_map(&.as_s?)
         end
@@ -1748,7 +1803,16 @@ module Hwaro
           config.og.auto_image.text_color = ai["text_color"]?.try(&.as_s?) || config.og.auto_image.text_color
           config.og.auto_image.accent_color = ai["accent_color"]?.try(&.as_s?) || config.og.auto_image.accent_color
           config.og.auto_image.secondary_color = ai["secondary_color"]?.try(&.as_s?)
-          config.og.auto_image.font_size = int_value(ai["font_size"]?, config.og.auto_image.font_size)
+          # Clamp to the OG canvas: og_image.cr hands this straight to
+          # stb_truetype as the glyph pixel scale, and a value far past the
+          # 1200x630 canvas (150000 was the observed threshold) makes
+          # stbtt_Rasterize write past its glyph bitmap — an out-of-bounds C
+          # write that takes the process down with SIGSEGV, or kills `hwaro
+          # serve` outright on one request when `lazy_generate` is on. A glyph
+          # taller than the image can never render usefully, so 630 is both the
+          # safe bound and the last visually meaningful one. The low bound is
+          # cosmetic: og_image.cr replaces anything <= 48 with a style default.
+          config.og.auto_image.font_size = int_value(ai["font_size"]?, config.og.auto_image.font_size).clamp(8, 630)
           config.og.auto_image.logo = ai["logo"]?.try(&.as_s?)
           config.og.auto_image.output_dir = ai["output_dir"]?.try(&.as_s?) || config.og.auto_image.output_dir
           config.og.auto_image.show_title = bool_value(ai["show_title"]?, config.og.auto_image.show_title)

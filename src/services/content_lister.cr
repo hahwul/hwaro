@@ -13,6 +13,62 @@ require "../utils/text_utils"
 
 module Hwaro
   module Services
+    # Filesystem guard shared by the content-walking tool services (`tool
+    # list` / `tool stats` here, plus `tool convert`, `tool validate` and
+    # `tool unused-assets`). It lives beside the lister because that is the
+    # walker the other services already build on.
+    #
+    # `Dir.glob` reports a symlink as an ordinary path, so a self-referential
+    # link (`ln -s loop.md content/loop.md`), a mutually-pointing pair, or a
+    # dangling link all come back looking like a normal file. Resolving one
+    # fails with ELOOP/ENOENT, and `File.info?` — hence `File.directory?` —
+    # RAISES `File::Error` on ELOOP, because it only swallows ENOENT/ENOTDIR.
+    # `hwaro build` adopted an lstat-first guard for exactly this tree (see
+    # `core/build/phases/read_content.cr`), but the tool commands still walked
+    # it blind: `tool unused-assets` died with a raw filesystem error, and the
+    # others turned every bad link into a read failure they reported as the
+    # author's problem. Skip such entries the way the build does.
+    #
+    # Unlike the build this guard judges READABILITY only, never containment:
+    # the build refuses a link resolving outside the project because it would
+    # publish the target, whereas these commands merely read, and they take an
+    # arbitrary `--content-dir` that need not sit under `Dir.current` — testing
+    # containment against that root would skip every file the user asked about.
+    module ContentWalk
+      extend self
+
+      # True when `path` is a regular file that can actually be opened.
+      #
+      # Anything that simply is not a file (a directory, or a FIFO/socket
+      # whose `File.read` would block forever) is skipped without comment — it
+      # was never content. A symlink we cannot follow is named in a single
+      # warning instead, matching `Phases::Initialize#static_target_info`, so
+      # a file missing from a listing or a validate summary is never silent.
+      def readable_file?(path : String) : Bool
+        # lstat never follows, so a cycle is an ordinary symlink entry here
+        # instead of an ELOOP failure. For the common (non-symlink) case it is
+        # also the only stat the walk needs.
+        lstat = File.info?(path, follow_symlinks: false)
+        return false if lstat.nil?
+        return lstat.file? unless lstat.symlink?
+
+        target = begin
+          File.info?(path, follow_symlinks: true)
+        rescue ex : File::Error
+          Logger.warn "Skipping unresolvable symlink: #{path}"
+          Logger.debug "Symlink stat failed: #{ex.message}"
+          return false
+        end
+
+        if target.nil?
+          Logger.warn "Skipping dangling symlink: #{path}"
+          return false
+        end
+
+        target.file?
+      end
+    end
+
     # Filter type for listing content
     enum ContentFilter
       All
@@ -179,12 +235,16 @@ module Hwaro
       private def find_content_files : Array(String)
         files = [] of String
 
+        # Unfollowable symlinks are dropped here (see `ContentWalk`) so one
+        # bad link cannot turn a listing into a wall of "Failed to read
+        # content file" warnings for files the build itself skips. `tool
+        # stats` walks through this method too, so both stay consistent.
         Dir.glob(File.join(@content_dir, "**", "*.md")) do |file|
-          files << file
+          files << file if ContentWalk.readable_file?(file)
         end
 
         Dir.glob(File.join(@content_dir, "**", "*.markdown")) do |file|
-          files << file
+          files << file if ContentWalk.readable_file?(file)
         end
 
         files.sort

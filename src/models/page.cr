@@ -122,12 +122,25 @@ module Hwaro
       # generated listings (taxonomies, series, related posts, authors).
       property unpublished : Bool
 
+      # True when the render phase resolved an output-path collision AGAINST
+      # this page, so no file was written for its URL (see
+      # compute_output_url_winners). Recomputed from scratch on every build and
+      # rerender — a collision introduced or resolved during a serve session
+      # must not leave a stale verdict behind.
+      #
+      # The discovery surfaces have to honour it: without this the build warned
+      # about the collision, declined to write the page, and then advertised
+      # its URL anyway in sitemap.xml, llms.txt, the feeds and the search
+      # index — trading a silent overwrite for a guaranteed 404 that the site's
+      # own sitemap points at.
+      property output_suppressed : Bool = false
+
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
       property path : String      # Relative path from content/ (e.g. "projects/a.md")
       property section : String   # Parent directory path (e.g. "blog/news"), not just the first component
-      property url : String       # Calculated relative URL (e.g. "/projects/a/")
+      getter url : String         # Calculated relative URL (e.g. "/projects/a/"), written through #url=
       property is_index : Bool    # Is this an index file?
       property language : String? # Language code (e.g. "en", "ko", nil for default)
       property translations : Array(TranslationLink)
@@ -224,7 +237,7 @@ module Hwaro
       # HTML, isn't a draft or preview-only unpublished page, opts into the
       # search index, and isn't a synthetic generated listing page.
       def search_index_eligible? : Bool
-        render && !draft && !unpublished && in_search_index && !generated
+        render && !draft && !unpublished && in_search_index && !generated && !output_suppressed
       end
 
       # Recompute `unpublished` from the publication window (`date` in the
@@ -372,6 +385,29 @@ module Hwaro
           offset += line.bytesize
         end
         @summary
+      end
+
+      # `#` and `?` are legal in a filename (and in an explicit `slug`/`path`)
+      # but they END the path component of a URL: `/posts/a#b/` is the page
+      # `/posts/a` with the fragment `b`. A page named `a#b.md` was written
+      # correctly to `public/posts/a#b/index.html`, yet every link hwaro
+      # emitted for it — `page.url` in listings, `page.permalink`, the sitemap
+      # `<loc>` — pointed at `/posts/a`, a 404. Encode them here, at the one
+      # place a page's URL is assigned, so templates that use `page.url`
+      # directly are right too and not just the permalink.
+      #
+      # Nothing else is escaped. The output path is derived from this string
+      # by decoding it again (`PathUtils.split_safe_segments`), so `%23` still
+      # lands in the directory named `a#b` that the URL now addresses —
+      # whereas encoding more (a non-ASCII slug, say) would rename the
+      # directory every existing site already publishes to. Leaving `%` itself
+      # alone also keeps this idempotent when a URL is assigned twice.
+      def url=(value : String)
+        @url = if value.includes?('#') || value.includes?('?')
+                 value.gsub('#', "%23").gsub('?', "%3F")
+               else
+                 value
+               end
       end
 
       # Generate permalink (absolute URL)

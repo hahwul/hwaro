@@ -81,6 +81,26 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["para", "    still para"]).should eq [false, false]
     end
 
+    it "opens directly after an ATX heading" do
+      # CommonMark only forbids indented code from interrupting a
+      # *paragraph*; a heading is a leaf block, so Markd opens `<pre><code>`
+      # here with no blank line in between. Reporting the line as ordinary
+      # text let the walkers transform content Markd renders verbatim.
+      feed(["## Example", "    code", "", "back"])
+        .should eq [false, true, true, false]
+    end
+
+    # Controls (they hold against the pre-fix tracker too): the new
+    # heading-arms-indented-code rule must not widen beyond the one line it is
+    # about, or ordinary indented prose starts being treated as code.
+    it "only arms the line immediately after the heading" do
+      feed(["## Example", "text", "    still para"]).should eq [false, false, false]
+    end
+
+    it "does not treat a bare `#hashtag` as a heading" do
+      feed(["#hashtag", "    still para"]).should eq [false, false]
+    end
+
     it "does not open inside an open list" do
       feed(["- item", "", "    continuation"]).should eq [false, false, false]
     end

@@ -104,6 +104,64 @@ describe Hwaro::Utils::TextUtils do
     end
   end
 
+  describe ".safe_slugify" do
+    # A pasted phrase in `tags` became an unbounded directory name and the
+    # build aborted at the first mkdir with ENAMETOOLONG. The cap lives here,
+    # the single source of truth, so the path, page.url, feeds, sitemap and
+    # get_taxonomy_url all shorten together.
+    it "leaves a slug at or under the cap byte-identical" do
+      Hwaro::Utils::TextUtils.safe_slugify("Hello World").should eq("hello-world")
+      Hwaro::Utils::TextUtils.safe_slugify("한글 제목").should eq("한글-제목")
+      long = "a" * Hwaro::Utils::TextUtils::MAX_SLUG_BYTES
+      Hwaro::Utils::TextUtils.safe_slugify(long).should eq(long)
+    end
+
+    it "bounds an over-long ASCII term" do
+      slug = Hwaro::Utils::TextUtils.safe_slugify("word-" * 60)
+      slug.bytesize.should be <= Hwaro::Utils::TextUtils::MAX_SLUG_BYTES
+    end
+
+    # ext4 caps a name at 255 BYTES while APFS caps it at 255 CHARACTERS, so a
+    # CJK term can be legal on macOS and fatal on Linux. Both units must be
+    # under the limit, and the cut must never split a codepoint.
+    it "bounds an over-long CJK term on a character boundary" do
+      slug = Hwaro::Utils::TextUtils.safe_slugify("한글단어" * 22)
+      slug.bytesize.should be <= Hwaro::Utils::TextUtils::MAX_SLUG_BYTES
+      slug.size.should be < 255
+      slug.valid_encoding?.should be_true
+    end
+
+    # An emoji-only term takes the hexstring fallback, which emits two
+    # characters per input byte — the longer of the two paths.
+    it "bounds the symbol-only fallback token" do
+      slug = Hwaro::Utils::TextUtils.safe_slugify("🎉" * 200)
+      slug.bytesize.should be <= Hwaro::Utils::TextUtils::MAX_SLUG_BYTES
+    end
+
+    it "keeps two over-long terms sharing a prefix on distinct slugs" do
+      # Truncating alone would fold every term sharing a long prefix onto one
+      # slug — two tags silently rendering as one page. Asserted on the shape
+      # the cap produces (both bounded, differing in the digest tail) so this
+      # cannot pass by the cap simply not being applied.
+      base = "word-" * 60
+      a = Hwaro::Utils::TextUtils.safe_slugify(base)
+      b = Hwaro::Utils::TextUtils.safe_slugify(base + " tail")
+      a.should_not eq(b)
+      a.bytesize.should be <= Hwaro::Utils::TextUtils::MAX_SLUG_BYTES
+      b.bytesize.should be <= Hwaro::Utils::TextUtils::MAX_SLUG_BYTES
+      # The heads are identical; only the digest tail separates them.
+      a[0, a.size - Hwaro::Utils::TextUtils::SLUG_DIGEST_CHARS]
+        .should eq(b[0, b.size - Hwaro::Utils::TextUtils::SLUG_DIGEST_CHARS])
+    end
+
+    # Reports whether a term's slug was shortened, so the taxonomy generator
+    # can warn once per build instead of `safe_slugify` warning per link.
+    it "reports which terms the cap shortened" do
+      Hwaro::Utils::TextUtils.slug_truncated?("Hello World").should be_false
+      Hwaro::Utils::TextUtils.slug_truncated?("word-" * 60).should be_true
+    end
+  end
+
   describe ".disambiguated_slugs" do
     it "leaves non-colliding terms unchanged" do
       map = Hwaro::Utils::TextUtils.disambiguated_slugs(["Crystal", "Ruby"])
@@ -130,6 +188,18 @@ describe Hwaro::Utils::TextUtils do
       values = map.values
       values.size.should eq(values.uniq.size)
       values.size.should eq(3)
+    end
+
+    # The `-N` suffix stacks on top of an already-capped base, so the headroom
+    # under the 255-byte/character filesystem limit has to absorb it.
+    it "keeps a disambiguated over-long slug within the filesystem limit" do
+      terms = ["word-" * 60, ("word-" * 60) + "!"]
+      map = Hwaro::Utils::TextUtils.disambiguated_slugs(terms)
+      map.values.uniq!.size.should eq(2)
+      map.each_value do |slug|
+        slug.bytesize.should be < 255
+        slug.size.should be < 255
+      end
     end
   end
 
@@ -158,6 +228,20 @@ describe Hwaro::Utils::TextUtils do
 
     it "leaves a bare domain without path unchanged" do
       Hwaro::Utils::TextUtils.encode_url_path("https://한글.example").should eq("https://한글.example")
+    end
+
+    # "contains an escape" is not "is fully escaped". Bailing out at the first
+    # `%XX` emitted raw UTF-8 into sitemap `<loc>` and RSS `<link>` for a page
+    # whose URL mixes an escape with a non-ASCII segment — the shape a file
+    # named `한글#x.md` produces once `#` is encoded at the Page level.
+    it "encodes the rest of a partly-escaped URL without double-encoding" do
+      Hwaro::Utils::TextUtils.encode_url_path("/posts/한글%23x/")
+        .should eq("/posts/%ED%95%9C%EA%B8%80%23x/")
+    end
+
+    it "encodes a raw space that sits beside an existing escape" do
+      Hwaro::Utils::TextUtils.encode_url_path("https://example.com/a b%20c/")
+        .should eq("https://example.com/a%20b%20c/")
     end
   end
 

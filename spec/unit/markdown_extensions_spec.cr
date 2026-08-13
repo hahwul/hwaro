@@ -1224,6 +1224,26 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.scan("noopener").size.should eq(1)
     end
 
+    # The merged rel string is spliced into a `String#sub` REPLACEMENT, where
+    # Crystal expands `\0`-`\9` and `\k<name>` unless told not to.
+    it "treats a backslash in an existing rel as literal text" do
+      cfg = make_config
+      cfg.external_links_no_follow = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://e.com" rel="a\\1b">x</a>), cfg
+      )
+      html.should contain(%(rel="a\\1b nofollow"))
+    end
+
+    it "does not raise on a named-group reference in an existing rel" do
+      cfg = make_config
+      cfg.external_links_no_follow = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://e.com" rel="\\k<g>">x</a>), cfg
+      )
+      html.should contain(%(rel="\\k<g> nofollow"))
+    end
+
     it "respects an existing target attribute" do
       cfg = make_config
       cfg.external_links_target_blank = true

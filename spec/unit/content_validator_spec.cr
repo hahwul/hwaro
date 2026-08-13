@@ -506,6 +506,31 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "skips unfollowable content symlinks instead of failing the run (regression)" do
+      # `hwaro build` skips a symlink cycle in content/ with one warning; the
+      # validator read the same path and turned every such link into an
+      # author-fixable `content-read-error`, so `tool validate` exited 5 on a
+      # tree that builds fine.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+
+        File.write(File.join(content_dir, "good.md"), "---\ntitle: Good\ndescription: Desc\n---\n\n# Good\n")
+        File.symlink("loop.md", File.join(content_dir, "loop.md"))
+        File.symlink("gone.md", File.join(content_dir, "dangling.md"))
+
+        issues = [] of Hwaro::Services::Issue
+        output = with_captured_log do
+          issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        end
+
+        issues.any? { |i| i.id == "content-read-error" }.should be_false
+        # The skip is announced, so the summary is short of a file the caller
+        # can see on disk only where they were told about it.
+        output.should contain("loop.md")
+      end
+    end
+
     it "excludes JSON frontmatter from body scans (regression)" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

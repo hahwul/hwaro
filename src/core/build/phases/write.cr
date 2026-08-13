@@ -76,7 +76,7 @@ module Hwaro::Core::Build::Phases::Write
         next
       end
 
-      # FileUtils.cp (and File.read) follow symlinks, so a raw-file symlink
+      # The copy below (and File.read) follows symlinks, so a raw-file symlink
       # whose target escapes the project would publish a file from outside
       # the site. Skip it — mirrors the bundle-asset guard in process_assets
       # and the static copy guard. In-repo symlinks resolve within and pass.
@@ -101,11 +101,17 @@ module Hwaro::Core::Build::Phases::Write
           Hwaro::Utils::FileSafe.atomic_write(output_path, result.content)
         else
           Logger.warn "Failed to process #{raw_file.relative_path}: #{result.error}"
-          FileUtils.cp(raw_file.source_path, output_path)
+          Hwaro::Utils::FileSafe.atomic_copy(raw_file.source_path, output_path)
         end
       else
         # Copy as-is (binary-safe) when not minifying or no processor exists.
-        FileUtils.cp(raw_file.source_path, output_path)
+        #
+        # Atomic (temp file + rename) for the same reason the processed branch
+        # above uses `atomic_write`: `hwaro serve` rebuilds while HTTP fibers
+        # stream these very paths, and a plain `FileUtils.cp` truncates the
+        # destination and then streams, so a request landing mid-copy is
+        # answered with a zero-length or half-written file.
+        Hwaro::Utils::FileSafe.atomic_copy(raw_file.source_path, output_path)
       end
 
       written << File.expand_path(output_path)
@@ -173,7 +179,12 @@ module Hwaro::Core::Build::Phases::Write
         end
 
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-        FileUtils.cp(source_path, dest_path)
+        # Atomic copy: bundle assets are re-copied on every serve rebuild while
+        # HTTP fibers stream them to the browser, and a truncate-and-stream
+        # copy hands out zero-length or partial images that nothing retries.
+        # The mtime stamp below still lands on the renamed-in destination, so
+        # the skip-unchanged check above keeps working.
+        Hwaro::Utils::FileSafe.atomic_copy(source_path, dest_path)
         if src_info
           begin
             File.utime(Time.utc, src_info.modification_time, dest_path)

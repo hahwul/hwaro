@@ -860,6 +860,26 @@ describe Hwaro::Services::Doctor do
           issues.any? { |i| i.id == "structure-missing-index" && i.message.includes?("images") }.should be_false
         end
       end
+
+      it "skips symlinked directories instead of recursing into a symlink cycle" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          content_dir = File.join(dir, "content")
+          FileUtils.mkdir_p(File.join(content_dir, "notes", "2024"))
+          File.write(File.join(content_dir, "notes", "2024", "post.md"), "+++\ntitle = \"Post\"\n+++\n")
+          # `notes/shared -> ..` closes a cycle: the walk followed it and only
+          # stopped at MAXSYMLINKS, where File.info? raises ELOOP straight out
+          # of `doctor` — a raw filesystem error and zero diagnostics.
+          File.symlink("..", File.join(content_dir, "notes", "shared"))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path, templates_dir: File.join(dir, "templates"))
+          issues = doctor.run
+          # The normal report still lands: notes/2024 has content but no _index.md.
+          issues.any? { |i| i.id == "structure-missing-index" && i.message.includes?("notes/2024/") }.should be_true
+          issues.any?(&.message.includes?("shared")).should be_false
+        end
+      end
     end
 
     describe "directory structure" do

@@ -27,19 +27,66 @@ module Hwaro
       # must be a whole `/`-separated segment (e.g. `/:year/:slug/`).
       VALID_TOKENS = %w[year month day slug title section filename]
 
-      # True when the `[permalinks]` target contains a `:token` segment,
-      # i.e. it is a Hugo-style pattern rather than a directory remap.
-      def pattern?(target : String) : Bool
-        target.split('/').any?(&.starts_with?(':'))
+      # A segment that OPENS with `:name` — the shape an author writes when
+      # they mean a token, whether or not the name is spelled correctly. This
+      # is what keeps `/:tokne/` a reportable typo instead of a directory
+      # literally named `:tokne`. The name must start with a letter or `_` so
+      # an ordinary directory target that happens to contain a colon before a
+      # digit (`2024:2025`) stays a plain remap.
+      TOKEN_ANYWHERE = /\A:[A-Za-z_][A-Za-z0-9_]*/
+
+      # A KNOWN token buried inside a larger segment (`post-:slug`). Matched
+      # anywhere because such a segment is not expandable — see
+      # validate_pattern! — and both callers below have to see it in order to
+      # reject it.
+      #
+      # Restricted to VALID_TOKENS, and closed with `\b`, because a colon is
+      # perfectly legal inside a URL path segment: a plain directory remap
+      # like `"notes" = "/wiki/pros:cons/"` (or `/docs/faq:slugs/`) contains
+      # no hwaro token at all, and matching any `:identifier` here made the
+      # compound-segment check fire on it and abort the build with a config
+      # error on config that published fine.
+      EMBEDDED_VALID_TOKEN = Regex.new(":(?:#{VALID_TOKENS.join("|")})\\b")
+
+      # The only shape `expand_pattern` can actually substitute: a segment
+      # that is nothing but one token.
+      WHOLE_SEGMENT_TOKEN = /\A:[A-Za-z_][A-Za-z0-9_]*\z/
+
+      # True when this `/`-separated segment is asking to be a token: it either
+      # opens with `:name`, or embeds a token hwaro knows.
+      private def token_segment?(segment : String) : Bool
+        segment.matches?(TOKEN_ANYWHERE) || segment.matches?(EMBEDDED_VALID_TOKEN)
       end
 
-      # Validate every `:token` segment of a pattern against VALID_TOKENS.
-      # Raises a classified config error so `hwaro build` exits with the
-      # stable config exit code instead of silently emitting literal
-      # `:tokne` path segments.
+      # True when the `[permalinks]` target contains a `:token`, i.e. it is a
+      # Hugo-style pattern rather than a directory remap.
+      def pattern?(target : String) : Bool
+        target.split('/').any? { |segment| token_segment?(segment) }
+      end
+
+      # Validate every `:token` in a pattern against VALID_TOKENS, and require
+      # each one to be a whole `/`-separated segment. Raises a classified
+      # config error so `hwaro build` exits with the stable config exit code
+      # instead of silently emitting literal `:tokne` path segments.
       def validate_pattern!(rule_key : String, target : String) : Nil
         target.split('/').each do |segment|
-          next unless segment.starts_with?(':')
+          next unless token_segment?(segment)
+
+          # `expand_pattern` substitutes whole segments only, so a token
+          # embedded in a larger segment (`/:year/post-:slug/`) used to be
+          # copied through verbatim: the build exited 0 having created a
+          # directory literally named `post-:slug`, which is illegal on NTFS
+          # and unescaped in every URL pointing at it. The whole-segment
+          # sibling (`/:year-:month/`) was already rejected; this closes the
+          # remaining half of the same mistake.
+          unless segment.matches?(WHOLE_SEGMENT_TOKEN)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "Path segment '#{segment}' in [permalinks] rule \"#{rule_key}\" (pattern '#{target}') mixes a token with other text.",
+              hint: "Tokens must be whole path segments: write '/:year/:slug/', not '/:year/post-:slug/'. Valid tokens are #{VALID_TOKENS.map { |t| ":#{t}" }.join(", ")}.",
+            )
+          end
+
           token = segment.lchop(':')
           next if VALID_TOKENS.includes?(token)
           raise Hwaro::HwaroError.new(

@@ -15,6 +15,26 @@ module Hwaro
         # crafted item. The threshold is far above any real blog post.
         MAX_REGEX_HTML_BYTES = 4 * 1024 * 1024
 
+        # Longest anchor TEXT the link conversion will match. Bounding the lazy
+        # body is what actually makes an unclosed-anchor document linear — see
+        # the anchor pass below. Far above any real inline link.
+        MAX_INLINE_BODY_CHARS = 4096
+
+        # Cheap short-circuit for the anchor pass: a document with no closing
+        # anchor tag has no link to convert. Exposed so the skip is assertable
+        # without a wall-clock measurement.
+        ANCHOR_CLOSE_RE = /<\/a>/i
+        ANCHOR_RE       = Regex.new(
+          "<a[^>]*\\bhref=[\"']([^\"']+)[\"'][^>]*>(.{0,#{MAX_INLINE_BODY_CHARS}}?)</a>",
+          Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
+        )
+
+        # True when `convert` will run the (bounded) anchor conversion pass on
+        # this document.
+        def self.anchor_pass_applicable?(html : String) : Bool
+          html.matches?(ANCHOR_CLOSE_RE)
+        end
+
         def self.convert(html : String) : String
           return "" if html.empty?
 
@@ -137,7 +157,31 @@ module Hwaro
           result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { safe_media($1, "", image: true) }
 
           # Links — likewise drop a dangerous href but keep the link text.
-          result = result.gsub(/<a[^>]*\bhref=["']([^"']+)["'][^>]*>(.*?)<\/a>/mi) { safe_media($1, $2, image: false) }
+          #
+          # The body is BOUNDED (`{0,MAX_INLINE_BODY_CHARS}?`) rather than an
+          # open `(.*?)`. An open lazy body rescans every remaining character
+          # from each `<a href=…>` that never closes, so a document of n
+          # unclosed anchors costs O(n^2): measured 1.4 s for 20k anchors and
+          # 6.0 s for 40k, while the same count of CLOSED anchors — a 1.4x
+          # LARGER document — takes 0.07 s. `MAX_REGEX_HTML_BYTES` did not
+          # bound that as its comment claims: ~175k unclosed anchors still fit
+          # under the 4 MB cap, i.e. minutes of CPU inside one import of an
+          # untrusted WXR export. With the bound, each anchor start costs a
+          # fixed scan instead of a scan to end-of-document.
+          #
+          # The `</a>` probe stays as a cheap short-circuit for the common
+          # no-anchor document, but it is an optimization, not the guard: a
+          # single `</a>` anywhere re-enables the pass, which is why the bound
+          # has to carry the cost argument. It is case-insensitive because the
+          # conversion is: `</A>` closes a real anchor.
+          #
+          # Trade-off: an anchor whose text runs longer than the bound is left
+          # as HTML and its text is kept by `strip_tags` below — the link
+          # markup is lost, no content is. Real inline anchors are orders of
+          # magnitude shorter.
+          if result.matches?(ANCHOR_CLOSE_RE)
+            result = result.gsub(ANCHOR_RE) { safe_media($1, $2, image: false) }
+          end
 
           # Bold
           result = result.gsub(/<(?:strong|b)>(.*?)<\/(?:strong|b)>/mi) { "**#{$1}**" }

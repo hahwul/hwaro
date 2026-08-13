@@ -574,6 +574,17 @@ module Hwaro
                 kind_label = link.kind == :image ? "Image not found" : "Internal link target not found"
                 results << Result.new(link: link, status: -1, error: kind_label)
               end
+            rescue ex : ArgumentError
+              # A destination whose percent-encoding decodes to a byte no path
+              # may contain (`/a%00b` → a real NUL) makes every `File.exists?`
+              # probe in `resolves?` raise straight out of libc. Degrade PER
+              # LINK — mirroring the per-file degradation `read_and_strip`
+              # already does for invalid UTF-8 — so one hostile destination
+              # cannot abort the whole run, hide the genuinely dead links in
+              # the other files, or leave `--json` writing nothing at all to
+              # stdout. The link itself is reported dead, which is exactly what
+              # it is: the build cannot resolve it either.
+              results << Result.new(link: link, status: -1, error: "Invalid link target: #{ex.message}")
             end
             results
           end

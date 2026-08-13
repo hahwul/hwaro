@@ -290,6 +290,24 @@ describe Hwaro::Utils::FrontmatterWriter do
       TOML.parse(doc)["title"].should eq(%(say "hi"\nbye))
     end
 
+    # Everything this builder writes has to be readable by the TOML parser
+    # hwaro itself uses, or `tool convert to-toml` hands the next build a file
+    # it cannot parse. toml.cr accumulates an integer's digits positively and
+    # only applies the sign afterwards, so Int64::MIN — a legal TOML integer,
+    # and a value any YAML/JSON front matter can carry — raised "Arithmetic
+    # overflow" on the way back in.
+    it "keeps Int64::MIN readable by emitting its exact digits" do
+      doc = toml_build({"n" => YAML::Any.new(Int64::MIN)})
+      doc.should contain("-9223372036854775808")
+      TOML.parse(doc)["n"].should eq("-9223372036854775808")
+    end
+
+    it "still emits ordinary large integers as bare TOML integers" do
+      doc = toml_build({"max" => YAML::Any.new(Int64::MAX), "big" => YAML::Any.new(9999999999_i64)})
+      TOML.parse(doc)["max"].should eq(Int64::MAX)
+      TOML.parse(doc)["big"].should eq(9999999999_i64)
+    end
+
     it "emits nil as an empty string, since TOML has no null" do
       doc = toml_build({"x" => YAML.parse("---\n")})
       TOML.parse(doc)["x"].should eq("")
@@ -321,6 +339,23 @@ describe Hwaro::Utils::FrontmatterWriter do
     it "promotes an int/float mix to floats so the array stays homogeneous" do
       doc = toml_build({"nums" => YAML::Any.new([YAML::Any.new(1_i64), YAML::Any.new(2.5)])})
       TOML.parse(doc)["nums"].as_a.map(&.raw).should eq([1.0, 2.5])
+    end
+
+    # Int64::MIN serializes as a quoted string, so an otherwise all-integer
+    # array holding it would become `["-9223372036854775808", 1]` — the mixed
+    # array toml.cr refuses — unless the whole array is coerced with it.
+    it "keeps an integer array holding Int64::MIN homogeneous" do
+      doc = toml_build({"nums" => YAML::Any.new([YAML::Any.new(Int64::MIN), YAML::Any.new(1_i64)])})
+      TOML.parse(doc)["nums"].as_a.should eq(["-9223372036854775808", "1"])
+    end
+
+    # The promoted `N.0` spelling has the same re-read problem: toml.cr keeps
+    # multiplying the Int64 integer part by 10 for each fractional digit, so
+    # `9223372036854775807.0` overflowed. The exponent spelling survives, and
+    # 2^63 is exactly representable, so no value is lost either.
+    it "promotes a large int in a float array to a re-readable float" do
+      doc = toml_build({"nums" => YAML::Any.new([YAML::Any.new(Int64::MAX), YAML::Any.new(2.5)])})
+      TOML.parse(doc)["nums"].as_a.map(&.raw).should eq([Int64::MAX.to_f64, 2.5])
     end
 
     it "coerces any other scalar mix to strings" do

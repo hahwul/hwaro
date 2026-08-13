@@ -240,6 +240,32 @@ describe Hwaro::Core::Lifecycle::Manager do
       after_ran.should be_false
     end
 
+    it "classifies an IO::Error from the action as HWARO_E_IO instead of Abort" do
+      # Returning Abort here erased the exception type, and the CLI turned the
+      # resulting `false` into HWARO_E_INTERNAL / exit 70 — the code reserved
+      # for hwaro bugs — for ordinary filesystem trouble, with the path and
+      # errno reaching only a stderr log line, never the --json payload.
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
+      after_ran = false
+
+      manager.after(Hwaro::Core::Lifecycle::Phase::Write, name: "after") do |_|
+        after_ran = true
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      error = expect_raises(Hwaro::HwaroError) do
+        manager.run_phase(Hwaro::Core::Lifecycle::Phase::Write, ctx) do
+          # Same shape Dir.mkdir raises when a plain file squats on the name.
+          raise File::Error.new("Unable to create directory: 'public': File exists", file: "public")
+        end
+      end
+      error.code.should eq(Hwaro::Errors::HWARO_E_IO)
+      error.exit_code.should eq(6)
+      (error.message || "").should contain("public")
+      after_ran.should be_false
+    end
+
     it "re-raises a HwaroError from the action and does not run after hooks" do
       manager = Hwaro::Core::Lifecycle::Manager.new
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)

@@ -1766,6 +1766,150 @@ describe Hwaro::Content::Processors::Markdown do
   end
 
   # ---------------------------------------------------------------------------
+  # Integers above Int32::MAX
+  #
+  # Regression: `as_i?` on TOML/YAML/JSON `Any` is a TYPE guard with no RANGE
+  # guard, so a value that is perfectly in range for the Int64 these parsers
+  # produce raised OverflowError out of a *nil-safe* accessor. The blanket
+  # rescue then reported the document as having NO front matter at all: the
+  # `draft` flag was lost so the page shipped, and the raw fence was rendered
+  # into the body.
+  # ---------------------------------------------------------------------------
+  describe "front matter integers above Int32::MAX" do
+    it "keeps TOML front matter when weight exceeds Int32::MAX" do
+      raw = <<-MD
+        +++
+        title = "Unreleased"
+        draft = true
+        weight = 3000000000
+        +++
+
+        Internal notes.
+        MD
+
+      result = processor.parse(raw, "content/w.md")
+      result[:title].should eq("Unreleased")
+      result[:draft].should be_true
+      result[:weight].should eq(Int32::MAX)
+      result[:content].should_not contain("+++")
+    end
+
+    it "keeps YAML front matter when weight exceeds Int32::MAX" do
+      raw = <<-MD
+        ---
+        title: W
+        draft: true
+        weight: 3000000000
+        ---
+
+        body
+        MD
+
+      result = processor.parse(raw, "content/w.md")
+      result[:title].should eq("W")
+      result[:draft].should be_true
+      result[:weight].should eq(Int32::MAX)
+    end
+
+    it "keeps JSON front matter when weight exceeds Int32::MAX" do
+      raw = "{\"title\": \"J\", \"draft\": true, \"weight\": 3000000000}\n\nbody\n"
+
+      result = processor.parse(raw, "content/j.md")
+      result[:title].should eq("J")
+      result[:draft].should be_true
+      result[:weight].should eq(Int32::MAX)
+    end
+
+    it "round-trips a large [extra] integer as Int64" do
+      raw = <<-MD
+        +++
+        title = "Unreleased"
+        draft = true
+
+        [extra]
+        build_id = 1755043200000
+        +++
+
+        Internal notes.
+        MD
+
+      result = processor.parse(raw, "content/secret.md")
+      result[:draft].should be_true
+      result[:extra]["build_id"].should eq(1755043200000_i64)
+    end
+
+    it "clamps an oversized menu weight instead of losing the front matter" do
+      raw = <<-MD
+        +++
+        title = "M"
+
+        [menus.main]
+        weight = 4200000000
+        +++
+
+        body
+        MD
+
+      result = processor.parse(raw, "content/m.md")
+      result[:title].should eq("M")
+      result[:menus]["main"].weight.should eq(Int32::MAX)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Non-string scalars where a string/list is expected
+  #
+  # These used to be dropped in total silence, so the page shipped as
+  # "Untitled" with no tags and no hint of why. The value is still ignored —
+  # coercing it would change output for sites that build today — but the
+  # mistake is now named.
+  # ---------------------------------------------------------------------------
+  describe "mistyped front matter scalars" do
+    it "warns when title is not a string" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = 2024\n+++\nbody", "content/n.md")
+        result[:title].should eq("Untitled")
+      end
+      log.should contain("content/n.md: `title` must be a string")
+    end
+
+    it "warns when slug and description are not strings" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = \"T\"\ndescription = 42\nslug = 7\n+++\nbody", "content/s.md")
+        result[:description].should be_nil
+        result[:slug].should be_nil
+      end
+      log.should contain("`description` must be a string")
+      log.should contain("`slug` must be a string")
+    end
+
+    it "warns when tags is a bare string instead of a list" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = \"T\"\ntags = \"solo\"\n+++\nbody", "content/t.md")
+        result[:tags].empty?.should be_true
+      end
+      log.should contain("`tags` must be a list of strings")
+    end
+
+    it "stays silent for an explicitly empty YAML key" do
+      log = with_captured_log do
+        result = processor.parse("---\ntitle: T\ndescription:\n---\nbody", "content/e.md")
+        result[:title].should eq("T")
+        result[:description].should be_nil
+      end
+      log.should_not contain("must be a string")
+    end
+
+    it "stays silent when no file_path is given (library use)" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = 2024\n+++\nbody")
+        result[:title].should eq("Untitled")
+      end
+      log.should_not contain("must be a string")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Anchor links and TOC
   # ---------------------------------------------------------------------------
   describe "render_with_anchors" do

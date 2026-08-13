@@ -6,6 +6,7 @@
 require "json"
 require "yaml"
 require "toml"
+require "./content_lister"
 require "../utils/frontmatter_scanner"
 require "../utils/frontmatter_writer"
 require "../utils/logger"
@@ -210,12 +211,16 @@ module Hwaro
       private def find_content_files : Array(String)
         files = [] of String
 
+        # Unfollowable symlinks are dropped here (see `ContentWalk`). There is
+        # no frontmatter to rewrite in a link that resolves to nothing, and
+        # counting one as a conversion *error* made `hwaro tool convert` report
+        # failure — and exit non-zero — on a tree `hwaro build` publishes fine.
         Dir.glob(File.join(@content_dir, "**", "*.md")) do |file|
-          files << file
+          files << file if ContentWalk.readable_file?(file)
         end
 
         Dir.glob(File.join(@content_dir, "**", "*.markdown")) do |file|
-          files << file
+          files << file if ContentWalk.readable_file?(file)
         end
 
         files.sort
