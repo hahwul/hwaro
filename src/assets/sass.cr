@@ -4,11 +4,14 @@
 # partials via @use (namespaces, `with (...)` configuration) / @forward /
 # @import (classic merge), @mixin / @include with defaults, keyword and
 # variadic args and @content, @function / @return, control flow
-# (@if/@else/@each/@for/@while), @debug/@warn/@error, @at-root, `#{...}`
-# interpolation, @media/@supports bubbling through nesting, SassScript
-# expressions (arithmetic, comparisons, string/list/map values), and a
-# curated built-in function set (`sass:math`, `sass:string`, `sass:list`,
-# `sass:map`, `sass:meta`, `sass:color` + the legacy global names).
+# (@if/@else/@each/@for/@while), @extend with %placeholders (simple-
+# selector targets), @debug/@warn/@error, @at-root, `#{...}`
+# interpolation (loud comments included), @media/@supports bubbling
+# through nesting, SassScript expressions (arithmetic, comparisons,
+# string/list/map values, `&`, lazy `if()`), and a curated built-in
+# function set (`sass:math`, `sass:string`, `sass:list`, `sass:map`,
+# `sass:meta` incl. get-function/call and the *-exists family,
+# `sass:color` + the legacy global names).
 #
 # Two invariants shape the design:
 # - Valid plain CSS compiles to itself (whitespace-normalized): value
@@ -26,6 +29,7 @@ require "./sass/ast"
 require "./sass/parser"
 require "./sass/environment"
 require "./sass/css"
+require "./sass/extend"
 require "./sass/importer"
 require "./sass/evaluator"
 

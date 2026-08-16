@@ -30,6 +30,26 @@ module Hwaro
       # A callable function: a user closure or a built-in proc.
       alias SassFn = FunctionClosure | Builtins::Fn
 
+      # First-class function reference: produced by `meta.get-function`,
+      # consumed by `meta.call`. Lives only within a single expression
+      # evaluation — the string storage model can't round-trip it, so a
+      # reference assigned to a variable degrades to its `to_css` text.
+      class FnRefV < Value
+        getter name : String
+        getter fn : SassFn
+
+        def initialize(@name : String, @fn : SassFn)
+        end
+
+        def to_css : String
+          "get-function(\"#{@name}\")"
+        end
+
+        def eq?(other : Value) : Bool
+          other.is_a?(FnRefV) && name == other.name
+        end
+      end
+
       # A loaded `@use` module: its root-scope members (plus anything it
       # `@forward`s). Module-private state stays in the closed-over
       # environments.
@@ -98,7 +118,10 @@ module Hwaro
 
         # Assignment semantics (dart-sass-flavored):
         # - `!global` writes the root scope (skipped by `!default` when set).
-        # - `!default` is a no-op when the name resolves anywhere in scope.
+        # - `!default` is a no-op when the name resolves anywhere in scope
+        #   to a non-null value; a null still takes the default (dart-sass:
+        #   the `$map: null !default; @if ... { $map: (...) !default; }`
+        #   guard idiom depends on it).
         # - Otherwise the innermost non-root scope already declaring the
         #   name is updated; failing that, the name is declared here —
         #   which shadows a root/global variable rather than mutating it.
@@ -108,11 +131,11 @@ module Hwaro
         def assign_var(name : String, value : String, default : Bool, global : Bool) : Nil
           name = Sass.normalize_ident(name)
           if global
-            return if default && root.variables.has_key?(name)
+            return if default && non_null?(root.variables[name]?)
             root.variables[name] = value
             return
           end
-          return if default && lookup_var(name)
+          return if default && non_null?(lookup_var(name))
           env : Environment? = self
           transparent = true # all frames walked so far are flow-control
           while env
@@ -125,6 +148,12 @@ module Hwaro
             env = env.parent
           end
           @variables[name] = value
+        end
+
+        # "null" is the storage spelling of a real null (Value#inspect_css)
+        # — the one value `!default` may overwrite.
+        private def non_null?(value : String?) : Bool
+          !value.nil? && value != "null"
         end
 
         def lookup_mixin(name : String) : MixinClosure?

@@ -19,10 +19,6 @@ module Hwaro
   module Assets
     module Sass
       class Parser
-        # Sass directives outside the supported subset. Rejected loudly with
-        # a located error — never silently emitted as broken CSS.
-        UNSUPPORTED_DIRECTIVES = %w[extend]
-
         private record TemplateScan,
           template : Ast::TextTemplate,
           terminator : Char?,
@@ -125,7 +121,10 @@ module Hwaro
         private def parse_statements(top_level : Bool) : Array(Ast::Node)
           nodes = [] of Ast::Node
           loop do
-            @s.skip_ws { |text, line, col| nodes << Ast::CommentNode.new(text, line, col) }
+            @s.skip_ws do |text, line, col|
+              template = text.includes?("\#{") ? Parser.comment_template(text, @s.path, line, col) : nil
+              nodes << Ast::CommentNode.new(text, line, col, template)
+            end
             break if @s.eof?
             case @s.peek
             when '}'
@@ -190,10 +189,6 @@ module Hwaro
           name = @s.read_ident
           @s.error("expected at-rule name after \"@\"", line, column) if name.empty?
 
-          if UNSUPPORTED_DIRECTIVES.includes?(name)
-            @s.error("@#{name} is not supported by hwaro's Sass subset (yet)", line, column)
-          end
-
           case name
           when "use"
             nodes << parse_use(line, column)
@@ -225,6 +220,8 @@ module Hwaro
             nodes << parse_message(:error, line, column)
           when "at-root"
             nodes << parse_at_root(line, column)
+          when "extend"
+            nodes << parse_extend(line, column)
           when "forward"
             nodes << parse_forward(line, column)
           when "content"
@@ -445,6 +442,18 @@ module Hwaro
             @s.error("expected selector or \"{\" after @at-root", line, column) if selector.empty?
             Ast::AtRootNode.new(selector, parse_block, line, column)
           end
+        end
+
+        # `@extend .target[, .other] [!optional];` — the selector template
+        # may contain interpolation (`.item-#{$i}`) but, like rule
+        # selectors, no bare `$var` substitution.
+        private def parse_extend(line : Int32, column : Int32) : Ast::Node
+          scan = read_template(stops: ";}", value_vars: false)
+          template, flags = strip_flags(scan.template, {"optional"})
+          template = trim_template(template)
+          @s.error("expected selector after @extend", line, column) if template.empty?
+          @s.advance if scan.terminator == ';'
+          Ast::ExtendNode.new(template, flags.includes?("optional"), line, column)
         end
 
         private def parse_forward(line : Int32, column : Int32) : Ast::Node
@@ -1051,6 +1060,34 @@ module Hwaro
               buf << @s.advance
             end
           end
+        end
+
+        # Splits a loud comment's text into literal runs and `#{...}`
+        # interpolations. Positions inside the returned template are
+        # relative to the comment body, so errors carry the comment's own
+        # location instead. nil when the text doesn't parse as a template
+        # (a literal `#{` with no closing brace) — plain-CSS comments must
+        # keep passing through verbatim, never become parse errors.
+        def self.comment_template(text : String, path : String,
+                                  line : Int32, column : Int32) : Ast::TextTemplate?
+          new(text, path).scan_comment_template(line, column)
+        rescue SyntaxError
+          nil
+        end
+
+        protected def scan_comment_template(line : Int32, column : Int32) : Ast::TextTemplate
+          pieces = [] of Ast::Piece
+          buf = Buf.new
+          until @s.eof?
+            if @s.peek == '#' && @s.peek(1) == '{'
+              buf.flush_into(pieces)
+              pieces << parse_interp
+            else
+              buf << @s.advance
+            end
+          end
+          buf.flush_into(pieces)
+          Ast::TextTemplate.new(pieces, line, column)
         end
 
         # `#{ ... }` (cursor on '#').

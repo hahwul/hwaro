@@ -124,7 +124,14 @@ module Hwaro
         end
 
         def with_alpha(alpha : Float64) : ColorV
-          ColorV.new(@red, @green, @blue, alpha)
+          color = ColorV.new(@red, @green, @blue, alpha)
+          # RGB is unchanged, so the declared HSL components survive an
+          # alpha-only derivation (transparentize/opacify/rgba($c, $a)) —
+          # otherwise `hue(transparentize(hsl(221, 14%, 100%), .2))` would
+          # forget the hue that from_hsl just preserved.
+          h, s, l = to_hsl
+          color.preset_hsl(h, s, l)
+          color
         end
 
         # ---------------------------------------------------------------
@@ -194,19 +201,31 @@ module Hwaro
           s = saturation.clamp(0.0, 100.0) / 100.0
           l = lightness.clamp(0.0, 100.0) / 100.0
 
-          if s == 0.0
-            gray = l * 255.0
-            return new(gray, gray, gray, alpha)
-          end
+          color =
+            if s == 0.0
+              gray = l * 255.0
+              new(gray, gray, gray, alpha)
+            else
+              q = l < 0.5 ? l * (1.0 + s) : l + s - l * s
+              p = 2.0 * l - q
+              new(
+                hue_to_rgb(p, q, h + 1.0 / 3.0) * 255.0,
+                hue_to_rgb(p, q, h) * 255.0,
+                hue_to_rgb(p, q, h - 1.0 / 3.0) * 255.0,
+                alpha
+              )
+            end
+          # Remember the DECLARED components: the RGB round trip collapses
+          # hue/saturation at the extremes (white/black/grays), but
+          # `hue(hsl(221, 14%, 100%))` must answer 221deg, not 0deg
+          # (dart-sass colors remember their construction space).
+          color.preset_hsl(h * 360.0, s * 100.0, l * 100.0)
+          color
+        end
 
-          q = l < 0.5 ? l * (1.0 + s) : l + s - l * s
-          p = 2.0 * l - q
-          new(
-            hue_to_rgb(p, q, h + 1.0 / 3.0) * 255.0,
-            hue_to_rgb(p, q, h) * 255.0,
-            hue_to_rgb(p, q, h - 1.0 / 3.0) * 255.0,
-            alpha
-          )
+        # :nodoc: — see from_hsl.
+        protected def preset_hsl(h : Float64, s : Float64, l : Float64) : Nil
+          @hsl = {h, s, l}
         end
 
         private def self.hue_to_rgb(p : Float64, q : Float64, t : Float64) : Float64
@@ -233,7 +252,7 @@ module Hwaro
           stripped = text.strip
           return if stripped.empty?
           return parse_hex?(stripped) if stripped[0] == '#'
-          named?(stripped) || parse_rgb_call?(stripped)
+          named?(stripped) || parse_rgb_call?(stripped) || parse_hsl_call?(stripped)
         end
 
         # Parses the `rgb(…)` / `rgba(…)` spelling.
@@ -266,6 +285,32 @@ module Hwaro
           end
           return unless channels.all?(&.finite?) && alpha.finite?
           new(channels[0], channels[1], channels[2], alpha, lexeme: text)
+        end
+
+        # The `hsl(…)` / `hsla(…)` legacy comma spelling, same rationale as
+        # `parse_rgb_call?`: a color function handed an hsl literal (or an
+        # hsl round-tripped through variable storage) must read it as a
+        # color. Saturation and lightness require `%`; hue accepts a bare
+        # number or `deg`. Modern space/slash syntax stays untouched.
+        private def self.parse_hsl_call?(text : String) : ColorV?
+          return unless match = text.match(/\A hsla? \( ([^()]*) \) \z/xi)
+          parts = match[1].split(',').map(&.strip)
+          return unless parts.size == 3 || parts.size == 4
+          return if parts.any?(&.empty?)
+
+          hue_text = parts[0]
+          hue_text = hue_text[0...-3] if hue_text.ends_with?("deg")
+          return unless hue = hue_text.to_f?
+          return unless parts[1].ends_with?('%') && parts[2].ends_with?('%')
+          return unless saturation = number_value?(parts[1])
+          return unless lightness = number_value?(parts[2])
+          alpha = 1.0
+          if raw_alpha = parts[3]?
+            return unless parsed = number_value?(raw_alpha)
+            alpha = raw_alpha.ends_with?('%') ? parsed / 100.0 : parsed
+          end
+          return unless hue.finite? && saturation.finite? && lightness.finite? && alpha.finite?
+          from_hsl(hue, saturation, lightness, alpha)
         end
 
         # An RGB channel: `0`..`255`, or a percentage of 255.

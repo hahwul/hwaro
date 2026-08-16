@@ -301,8 +301,8 @@ describe Hwaro::Assets::Sass do
     # =========================================================================
     # Unsupported directives fail loudly
     # =========================================================================
-    it "rejects @extend with a located error" do
-      ex = expect_raises(Hwaro::Assets::Sass::SyntaxError, /@extend is not supported/) do
+    it "rejects @extend of a missing target with a located error" do
+      ex = expect_raises(Hwaro::Assets::Sass::SyntaxError, /@extend target ".b" was not found/) do
         compile(".a { @extend .b; }", path: "d.scss")
       end
       ex.location.should eq("d.scss:1:6")

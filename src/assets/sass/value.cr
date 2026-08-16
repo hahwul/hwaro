@@ -229,6 +229,16 @@ module Hwaro
         # sublists so nesting survives a storage round-trip.
         def inspect_css : String
           return "()" if @items.empty?
+          if @sep == Sep::Comma && @items.size == 1 && !@bracketed
+            # A single-element comma list has no comma to reveal its
+            # separator — dart-sass spells it `(1,)`, which is also the
+            # only spelling that survives a storage round-trip without
+            # degrading into a plain value.
+            item = @items[0]
+            text = item.inspect_css
+            text = "(#{text})" if item.is_a?(ListV) && !item.bracketed
+            return "(#{text},)"
+          end
           joiner =
             case @sep
             in Sep::Space then " "
