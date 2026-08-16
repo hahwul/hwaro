@@ -384,4 +384,26 @@ describe Hwaro::Utils::CrinjaUtils do
       render({"data" => toml_r}, tpl).should eq(expected)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Cyclic YAML (self-referencing anchor)
+  # ---------------------------------------------------------------------------
+  describe "cyclic YAML" do
+    # `YAML.parse` accepts a self-referencing anchor and returns a CYCLIC
+    # YAML::Any. Every recursive walker over that graph used to run until the
+    # stack died — an unrescuable `Stack overflow`, exit 11, from two lines of
+    # a data file. The depth guard turns it into an ordinary exception the
+    # existing "skip this data file" rescues already handle.
+    it "raises TooDeep instead of overflowing the stack" do
+      cyclic = YAML.parse("x: &a\n  b: *a\n")
+      expect_raises(Hwaro::Utils::Nesting::TooDeep) do
+        Hwaro::Utils::CrinjaUtils.from_yaml(cyclic)
+      end
+    end
+
+    it "still converts deeply-but-finitely nested YAML" do
+      deep = YAML.parse("a: " + "[" * 100 + "]" * 100)
+      Hwaro::Utils::CrinjaUtils.from_yaml(deep).should_not be_nil
+    end
+  end
 end

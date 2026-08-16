@@ -76,23 +76,46 @@ void hwaro_font_free_bitmap(unsigned char *bitmap) {
     stbtt_FreeBitmap(bitmap, NULL);
 }
 
+/* Decode one UTF-8 sequence at `p` (NUL-terminated), storing the codepoint in
+ * `*out` and returning how many bytes were actually consumed — never more than
+ * the string holds.
+ *
+ * Advancing by the sequence's nominal length is wrong for truncated input: a
+ * string ending in a lone lead byte (0xF0) or a stray continuation byte would
+ * step the cursor PAST the NUL terminator, and the loop would then read heap
+ * memory past the end of the string until it happened to hit a zero byte.
+ * Crystal strings carry whatever bytes were on disk (front matter is not
+ * UTF-8 validated), so titles really can arrive truncated. Invalid bytes
+ * decode as U+FFFD and consume exactly one byte, which is what every other
+ * decoder in the codebase does. */
+static int hwaro_utf8_next(const char *p, int *out) {
+    unsigned char c = (unsigned char)p[0];
+    int need, codepoint;
+
+    if (c < 0x80) { *out = c; return 1; }
+    if (c < 0xC0) { *out = 0xFFFD; return 1; } /* stray continuation byte */
+    if (c < 0xE0) { need = 1; codepoint = c & 0x1F; }
+    else if (c < 0xF0) { need = 2; codepoint = c & 0x0F; }
+    else if (c < 0xF8) { need = 3; codepoint = c & 0x07; }
+    else { *out = 0xFFFD; return 1; }
+
+    for (int i = 1; i <= need; i++) {
+        unsigned char cc = (unsigned char)p[i];
+        if ((cc & 0xC0) != 0x80) { *out = 0xFFFD; return 1; } /* truncated */
+        codepoint = (codepoint << 6) | (cc & 0x3F);
+    }
+    *out = codepoint;
+    return need + 1;
+}
+
 /* Measure text width in pixels for a given string (UTF-8) at a given scale */
 float hwaro_font_measure_text(const stbtt_fontinfo *info, const char *text, float scale) {
     float x = 0;
     int prev_codepoint = 0;
     const char *p = text;
     while (*p) {
-        /* Simple UTF-8 decode */
         int codepoint;
-        unsigned char c = (unsigned char)*p;
-        int bytes;
-        if (c < 0x80) { codepoint = c; bytes = 1; }
-        else if (c < 0xE0) { codepoint = c & 0x1F; bytes = 2; }
-        else if (c < 0xF0) { codepoint = c & 0x0F; bytes = 3; }
-        else { codepoint = c & 0x07; bytes = 4; }
-        for (int i = 1; i < bytes && p[i]; i++)
-            codepoint = (codepoint << 6) | (p[i] & 0x3F);
-        p += bytes;
+        p += hwaro_utf8_next(p, &codepoint);
 
         int advance, lsb;
         stbtt_GetCodepointHMetrics(info, codepoint, &advance, &lsb);
@@ -119,17 +142,8 @@ float hwaro_font_render_text(const stbtt_fontinfo *info, unsigned char *pixels, 
     int prev_codepoint = 0;
     const char *p = text;
     while (*p) {
-        /* UTF-8 decode */
         int codepoint;
-        unsigned char c = (unsigned char)*p;
-        int bytes;
-        if (c < 0x80) { codepoint = c; bytes = 1; }
-        else if (c < 0xE0) { codepoint = c & 0x1F; bytes = 2; }
-        else if (c < 0xF0) { codepoint = c & 0x0F; bytes = 3; }
-        else { codepoint = c & 0x07; bytes = 4; }
-        for (int i = 1; i < bytes && p[i]; i++)
-            codepoint = (codepoint << 6) | (p[i] & 0x3F);
-        p += bytes;
+        p += hwaro_utf8_next(p, &codepoint);
 
         if (prev_codepoint)
             x += scale * stbtt_GetCodepointKernAdvance(info, prev_codepoint, codepoint);

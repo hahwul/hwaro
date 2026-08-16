@@ -52,7 +52,8 @@ module Hwaro
       # Convert a parsed TOML value into the YAML::Any tree the emitters
       # consume. Time leaves become frontmatter date strings (see
       # `serialize_time`).
-      def self.toml_to_yaml_any(value : TOML::Any) : YAML::Any
+      def self.toml_to_yaml_any(value : TOML::Any, depth : Int32 = 0) : YAML::Any
+        Nesting.check!(depth)
         raw = value.raw
 
         case raw
@@ -69,7 +70,7 @@ module Hwaro
         when Array
           arr = raw.map { |item|
             if item.is_a?(TOML::Any)
-              toml_to_yaml_any(item)
+              toml_to_yaml_any(item, depth + 1)
             else
               YAML::Any.new(item.to_s)
             end
@@ -79,7 +80,7 @@ module Hwaro
           if raw.is_a?(Hash(String, TOML::Any))
             hash = {} of YAML::Any => YAML::Any
             raw.each do |k, v|
-              hash[YAML::Any.new(k)] = toml_to_yaml_any(v)
+              hash[YAML::Any.new(k)] = toml_to_yaml_any(v, depth + 1)
             end
             YAML::Any.new(hash)
           else
@@ -150,7 +151,7 @@ module Hwaro
 
         def build(yaml : YAML::Any) : String
           return "" unless yaml.as_h?
-          process_table(yaml, [] of String, true)
+          process_table(yaml, [] of String, true, 0)
           @output.to_s
         end
 
@@ -161,7 +162,10 @@ module Hwaro
           build(YAML::Any.new(wrapped))
         end
 
-        private def process_table(yaml : YAML::Any, path : Array(String), print_header : Bool)
+        # `depth` guards a cyclic YAML::Any (self-referencing anchor); see
+        # `Utils::Nesting`. Callers already rescue conversion failures.
+        private def process_table(yaml : YAML::Any, path : Array(String), print_header : Bool, depth : Int32 = 0)
+          Nesting.check!(depth)
           return unless hash = yaml.as_h?
 
           # An empty table (`extra: {}`) has no values to force a header out,
@@ -196,11 +200,11 @@ module Hwaro
           end
 
           simple_values.each do |k, v|
-            @output << format_key(k) << " = " << to_toml_value(v) << "\n"
+            @output << format_key(k) << " = " << to_toml_value(v, depth + 1) << "\n"
           end
 
           tables.each do |k, v|
-            process_table(v, path + [k], true)
+            process_table(v, path + [k], true, depth + 1)
           end
 
           array_tables.each do |k, v|
@@ -208,7 +212,7 @@ module Hwaro
               new_path = path + [k]
               @output << "\n" unless @output.empty?
               @output << "[[" << format_path(new_path) << "]]\n"
-              process_table(item, new_path, false)
+              process_table(item, new_path, false, depth + 1)
             end
           end
         end
@@ -286,7 +290,8 @@ module Hwaro
           int.to_f64.to_s
         end
 
-        private def to_toml_value(value : YAML::Any) : String
+        private def to_toml_value(value : YAML::Any, depth : Int32 = 0) : String
+          Nesting.check!(depth)
           raw = value.raw
 
           case raw
@@ -307,12 +312,12 @@ module Hwaro
           when Time
             FrontmatterWriter.serialize_time(raw)
           when Array
-            "[#{array_items(value).join(", ")}]"
+            "[#{array_items(value, depth).join(", ")}]"
           when Hash
             # A hash reached from inside an array (mixed or nested) can't be
             # a `[table]` section; emit it as an inline table.
             pairs = value.as_h.map do |k, v|
-              "#{format_key(k.as_s? || k.to_s)} = #{to_toml_value(v)}"
+              "#{format_key(k.as_s? || k.to_s)} = #{to_toml_value(v, depth + 1)}"
             end
             "{#{pairs.join(", ")}}"
           when String
@@ -328,22 +333,22 @@ module Hwaro
         # possible: toml.cr refuses `[1, "two"]`, so an int/float mix is
         # promoted to floats and any other scalar mix is coerced to strings
         # (structured members keep their shape).
-        private def array_items(value : YAML::Any) : Array(String)
+        private def array_items(value : YAML::Any, depth : Int32 = 0) : Array(String)
           items = value.as_a
           kinds = items.map { |v| toml_kind(v) }.uniq!
 
           if kinds.size <= 1
-            items.map { |v| to_toml_value(v) }
+            items.map { |v| to_toml_value(v, depth + 1) }
           elsif kinds.sort == [:float, :int]
             items.map do |v|
               raw = v.raw
-              raw.is_a?(Int) ? toml_promoted_float_literal(raw) : to_toml_value(v)
+              raw.is_a?(Int) ? toml_promoted_float_literal(raw) : to_toml_value(v, depth + 1)
             end
           else
             items.map do |v|
               case toml_kind(v)
               when :string
-                to_toml_value(v)
+                to_toml_value(v, depth + 1)
               when :array, :table
                 # A structured member inside an otherwise-scalar array cannot
                 # keep its TOML shape: `["plain", {k = "v"}]` is precisely the
@@ -351,6 +356,10 @@ module Hwaro
                 # a file the very next `hwaro build` failed to parse. Emit it
                 # as JSON text — lossy for the reader, but the document stays
                 # loadable instead of corrupting the round-trip.
+                # `to_json` recurses the raw graph with no depth of its own,
+                # so a cyclic value would blow the stack here even though
+                # every other path is guarded. Bound it first.
+                Nesting.validate!(v, depth + 1)
                 "\"#{FrontmatterWriter.escape_toml_string(v.to_json)}\""
               when :time
                 "\"#{FrontmatterWriter.escape_toml_string(FrontmatterWriter.serialize_time(v.raw.as(Time)))}\""

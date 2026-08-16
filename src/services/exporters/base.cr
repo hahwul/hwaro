@@ -228,16 +228,19 @@ module Hwaro
         end
 
         # Recursively replace Time leaves with frontmatter date strings.
-        private def normalize_scalar_times(value : YAML::Any) : YAML::Any
+        # `depth` guards a cyclic YAML::Any (self-referencing anchor in the
+        # exported file's front matter); see `Utils::Nesting`.
+        private def normalize_scalar_times(value : YAML::Any, depth : Int32 = 0) : YAML::Any
+          Utils::Nesting.check!(depth)
           raw = value.raw
           case raw
           when Time
             YAML::Any.new(Hwaro::Utils::FrontmatterWriter.serialize_time(raw))
           when Array
-            YAML::Any.new(value.as_a.map { |v| normalize_scalar_times(v) })
+            YAML::Any.new(value.as_a.map { |v| normalize_scalar_times(v, depth + 1) })
           when Hash
             hash = {} of YAML::Any => YAML::Any
-            value.as_h.each { |k, v| hash[k] = normalize_scalar_times(v) }
+            value.as_h.each { |k, v| hash[k] = normalize_scalar_times(v, depth + 1) }
             YAML::Any.new(hash)
           else
             value

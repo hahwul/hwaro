@@ -93,6 +93,26 @@ describe Hwaro::Assets::Sass do
       end
     end
 
+    # The parent cross-product is `parents ** &-count`, and each level's output
+    # is the next level's `parents` — so a comma list plus a few `& &` rules
+    # compounds to 10 → 10² → 10⁴ → 10⁸ selectors. The build never crashed, it
+    # just never finished; the cap turns that into an immediate error.
+    it "errors instead of hanging on an exponential parent cross-product" do
+      expect_raises(Hwaro::Assets::Sass::SyntaxError, /expands to more than \d+ selectors/) do
+        compile(<<-SCSS)
+          .a,.b,.c,.d,.e,.f,.g,.h,.i,.j {
+            & & { & & { & & { color: red; } } }
+          }
+          SCSS
+      end
+    end
+
+    it "still expands ordinary nested & selectors" do
+      css = compile(".btn, .link { &:hover, &:focus { &::before { color: red; } } }")
+      css.should contain(".btn:hover::before")
+      css.should contain(".link:focus::before")
+    end
+
     it "errors on nested properties" do
       expect_raises(Hwaro::Assets::Sass::SyntaxError, /nested properties are not supported/) do
         compile(".a { font: { family: serif; } }")

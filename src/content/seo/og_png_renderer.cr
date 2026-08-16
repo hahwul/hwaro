@@ -815,26 +815,26 @@ module Hwaro
 
           # Terminal: block cursor after the last title line.
           if style == "terminal" && !title_lines.empty?
-            cursor_x = (last_line_end_x + font_size * 0.25_f32).to_i
-            cursor_y = (title_start_y + (title_lines.size - 1) * title_line_h - font_size * 0.88_f32).to_i
-            fill_rect(pixels, cursor_x, cursor_y, (font_size * 0.52_f32).to_i, (font_size * 0.95_f32).to_i, accent_color)
+            cursor_x = to_px(last_line_end_x + font_size * 0.25_f32)
+            cursor_y = to_px(title_start_y + (title_lines.size - 1) * title_line_h - font_size * 0.88_f32)
+            fill_rect(pixels, cursor_x, cursor_y, to_px(font_size * 0.52_f32), to_px(font_size * 0.95_f32), accent_color)
           end
 
           # Minimal: an accent full stop after the last title line — the
           # entire composition is type plus one period.
           if style == "minimal" && !title_lines.empty?
-            r = Math.max((font_size * 0.11_f32).to_i, 3)
+            r = Math.max(to_px(font_size * 0.11_f32), 3)
             last_baseline = title_start_y + (title_lines.size - 1) * title_line_h
-            dot_cx = (last_line_end_x + font_size * 0.18_f32).to_i + r
-            dot_cy = (last_baseline - r).to_i
+            dot_cx = to_px(last_line_end_x + font_size * 0.18_f32) + r
+            dot_cy = to_px(last_baseline - r)
             draw_filled_circle(pixels, dot_cx, dot_cy, r, accent_color, 1.0)
           end
 
           # Editorial: thin vertical accent rule, cap-height aligned to the title.
           if style == "editorial"
             rule_x = margin_x - 28
-            rule_top = (title_start_y - font_size * 0.72_f32).to_i.clamp(0, HEIGHT)
-            rule_bottom = (title_start_y + (title_lines.size - 1) * title_line_h).to_i.clamp(rule_top, HEIGHT)
+            rule_top = to_px(title_start_y - font_size * 0.72_f32).clamp(0, HEIGHT)
+            rule_bottom = to_px(title_start_y + (title_lines.size - 1) * title_line_h).clamp(rule_top, HEIGHT)
             fill_rect(pixels, rule_x, rule_top, 4, rule_bottom - rule_top, accent_color) if rule_x >= 0
           end
 
@@ -871,7 +871,7 @@ module Hwaro
           if style == "terminal"
             rows_top = desc_last_baseline + 44_f32
             OgImage::TERMINAL_GHOST_ROWS.each_with_index do |w, i|
-              ry = (rows_top + i * 32).to_i
+              ry = to_px(rows_top + i * 32)
               break if ry + 10 > HEIGHT - OgImage::TERMINAL_INSET - 24
               fill_rounded_rect(pixels, OgImage::TERMINAL_TEXT_X, ry, w, 10, 5, text_color, 0.08)
             end
@@ -891,7 +891,7 @@ module Hwaro
               chain_render(ctx.mono, pixels, (WIDTH - name_w) / 2, bar_center_y - name_size / 2, name_size, site_title, text_color, 0.5_f32)
             when "monument"
               name_w = chain_measure(brand_chain, OgImage::BRAND_SIZE.to_f32, site_title, 1.0_f32)
-              tick_x = (OgImage::MONUMENT_BRAND_RIGHT - name_w - OgImage::BRAND_TICK_W - OgImage::BRAND_GAP).to_i
+              tick_x = to_px(OgImage::MONUMENT_BRAND_RIGHT - name_w - OgImage::BRAND_TICK_W - OgImage::BRAND_GAP)
               fill_rect(pixels, tick_x, OgImage::BRAND_BASELINE - OgImage::BRAND_TICK_H + 4, OgImage::BRAND_TICK_W, OgImage::BRAND_TICK_H, accent_color)
               chain_render(brand_chain, pixels, (tick_x + OgImage::BRAND_TICK_W + OgImage::BRAND_GAP).to_f32,
                 (OgImage::BRAND_BASELINE - OgImage::BRAND_SIZE).to_f32, OgImage::BRAND_SIZE.to_f32,
@@ -964,7 +964,7 @@ module Hwaro
           widest = widths.max
           return lines if widest <= 0 || widths.last >= widest * 0.55_f32
           target = Math.max(widths.sum / lines.size * 1.08_f32, widest * 0.6_f32)
-          rebalanced = word_wrap_chain(chain, px_size, text, target.to_i)
+          rebalanced = word_wrap_chain(chain, px_size, text, to_px(target))
           rebalanced.size <= lines.size ? rebalanced : lines
         end
 
@@ -978,14 +978,49 @@ module Hwaro
           end
         end
 
+        # Float → pixel coordinate. `Float#to_i` raises OverflowError on NaN,
+        # infinity, and anything outside Int32, and several coordinates here
+        # are derived from measured text widths, which grow without bound with
+        # the page/site title. Saturate instead of raising; every consumer
+        # clips to the canvas anyway.
+        private def self.to_px(value : Float32 | Float64) : Int32
+          return 0 if value.nan?
+          value.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i32
+        end
+
+        # Clip a rectangle to the canvas, returning `{x0, y0, x1, y1}` as a
+        # half-open range, or nil when nothing of it lands on the canvas.
+        #
+        # `pixels` is a raw `UInt8*` with no bounds checking, so EVERY writer
+        # must clip on BOTH ends: a negative `x`/`y` is not a no-op, it is an
+        # out-of-bounds write before the buffer. Callers routinely produce
+        # negative coordinates from text measurements (`draw_corner_bracket`
+        # subtracts an arm length; the monument/brand rows subtract a measured
+        # site-title width, which grows without bound with `config.title`), so
+        # a long enough site title used to segfault the build here. Widths are
+        # summed in Int64 so `x + w` can't overflow Int32 either.
+        private def self.clip_rect(x : Int32, y : Int32, w : Int32, h : Int32) : {Int32, Int32, Int32, Int32}?
+          return if w <= 0 || h <= 0
+          x0 = Math.max(x, 0)
+          y0 = Math.max(y, 0)
+          x1 = Math.min(x.to_i64 + w, WIDTH.to_i64).to_i32
+          y1 = Math.min(y.to_i64 + h, HEIGHT.to_i64).to_i32
+          return if x0 >= x1 || y0 >= y1
+          {x0, y0, x1, y1}
+        end
+
         # Fill a solid rectangle
         private def self.fill_rect(pixels : UInt8*, x : Int32, y : Int32, w : Int32, h : Int32, color : UInt32)
+          clip = clip_rect(x, y, w, h)
+          return unless clip
+          x0, y0, x1, y1 = clip
+
           r = ((color >> 16) & 0xFF).to_u8
           g = ((color >> 8) & 0xFF).to_u8
           b = (color & 0xFF).to_u8
 
-          (y...Math.min(y + h, HEIGHT)).each do |py|
-            (x...Math.min(x + w, WIDTH)).each do |px|
+          (y0...y1).each do |py|
+            (x0...x1).each do |px|
               idx = (py * WIDTH + px) * CHANNELS
               pixels[idx] = r
               pixels[idx + 1] = g
@@ -997,13 +1032,17 @@ module Hwaro
 
         # Fill a rectangle with alpha blending
         private def self.fill_rect_alpha(pixels : UInt8*, x : Int32, y : Int32, w : Int32, h : Int32, color : UInt32, opacity : Float64)
+          clip = clip_rect(x, y, w, h)
+          return unless clip
+          x0, y0, x1, y1 = clip
+
           r = ((color >> 16) & 0xFF).to_u8
           g = ((color >> 8) & 0xFF).to_u8
           b = (color & 0xFF).to_u8
           alpha = opacity.clamp(0.0, 1.0)
 
-          (y...Math.min(y + h, HEIGHT)).each do |py|
-            (x...Math.min(x + w, WIDTH)).each do |px|
+          (y0...y1).each do |py|
+            (x0...x1).each do |px|
               idx = (py * WIDTH + px) * CHANNELS
               dr = pixels[idx]
               dg = pixels[idx + 1]

@@ -32,9 +32,29 @@ module Hwaro
         MAX_INCLUDE_DEPTH    =     100
         MAX_CALL_DEPTH       =     100
         MAX_WHILE_ITERATIONS = 100_000
+        # Total loop-body evaluations across `@for`/`@each`/`@while` in ONE
+        # compile. `MAX_WHILE_ITERATIONS` bounds a single `@while` and nothing
+        # bounded `@for` at all, so `@for $i from 1 through 100000000` — one
+        # mistyped bound — emitted rules until the process ran out of memory,
+        # and nesting two capped loops still multiplies. A shared budget is the
+        # only form that survives nesting. Six figures of loop bodies is orders
+        # of magnitude past any real stylesheet (palettes and grid systems land
+        # in the hundreds).
+        MAX_LOOP_ITERATIONS = 1_000_000
         # `&` slots per selector beyond which the parent cross-product is
         # not expanded (it grows as parents**slots).
         MAX_PARENT_REF_SLOTS = 4
+        # Ceiling on the selectors ONE rule may expand to. `MAX_PARENT_REF_SLOTS`
+        # bounds the exponent but not the base, and the base is the enclosing
+        # rule's own expansion — so nesting compounds:
+        #
+        #     .a,.b,…,.j { & & { & & { & & { color: red } } } }
+        #
+        # is 10 → 10² → 10⁴ → 10⁸ selectors from eight lines of SCSS. The build
+        # did not crash, it simply never finished, allocating the whole way.
+        # No hand-written rule needs four figures of selectors, so cap it and
+        # say so instead of hanging.
+        MAX_RULE_SELECTORS = 8192
 
         # Unwinds a @function body at @return. :nodoc:
         class ReturnSignal < Exception
@@ -66,6 +86,7 @@ module Hwaro
         @content : ContentBlock?
         @in_keyframes : Bool
         @include_depth : Int32
+        @loop_iterations : Int64
         @path : String
 
         def initialize(@importer : Importer, path : String)
@@ -77,6 +98,7 @@ module Hwaro
           @content = nil
           @in_keyframes = false
           @include_depth = 0
+          @loop_iterations = 0_i64
           @path = path
           @loaded_modules = {} of String => SassModule
           @load_stack = [] of String
@@ -196,11 +218,35 @@ module Hwaro
               end
               result << part
             elsif amps > 0
+              # Cost-check BEFORE building the cross-product: materializing it
+              # first is exactly the allocation this guard exists to prevent.
+              # Past MAX_PARENT_REF_SLOTS there is no cross-product to size —
+              # `parent_combinations` already degrades to a single combo — and
+              # the running product is capped rather than raised to a power so
+              # the check itself can't overflow.
+              if amps <= MAX_PARENT_REF_SLOTS
+                projected = 1_i64
+                amps.times do
+                  projected *= parents.size
+                  break if projected > MAX_RULE_SELECTORS
+                end
+                if projected > MAX_RULE_SELECTORS
+                  error_at(node.line, node.column,
+                    "selector expands to more than #{MAX_RULE_SELECTORS} selectors " \
+                    "(#{parents.size} parent selectors, #{amps} \"&\" references); " \
+                    "reduce the nesting or the comma-separated parent list")
+                end
+              end
               parent_combinations(parents, amps).each do |combo|
                 result << substitute_parent(part, combo)
               end
             else
               parents.each { |parent| result << "#{parent} #{part}" }
+            end
+            if result.size > MAX_RULE_SELECTORS
+              error_at(node.line, node.column,
+                "selector expands to more than #{MAX_RULE_SELECTORS} selectors; " \
+                "reduce the nesting or the comma-separated parent list")
             end
           end
           result
@@ -677,6 +723,7 @@ module Hwaro
               [value]
             end
           items.each do |item|
+            count_loop_iteration(node.line, node.column)
             scoped do
               bind_each_vars(node.vars, item)
               eval_nodes(node.body)
@@ -712,6 +759,7 @@ module Hwaro
           name = Sass.normalize_ident(node.var)
 
           iterate = ->(i : Int32) do
+            count_loop_iteration(node.line, node.column)
             scoped do
               @env.variables[name] = Number.format(i.to_f) + unit
               eval_nodes(node.body)
@@ -752,6 +800,7 @@ module Hwaro
               error_at(node.line, node.column,
                 "@while exceeded #{MAX_WHILE_ITERATIONS} iterations (infinite loop?)")
             end
+            count_loop_iteration(node.line, node.column)
             scoped { eval_nodes(node.body) }
           end
         end
@@ -1503,6 +1552,15 @@ module Hwaro
 
         private def error_at(line : Int32, column : Int32, message : String) : NoReturn
           raise SyntaxError.new(message, @path, line, column)
+        end
+
+        # One tick of the shared loop budget (see MAX_LOOP_ITERATIONS).
+        private def count_loop_iteration(line : Int32, column : Int32) : Nil
+          @loop_iterations += 1
+          return if @loop_iterations <= MAX_LOOP_ITERATIONS
+          error_at(line, column,
+            "stylesheet exceeded #{MAX_LOOP_ITERATIONS} total @for/@each/@while iterations " \
+            "(runaway loop bounds?)")
         end
 
         # A namespaced reference that fails still takes the documented lenient

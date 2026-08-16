@@ -284,12 +284,15 @@ module Hwaro
         # a JSON-literal tag like `["a", "b"]`. Skips nested hashes since
         # they don't map to a scalar tag — the caller can warn separately
         # if needed.
-        private def flatten_yaml_strings(value : YAML::Any) : Array(String)
+        private def flatten_yaml_strings(value : YAML::Any, depth : Int32 = 0) : Array(String)
+          # A self-referencing YAML anchor makes this walk unbounded; see
+          # `Utils::Nesting`.
+          Utils::Nesting.check!(depth)
           result = [] of String
           case value.raw
           when Array
             value.as_a.each do |item|
-              flatten_yaml_strings(item).each { |s| result << s }
+              flatten_yaml_strings(item, depth + 1).each { |s| result << s }
             end
           when Hash
             # Nested object: skip silently; tags/aliases don't carry objects.

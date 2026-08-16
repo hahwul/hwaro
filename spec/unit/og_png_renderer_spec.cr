@@ -479,6 +479,58 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
   end
 
+  describe "canvas clipping" do
+    # `fill_rect`/`fill_rect_alpha` write through a raw `UInt8*` with no bounds
+    # checking, and several callers legitimately produce NEGATIVE coordinates:
+    # the monument/brand rows subtract a MEASURED site-title width from a fixed
+    # right edge, and `draw_corner_bracket` subtracts an arm length. Only the
+    # upper bound used to be clipped, so a long enough `config.title` walked the
+    # write cursor off the front of the buffer — silent heap corruption at a few
+    # thousand characters, SIGSEGV in `fill_rect` at a few hundred thousand.
+    it "survives a site title far wider than the canvas in every style" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      Dir.mktmpdir do |dir|
+        %w[monument framed default terminal minimal editorial band split].each do |style|
+          config = Hwaro::Models::Config.new
+          config.title = "A" * 500_000
+          config.og.auto_image.style = style
+          config.og.auto_image.show_title = true
+
+          page = Hwaro::Models::Page.new("test.md")
+          page.title = "Hello"
+          page.description = "World"
+
+          png_path = File.join(dir, "wide-#{style}.png")
+          Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path, font_ctx: ctx).should be_true
+        end
+      end
+    end
+
+    # Front matter is not UTF-8 validated, so a title can carry a truncated
+    # multi-byte sequence. The C measure/render decoders used to advance by the
+    # sequence's NOMINAL length, stepping the cursor past the string's NUL
+    # terminator and reading heap memory until it happened to hit a zero byte.
+    it "renders a title whose bytes end mid UTF-8 sequence" do
+      next unless Hwaro::Content::Seo::OgPngRenderer.available?
+
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      truncated = String.new(Bytes[0x41_u8, 0x42_u8, 0xF0_u8])
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = truncated
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = truncated
+        page.description = truncated
+
+        png_path = File.join(dir, "truncated.png")
+        Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, png_path, font_ctx: ctx).should be_true
+      end
+    end
+  end
+
   describe ".load_image" do
     # load_image decodes/resizes logo & bg images via stb. Its failure guards
     # must each return nil cleanly (and free the source buffer) rather than
