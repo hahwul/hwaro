@@ -517,6 +517,16 @@ module Hwaro
             bracketed = base.is_a?(ListV) && base.bracketed
             ListV.new(list_of(base) + list_of(args[1]), sep_from(args[2]?, sep), bracketed)
           end,
+          "zip" => Fn.new do |args, kwargs|
+            no_kwargs!("list.zip", kwargs)
+            arity!("zip", args, 1, Int32::MAX)
+            lists = args.map { |a| list_of(a) }
+            size = lists.min_of(&.size)
+            items = (0...size).map do |i|
+              ListV.new(lists.map { |l| l[i] }, ListV::Sep::Space).as(Value)
+            end
+            ListV.new(items, ListV::Sep::Comma)
+          end,
           "separator" => Fn.new do |args, kwargs|
             no_kwargs!("list.separator", kwargs)
             arity!("list-separator", args, 1)
@@ -602,7 +612,54 @@ module Hwaro
             keys = args[1..]
             MapV.new(base.entries.reject { |e| keys.any?(&.eq?(e.key)) })
           end,
+          "set" => Fn.new do |args, kwargs|
+            no_kwargs!("map.set", kwargs)
+            arity!("map.set", args, 3, Int32::MAX)
+            # Intermediate keys drill into (or create) nested maps.
+            map_set(map!("map.set", args[0]), args[1...-1], args[-1])
+          end,
+          "deep-merge" => Fn.new do |args, kwargs|
+            no_kwargs!("map.deep-merge", kwargs)
+            arity!("map.deep-merge", args, 2)
+            map_deep_merge(map!("map.deep-merge", args[0]), map!("map.deep-merge", args[1]))
+          end,
         }
+
+        private def self.map_set(map : MapV, keys : Array(Value), value : Value) : MapV
+          key = keys[0]
+          entries = map.entries.dup
+          replacement =
+            if keys.size == 1
+              value
+            else
+              inner = map[key]?
+              inner_map = inner.as?(MapV) ||
+                          (inner.is_a?(Raw) ? Expr.coerce(inner.text).as?(MapV) : nil) ||
+                          MapV.new([] of MapEntry)
+              map_set(inner_map, keys[1..], value)
+            end
+          if idx = entries.index(&.key.eq?(key))
+            entries[idx] = MapEntry.new(key, replacement)
+          else
+            entries << MapEntry.new(key, replacement)
+          end
+          MapV.new(entries)
+        end
+
+        private def self.map_deep_merge(base : MapV, overlay : MapV) : MapV
+          entries = base.entries.dup
+          overlay.entries.each do |entry|
+            idx = entries.index(&.key.eq?(entry.key))
+            if idx && (existing = entries[idx].value.as?(MapV)) && (incoming = entry.value.as?(MapV))
+              entries[idx] = MapEntry.new(entry.key, map_deep_merge(existing, incoming))
+            elsif idx
+              entries[idx] = entry
+            else
+              entries << entry
+            end
+          end
+          MapV.new(entries)
+        end
 
         # ---------------------------------------------------------------
         # sass:meta
@@ -945,6 +1002,7 @@ module Hwaro
           "index"          => LIST_FNS["index"],
           "append"         => LIST_FNS["append"],
           "join"           => LIST_FNS["join"],
+          "zip"            => LIST_FNS["zip"],
           "list-separator" => LIST_FNS["separator"],
           "map-get"        => MAP_FNS["get"],
           "map-has-key"    => MAP_FNS["has-key"],

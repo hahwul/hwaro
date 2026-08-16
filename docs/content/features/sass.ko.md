@@ -75,9 +75,11 @@ Hwaro는 실용적인 SCSS 부분집합을 구현합니다 — 직접 작성하�
 | `@import`(Sass 파일) | ✅ 클래식 전역 병합 시맨틱, 순수 CSS 형태는 그대로 통과 |
 | `@mixin` / `@include` | ✅ 기본값, 키워드 인자, 가변 인자 `$args...`, 스프레드, `@content` 블록 |
 | `@function` / `@return` | ✅ 값 안에서 호출 가능한 사용자 함수, 기본값/키워드/가변 인자, 재귀 |
+| `@extend` + `%placeholder` | ✅ 단순 셀렉터 타깃, 컴파운드 통합, `!optional`. 확장되지 않은 플레이스홀더는 출력되지 않음 — 차이점 참고 |
+| SassScript의 `&` | ✅ `if(&, "&", "")` 패턴 — 부모 셀렉터를 값으로, 루트에서는 `null` |
 | 제어 흐름 | ✅ `@if` / `@else if` / `@else`, `@each`(구조 분해 포함), `@for`(`through`/`to`, 내림차순), `@while` |
 | SassScript 표현식 | ✅ 산술(`+ - * %`), 비교, `and`/`or`/`not`, 문자열, 리스트, 맵 — `/`는 차이점 참고 |
-| 내장 함수 | ✅ `sass:math`, `sass:string`, `sass:list`, `sass:map`, `sass:meta`, `sass:color` 부분집합 + 레거시 전역 이름(`map-get`, `nth`, `darken`, `if()` 등) |
+| 내장 함수 | ✅ `sass:math`, `sass:string`, `sass:list`(`zip` 포함), `sass:map`(`set` / `deep-merge` 포함), `sass:meta`(`variable-exists` / `function-exists` / `mixin-exists` / `content-exists` / `get-function` / `call` 포함), `sass:color` 부분집합 + 레거시 전역 이름(`map-get`, `nth`, `darken`, `if()` 등) |
 | `@debug` / `@warn` / `@error` | ✅ `@error`는 위치 정보가 담긴 메시지로 빌드를 실패시킴 |
 | `@at-root` | ✅ 셀렉터 형태와 블록 형태(`with:`/`without:` 쿼리는 제외) |
 | 규칙 안의 `@media` / `@supports` | ✅ 중첩 밖으로 자동 버블링, 피처 값에서 표현식 평가 |
@@ -111,7 +113,7 @@ $breakpoints: (sm: 640px, md: 768px, lg: 1024px);
 
 ### 색상
 
-색상 함수는 hex 리터럴(`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`)과 CSS 색상 키워드(`red`, `rebeccapurple`, `transparent`)에 동작합니다.
+색상 함수는 hex 리터럴(`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`), CSS 색상 키워드(`red`, `rebeccapurple`, `transparent`), 그리고 레거시 콤마 철자 `rgb(…)` / `rgba(…)` / `hsl(…)` / `hsla(…)`에 동작합니다. `hsl()`로 만든 색상은 선언된 색조/채도를 기억하므로 `hue(hsl(221, 14%, 100%))`는 `221deg`를 답합니다.
 
 ```scss
 $brand: #336699;
@@ -145,14 +147,26 @@ $brand: #336699;
 
 두 색상이 색상으로서 비교되는 것은 색상 함수가 만들어낸 값일 때뿐입니다. 리터럴끼리의 `#ffffff == #FFF`는 여전히 일반 텍스트 비교이므로 false입니다. `==`가 모든 리터럴을 파싱하게 만들면 지금 잘 컴파일되는 스타일시트의 `@if` 분기가 뒤집히는데, 순수 CSS 보장이 이를 허용하지 않습니다.
 
+### @extend
+
+`@extend`는 단순 셀렉터 타깃(클래스, `%placeholder`, id, 요소, 의사 클래스)에 동작합니다 — Bootstrap을 포함한 실제 스타일시트의 사용 방식을 전부 커버합니다. 타깃이 속한 컴파운드는 확장자의 마지막 컴파운드와 통합되고, 조상 컴파운드는 앞에 붙으며, 확장되지 않은 `%placeholder` 규칙은 출력에 등장하지 않습니다.
+
+```scss
+%visually-hidden { position: absolute; clip: rect(0 0 0 0); }
+.sr-only { @extend %visually-hidden; }
+// → .sr-only { position: absolute; clip: rect(0 0 0 0); }
+```
+
+타깃을 찾지 못하면 위치 정보가 담긴 오류로 빌드가 실패합니다. `!optional`을 붙이면 허용됩니다. dart-sass의 전체 extend 알고리즘과의 차이는 아래 차이점 목록을 참고하세요.
+
 ### 미지원 (아직)
 
-`@extend`, 단위 변환(`px`↔`cm`), `@at-root (with: ...)` 쿼리, `@forward ... with (...)`, `@content(args)` / `using`, `math.random` / `unique-id()`(빌드는 결정적이어야 합니다), 중첩 속성(`font: { family: ... }`), 들여쓰기 방식의 `.sass` 문법, 소스맵은 지원하지 않습니다.
+단위 변환(`px`↔`cm`), `@at-root (with: ...)` 쿼리, `@forward ... with (...)`, `@content(args)` / `using`, `math.random` / `unique-id()`(빌드는 결정적이어야 합니다), 중첩 속성(`font: { family: ... }`), 들여쓰기 방식의 `.sass` 문법, 소스맵은 지원하지 않습니다.
 
 **미지원 지시문은 위치 정보가 담긴 오류와 함께 빌드를 실패시킵니다** — Hwaro는 조용히 깨진 CSS를 내보내지 않습니다.
 
 ```
-Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not supported by hwaro's Sass subset (yet)
+Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @content arguments are not supported
 ```
 
 ### 표현식 시맨틱
@@ -169,9 +183,11 @@ Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not suppor
 - 단위 산술은 동일 단위이거나 한쪽이 단위 없는 경우만 지원합니다. `px`↔`in` 변환 테이블은 없습니다.
 - *값* 위치의 `and`/`or`는 실제 불리언에만 동작합니다 — `font-family: Franklin and Marshall`은 텍스트로 남습니다. 조건식에서는 Sass의 완전한 truthiness를 따릅니다.
 - 전역 `min()`/`max()`/`round()`/`abs()`는 모든 인자가 정적으로 비교 가능한 숫자일 때만 평가됩니다. CSS 형태(`min(5vw, 100px)`, `round(up, 101px, 10px)`)는 그대로 통과합니다.
-- `rgb()`/`rgba()`/`hsl()`/`hsla()`는 CSS 형태 그대로 두고 접지 **않습니다**. dart-sass는 `rgb(0, 0, 0)`을 `black`으로 내보내지만 여기서는 원문이 유지됩니다. 유효한 CSS가 아닌 Sass 전용 `rgba($color, $alpha)` 철자만 평가됩니다. 마찬가지로 `grayscale()`, `invert()`, `saturate()`, `opacity()`는 색상을 받으면 색상 함수, 숫자를 받으면 순수 CSS 필터로 취급됩니다(`filter: grayscale(50%)`는 그대로 통과).
+- `rgb()`/`rgba()`/`hsl()`/`hsla()`는 CSS 형태 그대로 두고 접지 **않습니다**. dart-sass는 `rgb(0, 0, 0)`을 `black`으로 내보내지만 여기서는 원문이 유지됩니다(색상 *함수*가 그런 리터럴을 받으면 색상으로 읽기는 합니다). 유효한 CSS가 아닌 Sass 전용 `rgba($color, $alpha)` 철자만 평가됩니다. 마찬가지로 `grayscale()`, `invert()`, `saturate()`, `opacity()`는 색상을 받으면 색상 함수, 숫자를 받으면 순수 CSS 필터로 취급됩니다(`filter: grayscale(50%)`는 그대로 통과).
+- 계산된 색상은 정수 채널의 hex/`rgba()`로 직렬화됩니다. dart-sass 1.79+는 소수 채널(`rgb(38.25, 76.5, 114.75)`)을 유지합니다. 채널당 최대 1 차이입니다.
 - 대부분의 내장 함수는 위치 인자만 받습니다. 키워드 호출(`list.append($l, x, $separator: comma)`)은 평가되지 않고 원문 그대로 남습니다. **색상** 함수는 예외로, 문서화된 키워드 이름을 받습니다(`darken($c, $amount: 10%)`, `mix($a, $b, $weight: 25%)`, `scale-color($c, $lightness: 60%)`). `adjust`/`scale`/`change`는 `$lightness` 같은 키워드 인자가 유일한 호출 방법이기 때문입니다. 사용자 정의 `@mixin`/`@function`의 키워드 인자는 정상 동작합니다.
-- `if()`는 두 분기를 모두 즉시 평가합니다(부수 효과가 없으므로, 선택되지 않은 분기의 `@error`로만 관찰 가능합니다).
+- `@extend`는 dart-sass 알고리즘의 실용적 부분집합입니다: 타깃은 단순 셀렉터여야 하고, 확장은 문서 전역에 적용되며(dart-sass는 모듈 단위로 스코프를 나누고 `@media` 경계를 넘는 확장을 금지), 확장 대상과 확장자 양쪽에 조상 컴파운드가 있으면 첫 번째 접두 순서만 출력합니다(dart-sass는 두 순서를 모두 "위빙"). 공유하는 선행 접두는 병합됩니다(`.nav %p`를 `.nav > .c`로 확장 → `.nav > .c`).
+- `calc()` 내용은 절대 단순화하지 않습니다 — dart-sass는 `calc(9 / 21 * 100%)`를 `42.86%`로 접지만 여기서는 쓴 그대로 남습니다. 브라우저 계산 결과는 동일합니다.
 - at-규칙 서두와 값 안의 변수는 직접 치환됩니다(`@media (min-width: $bp)` 동작). 셀렉터와 속성 이름에는 `#{...}` 보간이 필요합니다(dart-sass와 동일).
 - at-규칙 서두에서는 `(feature: value)` 구간 안에서만 표현식이 평가됩니다. 쿼리 구조 자체는 원문 그대로 유지됩니다.
 - `@media` 안에 중첩된 `@media`는 문자 그대로 중첩된 블록으로 출력됩니다(dart-sass는 조건을 병합).

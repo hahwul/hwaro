@@ -233,6 +233,17 @@ module Hwaro
           end
         end
 
+        # `@extend .target [!optional];` — extends the enclosing rule's
+        # selectors onto every rule matching the target selector(s).
+        class ExtendNode < Node
+          getter selector : TextTemplate
+          getter optional : Bool
+
+          def initialize(@selector, @optional, line, column)
+            super(line, column)
+          end
+        end
+
         # `@at-root { ... }` / `@at-root .sel { ... }` — evaluates its
         # body outside the current style-rule nesting (but inside any
         # surrounding at-rule).
@@ -268,11 +279,15 @@ module Hwaro
           end
         end
 
-        # Loud comment kept at statement position.
+        # Loud comment kept at statement position. `template` is set when
+        # the comment contains `#{...}` interpolation (dart-sass resolves
+        # interpolation inside loud comments — the `/*! Library v#{$ver} */`
+        # banner idiom).
         class CommentNode < Node
           getter text : String
+          getter template : TextTemplate?
 
-          def initialize(@text, line, column)
+          def initialize(@text, line, column, @template = nil)
             super(line, column)
           end
         end

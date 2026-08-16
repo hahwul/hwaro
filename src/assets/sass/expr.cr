@@ -131,6 +131,26 @@ module Hwaro
           end
         end
 
+        # A CSS-owned function span (`calc(...)`, `var(...)`, `url(...)`)
+        # whose argument text is interrupted by interpolation or `$var`
+        # pieces: `calc(#{$a} + 2px)`, `var(--#{$prefix}x)`. The span is
+        # never evaluated as Sass — the dynamic pieces resolve to text and
+        # splice back into the verbatim span (dart-sass treats these spans
+        # as unparsed too). Templates in `parts` are either a real `#{...}`
+        # body or a synthesized single-`$var` template.
+        class RawSpanE < Node
+          getter parts : Array(String | Ast::TextTemplate)
+
+          def initialize(@parts)
+          end
+        end
+
+        # `&` as a SassScript value: the parent selector as a comma list,
+        # or null at the root (dart-sass semantics). What makes the
+        # `#{if(&, "&", "")}` mixin idiom work.
+        class AmpE < Node
+        end
+
         # ---------------------------------------------------------------
         # Tokens
         # ---------------------------------------------------------------
@@ -143,7 +163,9 @@ module Hwaro
           Str
           Var
           Interp
-          Raw # hex colors, u+ranges, url(...)/calc(...) spans
+          Raw     # hex colors, u+ranges, url(...)/calc(...) spans
+          RawSpan # url(...)/calc(...) span with interpolation/$var pieces
+          Amp     # `&` parent-selector reference
           LParen
           RParen
           LBracket
@@ -206,8 +228,12 @@ module Hwaro
         # ---------------------------------------------------------------
 
         # Function names whose parenthesized span belongs to CSS and must
-        # pass through verbatim, never parsed as Sass arguments.
-        RAW_SPAN_FNS = %w[url var env attr counter counters expression format local]
+        # pass through verbatim, never parsed as Sass arguments. `var()` is
+        # deliberately NOT here: dart-sass parses its fallback argument as
+        # SassScript (`var(--x, escape-svg($d))` must call the function),
+        # and the computes? gate still passes plain `var(--x, 10px)`
+        # through verbatim.
+        RAW_SPAN_FNS = %w[url env attr counter counters expression format local]
 
         # :nodoc:
         class Lexer
@@ -355,16 +381,25 @@ module Hwaro
             buf = String::Builder.new
             loop do
               if eop?
-                # The string continues past this piece: an Interp piece
-                # follows, then a String piece with the rest.
+                # The string continues past this piece: one or more Interp
+                # pieces follow (`"--#{$a}#{$b}rest"`), then a String piece
+                # with the rest.
                 parts << buf.to_s
                 buf = String::Builder.new
-                nxt = @pieces[@piece_i + 1]?
-                fail unless nxt.is_a?(Ast::Interp)
-                parts << nxt.inner
-                @piece_i += 2
-                @char_i = 0
-                fail unless current_piece.is_a?(String)
+                loop do
+                  @piece_i += 1
+                  @char_i = 0
+                  nxt = current_piece
+                  fail unless nxt
+                  case nxt
+                  in String
+                    break
+                  in Ast::Interp
+                    parts << nxt.inner
+                  in Ast::VarRef
+                    fail # `$var` is literal inside strings; never a piece here
+                  end
+                end
                 next
               end
               c = advance
@@ -439,32 +474,71 @@ module Hwaro
           end
 
           # Balanced-paren verbatim span starting at `start` (cursor on
-          # the opening paren). Interpolation inside would have split the
-          # piece — that shape is unlexable and falls back.
+          # the opening paren). Interpolation or `$var` pieces inside the
+          # span (`calc(#{$a} + 2px)`, `var(--#{$p}x)`) split the String
+          # piece; the span then continues across those pieces and lexes
+          # as a RawSpan token whose dynamic parts resolve at eval time.
           private def lex_raw_span(start : Int32) : Nil
+            space = @space
+            parts = [] of String | Ast::TextTemplate
+            buf = String::Builder.new
+            buf << text[start...@char_i] # function name (cursor on '(')
             depth = 0
-            loop do
-              fail if eop?
+            done = false
+            until done
+              if eop?
+                # The span continues in the next piece(s): flush the text
+                # run and absorb dynamic pieces until text resumes.
+                flushed = buf.to_s
+                parts << flushed unless flushed.empty?
+                buf = String::Builder.new
+                loop do
+                  @piece_i += 1
+                  @char_i = 0
+                  piece = current_piece
+                  fail unless piece # unterminated span at template end
+                  case piece
+                  in String
+                    break
+                  in Ast::Interp
+                    parts << piece.inner
+                  in Ast::VarRef
+                    parts << Ast::TextTemplate.new(
+                      Array(Ast::Piece){piece}, piece.line, piece.column)
+                  end
+                end
+                next
+              end
               c = advance
-              if c == '"' || c == '\''
+              buf << c
+              case c
+              when '"', '\''
                 quote = c
                 loop do
-                  fail if eop?
+                  fail if eop? # interpolation inside a quoted span string
                   sc = advance
+                  buf << sc
                   if sc == '\\'
-                    advance unless eop?
+                    buf << advance unless eop?
                   elsif sc == quote
                     break
                   end
                 end
-              elsif c == '('
+              when '('
                 depth += 1
-              elsif c == ')'
+              when ')'
                 depth -= 1
-                break if depth == 0
+                done = true if depth == 0
               end
             end
-            push(Tok.new(TokKind::Raw, text[start...@char_i], @space))
+            tail = buf.to_s
+            parts << tail unless tail.empty?
+            if parts.size == 1 && (only = parts[0]).is_a?(String)
+              @toks << Tok.new(TokKind::Raw, only, space)
+            else
+              @toks << Tok.new(TokKind::RawSpan, "", space, str_parts: parts)
+            end
+            @space = false
           end
 
           private def lex_operator(c : Char) : Nil
@@ -501,6 +575,9 @@ module Hwaro
             when '%'
               advance
               push(Tok.new(TokKind::Percent, "%", @space))
+            when '&'
+              advance
+              push(Tok.new(TokKind::Amp, "&", @space))
             when '='
               advance
               fail unless peek == '='
@@ -508,9 +585,23 @@ module Hwaro
               push(Tok.new(TokKind::EqEq, "==", @space))
             when '!'
               advance
-              fail unless peek == '='
-              advance
-              push(Tok.new(TokKind::NotEq, "!=", @space))
+              if peek == '='
+                advance
+                push(Tok.new(TokKind::NotEq, "!=", @space))
+              else
+                # `!important` as a SassScript value (dart-sass
+                # ImportantExpression) — the utilities-API idiom
+                # `$value if($enable-important, !important, null)`.
+                # (A trailing `!important` flag never reaches this lexer;
+                # the statement parser strips it first.)
+                off = 0
+                while peek(off).try(&.ascii_whitespace?)
+                  off += 1
+                end
+                fail unless word_at?(off, "important")
+                (off + 9).times { advance }
+                push(Tok.new(TokKind::Ident, "!important", @space))
+              end
             when '<'
               advance
               if peek == '='
@@ -574,12 +665,23 @@ module Hwaro
             @space = false
           end
 
+          # Case-insensitive keyword match at `offset` chars ahead, ending
+          # at a non-ident boundary.
+          private def word_at?(offset : Int32, word : String) : Bool
+            word.each_char_with_index do |wc, i|
+              c = peek(offset + i)
+              return false unless c && c.downcase == wc
+            end
+            !ident_char?(peek(offset + word.size))
+          end
+
           private def prev_operand? : Bool
             last = @toks.last?
             return false unless last
             case last.kind
             when TokKind::Number, TokKind::Ident, TokKind::Str, TokKind::Var,
-                 TokKind::Interp, TokKind::Raw, TokKind::RParen, TokKind::RBracket
+                 TokKind::Interp, TokKind::Raw, TokKind::RawSpan, TokKind::Amp,
+                 TokKind::RParen, TokKind::RBracket
               true
             else
               false
@@ -693,8 +795,8 @@ module Hwaro
             return false unless tok
             case tok.kind
             when TokKind::Number, TokKind::Ident, TokKind::QualIdent, TokKind::Str,
-                 TokKind::Var, TokKind::Interp, TokKind::Raw, TokKind::LParen,
-                 TokKind::LBracket
+                 TokKind::Var, TokKind::Interp, TokKind::Raw, TokKind::RawSpan,
+                 TokKind::Amp, TokKind::LParen, TokKind::LBracket
               true
             when TokKind::Minus, TokKind::Plus
               # `a -b` starts a new item; `a - b` is subtraction and was
@@ -838,7 +940,8 @@ module Hwaro
             case tok.kind
             when TokKind::Interp
               true
-            when TokKind::Number, TokKind::Ident, TokKind::Str, TokKind::Var, TokKind::Raw
+            when TokKind::Number, TokKind::Ident, TokKind::Str, TokKind::Var,
+                 TokKind::Raw, TokKind::RawSpan
               # Only join runs that involve interpolation; `10px 5px`
               # spacing errors and the like should fail-fast instead.
               @toks[@pos - 1].kind.interp?
@@ -867,6 +970,13 @@ module Hwaro
             when TokKind::Raw
               @pos += 1
               Lit.new(Raw.new(tok.text))
+            when TokKind::RawSpan
+              @pos += 1
+              parts = tok.str_parts || fail
+              RawSpanE.new(parts)
+            when TokKind::Amp
+              @pos += 1
+              AmpE.new
             when TokKind::Ident, TokKind::QualIdent
               parse_ident_primary
             when TokKind::LParen
@@ -966,17 +1076,22 @@ module Hwaro
             sep = ListV::Sep::Space
             unless match?(TokKind::RBracket)
               first = parse_slash
-              items << first
               if match?(TokKind::Comma)
+                items << first
                 sep = ListV::Sep::Comma
                 while accept(TokKind::Comma)
                   break if match?(TokKind::RBracket)
                   items << parse_slash
                 end
+              elsif first.is_a?(ListE) && !first.bracketed
+                # parse_slash already consumed the whole space/slash run as
+                # one inner list — its items ARE the bracketed list's items
+                # (`[1 2 3]` is a 3-element bracketed space list, not a
+                # 1-element list holding `(1 2 3)`).
+                items = first.items
+                sep = first.sep
               else
-                while !match?(TokKind::RBracket) && !eof?
-                  items << parse_slash
-                end
+                items << first
               end
             end
             fail unless accept(TokKind::RBracket)
@@ -1006,12 +1121,21 @@ module Hwaro
           nil
         end
 
-        # Strict parse for control-flow contexts.
+        # Strict parse for control-flow contexts. Every ParseFailure —
+        # the lexer's included — must convert to SoftEvalError here: a raw
+        # ParseFailure escaping the compiler bypasses error classification
+        # entirely and surfaces as an unlocated crash.
         def self.parse!(template : Ast::TextTemplate) : Node
-          toks = Lexer.new(template).lex
+          toks = begin
+            Lexer.new(template).lex
+          rescue ParseFailure
+            raise SoftEvalError.new("invalid expression")
+          end
           raise SoftEvalError.new("expected expression") if toks.empty?
           begin
             Parser.new(toks).parse
+          rescue ex : DepthExceeded
+            raise SoftEvalError.new(ex.message || "invalid expression")
           rescue ParseFailure
             raise SoftEvalError.new("invalid expression")
           end
@@ -1036,7 +1160,12 @@ module Hwaro
           when ListE
             node.items.any? { |i| computes?(i, host) }
           when MapE
-            node.pairs.any? { |pair| computes?(pair.key, host) || computes?(pair.value, host) }
+            # Map literals ALWAYS count as work, same rationale as ParenE:
+            # `(a: b)` is Sass-only syntax with no CSS meaning. The verbatim
+            # path also corrupts them — substituting a comma-list variable
+            # into the map's text splices the list into the map's own comma
+            # structure, and the storage round-trip no longer parses.
+            true
           when ParenE
             # Grouping parens ALWAYS count as work, even around a bare literal
             # or a slash/space list: they are Sass syntax with no meaning in
@@ -1047,6 +1176,10 @@ module Hwaro
           when ConcatE
             node.parts.any? { |p| computes?(p, host) }
           else
+            # RawSpanE and AmpE deliberately don't compute: a lone
+            # `calc(#{$a})` value or a bare `&` resolves identically via
+            # the verbatim path, which keeps existing output
+            # byte-identical.
             false
           end
         end
@@ -1063,6 +1196,8 @@ module Hwaro
           abstract def expr_known_fn?(ns : String?, name : String) : Bool
           # Resolves an interpolation template to (unquoted) text.
           abstract def expr_interp(template : Ast::TextTemplate) : String
+          # Enclosing rule's resolved selectors for `&` (nil at root).
+          abstract def expr_parent_selectors : Array(String)?
         end
 
         # Coerces stored text back into a typed value ("1px" -> Number,
@@ -1099,6 +1234,10 @@ module Hwaro
           def expr_interp(template : Ast::TextTemplate) : String
             raise SoftEvalError.new("no interpolation in stored values")
           end
+
+          def expr_parent_selectors : Array(String)?
+            nil
+          end
         end
 
         # ---------------------------------------------------------------
@@ -1120,6 +1259,14 @@ module Hwaro
             when VarE    then Expr.coerce(@host.expr_var(node.name, node.ns))
             when InterpE then Expr.coerce(@host.expr_interp(node.template))
             when StrE    then eval_str(node)
+            when RawSpanE
+              Raw.new(node.parts.join { |p| p.is_a?(String) ? p : @host.expr_interp(p) })
+            when AmpE
+              if parents = @host.expr_parent_selectors
+                ListV.new(parents.map { |p| Str.new(p, quoted: false).as(Value) }, ListV::Sep::Comma)
+              else
+                NullV.new
+              end
             when ConcatE then Raw.new(node.parts.map { |p| eval(p).to_css }.join)
             when ParenE  then eval(node.inner)
             when ListE   then ListV.new(node.items.map { |i| eval(i).as(Value) }, node.sep, node.bracketed)
@@ -1185,9 +1332,9 @@ module Hwaro
               boolish!(left)
               left.truthy? ? eval(node.right) : left
             when :eq
-              BoolV.new(eval(node.left).eq?(eval(node.right)))
+              BoolV.new(loose_eq(eval(node.left), eval(node.right)))
             when :neq
-              BoolV.new(!eval(node.left).eq?(eval(node.right)))
+              BoolV.new(!loose_eq(eval(node.left), eval(node.right)))
             when :lt, :gt, :le, :ge
               compare(node.op, eval(node.left), eval(node.right))
             when :plus
@@ -1201,6 +1348,17 @@ module Hwaro
             else
               raise SoftEvalError.new("unsupported operator")
             end
+          end
+
+          # `==` with Raw normalization: a value that reaches comparison as
+          # unmodeled text (a function's raw return, a concat result) still
+          # compares equal to its typed twin — `1rem == 1rem` must not
+          # depend on which evaluation path each side took.
+          private def loose_eq(left : Value, right : Value) : Bool
+            return true if left.eq?(right)
+            l = left.is_a?(Raw) ? Expr.coerce(left.text) : left
+            r = right.is_a?(Raw) ? Expr.coerce(right.text) : right
+            l.eq?(r)
           end
 
           private def compare(op : Symbol, left : Value, right : Value) : Value
@@ -1269,6 +1427,10 @@ module Hwaro
           end
 
           private def eval_call(node : CallE) : Value
+            if node.ns.nil? && node.spread.nil? && node.kwargs.empty? &&
+               node.args.size == 3 && Sass.normalize_ident(node.name) == "if"
+              return eval(node.args[0]).truthy? ? eval(node.args[1]) : eval(node.args[2])
+            end
             args = node.args.map { |a| eval(a) }
             if spread = node.spread
               spread_val = eval(spread)

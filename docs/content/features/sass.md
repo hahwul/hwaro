@@ -75,9 +75,11 @@ Hwaro implements a practical SCSS subset — the features hand-written site styl
 | `@import` (Sass files) | ✅ classic global-merge semantics; plain-CSS forms pass through |
 | `@mixin` / `@include` | ✅ default values, keyword arguments, variadic `$args...`, spreads, `@content` blocks |
 | `@function` / `@return` | ✅ user functions callable in values, defaults/keywords/variadic, recursion |
+| `@extend` + `%placeholders` | ✅ simple-selector targets, compound unification, `!optional`; un-extended placeholders never emit — see deviations |
+| `&` in SassScript | ✅ `if(&, "&", "")` and friends — the parent selector as a value, `null` at the root |
 | Control flow | ✅ `@if` / `@else if` / `@else`, `@each` (with destructuring), `@for` (`through`/`to`, descending), `@while` |
 | SassScript expressions | ✅ arithmetic (`+ - * %`), comparisons, `and`/`or`/`not`, strings, lists, maps — see deviations for `/` |
-| Built-in functions | ✅ `sass:math`, `sass:string`, `sass:list`, `sass:map`, `sass:meta`, `sass:color` subset + legacy global names (`map-get`, `nth`, `darken`, `if()`, …) |
+| Built-in functions | ✅ `sass:math`, `sass:string`, `sass:list` (incl. `zip`), `sass:map` (incl. `set` / `deep-merge`), `sass:meta` (incl. `variable-exists` / `function-exists` / `mixin-exists` / `content-exists` / `get-function` / `call`), `sass:color` subset + legacy global names (`map-get`, `nth`, `darken`, `if()`, …) |
 | `@debug` / `@warn` / `@error` | ✅ `@error` fails the build with a located message |
 | `@at-root` | ✅ selector and block forms (no `with:`/`without:` queries) |
 | `@media` / `@supports` in rules | ✅ bubbled out of nesting automatically; feature values evaluate expressions |
@@ -111,7 +113,7 @@ $breakpoints: (sm: 640px, md: 768px, lg: 1024px);
 
 ### Colors
 
-Color functions operate on hex literals (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`) and the CSS color keywords (`red`, `rebeccapurple`, `transparent`):
+Color functions operate on hex literals (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`), the CSS color keywords (`red`, `rebeccapurple`, `transparent`), and the legacy comma spellings `rgb(…)` / `rgba(…)` / `hsl(…)` / `hsla(…)` — a color built from `hsl()` remembers its declared hue/saturation, so `hue(hsl(221, 14%, 100%))` answers `221deg`:
 
 ```scss
 $brand: #336699;
@@ -145,14 +147,26 @@ A computed color serializes as `#rrggbb` when opaque and `rgba(r, g, b, a)` othe
 
 Two colors are only compared as colors once a color function has produced them; `#ffffff == #FFF` between two literals is still the generic text comparison and is false. Teaching `==` to parse every literal would flip `@if` branches in stylesheets that compile today, which the plain-CSS guarantee rules out.
 
+### @extend
+
+`@extend` works on simple-selector targets — a class, `%placeholder`, id, element, or pseudo — which covers how real stylesheets (Bootstrap included) use it. The target's compound is unified with the extender's final compound, ancestor compounds are prepended, and un-extended `%placeholder` rules never reach the output:
+
+```scss
+%visually-hidden { position: absolute; clip: rect(0 0 0 0); }
+.sr-only { @extend %visually-hidden; }
+// → .sr-only { position: absolute; clip: rect(0 0 0 0); }
+```
+
+A missing target fails the build with a located error; append `!optional` to tolerate it. See the deviations list for how the subset differs from dart-sass's full extend algorithm.
+
 ### Not supported (yet)
 
-`@extend`, unit conversion (`px`↔`cm`), `@at-root (with: ...)` queries, `@forward ... with (...)`, `@content(args)` / `using`, `math.random` / `unique-id()` (builds must stay deterministic), nested properties (`font: { family: ... }`), the indented `.sass` syntax, and source maps.
+Unit conversion (`px`↔`cm`), `@at-root (with: ...)` queries, `@forward ... with (...)`, `@content(args)` / `using`, `math.random` / `unique-id()` (builds must stay deterministic), nested properties (`font: { family: ... }`), the indented `.sass` syntax, and source maps.
 
 **Unsupported directives fail the build with a located error** — Hwaro never emits silently broken CSS:
 
 ```
-Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @extend is not supported by hwaro's Sass subset (yet)
+Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @content arguments are not supported
 ```
 
 ### Expression semantics
@@ -169,9 +183,11 @@ The compiler's first duty is the plain-CSS guarantee, so expressions follow a tw
 - Unit arithmetic requires identical units or one unitless side; there is no `px`↔`in` conversion table.
 - `and`/`or` in *value* positions only operate on real booleans — `font-family: Franklin and Marshall` stays text. Conditions have full Sass truthiness.
 - Global `min()`/`max()`/`round()`/`abs()` evaluate only when all arguments are statically comparable numbers; CSS forms (`min(5vw, 100px)`, `round(up, 101px, 10px)`) pass through.
-- `rgb()`/`rgba()`/`hsl()`/`hsla()` are **not** folded in their CSS forms: `rgb(0, 0, 0)` stays verbatim where dart-sass would emit `black`. Only the Sass-only `rgba($color, $alpha)` spelling — which is not valid CSS — evaluates. Likewise `grayscale()`, `invert()`, `saturate()` and `opacity()` are color functions when handed a color and plain CSS filters when handed a number (`filter: grayscale(50%)` passes through).
+- `rgb()`/`rgba()`/`hsl()`/`hsla()` are **not** folded in their CSS forms: `rgb(0, 0, 0)` stays verbatim where dart-sass would emit `black` (a color *function* handed such a literal still reads it as a color). Only the Sass-only `rgba($color, $alpha)` spelling — which is not valid CSS — evaluates. Likewise `grayscale()`, `invert()`, `saturate()` and `opacity()` are color functions when handed a color and plain CSS filters when handed a number (`filter: grayscale(50%)` passes through).
+- A computed color serializes as hex/`rgba()` with integer channels; dart-sass 1.79+ keeps fractional channels (`rgb(38.25, 76.5, 114.75)`). Off by at most one per channel.
 - Most built-in functions take positional arguments only. A keyword call (`list.append($l, x, $separator: comma)`) doesn't evaluate and keeps its verbatim text. The **color** functions are the exception — they accept their documented keyword names (`darken($c, $amount: 10%)`, `mix($a, $b, $weight: 25%)`, `scale-color($c, $lightness: 60%)`), since `$lightness`-style arguments are the only way to call `adjust`/`scale`/`change`. User-defined `@mixin`/`@function` keyword arguments work normally.
-- `if()` evaluates both branches eagerly (no side effects exist, so this is observable only via `@error` in the untaken branch).
+- `@extend` is a practical subset of dart-sass's algorithm: targets must be simple selectors, extends apply document-wide (dart-sass scopes them per module and forbids crossing `@media` boundaries), and when both the extended selector and the extender have ancestor compounds only the first prefix order is emitted (dart-sass "weaves" both). Shared leading prefixes merge (`.nav %p` extended by `.nav > .c` → `.nav > .c`).
+- `calc()` contents are never simplified — `calc(9 / 21 * 100%)` stays as written where dart-sass folds it to `42.86%`. Browsers compute both identically.
 - Variables in at-rule preludes and values substitute directly (`@media (min-width: $bp)` works); selectors and property names require `#{...}` interpolation (same as dart-sass).
 - At-rule preludes evaluate expressions only inside `(feature: value)` spans; the query structure itself stays verbatim.
 - `@media` nested inside `@media` emits literally nested blocks (dart-sass merges the conditions).

@@ -20,6 +20,7 @@ require "./importer"
 require "./parser"
 require "./value"
 require "./expr"
+require "./extend"
 require "./functions"
 require "../../utils/logger"
 
@@ -107,6 +108,9 @@ module Hwaro
           @forward_variables = {} of String => String
           @forward_mixins = {} of String => MixinClosure
           @forward_functions = {} of String => SassFn
+          # @extend requests, applied document-wide as a post-pass —
+          # deliberately NOT saved/restored around module loads.
+          @extends = [] of Extend::Request
         end
 
         # Registers the entry file's canonical path so a self-import cycle
@@ -117,6 +121,8 @@ module Hwaro
 
         def evaluate(sheet : Ast::Stylesheet) : Array(Css::Node)
           eval_nodes(sheet.children)
+          apply_extends
+          Extend.scrub_placeholders(@sink)
           @sink
         end
 
@@ -169,6 +175,8 @@ module Hwaro
             eval_message(node)
           when Ast::AtRootNode
             eval_at_root(node)
+          when Ast::ExtendNode
+            eval_extend(node)
           when Ast::UseNode
             eval_use(node)
           when Ast::ImportNode
@@ -178,8 +186,23 @@ module Hwaro
           when Ast::RawAtRuleNode
             eval_at_rule(node)
           when Ast::CommentNode
-            emit_comment(node.text)
+            emit_comment(comment_text(node))
           end
+        end
+
+        # Comments are the most lenient context of all: a `#{...}` that
+        # fails to resolve (undefined variable in commented-out Sass, a
+        # `#{...}` that was never meant as interpolation) keeps the
+        # comment byte-identical instead of failing the build.
+        private def comment_text(node : Ast::CommentNode) : String
+          if template = node.template
+            begin
+              return resolve_template(template, allow_vars: true)
+            rescue SyntaxError
+              # fall through to the verbatim text
+            end
+          end
+          node.text
         end
 
         # ---------------------------------------------------------------
@@ -861,6 +884,86 @@ module Hwaro
         end
 
         # ---------------------------------------------------------------
+        # @extend
+        # ---------------------------------------------------------------
+
+        # Records the enclosing rule's selectors as extenders of each
+        # target; application happens document-wide after evaluation, once
+        # every rule (own file, @use'd modules, @imports) is in the sink.
+        private def eval_extend(node : Ast::ExtendNode) : Nil
+          rule = @current_rule
+          if rule.nil? || @in_keyframes
+            error_at(node.line, node.column, "@extend may only be used within style rules")
+          end
+          text = resolve_template(node.selector, allow_vars: false)
+          targets = Parser.split_top_level_commas(text).map { |s| collapse_ws(s) }.reject(&.empty?)
+          error_at(node.line, node.column, "expected selector after @extend") if targets.empty?
+          # Snapshot the selectors: the apply pass appends to rule selector
+          # arrays, and a request must not iterate an extender list that is
+          # growing under it (self-extension aliases the two). Chains still
+          # resolve through the per-rule fixpoint.
+          extenders = rule.selectors.dup
+          targets.each do |target|
+            @extends << Extend::Request.new(extenders, target, node.optional,
+              @path, node.line, node.column)
+          end
+        end
+
+        private def apply_extends : Nil
+          return if @extends.empty?
+          matched = Array(Bool).new(@extends.size, false)
+          extend_nodes(@sink, matched)
+          @extends.each_with_index do |req, i|
+            next if req.optional || matched[i]
+            raise SyntaxError.new(
+              "@extend target #{req.target.inspect} was not found " \
+              "(add \"!optional\" to tolerate a missing target)",
+              req.path, req.line, req.column)
+          end
+        end
+
+        private def extend_nodes(nodes : Array(Css::Node), matched : Array(Bool)) : Nil
+          nodes.each do |node|
+            case node
+            when Css::Rule
+              extend_rule(node, matched)
+            when Css::AtRule
+              extend_nodes(node.children, matched) unless keyframes?(node.name)
+            end
+          end
+        end
+
+        # Grows the rule's selector list to a local fixpoint: selectors a
+        # request adds are themselves candidates for other requests, which
+        # is what makes chained extends (`.c {@extend .b} .b {@extend .a}`)
+        # resolve. Terminates because additions are deduplicated and capped.
+        private def extend_rule(rule : Css::Rule, matched : Array(Bool)) : Nil
+          selectors = rule.selectors
+          seen = selectors.to_set
+          i = 0
+          while i < selectors.size
+            sel = selectors[i]
+            @extends.each_with_index do |req, ri|
+              results = Extend.extend_selector(sel, req.target, req.extenders)
+              next unless results
+              matched[ri] = true
+              results.each do |added|
+                next if seen.includes?(added)
+                seen << added
+                selectors << added
+                if selectors.size > MAX_RULE_SELECTORS
+                  raise SyntaxError.new(
+                    "@extend expanded a rule to more than #{MAX_RULE_SELECTORS} selectors " \
+                    "(mutually recursive extends?)",
+                    req.path, req.line, req.column)
+                end
+              end
+            end
+            i += 1
+          end
+        end
+
+        # ---------------------------------------------------------------
         # Functions
         # ---------------------------------------------------------------
 
@@ -1184,6 +1287,14 @@ module Hwaro
         # calls), evaluate it; otherwise — and on any soft failure — the
         # legacy verbatim path keeps output byte-identical.
         private def resolve_value(template : Ast::TextTemplate) : String
+          # A bare `$var` propagates its storage text EXACTLY: "null" must
+          # stay "null" (argument passing and `@if $x` depend on it — the
+          # splicing path below elides null, which turned a null argument
+          # into a truthy empty string), and structural parens of nested
+          # lists must survive for later coercion.
+          if template.pieces.size == 1 && (ref = template.pieces[0].as?(Ast::VarRef))
+            return lookup_var_ref(ref)
+          end
           if node = Expr.parse(template)
             if Expr.computes?(node, self)
               begin
@@ -1337,7 +1448,10 @@ module Hwaro
 
           text = String.build do |io|
             segments.each do |is_value, sub|
-              io << (is_value ? resolve_value(sub) : resolve_template(sub, allow_vars: true))
+              # Feature values render like declaration values (CSS text,
+              # not storage text) — the storage spellings `(10px,)` and
+              # `(a b), (c d)` must not leak into a media query.
+              io << (is_value ? resolve_decl_value(sub).text : resolve_template(sub, allow_vars: true))
             end
           end
           collapse_ws(text)
@@ -1372,9 +1486,31 @@ module Hwaro
         end
 
         # :nodoc:
+        def expr_parent_selectors : Array(String)?
+          @parent_selectors
+        end
+
+        # sass:meta functions that need evaluator state (scopes, mixins,
+        # @content) and therefore can't live in the static builtin tables.
+        META_HOST_FNS = %w[variable-exists global-variable-exists
+          function-exists mixin-exists content-exists get-function call]
+
+        # :nodoc:
         def expr_call(ns : String?, name : String, args : Array(Value),
                       kwargs : Hash(String, Value)) : Value?
           norm = Sass.normalize_ident(name)
+          if host_meta_fn?(ns, norm)
+            begin
+              return call_meta_host_fn(norm, args, kwargs)
+            rescue ex : NamespacedEvalError
+              raise ex
+            rescue ex : SoftEvalError
+              # Same policy as every other namespaced builtin: a failure
+              # inside `meta.…` must not fall back to verbatim CSS.
+              raise NamespacedEvalError.new(ex.message || "call failed") if ns
+              raise ex
+            end
+          end
           if ns
             mod = @env.module?(ns)
             raise NamespacedEvalError.new("there is no module namespace \"#{ns}\"") unless mod
@@ -1418,7 +1554,145 @@ module Hwaro
           # or function then soft-fails (lenient: verbatim, strict: loud).
           return true if ns
           norm = Sass.normalize_ident(name)
-          !@env.lookup_function(norm).nil? || Builtins::GLOBAL_FNS.has_key?(norm)
+          !@env.lookup_function(norm).nil? || Builtins::GLOBAL_FNS.has_key?(norm) ||
+            META_HOST_FNS.includes?(norm)
+        end
+
+        # True when this call resolves to a host-backed sass:meta function:
+        # the legacy global spelling (unless shadowed by a user @function)
+        # or a namespaced call whose namespace is the built-in meta module.
+        private def host_meta_fn?(ns : String?, norm : String) : Bool
+          return false unless META_HOST_FNS.includes?(norm)
+          if ns
+            mod = @env.module?(ns)
+            !mod.nil? && mod.same?(BUILTIN_MODULES["meta"]?)
+          else
+            @env.lookup_function(norm).nil?
+          end
+        end
+
+        private def call_meta_host_fn(norm : String, args : Array(Value),
+                                      kwargs : Hash(String, Value)) : Value
+          case norm
+          when "content-exists"
+            unless args.empty? && kwargs.empty?
+              raise SoftEvalError.new("content-exists() takes no arguments")
+            end
+            return BoolV.new(!@content.nil?)
+          when "get-function"
+            return meta_get_function(args, kwargs)
+          when "call"
+            return meta_call(args, kwargs)
+          end
+          raise SoftEvalError.new("#{norm}() takes one argument, $name") unless args.size <= 1
+          kwargs.each_key do |key|
+            next if key == "name"
+            next if key == "module" && norm != "variable-exists"
+            raise SoftEvalError.new("#{norm}(): no parameter named $#{key}")
+          end
+          value = args[0]? || kwargs["name"]?
+          member =
+            case value
+            when Str then value.text
+            when Raw then value.text
+            else
+              raise SoftEvalError.new("#{norm}() expects a string, got #{value.try(&.to_css).inspect}")
+            end
+          member = Sass.normalize_ident(member.lchop('$'))
+          if mod_arg = kwargs["module"]?
+            mod = @env.module?(module_arg_text(mod_arg))
+            raise SoftEvalError.new("#{norm}(): no module named #{mod_arg.to_css.inspect}") unless mod
+            exists =
+              case norm
+              when "global-variable-exists" then mod.variables.has_key?(member)
+              when "function-exists"        then mod.functions.has_key?(member)
+              else # mixin-exists
+                mod.mixins.has_key?(member)
+              end
+            return BoolV.new(exists)
+          end
+          exists =
+            case norm
+            when "variable-exists"
+              !@env.lookup_var(member).nil?
+            when "global-variable-exists"
+              @env.root.variables.has_key?(member)
+            when "function-exists"
+              !named_function(member).nil?
+            else # mixin-exists
+              !@env.lookup_mixin(member).nil?
+            end
+          BoolV.new(exists)
+        end
+
+        # Resolves a function name the way a call site would: user
+        # @functions win, then the host-backed meta functions (wrapped so
+        # they are first-class values for get-function/call), then the
+        # global builtins.
+        private def named_function(norm : String) : SassFn?
+          if fn = @env.lookup_function(norm)
+            return fn
+          end
+          if META_HOST_FNS.includes?(norm)
+            return Builtins::Fn.new { |a, k| call_meta_host_fn(norm, a, k) }
+          end
+          Builtins::GLOBAL_FNS[norm]?
+        end
+
+        private def meta_get_function(args : Array(Value), kwargs : Hash(String, Value)) : Value
+          if kwargs["css"]?.try(&.truthy?)
+            raise SoftEvalError.new("get-function($css: true) is not supported")
+          end
+          value = args[0]? || kwargs["name"]?
+          name =
+            case value
+            when Str then value.text
+            when Raw then value.text
+            else
+              raise SoftEvalError.new("get-function() expects a function name string")
+            end
+          norm = Sass.normalize_ident(name)
+          fn = if mod_name = kwargs["module"]?
+                 mod = @env.module?(module_arg_text(mod_name))
+                 raise SoftEvalError.new("get-function(): no module named #{mod_name.to_css.inspect}") unless mod
+                 mod.functions[norm]?
+               else
+                 named_function(norm)
+               end
+          raise SoftEvalError.new("get-function(): no function named #{name.inspect}") unless fn
+          FnRefV.new(norm, fn)
+        end
+
+        private def module_arg_text(value : Value) : String
+          value.is_a?(Str) ? value.text : value.to_css
+        end
+
+        private def meta_call(args : Array(Value), kwargs : Hash(String, Value)) : Value
+          ref = args[0]?
+          raise SoftEvalError.new("call() expects a function reference") unless ref
+          rest = args[1..]
+          name =
+            case ref
+            when FnRefV
+              return invoke_fn(ref.fn, ref.name, rest, kwargs)
+            when Str
+              # Legacy spelling: call("name", args...).
+              ref.text
+            when Raw
+              # A reference that round-tripped through string storage
+              # degrades to its `get-function("name")` spelling
+              # (`$f: get-function("darken"); call($f, …)`) — re-resolve
+              # it by name.
+              match = ref.text.match(/\Aget-function\(\s*"([^"]*)"\s*\)\z/)
+              raise SoftEvalError.new("call() expects a function reference, got #{ref.to_css.inspect}") unless match
+              match[1]
+            else
+              raise SoftEvalError.new("call() expects a function reference, got #{ref.to_css.inspect}")
+            end
+          norm = Sass.normalize_ident(name)
+          fn = named_function(norm)
+          raise SoftEvalError.new("call(): no function named #{name.inspect}") unless fn
+          invoke_fn(fn, norm, rest, kwargs)
         end
 
         # :nodoc:
@@ -1447,7 +1721,7 @@ module Hwaro
                   # optional-modifier idiom `.btn#{$mod}` with `$mod: null`
                   # has to yield `.btn`, not `.btnnull`.
                   var_text = lookup_var_ref(piece)
-                  io << var_text unless var_text == "null"
+                  io << var_display_text(var_text) unless var_text == "null"
                 end
               in Ast::Interp
                 io << unquote_interp(resolve_interp(piece.inner))
@@ -1494,6 +1768,26 @@ module Hwaro
             i += 1
           end
           inner
+        end
+
+        # Storage text is `inspect_css` — nested unbracketed lists carry
+        # structural parens (`(inset 0 1px #fff), (0 1px #000)`) and a
+        # single-element comma list spells itself `(10px,)` so they
+        # survive the string round-trip. Those spellings are NOT valid
+        # CSS, so a verbatim `$var` substitution must render such values
+        # with `to_css` instead. Every other storage text (including
+        # verbatim never-computed source) passes through untouched, which
+        # is what keeps plain-CSS output byte-identical.
+        private def var_display_text(storage : String) : String
+          return storage unless storage.includes?('(')
+          value = Expr.coerce(storage)
+          if value.is_a?(ListV) &&
+             (value.items.any? { |i| i.is_a?(ListV) && !i.bracketed } ||
+             (value.sep == ListV::Sep::Comma && value.items.size == 1))
+            value.to_css
+          else
+            storage
+          end
         end
 
         private def lookup_var_ref(ref : Ast::VarRef) : String
