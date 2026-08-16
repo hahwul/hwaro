@@ -260,7 +260,10 @@ module Hwaro
           {nil, raw}
         end
 
-        private def yaml_any_to_toml_any(value : YAML::Any) : TOML::Any
+        # `depth` guards a cyclic YAML::Any (self-referencing anchor); see
+        # `Utils::Nesting`.
+        private def yaml_any_to_toml_any(value : YAML::Any, depth : Int32 = 0) : TOML::Any
+          Utils::Nesting.check!(depth)
           raw = value.raw
           case raw
           when String
@@ -274,14 +277,14 @@ module Hwaro
           when Bool
             TOML::Any.new(raw)
           when Array
-            arr = raw.map { |item| yaml_any_to_toml_any(item.as(YAML::Any)) }
+            arr = raw.map { |item| yaml_any_to_toml_any(item.as(YAML::Any), depth + 1) }
             TOML::Any.new(arr)
           when Hash
             hash = {} of String => TOML::Any
             raw.each do |k, v|
               k_any = k.as(YAML::Any)
               key_str = yaml_string(k_any)
-              hash[key_str] = yaml_any_to_toml_any(v.as(YAML::Any))
+              hash[key_str] = yaml_any_to_toml_any(v.as(YAML::Any), depth + 1)
             end
             TOML::Any.new(hash)
           when Nil

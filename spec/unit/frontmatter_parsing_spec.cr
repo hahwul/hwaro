@@ -2113,5 +2113,16 @@ describe Hwaro::Content::Processors::Markdown do
       result = processor.parse("\uFEFFJust body text\n")
       result[:content].should eq("Just body text\n")
     end
+
+    # A self-referencing YAML anchor parses fine and yields a CYCLIC
+    # YAML::Any; walking it into `extra` used to blow the stack (exit 11,
+    # unrescuable) rather than surface as a front-matter error.
+    it "reports a self-referencing YAML anchor as a content error" do
+      ex = expect_raises(Hwaro::HwaroError) do
+        processor.parse("---\ntitle: T\nextra:\n  x: &a\n    b: *a\n---\nBody\n", "post.md")
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+      ex.message.to_s.should contain("nesting")
+    end
   end
 end

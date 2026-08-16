@@ -446,7 +446,11 @@ module Hwaro
         Utils::FrontmatterWriter.serialize_time(time)
       end
 
-      private def yaml_any_to_json_any(yaml : YAML::Any) : JSON::Any
+      # `depth` guards the cyclic-YAML case (a self-referencing anchor); see
+      # `Utils::Nesting`. Every caller already rescues and returns nil, so the
+      # conversion is skipped rather than crashing `hwaro tool convert`.
+      private def yaml_any_to_json_any(yaml : YAML::Any, depth : Int32 = 0) : JSON::Any
+        Utils::Nesting.check!(depth)
         raw = yaml.raw
         case raw
         when Bool    then JSON::Any.new(raw)
@@ -458,13 +462,13 @@ module Hwaro
         when Time    then JSON::Any.new(FrontmatterConverter.serialize_time(raw))
         when Nil     then JSON::Any.new(nil)
         when Array
-          arr = yaml.as_a.map { |v| yaml_any_to_json_any(v) }
+          arr = yaml.as_a.map { |v| yaml_any_to_json_any(v, depth + 1) }
           JSON::Any.new(arr)
         when Hash
           hash = {} of String => JSON::Any
           yaml.as_h.each do |k, v|
             key_str = k.as_s? || k.to_s
-            hash[key_str] = yaml_any_to_json_any(v)
+            hash[key_str] = yaml_any_to_json_any(v, depth + 1)
           end
           JSON::Any.new(hash)
         else
@@ -472,7 +476,8 @@ module Hwaro
         end
       end
 
-      private def toml_any_to_json_any(value : TOML::Any) : JSON::Any
+      private def toml_any_to_json_any(value : TOML::Any, depth : Int32 = 0) : JSON::Any
+        Utils::Nesting.check!(depth)
         raw = value.raw
         case raw
         when Bool    then JSON::Any.new(raw)
@@ -482,14 +487,14 @@ module Hwaro
         when Time    then JSON::Any.new(FrontmatterConverter.serialize_time(raw))
         when Array
           arr = raw.map do |item|
-            item.is_a?(TOML::Any) ? toml_any_to_json_any(item) : JSON::Any.new(item.to_s)
+            item.is_a?(TOML::Any) ? toml_any_to_json_any(item, depth + 1) : JSON::Any.new(item.to_s)
           end
           JSON::Any.new(arr)
         when Hash
           if raw.is_a?(Hash(String, TOML::Any))
             hash = {} of String => JSON::Any
             raw.each do |k, v|
-              hash[k] = toml_any_to_json_any(v)
+              hash[k] = toml_any_to_json_any(v, depth + 1)
             end
             JSON::Any.new(hash)
           else
@@ -501,7 +506,8 @@ module Hwaro
       end
 
       # Convert JSON::Any to YAML::Any so the existing TomlBuilder can consume it.
-      private def json_to_yaml_any(json : JSON::Any) : YAML::Any
+      private def json_to_yaml_any(json : JSON::Any, depth : Int32 = 0) : YAML::Any
+        Utils::Nesting.check!(depth)
         raw = json.raw
         case raw
         when Bool    then YAML::Any.new(raw)
@@ -510,12 +516,12 @@ module Hwaro
         when String  then YAML::Any.new(raw)
         when Nil     then YAML::Any.new(nil)
         when Array
-          arr = json.as_a.map { |v| json_to_yaml_any(v) }
+          arr = json.as_a.map { |v| json_to_yaml_any(v, depth + 1) }
           YAML::Any.new(arr)
         when Hash
           hash = {} of YAML::Any => YAML::Any
           json.as_h.each do |k, v|
-            hash[YAML::Any.new(k)] = json_to_yaml_any(v)
+            hash[YAML::Any.new(k)] = json_to_yaml_any(v, depth + 1)
           end
           YAML::Any.new(hash)
         else

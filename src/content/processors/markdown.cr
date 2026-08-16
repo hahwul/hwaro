@@ -747,13 +747,14 @@ module Hwaro
         # `[extra.author] name = "x"` round-trips to `{{ page.extra.author.name }}`.
         # Arrays of all-strings stay as `Array(String)` so existing
         # `page.extra["x"]?.as?(Array(String))` consumers keep working.
-        private def extract_extra_value(value : TOML::Any) : Models::ExtraValue
+        private def extract_extra_value(value : TOML::Any, depth : Int32 = 0) : Models::ExtraValue
+          Utils::Nesting.check!(depth)
           if h = value.as_h?
             out = {} of String => Models::ExtraValue
-            h.each { |k, v| out[k] = extract_extra_value(v) }
+            h.each { |k, v| out[k] = extract_extra_value(v, depth + 1) }
             out
           elsif arr = value.as_a?
-            extract_extra_array(arr)
+            extract_extra_array(arr, depth)
           elsif str = value.as_s?
             str
           elsif (bool_val = value.as_bool?) != nil
@@ -770,16 +771,22 @@ module Hwaro
           end
         end
 
-        private def extract_extra_value(value : YAML::Any) : Models::ExtraValue
+        # `depth` exists for the YAML overload's sake above all: a
+        # self-referencing anchor (`x: &a\n  b: *a`) parses fine and yields a
+        # CYCLIC `YAML::Any`, so this walk never terminates on its own. See
+        # `Utils::Nesting`; `extract_from_yaml` converts the raise into the
+        # usual HWARO_E_CONTENT front-matter error.
+        private def extract_extra_value(value : YAML::Any, depth : Int32 = 0) : Models::ExtraValue
+          Utils::Nesting.check!(depth)
           if h = value.as_h?
             out = {} of String => Models::ExtraValue
             h.each do |k_any, v|
               key = k_any.as_s? || k_any.to_s
-              out[key] = extract_extra_value(v)
+              out[key] = extract_extra_value(v, depth + 1)
             end
             out
           elsif arr = value.as_a?
-            extract_extra_array(arr)
+            extract_extra_array(arr, depth)
           elsif str = value.as_s?
             str
           elsif (bool_val = value.as_bool?) != nil
@@ -793,13 +800,14 @@ module Hwaro
           end
         end
 
-        private def extract_extra_value(value : JSON::Any) : Models::ExtraValue
+        private def extract_extra_value(value : JSON::Any, depth : Int32 = 0) : Models::ExtraValue
+          Utils::Nesting.check!(depth)
           if h = value.as_h?
             out = {} of String => Models::ExtraValue
-            h.each { |k, v| out[k] = extract_extra_value(v) }
+            h.each { |k, v| out[k] = extract_extra_value(v, depth + 1) }
             out
           elsif arr = value.as_a?
-            extract_extra_array(arr)
+            extract_extra_array(arr, depth)
           elsif str = value.as_s?
             str
           elsif (bool_val = value.as_bool?) != nil
@@ -816,11 +824,11 @@ module Hwaro
         # If every element is a plain string, preserve the `Array(String)` type
         # so downstream `.as?(Array(String))` calls (e.g. `jsonld.cr`) keep
         # matching. Mixed arrays widen to `Array(ExtraValue)`.
-        private def extract_extra_array(arr : Array(TOML::Any) | Array(YAML::Any) | Array(JSON::Any)) : Array(String) | Array(Models::ExtraValue)
+        private def extract_extra_array(arr : Array(TOML::Any) | Array(YAML::Any) | Array(JSON::Any), depth : Int32 = 0) : Array(String) | Array(Models::ExtraValue)
           if arr.all? { |v| !v.as_s?.nil? }
             arr.compact_map(&.as_s?)
           else
-            arr.map { |v| extract_extra_value(v).as(Models::ExtraValue) }
+            arr.map { |v| extract_extra_value(v, depth + 1).as(Models::ExtraValue) }
           end
         end
 

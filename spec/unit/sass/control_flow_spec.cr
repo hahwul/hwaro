@@ -261,3 +261,27 @@ describe "Sass control flow" do
     end
   end
 end
+
+describe "Sass loop budget" do
+  # `@while` had a per-loop cap; `@for` had none at all, so one mistyped bound
+  # emitted rules until the process ran out of memory. Per-loop caps also don't
+  # survive nesting (two capped loops still multiply), so the budget is shared
+  # across the whole compile.
+  it "errors on a runaway @for bound instead of running out of memory" do
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /total @for\/@each\/@while iterations/) do
+      compile("@for $i from 1 through 100000000 { .c { top: 0; } }")
+    end
+  end
+
+  it "errors on nested loops whose product exceeds the budget" do
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /total @for\/@each\/@while iterations/) do
+      compile("@for $i from 1 through 3000 { @for $j from 1 through 3000 { .c { top: 0; } } }")
+    end
+  end
+
+  it "leaves realistic loops alone" do
+    css = compile(%q(@for $i from 1 through 12 { .col-#{$i} { width: 1px; } }))
+    css.should contain(".col-1")
+    css.should contain(".col-12")
+  end
+end
