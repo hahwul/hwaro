@@ -49,7 +49,17 @@ module Hwaro
     # A named diagnostic check: a human label paired with the set of
     # issue IDs that, when present, count against this check. The CLI
     # uses this to render inline ✓/⚠/✗ lines in human output.
-    record CheckSpec, label : String, issue_ids : Array(String)
+    #
+    # `blocked_by` is this check's OWN abort conditions, on top of its
+    # group's — for checks that need something the group as a whole does
+    # not. The front-matter menu cross-check and the section-index walk
+    # both need a parsed config, so neither can run when `config.toml` is
+    # missing or broken, while the front-matter parse check in the same
+    # group runs fine.
+    record CheckSpec,
+      label : String,
+      issue_ids : Array(String),
+      blocked_by : Array(String) = [] of String
 
     # A logical group of checks, surfaced under one heading in the CLI.
     # `:config` is rendered with the runtime config_path; other keys use
@@ -66,6 +76,11 @@ module Hwaro
       default_heading : String,
       checks : Array(CheckSpec),
       blocked_by : Array(String) = [] of String
+
+    # The config failures that abort `check_config` before it can produce
+    # a `Models::Config`. Checks outside the config group that need one
+    # name these too — see `CheckSpec#blocked_by`.
+    CONFIG_BLOCKING_IDS = ["config-not-found", "config-parse-error"]
 
     # Single source of truth for the inline status lines emitted by
     # `hwaro doctor`. Anything that adds a new diagnostic to
@@ -99,7 +114,7 @@ module Hwaro
           CheckSpec.new("referenced files & dirs",
             ["config-path-missing", "config-dir-missing"]),
         ],
-        blocked_by: ["config-not-found", "config-parse-error"],
+        blocked_by: CONFIG_BLOCKING_IDS,
       ),
       CheckGroup.new(
         key: :templates,
@@ -121,13 +136,23 @@ module Hwaro
           CheckSpec.new("front matter (TOML/YAML parse)",
             ["content-frontmatter-invalid", "content-read-error"]),
           CheckSpec.new("front matter menus (declared in config)",
-            ["menu-undeclared"]),
+            ["menu-undeclared"], blocked_by: CONFIG_BLOCKING_IDS),
           CheckSpec.new("section index files (_index.md)",
-            ["structure-missing-index"]),
+            ["structure-missing-index"], blocked_by: CONFIG_BLOCKING_IDS),
         ],
         blocked_by: ["content-dir-missing"],
       ),
     ]
+
+    # Every id that aborts some check's scan, group-level or check-level.
+    ALL_BLOCKING_IDS = begin
+      ids = Set(String).new
+      CHECK_GROUPS.each do |group|
+        group.blocked_by.each { |id| ids << id }
+        group.checks.each { |spec| spec.blocked_by.each { |id| ids << id } }
+      end
+      ids
+    end
 
     class Doctor
       VALID_CHANGEFREQS    = %w[always hourly daily weekly monthly yearly never]
@@ -167,6 +192,17 @@ module Hwaro
         KNOWN_ISSUE_IDS.includes?(id) || id.starts_with?(MISSING_SECTION_ID_PREFIX)
       end
 
+      # The blocking ids the last `run` observed, recorded BEFORE the
+      # `[doctor] ignore` filter. The CLI's skip rule keys off this rather
+      # than off the returned issues: `content-dir-missing` is a warning,
+      # so `ignore = ["content-dir-missing"]` used to hide it AND take the
+      # whole `content/` group's skip state with it — every check in the
+      # group went back to rendering ✓ for a site with no content
+      # directory at all, which is the false all-clear this mechanism
+      # exists to prevent. Silencing a report is not the same as the scan
+      # having run.
+      getter observed_blocking_ids : Set(String) = Set(String).new
+
       @content_dir : String
       @config_path : String
       @templates_dir : String
@@ -182,6 +218,8 @@ module Hwaro
         check_directory_structure(issues, config)
         check_content_frontmatter(issues, config)
         check_referenced_paths(issues, config) if config
+        @observed_blocking_ids = issues.map(&.id).to_set & ALL_BLOCKING_IDS
+
         ignore = config.try(&.doctor.ignore) || [] of String
         # `[doctor].ignore` exists to silence advisory noise. We refuse to
         # silence build-blocking errors here so a stray entry can't disable
@@ -413,6 +451,7 @@ module Hwaro
         # the real config untouched — doctor reported the fix as applied
         # while the site kept building from the unfixed file.
         target_path = resolved_config_path
+        sweep_abandoned_temp_files(target_path)
         tmp_path = "#{target_path}.#{Process.pid}.hwaro-tmp"
         begin
           original_permissions = File.info(target_path).permissions
@@ -441,6 +480,31 @@ module Hwaro
         end
 
         summary
+      end
+
+      # Remove temp files left behind by runs that are no longer alive.
+      #
+      # The pid in the temp name is what keeps two concurrent `--fix` runs
+      # from renaming each other's half-written file into place. But a run
+      # killed outside our control (SIGKILL, power loss) never reaches the
+      # rescue that cleans up, and with a unique name per run nothing else
+      # ever would either — each crash would leave one more file in the
+      # project directory. Only files whose owning process is gone are
+      # swept, so a concurrent run's file is left alone.
+      private def sweep_abandoned_temp_files(target_path : String)
+        dir = File.dirname(target_path)
+        prefix = "#{File.basename(target_path)}."
+        suffix = ".hwaro-tmp"
+        Dir.each_child(dir) do |entry|
+          next unless entry.starts_with?(prefix) && entry.ends_with?(suffix)
+          pid = entry[prefix.size...(entry.size - suffix.size)].to_i?
+          next unless pid && pid > 0
+          next if pid == Process.pid || Process.exists?(pid)
+          path = File.join(dir, entry)
+          File.delete(path) if File.file?(path)
+        end
+      rescue ex : IO::Error | File::Error
+        Logger.debug "Doctor: could not sweep temp files beside #{target_path}: #{ex.message}"
       end
 
       # `@config_path` with symlinks resolved, so a rewrite lands on the
@@ -594,8 +658,14 @@ module Hwaro
             message: "base_url should not end with a trailing slash")
         end
 
-        # title check
-        if DEFAULT_TITLES.includes?(config.title)
+        # title check. An ABSENT `title` reaches here as the internal
+        # "Hwaro Site" fallback, so reporting it as a placeholder value
+        # sent the user grepping for a string their config doesn't
+        # contain. Say which of the two it is.
+        if config.raw["title"]?.try(&.as_s?).nil?
+          issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path,
+            message: "title is not set (the site falls back to \"#{config.title}\")")
+        elsif DEFAULT_TITLES.includes?(config.title)
           issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path,
             message: "title is still the placeholder value \"#{config.title}\"")
         end
@@ -886,6 +956,15 @@ module Hwaro
             message: "Content directory not found: #{@content_dir} — the build will produce no pages")
           return
         end
+
+        # The per-language index spellings come from the config. Without
+        # one, every `index.ko.md` reads as loose markdown and each
+        # multilingual page bundle is reported as a broken section — the
+        # false positive fixed below, reappearing whenever `config.toml`
+        # fails to parse. Report nothing rather than report wrongly; the
+        # board renders this check as skipped (`CheckSpec#blocked_by`).
+        return unless config
+
         walk_section_dirs(@content_dir, issues, index_names(config))
       end
 

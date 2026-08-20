@@ -1537,3 +1537,116 @@ describe "Hwaro::Services::Doctor#fix_config through a symlink" do
     end
   end
 end
+
+describe "Hwaro::Services::Doctor skip state vs [doctor] ignore" do
+  # Review finding: the CLI used to compute "did this group's scan run?"
+  # from the post-ignore issue list. `content-dir-missing` is a warning and
+  # therefore ignorable, so `ignore = ["content-dir-missing"]` hid it AND
+  # took the group's skip state with it — every check under `content/` went
+  # back to rendering ✓ for a site with no content directory. Silencing a
+  # report is not the same as the scan having run.
+  it "records a blocking id even when [doctor] ignore hides it" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n\n[doctor]\nignore = ["content-dir-missing"]\n))
+
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+      issues = doctor.run
+
+      issues.any? { |i| i.id == "content-dir-missing" }.should be_false
+      doctor.observed_blocking_ids.includes?("content-dir-missing").should be_true
+    end
+  end
+
+  it "leaves the observed set empty on a site with nothing blocked" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+      FileUtils.mkdir_p(File.join(dir, "content"))
+      templates = File.join(dir, "templates")
+      FileUtils.mkdir_p(templates)
+      File.write(File.join(templates, "page.html"), "x")
+      File.write(File.join(templates, "section.html"), "x")
+
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates)
+      doctor.run
+      doctor.observed_blocking_ids.empty?.should be_true
+    end
+  end
+end
+
+describe "Hwaro::Services::Doctor without a usable config" do
+  # Review finding: the section-index walk derives its per-language index
+  # spellings from the config, so with an unparseable one every
+  # `index.md` + `index.ko.md` bundle was reported as a broken section —
+  # the false positive this PR fixes, reappearing on a broken config.
+  it "does not run the section-index walk it cannot run correctly" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, "title = \"x\"\nthis is not toml\n")
+      bundle = File.join(dir, "content", "deploy", "docker")
+      FileUtils.mkdir_p(bundle)
+      File.write(File.join(bundle, "index.md"), "+++\ntitle = \"D\"\n+++\nbody\n")
+      File.write(File.join(bundle, "index.ko.md"), "+++\ntitle = \"디\"\n+++\nbody\n")
+
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+      issues = doctor.run
+
+      issues.any? { |i| i.id == "config-parse-error" }.should be_true
+      issues.any? { |i| i.id == "structure-missing-index" }.should be_false
+    end
+  end
+
+  # The checks that need a config declare it, so the board renders them as
+  # skipped instead of as passing.
+  it "declares the config dependency on the checks that have one" do
+    content = Hwaro::Services::CHECK_GROUPS.find! { |g| g.key == :content }
+    %w[menu-undeclared structure-missing-index].each do |id|
+      spec = content.checks.find!(&.issue_ids.includes?(id))
+      spec.blocked_by.should eq(Hwaro::Services::CONFIG_BLOCKING_IDS)
+    end
+    # The front-matter parse check runs without a config and must NOT be skipped.
+    parse_check = content.checks.find!(&.issue_ids.includes?("content-frontmatter-invalid"))
+    parse_check.blocked_by.should be_empty
+  end
+end
+
+describe "Hwaro::Services::Doctor title advisory" do
+  # Review finding: an ABSENT title reaches the check as the internal
+  # "Hwaro Site" fallback, so reporting it as a placeholder *value* sent
+  # the user grepping for a string their config doesn't contain.
+  it "distinguishes an unset title from a placeholder one" do
+    unset = run_doctor(%(base_url = "https://example.com"\n)).find! { |i| i.id == "title-default" }
+    unset.message.should contain("not set")
+    unset.message.should_not contain("still the placeholder")
+
+    placeholder = run_doctor(%(title = "My Hwaro Site"\nbase_url = "https://example.com"\n)).find! { |i| i.id == "title-default" }
+    placeholder.message.should contain("still the placeholder")
+  end
+end
+
+describe "Hwaro::Services::Doctor#fix_config temp files" do
+  # Review finding: the pid in the temp name is what keeps two concurrent
+  # runs from renaming each other's half-written file into place, but with
+  # a unique name per run a SIGKILL'd run's file would never be cleaned up
+  # by anything. Sweep the ones whose owning process is gone; leave a live
+  # run's file alone.
+  it "sweeps a dead run's temp file and spares a live one" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com/"\n))
+      dead = "#{config_path}.999999.hwaro-tmp"
+      # A DIFFERENT live process — our own pid is the path fix_config
+      # writes to and renames away, so it can't stand in for one.
+      live = "#{config_path}.#{Process.ppid}.hwaro-tmp"
+      File.write(dead, "abandoned")
+      File.write(live, "in flight")
+
+      Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path).fix_config
+
+      File.exists?(dead).should be_false
+      File.exists?(live).should be_true
+      File.read(config_path).should contain(%(base_url = "https://example.com"))
+    end
+  end
+end
