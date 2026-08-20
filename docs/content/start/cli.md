@@ -457,7 +457,9 @@ cannot reconcile:
 
 - An empty source directory (or one where `include`/`exclude` selected
   nothing) aborts instead of deleting the destination — run `hwaro build`
-  first, or pass `--force` to clear it deliberately.
+  first, or pass `--force` to clear it deliberately. A `command` target that
+  never interpolates `{source}` is exempt, since it does not read the
+  source at all.
 - `--max-deletes` caps the delete pass (256 by default; any negative value
   disables it). It applies to the built-in `file://` sync only — a command
   target's own `--delete` flag is not bounded by it.

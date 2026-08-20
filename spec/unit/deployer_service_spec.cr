@@ -775,6 +775,147 @@ describe Hwaro::Services::Deployer do
       end
     end
 
+    it "copies files behind a destination symlink instead of skipping them as identical" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside", "sub")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "root")
+        # `a.html` is byte-identical to the copy behind the link, `b.html` is new.
+        File.write(File.join(src_dir, "sub", "a.html"), "same")
+        File.write(File.join(src_dir, "sub", "b.html"), "new")
+        File.write(File.join(outside, "a.html"), "same")
+        File.symlink(outside, File.join(dest_dir, "sub"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        # The link is gone and BOTH files landed in the real directory.
+        File.symlink?(File.join(dest_dir, "sub")).should be_false
+        Dir.children(File.join(dest_dir, "sub")).sort.should eq(["a.html", "b.html"])
+        File.read(File.join(dest_dir, "sub", "a.html")).should eq("same")
+      end
+    end
+
+    it "clears an escaping symlink even when everything behind it is identical" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside", "sub")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "root")
+        File.write(File.join(src_dir, "sub", "a.html"), "same")
+        File.write(File.join(outside, "a.html"), "same")
+        File.symlink(outside, File.join(dest_dir, "sub"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        File.symlink?(File.join(dest_dir, "sub")).should be_false
+        File.read(File.join(dest_dir, "sub", "a.html")).should eq("same")
+      end
+    end
+
+    it "replaces a symlinked ancestor instead of reporting an unresolvable conflict" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "sub", "index.html"), "child")
+        File.write(File.join(outside, "victim.txt"), "untouched")
+        # A symlink to a *file* sits where the `sub/` directory has to go.
+        File.symlink(File.join(outside, "victim.txt"), File.join(dest_dir, "sub"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        File.read(File.join(outside, "victim.txt")).should eq("untouched")
+        File.read(File.join(dest_dir, "sub", "index.html")).should eq("child")
+      end
+    end
+
+    it "does not apply the empty-source guard to commands that never read the source" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        sentinel = File.join(dir, "ran.txt")
+        FileUtils.mkdir_p(src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "cmd"
+        target.command = "echo ran > #{sentinel}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["cmd"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+        File.exists?(sentinel).should be_true
+      end
+    end
+
+    it "applies the empty-source guard to commands that interpolate {source}" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "cmd"
+        target.command = "rsync -a {source}/ host:/var/www/"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["cmd"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Source directory is empty")
+      end
+    end
+
+    it "lets --force deploy from an empty source, as the docs promise" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "old.html"), "old")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"], force: true)
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+        File.exists?(File.join(dest_dir, "old.html")).should be_false
+      end
+    end
+
     it "expands a leading ~ in target paths and --source" do
       deployer = Hwaro::Services::Deployer.new
       deployer.test_expand_local_path("~/site").should eq(File.join(Path.home.to_s, "site"))

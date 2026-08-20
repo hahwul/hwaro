@@ -84,7 +84,6 @@ module Hwaro
         require_target_names!(target_names)
 
         targets = resolve_targets!(target_names, deployment)
-        require_non_empty_source!(source_dir)
         warn_duplicate_targets(deployment)
         warn_unapplied_matchers(deployment)
         warn_unapplied_workers(deployment)
@@ -94,6 +93,7 @@ module Hwaro
         targets.each do |target|
           if command = target.command
             warn_unapplied_target_options(target)
+            require_non_empty_source!(source_dir, effective) if command_reads_source?(command)
             ops << PlannedOp.new(
               target: target.name,
               action: "command",
@@ -108,6 +108,7 @@ module Hwaro
           raise_missing_url!(target) if url.empty?
 
           if directory_destination = local_directory_destination(url)
+            require_non_empty_source!(source_dir, effective)
             dest_dir = expand_local_path(directory_destination)
             check_overlap!(source_dir, dest_dir)
 
@@ -125,10 +126,13 @@ module Hwaro
             check_empty_selection!(desired, to_delete, target, effective)
             check_max_deletes!(to_delete.size, effective)
 
+            symlink_memo = {} of String => Bool
             desired.each do |dest_rel, src_path|
               dest_path = File.join(dest_dir, dest_rel)
               if File.exists?(dest_path)
-                next if !effective.force && !force_match?(dest_rel, force_patterns) && same_file?(src_path, dest_path)
+                next if !effective.force && !force_match?(dest_rel, force_patterns) &&
+                        !traverses_symlink?(dest_dir, dest_rel, symlink_memo) &&
+                        same_file?(src_path, dest_path)
                 ops << PlannedOp.new(target: target.name, action: "update", path: dest_rel, source: src_path, destination: dest_path)
               else
                 ops << PlannedOp.new(target: target.name, action: "create", path: dest_rel, source: src_path, destination: dest_path)
@@ -140,6 +144,7 @@ module Hwaro
             end
           elsif auto_command = auto_command_for_url(url, source_dir)
             warn_unapplied_target_options(target)
+            require_non_empty_source!(source_dir, effective) if command_reads_source?(auto_command)
             ops << PlannedOp.new(
               target: target.name,
               action: "command",
@@ -174,7 +179,6 @@ module Hwaro
         target_names = resolve_target_names(options, deployment)
         require_target_names!(target_names)
 
-        require_non_empty_source!(source_dir)
         warn_duplicate_targets(deployment)
         warn_unapplied_matchers(deployment)
         warn_unapplied_workers(deployment)
@@ -328,7 +332,6 @@ module Hwaro
         require_target_names!(target_names)
 
         targets = resolve_targets!(target_names, deployment)
-        require_non_empty_source!(source_dir)
         warn_duplicate_targets(deployment)
         warn_unapplied_matchers(deployment)
         warn_unapplied_workers(deployment)
@@ -399,6 +402,7 @@ module Hwaro
       ) : Bool
         Logger.heading("deploy", target.name)
         warn_unapplied_target_options(target)
+        require_non_empty_source!(source_dir, effective) if command_reads_source?(command)
         expanded = expand_placeholders(command, source_dir, target)
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
@@ -461,6 +465,7 @@ module Hwaro
       ) : {Bool, TargetCounts}
         Logger.heading("deploy", target.name)
         counts = TargetCounts.new
+        require_non_empty_source!(source_dir, effective)
         dest_dir_expanded = expand_local_path(dest_dir)
 
         check_overlap!(source_dir, dest_dir_expanded)
@@ -523,6 +528,7 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
       ) : Bool
+        require_non_empty_source!(source_dir, effective)
         dest_dir = expand_local_path(dest_dir)
 
         check_overlap!(source_dir, dest_dir)
@@ -606,10 +612,14 @@ module Hwaro
       ) : {Array({String, String}), Int32}
         to_copy = [] of {String, String}
         skipped = 0
+        symlink_memo = {} of String => Bool
 
         desired.each do |dest_rel, src_path|
           dest_path = File.join(dest_dir, dest_rel)
-          if !force && !force_match?(dest_rel, force_patterns) && File.exists?(dest_path) && same_file?(src_path, dest_path)
+          if !force && !force_match?(dest_rel, force_patterns) &&
+             File.exists?(dest_path) &&
+             !traverses_symlink?(dest_dir, dest_rel, symlink_memo) &&
+             same_file?(src_path, dest_path)
             skipped += 1
             next
           end
@@ -617,6 +627,45 @@ module Hwaro
         end
 
         {to_copy, skipped}
+      end
+
+      # True when any component of `dest_rel` under `dest_dir` is a symlink.
+      #
+      # `File.exists?`/`same_file?` both follow links, so a file whose content
+      # matched the one *behind* a destination link looked identical and was
+      # skipped — and then the copy pass replaced the link with a real
+      # directory, leaving the skipped file absent from the destination
+      # entirely. Forcing a copy for every path that crosses a link also
+      # guarantees the link is cleared even when everything behind it is
+      # byte-identical (otherwise the escaping link survived the sync).
+      #
+      # Directory components are memoised: `desired` is sorted, so the same
+      # prefixes repeat across every file in a directory.
+      private def traverses_symlink?(dest_dir : String, dest_rel : String, memo : Hash(String, Bool)) : Bool
+        parts = dest_rel.split('/')
+        current = dest_dir
+        last = parts.size - 1
+        parts.each_with_index do |part, idx|
+          next if part.empty?
+          current = File.join(current, part)
+          if idx == last
+            return true if symlink?(current)
+          else
+            cached = memo[current]?
+            if cached.nil?
+              cached = symlink?(current)
+              memo[current] = cached
+            end
+            return true if cached
+          end
+        end
+        false
+      end
+
+      private def symlink?(path : String) : Bool
+        File.symlink?(path)
+      rescue File::Error | IO::Error
+        false
       end
 
       private def compute_deletes(
@@ -866,15 +915,28 @@ module Hwaro
       # An empty source is "the site was never built" (or was cleaned), and
       # every delete-capable backend would wipe the destination from it: the
       # built-in sync deletes every stale file, and the auto-generated
-      # `aws s3 sync --delete` / `gsutil rsync -d` empty the bucket. Checked
-      # after target resolution so an unknown-target error still wins.
-      private def require_non_empty_source!(source_dir : String)
+      # `aws s3 sync --delete` / `gsutil rsync -d` empty the bucket.
+      #
+      # Applied per target rather than once per run: a hand-written `command`
+      # that never interpolates `{source}` (`netlify deploy --dir=dist`)
+      # doesn't read the source at all, and failing it here would block a
+      # perfectly valid deploy. `--force` is the documented way to clear a
+      # destination deliberately.
+      private def require_non_empty_source!(source_dir : String, effective : EffectiveOptions)
+        return if effective.force
         return unless Dir.empty?(source_dir)
         raise Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_CONFIG,
           message: "Source directory is empty: #{source_dir}",
-          hint: "Run 'hwaro build' first, or pass '--source DIR' pointing at the built site.",
+          hint: "Run 'hwaro build' first, or pass '--source DIR' pointing at the built site. " \
+                "Pass --force to deploy from it anyway.",
         )
+      end
+
+      # A command target only reads the deploy source if its template
+      # interpolates `{source}` — which every auto-generated command does.
+      private def command_reads_source?(command : String) : Bool
+        command.includes?("{source}")
       end
 
       # Clear any symlink standing between `dest_dir` and `dest_rel` — the
@@ -889,15 +951,21 @@ module Hwaro
         parts.each do |part|
           next if part.empty?
           current = File.join(current, part)
-          next unless File.symlink?(current)
+          next unless symlink?(current)
           begin
             File.delete(current)
-          rescue File::Error | IO::Error
-            next
+          rescue ex : File::Error | IO::Error
+            # Swallowing this would hand the path straight to `FileUtils.cp`,
+            # which follows the surviving link and writes outside the deploy
+            # root — the exact failure this method exists to prevent. Fail
+            # loudly instead.
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Cannot replace symlink at destination: #{current} (#{ex.message})",
+              hint: "Remove #{current} manually; deploying through it would write outside #{dest_dir}.",
+            )
           end
         end
-      rescue File::Error | IO::Error
-        nil
       end
 
       # Refuse a sync that would delete everything at the destination because
@@ -1050,7 +1118,18 @@ module Hwaro
           current = dest_dir
           parts[0...-1].each do |part|
             current = File.join(current, part)
-            if File.file?(current)
+            # lstat, matching the leaf check above: a symlink standing where a
+            # directory belongs is replaced by the copy pass, so reporting it
+            # as an unresolvable conflict was a dead end for exactly the case
+            # `unlink_destination_symlinks!` handles.
+            info = begin
+              File.info?(current, follow_symlinks: false)
+            rescue File::Error | IO::Error
+              nil
+            end
+            next unless info
+            next if info.symlink?
+            if info.file?
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_IO,
                 message: "Destination path is a file but needs a directory: #{current}",
@@ -1114,10 +1193,19 @@ module Hwaro
       end
 
       private def prune_empty_directories(dir : String) : Nil
-        Dir.each_child(dir) do |entry|
+        # Children are collected before anything is deleted: unlinking during
+        # an active `readdir` is unspecified by POSIX, and on filesystems that
+        # compact the directory it can skip the siblings that follow.
+        children = begin
+          Dir.children(dir)
+        rescue File::Error | IO::Error
+          return
+        end
+
+        children.each do |entry|
           next if entry.starts_with?(".")
           full = File.join(dir, entry)
-          next if File.symlink?(full)
+          next if symlink?(full)
           next unless Dir.exists?(full)
           prune_empty_directories(full)
           begin
@@ -1126,8 +1214,6 @@ module Hwaro
             next
           end
         end
-      rescue File::Error | IO::Error
-        nil
       end
 
       private def each_project_file(root : String, follow_symlinks : Bool = true, &block : String ->)

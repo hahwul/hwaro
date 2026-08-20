@@ -35,7 +35,7 @@ A deploy also refuses outright when the source directory is empty, or when
 `include`/`exclude` selected no files while the destination still holds
 some — that combination is almost always "the site was never built" and
 would otherwise wipe the destination. Pass `--force` to clear a destination
-on purpose.
+on purpose. A `command` target that never interpolates `{source}` is exempt.
 
 `workers` is accepted for forward compatibility but not applied: the
 built-in sync copies serially and command targets manage their own
