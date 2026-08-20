@@ -88,6 +88,20 @@ describe "hwaro doctor --fix exit contract" do
       end
     end
 
+    it "renders a check that never ran as skipped, not as passing" do
+      Dir.mktmpdir do |dir|
+        fix_project(dir, templates: false)
+        FileUtils.rm_rf(File.join(dir, "templates"))
+        _, stdout, _ = doctor_run(dir, ["doctor"])
+
+        # `template syntax` cannot have passed: `check_templates` bails out
+        # the moment the directory is missing, so a ✓ there is an all-clear
+        # the run never earned.
+        stdout.should contain("template syntax (skipped)")
+        stdout.should_not contain("[ok]   template syntax")
+      end
+    end
+
     it "reports the sections it added alongside the diagnosis" do
       Dir.mktmpdir do |dir|
         fix_project(dir, templates: true)

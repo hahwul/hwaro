@@ -221,11 +221,7 @@ module Hwaro
           private def render_human(issues : Array(Services::Issue), config_path : String)
             plain = plain_output?
 
-            # A missing/unparseable config aborts `check_config` before any of
-            # the other config sub-checks (and `check_referenced_paths`) run.
-            # Those checks must render as skipped — a green ✓ for a check that
-            # never executed is reassuring noise on top of a broken config.
-            config_blocked = issues.any? { |i| i.id == "config-not-found" || i.id == "config-parse-error" }
+            reported = issues.map(&.id).to_set
 
             Logger.heading("doctor")
             # TTY already gets its blank line from `heading`; keep the plain
@@ -233,9 +229,17 @@ module Hwaro
             Logger.info "" unless Logger.color_enabled?
             Services::CHECK_GROUPS.each do |group|
               heading = group.key == :config ? config_path : group.default_heading
+              # A missing/unparseable config, a missing `templates/` or a
+              # missing `content/` aborts its group's scan before the rest of
+              # the group runs. Those checks render as skipped — a green ✓ for
+              # a check that never executed is reassuring noise on top of a
+              # broken site. The blocking ids live on the group in
+              # `Services::CHECK_GROUPS` so service and CLI can't drift.
+              blocked = group.blocked_by.any? { |id| reported.includes?(id) }
               Logger.info "  #{heading}"
               group.checks.each do |spec|
-                skipped = config_blocked && group.key == :config && !spec.issue_ids.includes?("config-parse-error")
+                # The check that reports the blocking issue still renders it.
+                skipped = blocked && (spec.issue_ids & group.blocked_by).empty?
                 Logger.info "    #{render_check_line(spec, issues, plain, skipped)}"
               end
               Logger.info ""

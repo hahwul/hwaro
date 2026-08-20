@@ -51,22 +51,32 @@ hwaro doctor --json
 
 **Config diagnostics:**
 
-- `base_url` is not set
-- `base_url` doesn't start with `http://` or `https://`
-- `base_url` has a trailing slash
-- `title` is still the default value
+- `base_url` is not set, or has a trailing slash
+- `title` is still a placeholder (`Hwaro Site`, `My Hwaro Site`)
 - `sitemap.changefreq` has an invalid value
 - `sitemap.priority` is out of range (0.0–1.0)
-- Duplicate taxonomy names
-- Duplicate language codes
-- Invalid `search.format` value
+- Duplicate taxonomy names or language codes
+- Invalid `search.format`, `markdown.math_engine` or `pwa.cache_strategy` value
+- `default_language` with no matching `[languages.<code>]` block
+- `deployment.target` / `[related] taxonomies` referencing something undefined
+- `[[menus.*]]` entries whose `parent` names no identifier in the same menu
+- Referenced files and directories that don't exist (`[og] default_image`,
+  `[pwa] icons`, `[auto_includes] dirs`, `[[assets.bundles]] files`, …).
+  Values that carry their own origin (`https://…`, `//cdn…`, `data:…`) are
+  left alone — doctor can't validate a remote URL.
 
 **Template diagnostics:**
 
 - Templates directory not found
 - Required templates missing (`page.html`, `section.html`)
-- Unclosed block tags (`if`, `for`, `block`, `macro` without matching `end`)
-- Mismatched `{{ }}` variable tags
+- Template syntax errors, reported by the same Crinja parser the build uses
+  (unknown project shortcodes are tolerated)
+
+**Content diagnostics:**
+
+- Content directory not found (the build would produce no pages)
+- Front matter that fails to parse (TOML/YAML)
+- Front matter registering a menu name no `[[menus.*]]` declares
 
 **Structure diagnostics:**
 
@@ -86,6 +96,7 @@ hwaro: doctor
     [ok]   languages (default_language resolves)
     [ok]   markdown / pwa (valid enums)
     [ok]   deployment / related (refs resolve)
+    [ok]   menus (parent references)
     [ok]   referenced files & dirs
 
   templates/
@@ -93,7 +104,10 @@ hwaro: doctor
     [ok]   template syntax
 
   content/
+    [ok]   directory present
     [ok]   front matter (TOML/YAML parse)
+    [ok]   front matter menus (declared in config)
+    [info] section index files (_index.md)
 
 Config:
   [warn] config.toml: base_url is not set
@@ -105,6 +119,9 @@ checked: 0 errors, 1 warning, 1 info
 
 Tip: Use 'hwaro tool validate' for content checks
 ```
+
+A check whose scan never ran renders as `[--] … (skipped)` rather than as a
+passing check — for example `template syntax` when `templates/` is missing.
 
 In a color terminal the check lines use `✓`/`⚠`/`✗`/`ℹ` glyphs under an
 `hwaro doctor` heading, and the summary is a severity-colored `✦ checked` outcome
@@ -138,21 +155,34 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `config-not-found` | config | Config file not found ✗ |
 | `config-parse-error` | config | Failed to parse config ✗ |
 | `base-url-missing` | config | base_url is not set |
-| `base-url-scheme` | config | base_url doesn't start with http(s) |
 | `base-url-trailing-slash` | config | base_url has trailing slash |
-| `title-default` | config | Title is still default value |
+| `title-default` | config | Title is still a scaffold placeholder |
 | `sitemap-changefreq-invalid` | config | Invalid sitemap.changefreq |
 | `sitemap-priority-range` | config | sitemap.priority out of range |
 | `taxonomy-duplicate` | config | Duplicate taxonomy name |
-| `search-format-invalid` | config | Unsupported search.format |
 | `language-duplicate` | config | Duplicate language code |
+| `search-format-invalid` | config | Unsupported search.format |
+| `default-language-undefined` | config | default_language has no `[languages.<code>]` block |
+| `markdown-math-engine-invalid` | config | Unsupported markdown.math_engine |
+| `pwa-cache-strategy-invalid` | config | Unsupported pwa.cache_strategy |
+| `deployment-target-undefined` | config | deployment.target names no `[[deployment.targets]]` |
+| `related-taxonomy-undefined` | config | `[related]` references an undefined taxonomy |
+| `menu-parent-undefined` | config | Menu entry's `parent` matches no identifier in that menu |
+| `config-path-missing` | config | Referenced file does not exist |
+| `config-dir-missing` | config | Referenced directory does not exist |
 | `missing-config-*` | config_missing | Missing config section (e.g. `missing-config-pwa`) |
 | `template-dir-missing` | template | Templates directory not found ✗ |
 | `template-required-missing` | template | Required template missing ✗ |
-| `template-unclosed-block` | template | Unclosed block tag ✗ |
-| `template-mismatched-vars` | template | Mismatched variable tags ✗ |
+| `template-syntax-error` | template | Template fails to parse ✗ |
 | `template-read-error` | template | Failed to read template ✗ |
+| `content-dir-missing` | content | Content directory not found |
+| `content-frontmatter-invalid` | content | Front matter fails to parse ✗ |
+| `content-read-error` | content | Failed to read content file ✗ |
+| `menu-undeclared` | content | Front matter menu name not declared in config |
 | `structure-missing-index` | structure | Section missing _index.md |
+
+An entry that matches no rule id is reported as having no effect, so a typo
+in this list never passes silently.
 
 ## JSON Output
 
@@ -173,6 +203,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
     "warnings": 1,
     "infos": 0,
     "total": 1
-  }
+  },
+  "exit_code": 0
 }
 ```

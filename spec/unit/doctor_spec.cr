@@ -46,14 +46,22 @@ describe Hwaro::Services::Doctor do
         issues.any?(&.message.includes?("base_url")).should be_true
       end
 
-      it "warns when title is default" do
+      it "warns when title is the config fallback" do
         issues = run_doctor(%(title = "Hwaro Site"\nbase_url = "https://example.com"\n))
-        issues.any?(&.message.includes?("default value")).should be_true
+        issues.any? { |i| i.id == "title-default" }.should be_true
+      end
+
+      # `hwaro init` writes "My Hwaro Site", never the internal fallback,
+      # so checking only "Hwaro Site" meant the advisory never fired on a
+      # real scaffolded site and the placeholder shipped to production.
+      it "warns when title is still the scaffold placeholder" do
+        issues = run_doctor(%(title = "My Hwaro Site"\nbase_url = "https://example.com"\n))
+        issues.any? { |i| i.id == "title-default" }.should be_true
       end
 
       it "does not warn when title is custom" do
         issues = run_doctor(base_config)
-        issues.any?(&.message.includes?("default value")).should be_false
+        issues.any? { |i| i.id == "title-default" }.should be_false
       end
 
       it "does not warn when feeds enabled with empty filename (uses runtime default)" do
@@ -1245,14 +1253,20 @@ describe Hwaro::Services::Doctor do
         end
       end
 
-      it "skips silently when the content directory doesn't exist" do
+      # A site with no content directory builds zero pages, so doctor must
+      # say so instead of reporting "no issues found". It still must not
+      # emit per-file front-matter issues — there are no files to scan.
+      it "reports the missing content directory instead of scanning it" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, base_config)
           # No content dir at all.
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: File.join(dir, "templates"))
           issues = doctor.run
-          issues.any? { |i| i.category == "content" }.should be_false
+          missing = issues.select { |i| i.id == "content-dir-missing" }
+          missing.size.should eq(1)
+          missing.first.level.should eq(:warning)
+          issues.any? { |i| i.id == "content-frontmatter-invalid" || i.id == "content-read-error" }.should be_false
         end
       end
 
@@ -1380,6 +1394,146 @@ describe Hwaro::Services::Doctor do
       expect_raises(JSON::ParseException, /Unknown issue level/) do
         Hwaro::Services::Issue.from_json(bogus)
       end
+    end
+  end
+end
+
+describe "Hwaro::Services::CHECK_GROUPS" do
+  # `CHECK_GROUPS` is the registry the CLI renders its inline ✓/⚠/✗ board
+  # from. An id that never made it into the registry still prints in the
+  # detail list below the board, but its check line renders a green ✓ — an
+  # all-clear board over a warning. `menu-parent-undefined`,
+  # `menu-undeclared` and `structure-missing-index` all drifted out of it
+  # that way, so pin the invariant to the source rather than to a list a
+  # future diagnostic can forget to join.
+  it "declares every issue id the Doctor service emits" do
+    source = File.read(File.expand_path("../../src/services/doctor.cr", __DIR__))
+    emitted = source.scan(/id: "([a-z0-9-]+)"/).map { |m| m[1] }.uniq!
+    emitted.empty?.should be_false
+
+    unregistered = emitted.reject { |id| Hwaro::Services::Doctor.known_issue_id?(id) }
+    unregistered.should eq([] of String)
+  end
+
+  it "recognizes the generated missing-config-* ids as ignorable" do
+    Hwaro::Services::Doctor.known_issue_id?("missing-config-pwa").should be_true
+    Hwaro::Services::Doctor.known_issue_id?("template-unclosed-block").should be_false
+  end
+
+  it "lists the blocking id inside the group it blocks" do
+    Hwaro::Services::CHECK_GROUPS.each do |group|
+      group.blocked_by.each do |id|
+        group.checks.any?(&.issue_ids.includes?(id)).should be_true
+      end
+    end
+  end
+end
+
+describe "Hwaro::Services::Doctor multilingual page bundles" do
+  private_multilingual_config = <<-TOML
+    title = "My Site"
+    base_url = "https://example.com"
+    default_language = "en"
+
+    [languages.en]
+    name = "English"
+
+    [languages.ko]
+    name = "Korean"
+    TOML
+
+  # Reproduced on hwaro's own docs site: `content/deploy/docker/` holds
+  # `index.md` + `index.ko.md` — an ordinary multilingual page bundle — and
+  # doctor reported "Section directory missing _index.md" for every one of
+  # them because only the bare `index.md` spelling counted as a bundle index.
+  # Mirrors hwaro's own docs tree: a section with `_index.md` holding page
+  # bundles, each of which is `index.md` + `index.ko.md`.
+  private_bundle_site = ->(dir : String) do
+    File.write(File.join(dir, "config.toml"), private_multilingual_config)
+    section = File.join(dir, "content", "deploy")
+    bundle = File.join(section, "docker")
+    FileUtils.mkdir_p(bundle)
+    File.write(File.join(section, "_index.md"), "+++\ntitle = \"Deploy\"\n+++\nbody\n")
+    File.write(File.join(bundle, "index.md"), "+++\ntitle = \"Docker\"\n+++\nbody\n")
+    bundle
+  end
+
+  it "does not flag a page bundle whose only extra file is a translation" do
+    Dir.mktmpdir do |dir|
+      bundle = private_bundle_site.call(dir)
+      File.write(File.join(bundle, "index.ko.md"), "+++\ntitle = \"도커\"\n+++\nbody\n")
+
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: File.join(dir, "config.toml"))
+      doctor.run.any? { |i| i.id == "structure-missing-index" }.should be_false
+    end
+  end
+
+  # The undeclared-suffix case must keep behaving like a loose page: a
+  # bundle holding `index.md` + `notes.md` is still a section candidate.
+  it "still flags a bundle whose extra markdown is not a translation" do
+    Dir.mktmpdir do |dir|
+      bundle = private_bundle_site.call(dir)
+      File.write(File.join(bundle, "notes.md"), "+++\ntitle = \"N\"\n+++\nbody\n")
+
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: File.join(dir, "config.toml"))
+      doctor.run.any? { |i| i.id == "structure-missing-index" }.should be_true
+    end
+  end
+
+  it "accepts a per-language _index as the section index" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, private_multilingual_config)
+      section = File.join(dir, "content", "guides")
+      FileUtils.mkdir_p(section)
+      File.write(File.join(section, "_index.ko.md"), "+++\ntitle = \"안내\"\n+++\nbody\n")
+      File.write(File.join(section, "a.md"), "+++\ntitle = \"A\"\n+++\nbody\n")
+
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+      doctor.run.any? { |i| i.id == "structure-missing-index" }.should be_false
+    end
+  end
+end
+
+describe "Hwaro::Services::Doctor referenced paths with their own origin" do
+  # `[og] default_image` explicitly supports absolute URLs
+  # (`OgConfig#resolve_image_url` returns them untouched), so resolving
+  # them against `static/` reported every CDN-hosted OG image as a missing
+  # file.
+  it "does not report a remote [og] default_image as a missing file" do
+    ["https://cdn.example.com/og.png", "//cdn.example.com/og.png", "data:image/png;base64,AAAA"].each do |value|
+      issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com"\n\n[og]\ndefault_image = "#{value}"\n))
+      issues.any? { |i| i.id == "config-path-missing" }.should be_false
+    end
+  end
+
+  it "still reports a project-relative [og] default_image that does not exist" do
+    issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com"\n\n[og]\ndefault_image = "/images/nope.png"\n))
+    issues.any? { |i| i.id == "config-path-missing" }.should be_true
+  end
+end
+
+describe "Hwaro::Services::Doctor#fix_config through a symlink" do
+  # `File.rename` replaces the path it targets. Aimed at the link itself it
+  # dropped a regular file on top of `config.toml -> shared/config.toml`,
+  # reported the fix as applied, and left the file the site actually builds
+  # from unchanged.
+  it "writes through the symlink instead of replacing it" do
+    Dir.mktmpdir do |dir|
+      real_dir = File.join(dir, "shared")
+      FileUtils.mkdir_p(real_dir)
+      real_path = File.join(real_dir, "config.toml")
+      File.write(real_path, %(title = "My Site"\nbase_url = "https://example.com/"\n))
+      link_path = File.join(dir, "config.toml")
+      File.symlink(File.join("shared", "config.toml"), link_path)
+
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: link_path)
+      summary = doctor.fix_config(approve_sections: false)
+
+      summary.value_fixes.map(&.field).should contain("base_url")
+      File.symlink?(link_path).should be_true
+      File.read(real_path).should contain(%(base_url = "https://example.com"))
+      File.read(real_path).should_not contain(%(base_url = "https://example.com/"))
     end
   end
 end

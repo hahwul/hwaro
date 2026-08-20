@@ -11,6 +11,7 @@ require "../models/config"
 require "../utils/errors"
 require "../utils/logger"
 require "../content/processors/markdown"
+require "../content/processors/internal_link_resolver"
 require "../core/build/parallel"
 require "./config_snippets"
 
@@ -53,7 +54,18 @@ module Hwaro
     # A logical group of checks, surfaced under one heading in the CLI.
     # `:config` is rendered with the runtime config_path; other keys use
     # `default_heading` verbatim.
-    record CheckGroup, key : Symbol, default_heading : String, checks : Array(CheckSpec)
+    #
+    # `blocked_by` lists the issue ids that abort the group's scan before
+    # the remaining checks can run (a missing config.toml, a missing
+    # `templates/`, a missing `content/`). When one of them is present the
+    # CLI renders every OTHER check in the group as skipped instead of as
+    # a passing check — a green ✓ for a check that never executed reads as
+    # reassurance the run has not earned.
+    record CheckGroup,
+      key : Symbol,
+      default_heading : String,
+      checks : Array(CheckSpec),
+      blocked_by : Array(String) = [] of String
 
     # Single source of truth for the inline status lines emitted by
     # `hwaro doctor`. Anything that adds a new diagnostic to
@@ -82,9 +94,12 @@ module Hwaro
             ["markdown-math-engine-invalid", "pwa-cache-strategy-invalid"]),
           CheckSpec.new("deployment / related (refs resolve)",
             ["deployment-target-undefined", "related-taxonomy-undefined"]),
+          CheckSpec.new("menus (parent references)",
+            ["menu-parent-undefined"]),
           CheckSpec.new("referenced files & dirs",
             ["config-path-missing", "config-dir-missing"]),
         ],
+        blocked_by: ["config-not-found", "config-parse-error"],
       ),
       CheckGroup.new(
         key: :templates,
@@ -95,14 +110,22 @@ module Hwaro
           CheckSpec.new("template syntax",
             ["template-syntax-error", "template-read-error"]),
         ],
+        blocked_by: ["template-dir-missing"],
       ),
       CheckGroup.new(
         key: :content,
         default_heading: "content/",
         checks: [
+          CheckSpec.new("directory present",
+            ["content-dir-missing"]),
           CheckSpec.new("front matter (TOML/YAML parse)",
             ["content-frontmatter-invalid", "content-read-error"]),
+          CheckSpec.new("front matter menus (declared in config)",
+            ["menu-undeclared"]),
+          CheckSpec.new("section index files (_index.md)",
+            ["structure-missing-index"]),
         ],
+        blocked_by: ["content-dir-missing"],
       ),
     ]
 
@@ -117,6 +140,33 @@ module Hwaro
       KNOWN_CONFIG_SECTIONS = ConfigSnippets::KNOWN_SECTIONS
       KNOWN_SUB_SECTIONS    = ConfigSnippets::KNOWN_SUB_SECTIONS
 
+      # The scaffolded placeholder titles. `Models::Config` falls back to
+      # "Hwaro Site" when `title` is absent, but every site `hwaro init`
+      # creates ships "My Hwaro Site" — so checking only the internal
+      # fallback meant the advisory never fired on the sites that actually
+      # have a placeholder title, and it shipped into <title>, OG tags and
+      # feeds unnoticed.
+      DEFAULT_TITLES = {"Hwaro Site", "My Hwaro Site"}
+
+      # `missing-config-<section>` ids are generated per config section
+      # rather than enumerated, so `[doctor] ignore` validation matches
+      # them by prefix.
+      MISSING_SECTION_ID_PREFIX = "missing-config-"
+
+      # Every static issue id doctor can emit, derived from `CHECK_GROUPS`
+      # so a new diagnostic can't be validated against a list that forgot
+      # it. `CHECK_GROUPS` is the registry; this is just its index.
+      KNOWN_ISSUE_IDS = begin
+        ids = Set(String).new
+        CHECK_GROUPS.each { |group| group.checks.each { |spec| spec.issue_ids.each { |id| ids << id } } }
+        ids
+      end
+
+      # True for any id `[doctor] ignore` can legitimately name.
+      def self.known_issue_id?(id : String) : Bool
+        KNOWN_ISSUE_IDS.includes?(id) || id.starts_with?(MISSING_SECTION_ID_PREFIX)
+      end
+
       @content_dir : String
       @config_path : String
       @templates_dir : String
@@ -129,7 +179,7 @@ module Hwaro
         issues = [] of Issue
         config = check_config(issues)
         check_templates(issues)
-        check_directory_structure(issues)
+        check_directory_structure(issues, config)
         check_content_frontmatter(issues, config)
         check_referenced_paths(issues, config) if config
         ignore = config.try(&.doctor.ignore) || [] of String
@@ -143,6 +193,12 @@ module Hwaro
           issues.select { |i| i.level == :error && ignore.includes?(i.id) }
             .map(&.id).uniq!.each do |id|
             Logger.warn "[doctor] ignore entry '#{id}' names an error-level rule and cannot be silenced."
+          end
+          # A misspelled entry silences nothing and used to do so in total
+          # silence, so the user reads the still-reported issue as doctor
+          # ignoring their ignore list. Name the typo instead.
+          ignore.reject { |id| Doctor.known_issue_id?(id) }.uniq!.each do |id|
+            Logger.warn "[doctor] ignore entry '#{id}' does not match any doctor rule id and has no effect."
           end
         end
         issues.reject { |i| i.level != :error && ignore.includes?(i.id) }
@@ -349,19 +405,34 @@ module Hwaro
         # permissions carry over to the temp file — without that, the
         # rename would silently reset e.g. a 0600 config to the default
         # umask.
-        tmp_path = "#{@config_path}.hwaro-tmp"
+        #
+        # `rename` REPLACES the path it targets, so it must target the
+        # file the config actually lives in: aimed at a symlink
+        # (`config.toml -> shared/config.toml`, a common monorepo/theme
+        # layout) it dropped a regular file on top of the link and left
+        # the real config untouched — doctor reported the fix as applied
+        # while the site kept building from the unfixed file.
+        target_path = resolved_config_path
+        tmp_path = "#{target_path}.#{Process.pid}.hwaro-tmp"
         begin
-          original_permissions = File.info(@config_path).permissions
+          original_permissions = File.info(target_path).permissions
           File.open(tmp_path, "w") do |f|
             f.print(current_text)
             f.print("\n") unless current_text.ends_with?("\n")
             snippets.each { |s| f.print(s) }
           end
           File.chmod(tmp_path, original_permissions)
-          File.rename(tmp_path, @config_path)
+          File.rename(tmp_path, target_path)
         rescue ex : IO::Error | File::Error
           # Clean the half-written temp file so re-running isn't blocked.
-          File.delete(tmp_path) if File.exists?(tmp_path)
+          # Cleanup is best-effort: it must never replace the classified
+          # I/O error below with a raw one (a directory sitting on the temp
+          # path made `File.delete` raise straight out of this handler).
+          begin
+            File.delete(tmp_path) if File.file?(tmp_path)
+          rescue err : IO::Error | File::Error
+            Logger.debug "Doctor: could not remove temp file #{tmp_path}: #{err.message}"
+          end
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
             message: "Failed to update #{@config_path}: #{ex.message}",
@@ -370,6 +441,18 @@ module Hwaro
         end
 
         summary
+      end
+
+      # `@config_path` with symlinks resolved, so a rewrite lands on the
+      # real file. Falls back to the literal path when the link can't be
+      # resolved — the write then fails with the classified error above
+      # rather than here.
+      private def resolved_config_path : String
+        return @config_path unless File.symlink?(@config_path)
+        File.realpath(@config_path)
+      rescue ex : File::Error
+        Logger.debug "Doctor: cannot resolve #{@config_path}: #{ex.message}"
+        @config_path
       end
 
       # Strip trailing slashes from a top-level `base_url = "..."` line.
@@ -512,8 +595,9 @@ module Hwaro
         end
 
         # title check
-        if config.title == "Hwaro Site"
-          issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path, message: "title is still the default value \"Hwaro Site\"")
+        if DEFAULT_TITLES.includes?(config.title)
+          issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path,
+            message: "title is still the placeholder value \"#{config.title}\"")
         end
 
         # sitemap changefreq validity
@@ -792,12 +876,43 @@ module Hwaro
       # (`.`) and underscore-prefixed (`_`) directories are also skipped
       # so private/draft trees stay quiet. Issued at `:info` level so
       # CI doesn't gate on it.
-      private def check_directory_structure(issues : Array(Issue))
-        return unless Dir.exists?(@content_dir)
-        walk_section_dirs(@content_dir, issues)
+      private def check_directory_structure(issues : Array(Issue), config : Models::Config?)
+        unless Dir.exists?(@content_dir)
+          # A site with no content directory builds zero pages. `hwaro
+          # build` says so at the end of a run; doctor used to skip both
+          # the structure walk and the front-matter scan in silence and
+          # then report "no issues found — your site looks great".
+          issues << Issue.new(id: "content-dir-missing", level: :warning, category: "content", file: @content_dir,
+            message: "Content directory not found: #{@content_dir} — the build will produce no pages")
+          return
+        end
+        walk_section_dirs(@content_dir, issues, index_names(config))
       end
 
-      private def walk_section_dirs(root : String, issues : Array(Issue))
+      # The base names that count as an index page for this site: always
+      # `index`/`_index`, plus one language-suffixed spelling per declared
+      # language (`index.ko`, `_index.zh-tw`, …) exactly as
+      # `Phases::ReadContent#extract_language_from_filename` resolves them.
+      #
+      # Without the language variants a perfectly ordinary multilingual
+      # page bundle (`index.md` + `index.ko.md`) looked like a section
+      # holding loose markdown, so doctor reported "Section directory
+      # missing _index.md" for it — reproduced on hwaro's own docs site.
+      private def index_names(config : Models::Config?) : Set(String)
+        names = Set{"index", "_index"}
+        return names unless config && config.multilingual?
+
+        codes = config.languages.keys.dup
+        codes << config.default_language unless config.default_language.empty?
+        codes.each do |code|
+          next if code.empty?
+          names << "index.#{code}"
+          names << "_index.#{code}"
+        end
+        names
+      end
+
+      private def walk_section_dirs(root : String, issues : Array(Issue), index_names : Set(String))
         Dir.each_child(root) do |entry|
           next if entry.starts_with?(".") || entry.starts_with?("_")
           child = File.join(root, entry)
@@ -816,14 +931,13 @@ module Hwaro
           next unless File.directory?(child)
           next unless dir_contains_markdown?(child)
 
-          has_index = File.exists?(File.join(child, "_index.md")) ||
-                      File.exists?(File.join(child, "_index.markdown"))
+          has_index = section_index?(child, index_names)
 
           # Many documentation sites use page bundles (index.md directly in
           # a folder) for individual guides rather than true sections with
           # _index.md. Only warn when the folder actually contains other
           # markdown content beneath it (suggesting it intends to be a section).
-          has_nested_content = dir_has_markdown_in_subdirs?(child)
+          has_nested_content = dir_has_markdown_in_subdirs?(child, index_names)
 
           if !has_index && has_nested_content
             relative = child.lchop(@content_dir).lchop(File::SEPARATOR)
@@ -831,7 +945,7 @@ module Hwaro
               message: "Section directory missing _index.md: #{relative}/")
           end
 
-          walk_section_dirs(child, issues)
+          walk_section_dirs(child, issues, index_names)
         end
       rescue ex : File::Error
         # Belt and braces: an unreadable (or concurrently removed) directory
@@ -850,20 +964,48 @@ module Hwaro
       end
 
       # Returns true if the directory contains markdown files anywhere
-      # besides a direct top-level index.md / index.markdown (page bundle).
-      # This helps avoid noisy warnings on documentation-style sites that
-      # organize guides as page bundles rather than true sections.
-      private def dir_has_markdown_in_subdirs?(dir : String) : Bool
+      # besides a direct top-level index page (page bundle), counting the
+      # per-language spellings in `index_names`. This helps avoid noisy
+      # warnings on documentation-style sites that organize guides as page
+      # bundles rather than true sections.
+      private def dir_has_markdown_in_subdirs?(dir : String, index_names : Set(String)) : Bool
         # Any markdown deeper than direct children of this dir?
         Dir.glob(File.join(dir, "*/*.{md,markdown}")) { |_| return true }
 
         # Any direct markdown file that is *not* an index page?
         Dir.glob(File.join(dir, "*.{md,markdown}")) do |path|
-          b = File.basename(path)
-          return true unless b == "index.md" || b == "index.markdown"
+          return true unless index_names.includes?(markdown_stem(File.basename(path)))
         end
 
         false
+      end
+
+      # True when `dir` holds a section index (`_index.md`, or a declared
+      # per-language spelling such as `_index.ko.md`).
+      private def section_index?(dir : String, index_names : Set(String)) : Bool
+        return true if File.exists?(File.join(dir, "_index.md")) ||
+                       File.exists?(File.join(dir, "_index.markdown"))
+        # Only a multilingual site has more spellings to look for, and only
+        # then is the extra glob per directory worth paying for.
+        return false if index_names.size <= 2
+
+        Dir.glob(File.join(dir, "_index.*.{md,markdown}")) do |path|
+          return true if index_names.includes?(markdown_stem(File.basename(path)))
+        end
+        false
+      end
+
+      # `index.ko.md` -> "index.ko". Only the markdown extension is
+      # stripped; the language suffix is left on so the caller can match it
+      # against the declared codes.
+      private def markdown_stem(basename : String) : String
+        if basename.ends_with?(".markdown")
+          basename[0, basename.size - ".markdown".size]
+        elsif basename.ends_with?(".md")
+          basename[0, basename.size - ".md".size]
+        else
+          basename
+        end
       end
 
       # Parse every markdown file's front matter so doctor flags what
@@ -951,6 +1093,13 @@ module Hwaro
       # or `resolver` reports it resolves. `id`/`kind` are passed independently
       # so route checks can keep the "config-path-missing"/"file" pairing.
       private def emit_missing(issues : Array(Issue), label : String, value : String, *, resolver : String -> Bool, id : String, kind : String)
+        # A value that carries its own origin (`https://cdn…/og.png`,
+        # `//cdn…/og.png`, `data:…`) names something outside the project
+        # tree, so "file not found" is simply the wrong answer: `[og]
+        # default_image` explicitly supports absolute URLs (see
+        # `OgConfig#resolve_image_url`) and doctor flagged every site using
+        # a CDN. Doctor cannot validate a remote URL, so it says nothing.
+        return if Content::Processors::InternalLinkResolver.has_own_origin?(value)
         stripped = strip_query_hash(value)
         return if stripped.empty?
         return if resolver.call(stripped)
@@ -986,8 +1135,10 @@ module Hwaro
         config.og.auto_image.background_image.try { |v| emit_file.call("[og.auto_image] background_image", v) }
         config.pwa.offline_page.try { |v| emit_route.call("[pwa] offline_page", v) }
         config.pwa.precache_urls.each_with_index do |url, idx|
-          # Only validate site-internal routes; external URLs aren't ours.
-          next if url.starts_with?("http://") || url.starts_with?("https://")
+          # External URLs aren't ours to validate; `emit_missing` drops any
+          # value that carries its own origin, which also covers the
+          # protocol-relative and non-http schemes the old
+          # `starts_with?("http")` pair missed.
           emit_route.call("[pwa] precache_urls[#{idx}]", url)
         end
         config.pwa.icons.each_with_index do |icon, idx|
