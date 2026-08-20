@@ -27,6 +27,20 @@ max_deletes = 256
 | force | bool | false | Force deployment even if no changes detected |
 | max_deletes | int | 256 | Safety limit on file deletions (any negative value disables the limit) |
 
+`max_deletes` bounds the **built-in** `file://` sync only. Command targets
+(`s3://`, `gs://`, `az://`, or an explicit `command`) delete through the
+external tool's own flags, which hwaro cannot count in advance.
+
+A deploy also refuses outright when the source directory is empty, or when
+`include`/`exclude` selected no files while the destination still holds
+some — that combination is almost always "the site was never built" and
+would otherwise wipe the destination. Pass `--force` to clear a destination
+on purpose. A `command` target that never interpolates `{source}` is exempt.
+
+`workers` is accepted for forward compatibility but not applied: the
+built-in sync copies serially and command targets manage their own
+concurrency. Setting it prints a warning.
+
 ## Targets
 
 Define one or more deployment targets:
@@ -61,10 +75,24 @@ For `az://container/sub/dir` URLs the path becomes the `--destination` prefix in
 
 If a `command` field is set, it always takes priority over auto-generation.
 
+A value that starts with a URL scheme is never treated as a local path, so a
+single-slash typo (`s3:/bucket`) fails with an unsupported-scheme error
+instead of quietly creating a directory named `s3:`. `include`, `exclude`,
+and `strip_index_html` apply to the built-in `file://` sync only; on
+command targets they warn, because the external tool receives the whole
+source tree.
+
+**Local directory sync and symlinks.** The built-in sync keeps every write
+inside the destination. A symlink standing where a file or directory belongs
+is replaced with the real thing, and a symlink with no counterpart in the
+source is unlinked — neither case reads or deletes through the link, so
+content living outside the destination is never touched.
+
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| name | string | — | Target identifier |
+| name | string | — | Target identifier (must be unique — duplicates are warned about and only the first is used) |
 | url | string | — | Destination URL (`file://`, `s3://`, `gs://`, `az://`) |
+| path | string | — | Alias for `url` when deploying to a local directory (`path = "~/public"`; `~` is expanded) |
 | include | string | — | Glob pattern for files to include |
 | exclude | string | — | Glob pattern for files to exclude |
 | strip_index_html | bool | false | Remove `index.html` from URLs |
