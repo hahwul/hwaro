@@ -156,7 +156,7 @@ module Hwaro
             if Logger.quiet?
               render_quiet(issues, code)
             else
-              render_human(issues, config_path)
+              render_human(issues, config_path, doctor.observed_blocking_ids)
             end
             exit(code)
           end
@@ -218,14 +218,10 @@ module Hwaro
           end
 
           # Render human-readable diagnostics with inline status glyphs per check.
-          private def render_human(issues : Array(Services::Issue), config_path : String)
+          # `blocking_ids` comes from the service and is NOT filtered by
+          # `[doctor] ignore` — see `Doctor#observed_blocking_ids`.
+          private def render_human(issues : Array(Services::Issue), config_path : String, blocking_ids : Set(String))
             plain = plain_output?
-
-            # A missing/unparseable config aborts `check_config` before any of
-            # the other config sub-checks (and `check_referenced_paths`) run.
-            # Those checks must render as skipped — a green ✓ for a check that
-            # never executed is reassuring noise on top of a broken config.
-            config_blocked = issues.any? { |i| i.id == "config-not-found" || i.id == "config-parse-error" }
 
             Logger.heading("doctor")
             # TTY already gets its blank line from `heading`; keep the plain
@@ -235,7 +231,17 @@ module Hwaro
               heading = group.key == :config ? config_path : group.default_heading
               Logger.info "  #{heading}"
               group.checks.each do |spec|
-                skipped = config_blocked && group.key == :config && !spec.issue_ids.includes?("config-parse-error")
+                # A missing/unparseable config, a missing `templates/` or a
+                # missing `content/` aborts a scan before the checks that
+                # depend on it can run. Those render as skipped — a green ✓
+                # for a check that never executed is reassuring noise on top
+                # of a broken site. The blocking ids live on the group and
+                # the check in `Services::CHECK_GROUPS`, so the service and
+                # this renderer can't drift apart.
+                blockers = group.blocked_by | spec.blocked_by
+                # The check that reports the blocking issue still renders it.
+                skipped = blockers.any? { |id| blocking_ids.includes?(id) } &&
+                          (spec.issue_ids & blockers).empty?
                 Logger.info "    #{render_check_line(spec, issues, plain, skipped)}"
               end
               Logger.info ""

@@ -51,22 +51,31 @@ hwaro doctor --json
 
 **설정 진단:**
 
-- `base_url`이 설정되지 않음
-- `base_url`이 `http://` 또는 `https://`로 시작하지 않음
-- `base_url`에 끝 슬래시가 있음
-- `title`이 기본값 그대로임
+- `base_url`이 설정되지 않았거나 끝 슬래시가 있음
+- `title`이 아직 자리표시자(`Hwaro Site`, `My Hwaro Site`)임
 - `sitemap.changefreq` 값이 유효하지 않음
 - `sitemap.priority`가 범위(0.0–1.0)를 벗어남
-- 택소노미 이름 중복
-- 언어 코드 중복
-- `search.format` 값이 유효하지 않음
+- 택소노미 이름 또는 언어 코드 중복
+- `search.format`, `markdown.math_engine`, `pwa.cache_strategy` 값이 유효하지 않음
+- `default_language`에 대응하는 `[languages.<code>]` 블록이 없음
+- `deployment.target` / `[related] taxonomies`가 정의되지 않은 대상을 참조함
+- `[[menus.*]]` 항목의 `parent`가 같은 메뉴의 어떤 identifier와도 맞지 않음
+- 참조한 파일·디렉터리가 존재하지 않음 (`[og] default_image`, `[pwa] icons`,
+  `[auto_includes] dirs`, `[[assets.bundles]] files` 등). 자체 origin을 가진 값
+  (`https://…`, `//cdn…`, `data:…`)은 원격 URL이라 검증할 수 없으므로 건너뜁니다.
 
 **템플릿 진단:**
 
 - 템플릿 디렉터리를 찾을 수 없음
 - 필수 템플릿 누락 (`page.html`, `section.html`)
-- 닫히지 않은 블록 태그 (`if`, `for`, `block`, `macro`에 대응하는 `end` 없음)
-- 짝이 맞지 않는 `{{ }}` 변수 태그
+- 빌드와 동일한 Crinja 파서로 검사한 템플릿 문법 오류
+  (프로젝트 전용 숏코드 태그는 오류로 보지 않습니다)
+
+**콘텐츠 진단:**
+
+- 콘텐츠 디렉터리를 찾을 수 없음 (빌드해도 페이지가 생성되지 않음)
+- 파싱에 실패하는 front matter (TOML/YAML)
+- `[[menus.*]]`에 선언되지 않은 메뉴 이름을 front matter가 등록함
 
 **구조 진단:**
 
@@ -86,6 +95,7 @@ hwaro: doctor
     [ok]   languages (default_language resolves)
     [ok]   markdown / pwa (valid enums)
     [ok]   deployment / related (refs resolve)
+    [ok]   menus (parent references)
     [ok]   referenced files & dirs
 
   templates/
@@ -93,7 +103,10 @@ hwaro: doctor
     [ok]   template syntax
 
   content/
+    [ok]   directory present
     [ok]   front matter (TOML/YAML parse)
+    [ok]   front matter menus (declared in config)
+    [info] section index files (_index.md)
 
 Config:
   [warn] config.toml: base_url is not set
@@ -105,6 +118,9 @@ checked: 0 errors, 1 warning, 1 info
 
 Tip: Use 'hwaro tool validate' for content checks
 ```
+
+스캔 자체가 실행되지 않은 검사는 통과(✓)가 아니라 `[--] … (skipped)`로
+표시됩니다. 예를 들어 `templates/`가 없으면 `template syntax`가 그렇습니다.
 
 색상 터미널에서는 검사 줄이 `hwaro doctor` 헤딩 아래 `✓`/`⚠`/`✗`/`ℹ` 기호로
 표시되고, 요약은 심각도별 색이 입혀진 `✦ checked` 결과 줄로 출력됩니다. 문제가
@@ -138,21 +154,34 @@ ignore = [
 | `config-not-found` | config | 설정 파일을 찾을 수 없음 ✗ |
 | `config-parse-error` | config | 설정 파싱 실패 ✗ |
 | `base-url-missing` | config | base_url이 설정되지 않음 |
-| `base-url-scheme` | config | base_url이 http(s)로 시작하지 않음 |
 | `base-url-trailing-slash` | config | base_url에 끝 슬래시가 있음 |
-| `title-default` | config | title이 기본값 그대로임 |
+| `title-default` | config | title이 아직 자리표시자임 |
 | `sitemap-changefreq-invalid` | config | 유효하지 않은 sitemap.changefreq |
 | `sitemap-priority-range` | config | sitemap.priority가 범위를 벗어남 |
 | `taxonomy-duplicate` | config | 택소노미 이름 중복 |
-| `search-format-invalid` | config | 지원하지 않는 search.format |
 | `language-duplicate` | config | 언어 코드 중복 |
+| `search-format-invalid` | config | 지원하지 않는 search.format |
+| `default-language-undefined` | config | default_language에 대응하는 `[languages.<code>]` 없음 |
+| `markdown-math-engine-invalid` | config | 지원하지 않는 markdown.math_engine |
+| `pwa-cache-strategy-invalid` | config | 지원하지 않는 pwa.cache_strategy |
+| `deployment-target-undefined` | config | deployment.target에 대응하는 `[[deployment.targets]]` 없음 |
+| `related-taxonomy-undefined` | config | `[related]`가 정의되지 않은 택소노미를 참조 |
+| `menu-parent-undefined` | config | 메뉴 항목의 `parent`가 같은 메뉴의 identifier와 맞지 않음 |
+| `config-path-missing` | config | 참조한 파일이 존재하지 않음 |
+| `config-dir-missing` | config | 참조한 디렉터리가 존재하지 않음 |
 | `missing-config-*` | config_missing | 설정 섹션 누락 (예: `missing-config-pwa`) |
 | `template-dir-missing` | template | 템플릿 디렉터리를 찾을 수 없음 ✗ |
 | `template-required-missing` | template | 필수 템플릿 누락 ✗ |
-| `template-unclosed-block` | template | 닫히지 않은 블록 태그 ✗ |
-| `template-mismatched-vars` | template | 짝이 맞지 않는 변수 태그 ✗ |
+| `template-syntax-error` | template | 템플릿 파싱 실패 ✗ |
 | `template-read-error` | template | 템플릿 읽기 실패 ✗ |
+| `content-dir-missing` | content | 콘텐츠 디렉터리를 찾을 수 없음 |
+| `content-frontmatter-invalid` | content | front matter 파싱 실패 ✗ |
+| `content-read-error` | content | 콘텐츠 파일 읽기 실패 ✗ |
+| `menu-undeclared` | content | front matter의 메뉴 이름이 설정에 선언되지 않음 |
 | `structure-missing-index` | structure | `_index.md`가 없는 섹션 |
+
+어떤 규칙 ID와도 맞지 않는 항목은 "효과 없음" 경고로 알려주므로, 오타가 조용히
+넘어가지 않습니다.
 
 ## JSON 출력
 
@@ -173,6 +202,7 @@ ignore = [
     "warnings": 1,
     "infos": 0,
     "total": 1
-  }
+  },
+  "exit_code": 0
 }
 ```
