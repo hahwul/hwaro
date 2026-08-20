@@ -255,10 +255,15 @@ describe "Sass control flow" do
     css.should contain("@media print {\n  .q {\n    color: red;")
   end
 
-  it "rejects with/without queries" do
-    expect_raises(Hwaro::Assets::Sass::SyntaxError, /queries are not supported/) do
-      compile(".a { @at-root (without: media) { color: red; } }")
-    end
+  it "escapes @media but keeps selector nesting with (without: media)" do
+    css = compile("@media screen { .e { @at-root (without: media) { .f { color: red; } } } }")
+    css.should contain(".e .f {\n  color: red;")
+    css.should_not contain("@media screen {\n  .e .f")
+  end
+
+  it "escapes at-rules but keeps rules with (with: rule)" do
+    css = compile("@media screen { .e { @at-root (with: rule) { .g { color: blue; } } } }")
+    css.should contain(".e .g {\n  color: blue;")
   end
 end
 

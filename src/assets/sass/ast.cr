@@ -121,13 +121,38 @@ module Hwaro
           getter namespace : String?
           getter args : Array(Arg)
           getter body : Array(Node)?
+          # `@include m using ($a, $b: 1) { ... }` — parameters the mixin's
+          # `@content(...)` arguments bind to. Empty without `using`.
+          getter using_params : Array(Param)
 
-          def initialize(@name, @namespace, @args, @body, line, column)
+          def initialize(@name, @namespace, @args, @body, line, column,
+                         @using_params = [] of Param)
             super(line, column)
           end
         end
 
         class ContentNode < Node
+          # `@content(1, 2)` arguments, evaluated in the mixin body's scope
+          # and bound to the include's `using` parameters.
+          getter args : Array(Arg)
+
+          def initialize(line, column, @args = [] of Arg)
+            super(line, column)
+          end
+        end
+
+        # `font: 12px serif { family: sans; }` — a declaration with a
+        # nested property block. Inner declarations emit with the outer
+        # name as a `-` prefix (`font-family`).
+        class NestedPropsNode < Node
+          getter name : TextTemplate
+          getter value : TextTemplate?
+          getter important : Bool
+          getter children : Array(Node)
+
+          def initialize(@name, @value, @important, @children, line, column)
+            super(line, column)
+          end
         end
 
         # One `$name: value` entry of `@use ... with (...)`.
@@ -244,14 +269,37 @@ module Hwaro
           end
         end
 
+        # `(with: media supports)` / `(without: media)` — which contexts an
+        # `@at-root` body keeps. `names` are at-rule names plus the special
+        # "rule" (style rules) and "all".
+        record AtRootQuery, mode : Symbol, names : Array(String) do
+          # True when style-rule nesting is escaped.
+          def escapes_rules? : Bool
+            case mode
+            when :without then names.includes?("rule") || names.includes?("all")
+            else               !names.includes?("rule")
+            end
+          end
+
+          # True when the named at-rule context is escaped.
+          def escapes_at?(at_name : String) : Bool
+            case mode
+            when :without then names.includes?(at_name) || names.includes?("all")
+            else               !names.includes?(at_name)
+            end
+          end
+        end
+
         # `@at-root { ... }` / `@at-root .sel { ... }` — evaluates its
         # body outside the current style-rule nesting (but inside any
-        # surrounding at-rule).
+        # surrounding at-rule). A query (`(without: media)`) picks which
+        # contexts are escaped instead of the default `(without: rule)`.
         class AtRootNode < Node
           getter selector : TextTemplate?
           getter children : Array(Node)
+          getter query : AtRootQuery?
 
-          def initialize(@selector, @children, line, column)
+          def initialize(@selector, @children, line, column, @query = nil)
             super(line, column)
           end
         end

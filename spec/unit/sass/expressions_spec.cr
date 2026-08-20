@@ -180,9 +180,10 @@ describe "Sass grouping parentheses" do
   # around a bare literal or a slash/space list computes nothing — so the
   # parens were emitted into the stylesheet as part of the declaration
   # value, which no browser accepts.
-  it "does not leak parentheses around a slash list" do
+  it "divides a parenthesized slash expression" do
+    # Parens force `/` division (classic Sass rule, dart-sass parity).
     css = Hwaro::Assets::Sass.compile("a { width: (10px / 2); }")
-    css.should contain("width: 10px / 2;")
+    css.should contain("width: 5px;")
     css.should_not contain("(10px")
   end
 

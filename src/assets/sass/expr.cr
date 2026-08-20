@@ -12,9 +12,13 @@
 #   @use ... with) parse with `Expr.parse!` and surface every failure as
 #   a located SyntaxError.
 #
-# `/` is never division (dart-sass 2.0 semantics): it builds a
-# slash-separated list, which is what keeps CSS shorthands like
-# `font: 12px/1.5` and `grid-area: 1 / 2` safe. Division is `math.div`.
+# `/` follows the classic Sass division rule (dart-sass 1.x semantics):
+# it divides when either operand is "computed" (a variable, a known
+# function call, parenthesized) or when the slash itself sits in a
+# computing context (an operand of other arithmetic, a Sass function
+# argument, a variable declaration, interpolation, control flow).
+# Otherwise the operands render joined by a literal `/`, which is what
+# keeps CSS shorthands like `font: 12px/1.5` and `grid-area: 1 / 2` safe.
 #
 # CSS-owned function spans (`url(...)`, `calc(...)`, `var(...)`, ...)
 # lex as verbatim raw tokens and are never evaluated.
@@ -112,7 +116,7 @@ module Hwaro
         end
 
         class Binary < Node
-          getter op : Symbol # :or, :and, :eq, :neq, :lt, :gt, :le, :ge, :plus, :minus, :times, :mod
+          getter op : Symbol # :or, :and, :eq, :neq, :lt, :gt, :le, :ge, :plus, :minus, :times, :div, :mod
           getter left : Node
           getter right : Node
 
@@ -694,9 +698,11 @@ module Hwaro
         # ---------------------------------------------------------------
 
         # Grammar, loosest first:
-        #   comma-list > slash-list > space-list > or > and >
-        #   equality > relational > additive > multiplicative >
+        #   comma-list > space-list > or > and >
+        #   equality > relational > additive > multiplicative (*, /, %) >
         #   unary (-, +, not) > concat/primary
+        # `/` parses at multiplicative precedence (dart-sass): whether it
+        # divides or renders as a literal slash is decided at eval time.
         # :nodoc:
         class Parser
           # Cap on expression nesting depth. This is a recursive-descent
@@ -759,24 +765,14 @@ module Hwaro
           end
 
           private def parse_comma : Node
-            first = parse_slash
+            first = parse_space
             return first unless match?(TokKind::Comma)
             items = [first]
             while accept(TokKind::Comma)
               break if eof? # trailing comma
-              items << parse_slash
-            end
-            ListE.new(items, ListV::Sep::Comma)
-          end
-
-          private def parse_slash : Node
-            first = parse_space
-            return first unless match?(TokKind::Slash)
-            items = [first]
-            while accept(TokKind::Slash)
               items << parse_space
             end
-            ListE.new(items, ListV::Sep::Slash)
+            ListE.new(items, ListV::Sep::Comma)
           end
 
           private def parse_space : Node
@@ -891,6 +887,8 @@ module Hwaro
             loop do
               if accept(TokKind::Star)
                 left = Binary.new(:times, left, parse_unary)
+              elsif accept(TokKind::Slash)
+                left = Binary.new(:div, left, parse_unary)
               elsif (tok = peek) && tok.kind.percent?
                 @pos += 1
                 left = Binary.new(:mod, left, parse_unary)
@@ -1019,9 +1017,9 @@ module Hwaro
               if (v = peek) && v.kind.var? && @toks[@pos + 1]?.try(&.kind.colon?)
                 kw = advance.text
                 advance # ':'
-                kwargs << KwargE.new(kw, parse_slash)
+                kwargs << KwargE.new(kw, parse_space)
               else
-                value = parse_slash
+                value = parse_space
                 if accept(TokKind::Ellipsis)
                   fail unless kwargs.empty?
                   spread = value
@@ -1041,16 +1039,16 @@ module Hwaro
             advance # '('
             return Lit.new(ListV.new(Array(Value).new, ListV::Sep::Space)) if accept(TokKind::RParen)
 
-            first = parse_slash
+            first = parse_space
             if accept(TokKind::Colon)
-              first_val = parse_slash
+              first_val = parse_space
               pairs = Array(MapPair).new
               pairs << MapPair.new(first, first_val)
               while accept(TokKind::Comma)
                 break if match?(TokKind::RParen) # trailing comma
-                key = parse_slash
+                key = parse_space
                 fail unless accept(TokKind::Colon)
-                pairs << MapPair.new(key, parse_slash)
+                pairs << MapPair.new(key, parse_space)
               end
               fail unless accept(TokKind::RParen)
               return MapE.new(pairs)
@@ -1060,7 +1058,7 @@ module Hwaro
               items = [first]
               while accept(TokKind::Comma)
                 break if match?(TokKind::RParen) # trailing comma
-                items << parse_slash
+                items << parse_space
               end
               fail unless accept(TokKind::RParen)
               return ListE.new(items, ListV::Sep::Comma)
@@ -1075,16 +1073,16 @@ module Hwaro
             items = [] of Node
             sep = ListV::Sep::Space
             unless match?(TokKind::RBracket)
-              first = parse_slash
+              first = parse_space
               if match?(TokKind::Comma)
                 items << first
                 sep = ListV::Sep::Comma
                 while accept(TokKind::Comma)
                   break if match?(TokKind::RBracket)
-                  items << parse_slash
+                  items << parse_space
                 end
               elsif first.is_a?(ListE) && !first.bracketed
-                # parse_slash already consumed the whole space/slash run as
+                # parse_space already consumed the whole space run as
                 # one inner list — its items ARE the bracketed list's items
                 # (`[1 2 3]` is a 3-element bracketed space list, not a
                 # 1-element list holding `(1 2 3)`).
@@ -1141,24 +1139,66 @@ module Hwaro
           end
         end
 
+        # True when this node, used as a `/` operand, forces the slash to
+        # divide (the classic Sass rule): a variable reference, a function
+        # call, or grouping parens. Unary wrappers force iff their operand
+        # does (`-1/2` stays literal, `-$a/2` divides — dart-sass parity).
+        def self.div_operand_forces?(node : Node) : Bool
+          case node
+          when VarE, CallE, ParenE
+            true
+          when Unary
+            div_operand_forces?(node.operand)
+          when Binary
+            # A nested arithmetic result is a computed value.
+            node.op != :div || div_operand_forces?(node.left) || div_operand_forces?(node.right)
+          else
+            false
+          end
+        end
+
+        # Division with the math.div unit rules plus convertible-group
+        # cancelling: same units (or convertible ones) cancel, a unitless
+        # divisor keeps the numerator's unit.
+        def self.divide_numbers(ln : Number, rn : Number) : {Float64, String}
+          if ln.unit == rn.unit
+            {ln.value / rn.value, ""}
+          elsif rn.unit.empty?
+            {ln.value / rn.value, ln.unit}
+          elsif ln.unit.empty?
+            raise SoftEvalError.new("can't divide unitless by #{rn.to_css}")
+          elsif factor = Number.conversion_factor(rn.unit, ln.unit)
+            {ln.value / (rn.value * factor), ""}
+          else
+            raise SoftEvalError.new("incompatible units: #{ln.to_css} and #{rn.to_css}")
+          end
+        end
+
         # True when evaluating the tree would do real work: any operator,
         # `not`, or a call that resolves to a known (user or built-in)
         # function. Bare literals/variables/lists resolve identically via
         # the legacy path, so they don't count — that is what keeps
         # existing output byte-identical.
-        def self.computes?(node : Node, host : Host) : Bool
+        #
+        # `force_div` marks a division-forcing context (variable values,
+        # interpolation): there a literal-operand `/` counts as work too.
+        def self.computes?(node : Node, host : Host, force_div : Bool = false) : Bool
           case node
           when Binary
-            true
+            return true unless node.op == :div
+            force_div || div_operand_forces?(node.left) || div_operand_forces?(node.right) ||
+              computes?(node.left, host, force_div) || computes?(node.right, host, force_div)
           when Unary
-            node.op == :not || computes?(node.operand, host)
+            # Even a plain `-$a` / `+$a` counts: the verbatim path renders
+            # `+5` for `+$a` where dart-sass emits the evaluated `5`.
+            true
           when CallE
             return true if host.expr_known_fn?(node.ns, node.name)
-            node.args.any? { |a| computes?(a, host) } ||
-              node.kwargs.any? { |kw| computes?(kw.value, host) } ||
-              node.spread.try { |s| computes?(s, host) } || false
+            node.args.any? { |a| computes?(a, host, force_div) } ||
+              node.kwargs.any? { |kw| computes?(kw.value, host, force_div) } ||
+              node.spread.try { |s| computes?(s, host, force_div) } || false
           when ListE
-            node.items.any? { |i| computes?(i, host) }
+            node.items.any? { |i| computes?(i, host, force_div) }
           when MapE
             # Map literals ALWAYS count as work, same rationale as ParenE:
             # `(a: b)` is Sass-only syntax with no CSS meaning. The verbatim
@@ -1198,6 +1238,13 @@ module Hwaro
           abstract def expr_interp(template : Ast::TextTemplate) : String
           # Enclosing rule's resolved selectors for `&` (nil at root).
           abstract def expr_parent_selectors : Array(String)?
+
+          # `meta.keywords($args)` — the keyword arguments captured by the
+          # variadic parameter `$name`, as a map; nil when the call does
+          # not resolve to the built-in (the normal call path then runs).
+          def expr_keywords(name : String, var_ns : String?, call_ns : String?) : Value?
+            nil
+          end
         end
 
         # Coerces stored text back into a typed value ("1px" -> Number,
@@ -1250,7 +1297,14 @@ module Hwaro
           # `Franklin and Marshall` font stack must fall back to verbatim
           # text, never evaluate to one operand. Strict contexts
           # (@if/@while conditions) keep full Sass truthiness.
-          def initialize(@host : Host, @strict : Bool = false)
+          #
+          # `force_div` starts the evaluation in a division-forcing context
+          # (variable declarations, interpolation, strict contexts): every
+          # `/` in the tree divides. When it starts false (declaration
+          # values), a `/` divides only when an operand is computed or the
+          # slash sits under other arithmetic / a Sass function call — the
+          # classic Sass division rule.
+          def initialize(@host : Host, @strict : Bool = false, @force_div : Bool = false)
           end
 
           def eval(node : Node) : Value
@@ -1268,7 +1322,7 @@ module Hwaro
                 NullV.new
               end
             when ConcatE then Raw.new(node.parts.map { |p| eval(p).to_css }.join)
-            when ParenE  then eval(node.inner)
+            when ParenE  then eval_forced(node.inner) # parens force `/` division (Sass rule)
             when ListE   then ListV.new(node.items.map { |i| eval(i).as(Value) }, node.sep, node.bracketed)
             when MapE    then eval_map(node)
             when Unary   then eval_unary(node)
@@ -1332,21 +1386,52 @@ module Hwaro
               boolish!(left)
               left.truthy? ? eval(node.right) : left
             when :eq
-              BoolV.new(loose_eq(eval(node.left), eval(node.right)))
+              BoolV.new(loose_eq(eval_forced(node.left), eval_forced(node.right)))
             when :neq
-              BoolV.new(!loose_eq(eval(node.left), eval(node.right)))
+              BoolV.new(!loose_eq(eval_forced(node.left), eval_forced(node.right)))
             when :lt, :gt, :le, :ge
-              compare(node.op, eval(node.left), eval(node.right))
+              compare(node.op, eval_forced(node.left), eval_forced(node.right))
             when :plus
-              add(eval(node.left), eval(node.right))
+              add(eval_forced(node.left), eval_forced(node.right))
             when :minus
-              arith(:minus, eval(node.left), eval(node.right))
+              arith(:minus, eval_forced(node.left), eval_forced(node.right))
             when :times
-              multiply(eval(node.left), eval(node.right))
+              multiply(eval_forced(node.left), eval_forced(node.right))
+            when :div
+              eval_div(node)
             when :mod
-              arith(:mod, eval(node.left), eval(node.right))
+              arith(:mod, eval_forced(node.left), eval_forced(node.right))
             else
               raise SoftEvalError.new("unsupported operator")
+            end
+          end
+
+          # Evaluates a subexpression in division-forcing position (an
+          # arithmetic/comparison operand or a Sass function argument).
+          private def eval_forced(node : Node) : Value
+            saved = @force_div
+            @force_div = true
+            begin
+              eval(node)
+            ensure
+              @force_div = saved
+            end
+          end
+
+          # The classic Sass `/` rule: divide when forced by context or by
+          # a computed operand; otherwise render the operands joined by a
+          # literal slash (`font: 12px/30px` territory).
+          private def eval_div(node : Binary) : Value
+            if @force_div || Expr.div_operand_forces?(node.left) || Expr.div_operand_forces?(node.right)
+              ln = number!(eval_forced(node.left), "division")
+              rn = number!(eval_forced(node.right), "division")
+              raise SoftEvalError.new("division by zero") if rn.value == 0
+              value, unit = Expr.divide_numbers(ln, rn)
+              Number.new(value, unit)
+            else
+              left = eval(node.left)
+              right = eval(node.right)
+              Raw.new("#{left.to_css}/#{right.to_css}")
             end
           end
 
@@ -1358,7 +1443,14 @@ module Hwaro
             return true if left.eq?(right)
             l = left.is_a?(Raw) ? Expr.coerce(left.text) : left
             r = right.is_a?(Raw) ? Expr.coerce(right.text) : right
-            l.eq?(r)
+            return true if l.eq?(r)
+            # Colors compare by channel across spellings: `red == #f00`.
+            # Neither side coerces to ColorV via Expr.coerce (colors are
+            # only produced on demand), so ask the color parser directly.
+            if (lc = ColorV.coerce?(l)) && (rc = ColorV.coerce?(r))
+              return lc.eq?(rc)
+            end
+            false
           end
 
           private def compare(op : Symbol, left : Value, right : Value) : Value
@@ -1367,12 +1459,13 @@ module Hwaro
             unless ln.compatible_unit?(rn)
               raise SoftEvalError.new("can't compare #{ln.to_css} with #{rn.to_css} (incompatible units)")
             end
+            rv = ln.unit.empty? ? rn.value : ln.coerce_value(rn)
             result =
               case op
-              when :lt then ln.value < rn.value
-              when :gt then ln.value > rn.value
-              when :le then ln.value <= rn.value
-              else          ln.value >= rn.value
+              when :lt then ln.value < rv
+              when :gt then ln.value > rv
+              when :le then ln.value <= rv
+              else          ln.value >= rv
               end
             BoolV.new(result)
           end
@@ -1382,13 +1475,13 @@ module Hwaro
               return arith_numbers(:plus, ln, rn)
             end
             # String concatenation; quotedness follows the left operand
-            # (dart-sass semantics).
+            # when it IS a string, otherwise the right one (dart-sass:
+            # `"a" + b` is quoted, `a + "b"` is not, `1 + "a"` is).
             if left.is_a?(Str) || right.is_a?(Str)
               lt = left.is_a?(Str) ? left.text : left.to_css
               rt = right.is_a?(Str) ? right.text : right.to_css
-              quoted = left.is_a?(Str) && left.quoted
-              quote = left.is_a?(Str) ? left.quote_char : '"'
-              return Str.new(lt + rt, quoted: quoted, quote_char: quote)
+              lead = left.is_a?(Str) ? left : right.as(Str)
+              return Str.new(lt + rt, quoted: lead.quoted, quote_char: lead.quote_char)
             end
             raise SoftEvalError.new("can't add #{left.to_css} and #{right.to_css}")
           end
@@ -1404,13 +1497,16 @@ module Hwaro
               raise SoftEvalError.new("incompatible units: #{ln.to_css} and #{rn.to_css}")
             end
             unit = ln.result_unit(rn)
+            # The left operand's unit wins; a convertible right operand is
+            # re-expressed in it (`1in + 72pt` is `2in`, dart-sass parity).
+            rv = ln.unit.empty? ? rn.value : ln.coerce_value(rn)
             value =
               case op
-              when :plus  then ln.value + rn.value
-              when :minus then ln.value - rn.value
+              when :plus  then ln.value + rv
+              when :minus then ln.value - rv
               when :mod
-                raise SoftEvalError.new("modulo by zero") if rn.value == 0
-                ln.value % rn.value
+                raise SoftEvalError.new("modulo by zero") if rv == 0
+                ln.value % rv
               else
                 raise SoftEvalError.new("unsupported arithmetic")
               end
@@ -1426,14 +1522,35 @@ module Hwaro
             Number.new(ln.value * rn.value, ln.unit.empty? ? rn.unit : ln.unit)
           end
 
+          # Built-ins that shadow real CSS functions. Their argument lists
+          # may be plain CSS (`rgb(255 0 0 / 0.5)`, `min(10px, 5%/2)`), so
+          # a `/` inside must stay literal — forcing division there would
+          # corrupt the reconstructed passthrough.
+          SHADOWED_CSS_FNS = %w[rgb rgba hsl hsla hwb min max clamp round abs
+            invert grayscale greyscale opacity saturate]
+
           private def eval_call(node : CallE) : Value
             if node.ns.nil? && node.spread.nil? && node.kwargs.empty? &&
                node.args.size == 3 && Sass.normalize_ident(node.name) == "if"
-              return eval(node.args[0]).truthy? ? eval(node.args[1]) : eval(node.args[2])
+              return eval_forced(node.args[0]).truthy? ? eval_forced(node.args[1]) : eval_forced(node.args[2])
             end
-            args = node.args.map { |a| eval(a) }
+            # `meta.keywords($args)` needs the VARIABLE, not its value —
+            # the keyword store is a side channel of the variadic binding
+            # that doesn't survive evaluation of `$args` into a list.
+            if Sass.normalize_ident(node.name) == "keywords" && node.kwargs.empty? &&
+               node.spread.nil? && node.args.size == 1 && (ref = node.args[0]).is_a?(VarE)
+              if result = @host.expr_keywords(ref.name, ref.ns, node.ns)
+                return result
+              end
+            end
+            # Arguments of a known Sass function are a SassScript context:
+            # `/` divides there (`percentage(1/4)` is `25%`). Unknown-
+            # function arguments are CSS and keep the literal slash.
+            force_args = @host.expr_known_fn?(node.ns, node.name) &&
+                         !(node.ns.nil? && SHADOWED_CSS_FNS.includes?(Sass.normalize_ident(node.name)))
+            args = node.args.map { |a| force_args ? eval_forced(a) : eval(a) }
             if spread = node.spread
-              spread_val = eval(spread)
+              spread_val = force_args ? eval_forced(spread) : eval(spread)
               case spread_val
               when ListV
                 args.concat(spread_val.items)
@@ -1445,7 +1562,7 @@ module Hwaro
             node.kwargs.each do |kw|
               key = Sass.normalize_ident(kw.name)
               raise SoftEvalError.new("duplicate argument $#{kw.name}") if kwargs.has_key?(key)
-              kwargs[key] = eval(kw.value)
+              kwargs[key] = force_args ? eval_forced(kw.value) : eval(kw.value)
             end
             if result = @host.expr_call(node.ns, node.name, args, kwargs)
               result

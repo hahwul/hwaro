@@ -113,24 +113,68 @@ module Hwaro
           s
         end
 
+        # Convertible-unit groups (dart-sass's known compatibilities):
+        # {group id, factor to the group's canonical unit}. Lookup is
+        # case-insensitive because CSS units are.
+        UNIT_CONVERSIONS = {
+          # length — canonical px
+          "px" => {0, 1.0}, "cm" => {0, 96.0 / 2.54}, "mm" => {0, 96.0 / 25.4},
+          "q" => {0, 96.0 / 101.6}, "in" => {0, 96.0}, "pt" => {0, 4.0 / 3.0},
+          "pc" => {0, 16.0},
+          # angle — canonical deg
+          "deg" => {1, 1.0}, "grad" => {1, 0.9}, "rad" => {1, 180.0 / Math::PI},
+          "turn" => {1, 360.0},
+          # time — canonical s
+          "s" => {2, 1.0}, "ms" => {2, 0.001},
+          # frequency — canonical Hz
+          "hz" => {3, 1.0}, "khz" => {3, 1000.0},
+          # resolution — canonical dppx
+          "dppx" => {4, 1.0}, "dpi" => {4, 1.0 / 96.0}, "dpcm" => {4, 2.54 / 96.0},
+        }
+
+        # Multiplier that converts a value in `from` units to `to` units;
+        # nil when the units aren't in the same convertible group.
+        def self.conversion_factor(from : String, to : String) : Float64?
+          return 1.0 if from == to
+          f = UNIT_CONVERSIONS[from.downcase]?
+          t = UNIT_CONVERSIONS[to.downcase]?
+          return unless f && t && f[0] == t[0]
+          f[1] / t[1]
+        end
+
         def eq?(other : Value) : Bool
           return false unless other.is_a?(Number)
           # Equality needs units to actually match — `1px == 1` is false.
           # `compatible_unit?` (one side unitless adopts the other's unit)
           # is the right rule for arithmetic and comparison, but using it
           # here silently picks the wrong `@if` branch and collides map
-          # keys that differ only by unit.
-          unit == other.unit && value == other.value
+          # keys that differ only by unit. Convertible units DO compare
+          # equal after conversion (`1in == 96px` is true in dart-sass).
+          return value == other.value if unit == other.unit
+          return false if unit.empty? || other.unit.empty?
+          factor = Number.conversion_factor(other.unit, unit)
+          !factor.nil? && value == other.value * factor
         end
 
-        # v1 unit model: identical units or one side unitless. No
-        # px↔cm-style conversions.
+        # Identical units, one side unitless, or units in the same
+        # convertible group (px↔in, deg↔turn, s↔ms, ...).
         def compatible_unit?(other : Number) : Bool
-          unit.empty? || other.unit.empty? || unit == other.unit
+          unit.empty? || other.unit.empty? || unit == other.unit ||
+            !Number.conversion_factor(other.unit, unit).nil?
         end
 
         def result_unit(other : Number) : String
           unit.empty? ? other.unit : unit
+        end
+
+        # The other operand's value expressed in THIS number's unit (the
+        # left operand of an arithmetic expression wins the unit, dart-sass
+        # semantics). Callers must have checked `compatible_unit?`.
+        def coerce_value(other : Number) : Float64
+          return other.value if unit.empty? || other.unit.empty? || unit == other.unit
+          factor = Number.conversion_factor(other.unit, unit)
+          raise SoftEvalError.new("incompatible units: #{to_css} and #{other.to_css}") unless factor
+          other.value * factor
         end
 
         def int_value(context : String) : Int32

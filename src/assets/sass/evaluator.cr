@@ -68,20 +68,38 @@ module Hwaro
 
         # A `{ ... }` block passed to `@include`; evaluated at `@content`
         # with the caller's variable scope (dart-sass lexical semantics).
+        # `params` are the `using ($a, $b: 1)` parameters that
+        # `@content(...)` arguments bind to.
         # :nodoc:
         class ContentBlock
           getter nodes : Array(Ast::Node)
           getter env : Environment
           getter outer : ContentBlock?
           getter path : String
+          getter params : Array(Ast::Param)
 
-          def initialize(@nodes, @env, @outer, @path)
+          def initialize(@nodes, @env, @outer, @path, @params = [] of Ast::Param)
+          end
+        end
+
+        # An at-rule the evaluator is currently writing into, with the sink
+        # that CONTAINS it. Needed to reopen the at-rule when later content
+        # arrives after something else (a merged nested @media) was emitted
+        # beside it, and to find enclosing @media preludes for merging.
+        # :nodoc:
+        class AtFrame
+          property at : Css::AtRule
+          getter container : Array(Css::Node)
+
+          def initialize(@at, @container)
           end
         end
 
         @env : Environment
         @sink : Array(Css::Node)
         @current_rule : Css::Rule?
+        @current_rule_sink : Array(Css::Node)?
+        @at_frames : Array(AtFrame)
         @current_at : Css::AtRule?
         @parent_selectors : Array(String)?
         @content : ContentBlock?
@@ -101,6 +119,13 @@ module Hwaro
           @include_depth = 0
           @loop_iterations = 0_i64
           @path = path
+          # Sink the current rule was emitted into; when it is no longer
+          # the sink's last node (a nested rule was emitted after it),
+          # later declarations reopen a fresh rule with the same selectors
+          # to preserve cascade order (dart-sass behavior).
+          @current_rule_sink = nil
+          # Enclosing at-rule stack (innermost last) — see AtFrame.
+          @at_frames = [] of AtFrame
           @loaded_modules = {} of String => SassModule
           @load_stack = [] of String
           @in_function = false
@@ -156,10 +181,12 @@ module Hwaro
             eval_rule(node)
           when Ast::DeclarationNode
             eval_declaration(node)
+          when Ast::NestedPropsNode
+            eval_nested_props(node)
           when Ast::IncludeNode
             eval_include(node)
           when Ast::ContentNode
-            eval_content
+            eval_content(node)
           when Ast::IfNode
             eval_if(node)
           when Ast::EachNode
@@ -216,67 +243,117 @@ module Hwaro
 
           selectors = @in_keyframes ? parts : combine_selectors(parts, node)
           rule = Css::Rule.new(selectors)
-          @sink << rule
+          emit(rule)
 
           saved_rule = @current_rule
+          saved_rule_sink = @current_rule_sink
           saved_parents = @parent_selectors
           saved_env = @env
           @current_rule = rule
+          @current_rule_sink = @sink
           @parent_selectors = selectors
           @env = Environment.new(saved_env) # each block is a variable scope
           eval_nodes(node.children)
           @current_rule = saved_rule
+          @current_rule_sink = saved_rule_sink
           @parent_selectors = saved_parents
           @env = saved_env
         end
 
+        # Emits a node into the current sink, reopening the innermost
+        # enclosing at-rule first when something else (a bubbled/merged
+        # @media) was emitted beside it in the meantime — later content
+        # must not serialize above it, or cascade order flips
+        # (dart-sass reopens the block the same way).
+        private def emit(node : Css::Node) : Nil
+          if (frame = @at_frames.last?) && @sink.same?(frame.at.children) &&
+             !frame.container.last?.same?(frame.at)
+            stale = frame.at
+            fresh = Css::AtRule.new(stale.name, stale.prelude)
+            frame.container << fresh
+            frame.at = fresh
+            @sink = fresh.children
+            @current_at = fresh if @current_at.same?(stale)
+          end
+          @sink << node
+        end
+
         private def combine_selectors(parts : Array(String), node : Ast::RuleNode) : Array(String)
           parents = @parent_selectors
-          result = [] of String
-          parts.each do |part|
-            amps = count_parent_refs(part)
-            if parents.nil?
-              if amps > 0
+          if parents.nil?
+            parts.each do |part|
+              if count_parent_refs(part) > 0
                 error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
               end
-              result << part
-            elsif amps > 0
-              # Cost-check BEFORE building the cross-product: materializing it
-              # first is exactly the allocation this guard exists to prevent.
-              # Past MAX_PARENT_REF_SLOTS there is no cross-product to size —
-              # `parent_combinations` already degrades to a single combo — and
-              # the running product is capped rather than raised to a power so
-              # the check itself can't overflow.
-              if amps <= MAX_PARENT_REF_SLOTS
-                projected = 1_i64
-                amps.times do
-                  projected *= parents.size
-                  break if projected > MAX_RULE_SELECTORS
-                end
-                if projected > MAX_RULE_SELECTORS
-                  error_at(node.line, node.column,
-                    "selector expands to more than #{MAX_RULE_SELECTORS} selectors " \
-                    "(#{parents.size} parent selectors, #{amps} \"&\" references); " \
-                    "reduce the nesting or the comma-separated parent list")
-                end
-              end
-              parent_combinations(parents, amps).each do |combo|
-                result << substitute_parent(part, combo)
-              end
-            else
-              parents.each { |parent| result << "#{parent} #{part}" }
             end
-            if result.size > MAX_RULE_SELECTORS
+            return parts
+          end
+
+          amps_by_part = parts.map { |part| count_parent_refs(part) }
+          amps_by_part.each do |amps|
+            next unless amps > 0
+            # Cost-check BEFORE building the cross-product: materializing it
+            # first is exactly the allocation this guard exists to prevent.
+            # Past MAX_PARENT_REF_SLOTS there is no cross-product to size —
+            # `parent_combinations` already degrades to a single combo — and
+            # the running product is capped rather than raised to a power so
+            # the check itself can't overflow.
+            next unless amps <= MAX_PARENT_REF_SLOTS
+            projected = 1_i64
+            amps.times do
+              projected *= parents.size
+              break if projected > MAX_RULE_SELECTORS
+            end
+            if projected > MAX_RULE_SELECTORS
               error_at(node.line, node.column,
-                "selector expands to more than #{MAX_RULE_SELECTORS} selectors; " \
+                "selector expands to more than #{MAX_RULE_SELECTORS} selectors " \
+                "(#{parents.size} parent selectors, #{amps} \"&\" references); " \
                 "reduce the nesting or the comma-separated parent list")
+            end
+          end
+
+          # Parent-major ordering (dart-sass): `a, b { c, d {} }` resolves
+          # to `a c, a d, b c, b d` — the parent varies slowest. For a
+          # multi-`&` part the FIRST `&` slot is the one aligned with the
+          # parent loop; the remaining slots run the full parent list.
+          result = [] of String
+          parents.each_with_index do |parent, parent_i|
+            parts.each_with_index do |part, pi|
+              amps = amps_by_part[pi]
+              if amps == 0
+                result << "#{parent} #{part}"
+              elsif amps > MAX_PARENT_REF_SLOTS
+                # Degraded single-combo expansion; emit once, on the first
+                # parent pass, mirroring parent_combinations' fallback.
+                result << substitute_parent(part, parents) if parent_i == 0
+              else
+                parent_combinations(parents, amps - 1).each do |combo|
+                  result << substitute_parent(part, [parent] + combo)
+                end
+              end
+              if result.size > MAX_RULE_SELECTORS
+                error_at(node.line, node.column,
+                  "selector expands to more than #{MAX_RULE_SELECTORS} selectors; " \
+                  "reduce the nesting or the comma-separated parent list")
+              end
             end
           end
           result
         end
 
         private def template_has_parent_ref?(template : Ast::TextTemplate) : Bool
-          template.pieces.any? { |piece| piece.is_a?(String) && piece.includes?('&') }
+          template.pieces.any? do |piece|
+            case piece
+            when String
+              piece.includes?('&')
+            when Ast::Interp
+              # `@at-root #{&}__suffix` — the `&` lives inside the
+              # interpolation body (the standard BEM idiom).
+              template_has_parent_ref?(piece.inner)
+            else
+              false
+            end
+          end
         end
 
         # Every assignment of `parents` to `slots` independent `&` slots,
@@ -390,7 +467,7 @@ module Hwaro
             return
           end
           decl = Css::Decl.new(name, value, node.important)
-          if rule = @current_rule
+          if rule = open_rule
             rule.items << decl
           elsif at = @current_at
             at.items << decl
@@ -399,13 +476,29 @@ module Hwaro
           end
         end
 
+        # The rule new declarations belong to. When nested rules were
+        # emitted after the current rule in the same sink, a declaration
+        # arriving now must NOT be hoisted back into it — that flips
+        # cascade order against source order. Reopen a fresh rule with the
+        # same selectors instead (dart-sass behavior).
+        private def open_rule : Css::Rule?
+          rule = @current_rule
+          return unless rule
+          sink = @current_rule_sink
+          return rule if sink.nil? || sink.last?.same?(rule)
+          fresh = Css::Rule.new(rule.selectors)
+          sink << fresh
+          @current_rule = fresh
+          fresh
+        end
+
         private def emit_comment(text : String) : Nil
-          if rule = @current_rule
+          if rule = open_rule
             rule.items << Css::Comment.new(text)
           elsif at = @current_at
             at.items << Css::Comment.new(text)
           else
-            @sink << Css::Comment.new(text)
+            emit(Css::Comment.new(text))
           end
         end
 
@@ -419,15 +512,38 @@ module Hwaro
           children = node.children
           unless children
             text = prelude.empty? ? "@#{node.name};" : "@#{node.name} #{prelude};"
-            @sink << Css::Raw.new(text)
+            emit(Css::Raw.new(text))
             return
           end
 
+          # `@media` nested inside `@media` merges into one query and
+          # bubbles beside the OUTERMOST enclosing media block, matching
+          # dart-sass output (`screen` + `(min-width: x)` →
+          # `screen and (min-width: x)` at the top level). Queries the
+          # string merge can't express (`not …`) keep the nested form —
+          # valid modern CSS — instead of being dropped.
+          # Only merge when every enclosing at-rule is a @media: with a
+          # @supports (or unknown at-rule) in between, bubbling past it
+          # would silently drop that condition — keep the nested form.
+          container = @sink
+          if node.name == "media" && !@at_frames.empty? &&
+             @at_frames.all? { |f| f.at.name == "media" }
+            if merged = merge_media_queries(@at_frames.map(&.at.prelude), prelude)
+              prelude = merged
+              container = @at_frames[0].container
+            end
+          end
+
           at = Css::AtRule.new(node.name, prelude)
-          @sink << at
+          if container.same?(@sink)
+            emit(at)
+          else
+            container << at
+          end
 
           saved_sink = @sink
           saved_rule = @current_rule
+          saved_rule_sink = @current_rule_sink
           saved_at = @current_at
           saved_parents = @parent_selectors
           saved_keyframes = @in_keyframes
@@ -438,6 +554,7 @@ module Hwaro
           @env = Environment.new(saved_env)
           if keyframes?(node.name)
             @current_rule = nil
+            @current_rule_sink = nil
             @parent_selectors = nil
             @in_keyframes = true
           elsif (rule = saved_rule) && conditional_group?(node.name)
@@ -450,18 +567,143 @@ module Hwaro
             synthetic = Css::Rule.new(rule.selectors)
             at.children << synthetic
             @current_rule = synthetic
+            @current_rule_sink = at.children
           else
             @current_rule = nil
+            @current_rule_sink = nil
           end
 
-          eval_nodes(children)
+          @at_frames << AtFrame.new(at, container)
+          begin
+            eval_nodes(children)
+          ensure
+            @at_frames.pop
+          end
 
           @sink = saved_sink
           @current_rule = saved_rule
+          @current_rule_sink = saved_rule_sink
           @current_at = saved_at
           @parent_selectors = saved_parents
           @in_keyframes = saved_keyframes
           @env = saved_env
+        end
+
+        # Merges enclosing @media preludes with a nested one into a single
+        # query list, or nil when the combination can't be expressed
+        # (`not` operands, conflicting media types). Comma lists cross-
+        # multiply, outer-major; type-conflicting pairs are dropped
+        # (dart-sass semantics).
+        private def merge_media_queries(outers : Array(String), inner : String) : String?
+          merged = inner
+          outers.reverse_each do |outer|
+            merged = merge_media_pair(outer, merged) || return
+          end
+          merged
+        end
+
+        private def merge_media_pair(outer : String, inner : String) : String?
+          outer_qs = Parser.split_top_level_commas(outer).map { |q| collapse_ws(q) }.reject(&.empty?)
+          inner_qs = Parser.split_top_level_commas(inner).map { |q| collapse_ws(q) }.reject(&.empty?)
+          return if outer_qs.empty? || inner_qs.empty?
+          combined = [] of String
+          outer_qs.each do |oq|
+            inner_qs.each do |iq|
+              if q = merge_media_query(oq, iq)
+                combined << q
+              elsif oq.starts_with?("not ") || iq.starts_with?("not ")
+                # `not` can't be distributed over `and`; keep nesting.
+                return
+              end
+              # A plain type conflict (screen × print) drops the pair.
+            end
+          end
+          combined.empty? ? nil : combined.join(", ")
+        end
+
+        # One query each side: `[only|not] [type] [and (feature)...]`.
+        private def merge_media_query(outer : String, inner : String) : String?
+          o = parse_media_query(outer)
+          i = parse_media_query(inner)
+          return unless o && i
+          return if o[:negated] || i[:negated]
+          type =
+            if (ot = o[:type]) && (it = i[:type])
+              return unless ot == it && o[:modifier] == i[:modifier]
+              o[:modifier] + ot
+            else
+              side = o[:type] ? o : i
+              (t = side[:type]) ? side[:modifier] + t : nil
+            end
+          parts = [] of String
+          parts << type if type
+          parts.concat(o[:features])
+          parts.concat(i[:features])
+          return if parts.empty?
+          parts.join(" and ")
+        end
+
+        # Splits a single media query into modifier/type/features; nil when
+        # it doesn't fit the simple shape (`not (...)`, level-4 syntax).
+        private def parse_media_query(query : String)
+          words = split_media_words(query)
+          return if words.empty?
+          modifier = ""
+          negated = false
+          idx = 0
+          case words[0].downcase
+          when "only"
+            modifier = "only "
+            idx = 1
+          when "not"
+            negated = true
+            idx = 1
+          end
+          type = nil
+          features = [] of String
+          expect_and = false
+          while idx < words.size
+            word = words[idx]
+            if word.starts_with?('(')
+              features << word
+            elsif word.downcase == "and"
+              idx += 1
+              next
+            elsif type.nil? && features.empty? && !expect_and
+              type = word
+            else
+              return
+            end
+            expect_and = true
+            idx += 1
+          end
+          return if negated && !features.empty? && type.nil?
+          {modifier: modifier, negated: negated, type: type, features: features}
+        end
+
+        # Media query words: feature parens are single words.
+        private def split_media_words(query : String) : Array(String)
+          words = [] of String
+          buf = String::Builder.new
+          depth = 0
+          query.each_char do |c|
+            if c == '('
+              depth += 1
+              buf << c
+            elsif c == ')'
+              depth -= 1
+              buf << c
+            elsif c.ascii_whitespace? && depth == 0
+              word = buf.to_s
+              words << word unless word.empty?
+              buf = String::Builder.new
+            else
+              buf << c
+            end
+          end
+          word = buf.to_s
+          words << word unless word.empty?
+          words
         end
 
         private def keyframes?(name : String) : Bool
@@ -497,9 +739,9 @@ module Hwaro
           end
 
           call_env = Environment.new(closure.env)
-          positional, kwargs = collect_args(node.args, "mixin #{node.name}", node.line, node.column)
+          positional, kwargs, rest_sep = collect_args(node.args, "mixin #{node.name}", node.line, node.column)
           bind_params(closure.node.params, positional, kwargs, call_env,
-            "mixin #{node.name}", node.line, node.column)
+            "mixin #{node.name}", node.line, node.column, rest_sep: rest_sep)
 
           content =
             if body = node.body
@@ -511,7 +753,7 @@ module Hwaro
                 error_at(node.line, node.column,
                   "mixin #{node.name} doesn't accept a content block (no @content in its body)")
               end
-              ContentBlock.new(body, @env, @content, @path)
+              ContentBlock.new(body, @env, @content, @path, node.using_params)
             end
 
           saved_env = @env
@@ -544,16 +786,37 @@ module Hwaro
 
         # Resolves call-site arguments (in the caller's scope) into
         # positional strings and keyword strings; `$value...` spreads
-        # lists into positionals and maps into keywords.
+        # lists into positionals and maps into keywords. The third result
+        # is the separator of a spread list, so a variadic parameter that
+        # absorbs it keeps the original separator (`$lst: 4 5 6` spread
+        # into `$rest...` must stay space-separated).
         private def collect_args(args : Array(Ast::Arg), what : String,
-                                 line : Int32, column : Int32) : {Array(String), Hash(String, String)}
+                                 line : Int32, column : Int32) : {Array(String), Hash(String, String), ListV::Sep?}
           positional = [] of String
           kwargs = {} of String => String
+          rest_sep = nil.as(ListV::Sep?)
 
           args.each do |arg|
             value = resolve_value(arg.value) # evaluated in the caller's scope
             if arg.spread
-              spread_into(value, positional, kwargs, line, column)
+              if sep = spread_into(value, positional, kwargs, line, column)
+                rest_sep = sep
+              end
+              # Spreading a variadic arglist onward forwards its keyword
+              # arguments too (`@include inner($args...)` — dart-sass
+              # semantics). The keywords live in the hidden side-channel
+              # the variadic binding wrote.
+              if (pieces = arg.value.pieces).size == 1 && (ref = pieces[0].as?(Ast::VarRef)) && ref.namespace.nil?
+                if stored = @env.lookup_var(KEYWORDS_VAR_PREFIX + Sass.normalize_ident(ref.name))
+                  if map = Expr.coerce(stored).as?(MapV)
+                    map.entries.each do |entry|
+                      key = entry.key
+                      next unless key.is_a?(Str)
+                      kwargs[Sass.normalize_ident(key.text)] ||= value_storage(entry.value)
+                    end
+                  end
+                end
+              end
             elsif name = arg.name
               name = Sass.normalize_ident(name)
               if kwargs.has_key?(name)
@@ -567,11 +830,12 @@ module Hwaro
               positional << value
             end
           end
-          {positional, kwargs}
+          {positional, kwargs, rest_sep}
         end
 
+        # Returns the spread list's separator (nil for maps/scalars).
         private def spread_into(value : String, positional : Array(String),
-                                kwargs : Hash(String, String), line : Int32, column : Int32) : Nil
+                                kwargs : Hash(String, String), line : Int32, column : Int32) : ListV::Sep?
           spread = Expr.coerce(value)
           case spread
           when MapV
@@ -582,16 +846,19 @@ module Hwaro
               end
               kwargs[Sass.normalize_ident(key.text)] = value_storage(entry.value)
             end
+            nil
           when ListV
             unless kwargs.empty?
               error_at(line, column, "positional arguments must precede keyword arguments")
             end
             spread.items.each { |item| positional << value_storage(item) }
+            spread.sep
           else
             unless kwargs.empty?
               error_at(line, column, "positional arguments must precede keyword arguments")
             end
             positional << value
+            nil
           end
         end
 
@@ -599,17 +866,30 @@ module Hwaro
         # `soft: true` raises SoftEvalError instead of located errors —
         # function calls happen inside expression evaluation, where
         # lenient contexts fall back and strict contexts add locations.
+        # Hidden variable prefix carrying a variadic parameter's keyword
+        # arguments (`meta.keywords($args)` / spread forwarding). `@` can
+        # never appear in a user identifier, so the side-channel is
+        # unreachable from stylesheet code.
+        KEYWORDS_VAR_PREFIX = "@kw:"
+
         private def bind_params(params : Array(Ast::Param), positional : Array(String),
                                 kwargs : Hash(String, String), call_env : Environment,
                                 what : String, line : Int32, column : Int32,
-                                soft : Bool = false) : Nil
+                                soft : Bool = false, rest_sep : ListV::Sep? = nil) : Nil
           param_names = params.map { |p| Sass.normalize_ident(p.name) }
           variadic = params.last?.try(&.variadic) || false
           fixed = variadic ? params.size - 1 : params.size
 
-          kwargs.each_key do |name|
+          # Keyword arguments no fixed parameter declares flow into the
+          # variadic arglist's keyword store (dart-sass semantics) — only
+          # a non-variadic signature rejects them.
+          extra_kwargs = {} of String => String
+          kwargs.each do |name, value|
             unless param_names.includes?(name)
-              bind_error("no parameter named $#{name} in #{what}", soft, line, column)
+              unless variadic
+                bind_error("no parameter named $#{name} in #{what}", soft, line, column)
+              end
+              extra_kwargs[name] = value
             end
           end
           if variadic && kwargs.has_key?(param_names.last)
@@ -623,7 +903,14 @@ module Hwaro
             param_name = param_names[i]
             if param.variadic
               rest = positional.size > fixed ? positional[fixed..] : [] of String
-              call_env.variables[param_name] = rest.empty? ? "()" : rest.join(", ")
+              joiner =
+                case rest_sep
+                in nil, ListV::Sep::Comma then ", "
+                in ListV::Sep::Space      then " "
+                in ListV::Sep::Slash      then " / "
+                end
+              call_env.variables[param_name] = rest.empty? ? "()" : rest.join(joiner)
+              call_env.variables[KEYWORDS_VAR_PREFIX + param_name] = keywords_storage(extra_kwargs)
               next
             end
             value =
@@ -655,6 +942,14 @@ module Hwaro
           error_at(line, column, message)
         end
 
+        # Serializes leftover keyword arguments as a map storage string.
+        # Values containing top-level commas wrap in structural parens so
+        # they survive the map's own comma separators on re-parse.
+        private def keywords_storage(kwargs : Hash(String, String)) : String
+          return "()" if kwargs.empty?
+          "(" + kwargs.map { |k, v| "#{k}: #{v.includes?(',') ? "(#{v})" : v}" }.join(", ") + ")"
+        end
+
         # True when the mixin body can reach `@content`: a lexically nested
         # `@content` anywhere except inside a nested `@mixin` definition
         # (whose `@content` belongs to that inner mixin — dart-sass scoping).
@@ -683,14 +978,24 @@ module Hwaro
           end
         end
 
-        private def eval_content : Nil
+        private def eval_content(node : Ast::ContentNode) : Nil
           block = @content
           return unless block # @include without a body: @content emits nothing
+
+          # `@content(args)` arguments evaluate in the MIXIN body's scope
+          # and bind to the include's `using (...)` parameters in the
+          # content block's scope (dart-sass semantics).
+          content_env = Environment.new(block.env)
+          if !node.args.empty? || !block.params.empty?
+            positional, kwargs, rest_sep = collect_args(node.args, "@content", node.line, node.column)
+            bind_params(block.params, positional, kwargs, content_env,
+              "the content block", node.line, node.column, rest_sep: rest_sep)
+          end
 
           saved_env = @env
           saved_content = @content
           saved_path = @path
-          @env = Environment.new(block.env)
+          @env = content_env
           @content = block.outer
           @path = block.path
           begin
@@ -700,6 +1005,50 @@ module Hwaro
             @content = saved_content
             @path = saved_path
           end
+        end
+
+        # Nested property block: `font: 12px serif { family: sans; }`
+        # emits `font: 12px serif` plus `font-family: sans`, prefixing
+        # recursively. Only declarations (and nested blocks/comments) may
+        # appear inside — anything else is an error, matching dart-sass.
+        private def eval_nested_props(node : Ast::NestedPropsNode) : Nil
+          if value = node.value
+            eval_declaration(Ast::DeclarationNode.new(
+              node.name, value, node.important, false, node.line, node.column))
+          end
+          node.children.each do |child|
+            case child
+            when Ast::DeclarationNode
+              eval_declaration(Ast::DeclarationNode.new(
+                prefix_property(node.name, child.name), child.value,
+                child.important, child.custom_property, child.line, child.column))
+            when Ast::NestedPropsNode
+              eval_nested_props(Ast::NestedPropsNode.new(
+                prefix_property(node.name, child.name), child.value,
+                child.important, child.children, child.line, child.column))
+            when Ast::CommentNode
+              emit_comment(comment_text(child))
+            when Ast::VarDeclNode, Ast::MessageNode
+              eval_node(child)
+            else
+              # Control flow / includes inside a nested property block
+              # would emit their declarations WITHOUT the prefix — a
+              # silent misrender. Refuse instead.
+              error_at(child.line, child.column,
+                "only declarations are allowed inside a nested property block")
+            end
+          end
+        end
+
+        # `font` + `family` → `font-family`, preserving interpolation in
+        # either template.
+        private def prefix_property(outer : Ast::TextTemplate, inner : Ast::TextTemplate) : Ast::TextTemplate
+          pieces = outer.pieces + [dash_piece] + inner.pieces
+          Ast::TextTemplate.new(pieces, inner.line, inner.column)
+        end
+
+        private def dash_piece : Ast::Piece
+          "-".as(Ast::Piece)
         end
 
         # ---------------------------------------------------------------
@@ -842,7 +1191,7 @@ module Hwaro
         end
 
         private def message_text(template : Ast::TextTemplate) : String
-          value = Expr::Evaluator.new(self, strict: true).eval(Expr.parse!(template))
+          value = Expr::Evaluator.new(self, strict: true, force_div: true).eval(Expr.parse!(template))
           value.is_a?(Str) ? value.text : Builtins.inspect_value(value)
         rescue SoftEvalError
           resolve_value(template)
@@ -850,8 +1199,14 @@ module Hwaro
 
         # `@at-root` re-evaluates its body outside style-rule nesting but
         # inside any surrounding at-rule (the flat sink makes that the
-        # natural behavior).
+        # natural behavior). A query picks which contexts are escaped:
+        # `(without: media)` keeps selector nesting but hoists out of
+        # `@media`, `(with: rule)` keeps rules and escapes all at-rules.
         private def eval_at_root(node : Ast::AtRootNode) : Nil
+          if query = node.query
+            eval_at_root_query(node, query)
+            return
+          end
           saved_rule = @current_rule
           saved_parents = @parent_selectors
           @current_rule = nil
@@ -860,11 +1215,12 @@ module Hwaro
             if selector = node.selector
               # `&` in an `@at-root` selector still refers to the enclosing
               # rule (`.parent { @at-root .child & { } }` → `.child
-              # .parent`). Expose the parents only when the selector
-              # actually uses `&` — otherwise `@at-root .child` would be
-              # nested under them, the opposite of what @at-root means.
+              # .parent`, `@at-root #{&}__suffix` → `.parent__suffix`) —
+              # expose the parents for resolution. But the result is a
+              # TOP-LEVEL rule: a selector without `&` left in it must not
+              # be re-nested under the parents.
               @parent_selectors = saved_parents if template_has_parent_ref?(selector)
-              eval_rule(Ast::RuleNode.new(selector, node.children, node.line, node.column))
+              eval_at_root_rule(selector, node, saved_parents)
             else
               # A plain block scope, not `scoped`: `@at-root` is not a
               # flow-control rule, so assignments inside it must not write
@@ -880,6 +1236,110 @@ module Hwaro
           ensure
             @current_rule = saved_rule
             @parent_selectors = saved_parents
+          end
+        end
+
+        # The `@at-root .sel { }` rule: literal `&` substitutes the parent
+        # selectors, but the resolved parts stand at the root as-is —
+        # unlike a nested rule, a part without `&` takes no parent prefix.
+        private def eval_at_root_rule(selector : Ast::TextTemplate, node : Ast::AtRootNode,
+                                      parents : Array(String)?) : Nil
+          text = resolve_template(selector, allow_vars: false)
+          parts = Parser.split_top_level_commas(text).map { |s| collapse_ws(s) }.reject(&.empty?)
+          error_at(node.line, node.column, "expected selector") if parts.empty?
+
+          selectors = [] of String
+          parts.each do |part|
+            amps = count_parent_refs(part)
+            if amps == 0
+              selectors << part
+            elsif parents.nil?
+              error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
+            else
+              combos =
+                if amps <= MAX_PARENT_REF_SLOTS
+                  parent_combinations(parents, amps)
+                else
+                  [parents.dup]
+                end
+              combos.each { |combo| selectors << substitute_parent(part, combo) }
+            end
+            if selectors.size > MAX_RULE_SELECTORS
+              error_at(node.line, node.column,
+                "selector expands to more than #{MAX_RULE_SELECTORS} selectors; " \
+                "reduce the comma-separated parent list")
+            end
+          end
+
+          rule = Css::Rule.new(selectors)
+          emit(rule)
+          saved_rule = @current_rule
+          saved_rule_sink = @current_rule_sink
+          saved_parents = @parent_selectors
+          saved_env = @env
+          @current_rule = rule
+          @current_rule_sink = @sink
+          @parent_selectors = selectors
+          @env = Environment.new(saved_env)
+          begin
+            eval_nodes(node.children)
+          ensure
+            @current_rule = saved_rule
+            @current_rule_sink = saved_rule_sink
+            @parent_selectors = saved_parents
+            @env = saved_env
+          end
+        end
+
+        # `@at-root (with: ...)` / `(without: ...)`. Escaped at-rule
+        # contexts are left by re-targeting the sink at the container of
+        # the outermost escaped frame; kept style-rule nesting means the
+        # parent selectors stay visible so nested rules resolve normally.
+        private def eval_at_root_query(node : Ast::AtRootNode, query : Ast::AtRootQuery) : Nil
+          target_sink = @sink
+          kept_frames = @at_frames
+          if idx = @at_frames.index { |frame| query.escapes_at?(frame.at.name) }
+            target_sink = @at_frames[idx].container
+            kept_frames = @at_frames[0...idx]
+          end
+
+          saved_sink = @sink
+          saved_frames = @at_frames
+          saved_rule = @current_rule
+          saved_rule_sink = @current_rule_sink
+          saved_parents = @parent_selectors
+          saved_at = @current_at
+          saved_env = @env
+
+          @sink = target_sink
+          @at_frames = kept_frames
+          @current_at = kept_frames.last?.try(&.at)
+          @current_rule = nil
+          @current_rule_sink = nil
+          @parent_selectors = query.escapes_rules? ? nil : saved_parents
+          @env = Environment.new(saved_env)
+          begin
+            if query.escapes_rules? || saved_parents.nil?
+              eval_nodes(node.children)
+            else
+              # Rules kept: re-wrap the body in the enclosing selectors so
+              # declarations keep their rule (`e { @at-root (without:
+              # media) { f {} } }` → `e f` outside the media).
+              rule = Css::Rule.new(saved_parents)
+              emit(rule)
+              @current_rule = rule
+              @current_rule_sink = @sink
+              @parent_selectors = saved_parents
+              eval_nodes(node.children)
+            end
+          ensure
+            @sink = saved_sink
+            @at_frames = saved_frames
+            @current_rule = saved_rule
+            @current_rule_sink = saved_rule_sink
+            @parent_selectors = saved_parents
+            @current_at = saved_at
+            @env = saved_env
           end
         end
 
@@ -971,7 +1431,7 @@ module Hwaro
         # failure is a located error.
         private def eval_expr!(template : Ast::TextTemplate) : Value
           node = Expr.parse!(template)
-          Expr::Evaluator.new(self, strict: true).eval(node)
+          Expr::Evaluator.new(self, strict: true, force_div: true).eval(node)
         rescue ex : SoftEvalError
           error_at(template.line, template.column, ex.message || "invalid expression")
         end
@@ -1296,9 +1756,9 @@ module Hwaro
             return lookup_var_ref(ref)
           end
           if node = Expr.parse(template)
-            if Expr.computes?(node, self)
+            if Expr.computes?(node, self, force_div: true)
               begin
-                return value_storage(Expr::Evaluator.new(self).eval(node))
+                return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
               rescue ex : NamespacedEvalError
                 warn_namespaced(template, ex)
               rescue SoftEvalError
@@ -1338,9 +1798,9 @@ module Hwaro
         # text exactly as today when nothing computes).
         private def resolve_interp(template : Ast::TextTemplate) : String
           if node = Expr.parse(template)
-            if Expr.computes?(node, self)
+            if Expr.computes?(node, self, force_div: true)
               begin
-                return Expr::Evaluator.new(self).eval(node).to_css
+                return Expr::Evaluator.new(self, force_div: true).eval(node).to_css
               rescue ex : NamespacedEvalError
                 warn_namespaced(template, ex)
               rescue SoftEvalError
@@ -1493,7 +1953,20 @@ module Hwaro
         # sass:meta functions that need evaluator state (scopes, mixins,
         # @content) and therefore can't live in the static builtin tables.
         META_HOST_FNS = %w[variable-exists global-variable-exists
-          function-exists mixin-exists content-exists get-function call]
+          function-exists mixin-exists content-exists get-function call keywords]
+
+        # :nodoc: — see Expr::Host#expr_keywords.
+        def expr_keywords(name : String, var_ns : String?, call_ns : String?) : Value?
+          return if var_ns # a module variable is never an arglist
+          norm = Sass.normalize_ident(name)
+          # Only when the call actually resolves to the meta built-in.
+          return unless host_meta_fn?(call_ns, "keywords")
+          stored = @env.lookup_var(KEYWORDS_VAR_PREFIX + norm)
+          unless stored
+            raise SoftEvalError.new("keywords(): $#{name} is not an argument list")
+          end
+          Expr.coerce(stored).as?(MapV) || MapV.new([] of MapEntry)
+        end
 
         # :nodoc:
         def expr_call(ns : String?, name : String, args : Array(Value),
@@ -1583,6 +2056,10 @@ module Hwaro
             return meta_get_function(args, kwargs)
           when "call"
             return meta_call(args, kwargs)
+          when "keywords"
+            # The VarE fast path in Expr's eval_call handles the real
+            # `keywords($args)` shape; anything else isn't an arglist.
+            raise SoftEvalError.new("keywords() expects an argument-list variable ($args)")
           end
           raise SoftEvalError.new("#{norm}() takes one argument, $name") unless args.size <= 1
           kwargs.each_key do |key|

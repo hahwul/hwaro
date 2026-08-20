@@ -113,10 +113,19 @@ describe Hwaro::Assets::Sass do
       css.should contain(".link:focus::before")
     end
 
-    it "errors on nested properties" do
-      expect_raises(Hwaro::Assets::Sass::SyntaxError, /nested properties are not supported/) do
-        compile(".a { font: { family: serif; } }")
-      end
+    it "expands nested properties" do
+      css = compile(".a { font: 12px serif { family: serif; weight: bold; } margin: auto { top: 1px; } }")
+      css.should contain("font: 12px serif;")
+      css.should contain("font-family: serif;")
+      css.should contain("font-weight: bold;")
+      css.should contain("margin: auto;")
+      css.should contain("margin-top: 1px;")
+    end
+
+    it "expands recursively nested properties without a value" do
+      css = compile(".a { grid: { template: { columns: 1fr; } } }")
+      css.should contain("grid-template-columns: 1fr;")
+      css.should_not contain("grid:;")
     end
 
     # =========================================================================
@@ -201,9 +210,15 @@ describe Hwaro::Assets::Sass do
       css.should contain("@supports (display: grid) {\n  .a {\n    display: grid;")
     end
 
-    it "nests @media inside @media literally" do
+    it "merges @media nested inside @media" do
       css = compile("@media screen { @media (min-width: 5px) { .a { color: red; } } }")
-      css.should contain("@media screen {\n  @media (min-width: 5px) {")
+      css.should contain("@media screen and (min-width: 5px) {")
+      css.should_not contain("@media screen {\n  @media")
+    end
+
+    it "keeps unmergeable nested @media literal" do
+      css = compile("@media screen { @media not print { .a { color: red; } } }")
+      css.should contain("@media screen {\n  @media not print {")
     end
 
     it "does not join @keyframes frame selectors with outer rules" do
@@ -229,7 +244,9 @@ describe Hwaro::Assets::Sass do
         @font-face { font-family: "X"; src: url(x.woff2) format("woff2"); }
         .grid { background: url(data:image/png;base64,AAA/BBB==); }
         SCSS
-      css.should contain(%q(@charset "utf-8";))
+      # A source @charset is dropped for ASCII-only output (the serializer
+      # re-emits a single UTF-8 one only when the bytes need it).
+      css.should_not contain("@charset")
       css.should contain("--brand: #f00;")
       css.should contain("--gap: 4px   8px;")
       css.should contain(%q(src: url(x.woff2) format("woff2");))

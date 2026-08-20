@@ -123,11 +123,8 @@ describe "Sass functions" do
   end
 
   it "rejects unknown built-in modules" do
-    # `sass:selector` is a real dart-sass module this subset doesn't
-    # implement. (`sass:color` used to stand in here, before the color
-    # functions landed.)
     expect_raises(Hwaro::Assets::Sass::SyntaxError, /unknown built-in module/) do
-      compile(%q(@use "sass:selector";))
+      compile(%q(@use "sass:no-such-module";))
     end
   end
 
