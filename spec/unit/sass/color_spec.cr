@@ -301,14 +301,16 @@ describe "Sass colors" do
       css.should contain("b: yes;")
     end
 
-    # Documented deviation: `==` between two *literals* is still the
-    # generic text comparison, because colors are only parsed when a color
-    # function asks for one. Teaching `==` to parse would flip `@if`
-    # branches in stylesheets that compile today, which the plain-CSS
-    # guarantee rules out. See docs/content/features/sass.md.
-    it "compares two color literals as text" do
+    # `==` compares colors by channel across spellings (dart-sass
+    # semantics): `#ffffff`, `#FFF` and `white` are one value.
+    it "compares two color literals by channel" do
       css = compile(".a { b: if(#ffffff == #FFF, yes, no); }")
-      css.should contain("b: no;")
+      css.should contain("b: yes;")
+    end
+
+    it "compares a named color against a hex literal" do
+      css = compile(".a { b: if(red == #f00, yes, no); }")
+      css.should contain("b: yes;")
     end
 
     it "works through variables and user functions" do

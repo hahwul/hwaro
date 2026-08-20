@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+- Sass: classic `/` division (dart-sass 1.x rule) — `$w/2`, `(1/3)`, `percentage(1/4)` and `12 / 4 * 3` now divide, while literal-only slashes (`font: 12px/30px`, `grid-area: 1 / 2`) stay verbatim
+- Sass: unit conversion within the standard groups (`1in + 72pt`, `1in == 96px`, `math.min(1in, 50px)`, `math.compatible(1px, 1in)`)
+- Sass: nested properties (`font: 12px serif { family: sans; }`), `@content(args)` / `@include … using (...)`, `@at-root (with: ...)` / `(without: ...)` queries
+- Sass: variadic keyword arguments — extra keywords bind into `meta.keywords($args)` and forward through `@include inner($args...)`; unused extra keywords (typos like `$colour`) error unless `keywords()` reads them
+- Sass: the `sass:selector` module (`parse` / `nest` / `append` / `unify` / `is-superselector`, string-level) plus the legacy global spellings
+- Sass: `math.log` / `math.hypot` / trigonometry, `string.insert` / `string.split`, `list.set-nth` / `list.slash` / `list.is-bracketed`, `color.channel` / `color.hwb` / `ie-hex-str`
+- Sass: a single `@charset "UTF-8";` is prepended when the compiled CSS contains non-ASCII (source `@charset` lines are dropped, so a merged sheet no longer carries one per imported file)
+
 ### Fixed
 - **`hwaro tool list` and `hwaro tool stats` disagreed with `hwaro build` about what is published.** Both called every non-draft file "published", while a default build also drops future-dated pages (`date` in the future), expired ones (`expires` in the past), and pages a parent section marked draft via `[cascade]` — so the tool that answers "what will ship?" listed files that would not. `list` now reports `[pub]` / `[draft]` / `[future]` / `[expired]` (with a matching `status` field in `--json`), `list published` returns exactly the build's published set, and `stats` counts `future` / `expired` separately instead of folding them into `published`. Cascade resolution matches the build's: the nearest section wins (so a nested `[cascade] draft = false` un-drafts what an ancestor cascaded) and the language must match
 - `hwaro tool stats` and `hwaro tool validate` read tags declared in a `[taxonomies]` table — the shape hwaro's own scaffolds and every Zola-style site use. The tag distribution came back EMPTY for those sites and the mixed-case tag check never ran; `stats` also ignored JSON front matter entirely
@@ -30,6 +39,13 @@
 - `get_taxonomy_url` on a multilingual site links to that language's term page (`/ko/tags/foo/`) when one exists — a term appearing only in non-default-language content previously linked to a root page that was never written
 - **Release binaries could hang forever at exit.** `-Dpreview_mt` is deprecated in Crystal 1.21 and its legacy MT scheduler spins in the event loop's spin lock at process exit, so `hwaro build` never returned (measured 4/120 short-lived runs under CPU oversubscription). Parallelism now comes from Crystal's execution contexts, sized in `src/main.cr`
 - Sass grouping parentheses no longer leak into declaration values (`width: (10px / 2)`, `margin: (1px 2px)`); a failing namespaced reference (`math.div(…)`) now warns with a `path:line:col` location instead of silently emitting invalid CSS
+- Sass output-order fixes matching dart-sass: selector lists resolve parent-major (`a, b { c, d {} }` → `a c, a d, b c, b d`), declarations after a nested rule reopen the parent selector instead of being hoisted above it (cascade order), and `@media` nested in `@media` merges into `screen and (min-width: …)` at the top level (comma lists cross-multiply; `not`/`@supports`-interrupted nestings stay literal)
+- Sass media merge no longer duplicates ancestor conditions in ≥3-deep `@media` nesting, and treats `Not`/`NOT` like `not` instead of silently dropping that branch
+- Sass `@at-root (with: all)` keeps media and selector nesting (a no-op, matching dart-sass) instead of escaping both
+- Sass `list.slash(...)` stored in a variable round-trips as a slash list (`list.length`/`nth`/`separator` work), and maps whose keys collide after unit conversion (`1in` vs `96px`) error as Duplicate key
+- Sass variadic mixins/functions reject unused extra keyword arguments unless `meta.keywords($args)` reads them or `$args...` forwards them
+- Sass `sass:selector` keeps whitespace inside attribute selectors and `:is()`/`:not()` arguments instead of fragmenting them
+- Sass: `12 / 4 * 3` no longer mangles into the meaning-changing `12 / 12`; `+$a` evaluates; `1 + "a"` keeps the quote; `red == #f00` compares colors by channel; a spread space list keeps its separator in a variadic `$rest`; `@at-root #{&}__suffix` resolves instead of erroring
 - GFM tables with short alignment delimiters (`|:--|--:|`, `|:-:|`, `| - |`) render as tables; the delimiter cell now matches GFM's `:?-+:?` instead of requiring three hyphens
 - `hwaro tool check-links` stops reporting valid links as dead: angle-bracket destinations (`[t](</about/>)`, including ones containing spaces) and destinations with balanced parentheses (`/docs/foo_(bar)`)
 - An oversized `[image_processing] widths` entry no longer aborts the build with a bare `OverflowError`; the variant is declined by the existing pixel-count guard instead

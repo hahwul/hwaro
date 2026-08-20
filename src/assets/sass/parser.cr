@@ -226,11 +226,10 @@ module Hwaro
             nodes << parse_forward(line, column)
           when "content"
             @s.skip_ws
-            if @s.peek == '('
-              @s.error("@content arguments are not supported", line, column)
-            end
+            args = @s.peek == '(' ? parse_args : [] of Ast::Arg
+            @s.skip_ws
             @s.advance if @s.peek == ';'
-            nodes << Ast::ContentNode.new(line, column)
+            nodes << Ast::ContentNode.new(line, column, args)
           else
             nodes << parse_raw_at_rule(name, line, column)
           end
@@ -430,11 +429,14 @@ module Hwaro
 
         private def parse_at_root(line : Int32, column : Int32) : Ast::Node
           @s.skip_ws
+          query = nil
           if @s.peek == '('
-            @s.error("@at-root (with: ...) / (without: ...) queries are not supported", line, column)
+            query = parse_at_root_query(line, column)
+            @s.skip_ws
+            @s.error("expected \"{\" after @at-root (...)", line, column) unless @s.peek == '{'
           end
           if @s.peek == '{'
-            Ast::AtRootNode.new(nil, parse_block, line, column)
+            Ast::AtRootNode.new(nil, parse_block, line, column, query)
           else
             scan = read_template(stops: "{;}", value_vars: true)
             @s.error("expected \"{\" after @at-root", line, column) unless scan.terminator == '{'
@@ -442,6 +444,31 @@ module Hwaro
             @s.error("expected selector or \"{\" after @at-root", line, column) if selector.empty?
             Ast::AtRootNode.new(selector, parse_block, line, column)
           end
+        end
+
+        # `(with: media supports)` / `(without: media)`.
+        private def parse_at_root_query(line : Int32, column : Int32) : Ast::AtRootQuery
+          @s.advance # '('
+          @s.skip_ws
+          keyword = @s.read_ident
+          unless keyword == "with" || keyword == "without"
+            @s.error("expected \"with\" or \"without\" in @at-root query", line, column)
+          end
+          @s.skip_ws
+          @s.error("expected \":\" after @at-root (#{keyword}", line, column) unless @s.peek == ':'
+          @s.advance
+          names = [] of String
+          loop do
+            @s.skip_ws
+            break if @s.peek == ')'
+            @s.error("unterminated @at-root query", line, column) if @s.eof?
+            name = @s.read_ident
+            @s.error("expected an at-rule name in @at-root query", line, column) if name.empty?
+            names << name.downcase
+          end
+          @s.advance # ')'
+          @s.error("expected at least one name in @at-root (#{keyword}: ...)", line, column) if names.empty?
+          Ast::AtRootQuery.new(keyword == "with" ? :with : :without, names)
         end
 
         # `@extend .target[, .other] [!optional];` — the selector template
@@ -717,12 +744,21 @@ module Hwaro
           args = @s.peek == '(' ? parse_args : [] of Ast::Arg
           @s.skip_ws
           body = nil
+          using_params = [] of Ast::Param
           if @s.ident_start?(@s.peek)
             word_line = @s.line
             word_col = @s.column
             word = @s.read_ident
             if word == "using"
-              @s.error("@include ... using (...) is not supported", word_line, word_col)
+              @s.skip_ws
+              unless @s.peek == '('
+                @s.error("expected \"(\" after \"using\"", word_line, word_col)
+              end
+              using_params = parse_params
+              @s.skip_ws
+              unless @s.peek == '{'
+                @s.error("expected a content block after @include ... using (...)", word_line, word_col)
+              end
             else
               @s.error("unexpected \"#{word}\" after @include #{name}", word_line, word_col)
             end
@@ -732,7 +768,7 @@ module Hwaro
           elsif @s.peek == ';'
             @s.advance
           end
-          Ast::IncludeNode.new(name, namespace, args, body, line, column)
+          Ast::IncludeNode.new(name, namespace, args, body, line, column, using_params)
         end
 
         private def parse_args : Array(Ast::Arg)
@@ -808,23 +844,32 @@ module Hwaro
           scan = read_template(stops: "{;}", value_vars: true)
 
           if scan.terminator == '{'
-            if (colon = scan.first_decl_colon) && blank_after?(scan.template, colon)
-              cp_name = trim_template(split_at(scan.template, colon)[0])
-              if cp_name.pieces[0]?.as?(String).try(&.starts_with?("--"))
-                # `--x: { ... }` is a custom property whose value happens to
-                # be a brace block — legal CSS, since custom-property values
-                # are an almost free-form token stream. Only the
-                # `font: { family: x }` nested-property shape is unsupported,
-                # so `--` names must not be swept up by that check. The block
-                # is kept fully verbatim.
-                raw = read_raw_block
-                @s.skip_ws { }
-                @s.advance if @s.peek == ';'
-                return Ast::DeclarationNode.new(
-                  cp_name, Ast::TextTemplate.new(Array(Ast::Piece){raw}, line, column),
-                  false, true, line, column)
+            if colon = scan.first_decl_colon
+              name_t, value_t = split_at(scan.template, colon)
+              name_t = trim_template(name_t)
+              if name_t.pieces[0]?.as?(String).try(&.starts_with?("--"))
+                if blank_after?(scan.template, colon)
+                  # `--x: { ... }` is a custom property whose value happens
+                  # to be a brace block — legal CSS, since custom-property
+                  # values are an almost free-form token stream. `--` names
+                  # must not be swept up by the nested-property handling
+                  # below. The block is kept fully verbatim.
+                  raw = read_raw_block
+                  @s.skip_ws { }
+                  @s.advance if @s.peek == ';'
+                  return Ast::DeclarationNode.new(
+                    name_t, Ast::TextTemplate.new(Array(Ast::Piece){raw}, line, column),
+                    false, true, line, column)
+                end
+              elsif !name_t.empty?
+                # `font: { family: x }` / `margin: auto { top: 1px }` —
+                # a nested property block, with an optional leading value.
+                value_t, flags = strip_flags(value_t, {"important"})
+                value_t = trim_template(value_t)
+                return Ast::NestedPropsNode.new(
+                  name_t, value_t.empty? ? nil : value_t,
+                  flags.includes?("important"), parse_block, line, column)
               end
-              @s.error("nested properties are not supported", line, column)
             end
             selector = trim_template(scan.template)
             @s.error("expected selector", line, column) if selector.empty?
@@ -974,7 +1019,11 @@ module Hwaro
               if depth == 0
                 first_colon ||= {pieces.size, buf.size}
                 nxt = @s.peek(1)
-                pseudo_like = @s.ident_start?(nxt) || nxt == ':'
+                # `:#{...}` with no space counts as pseudo-like too: a
+                # dynamic pseudo selector (`.btn:#{$state} { }`) must stay
+                # a selector, not become a nested property block.
+                pseudo_like = @s.ident_start?(nxt) || nxt == ':' ||
+                              (nxt == '#' && @s.peek(2) == '{')
                 first_decl_colon ||= {pieces.size, buf.size} unless pseudo_like
               end
               buf << @s.advance

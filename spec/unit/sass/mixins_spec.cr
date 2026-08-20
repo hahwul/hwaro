@@ -198,8 +198,18 @@ describe "Hwaro::Assets::Sass mixins" do
     end
   end
 
-  it "rejects @include using clauses" do
-    expect_raises(Hwaro::Assets::Sass::SyntaxError, /using \(\.\.\.\) is not supported/) do
+  it "binds @content arguments to @include using parameters" do
+    css = compile("@mixin m { @content(4px); }\n.x { @include m using ($a) { width: $a; } }")
+    css.should contain("width: 4px;")
+  end
+
+  it "applies using parameter defaults when @content passes fewer arguments" do
+    css = compile("@mixin m { @content(1px); }\n.x { @include m using ($a, $b: 2px) { margin: $a $b; } }")
+    css.should contain("margin: 1px 2px;")
+  end
+
+  it "errors when @content omits a required using parameter" do
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /missing argument \$a/) do
       compile("@mixin m { @content; }\n.x { @include m using ($a) { width: $a; } }")
     end
   end

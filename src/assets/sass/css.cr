@@ -56,10 +56,24 @@ module Hwaro
           extend self
 
           def serialize(nodes : Array(Node)) : String
-            out = String.build do |io|
+            # Source `@charset` declarations are dropped (a merged sheet
+            # can carry one per imported file); the single output charset
+            # is decided below from the bytes actually emitted.
+            nodes = nodes.reject { |n| charset?(n) }
+            text = String.build do |io|
               write_nodes(io, hoist_statements(nodes), 0)
             end
-            out.empty? ? out : out.chomp + "\n"
+            return text if text.empty?
+            text = text.chomp + "\n"
+            # Non-ASCII output needs an encoding declaration or browsers
+            # fall back to the response/platform charset and garble it
+            # (dart-sass emits this too).
+            text = "@charset \"UTF-8\";\n" + text unless text.ascii_only?
+            text
+          end
+
+          private def charset?(node : Node) : Bool
+            node.is_a?(Raw) && node.text.lstrip.starts_with?("@charset")
           end
 
           # Plain-CSS `@import` (and `@charset`) are only honoured before any
