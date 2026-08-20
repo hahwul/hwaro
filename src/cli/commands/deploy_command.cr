@@ -20,6 +20,7 @@ module Hwaro
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
           FlagInfo.new(short: "-s", long: "--source", description: "Source directory to deploy (default: deployment.source_dir or public)", takes_value: true, value_hint: "DIR"),
+          FlagInfo.new(short: "-t", long: "--target", description: "Deploy target name (repeatable; equivalent to a positional target)", takes_value: true, value_hint: "NAME"),
           FlagInfo.new(short: nil, long: "--dry-run", description: "Show planned changes without writing"),
           FlagInfo.new(short: nil, long: "--confirm", description: "Ask for confirmation before deploying"),
           FlagInfo.new(short: nil, long: "--force", description: "Force upload/copy (ignore file comparisons)"),
@@ -133,6 +134,7 @@ module Hwaro
 
         def parse_options(args : Array(String)) : {Config::Options::DeployOptions, Bool, Bool}
           source_dir = nil.as(String?)
+          flag_targets = [] of String
           dry_run = nil.as(Bool?)
           confirm = nil.as(Bool?)
           force = nil.as(Bool?)
@@ -144,6 +146,10 @@ module Hwaro
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro deploy [options] [target ...]"
             parser.on("-s DIR", "--source DIR", "Source directory to deploy (default: deployment.source_dir or public)") { |dir| source_dir = dir }
+            # Positional targets are the primary form, but `--target` is what
+            # Hugo users (and hwaro's own docs) reach for, and hitting
+            # "Invalid option: --target" for a documented flag is a dead end.
+            parser.on("-t NAME", "--target NAME", "Deploy target name (repeatable; equivalent to a positional target)") { |name| flag_targets << name }
             parser.on("--dry-run", "Show planned changes without writing") { dry_run = true }
             parser.on("--confirm", "Ask for confirmation before deploying") { confirm = true }
             parser.on("--force", "Force upload/copy (ignore file comparisons)") { force = true }
@@ -181,7 +187,9 @@ module Hwaro
             end
           end
 
-          targets = args.dup
+          # Flag-supplied targets come first so `--target` and positional
+          # names compose; `Deployer#resolve_target_names` collapses repeats.
+          targets = flag_targets + args
 
           {
             Config::Options::DeployOptions.new(

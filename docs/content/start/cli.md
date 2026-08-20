@@ -433,6 +433,7 @@ Deploy the generated site to configured targets.
 
 ```bash
 hwaro deploy [target ...]
+hwaro deploy --target prod
 hwaro deploy --dry-run
 ```
 
@@ -441,12 +442,30 @@ hwaro deploy --dry-run
 | Flag | Description |
 |------|-------------|
 | -s, --source DIR | Source directory to deploy (default: deployment.source_dir or public) |
+| -t, --target NAME | Deploy target name (repeatable; equivalent to a positional target) |
 | --dry-run | Show planned changes without writing |
 | --confirm | Ask for confirmation before deploying |
-| --force | Force upload/copy (ignore file comparisons) |
+| --force | Force upload/copy (ignore file comparisons), and allow clearing a destination from an empty source |
 | --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
 | --list-targets | List configured deployment targets and exit |
-| --json | Emit machine-readable JSON output (with --list-targets) |
+| --json | Emit machine-readable JSON output (plan with `--dry-run`, per-target summary otherwise, target list with `--list-targets`) |
+| -e, --env NAME | Config environment to load (also `HWARO_ENV`) |
+| -q, --quiet | Suppress human log output |
+
+**Safety rules.** `deploy` refuses rather than destroying a destination it
+cannot reconcile:
+
+- An empty source directory (or one where `include`/`exclude` selected
+  nothing) aborts instead of deleting the destination — run `hwaro build`
+  first, or pass `--force` to clear it deliberately.
+- `--max-deletes` caps the delete pass (256 by default; any negative value
+  disables it). It applies to the built-in `file://` sync only — a command
+  target's own `--delete` flag is not bounded by it.
+- Symlinks at the destination are never written or deleted *through*. A link
+  standing where a file or directory belongs is replaced; a stale one is
+  unlinked without touching what it points at.
+- `--json` is non-interactive: combining it with `--confirm` fails instead of
+  writing a prompt into the JSON document.
 
 ### doctor
 

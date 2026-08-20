@@ -5,6 +5,7 @@ require "set"
 require "uri"
 
 require "../cli/prompt"
+require "../cli/runner"
 require "../models/config"
 require "../utils/command_runner"
 require "../utils/errors"
@@ -83,11 +84,16 @@ module Hwaro
         require_target_names!(target_names)
 
         targets = resolve_targets!(target_names, deployment)
+        require_non_empty_source!(source_dir)
+        warn_duplicate_targets(deployment)
+        warn_unapplied_matchers(deployment)
+        warn_unapplied_workers(deployment)
         effective = EffectiveOptions.new(deployment, options)
         force_patterns = force_matcher_patterns(deployment)
 
         targets.each do |target|
           if command = target.command
+            warn_unapplied_target_options(target)
             ops << PlannedOp.new(
               target: target.name,
               action: "command",
@@ -102,13 +108,21 @@ module Hwaro
           raise_missing_url!(target) if url.empty?
 
           if directory_destination = local_directory_destination(url)
-            dest_dir = File.expand_path(directory_destination)
+            dest_dir = expand_local_path(directory_destination)
             check_overlap!(source_dir, dest_dir)
 
             desired = build_desired_map(source_dir, target)
             existing = list_existing_files(dest_dir)
 
+            # `--dry-run` is only useful if it fails the way the real deploy
+            # would. Skipping these left `--dry-run --json` reporting a clean
+            # plan for a destination that a real deploy refuses (e.g. a
+            # directory sitting where a file has to go).
+            validate_strip_index_html_for_filesystem(target, desired.keys)
+            validate_destination_paths(dest_dir, desired.keys)
+
             to_delete = compute_deletes(existing, desired.keys, target)
+            check_empty_selection!(desired, to_delete, target, effective)
             check_max_deletes!(to_delete.size, effective)
 
             desired.each do |dest_rel, src_path|
@@ -125,6 +139,7 @@ module Hwaro
               ops << PlannedOp.new(target: target.name, action: "delete", path: rel, source: nil, destination: File.join(dest_dir, rel))
             end
           elsif auto_command = auto_command_for_url(url, source_dir)
+            warn_unapplied_target_options(target)
             ops << PlannedOp.new(
               target: target.name,
               action: "command",
@@ -159,7 +174,10 @@ module Hwaro
         target_names = resolve_target_names(options, deployment)
         require_target_names!(target_names)
 
+        require_non_empty_source!(source_dir)
+        warn_duplicate_targets(deployment)
         warn_unapplied_matchers(deployment)
+        warn_unapplied_workers(deployment)
 
         targets = target_names.compact_map do |name|
           target = deployment.target_named(name)
@@ -310,7 +328,10 @@ module Hwaro
         require_target_names!(target_names)
 
         targets = resolve_targets!(target_names, deployment)
+        require_non_empty_source!(source_dir)
+        warn_duplicate_targets(deployment)
         warn_unapplied_matchers(deployment)
+        warn_unapplied_workers(deployment)
 
         effective = EffectiveOptions.new(deployment, options)
 
@@ -440,7 +461,7 @@ module Hwaro
       ) : {Bool, TargetCounts}
         Logger.heading("deploy", target.name)
         counts = TargetCounts.new
-        dest_dir_expanded = File.expand_path(dest_dir)
+        dest_dir_expanded = expand_local_path(dest_dir)
 
         check_overlap!(source_dir, dest_dir_expanded)
 
@@ -453,6 +474,7 @@ module Hwaro
         validate_destination_paths(dest_dir_expanded, desired.keys)
 
         to_delete = compute_deletes(existing, desired.keys, target)
+        check_empty_selection!(desired, to_delete, target, effective)
         check_max_deletes!(to_delete.size, effective)
 
         to_copy, _skipped = compute_copies(desired, dest_dir_expanded, effective.force, force_matcher_patterns(deployment))
@@ -469,6 +491,9 @@ module Hwaro
         to_copy.each_with_index do |(dest_rel, src_path), idx|
           Logger.progress(idx + 1, to_copy.size, "Copying ")
           dest_path = File.join(dest_dir_expanded, dest_rel)
+          # `existed_before` is sampled after the symlink is cleared: a link
+          # replaced by a real file is a create, not an update.
+          unlink_destination_symlinks!(dest_dir_expanded, dest_rel)
           existed_before = File.exists?(dest_path)
           Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
           FileUtils.cp(src_path, dest_path)
@@ -498,7 +523,7 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
       ) : Bool
-        dest_dir = File.expand_path(dest_dir)
+        dest_dir = expand_local_path(dest_dir)
 
         check_overlap!(source_dir, dest_dir)
 
@@ -511,6 +536,7 @@ module Hwaro
         validate_destination_paths(dest_dir, desired.keys)
 
         to_delete = compute_deletes(existing, desired.keys, target)
+        check_empty_selection!(desired, to_delete, target, effective)
         check_max_deletes!(to_delete.size, effective)
 
         to_copy, skipped = compute_copies(desired, dest_dir, effective.force, force_matcher_patterns(deployment))
@@ -536,6 +562,7 @@ module Hwaro
         to_copy.each_with_index do |(dest_rel, src_path), idx|
           Logger.progress(idx + 1, to_copy.size, "Copying ")
           dest_path = File.join(dest_dir, dest_rel)
+          unlink_destination_symlinks!(dest_dir, dest_rel)
           Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
           FileUtils.cp(src_path, dest_path)
           summary.copied += 1
@@ -598,12 +625,33 @@ module Hwaro
         target : Models::DeploymentTarget,
       ) : Array(String)
         desired_set = desired_paths.to_set
+        # Directory prefixes of desired paths are never stale. A destination
+        # symlink is listed as a leaf entry (see `#list_existing_files`), so
+        # `out/sub -> …` with a desired `sub/index.html` looked like a stale
+        # `sub` — but the copy pass replaces that link with the real directory
+        # holding the new file, and deleting it afterwards failed with EPERM.
+        ancestors = desired_ancestors(desired_paths)
 
         existing.select do |rel|
           next false if ignored_file?(rel)
+          next false if ancestors.includes?(rel)
           next false unless delete_candidate?(rel, target)
           !desired_set.includes?(rel)
         end
+      end
+
+      private def desired_ancestors(desired_paths : Array(String)) : Set(String)
+        ancestors = Set(String).new
+        desired_paths.each do |path|
+          parts = path.split('/')
+          next if parts.size <= 1
+          prefix = ""
+          parts[0...-1].each do |part|
+            prefix = prefix.empty? ? part : "#{prefix}/#{part}"
+            ancestors << prefix
+          end
+        end
+        ancestors
       end
 
       private def delete_candidate?(rel : String, target : Models::DeploymentTarget) : Bool
@@ -619,7 +667,13 @@ module Hwaro
         files = [] of String
         return files unless Dir.exists?(dest_dir)
 
-        each_project_file(dest_dir) do |path|
+        # `follow_symlinks: false` is load-bearing. Descending into a
+        # symlinked directory at the destination made every file *behind*
+        # the link a delete candidate, so a stale `out/sub -> /data/sub`
+        # link let `hwaro deploy` unlink files outside the deploy root.
+        # A link is now a leaf entry: stale ones are removed as links, and
+        # their targets are never read or touched.
+        each_project_file(dest_dir, follow_symlinks: false) do |path|
           rel = relative_to(path, dest_dir)
           next if rel.empty?
           next if ignored_file?(rel)
@@ -631,7 +685,15 @@ module Hwaro
 
       # Resolve the deploy source directory from options/config (expanded).
       private def resolve_source_dir(options, deployment) : String
-        File.expand_path(options.source_dir || deployment.source_dir)
+        expand_local_path(options.source_dir || deployment.source_dir)
+      end
+
+      # Expand a user-supplied local path. `home: true` matters: `path =
+      # "~/public"` is the shape Hugo/Jekyll users reach for first, and
+      # plain `File.expand_path` left the tilde literal, quietly creating a
+      # directory named `~` inside the project instead of deploying home.
+      private def expand_local_path(path : String) : String
+        File.expand_path(path, home: true)
       end
 
       # Resolve which deploy target names to act on: explicit CLI targets, then
@@ -801,6 +863,93 @@ module Hwaro
         )
       end
 
+      # An empty source is "the site was never built" (or was cleaned), and
+      # every delete-capable backend would wipe the destination from it: the
+      # built-in sync deletes every stale file, and the auto-generated
+      # `aws s3 sync --delete` / `gsutil rsync -d` empty the bucket. Checked
+      # after target resolution so an unknown-target error still wins.
+      private def require_non_empty_source!(source_dir : String)
+        return unless Dir.empty?(source_dir)
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Source directory is empty: #{source_dir}",
+          hint: "Run 'hwaro build' first, or pass '--source DIR' pointing at the built site.",
+        )
+      end
+
+      # Clear any symlink standing between `dest_dir` and `dest_rel` — the
+      # leaf itself and every intermediate directory segment. Copying through
+      # a destination symlink writes *outside* the deploy root (a link at
+      # `out/index.html` silently overwrote whatever it pointed at). Removing
+      # the link and materialising a real file/directory in its place is what
+      # `rsync` does by default, and keeps every write inside the destination.
+      private def unlink_destination_symlinks!(dest_dir : String, dest_rel : String) : Nil
+        parts = dest_rel.split('/')
+        current = dest_dir
+        parts.each do |part|
+          next if part.empty?
+          current = File.join(current, part)
+          next unless File.symlink?(current)
+          begin
+            File.delete(current)
+          rescue File::Error | IO::Error
+            next
+          end
+        end
+      rescue File::Error | IO::Error
+        nil
+      end
+
+      # Refuse a sync that would delete everything at the destination because
+      # the source selected nothing. This is almost always `hwaro deploy`
+      # before `hwaro build`, or an `include`/`exclude` typo — and the delete
+      # cap (256 by default) is high enough to lose a small site silently.
+      # `--force` is the documented escape hatch for deliberately clearing a
+      # destination.
+      private def check_empty_selection!(
+        desired : Hash(String, String),
+        to_delete : Array(String),
+        target : Models::DeploymentTarget,
+        effective : EffectiveOptions,
+      )
+        return unless desired.empty?
+        return if to_delete.empty?
+        return if effective.force
+
+        filtered = target.include || target.exclude
+        hint = if filtered
+                 "Check 'include'/'exclude' for target '#{target.name}' — they matched no files. " \
+                 "Pass --force to clear the destination anyway."
+               else
+                 "Run 'hwaro build' first, or pass '--source DIR'. " \
+                 "Pass --force to clear the destination anyway."
+               end
+
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_USAGE,
+          message: "Refusing to delete #{to_delete.size} files: target '#{target.name}' selected no files to deploy.",
+          hint: hint,
+        )
+      end
+
+      # Duplicate `name =` entries are a copy/paste slip: `target_named`
+      # returns the first match, so every later definition is dead config
+      # that looks live in `--list-targets`.
+      private def warn_duplicate_targets(deployment : Models::DeploymentConfig)
+        duplicates = deployment.targets.map(&.name).tally.select { |_, count| count > 1 }.keys
+        return if duplicates.empty?
+        Logger.warn "deployment.targets: duplicate target name(s) #{duplicates.sort!.join(", ")} — only the first definition of each is used."
+      end
+
+      # `deployment.workers` is parsed for forward compatibility but the
+      # built-in sync copies serially and command targets manage their own
+      # concurrency, so the value has no effect. Say so instead of letting a
+      # tuned number look applied.
+      private def warn_unapplied_workers(deployment : Models::DeploymentConfig)
+        return if deployment.workers == Models::DeploymentConfig::DEFAULT_WORKERS
+        Logger.warn "deployment.workers = #{deployment.workers} is not applied — hwaro's built-in sync copies serially, and command targets (s3/gs/az/command) manage their own concurrency."
+      end
+
       # Raise HWARO_E_CONFIG when no deployment targets are configured.
       private def require_target_names!(target_names : Array(String))
         return unless target_names.empty?
@@ -887,7 +1036,10 @@ module Hwaro
           end
 
           full_path = File.join(dest_dir, rel)
-          if Dir.exists?(full_path)
+          # A *symlink* to a directory is replaced with a real file by the
+          # copy pass (see `unlink_destination_symlinks!`), so only a real
+          # directory is an unresolvable conflict here.
+          if Dir.exists?(full_path) && !File.symlink?(full_path)
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_IO,
               message: "Destination path is a directory but needs a file: #{rel}",
@@ -952,35 +1104,56 @@ module Hwaro
         total
       end
 
+      # Prune directories the delete pass emptied. Walks depth-first with
+      # lstat instead of `Dir.glob`: glob expands `**` *through* symlinked
+      # directories, so the old sweep could delete empty directories that
+      # live outside the deploy root entirely. Dot-entries are left alone
+      # (glob skipped them too, and the deploy never creates them).
       private def remove_empty_directories(root : String)
-        dirs = Dir.glob(File.join(root, "**", "*")).select { |p| Dir.exists?(p) }
-        dirs.sort_by! { |p| -p.count('/') }
-        dirs.each do |dir|
-          next if dir == root
-          next unless Dir.exists?(dir)
-          next unless Dir.empty?(dir)
-          Dir.delete(dir)
-        end
+        prune_empty_directories(root)
       end
 
-      private def each_project_file(root : String, &block : String ->)
+      private def prune_empty_directories(dir : String) : Nil
+        Dir.each_child(dir) do |entry|
+          next if entry.starts_with?(".")
+          full = File.join(dir, entry)
+          next if File.symlink?(full)
+          next unless Dir.exists?(full)
+          prune_empty_directories(full)
+          begin
+            Dir.delete(full) if Dir.empty?(full)
+          rescue File::Error | IO::Error
+            next
+          end
+        end
+      rescue File::Error | IO::Error
+        nil
+      end
+
+      private def each_project_file(root : String, follow_symlinks : Bool = true, &block : String ->)
         visited = Set(String).new
         visited << existing_real_path(root)
-        walk_project_files(root, visited, &block)
+        walk_project_files(root, visited, follow_symlinks, &block)
       end
 
-      private def walk_project_files(dir : String, visited : Set(String), &block : String ->)
+      private def walk_project_files(dir : String, visited : Set(String), follow_symlinks : Bool, &block : String ->)
         Dir.each_child(dir) do |entry|
           next if entry == ".DS_Store"
           full = File.join(dir, entry)
           # info? follows symlinks; broken links and ELOOP entries are
           # skipped instead of crashing the deploy mid-walk.
           info = begin
-            File.info?(full)
+            File.info?(full, follow_symlinks: follow_symlinks)
           rescue File::Error | IO::Error
             nil
           end
           next unless info
+          if !follow_symlinks && info.symlink?
+            # Report the link itself so the delete pass can unlink a stale
+            # one, without ever reading through it.
+            block.call(full)
+            next
+          end
           if info.directory?
             if entry.starts_with?(".") && entry != ".well-known"
               next
@@ -994,7 +1167,7 @@ module Hwaro
             end
             next if visited.includes?(real)
             visited << real
-            walk_project_files(full, visited, &block)
+            walk_project_files(full, visited, follow_symlinks, &block)
           elsif info.file?
             block.call(full)
           end
@@ -1039,14 +1212,18 @@ module Hwaro
       end
 
       private def confirm?(prompt : String) : Bool
-        unless CLI::Prompt.interactive?
+        # `--json` promises a single machine-readable document on stdout;
+        # a prompt written there corrupts it even on a TTY, so JSON mode is
+        # treated as non-interactive and fails loudly instead.
+        if !CLI::Prompt.interactive? || CLI::Runner.json_mode?
           # Note: `--force` does NOT bypass an explicit `--confirm` — it only
           # skips the automatic confirmation added for dangerous shell
           # commands. The old hint claimed otherwise and sent script authors
           # down a dead end.
+          reason = CLI::Runner.json_mode? ? "--json output must stay machine-readable" : "stdin is not a TTY"
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_USAGE,
-            message: "Cannot prompt for confirmation: stdin is not a TTY.",
+            message: "Cannot prompt for confirmation: #{reason}.",
             hint: "Drop --confirm (or confirm = true in config.toml) for non-interactive deploys. " \
                   "If this prompt came from a deploy command with shell metacharacters, --force skips that check.",
           )
@@ -1122,10 +1299,16 @@ module Hwaro
         rescue URI::Error
           return
         end
+        # A missing authority means the URL has no bucket — `s3:/bucket`
+        # (one slash) parses as scheme `s3` with path `/bucket`. Handing that
+        # to `aws s3 sync` produces an opaque CLI error; returning nil routes
+        # it to the unsupported-scheme message that names the target.
         case uri.scheme
         when "s3"
+          return if uri.host.nil? || uri.host.try(&.empty?)
           "aws s3 sync {source}/ {url} --delete"
         when "gs"
+          return if uri.host.nil? || uri.host.try(&.empty?)
           "gsutil -m rsync -r -d {source}/ {url}"
         when "az"
           # az://container → Azure Blob Storage. Inline the container name
@@ -1142,10 +1325,17 @@ module Hwaro
         end
       end
 
+      # Any `scheme:` prefix marks the value as a URL rather than a path. The
+      # second character class requires at least two scheme characters so a
+      # Windows drive letter (`C:\\out`) stays a local path. Matching on
+      # `://` alone let a single-slash typo like `s3:/bucket` fall through to
+      # the local-copy branch and create a directory literally named `s3:`.
+      private URL_SCHEME_RE = /\A[A-Za-z][A-Za-z0-9+.\-]+:/
+
       private def local_directory_destination(url : String) : String?
-        if url.includes?("://")
+        if url.matches?(URL_SCHEME_RE)
           uri = URI.parse(url)
-          return unless uri.scheme == "file"
+          return unless uri.scheme.try(&.downcase) == "file"
           # Allow both file:///abs/path and file://relative/path forms.
           # For a relative form (file://./out, file://relative/path) URI puts the
           # first segment in `host`; prepend it so the path isn't silently

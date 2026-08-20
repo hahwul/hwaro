@@ -435,6 +435,7 @@ hwaro serve --header "X-Custom: foo" --header "Cache-Control: no-store"
 
 ```bash
 hwaro deploy [target ...]
+hwaro deploy --target prod
 hwaro deploy --dry-run
 ```
 
@@ -443,12 +444,29 @@ hwaro deploy --dry-run
 | 플래그 | 설명 |
 |------|-------------|
 | -s, --source DIR | 배포할 소스 디렉터리 (기본값: deployment.source_dir 또는 public) |
+| -t, --target NAME | 배포 대상 이름 (반복 지정 가능, 위치 인자와 동일) |
 | --dry-run | 실제로 쓰지 않고 계획된 변경만 표시 |
 | --confirm | 배포 전 확인 요청 |
-| --force | 강제 업로드/복사 (파일 비교 무시) |
+| --force | 강제 업로드/복사 (파일 비교 무시). 빈 소스로 대상을 비우는 것도 허용 |
 | --max-deletes N | 최대 삭제 수 (기본값: deployment.maxDeletes 또는 256, -1이면 제한 없음) |
 | --list-targets | 설정된 배포 대상 목록 출력 후 종료 |
-| --json | 기계가 읽을 수 있는 JSON 출력 (--list-targets와 함께) |
+| --json | 기계가 읽을 수 있는 JSON 출력 (`--dry-run`이면 계획, 아니면 대상별 요약, `--list-targets`면 대상 목록) |
+| -e, --env NAME | 불러올 설정 환경 (`HWARO_ENV`로도 지정) |
+| -q, --quiet | 사람이 읽는 로그 출력 억제 |
+
+**안전 규칙.** `deploy`는 정합성을 맞출 수 없는 대상을 파괴하는 대신 거부합니다.
+
+- 소스 디렉터리가 비어 있거나 `include`/`exclude`가 아무 파일도 고르지 못하면
+  대상을 지우지 않고 중단합니다. 먼저 `hwaro build`를 실행하거나, 의도적으로
+  비우려면 `--force`를 넘기세요.
+- `--max-deletes`는 삭제 단계를 제한합니다(기본 256, 음수면 해제). 내장
+  `file://` 동기화에만 적용되며, 커맨드 대상이 자체적으로 쓰는 `--delete`는
+  제한하지 않습니다.
+- 대상에 있는 심볼릭 링크를 **따라가서** 쓰거나 지우지 않습니다. 파일이나
+  디렉터리가 있어야 할 자리의 링크는 교체하고, 오래된 링크는 가리키는 대상을
+  건드리지 않은 채 링크만 제거합니다.
+- `--json`은 비대화형입니다. `--confirm`과 함께 쓰면 JSON 문서에 프롬프트를
+  섞어 넣는 대신 오류로 실패합니다.
 
 ### doctor
 

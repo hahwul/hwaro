@@ -26,6 +26,20 @@ describe Hwaro::CLI::Commands::DeployCommand do
       options.source_dir.should eq("public")
     end
 
+    it "accepts targets via --target as well as positionally" do
+      cmd = Hwaro::CLI::Commands::DeployCommand.new
+
+      options, _, _ = cmd.parse_options(["--target", "prod"])
+      options.targets.should eq(["prod"])
+
+      options, _, _ = cmd.parse_options(["-t", "prod", "-t", "staging"])
+      options.targets.should eq(["prod", "staging"])
+
+      # Flag- and positional-supplied names compose.
+      options, _, _ = cmd.parse_options(["--target", "prod", "staging"])
+      options.targets.should eq(["prod", "staging"])
+    end
+
     it "parses boolean flags" do
       cmd = Hwaro::CLI::Commands::DeployCommand.new
       options, _, _ = cmd.parse_options(["--dry-run", "--confirm", "--force"])
