@@ -265,6 +265,11 @@ describe "Sass control flow" do
     css = compile("@media screen { .e { @at-root (with: rule) { .g { color: blue; } } } }")
     css.should contain(".e .g {\n  color: blue;")
   end
+
+  it "treats (with: all) as a no-op that keeps media and selector nesting" do
+    css = compile("@media screen { .e { @at-root (with: all) { .f { color: red; } } } }")
+    css.should contain("@media screen {\n  .e .f {\n    color: red;")
+  end
 end
 
 describe "Sass loop budget" do

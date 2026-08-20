@@ -1335,7 +1335,13 @@ module Hwaro
 
           private def eval_map(node : MapE) : Value
             entries = Array(MapEntry).new
-            node.pairs.each { |pair| entries << MapEntry.new(eval(pair.key), eval(pair.value)) }
+            node.pairs.each do |pair|
+              key = eval(pair.key)
+              if entries.any? { |entry| entry.key.eq?(key) }
+                raise DuplicateKeyError.new("Duplicate key")
+              end
+              entries << MapEntry.new(key, eval(pair.value))
+            end
             MapV.new(entries)
           end
 
@@ -1419,8 +1425,10 @@ module Hwaro
           end
 
           # The classic Sass `/` rule: divide when forced by context or by
-          # a computed operand; otherwise render the operands joined by a
-          # literal slash (`font: 12px/30px` territory).
+          # a computed operand; otherwise the slash is a list separator
+          # (`list.slash` round-trips through variable storage as
+          # `4 / 5 / 6`). Literal CSS slashes (`font: 12px/30px`) never
+          # reach here — `computes?` is false, so they stay verbatim.
           private def eval_div(node : Binary) : Value
             if @force_div || Expr.div_operand_forces?(node.left) || Expr.div_operand_forces?(node.right)
               ln = number!(eval_forced(node.left), "division")
@@ -1429,9 +1437,24 @@ module Hwaro
               value, unit = Expr.divide_numbers(ln, rn)
               Number.new(value, unit)
             else
-              left = eval(node.left)
-              right = eval(node.right)
-              Raw.new("#{left.to_css}/#{right.to_css}")
+              slash_list(eval(node.left), eval(node.right))
+            end
+          end
+
+          # Flattens adjacent unbracketed slash lists so `1 / 2 / 3`
+          # round-trips as one 3-element slash list, not a nested pair.
+          private def slash_list(left : Value, right : Value) : ListV
+            items = [] of Value
+            append_slash_items(items, left)
+            append_slash_items(items, right)
+            ListV.new(items, ListV::Sep::Slash)
+          end
+
+          private def append_slash_items(items : Array(Value), value : Value) : Nil
+            if value.is_a?(ListV) && value.sep == ListV::Sep::Slash && !value.bracketed
+              items.concat(value.items)
+            else
+              items << value
             end
           end
 
@@ -1539,8 +1562,17 @@ module Hwaro
             # that doesn't survive evaluation of `$args` into a list.
             if Sass.normalize_ident(node.name) == "keywords" && node.kwargs.empty? &&
                node.spread.nil? && node.args.size == 1 && (ref = node.args[0]).is_a?(VarE)
-              if result = @host.expr_keywords(ref.name, ref.ns, node.ns)
-                return result
+              begin
+                if result = @host.expr_keywords(ref.name, ref.ns, node.ns)
+                  return result
+                end
+              rescue ex : NamespacedEvalError
+                raise ex
+              rescue ex : SoftEvalError
+                # Same policy as expr_call: a namespaced `meta.keywords`
+                # failure must not fall back to verbatim CSS.
+                raise NamespacedEvalError.new(ex.message || "keywords() failed") if node.ns
+                raise ex
               end
             end
             # Arguments of a known Sass function are a SassScript context:

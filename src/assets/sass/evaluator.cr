@@ -136,6 +136,10 @@ module Hwaro
           # @extend requests, applied document-wide as a post-pass —
           # deliberately NOT saved/restored around module loads.
           @extends = [] of Extend::Request
+          # Rest-parameter names whose `meta.keywords($args)` store was
+          # read (or forwarded via `$args...`) during the current mixin /
+          # function / @content body. Unused extra keywords error.
+          @keywords_accessed = Set(String).new
         end
 
         # Registers the entry file's canonical path so a self-import cycle
@@ -528,7 +532,11 @@ module Hwaro
           container = @sink
           if node.name == "media" && !@at_frames.empty? &&
              @at_frames.all? { |f| f.at.name == "media" }
-            if merged = merge_media_queries(@at_frames.map(&.at.prelude), prelude)
+            # Only fold the innermost enclosing prelude: intermediate
+            # frames already store their merged query, so folding every
+            # ancestor would duplicate the outer conditions
+            # (`(min-width: 1px) and (min-width: 1px) and …`).
+            if merged = merge_media_pair(@at_frames.last.at.prelude, prelude)
               prelude = merged
               container = @at_frames[0].container
             end
@@ -589,19 +597,6 @@ module Hwaro
           @env = saved_env
         end
 
-        # Merges enclosing @media preludes with a nested one into a single
-        # query list, or nil when the combination can't be expressed
-        # (`not` operands, conflicting media types). Comma lists cross-
-        # multiply, outer-major; type-conflicting pairs are dropped
-        # (dart-sass semantics).
-        private def merge_media_queries(outers : Array(String), inner : String) : String?
-          merged = inner
-          outers.reverse_each do |outer|
-            merged = merge_media_pair(outer, merged) || return
-          end
-          merged
-        end
-
         private def merge_media_pair(outer : String, inner : String) : String?
           outer_qs = Parser.split_top_level_commas(outer).map { |q| collapse_ws(q) }.reject(&.empty?)
           inner_qs = Parser.split_top_level_commas(inner).map { |q| collapse_ws(q) }.reject(&.empty?)
@@ -611,14 +606,20 @@ module Hwaro
             inner_qs.each do |iq|
               if q = merge_media_query(oq, iq)
                 combined << q
-              elsif oq.starts_with?("not ") || iq.starts_with?("not ")
+              elsif media_query_negated?(oq) || media_query_negated?(iq)
                 # `not` can't be distributed over `and`; keep nesting.
+                # Case-insensitive: CSS media types/keywords are ASCII
+                # case-insensitive (`Not print` is the same as `not print`).
                 return
               end
               # A plain type conflict (screen × print) drops the pair.
             end
           end
           combined.empty? ? nil : combined.join(", ")
+        end
+
+        private def media_query_negated?(query : String) : Bool
+          parse_media_query(query).try(&.[:negated]) || false
         end
 
         # One query each side: `[only|not] [type] [and (feature)...]`.
@@ -740,7 +741,7 @@ module Hwaro
 
           call_env = Environment.new(closure.env)
           positional, kwargs, rest_sep = collect_args(node.args, "mixin #{node.name}", node.line, node.column)
-          bind_params(closure.node.params, positional, kwargs, call_env,
+          extra = bind_params(closure.node.params, positional, kwargs, call_env,
             "mixin #{node.name}", node.line, node.column, rest_sep: rest_sep)
 
           content =
@@ -759,15 +760,20 @@ module Hwaro
           saved_env = @env
           saved_content = @content
           saved_path = @path
+          saved_kw = @keywords_accessed
           @env = call_env
           @content = content
           @path = closure.path
+          @keywords_accessed = Set(String).new
           begin
             eval_nodes(closure.node.body)
+            reject_unused_kwargs(extra, closure.node.params, "mixin #{node.name}",
+              node.line, node.column)
           ensure
             @env = saved_env
             @content = saved_content
             @path = saved_path
+            @keywords_accessed = saved_kw
             @include_depth -= 1
           end
         end
@@ -807,7 +813,10 @@ module Hwaro
               # semantics). The keywords live in the hidden side-channel
               # the variadic binding wrote.
               if (pieces = arg.value.pieces).size == 1 && (ref = pieces[0].as?(Ast::VarRef)) && ref.namespace.nil?
-                if stored = @env.lookup_var(KEYWORDS_VAR_PREFIX + Sass.normalize_ident(ref.name))
+                rest_name = Sass.normalize_ident(ref.name)
+                if stored = @env.lookup_var(KEYWORDS_VAR_PREFIX + rest_name)
+                  # Forwarding `$args...` counts as using the extra keywords.
+                  @keywords_accessed << rest_name
                   if map = Expr.coerce(stored).as?(MapV)
                     map.entries.each do |entry|
                       key = entry.key
@@ -875,7 +884,7 @@ module Hwaro
         private def bind_params(params : Array(Ast::Param), positional : Array(String),
                                 kwargs : Hash(String, String), call_env : Environment,
                                 what : String, line : Int32, column : Int32,
-                                soft : Bool = false, rest_sep : ListV::Sep? = nil) : Nil
+                                soft : Bool = false, rest_sep : ListV::Sep? = nil) : Hash(String, String)
           param_names = params.map { |p| Sass.normalize_ident(p.name) }
           variadic = params.last?.try(&.variadic) || false
           fixed = variadic ? params.size - 1 : params.size
@@ -935,6 +944,18 @@ module Hwaro
               end
             call_env.variables[param_name] = value
           end
+          extra_kwargs
+        end
+
+        private def reject_unused_kwargs(extra : Hash(String, String), params : Array(Ast::Param),
+                                         what : String, line : Int32, column : Int32,
+                                         soft : Bool = false) : Nil
+          return if extra.empty?
+          rest = params.last?
+          return unless rest && rest.variadic
+          rest_name = Sass.normalize_ident(rest.name)
+          return if @keywords_accessed.includes?(rest_name)
+          bind_error("no parameter named $#{extra.keys.first} in #{what}", soft, line, column)
         end
 
         private def bind_error(message : String, soft : Bool, line : Int32, column : Int32) : NoReturn
@@ -986,24 +1007,29 @@ module Hwaro
           # and bind to the include's `using (...)` parameters in the
           # content block's scope (dart-sass semantics).
           content_env = Environment.new(block.env)
+          extra = {} of String => String
           if !node.args.empty? || !block.params.empty?
             positional, kwargs, rest_sep = collect_args(node.args, "@content", node.line, node.column)
-            bind_params(block.params, positional, kwargs, content_env,
+            extra = bind_params(block.params, positional, kwargs, content_env,
               "the content block", node.line, node.column, rest_sep: rest_sep)
           end
 
           saved_env = @env
           saved_content = @content
           saved_path = @path
+          saved_kw = @keywords_accessed
           @env = content_env
           @content = block.outer
           @path = block.path
+          @keywords_accessed = Set(String).new
           begin
             eval_nodes(block.nodes)
+            reject_unused_kwargs(extra, block.params, "the content block", node.line, node.column)
           ensure
             @env = saved_env
             @content = saved_content
             @path = saved_path
+            @keywords_accessed = saved_kw
           end
         end
 
@@ -1256,6 +1282,19 @@ module Hwaro
             elsif parents.nil?
               error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
             else
+              if amps <= MAX_PARENT_REF_SLOTS
+                projected = 1_i64
+                amps.times do
+                  projected *= parents.size
+                  break if projected > MAX_RULE_SELECTORS
+                end
+                if projected > MAX_RULE_SELECTORS
+                  error_at(node.line, node.column,
+                    "selector expands to more than #{MAX_RULE_SELECTORS} selectors " \
+                    "(#{parents.size} parent selectors, #{amps} \"&\" references); " \
+                    "reduce the nesting or the comma-separated parent list")
+                end
+              end
               combos =
                 if amps <= MAX_PARENT_REF_SLOTS
                   parent_combinations(parents, amps)
@@ -1451,24 +1490,29 @@ module Hwaro
             positional = args.map { |a| value_storage(a) }
             kw = {} of String => String
             kwargs.each { |k, v| kw[k] = value_storage(v) }
-            bind_params(closure.node.params, positional, kw, call_env,
+            extra = bind_params(closure.node.params, positional, kw, call_env,
               "function #{name}", closure.node.line, closure.node.column, soft: true)
 
             saved_env = @env
             saved_path = @path
             saved_in_function = @in_function
+            saved_kw = @keywords_accessed
             @env = call_env
             @path = closure.path
             @in_function = true
+            @keywords_accessed = Set(String).new
             begin
               eval_nodes(closure.node.body)
               raise SoftEvalError.new("function #{name} finished without @return")
             rescue ex : ReturnSignal
+              reject_unused_kwargs(extra, closure.node.params, "function #{name}",
+                closure.node.line, closure.node.column, soft: true)
               ex.value
             ensure
               @env = saved_env
               @path = saved_path
               @in_function = saved_in_function
+              @keywords_accessed = saved_kw
             end
           ensure
             @call_depth -= 1
@@ -1761,6 +1805,8 @@ module Hwaro
                 return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
               rescue ex : NamespacedEvalError
                 warn_namespaced(template, ex)
+              rescue ex : DuplicateKeyError
+                error_at(template.line, template.column, ex.message || "Duplicate key")
               rescue SoftEvalError
                 # fall through to the verbatim path
               end
@@ -1782,6 +1828,8 @@ module Hwaro
                 return ResolvedValue.new(value.to_css, value.is_a?(NullV))
               rescue ex : NamespacedEvalError
                 warn_namespaced(template, ex)
+              rescue ex : DuplicateKeyError
+                error_at(template.line, template.column, ex.message || "Duplicate key")
               rescue SoftEvalError
                 # fall through to the verbatim path
               end
@@ -1965,6 +2013,7 @@ module Hwaro
           unless stored
             raise SoftEvalError.new("keywords(): $#{name} is not an argument list")
           end
+          @keywords_accessed << norm
           Expr.coerce(stored).as?(MapV) || MapV.new([] of MapEntry)
         end
 

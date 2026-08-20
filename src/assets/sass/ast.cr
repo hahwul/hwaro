@@ -277,7 +277,7 @@ module Hwaro
           def escapes_rules? : Bool
             case mode
             when :without then names.includes?("rule") || names.includes?("all")
-            else               !names.includes?("rule")
+            else               !(names.includes?("rule") || names.includes?("all"))
             end
           end
 
@@ -285,7 +285,7 @@ module Hwaro
           def escapes_at?(at_name : String) : Bool
             case mode
             when :without then names.includes?(at_name) || names.includes?("all")
-            else               !names.includes?(at_name)
+            else               !(names.includes?(at_name) || names.includes?("all"))
             end
           end
         end

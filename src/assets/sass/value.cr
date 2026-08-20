@@ -35,6 +35,13 @@ module Hwaro
       class NamespacedEvalError < SoftEvalError
       end
 
+      # Map construction saw two keys that `==` considers equal (`1in` and
+      # `96px` after unit conversion). dart-sass fails the compile; the
+      # lenient SoftEvalError fallback would store the map as text and
+      # later lookups would silently hit the first key.
+      class DuplicateKeyError < SoftEvalError
+      end
+
       # "This call isn't mine" — raised by a built-in whose name shadows a
       # real CSS function (`rgba()`, `grayscale()`, `saturate()`, …) when
       # the arguments are the CSS shape rather than the Sass one.

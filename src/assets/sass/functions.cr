@@ -27,6 +27,8 @@
 require "./value"
 require "./color"
 require "./expr"
+require "./extend"
+require "./parser"
 
 module Hwaro
   module Assets
@@ -1219,43 +1221,12 @@ module Hwaro
         # sass:selector
         #
         # String-level implementations of the selector functions: selectors
-        # are handled as comma lists of complex selectors (whitespace-
-        # separated compound words). Sound for the class/id/element/pseudo
-        # selectors frameworks feed these; the full unification semantics
-        # (combinator weaving, pseudo-element rules) are out of scope.
+        # are comma lists of complex selectors, tokenized with the same
+        # quote/bracket/paren-aware parser @extend uses. Sound for the
+        # class/id/element/pseudo/attribute selectors frameworks feed
+        # these; the full unification semantics (combinator weaving,
+        # pseudo-element rules) are out of scope.
         # ---------------------------------------------------------------
-
-        # Splits selector text on top-level commas (commas inside `(...)`
-        # and `[...]` — `:is(a, b)`, `[title="a,b"]` — don't split).
-        private def self.split_selector_commas(text : String) : Array(String)
-          parts = [] of String
-          buf = String::Builder.new
-          depth = 0
-          in_quote = '\0'
-          text.each_char do |c|
-            if in_quote != '\0'
-              buf << c
-              in_quote = '\0' if c == in_quote
-              next
-            end
-            case c
-            when '"', '\'' then in_quote = c; buf << c
-            when '(', '['  then depth += 1; buf << c
-            when ')', ']'  then depth -= 1; buf << c
-            when ','
-              if depth == 0
-                parts << buf.to_s
-                buf = String::Builder.new
-              else
-                buf << c
-              end
-            else
-              buf << c
-            end
-          end
-          parts << buf.to_s
-          parts.map(&.strip).reject(&.empty?)
-        end
 
         # A selector argument as text: strings/raw verbatim, lists joined
         # by their separator (`&` arrives as a comma list of strings).
@@ -1270,10 +1241,21 @@ module Hwaro
           end
         end
 
-        # Comma list of complex selectors, each an array of whitespace-
-        # separated words (compounds and combinators).
+        # Comma list of complex selectors, each an array of compounds and
+        # combinators. Attribute selectors and `:is()`/`:not()` parens keep
+        # their internal whitespace — naive String#split would fragment
+        # `[title="a b"]` into two tokens.
         private def self.selector_complexes(name : String, value : Value) : Array(Array(String))
-          split_selector_commas(selector_text(name, value)).map(&.split)
+          Parser.split_top_level_commas(selector_text(name, value)).map(&.strip).reject(&.empty?).map do |complex|
+            items = Extend.parse_items(complex)
+            raise SoftEvalError.new("#{name}: invalid selector #{complex.inspect}") unless items
+            items.map do |item|
+              case item
+              in Extend::Combinator then item.text
+              in Extend::Compound   then item.simples.join
+              end
+            end
+          end
         end
 
         # Splits one compound selector into its leading element (or "") and

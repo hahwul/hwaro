@@ -79,6 +79,12 @@ describe "Sass unit conversion" do
     css.should contain("b: true;")
   end
 
+  it "rejects maps whose keys collide after unit conversion" do
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /Duplicate key/) do
+      compile(%(@use "sass:map"; $m: (1in: a, 96px: b); o { x: map.get($m, 96px); }))
+    end
+  end
+
   it "reports convertible units as compatible" do
     compile(%(@use "sass:math";\no { c: math.compatible(1px, 1in); })).should contain("c: true;")
   end
@@ -160,6 +166,17 @@ describe "Sass string/list function additions" do
     css.should contain("c: true;")
     css.should contain("d: 2;")
   end
+
+  it "round-trips a slash list through a variable" do
+    css = compile(<<-SCSS)
+      @use "sass:list";
+      $l: list.slash(4, 5, 6);
+      a { n: list.length($l); s: list.separator($l); b: list.nth($l, 2); }
+      SCSS
+    css.should contain("n: 3;")
+    css.should contain("s: slash;")
+    css.should contain("b: 5;")
+  end
 end
 
 describe "Sass color additions" do
@@ -215,6 +232,18 @@ describe "Sass selector module" do
     css.should contain("b: false;")
   end
 
+  it "keeps whitespace inside attribute selectors and :is() when appending/nesting" do
+    css = compile(<<-SCSS)
+      @use "sass:selector";
+      o {
+        a: selector.append('[title="a b"]', ".x");
+        b: selector.nest(":is(a > b)", ".c");
+      }
+      SCSS
+    css.should contain(%(a: [title="a b"].x;))
+    css.should contain("b: :is(a > b) .c;")
+  end
+
   it "works with & through interpolation in @at-root" do
     css = compile(<<-'SCSS')
       @use "sass:selector";
@@ -239,6 +268,13 @@ describe "Sass variadic keyword arguments" do
     css.should contain("n: 1;")
   end
 
+  it "warns when namespaced meta.keywords is not given an argument list" do
+    log = with_captured_log do
+      compile(%(@use "sass:meta"; $x: 1; .a { x: meta.keywords($x); }))
+    end
+    log.should match(/not an argument list/)
+  end
+
   it "forwards keywords through a spread" do
     css = compile(<<-SCSS)
       @use "sass:meta";
@@ -247,6 +283,24 @@ describe "Sass variadic keyword arguments" do
       b { @include fwd(9, $z: 8); }
       SCSS
     css.should contain("x: (z: 8);")
+  end
+
+  it "errors on a misspelled keyword even when the mixin is variadic" do
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /no parameter named \$colour/) do
+      compile(<<-SCSS)
+        @mixin theme($color: red, $args...) { color: $color; }
+        a { @include theme($colour: blue); }
+        SCSS
+    end
+  end
+
+  it "accepts extra keywords when meta.keywords reads them" do
+    css = compile(<<-SCSS)
+      @use "sass:meta";
+      @mixin theme($color: red, $args...) { x: inspect(meta.keywords($args)); }
+      a { @include theme($colour: blue); }
+      SCSS
+    css.should contain("x: (colour: blue);")
   end
 
   it "preserves the spread list's separator in the rest arglist" do
@@ -299,6 +353,22 @@ describe "Sass output structure" do
   it "cross-multiplies comma-separated media queries outer-major, dropping type conflicts" do
     css = compile("@media (min-width: 10px), print { a { @media (max-width: 20px), screen { x: 1; } } }")
     css.should contain("@media (min-width: 10px) and (max-width: 20px), screen and (min-width: 10px), print and (max-width: 20px) {")
+  end
+
+  it "does not duplicate ancestor conditions in triple-nested @media" do
+    css = compile("@media (min-width: 1px) { @media (min-width: 2px) { @media (min-width: 3px) { a { x: 1 } } } }")
+    css.should contain("@media (min-width: 1px) and (min-width: 2px) and (min-width: 3px) {")
+    css.should_not contain("(min-width: 1px) and (min-width: 1px)")
+  end
+
+  it "keeps nested form for uppercase NOT media queries the same as lowercase" do
+    lower = compile("@media not print, screen { .a { @media (min-width: 10px) { x: 1; } } }")
+    upper = compile("@media Not print, screen { .a { @media (min-width: 10px) { x: 1; } } }")
+    lower.should contain("@media not print, screen")
+    lower.should contain("@media (min-width: 10px)")
+    upper.should contain("@media Not print, screen")
+    upper.should contain("@media (min-width: 10px)")
+    upper.should_not contain("@media screen and (min-width: 10px)")
   end
 
   it "resolves @at-root \#{&} without re-nesting" do
