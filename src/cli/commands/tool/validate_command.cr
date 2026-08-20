@@ -57,7 +57,9 @@ module Hwaro
               issues = validator.run
             rescue ex
               if json_output
-                err = Hwaro::HwaroError.new(
+                # Keep a classified failure's own code and hint instead of
+                # re-labelling every one of them HWARO_E_CONTENT.
+                err = ex.as?(Hwaro::HwaroError) || Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_CONTENT,
                   message: ex.message || "validate failed",
                 )

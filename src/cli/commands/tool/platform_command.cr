@@ -1,6 +1,8 @@
 require "file_utils"
 require "option_parser"
 require "../../metadata"
+require "../../../utils/command_suggester"
+require "../../../utils/errors"
 require "../../../utils/logger"
 require "../../../utils/file_safe"
 require "../../../services/platform_config"
@@ -73,15 +75,30 @@ module Hwaro
               end
             end
 
+            supported = Services::PlatformConfig::SUPPORTED_PLATFORMS.join(", ")
+
+            # Classified usage errors (exit 2), like every sibling `tool`
+            # subcommand. These two used to print an unclassified message and
+            # exit 1 — the same status the "file already exists" refusal and a
+            # genuine write failure use, so a caller could not tell a typo from
+            # a real error.
             unless platform_name = platform
-              Logger.error "Platform name required. Use: #{Services::PlatformConfig::SUPPORTED_PLATFORMS.join(", ")}"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "missing <platform> argument",
+                hint: "Usage: hwaro tool platform <platform> — supported: #{supported}.",
+              )
             end
 
             unless Services::PlatformConfig::SUPPORTED_PLATFORMS.includes?(platform_name)
-              Logger.error "Unsupported platform: #{platform_name}"
-              Logger.info "Supported platforms: #{Services::PlatformConfig::SUPPORTED_PLATFORMS.join(", ")}"
-              exit(1)
+              if suggestion = Utils::CommandSuggester.suggest(platform_name, Services::PlatformConfig::SUPPORTED_PLATFORMS)
+                STDERR.puts "Did you mean '#{suggestion}'?"
+              end
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "unsupported platform: #{platform_name}",
+                hint: "Supported: #{supported}.",
+              )
             end
 
             config = if File.exists?("config.toml")
@@ -102,8 +119,11 @@ module Hwaro
               puts content
             else
               if File.exists?(filename) && !force
-                Logger.warn "#{filename} already exists. Use --force to overwrite."
-                exit(1)
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "#{filename} already exists",
+                  hint: "Pass --force to overwrite it, -o PATH to write elsewhere, or --stdout to print it.",
+                )
               end
 
               dir = File.dirname(filename)

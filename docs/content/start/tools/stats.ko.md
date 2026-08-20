@@ -6,6 +6,12 @@ weight = 7
 
 글 개수, 단어 수 지표, 태그 분포, 월별 발행 빈도 등 콘텐츠 통계를 표시합니다.
 
+`published`는 기본 `hwaro build`가 실제로 내보내는 파일 수입니다. 빌드가 제외하는
+파일은 각각의 이유로 따로 집계됩니다 — `drafts`(자체 또는 상위 섹션에서 캐스케이드),
+`future`(`date`가 미래), `expired`(`expires`가 지남). 단어 수·태그 분포·월별 차트는
+발행되는 파일만 대상으로 합니다. 태그는 최상위 `tags` 목록에서 읽고, 없으면
+`[taxonomies] tags` 테이블로 대체합니다 — 빌드와 동일한 규칙입니다.
+
 ```bash
 # 콘텐츠 디렉터리 통계 표시
 hwaro tool stats
@@ -29,7 +35,7 @@ hwaro tool stats --json
 
 ```
 hwaro: stats content
-total: 42 files, 4 drafts
+total: 42 files, 4 drafts · 1 future
 words: 28,500 total, 678 avg
 range: 120 min, 3,200 max
 
@@ -43,7 +49,7 @@ monthly:
       2024-02      5  ####################
       2024-03      2  ########
 
-counted: 42 files, 38 published, 4 drafts
+counted: 42 files, 37 published, 4 drafts · 1 future
 ```
 
 색상 터미널에서는 같은 보고서가 `hwaro stats` 헤딩, 정렬된 영수증 형식 행,
@@ -55,8 +61,10 @@ counted: 42 files, 38 published, 4 drafts
 ```json
 {
   "total": 42,
-  "published": 38,
+  "published": 37,
   "drafts": 4,
+  "future": 1,
+  "expired": 0,
   "word_count": {
     "total": 28500,
     "average": 678,

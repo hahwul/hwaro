@@ -38,7 +38,22 @@ hwaro tool check-links --internal-only
 2. 외부 URL(http/https 링크)과 내부 링크(상대/절대 경로)를 수집
 3. 외부 URL에 동시 HEAD 요청 전송
 4. 내부 링크 대상이 디스크에 존재하는지 확인 (`.md`, `_index.md`, `index.md` 검사)
-5. 깨졌거나 접근할 수 없는 링크 보고
+5. 빌드가 생성하는 경로는 소스 파일 없이도 유효한 것으로 인정
+6. 깨졌거나 접근할 수 없는 링크 보고
+
+### 생성 경로
+
+일부 URL은 원본 파일이 없고 빌드가 직접 씁니다. 이런 경로는 `config.toml`에서
+유도하므로, 첫 빌드 **이전**에도 `check-links`를 돌릴 수 있습니다(린트 후 빌드
+순서로 도는 CI가 이 경우입니다).
+
+- `/sitemap.xml`, `/robots.txt`, `/llms.txt`, 검색 인덱스, `404.html` — 각각
+  설정된 `filename`을 따릅니다
+- 피드(`/rss.xml`, `/atom.xml`) — 섹션별·언어별 사본(`/posts/rss.xml`,
+  `/ko/rss.xml`) 포함
+- 분류 목록·용어 페이지(`/tags/`, `/categories/rust/`)
+- 페이지네이션 경로(`/posts/page/2/`) — `paginate_by`를 실제로 선언한 섹션에만
+  해당하므로, 페이지네이션이 없는 섹션의 `/page/N/` 링크는 여전히 보고됩니다
 
 ## 링크 유형
 

@@ -63,6 +63,17 @@ module Hwaro
         Error
       end
 
+      # Why a file was left alone. A bulk run reported only a bare
+      # "N skipped", so an author whose whole tree was passed over had no way
+      # to learn whether the files were already in the target format, carried
+      # no front matter at all, or opened with a `---` pair the converter
+      # REFUSED to touch because rewriting it would have deleted their prose.
+      private enum SkipReason
+        AlreadyTarget
+        NoFrontmatter
+        NotFrontmatter
+      end
+
       # Content directory path
       @content_dir : String
 
@@ -113,7 +124,12 @@ module Hwaro
         status == ConversionStatus::Converted
       end
 
-      private def convert_file_with_status(file_path : String, target_format : FrontmatterFormat, log_skipped : Bool = true) : ConversionStatus
+      private def convert_file_with_status(
+        file_path : String,
+        target_format : FrontmatterFormat,
+        log_skipped : Bool = true,
+        skips : Hash(SkipReason, Int32)? = nil,
+      ) : ConversionStatus
         # Strip a BOM before detection so a BOM'd file isn't misread as
         # "no frontmatter" and skipped. The rewrite below drops the BOM too.
         content = Utils::TextUtils.strip_bom(File.read(file_path))
@@ -122,11 +138,13 @@ module Hwaro
         # Skip if already in target format or unknown format
         if current_format == target_format
           Logger.item("skipped (already #{target_format}): #{file_path}", glyph: :bullet) if log_skipped
+          skips.try { |h| h[SkipReason::AlreadyTarget] = (h[SkipReason::AlreadyTarget]? || 0) + 1 }
           return ConversionStatus::Skipped
         end
 
         if current_format == FrontmatterFormat::Unknown
           Logger.item("skipped (no frontmatter): #{file_path}", glyph: :warn) if log_skipped
+          skips.try { |h| h[SkipReason::NoFrontmatter] = (h[SkipReason::NoFrontmatter]? || 0) + 1 }
           return ConversionStatus::Skipped
         end
 
@@ -136,7 +154,11 @@ module Hwaro
         # empty frontmatter, silently deleting the author's content — skip
         # such files instead of writing anything.
         unless frontmatter_mapping?(content, current_format)
-          Logger.item("skipped (leading #{format_label(current_format)} block is not frontmatter): #{file_path}", glyph: :warn) if log_skipped
+          # Always named, bulk run or not: this is the skip that protects the
+          # author's body text, and staying quiet about it reads as "nothing
+          # to do here" for a file that may well have broken front matter.
+          Logger.warn "#{file_path}: leading #{format_label(current_format)} block is not front matter — left unchanged."
+          skips.try { |h| h[SkipReason::NotFrontmatter] = (h[SkipReason::NotFrontmatter]? || 0) + 1 }
           return ConversionStatus::Skipped
         end
 
@@ -176,11 +198,12 @@ module Hwaro
         converted = 0
         skipped = 0
         errors = 0
+        skips = {} of SkipReason => Int32
 
         format_name = format_label(target_format)
 
         find_content_files.each do |file_path|
-          status = convert_file_with_status(file_path, target_format, log_skipped: false)
+          status = convert_file_with_status(file_path, target_format, log_skipped: false, skips: skips)
 
           case status
           when ConversionStatus::Converted
@@ -193,6 +216,7 @@ module Hwaro
         end
 
         summary = "#{converted} files · #{skipped} skipped"
+        summary += " (#{skip_breakdown(skips, target_format)})" if skipped > 0
         summary += " · #{errors} errors" if errors > 0
         Logger.info "" if Logger.color_enabled?
         Logger.outcome("converted", summary, glyph: errors > 0 ? :err : :result)
@@ -206,6 +230,21 @@ module Hwaro
           skipped_count: skipped,
           error_count: errors
         )
+      end
+
+      # Human breakdown of the skip tally, in the order a reader cares about.
+      private def skip_breakdown(skips : Hash(SkipReason, Int32), target_format : FrontmatterFormat) : String
+        parts = [] of String
+        if n = skips[SkipReason::AlreadyTarget]?
+          parts << "#{n} already #{format_label(target_format)}"
+        end
+        if n = skips[SkipReason::NoFrontmatter]?
+          parts << "#{n} without front matter"
+        end
+        if n = skips[SkipReason::NotFrontmatter]?
+          parts << "#{n} not front matter"
+        end
+        parts.join(", ")
       end
 
       private def find_content_files : Array(String)

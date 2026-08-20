@@ -126,14 +126,14 @@ module Hwaro
               when Time    then result[key] = raw.to_s
               end
             end
-            # Extract tags as comma-separated string for convention check
-            if tags_val = toml_data["tags"]?
-              raw = tags_val.raw
-              if raw.is_a?(Array)
-                tag_strs = raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) }
-                result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
-              end
-            end
+            # Extract tags as comma-separated string for convention check.
+            # The `[taxonomies] tags` table is the scaffold's own (and Zola's)
+            # way of declaring them, and the build falls back to it when no
+            # top-level `tags` exists — without the same fallback here, those
+            # sites were never tag-checked at all.
+            tag_strs = toml_tag_list(toml_data["tags"]?)
+            tag_strs = toml_tag_list(toml_data["taxonomies"]?.try(&.as_h?).try(&.["tags"]?)) if tag_strs.empty?
+            result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
             return result
           rescue ex
             issues << Issue.new(id: "content-frontmatter-toml-error", level: :error, category: "content", file: file_path,
@@ -149,7 +149,11 @@ module Hwaro
                 k = key.as_s? || next
                 if s = value.as_s?
                   result[k] = s
-                elsif b = value.as_bool?
+                elsif !(b = value.as_bool?).nil?
+                  # `elsif b = value.as_bool?` DROPPED every `false` value —
+                  # Crystal treats the returned `false` as a failed match — so
+                  # a `draft: false` (or any other false flag) never reached
+                  # the checks below.
                   result[k] = b
                 elsif i = value.as_i64?
                   # 64-bit accessor: `as_i?` only type-checks (`@raw.as(Int).to_i`),
@@ -163,13 +167,13 @@ module Hwaro
                   result[k] = t.to_s
                 end
               end
-              # Extract tags for convention check
-              if tags_node = h[YAML::Any.new("tags")]?
-                if arr = tags_node.as_a?
-                  tag_strs = arr.compact_map(&.as_s?)
-                  result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
-                end
+              # Extract tags for convention check (same `[taxonomies]`
+              # fallback the build applies).
+              tag_strs = yaml_tag_list(h[YAML::Any.new("tags")]?)
+              if tag_strs.empty?
+                tag_strs = yaml_tag_list(h[YAML::Any.new("taxonomies")]?.try(&.as_h?).try(&.[YAML::Any.new("tags")]?))
               end
+              result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
               return result
             end
             # Empty or non-mapping YAML frontmatter (e.g. `---\n---`) is valid
@@ -198,7 +202,8 @@ module Hwaro
               h.each do |k, value|
                 if s = value.as_s?
                   result[k] = s
-                elsif b = value.as_bool?
+                elsif !(b = value.as_bool?).nil?
+                  # Same falsy-drop as the YAML branch above.
                   result[k] = b
                 elsif i = value.as_i64?
                   # Same Int32 overflow hazard as the YAML branch above.
@@ -207,12 +212,9 @@ module Hwaro
                   result[k] = f
                 end
               end
-              if tags_node = h["tags"]?
-                if arr = tags_node.as_a?
-                  tag_strs = arr.compact_map(&.as_s?)
-                  result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
-                end
-              end
+              tag_strs = json_tag_list(h["tags"]?)
+              tag_strs = json_tag_list(h["taxonomies"]?.try(&.as_h?).try(&.["tags"]?)) if tag_strs.empty?
+              result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
               return result
             end
             return
@@ -224,6 +226,20 @@ module Hwaro
         end
 
         nil
+      end
+
+      private def toml_tag_list(value : TOML::Any?) : Array(String)
+        raw = value.try(&.raw)
+        return [] of String unless raw.is_a?(Array)
+        raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) }
+      end
+
+      private def yaml_tag_list(value : YAML::Any?) : Array(String)
+        value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String
+      end
+
+      private def json_tag_list(value : JSON::Any?) : Array(String)
+        value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String
       end
 
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))

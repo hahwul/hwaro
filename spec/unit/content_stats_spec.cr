@@ -2,12 +2,12 @@ require "../spec_helper"
 
 describe Hwaro::Services::ContentStats do
   describe "#run" do
-    it "returns zero stats when content directory does not exist" do
+    it "raises a classified content error when the content directory does not exist" do
+      # A missing directory must be distinguishable from "no content": a
+      # zeroed report and exit 0 hid a mistyped --content-dir entirely.
       stats = Hwaro::Services::ContentStats.new("/nonexistent/path/content")
-      result = stats.run
-      result.total.should eq(0)
-      result.drafts.should eq(0)
-      result.published.should eq(0)
+      error = expect_raises(Hwaro::HwaroError) { stats.run }
+      error.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
     end
 
     it "counts total, drafts, and published correctly" do

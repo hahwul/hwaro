@@ -355,7 +355,10 @@ describe Hwaro::Services::Exporters::HugoExporter do
         parsed["weight"].raw.should eq(10)
         parsed["rating"].raw.should eq(4.5)
         parsed["numbers"].raw.as(Array).map(&.as(TOML::Any).raw).should eq([1, 2, 3])
-        parsed["taxonomies"]["categories"].raw.as(Array).first.as(TOML::Any).raw.should eq("tech")
+        # `[taxonomies]` is hoisted to the top level, which is where Hugo
+        # actually reads taxonomy membership from.
+        parsed["taxonomies"]?.should be_nil
+        parsed["categories"].raw.as(Array).first.as(TOML::Any).raw.should eq("tech")
         parsed["extra"]["subtitle"].raw.should eq("hello")
         parsed["extra"]["nested"]["key"].raw.should eq("value")
       end

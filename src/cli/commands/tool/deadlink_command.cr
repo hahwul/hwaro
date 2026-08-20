@@ -5,7 +5,11 @@ require "uri"
 require "file"
 require "option_parser"
 require "../../metadata"
+require "toml"
+require "yaml"
 require "../../../models/config"
+require "../../../utils/frontmatter_scanner"
+require "../../../utils/text_utils"
 require "../../../utils/errors"
 require "../../../utils/logger"
 
@@ -163,7 +167,8 @@ module Hwaro
             # multilingual site resolves against `content/ko/…` and is
             # reported dead.
             language_codes = translation_language_codes(config)
-            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes)
+            generated_routes = generated_routes(config)
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes)
 
             total = external_links.size + internal_links.size
             dead_total = dead_external.size + dead_internal.size
@@ -535,7 +540,7 @@ module Hwaro
             !!(url =~ /\A[a-z][a-z0-9+.\-]*:/i)
           end
 
-          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String) : Array(Result)
+          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new) : Array(Result)
             results = [] of Result
             project_root = find_project_root(content_dir)
 
@@ -557,7 +562,10 @@ module Hwaro
               # (`content/ko/posts/`), and that section outranks any
               # translation reading — stripping unconditionally reported such
               # links dead even though the build publishes them.
-              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names)
+              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names) ||
+                       generated_routes.matches?(resolved_url) ||
+                       feed_route?(resolved_url, generated_routes, content_dir, base_dir, language_codes) ||
+                       paginated_route?(resolved_url, link, content_dir, base_dir, taxonomy_names)
 
               # Only when the literal path fails do we read the URL as a
               # translation route (`/ko/about/` ← `content/about.ko.md`), and
@@ -587,6 +595,180 @@ module Hwaro
               results << Result.new(link: link, status: -1, error: "Invalid link target: #{ex.message}")
             end
             results
+          end
+
+          # Routes the BUILD writes that have no source file to check against:
+          # the sitemap, robots.txt, llms.txt, the search index and the feeds.
+          #
+          # Without this the checker only accepted them once `public/` existed,
+          # so a `check-links` run in CI *before* `hwaro build` reported a
+          # site's own `/rss.xml` and `/sitemap.xml` links dead — the exact
+          # order a lint-then-build pipeline uses.
+          struct GeneratedRoutes
+            # Exact absolute paths (`/sitemap.xml`).
+            getter paths : Set(String)
+            # The feed filename, when feeds are enabled. Feeds are ALSO
+            # emitted per section and per language (`/posts/rss.xml`,
+            # `/ko/rss.xml`), so those are resolved by `feed_route?`, which
+            # still requires the prefix to name a real section — matching the
+            # bare basename anywhere would have declared `/nowhere/rss.xml`
+            # live, hiding exactly the dead link this command exists to find.
+            getter feed_filename : String?
+
+            def initialize(@paths : Set(String) = Set(String).new, @feed_filename : String? = nil)
+            end
+
+            def matches?(url : String) : Bool
+              url.starts_with?("/") && paths.includes?(url)
+            end
+          end
+
+          private def generated_routes(config : Models::Config?) : GeneratedRoutes
+            paths = Set(String).new
+            # The build always synthesizes a 404 page.
+            paths << "/404.html"
+            return GeneratedRoutes.new(paths) unless config
+
+            add_route = ->(filename : String) do
+              name = File.basename(filename)
+              paths << "/#{name}" unless name.empty?
+            end
+
+            add_route.call(config.sitemap.filename) if config.sitemap.enabled
+            add_route.call(config.robots.filename) if config.robots.enabled
+            add_route.call(config.llms.filename) if config.llms.enabled
+            add_route.call(config.llms.full_filename) if config.llms.enabled && config.llms.full_enabled
+            add_route.call(config.search.filename) if config.search.enabled
+
+            feed_filename = nil
+            if config.feeds.enabled
+              name = config.feeds.filename.empty? ? default_feed_filename(config.feeds.type) : File.basename(config.feeds.filename)
+              unless name.empty?
+                paths << "/#{name}"
+                feed_filename = name
+              end
+            end
+
+            GeneratedRoutes.new(paths, feed_filename)
+          end
+
+          # `/posts/rss.xml` / `/ko/rss.xml` / `/ko/posts/rss.xml` — a feed the
+          # build emits beside a section or under a language prefix. The root
+          # feed is already an exact path, so this only has to vouch for the
+          # prefixed forms, and only when the prefix resolves to a section.
+          private def feed_route?(url : String, routes : GeneratedRoutes, content_dir : String, base_dir : String, language_codes : Array(String)) : Bool
+            name = routes.feed_filename
+            return false unless name
+            return false unless url.starts_with?("/")
+            return false unless File.basename(url) == name
+
+            prefix = url[0, url.size - name.size].rstrip("/")
+            return true if prefix.empty?
+
+            segments = prefix.lstrip("/").split("/")
+            if (code = segments.first?) && language_codes.includes?(code)
+              segments = segments[1..]
+              return true if segments.empty?
+              prefix = "/#{segments.join("/")}"
+            end
+
+            !section_index_path(prefix, content_dir, base_dir).nil?
+          end
+
+          # Mirrors `Seo::Feeds.safe_feed_filename` for an unset filename.
+          private def default_feed_filename(feed_type : String) : String
+            feed_type.downcase == "atom" ? "atom.xml" : "rss.xml"
+          end
+
+          # `/posts/page/2/` — a paginated listing route. It exists only in the
+          # output, so accept it when the URL minus its `/<paginate_path>/<n>/`
+          # tail resolves to a section that actually paginates. The `/page/`
+          # segment is trusted only for a real section, so an ordinary dead
+          # `/foo/page/2/` still reports.
+          private def paginated_route?(url : String, link : Link, content_dir : String, base_dir : String, taxonomy_names : Array(String)) : Bool
+            return false if link.kind == :image
+            match = url.match(/\A(.*)\/([^\/]+)\/(\d+)\/?\z/)
+            return false unless match
+            prefix = match[1]
+            segment = match[2]
+            prefix = "/" if prefix.empty?
+
+            # Taxonomy term listings paginate too (`/tags/crystal/page/2/`).
+            return true if segment == "page" && taxonomy_url?(prefix, taxonomy_names)
+
+            index_path = section_index_path(prefix, content_dir, base_dir)
+            return false unless index_path
+            paginate_path, per_page = section_pagination(index_path)
+            return false unless per_page
+            return false unless segment == paginate_path
+
+            number = match[3].to_i?
+            return false unless number && number >= 1
+
+            # Bound the page number by how many pages could possibly exist.
+            # Accepting any N declared `/posts/page/99/` live on a two-page
+            # section. The count is a deliberate OVER-estimate (every
+            # descendant, drafts included), so the bound can never report a
+            # link the build does publish.
+            descendants = section_page_count(File.dirname(index_path))
+            return true if descendants == 0
+            number <= (descendants + per_page - 1) // per_page
+          end
+
+          # Upper bound on the pages a section can paginate: every Markdown
+          # descendant that is not itself a section index.
+          private def section_page_count(dir : String) : Int32
+            count = 0
+            Dir.glob(File.join(dir, "**", "*.{md,markdown}")) do |path|
+              next if File.basename(path).starts_with?("_index.")
+              count += 1
+            end
+            count
+          end
+
+          # Path of the `_index` file backing a section URL, if any.
+          private def section_index_path(url : String, content_dir : String, base_dir : String) : String?
+            base = content_target(url, content_dir, base_dir).rstrip("/")
+            {"_index.md", "_index.markdown"}.each do |name|
+              candidate = File.join(base, name)
+              return candidate if File.exists?(candidate)
+            end
+            nil
+          end
+
+          # `{paginate_path, per_page}` for a section `_index` file. `per_page`
+          # is nil unless the section declares a positive `paginate_by`, which
+          # is what makes it produce `/page/N/` routes at all.
+          private def section_pagination(index_path : String) : {String, Int32?}
+            content = Utils::TextUtils.strip_bom(File.read(index_path))
+
+            if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
+              data = TOML.parse(match[1])
+              per_page = data["paginate_by"]?.try(&.raw).as?(Int64)
+              path = data["paginate_path"]?.try(&.as_s?) || "page"
+              return {path, positive_page_size(per_page)}
+            elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
+              if h = YAML.parse(match[1]).as_h?
+                per_page = h[YAML::Any.new("paginate_by")]?.try(&.as_i64?)
+                path = h[YAML::Any.new("paginate_path")]?.try(&.as_s?) || "page"
+                return {path, positive_page_size(per_page)}
+              end
+            elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
+              if h = JSON.parse(content.byte_slice(0, end_idx)).as_h?
+                per_page = h["paginate_by"]?.try(&.as_i64?)
+                path = h["paginate_path"]?.try(&.as_s?) || "page"
+                return {path, positive_page_size(per_page)}
+              end
+            end
+
+            {"page", nil}
+          rescue
+            {"page", nil}
+          end
+
+          private def positive_page_size(value : Int64?) : Int32?
+            return unless value && value > 0
+            value.clamp(1_i64, Int32::MAX.to_i64).to_i32
           end
 
           # Resolve the project root from the given content directory.

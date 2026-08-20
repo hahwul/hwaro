@@ -84,6 +84,10 @@ module Hwaro
         ) : Symbol
           raw = read_content(file_path)
           fields, body = parse_content(raw)
+          # Jekyll reads `tags:` / `categories:` at the top level, so a
+          # `[taxonomies]` table has to be hoisted or the post loses every
+          # taxonomy it belongs to.
+          fields = flatten_taxonomies(fields)
 
           is_draft = fields["draft"]?.try(&.raw) == true
           if is_draft && !include_drafts

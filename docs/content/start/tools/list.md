@@ -36,8 +36,19 @@ hwaro tool list all --json
 | Filter | Description |
 |--------|-------------|
 | all | Show all content files |
-| drafts | Show only files with `draft = true` |
-| published | Show only files with `draft = false` or no draft field |
+| drafts | Show only drafts — `draft = true`, or a `draft` cascaded from a parent section |
+| published | Show only the files a default `hwaro build` actually publishes |
+
+`published` means what the build ships, not merely "not flagged draft". A
+default build also drops future-dated pages (`date` in the future) and expired
+ones (`expires` in the past), so those are reported separately:
+
+| Status | Meaning |
+|--------|---------|
+| `[pub]` | Published by a default build |
+| `[draft]` | `draft = true`, own or cascaded |
+| `[future]` | `date` is in the future (build it with `--include-future`) |
+| `[expired]` | `expires` has passed (build it with `--include-expired`) |
 
 ## JSON Output
 
@@ -47,13 +58,20 @@ hwaro tool list all --json
     "path": "content/blog/my-post.md",
     "title": "My Post",
     "draft": false,
-    "date": "2024-06-15T00:00:00+00:00"
+    "date": "2024-06-15T00:00:00+00:00",
+    "status": "published",
+    "expires": null
   },
   {
     "path": "content/blog/draft-post.md",
     "title": "Draft Post",
     "draft": true,
-    "date": "2024-06-10T00:00:00+00:00"
+    "date": "2024-06-10T00:00:00+00:00",
+    "status": "draft",
+    "expires": null
   }
 ]
 ```
+
+`status` is `published`, `draft`, `future` or `expired`. `draft` is kept for
+existing consumers and is true only for actual drafts.

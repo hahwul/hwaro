@@ -57,7 +57,9 @@ module Hwaro
               result = stats.run
             rescue ex
               if json_output
-                err = Hwaro::HwaroError.new(
+                # Keep a classified failure's own code and hint instead of
+                # re-labelling every one of them HWARO_E_CONTENT.
+                err = ex.as?(Hwaro::HwaroError) || Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_CONTENT,
                   message: ex.message || "stats failed",
                 )
@@ -73,6 +75,8 @@ module Hwaro
                 "total"      => result.total,
                 "published"  => result.published,
                 "drafts"     => result.drafts,
+                "future"     => result.future,
+                "expired"    => result.expired,
                 "word_count" => {
                   "total"   => result.words_total,
                   "average" => result.words_avg,
@@ -96,7 +100,7 @@ module Hwaro
             # what `build` ships), then bar-chart sections and one outcome.
             receipt = Logger::Receipt.new("stats", content_dir)
             receipt.row("total", "#{result.total.format} #{result.total == 1 ? "file" : "files"}",
-              emphasis: result.drafts > 0 ? "#{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}" : nil)
+              emphasis: unpublished_emphasis(result))
             receipt.row("words", "#{result.words_total.format} total · #{result.words_avg.format} avg")
             receipt.row("range", "#{result.words_min.format} min · #{result.words_max.format} max")
             receipt.emit
@@ -129,8 +133,23 @@ module Hwaro
             end
 
             Logger.info ""
-            Logger.outcome("counted",
-              "#{result.total.format} #{result.total == 1 ? "file" : "files"} · #{result.published.format} published · #{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}")
+            summary = "#{result.total.format} #{result.total == 1 ? "file" : "files"} · " \
+                      "#{result.published.format} published · " \
+                      "#{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}"
+            # Future/expired files are dropped by a default build exactly like
+            # drafts, so name them instead of folding them into "published".
+            summary += " · #{result.future.format} future" if result.future > 0
+            summary += " · #{result.expired.format} expired" if result.expired > 0
+            Logger.outcome("counted", summary)
+          end
+
+          # Receipt emphasis naming everything a default build will NOT ship.
+          private def unpublished_emphasis(result : Services::StatsResult) : String?
+            parts = [] of String
+            parts << "#{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}" if result.drafts > 0
+            parts << "#{result.future.format} future" if result.future > 0
+            parts << "#{result.expired.format} expired" if result.expired > 0
+            parts.empty? ? nil : parts.join(" · ")
           end
 
           # Cap a bar-chart label to the column width, marking the cut with an

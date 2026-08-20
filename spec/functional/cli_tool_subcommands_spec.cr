@@ -233,13 +233,22 @@ describe "hwaro tool platform" do
     end
   end
 
-  it "exits 1 and prints 'Unsupported platform' on an unknown platform" do
+  it "exits with the shared usage code on an unknown platform" do
     with_initialized_project do |project_dir|
       status, _, err = run_hwaro(
         ["tool", "platform", "definitely-not-real"], chdir: project_dir
       )
-      status.success?.should be_false
-      err.should contain("Unsupported platform")
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+      err.should contain("unsupported platform: definitely-not-real")
+    end
+  end
+
+  it "exits with the shared usage code when no platform is given" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "platform"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("missing <platform> argument")
     end
   end
 
@@ -508,5 +517,101 @@ describe "hwaro doctor (top-level alias)" do
     Hwaro::CLI::Commands::DoctorCommand.metadata.positional_choices.should eq(
       Hwaro::CLI::Commands::Tool::DoctorCommand::POSITIONAL_CHOICES
     )
+  end
+end
+
+# `check-links` had no idea which routes the BUILD generates, so it could only
+# accept `/sitemap.xml` and `/rss.xml` once `public/` existed — reporting a
+# site's own links dead in the lint-before-build order CI actually uses.
+describe "hwaro tool check-links (generated routes)" do
+  it "accepts config-generated routes and paginated section routes before a build" do
+    with_initialized_project do |project_dir|
+      content_dir = File.join(project_dir, "content")
+      posts_dir = File.join(content_dir, "posts")
+      # Replace the scaffold's content and config so the assertion depends
+      # only on the routes under test.
+      FileUtils.rm_rf(content_dir)
+      Dir.mkdir_p(posts_dir)
+      File.write(File.join(project_dir, "config.toml"), <<-TOML)
+        title = "Site"
+        base_url = "https://example.com"
+
+        [sitemap]
+        enabled = true
+
+        [feeds]
+        enabled = true
+        TOML
+      File.write(File.join(posts_dir, "_index.md"), "+++\ntitle = \"Posts\"\npaginate_by = 2\n+++\n")
+      # Three pages at two per page, so `/posts/page/2/` really is reachable.
+      File.write(File.join(posts_dir, "a.md"), "+++\ntitle = \"A\"\n+++\n")
+      File.write(File.join(posts_dir, "b.md"), "+++\ntitle = \"B\"\n+++\n")
+      File.write(File.join(posts_dir, "routes.md"), <<-MD)
+        +++
+        title = "Routes"
+        +++
+
+        [feed](/rss.xml)
+        [map](/sitemap.xml)
+        [robots](/robots.txt)
+        [next](/posts/page/2/)
+        [gone](/nope/)
+        MD
+
+      status, output, _ = run_hwaro(["tool", "check-links", "--internal-only", "--json"], chdir: project_dir)
+      status.success?.should be_false
+      dead = JSON.parse(output)["dead_internal"].as_a.map(&.["link"].["url"].as_s)
+      dead.should eq(["/nope/"])
+    end
+  end
+
+  it "refuses a feed path whose prefix is not a section, and an out-of-range page" do
+    with_initialized_project do |project_dir|
+      content_dir = File.join(project_dir, "content")
+      blog_dir = File.join(content_dir, "blog")
+      FileUtils.rm_rf(content_dir)
+      Dir.mkdir_p(blog_dir)
+      File.write(File.join(project_dir, "config.toml"), <<-TOML)
+        title = "Site"
+        base_url = "https://example.com"
+
+        [feeds]
+        enabled = true
+        TOML
+      File.write(File.join(blog_dir, "_index.md"), "+++\ntitle = \"Blog\"\npaginate_by = 2\n+++\n")
+      File.write(File.join(blog_dir, "p1.md"), "+++\ntitle = \"P1\"\n+++\n")
+      File.write(File.join(blog_dir, "p2.md"), "+++\ntitle = \"P2\"\n+++\n")
+      File.write(File.join(blog_dir, "links.md"), <<-MD)
+        +++
+        title = "Links"
+        +++
+
+        [section feed](/blog/rss.xml)
+        [page one](/blog/page/1/)
+        [nowhere feed](/nowhere/rss.xml)
+        [too far](/blog/page/99/)
+        MD
+
+      status, output, _ = run_hwaro(["tool", "check-links", "--internal-only", "--json"], chdir: project_dir)
+      status.success?.should be_false
+      dead = JSON.parse(output)["dead_internal"].as_a.map(&.["link"].["url"].as_s)
+      dead.sort!.should eq(["/blog/page/99/", "/nowhere/rss.xml"])
+    end
+  end
+
+  it "still reports /page/N/ under a section that does not paginate" do
+    with_initialized_project do |project_dir|
+      content_dir = File.join(project_dir, "content")
+      posts_dir = File.join(content_dir, "posts")
+      FileUtils.rm_rf(content_dir)
+      Dir.mkdir_p(posts_dir)
+      File.write(File.join(posts_dir, "_index.md"), "+++\ntitle = \"Posts\"\n+++\n")
+      File.write(File.join(posts_dir, "routes.md"), "+++\ntitle = \"Routes\"\n+++\n\n[next](/posts/page/2/)\n")
+
+      status, output, _ = run_hwaro(["tool", "check-links", "--internal-only", "--json"], chdir: project_dir)
+      status.success?.should be_false
+      dead = JSON.parse(output)["dead_internal"].as_a.map(&.["link"].["url"].as_s)
+      dead.should contain("/posts/page/2/")
+    end
   end
 end

@@ -1,5 +1,6 @@
 require "option_parser"
 require "../../metadata"
+require "../../../utils/errors"
 require "../../../utils/logger"
 require "../../../utils/file_safe"
 require "../../../services/ci_config"
@@ -73,15 +74,22 @@ module Hwaro
               end
             end
 
+            supported = Services::CIConfig::SUPPORTED_PROVIDERS.join(", ")
+
             unless provider_name = provider
-              Logger.error "CI provider name required. Use: github-actions"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "missing <provider> argument",
+                hint: "Usage: hwaro tool ci <provider> — supported: #{supported}.",
+              )
             end
 
             unless Services::CIConfig::SUPPORTED_PROVIDERS.includes?(provider_name)
-              Logger.error "Unsupported CI provider: #{provider_name}"
-              Logger.info "Supported providers: #{Services::CIConfig::SUPPORTED_PROVIDERS.join(", ")}"
-              exit(1)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "unsupported CI provider: #{provider_name}",
+                hint: "Supported: #{supported}.",
+              )
             end
 
             generator = Services::CIConfig.new
@@ -96,8 +104,11 @@ module Hwaro
               puts content
             else
               if File.exists?(filename) && !force
-                Logger.warn "#{filename} already exists. Use --force to overwrite."
-                exit(1)
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "#{filename} already exists",
+                  hint: "Pass --force to overwrite it, -o PATH to write elsewhere, or --stdout to print it.",
+                )
               end
 
               dir = File.dirname(filename)
