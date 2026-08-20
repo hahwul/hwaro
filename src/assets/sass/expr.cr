@@ -1337,7 +1337,7 @@ module Hwaro
             entries = Array(MapEntry).new
             node.pairs.each do |pair|
               key = eval(pair.key)
-              if entries.any? { |entry| entry.key.eq?(key) }
+              if entries.any?(&.key.eq?(key))
                 raise DuplicateKeyError.new("Duplicate key")
               end
               entries << MapEntry.new(key, eval(pair.value))
