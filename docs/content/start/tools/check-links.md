@@ -38,7 +38,23 @@ hwaro tool check-links --internal-only
 2. Finds external URLs (http/https links) and internal links (relative/absolute paths)
 3. Sends concurrent HEAD requests to external URLs
 4. Verifies internal link targets exist on disk (checks `.md`, `_index.md`, `index.md`)
-5. Reports broken or unreachable links
+5. Accepts routes the build generates rather than reads from disk
+6. Reports broken or unreachable links
+
+### Generated routes
+
+Some URLs have no source file at all — the build writes them. Those are
+resolved from `config.toml`, so `check-links` can run **before** the first
+build (the order a lint-then-build CI pipeline uses):
+
+- `/sitemap.xml`, `/robots.txt`, `/llms.txt`, the search index, and `404.html`,
+  each honouring its configured `filename`
+- Feeds (`/rss.xml`, `/atom.xml`), including the per-section and per-language
+  copies (`/posts/rss.xml`, `/ko/rss.xml`)
+- Taxonomy listing and term pages (`/tags/`, `/categories/rust/`)
+- Paginated listings (`/posts/page/2/`) — only for a section that actually
+  declares `paginate_by`, so a `/page/N/` link under a non-paginated section
+  is still reported
 
 ## Link Types
 

@@ -43,6 +43,19 @@ hwaro tool convert to-yaml --json
 }
 ```
 
+## 건너뛴 파일
+
+사람이 읽는 요약에는 건너뛴 이유가 함께 표시됩니다 — `already TOML`,
+`without front matter`, `not front matter`:
+
+```
+converted: 5 files · 2 skipped (1 already TOML, 1 not front matter)
+```
+
+이 중 `not front matter`를 눈여겨보세요. 파일 첫머리의 `---`/`+++` 쌍 안이
+키/값 매핑이 아니라 본문(예: 수평선)이라는 뜻입니다. 그대로 변환하면 작성자의
+글이 지워지므로 파일을 건드리지 않고 stderr에 파일명을 남깁니다.
+
 ## 예시
 
 변환 전:

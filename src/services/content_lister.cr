@@ -76,23 +76,73 @@ module Hwaro
       Published
     end
 
+    # Publication state a file will have in a DEFAULT `hwaro build`.
+    #
+    # `draft` alone never described that: the build also drops future-dated
+    # pages (`date` in the future) and expired ones (`expires` in the past),
+    # and it honours a `draft` cascaded from an ancestor section. Reporting
+    # all three as "published" made `tool list published` and `tool stats`
+    # disagree with the site the very next build shipped.
+    enum PublishState
+      Published
+      Draft
+      Future
+      Expired
+
+      def label : String
+        case self
+        in Published then "published"
+        in Draft     then "draft"
+        in Future    then "future"
+        in Expired   then "expired"
+        end
+      end
+    end
+
     # Information about a content file
     struct ContentInfo
       include JSON::Serializable
 
       property path : String
       property title : String
+      # Kept for compatibility with existing `--json` consumers: true when the
+      # file is a draft (its own flag or one cascaded from a parent section).
       property draft : Bool
 
       @[JSON::Field(converter: Hwaro::Services::ContentInfo::TimeConverter, emit_null: true)]
       property date : Time?
+
+      # `published` | `draft` | `future` | `expired` — what a default build
+      # does with this file. Only `published` files are actually shipped.
+      property status : String
+
+      @[JSON::Field(converter: Hwaro::Services::ContentInfo::TimeConverter, emit_null: true)]
+      property expires : Time?
 
       def initialize(
         @path : String,
         @title : String = "Untitled",
         @draft : Bool = false,
         @date : Time? = nil,
+        @status : String = "published",
+        @expires : Time? = nil,
       )
+      end
+
+      def initialize(
+        @path : String,
+        @title : String,
+        @draft : Bool,
+        @date : Time?,
+        state : PublishState,
+        @expires : Time? = nil,
+      )
+        @status = state.label
+      end
+
+      # Will a default `hwaro build` publish this file?
+      def published? : Bool
+        @status == PublishState::Published.label
       end
 
       module TimeConverter
@@ -127,6 +177,7 @@ module Hwaro
 
       # Content directory path
       @content_dir : String
+      @default_language : String? = nil
 
       def initialize(@content_dir : String = "content")
       end
@@ -155,9 +206,11 @@ module Hwaro
 
         files = find_content_files
         contents = [] of ContentInfo
+        cascade = collect_cascade_drafts(files)
+        now = Time.utc
 
         files.each do |file_path|
-          info = parse_content_info(file_path)
+          info = parse_content_info(file_path, cascade, now)
           next unless info
 
           case filter
@@ -166,7 +219,9 @@ module Hwaro
           when ContentFilter::Drafts
             contents << info if info.draft
           when ContentFilter::Published
-            contents << info unless info.draft
+            # "Published" now means what the build ships, not merely
+            # "not flagged draft": future and expired files are excluded.
+            contents << info if info.published?
           end
         end
 
@@ -213,8 +268,15 @@ module Hwaro
 
         table = Logger::Table.new([HEADER_STATUS, HEADER_DATE, HEADER_TITLE, HEADER_PATH])
         contents.each_with_index do |info, index|
-          status = info.draft ? "[draft]" : "[pub]"
-          status_role = info.draft ? Logger::Role::Warn : Logger::Role::Dim
+          # `[future]` / `[expired]` are as unpublished as `[draft]` — a
+          # default build ships none of them — so they get the same warn
+          # colour rather than reading as published.
+          status, status_role = case info.status
+                                when "draft"   then {"[draft]", Logger::Role::Warn}
+                                when "future"  then {"[future]", Logger::Role::Warn}
+                                when "expired" then {"[expired]", Logger::Role::Warn}
+                                else                {"[pub]", Logger::Role::Dim}
+                                end
           title, path = cells[index]
           table.row(
             [
@@ -250,30 +312,37 @@ module Hwaro
         files.sort
       end
 
-      private def parse_content_info(file_path : String) : ContentInfo?
+      private def parse_content_info(
+        file_path : String,
+        cascade : Hash(Tuple(String, String), Bool) = {} of Tuple(String, String) => Bool,
+        now : Time = Time.utc,
+      ) : ContentInfo?
         # Match the build's frontmatter reader: a BOM'd file would otherwise
         # list as "Untitled" with no date while it builds correctly.
         content = Utils::TextUtils.strip_bom(File.read(file_path))
 
         title = "Untitled"
         draft = false
+        # The build resolves a cascade against the DECLARED keys
+        # (`front_matter_keys`), not against the parsed value: a page that
+        # spells `draft = "true"` still shadows an ancestor's cascade even
+        # though the value is not a boolean. Track presence separately so the
+        # two agree.
+        draft_declared = false
         date : Time? = nil
+        expires : Time? = nil
 
         # Try TOML Front Matter (+++)
         if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
           begin
             toml_fm = TOML.parse(match[1])
             title = toml_fm["title"]?.try(&.as_s?) || title
-            draft = toml_fm["draft"]?.try(&.as_bool?) || false
-            # TOML parser may return Time directly or String
-            if date_val = toml_fm["date"]?
-              raw = date_val.raw
-              if raw.is_a?(Time)
-                date = raw
-              elsif raw.is_a?(String)
-                date = parse_time(raw)
-              end
+            if declared = toml_fm["draft"]?
+              draft_declared = true
+              draft = declared.as_bool? || false
             end
+            date = toml_date(toml_fm["date"]?)
+            expires = toml_date(toml_fm["expires"]?)
           rescue ex
             Logger.debug "TOML front matter parsing failed for #{file_path}: #{ex.message}"
           end
@@ -283,15 +352,12 @@ module Hwaro
             yaml_fm = YAML.parse(match[1])
             if yaml_fm.as_h?
               title = yaml_fm["title"]?.try(&.as_s?) || title
-              draft = yaml_fm["draft"]?.try(&.as_bool?) || false
-              # YAML parser may return Time directly or String
-              if date_val = yaml_fm["date"]?
-                if time_val = date_val.as_time?
-                  date = time_val
-                elsif str_val = date_val.as_s?
-                  date = parse_time(str_val)
-                end
+              if declared = yaml_fm["draft"]?
+                draft_declared = true
+                draft = declared.as_bool? || false
               end
+              date = yaml_date(yaml_fm["date"]?)
+              expires = yaml_date(yaml_fm["expires"]?)
             end
           rescue ex
             Logger.debug "YAML front matter parsing failed for #{file_path}: #{ex.message}"
@@ -304,25 +370,175 @@ module Hwaro
             json_fm = JSON.parse(content.byte_slice(0, end_idx))
             if json_fm.as_h?
               title = json_fm["title"]?.try(&.as_s?) || title
-              draft = json_fm["draft"]?.try(&.as_bool?) || false
-              if str_val = json_fm["date"]?.try(&.as_s?)
-                date = parse_time(str_val)
+              if declared = json_fm["draft"]?
+                draft_declared = true
+                draft = declared.as_bool? || false
               end
+              date = parse_time(json_fm["date"]?.try(&.as_s?))
+              expires = parse_time(json_fm["expires"]?.try(&.as_s?))
             end
           rescue ex
             Logger.debug "JSON front matter parsing failed for #{file_path}: #{ex.message}"
           end
         end
 
+        is_draft = draft_declared ? draft : cascaded_draft?(file_path, cascade)
+        state = publish_state(is_draft, date, expires, now)
+
         ContentInfo.new(
           path: file_path,
           title: title,
-          draft: draft,
-          date: date
+          draft: is_draft,
+          date: date,
+          state: state,
+          expires: expires
         )
       rescue ex
         Logger.warn "Failed to read content file #{file_path}: #{ex.message}"
         nil
+      end
+
+      # Mirrors the build's filter ORDER (draft → expired → future) so the
+      # reported reason matches the one `hwaro build` would report.
+      private def publish_state(draft : Bool, date : Time?, expires : Time?, now : Time) : PublishState
+        return PublishState::Draft if draft
+        return PublishState::Expired if expires && expires <= now
+        return PublishState::Future if date && date > now
+        PublishState::Published
+      end
+
+      private def toml_date(value : TOML::Any?) : Time?
+        return unless value
+        raw = value.raw
+        case raw
+        when Time   then raw
+        when String then parse_time(raw)
+        end
+      end
+
+      private def yaml_date(value : YAML::Any?) : Time?
+        return unless value
+        if time_val = value.as_time?
+          time_val
+        elsif str_val = value.as_s?
+          parse_time(str_val)
+        end
+      end
+
+      # `[cascade] draft = true` on a section `_index` file marks every
+      # descendant a draft, and the build drops them all. Collect those
+      # declarations once per run, keyed by `{relative dir, language}` the
+      # way `Phases::ParseContent#build_cascade_map` does.
+      private def collect_cascade_drafts(files : Array(String)) : Hash(Tuple(String, String), Bool)
+        map = {} of Tuple(String, String) => Bool
+
+        files.each do |file_path|
+          basename = File.basename(file_path)
+          next unless basename.starts_with?("_index.")
+          value = cascade_draft_value(file_path)
+          next if value.nil?
+          map[{relative_dir(file_path), language_token(basename)}] = value
+        end
+
+        map
+      end
+
+      # The `draft` entry of a section's `[cascade]` table, or nil when the
+      # file declares no cascade (or no `draft` inside it).
+      private def cascade_draft_value(file_path : String) : Bool?
+        content = Utils::TextUtils.strip_bom(File.read(file_path))
+
+        if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
+          TOML.parse(match[1])["cascade"]?.try(&.as_h?).try(&.["draft"]?).try(&.as_bool?)
+        elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
+          YAML.parse(match[1]).as_h?.try(&.[YAML::Any.new("cascade")]?).try(&.as_h?)
+            .try(&.[YAML::Any.new("draft")]?).try(&.as_bool?)
+        elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
+          JSON.parse(content.byte_slice(0, end_idx)).as_h?.try(&.["cascade"]?).try(&.as_h?)
+            .try(&.["draft"]?).try(&.as_bool?)
+        end
+      rescue ex
+        Logger.debug "Cascade parsing failed for #{file_path}: #{ex.message}"
+        nil
+      end
+
+      # Walk the ancestor chain shallowest-first so the nearest section wins.
+      # A section's own `_index` is NOT subject to its own cascade, and the
+      # language must match exactly — `merged_cascade_for` keys strictly on
+      # `{dir, language}`, so a `ko` page never inherits a default-language
+      # section's cascade.
+      private def cascaded_draft?(file_path : String, cascade : Hash(Tuple(String, String), Bool)) : Bool
+        return false if cascade.empty?
+
+        basename = File.basename(file_path)
+        language = language_token(basename)
+        dir = relative_dir(file_path)
+
+        chain = [""] of String
+        unless dir.empty?
+          acc = ""
+          dir.split('/').each do |part|
+            acc = acc.empty? ? part : "#{acc}/#{part}"
+            chain << acc
+          end
+        end
+        # Cascade applies to descendants only.
+        chain.pop if basename.starts_with?("_index.")
+
+        result = false
+        chain.each do |ancestor|
+          # `if value = cascade[...]?` would drop a cascaded `draft = false`:
+          # Crystal reads the retrieved `false` as a failed match, so a nested
+          # section could never un-draft what an ancestor cascaded. The build
+          # merges per ancestor, deeper wins — `false` included.
+          next unless cascade.has_key?({ancestor, language})
+          result = cascade[{ancestor, language}]
+        end
+        result
+      end
+
+      # Path of `file_path`'s directory relative to the content root, with
+      # `""` for the root itself.
+      private def relative_dir(file_path : String) : String
+        relative = Path[file_path].relative_to?(Path[@content_dir]).try(&.to_s) || file_path
+        dir = File.dirname(relative)
+        dir == "." ? "" : dir
+      end
+
+      # The language suffix of a content filename (`about.ko.md` → `"ko"`),
+      # or `""` for the default language. The build normalizes an absent
+      # language to `config.default_language`, so a file that spells the
+      # DEFAULT code out (`about.en.md` on an `en` site) has to normalize to
+      # the same bucket as `about.md` — otherwise the two stop sharing a
+      # section's cascade. The suffix test is shape-based: the build only
+      # routes suffixes that look like a language code anyway.
+      private def language_token(basename : String) : String
+        stem = basename.sub(/\.(md|markdown)\z/, "")
+        parts = stem.split('.')
+        return "" if parts.size < 2
+        candidate = parts.last
+        return "" unless candidate.matches?(/\A[a-z]{2,3}(-[A-Za-z]{2,4})?\z/)
+        candidate == default_language ? "" : candidate
+      end
+
+      # `default_language` from the project's `config.toml`, or `""` when
+      # there is none to read. Parsed directly rather than through
+      # `Models::Config` so the lister keeps taking nothing but a directory.
+      private def default_language : String
+        @default_language ||= read_default_language
+      end
+
+      private def read_default_language : String
+        parent = File.dirname(@content_dir.rstrip(File::SEPARATOR))
+        {File.join(parent, "config.toml"), "config.toml"}.each do |path|
+          next unless File.exists?(path)
+          begin
+            return TOML.parse(Utils::TextUtils.strip_bom(File.read(path)))["default_language"]?.try(&.as_s?) || ""
+          rescue
+            return ""
+          end
+        end
+        ""
       end
 
       private def parse_time(time_str : String?) : Time?

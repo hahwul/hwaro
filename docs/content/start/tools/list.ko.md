@@ -36,8 +36,19 @@ hwaro tool list all --json
 | 필터 | 설명 |
 |--------|-------------|
 | all | 모든 콘텐츠 파일 표시 |
-| drafts | `draft = true`인 파일만 표시 |
-| published | `draft = false`이거나 draft 필드가 없는 파일만 표시 |
+| drafts | 초안만 표시 — `draft = true` 또는 상위 섹션에서 캐스케이드된 `draft` |
+| published | 기본 `hwaro build`가 실제로 발행하는 파일만 표시 |
+
+`published`는 "draft 표시가 없음"이 아니라 "빌드가 실제로 내보냄"을 뜻합니다.
+기본 빌드는 미래 날짜(`date`가 미래) 페이지와 만료된(`expires`가 지난) 페이지도
+제외하므로, 이들은 별도 상태로 보고됩니다.
+
+| 상태 | 의미 |
+|--------|---------|
+| `[pub]` | 기본 빌드가 발행 |
+| `[draft]` | 자체 또는 캐스케이드된 `draft = true` |
+| `[future]` | `date`가 미래 (`--include-future`로 빌드 가능) |
+| `[expired]` | `expires`가 지남 (`--include-expired`로 빌드 가능) |
 
 ## JSON 출력
 
@@ -47,13 +58,20 @@ hwaro tool list all --json
     "path": "content/blog/my-post.md",
     "title": "My Post",
     "draft": false,
-    "date": "2024-06-15T00:00:00+00:00"
+    "date": "2024-06-15T00:00:00+00:00",
+    "status": "published",
+    "expires": null
   },
   {
     "path": "content/blog/draft-post.md",
     "title": "Draft Post",
     "draft": true,
-    "date": "2024-06-10T00:00:00+00:00"
+    "date": "2024-06-10T00:00:00+00:00",
+    "status": "draft",
+    "expires": null
   }
 ]
 ```
+
+`status`는 `published`, `draft`, `future`, `expired` 중 하나입니다. `draft`는
+기존 소비자를 위해 유지되며 실제 초안일 때만 true입니다.

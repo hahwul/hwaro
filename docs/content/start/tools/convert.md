@@ -43,6 +43,20 @@ hwaro tool convert to-yaml --json
 }
 ```
 
+## Skipped Files
+
+The human summary breaks the skip count down by reason — `already TOML`,
+`without front matter`, and `not front matter`:
+
+```
+converted: 5 files · 2 skipped (1 already TOML, 1 not front matter)
+```
+
+`not front matter` is the one worth reading. It means the file opens with a
+`---`/`+++` pair whose contents are prose, not a key/value mapping — a thematic
+rule, say. Rewriting it would delete the author's text, so the file is left
+untouched and named on stderr.
+
 ## Example
 
 Before:

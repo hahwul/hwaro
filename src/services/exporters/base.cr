@@ -227,6 +227,42 @@ module Hwaro
           {fields, content}
         end
 
+        # Hoist a `[taxonomies]` table's entries to top-level front-matter
+        # keys, the shape both Hugo and Jekyll actually read.
+        #
+        # Hwaro (like Zola) declares taxonomy membership as
+        # `[taxonomies] tags = [...] categories = [...]`; neither target
+        # understands that nesting, so passing the table through verbatim
+        # meant EVERY tag and category silently became an opaque `taxonomies`
+        # param — and re-importing the export dropped them entirely. A
+        # top-level key already present wins, matching the build's own
+        # precedence (`Processors::Markdown` only falls back to the table).
+        protected def flatten_taxonomies(fields : Hash(String, YAML::Any)) : Hash(String, YAML::Any)
+          table = fields["taxonomies"]?.try(&.as_h?)
+          return fields unless table
+
+          flattened = {} of String => YAML::Any
+          fields.each do |key, value|
+            next if key == "taxonomies"
+            flattened[key] = value
+          end
+
+          table.each do |key, value|
+            name = key.as_s? || key.to_s
+            next if name.empty?
+            existing = flattened[name]?
+            # A declared-but-null key (`tags:` with no value) is NOT a
+            # declaration that wins: the Hugo exporter drops null values
+            # outright, so treating it as present lost the terms entirely.
+            # An empty array loses too, matching the build's `tags.empty?`
+            # fallback.
+            next if existing && !existing.raw.nil? && !(existing.as_a?.try(&.empty?))
+            flattened[name] = value
+          end
+
+          flattened
+        end
+
         # Recursively replace Time leaves with frontmatter date strings.
         # `depth` guards a cyclic YAML::Any (self-referencing anchor in the
         # exported file's front matter); see `Utils::Nesting`.

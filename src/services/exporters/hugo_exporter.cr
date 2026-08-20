@@ -64,14 +64,17 @@ module Hwaro
           # Strategy: walk every parsed frontmatter key and either rename
           # it to its Hugo equivalent (`updated`→`lastmod`, `image`→`images`,
           # `expires`→`expiryDate`) or pass it through unchanged — including
-          # nested tables (`[extra]`, `[taxonomies]`) and typed scalars. Hugo
+          # nested tables (`[extra]`) and typed scalars. Hugo
           # accepts arbitrary keys as page params, so dropping them was a
           # silent data-loss bug for `categories`, `authors`, and any
-          # custom field the user added (gh#527). Source-iteration order
-          # is preserved so Hugo frontmatter reads similarly to the
-          # original.
+          # custom field the user added (gh#527). A `[taxonomies]` table is
+          # flattened first: Hugo reads `tags`/`categories` at the TOP level
+          # and treats the nested table as an inert param, so passing it
+          # through cost the post every taxonomy it belonged to.
+          # Source-iteration order is preserved so Hugo frontmatter reads
+          # similarly to the original.
           hugo_fields = {} of String => YAML::Any
-          fields.each do |key, value|
+          flatten_taxonomies(fields).each do |key, value|
             next if value.raw.nil?
             case key
             when "updated"

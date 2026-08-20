@@ -57,6 +57,9 @@ hwaro tool export hugo --verbose
 | image | images (배열) |
 | expires | expiryDate |
 | weight | weight |
+| [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
+
+그 외 프론트 매터 키는 Hugo 페이지 파라미터로 그대로 전달됩니다.
 
 출력 구조는 `export/content/` 아래에 원본 디렉터리 배치를 그대로 유지합니다.
 
@@ -71,12 +74,17 @@ hwaro tool export hugo --verbose
 | tags | tags |
 | categories | categories |
 | image | image |
+| template | layout |
+| [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
 
 출력 규칙:
 - 일반 글은 `_posts/`에 `YYYY-MM-DD-slug.md` 파일명으로 저장
 - 초안 글은 날짜 접두사 없이 `_drafts/`에 저장
 - 섹션 인덱스 파일(`_index.md`)은 `index.md` 페이지로 변환
 - 프론트 매터는 TOML(`+++`)에서 YAML(`---`)로 변환
+- `[taxonomies]` 테이블은 최상위 키로 승격됩니다. Hugo도 Jekyll도 중첩 테이블에서
+  분류 소속을 읽지 않기 때문입니다. 같은 이름의 최상위 키가 이미 있으면 그쪽이
+  우선하며, 이는 빌드가 둘을 해석하는 순서와 같습니다
 
 ## 내부 링크
 

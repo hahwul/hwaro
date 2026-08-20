@@ -57,6 +57,9 @@ hwaro tool export hugo --verbose
 | image | images (array) |
 | expires | expiryDate |
 | weight | weight |
+| [taxonomies] table | flattened to top-level `tags` / `categories` / … |
+
+Every other front-matter key is passed through as a Hugo page param.
 
 Output structure preserves the original directory layout under `export/content/`.
 
@@ -71,12 +74,17 @@ Output structure preserves the original directory layout under `export/content/`
 | tags | tags |
 | categories | categories |
 | image | image |
+| template | layout |
+| [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Output conventions:
 - Regular posts go to `_posts/` with `YYYY-MM-DD-slug.md` filename
 - Draft posts go to `_drafts/` without date prefix
 - Section index files (`_index.md`) become `index.md` pages
 - Frontmatter is converted from TOML (`+++`) to YAML (`---`)
+- A `[taxonomies]` table is hoisted to top-level keys, since neither Hugo nor
+  Jekyll reads taxonomy membership from a nested table. An explicit top-level
+  key of the same name wins, matching how the build resolves the two
 
 ## Internal Links
 
