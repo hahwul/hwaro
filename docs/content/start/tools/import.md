@@ -77,6 +77,10 @@ can inspect exactly what a large import will do before running it for real.
 
 `action` is `imported`, `skipped` (destination already exists and `--force`
 was not passed), or `overwritten` (`--force` replaced an existing file).
+`files` lists every destination the run resolved — page-bundle assets
+included — while the counts cover content documents only; sources skipped
+before a destination was resolved (drafts without `--drafts`, unsafe slugs)
+appear in the counts but have no row.
 
 ## Behavior
 

@@ -37,11 +37,14 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
-`--ignore-url` matches the URL as written in the source, as a substring —
-`--ignore-url twitter.com` skips every link containing `twitter.com`, and `*`
-matches any run of characters (`--ignore-url 'https://example.com/*'`). The
-flag can be passed multiple times; matching links are never contacted at all,
-and the scan line reports how many were ignored.
+`--ignore-url` matches the URL as written in the source, as a
+case-insensitive substring — `--ignore-url twitter.com` skips every link
+containing `twitter.com` (or `Twitter.com`), and `*` matches any run of
+characters (`--ignore-url 'https://example.com/*'`). The flag can be passed
+multiple times; matching links are never contacted at all, the scan line
+reports how many were ignored, and the JSON payload carries the same number
+as `ignored_count` — so a machine consumer can tell "all healthy" from "an
+over-broad pattern checked nothing".
 
 `--allow-status` is for hosts that answer link checkers with `403`/`429`
 while serving browsers fine: a listed status counts as healthy instead of
@@ -141,6 +144,7 @@ command exits non-zero when dead links are found, so it can gate CI.
       "status": -1,
       "error": "Skipped: private/internal address"
     }
-  ]
+  ],
+  "ignored_count": 0
 }
 ```

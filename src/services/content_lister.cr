@@ -79,6 +79,11 @@ module Hwaro
     # Sort key for listing content. `Date` is the historical default
     # (newest first, path as tie-breaker); `Title` and `Path` sort
     # ascending. `--reverse` flips whichever order the key produced.
+    #
+    # `Title` matches the template engine's `sort_by="title"` ordering
+    # (`Utils::SortUtils.compare_by_title`): a plain case-sensitive
+    # comparison with path as tie-breaker — the CLI listing and a rendered
+    # section index must not order the same titles differently.
     enum ContentSort
       Date
       Title
@@ -248,9 +253,9 @@ module Hwaro
             {-(info.date.try(&.to_unix) || 0_i64), info.path}
           end
         in ContentSort::Title
-          # Case-insensitive so "apple" and "Apple" don't split apart; path
-          # keeps equal titles deterministic.
-          contents.sort_by! { |info| {info.title.downcase, info.path} }
+          # Case-sensitive, matching SortUtils.compare_by_title — see the
+          # enum comment. Path keeps equal titles deterministic.
+          contents.sort_by! { |info| {info.title, info.path} }
         in ContentSort::Path
           contents.sort_by!(&.path)
         end

@@ -54,6 +54,9 @@ hwaro tool unused-assets --delete --force --json
 템플릿이 `templates/` 밖에 있다면 `--templates-dir`로 스캔 위치를 알려주세요.
 그렇지 않으면 해당 템플릿의 에셋 참조가 보이지 않아, 실제로 쓰이는 에셋이
 미사용으로 보고되고 `--delete`로 삭제될 수 있습니다.
+명시적으로 전달한 `--templates-dir`은 반드시 존재해야 하며(경로는 현재
+디렉터리 기준), 없는 경로면 템플릿 0개를 조용히 스캔하는 대신 실행을
+거부합니다.
 
 **지원 에셋 확장자:**
 이미지(png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff, tif), 스타일시트(css), 스크립트(js), 폰트(woff, woff2, ttf, eot, otf), 미디어(mp4, webm, ogg, mp3, wav), 문서(pdf, zip).

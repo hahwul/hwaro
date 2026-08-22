@@ -37,11 +37,13 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
 
-`--ignore-url`은 소스에 적힌 URL을 부분 문자열로 매칭합니다 —
-`--ignore-url twitter.com`은 `twitter.com`이 포함된 모든 링크를 건너뛰고,
-`*`는 임의 문자열과 매칭됩니다(`--ignore-url 'https://example.com/*'`).
-여러 번 전달할 수 있으며, 매칭된 링크에는 요청 자체를 보내지 않고 스캔
-라인에 무시된 개수를 표시합니다.
+`--ignore-url`은 소스에 적힌 URL을 대소문자 구분 없는 부분 문자열로
+매칭합니다 — `--ignore-url twitter.com`은 `twitter.com`(또는 `Twitter.com`)이
+포함된 모든 링크를 건너뛰고, `*`는 임의 문자열과 매칭됩니다
+(`--ignore-url 'https://example.com/*'`). 여러 번 전달할 수 있으며, 매칭된
+링크에는 요청 자체를 보내지 않습니다. 무시된 개수는 스캔 라인과 JSON의
+`ignored_count`에 함께 표시되므로, "모두 정상"과 "패턴이 과하게 넓어 아무것도
+검사하지 않음"을 기계적으로 구분할 수 있습니다.
 
 `--allow-status`는 브라우저에는 정상 응답하면서 링크 검사기에는 `403`/`429`를
 돌려주는 호스트를 위한 것으로, 나열된 상태 코드는 CI를 실패시키지 않습니다.
@@ -138,6 +140,7 @@ checked: 50 links, 3 dead
       "status": -1,
       "error": "Skipped: private/internal address"
     }
-  ]
+  ],
+  "ignored_count": 0
 }
 ```

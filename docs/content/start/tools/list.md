@@ -43,6 +43,9 @@ hwaro tool list all --json
 
 `--limit` caps the result after sorting, so `--sort date --limit 5` means
 "the 5 newest files", and `--sort date --reverse --limit 5` the 5 oldest.
+`--sort title` uses the same case-sensitive ordering as the template
+engine's `sort_by="title"`, so the CLI listing matches a rendered section
+index.
 
 The filter argument also accepts the shorthands `draft` (for `drafts`) and
 `pub` (for `published`).

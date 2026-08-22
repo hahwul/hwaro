@@ -64,6 +64,9 @@ hwaro tool export hugo --verbose
 }
 ```
 
+`files`에는 페이지 번들 에셋을 포함해 기록된 모든 대상 경로가 나열되며,
+카운트는 콘텐츠 문서만 셉니다.
+
 ## 필드 매핑
 
 ### Hugo

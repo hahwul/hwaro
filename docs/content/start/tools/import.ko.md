@@ -77,6 +77,10 @@ hwaro tool import hugo path/to/site --verbose
 
 `action`은 `imported`, `skipped`(대상이 이미 존재하고 `--force` 미지정),
 `overwritten`(`--force`로 기존 파일 대체) 중 하나입니다.
+`files`에는 페이지 번들 에셋을 포함해 실행이 해석한 모든 대상 경로가
+나열되며, 카운트는 콘텐츠 문서만 셉니다. 대상 경로를 해석하기 전에 건너뛴
+소스(`--drafts` 없는 초안, 안전하지 않은 슬러그)는 카운트에만 반영되고 행은
+없습니다.
 
 ## 동작
 

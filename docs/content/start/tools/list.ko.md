@@ -43,6 +43,8 @@ hwaro tool list all --json
 
 `--limit`은 정렬 후에 적용되므로 `--sort date --limit 5`는 "가장 최신 5개",
 `--sort date --reverse --limit 5`는 가장 오래된 5개를 의미합니다.
+`--sort title`은 템플릿 엔진의 `sort_by="title"`과 같은 대소문자 구분
+정렬을 사용하므로 CLI 목록이 렌더링된 섹션 인덱스와 일치합니다.
 
 필터 인자는 축약형 `draft`(`drafts`)와 `pub`(`published`)도 허용합니다.
 

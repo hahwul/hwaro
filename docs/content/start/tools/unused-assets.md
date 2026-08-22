@@ -53,7 +53,10 @@ hwaro tool unused-assets --delete --force --json
 
 If your templates live outside `templates/`, point the scan at them with
 `--templates-dir` — otherwise their asset references are invisible and the
-assets they use are reported (and can be deleted) as unused.
+assets they use are reported (and can be deleted) as unused. An explicitly
+passed `--templates-dir` must exist (the path is resolved relative to the
+current directory); the command refuses to run against a missing one rather
+than silently scanning zero templates.
 
 **Supported asset extensions:**
 Images (png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff, tif), stylesheets (css), scripts (js), fonts (woff, woff2, ttf, eot, otf), media (mp4, webm, ogg, mp3, wav), documents (pdf, zip).

@@ -177,10 +177,13 @@ module Hwaro
 
             if external_links.empty? && internal_links.empty?
               if json_output
+                # `ignored_count` distinguishes "all healthy" from "an
+                # over-broad --ignore-url pattern checked nothing".
                 puts({
                   "dead_internal"    => [] of Result,
                   "dead_external"    => [] of Result,
                   "skipped_external" => [] of Result,
+                  "ignored_count"    => ignored_count,
                 }.to_json)
               else
                 Logger.outcome("checked", ignored_count > 0 ? "no links to check (#{ignored_count} ignored)" : "no links found", :info)
@@ -226,6 +229,7 @@ module Hwaro
                 "dead_internal"    => dead_internal,
                 "dead_external"    => dead_external,
                 "skipped_external" => skipped_external,
+                "ignored_count"    => ignored_count,
               }.to_json)
               # Exit non-zero so CI can gate on broken links (the JSON payload
               # has already been emitted to stdout for tooling to consume).
@@ -275,8 +279,10 @@ module Hwaro
           # Compile an `--ignore-url` pattern: matched as a SUBSTRING of the
           # link URL as written, with `*` matching any run of characters.
           # Everything else is literal — dots in domains don't need escaping.
+          # Matching is case-insensitive: URL hosts are case-insensitive, so
+          # `--ignore-url twitter.com` must also silence `https://Twitter.com/…`.
           private def ignore_pattern_to_regex(pattern : String) : Regex
-            Regex.new(pattern.split('*').map { |part| Regex.escape(part) }.join(".*"))
+            Regex.new(pattern.split('*').map { |part| Regex.escape(part) }.join(".*"), Regex::Options::IGNORE_CASE)
           end
 
           # Markdown links inside fenced code blocks or inline code spans are

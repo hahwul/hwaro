@@ -176,10 +176,14 @@ module Hwaro
           # `within_output_dir?` is lexical. If the destination directory —
           # or any ancestor — is a symlink out of the tree, `Dir.exists?`
           # follows it and `File.copy` would write straight through it.
-          # A dry run never created `dest_dir`, so the resolved check can't
-          # run there — the lexical check above still applies, and the real
-          # run re-checks with symlinks resolved.
-          return 0 unless @dry_run || Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
+          # A dry run never created `dest_dir`, so it can only apply the
+          # resolved check to a directory that already exists — the same
+          # pre-existing-symlink case the real run refuses.
+          if @dry_run
+            return 0 if Dir.exists?(dest_dir) && !Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
+          else
+            return 0 unless Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
+          end
 
           copied = 0
           Dir.children(source_dir).sort!.each do |entry|
@@ -190,10 +194,12 @@ module Hwaro
             dest = File.join(dest_dir, entry)
             next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest, output_dir)
 
+            action = File.exists?(dest) ? "overwritten" : "exported"
             unless @dry_run
               Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
               File.copy(src, dest)
             end
+            @file_actions << FileAction.new(dest, action)
             Logger.debug "#{@dry_run ? "Would export" : "Exported"} bundle asset: #{dest}" if verbose
             copied += 1
           rescue ex

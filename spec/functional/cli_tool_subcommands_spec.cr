@@ -897,3 +897,57 @@ describe "hwaro tool agents-md (site-specific preservation)" do
     end
   end
 end
+
+describe "hwaro tool review-fix regressions (2026-08 batch)" do
+  it "refuses a missing explicit --templates-dir instead of scanning nothing" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(
+        ["tool", "unused-assets", "--templates-dir", "no-such-templates"], chdir: project_dir
+      )
+      status.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+      err.should contain("HWARO_E_IO")
+    end
+  end
+
+  it "matches --ignore-url patterns case-insensitively" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "broken.md"),
+        "+++\ntitle = \"B\"\n+++\n\n[dead](/definitely-missing/)\n")
+
+      status, _, _ = run_hwaro(
+        ["tool", "check-links", "--internal-only", "--ignore-url", "DEFINITELY-MISSING"],
+        chdir: project_dir
+      )
+      status.success?.should be_true
+    end
+  end
+
+  it "reports ignored_count in the --json payload" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "broken.md"),
+        "+++\ntitle = \"B\"\n+++\n\n[dead](/definitely-missing/)\n")
+
+      _, output, _ = run_hwaro(
+        ["tool", "check-links", "--internal-only", "--json", "--ignore-url", "definitely-missing"],
+        chdir: project_dir
+      )
+      parsed = JSON.parse(output.strip)
+      parsed["ignored_count"].as_i.should eq(1)
+      parsed["dead_internal"].as_a.should be_empty
+    end
+  end
+
+  it "warns and fully replaces an AGENTS.md without the Site-Specific heading" do
+    with_initialized_project do |project_dir|
+      agents_md = File.join(project_dir, "AGENTS.md")
+      File.write(agents_md, "# Hand-written file\n\n- my custom rule\n")
+
+      status, _, err = run_hwaro(["tool", "agents-md", "--write", "--force"], chdir: project_dir)
+      status.success?.should be_true
+      err.should contain("replacing the whole file")
+      content = File.read(agents_md)
+      content.should_not contain("my custom rule")
+      content.should contain("## Site-Specific Instructions")
+    end
+  end
+end

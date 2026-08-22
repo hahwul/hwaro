@@ -49,6 +49,50 @@ describe "tool feature improvements" do
       end
     end
 
+    it "lists page-bundle assets in the manifest alongside the document" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "site", "content", "posts", "bundle")
+        FileUtils.mkdir_p(bundle)
+        File.write(File.join(bundle, "index.md"), "+++\ntitle = \"Bundle\"\n+++\n\n![cover](cover.png)\n")
+        File.write(File.join(bundle, "cover.png"), "notapng")
+        output = File.join(dir, "content")
+
+        importer = Hwaro::Services::Importers::HugoImporter.new
+        importer.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "hugo", path: File.join(dir, "site"), output_dir: output))
+
+        asset = importer.file_actions.find(&.path.ends_with?("cover.png"))
+        asset.should_not be_nil
+        asset.not_nil!.action.should eq("imported")
+        importer.file_actions.any?(&.path.ends_with?("index.md")).should be_true
+      end
+    end
+
+    it "refuses a pre-existing symlinked-outside section directory in dry run too" do
+      Dir.mktmpdir do |dir|
+        posts = File.join(dir, "site", "_posts")
+        FileUtils.mkdir_p(posts)
+        File.write(File.join(posts, "2024-01-01-hello.md"), "---\ntitle: Hello\n---\n\nBody\n")
+
+        outside = File.join(dir, "outside")
+        output = File.join(dir, "content")
+        FileUtils.mkdir_p(outside)
+        FileUtils.mkdir_p(output)
+        # The importer writes into <output>/posts — make that a symlink out
+        # of the tree, the exact case the real run refuses.
+        File.symlink(outside, File.join(output, "posts"))
+
+        importer = Hwaro::Services::Importers::JekyllImporter.new
+        importer.dry_run = true
+        result = importer.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "jekyll", path: File.join(dir, "site"), output_dir: output, dry_run: true))
+
+        result.imported_count.should eq(0)
+        importer.file_actions.should be_empty
+        Dir.children(outside).should be_empty
+      end
+    end
+
     it "records overwritten when --force replaces an existing file" do
       Dir.mktmpdir do |dir|
         posts = File.join(dir, "site", "_posts")
@@ -136,8 +180,11 @@ describe "tool feature improvements" do
         lister = Hwaro::Services::ContentLister.new(content_dir)
         all = Hwaro::Services::ContentFilter::All
 
+        # Case-sensitive, matching the template engine's `sort_by="title"`
+        # ordering (SortUtils.compare_by_title): uppercase sorts before
+        # lowercase in ASCII.
         by_title = lister.list_content(all, Hwaro::Services::ContentSort::Title)
-        by_title.map(&.title).should eq(["alpha", "Beta", "Gamma"])
+        by_title.map(&.title).should eq(["Beta", "Gamma", "alpha"])
 
         by_path = lister.list_content(all, Hwaro::Services::ContentSort::Path)
         by_path.map(&.path).should eq(by_path.map(&.path).sort!)

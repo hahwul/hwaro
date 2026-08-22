@@ -64,6 +64,9 @@ full manifest before writing.
 }
 ```
 
+`files` lists every destination written — page-bundle assets included —
+while the counts cover content documents only.
+
 ## Field Mappings
 
 ### Hugo
