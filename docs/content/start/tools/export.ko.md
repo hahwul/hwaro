@@ -35,10 +35,34 @@ hwaro tool export hugo --verbose
 | 플래그 | 설명 |
 |------|-------------|
 | -o, --output DIR | 출력 디렉터리 (기본값: export) |
-| -c, --content DIR | 콘텐츠 디렉터리 (기본값: content) |
+| -c, --content-dir DIR | 콘텐츠 디렉터리 (기본값: content) |
 | -d, --drafts | 초안 콘텐츠 포함 |
+| --dry-run | 아무것도 쓰지 않고 모든 대상 경로 미리보기 |
 | -v, --verbose | 상세 출력 표시 |
+| -j, --json | 파일별 매니페스트를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
+
+같은 디렉터리로 다시 내보내면 이전 출력을 **대체**합니다 — 이것이 일반적인
+갱신 워크플로입니다. 기존 파일을 대체한 실행은 요약에 개수와 함께 경고가
+표시되고, JSON 매니페스트에서는 해당 행이 `overwritten`으로 표시됩니다(새
+대상은 `exported`). 쓰기 전에 전체 매니페스트를 보려면 `--dry-run`을
+사용하세요.
+
+## JSON 출력
+
+```json
+{
+  "success": true,
+  "dry_run": false,
+  "exported_count": 2,
+  "skipped_count": 0,
+  "error_count": 0,
+  "files": [
+    { "path": "export/_posts/2024-01-01-hello.md", "action": "exported" },
+    { "path": "export/about.md", "action": "overwritten" }
+  ]
+}
+```
 
 ## 필드 매핑
 

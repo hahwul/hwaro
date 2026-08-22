@@ -19,6 +19,13 @@ hwaro tool list published
 # 특정 디렉터리의 파일 나열
 hwaro tool list all -c posts
 
+# 가장 최근 발행 파일 5개
+hwaro tool list published --limit 5
+
+# 제목순 정렬(A→Z), 또는 임의 정렬의 역순
+hwaro tool list all --sort title
+hwaro tool list all --sort path --reverse
+
 # 결과를 JSON으로 출력
 hwaro tool list all --json
 ```
@@ -27,9 +34,17 @@ hwaro tool list all --json
 
 | 플래그 | 설명 |
 |------|-------------|
-| -c, --content DIR | 특정 콘텐츠 디렉터리로 목록 범위 제한 |
+| -c, --content-dir DIR | 특정 콘텐츠 디렉터리로 목록 범위 제한 |
+| --sort KEY | 정렬 키: `date`(최신순, 기본값), `title`, `path` |
+| -r, --reverse | 정렬 순서 뒤집기 |
+| -n, --limit N | 최대 N개 파일만 표시 (정렬 후 적용) |
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
+
+`--limit`은 정렬 후에 적용되므로 `--sort date --limit 5`는 "가장 최신 5개",
+`--sort date --reverse --limit 5`는 가장 오래된 5개를 의미합니다.
+
+필터 인자는 축약형 `draft`(`drafts`)와 `pub`(`published`)도 허용합니다.
 
 ## 필터
 

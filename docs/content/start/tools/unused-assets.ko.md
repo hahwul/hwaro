@@ -30,8 +30,9 @@ hwaro tool unused-assets --delete --force --json
 
 | 플래그 | 설명 |
 |------|-------------|
-| -c, --content DIR | 콘텐츠 디렉터리 (기본값: content) |
+| -c, --content-dir DIR | 콘텐츠 디렉터리 (기본값: content) |
 | -s, --static-dir DIR | 정적 파일 디렉터리 (기본값: static) |
+| -t, --templates-dir DIR | 참조 스캔 대상 템플릿 디렉터리 (기본값: templates) |
 | --delete | 사용하지 않는 파일 삭제 (확인 프롬프트 표시) |
 | -f, --force | 삭제 시 확인 프롬프트 생략 (`--json`에서 삭제하려면 필수) |
 | -j, --json | 결과를 JSON으로 출력 |
@@ -45,10 +46,17 @@ hwaro tool unused-assets --delete --force --json
 
 **참조 소스:**
 - 모든 콘텐츠 파일 (`.md`, `.markdown`)
-- 모든 템플릿 파일 (`.html`, `.css`, `.js`)
+- 템플릿 파일 (`.html`, `.j2`, `.jinja`, `.jinja2`, `.ecr`, 그리고 `.css`, `.js`, `.xml`, `.json`, `.webmanifest`, `.svg`, `.txt`)
+- 다른 정적 파일을 참조할 수 있는 정적 소스 (`.css`, `.scss`, `.sass`, `.js`, `.json`, `.webmanifest`, `.xml`, `.svg`, `.txt`, `.html`, `.htm`)
+- 데이터·번역 파일 (`data/`, `i18n/` — `.yml`, `.yaml`, `.json`, `.toml`)
+- 파일을 지정하는 `config.toml` 값
+
+템플릿이 `templates/` 밖에 있다면 `--templates-dir`로 스캔 위치를 알려주세요.
+그렇지 않으면 해당 템플릿의 에셋 참조가 보이지 않아, 실제로 쓰이는 에셋이
+미사용으로 보고되고 `--delete`로 삭제될 수 있습니다.
 
 **지원 에셋 확장자:**
-이미지(png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff), 스타일시트(css), 스크립트(js), 폰트(woff, woff2, ttf, eot, otf), 미디어(mp4, webm, ogg, mp3, wav), 문서(pdf, zip).
+이미지(png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff, tif), 스타일시트(css), 스크립트(js), 폰트(woff, woff2, ttf, eot, otf), 미디어(mp4, webm, ogg, mp3, wav), 문서(pdf, zip).
 
 ## 출력 예시
 

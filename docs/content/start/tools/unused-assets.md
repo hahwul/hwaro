@@ -30,8 +30,9 @@ hwaro tool unused-assets --delete --force --json
 
 | Flag | Description |
 |------|-------------|
-| -c, --content DIR | Content directory (default: content) |
+| -c, --content-dir DIR | Content directory (default: content) |
 | -s, --static-dir DIR | Static files directory (default: static) |
+| -t, --templates-dir DIR | Templates directory scanned for references (default: templates) |
 | --delete | Delete unused files (prompts for confirmation) |
 | -f, --force | Skip the confirmation prompt when deleting (required for deletion under `--json`) |
 | -j, --json | Output result as JSON |
@@ -45,10 +46,17 @@ hwaro tool unused-assets --delete --force --json
 
 **Reference sources:**
 - All content files (`.md`, `.markdown`)
-- All template files (`.html`, `.css`, `.js`)
+- Template files (`.html`, `.j2`, `.jinja`, `.jinja2`, `.ecr`, plus `.css`, `.js`, `.xml`, `.json`, `.webmanifest`, `.svg`, `.txt`)
+- Static sources that can reference other static files (`.css`, `.scss`, `.sass`, `.js`, `.json`, `.webmanifest`, `.xml`, `.svg`, `.txt`, `.html`, `.htm`)
+- Data and translation files (`data/` and `i18n/` — `.yml`, `.yaml`, `.json`, `.toml`)
+- `config.toml` values that name files
+
+If your templates live outside `templates/`, point the scan at them with
+`--templates-dir` — otherwise their asset references are invisible and the
+assets they use are reported (and can be deleted) as unused.
 
 **Supported asset extensions:**
-Images (png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff), stylesheets (css), scripts (js), fonts (woff, woff2, ttf, eot, otf), media (mp4, webm, ogg, mp3, wav), documents (pdf, zip).
+Images (png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff, tif), stylesheets (css), scripts (js), fonts (woff, woff2, ttf, eot, otf), media (mp4, webm, ogg, mp3, wav), documents (pdf, zip).
 
 ## Example Output
 

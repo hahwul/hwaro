@@ -1,5 +1,7 @@
 require "file_utils"
+require "json"
 require "set"
+require "../file_action"
 require "../../config/options/import_options"
 require "../../utils/date_utils"
 require "../../utils/file_safe"
@@ -35,6 +37,13 @@ module Hwaro
 
       abstract class Base
         abstract def run(options : Config::Options::ImportOptions) : ImportResult
+
+        # When set, the run resolves and reports every destination (counts,
+        # manifest, collision renames) but writes nothing to disk.
+        property dry_run : Bool = false
+
+        # Per-file manifest of this run, in write order.
+        getter file_actions = [] of FileAction
 
         # Regex matching YAML frontmatter: opening `---` on the first line and a
         # closing `---` on its own line (multiline mode so ^ matches line starts).
@@ -216,6 +225,7 @@ module Hwaro
           @claimed_paths.clear
           @claim_suffixes.clear
           @collision_count = 0
+          @file_actions.clear
         end
 
         # Emit the single end-of-run collision summary, if any. Importers call
@@ -325,25 +335,33 @@ module Hwaro
           path = claim_path(resolved)
           dir = File.dirname(path)
 
-          Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
+          unless @dry_run
+            Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
 
-          # `within_output_dir?` above is lexical. If the section directory
-          # (or any ancestor) is a symlink pointing out of the tree, that
-          # check still passes and `File.write` follows the link straight out
-          # of `output_dir`. Re-check with symlinks resolved now that the
-          # directory exists.
-          unless Utils::PathUtils.resolves_within?(dir, output_dir)
-            Logger.warn "Skipped (destination directory resolves outside the output directory): #{dir}"
-            return {false, nil}
+            # `within_output_dir?` above is lexical. If the section directory
+            # (or any ancestor) is a symlink pointing out of the tree, that
+            # check still passes and `File.write` follows the link straight out
+            # of `output_dir`. Re-check with symlinks resolved now that the
+            # directory exists. A dry run creates no directories, so it can't
+            # perform this resolved check — the real run still does.
+            unless Utils::PathUtils.resolves_within?(dir, output_dir)
+              Logger.warn "Skipped (destination directory resolves outside the output directory): #{dir}"
+              return {false, nil}
+            end
           end
 
           if File.exists?(path) && !force
             Logger.warn "Skipped (already exists): #{path}" if verbose
+            @file_actions << FileAction.new(path, "skipped")
             return {false, path}
           end
 
-          content = "#{frontmatter}\n\n#{body}\n"
-          File.write(path, content)
+          action = File.exists?(path) ? "overwritten" : "imported"
+
+          unless @dry_run
+            content = "#{frontmatter}\n\n#{body}\n"
+            File.write(path, content)
+          end
 
           # Only now is the rename real. Counting/announcing it at claim time
           # asserted a write that never happened when the disambiguated
@@ -353,7 +371,11 @@ module Hwaro
             Logger.debug "Renamed: #{File.basename(resolved)} → #{File.basename(path)} (claimed by an earlier source in this run)" if verbose
           end
 
-          Logger.debug(force ? "Overwrote: #{path}" : "Imported: #{path}") if verbose
+          @file_actions << FileAction.new(path, action)
+          if verbose
+            label = @dry_run ? "Would import" : (action == "overwritten" ? "Overwrote" : "Imported")
+            Logger.debug "#{label}: #{path}"
+          end
           {true, path}
         end
 
@@ -376,7 +398,10 @@ module Hwaro
           # `within_output_dir?` is lexical. If the destination directory —
           # or any ancestor — is a symlink out of the tree, `Dir.exists?`
           # follows it and `File.copy` would write straight through it.
-          return 0 unless Utils::PathUtils.resolves_within?(dest_dir, output_dir)
+          # A dry run never created `dest_dir`, so the resolved check can't
+          # run there — the lexical check above still applies, and the real
+          # run re-checks with symlinks resolved.
+          return 0 unless @dry_run || Utils::PathUtils.resolves_within?(dest_dir, output_dir)
 
           copied = 0
           Dir.children(source_dir).sort!.each do |entry|
@@ -394,9 +419,11 @@ module Hwaro
             next unless Utils::OutputGuard.within_output_dir?(dest, output_dir)
             next if File.exists?(dest) && !force
 
-            Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
-            File.copy(src, dest)
-            Logger.debug "Copied bundle asset: #{dest}" if verbose
+            unless @dry_run
+              Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
+              File.copy(src, dest)
+            end
+            Logger.debug "#{@dry_run ? "Would copy" : "Copied"} bundle asset: #{dest}" if verbose
             copied += 1
           rescue ex
             Logger.warn "Could not copy bundle asset #{src}: #{ex.message}"

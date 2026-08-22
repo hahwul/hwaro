@@ -78,19 +78,45 @@ module Hwaro
               if existed && !force
                 # `confirm?` returns nil on EOF (piped/non-interactive stdin) —
                 # treat that the same as "no" and abort without writing.
-                unless Prompt.confirm?("AGENTS.md already exists. Overwrite?", default: false) == true
+                unless Prompt.confirm?("AGENTS.md already exists. Regenerate it? (your Site-Specific Instructions are kept)", default: false) == true
                   Logger.info "Aborted."
                   exit
                 end
               end
 
+              preserved = false
+              if existed
+                merged = merge_site_section(content, File.read(filename))
+                preserved = merged != content
+                content = merged
+              end
+
               File.write(filename, content)
               mode_name = remote ? "remote" : "local"
               outcome_verb = existed ? "updated" : "created"
-              Logger.outcome(outcome_verb, "AGENTS.md · #{mode_name} mode")
+              summary = "AGENTS.md · #{mode_name} mode"
+              summary += " · site-specific section preserved" if preserved
+              Logger.outcome(outcome_verb, summary)
             else
               puts content
             end
+          end
+
+          # The generated document ends with a "Site-Specific Instructions"
+          # section that explicitly invites the user to add their own rules.
+          # Regenerating used to overwrite the whole file — destroying exactly
+          # the content the template told them to write there. Carry the
+          # existing file's section (heading included) into the fresh
+          # template; a file without the marker falls back to a full rewrite,
+          # as does a template variant without one.
+          SITE_SECTION_MARKER = "## Site-Specific Instructions"
+
+          private def merge_site_section(fresh : String, existing : String) : String
+            existing_idx = existing.index(SITE_SECTION_MARKER)
+            return fresh unless existing_idx
+            fresh_idx = fresh.index(SITE_SECTION_MARKER)
+            return fresh unless fresh_idx
+            fresh[0...fresh_idx] + existing[existing_idx..]
           end
         end
       end

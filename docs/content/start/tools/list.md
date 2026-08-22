@@ -19,6 +19,13 @@ hwaro tool list published
 # List files in a specific directory
 hwaro tool list all -c posts
 
+# The 5 newest published files
+hwaro tool list published --limit 5
+
+# Sort by title (A→Z), or reverse any ordering
+hwaro tool list all --sort title
+hwaro tool list all --sort path --reverse
+
 # Output result as JSON
 hwaro tool list all --json
 ```
@@ -27,9 +34,18 @@ hwaro tool list all --json
 
 | Flag | Description |
 |------|-------------|
-| -c, --content DIR | Limit listing to a specific content directory |
+| -c, --content-dir DIR | Limit listing to a specific content directory |
+| --sort KEY | Sort key: `date` (newest first, default), `title`, or `path` |
+| -r, --reverse | Reverse the sort order |
+| -n, --limit N | Show at most N files (applied after sorting) |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
+
+`--limit` caps the result after sorting, so `--sort date --limit 5` means
+"the 5 newest files", and `--sort date --reverse --limit 5` the 5 oldest.
+
+The filter argument also accepts the shorthands `draft` (for `drafts`) and
+`pub` (for `published`).
 
 ## Filters
 

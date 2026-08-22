@@ -13,6 +13,10 @@ hwaro tool validate
 # Validate a specific content directory
 hwaro tool validate -c posts
 
+# Fail CI on any warning, or cap the allowed warning count
+hwaro tool validate --strict
+hwaro tool validate --max-warnings 5
+
 # Output as JSON
 hwaro tool validate --json
 ```
@@ -21,7 +25,9 @@ hwaro tool validate --json
 
 | Flag | Description |
 |------|-------------|
-| -c, --content DIR | Content directory (default: content) |
+| -c, --content-dir DIR | Content directory (default: content) |
+| --strict | Treat warnings as errors when computing the exit code |
+| --max-warnings N | Exit non-zero when warning count exceeds N (default: unlimited) |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
@@ -55,6 +61,11 @@ checked: 0 errors, 2 warnings, 2 info
 In a color terminal the findings use `⚠`/`✗`/`ℹ` glyphs under an `hwaro validate`
 heading, and the closing line is a severity-colored `✦ checked` outcome. The
 command exits non-zero when error-level issues are found, so it can gate CI.
+
+Exit codes mirror `hwaro doctor`: error-level findings exit with the content
+error code (5), while warning-driven failures from `--strict` or
+`--max-warnings` exit with the generic code (1) — a consumer can still tell a
+broken file from a tightened gate. Both flags apply to `--json` runs too.
 
 ## Rule IDs
 

@@ -19,6 +19,9 @@ hwaro tool stats
 # 사용자 지정 콘텐츠 디렉터리 사용
 hwaro tool stats -c posts
 
+# 기본 15개 대신 상위 30개 태그 차트
+hwaro tool stats --top 30
+
 # JSON으로 출력
 hwaro tool stats --json
 ```
@@ -27,7 +30,8 @@ hwaro tool stats --json
 
 | 플래그 | 설명 |
 |------|-------------|
-| -c, --content DIR | 콘텐츠 디렉터리 (기본값: content) |
+| -c, --content-dir DIR | 콘텐츠 디렉터리 (기본값: content) |
+| --top N | 차트에 상위 N개 태그 표시 (기본값: 15) |
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
 
@@ -53,8 +57,9 @@ counted: 42 files, 37 published, 4 drafts · 1 future
 ```
 
 색상 터미널에서는 같은 보고서가 `hwaro stats` 헤딩, 정렬된 영수증 형식 행,
-비례 막대 차트, `✦ counted` 결과 줄로 표시됩니다. 태그가 15개를 넘으면 상위
-15개만 차트로 그립니다(`tags: top 15`).
+비례 막대 차트, `✦ counted` 결과 줄로 표시됩니다. 태그가 차트 예산을 넘으면
+상위 N개만 차트로 그립니다(기본 `tags: top 15`, `--top N`으로 조정). JSON
+출력은 `--top`과 무관하게 항상 모든 태그를 담습니다.
 
 ## JSON 출력
 

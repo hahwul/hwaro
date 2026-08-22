@@ -25,6 +25,7 @@ module Hwaro
           FLAGS = [
             CONTENT_DIR_FLAG,
             FlagInfo.new(short: "-s", long: "--static-dir", description: "Static files directory (default: static)", takes_value: true, value_hint: "DIR"),
+            FlagInfo.new(short: "-t", long: "--templates-dir", description: "Templates directory scanned for references (default: templates)", takes_value: true, value_hint: "DIR"),
             FlagInfo.new(short: nil, long: "--delete", description: "Delete unused files (with confirmation)"),
             FlagInfo.new(short: "-f", long: "--force", description: "Skip confirmation prompt when deleting"),
             JSON_FLAG,
@@ -44,6 +45,7 @@ module Hwaro
           def run(args : Array(String))
             content_dir = "content"
             static_dir = "static"
+            templates_dir = "templates"
             delete_mode = false
             force = false
             json_output = false
@@ -52,6 +54,11 @@ module Hwaro
               parser.banner = "Usage: hwaro tool unused-assets [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               parser.on("-s DIR", "--static-dir DIR", "Static files directory (default: static)") { |v| static_dir = v }
+              # Without this flag a project with a non-default templates
+              # directory silently scanned the wrong (empty) tree: every
+              # template-referenced asset came back "unused", and `--delete`
+              # then removed files the build still needs.
+              parser.on("-t DIR", "--templates-dir DIR", "Templates directory scanned for references (default: templates)") { |v| templates_dir = v }
               parser.on("--delete", "Delete unused files (with confirmation)") { delete_mode = true }
               parser.on("-f", "--force", "Skip confirmation prompt when deleting") { force = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
@@ -68,6 +75,7 @@ module Hwaro
             service = Services::UnusedAssets.new(
               content_dir: content_dir,
               static_dir: static_dir,
+              templates_dir: templates_dir,
             )
             result = service.run
 

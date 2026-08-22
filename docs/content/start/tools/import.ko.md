@@ -48,8 +48,35 @@ hwaro tool import hugo path/to/site --verbose
 |------|-------------|
 | -o, --output DIR | 출력 콘텐츠 디렉터리 (기본값: `content`) |
 | -d, --drafts | 초안 콘텐츠 포함 |
+| --force | 기존 파일을 건너뛰지 않고 덮어쓰기 |
+| --dry-run | 아무것도 쓰지 않고 모든 대상 경로 미리보기 |
 | -v, --verbose | 상세 출력 표시 |
+| -j, --json | 파일별 매니페스트를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
+
+`--dry-run`은 충돌로 인한 이름 변경과 건너뛰기 판정을 포함해 모든 대상 경로를
+실제와 동일하게 해석하되 디스크는 건드리지 않으므로, 대규모 임포트가 정확히
+무엇을 할지 실행 전에 확인할 수 있습니다.
+
+## JSON 출력
+
+```json
+{
+  "success": true,
+  "dry_run": false,
+  "imported_count": 2,
+  "skipped_count": 1,
+  "error_count": 0,
+  "files": [
+    { "path": "content/posts/hello.md", "action": "imported" },
+    { "path": "content/posts/second.md", "action": "imported" },
+    { "path": "content/posts/existing.md", "action": "skipped" }
+  ]
+}
+```
+
+`action`은 `imported`, `skipped`(대상이 이미 존재하고 `--force` 미지정),
+`overwritten`(`--force`로 기존 파일 대체) 중 하나입니다.
 
 ## 동작
 

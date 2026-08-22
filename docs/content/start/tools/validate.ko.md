@@ -13,6 +13,10 @@ hwaro tool validate
 # 특정 콘텐츠 디렉터리 검증
 hwaro tool validate -c posts
 
+# 경고도 CI 실패로 처리하거나, 허용 경고 수 상한 지정
+hwaro tool validate --strict
+hwaro tool validate --max-warnings 5
+
 # JSON으로 출력
 hwaro tool validate --json
 ```
@@ -21,7 +25,9 @@ hwaro tool validate --json
 
 | 플래그 | 설명 |
 |------|-------------|
-| -c, --content DIR | 콘텐츠 디렉터리 (기본값: content) |
+| -c, --content-dir DIR | 콘텐츠 디렉터리 (기본값: content) |
+| --strict | 종료 코드 계산 시 경고를 오류로 취급 |
+| --max-warnings N | 경고 수가 N을 넘으면 0이 아닌 코드로 종료 (기본값: 무제한) |
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
 
@@ -55,6 +61,11 @@ checked: 0 errors, 2 warnings, 2 info
 색상 터미널에서는 발견 항목이 `hwaro validate` 헤딩 아래 `⚠`/`✗`/`ℹ` 기호로
 표시되고, 마지막 줄은 심각도별 색이 입혀진 `✦ checked` 결과입니다. 오류 수준
 문제가 발견되면 0이 아닌 종료 코드를 반환하므로 CI 게이트로 쓸 수 있습니다.
+
+종료 코드는 `hwaro doctor`와 같은 규칙을 따릅니다. 오류 수준 발견은 콘텐츠
+오류 코드(5)로, `--strict`/`--max-warnings`로 인한 경고 기반 실패는 일반
+코드(1)로 종료되어 파일 자체의 문제와 게이트 강화로 인한 실패를 구분할 수
+있습니다. 두 플래그는 `--json` 실행에도 동일하게 적용됩니다.
 
 ## 규칙 ID
 

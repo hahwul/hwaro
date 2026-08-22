@@ -87,6 +87,12 @@ module Hwaro
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
 
+            # Route through the shared JSON mode like every sibling command:
+            # it silences human log lines AND flips `Runner.json_mode?`, so a
+            # classified error raised mid-run renders as the standard JSON
+            # error payload instead of human text on a machine-read stream.
+            Runner.enable_json_mode! if json_output
+
             doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path)
 
             if dry_run_mode && !fix_mode && !approve_mode && !full_mode

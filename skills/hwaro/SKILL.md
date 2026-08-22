@@ -187,8 +187,10 @@ hwaro tool import hugo /path/to/hugo-site     # also: jekyll, wordpress, notion,
 hwaro tool export jekyll                       # also: hugo
 ```
 
-`-c, --content DIR` scopes most tools to a subtree; `-j, --json` is widely
-available. Run `hwaro tool <name> --help` for specifics.
+`-c, --content-dir DIR` scopes most tools to a subtree; `-j, --json` is widely
+available (import/export emit a per-file manifest). `--dry-run` previews
+convert/import/export without writing. Run `hwaro tool <name> --help` for
+specifics.
 
 ### G. Platform config & deploy
 

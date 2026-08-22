@@ -615,3 +615,285 @@ describe "hwaro tool check-links (generated routes)" do
     end
   end
 end
+
+# =============================================================================
+# Feature-flag coverage: the 2026-08 tool improvement batch.
+# =============================================================================
+
+describe "hwaro tool check-links (--ignore-url / --allow-status)" do
+  it "silences a broken link matched by --ignore-url" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "broken.md"),
+        "+++\ntitle = \"B\"\n+++\n\n[dead](/definitely-missing/)\n")
+
+      status, _, _ = run_hwaro(["tool", "check-links", "--internal-only"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_GENERIC)
+
+      ignored, _, _ = run_hwaro(
+        ["tool", "check-links", "--internal-only", "--ignore-url", "definitely-missing"],
+        chdir: project_dir
+      )
+      ignored.success?.should be_true
+    end
+  end
+
+  it "supports * wildcards in --ignore-url patterns" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "broken.md"),
+        "+++\ntitle = \"B\"\n+++\n\n[dead](/definitely-missing/)\n")
+
+      status, _, _ = run_hwaro(
+        ["tool", "check-links", "--internal-only", "--ignore-url", "/definitely*missing/"],
+        chdir: project_dir
+      )
+      status.success?.should be_true
+    end
+  end
+
+  it "emits skipped_external in the --json payload" do
+    with_initialized_project do |project_dir|
+      _, output, _ = run_hwaro(["tool", "check-links", "--json", "--internal-only"], chdir: project_dir)
+      parsed = JSON.parse(output.strip)
+      parsed["skipped_external"].as_a?.should_not be_nil
+    end
+  end
+
+  it "rejects an invalid --allow-status value with the shared usage code" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "check-links", "--allow-status", "abc"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+    end
+  end
+
+  it "rejects an empty --ignore-url pattern with the shared usage code" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "check-links", "--ignore-url", " "], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+    end
+  end
+end
+
+describe "hwaro tool validate (--strict / --max-warnings)" do
+  it "gates warnings behind --strict and --max-warnings" do
+    with_initialized_project do |project_dir|
+      # Guarantees at least one warning-level finding (missing description).
+      File.write(File.join(project_dir, "content", "warny.md"),
+        "+++\ntitle = \"W\"\n+++\n\nBody\n")
+
+      status, _, _ = run_hwaro(["tool", "validate"], chdir: project_dir)
+      status.success?.should be_true
+
+      strict, _, _ = run_hwaro(["tool", "validate", "--strict"], chdir: project_dir)
+      strict.exit_code.should eq(Hwaro::Errors::EXIT_GENERIC)
+
+      capped, _, _ = run_hwaro(["tool", "validate", "--max-warnings", "0"], chdir: project_dir)
+      capped.exit_code.should eq(Hwaro::Errors::EXIT_GENERIC)
+
+      loose, _, _ = run_hwaro(["tool", "validate", "--max-warnings", "999"], chdir: project_dir)
+      loose.success?.should be_true
+    end
+  end
+
+  it "applies --strict to the --json exit code too" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "warny.md"),
+        "+++\ntitle = \"W\"\n+++\n\nBody\n")
+
+      status, output, _ = run_hwaro(["tool", "validate", "--strict", "--json"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_GENERIC)
+      JSON.parse(output.strip)["findings"].as_a?.should_not be_nil
+    end
+  end
+
+  it "rejects a negative --max-warnings with the shared usage code" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "validate", "--max-warnings", "-1"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+    end
+  end
+end
+
+describe "hwaro tool list (--sort / --reverse / --limit)" do
+  it "sorts by path, reverses, and limits the --json output" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(["tool", "list", "all", "--json", "--sort", "path"], chdir: project_dir)
+      status.success?.should be_true
+      paths = JSON.parse(output.strip).as_a.map(&.["path"].as_s)
+      paths.should eq(paths.sort)
+      paths.size.should be > 1
+
+      _, reversed_out, _ = run_hwaro(
+        ["tool", "list", "all", "--json", "--sort", "path", "--reverse"], chdir: project_dir
+      )
+      JSON.parse(reversed_out.strip).as_a.map(&.["path"].as_s).should eq(paths.reverse)
+
+      _, limited_out, _ = run_hwaro(
+        ["tool", "list", "all", "--json", "--limit", "1"], chdir: project_dir
+      )
+      JSON.parse(limited_out.strip).as_a.size.should eq(1)
+    end
+  end
+
+  it "rejects an unknown --sort key with the shared usage code" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "list", "all", "--sort", "size"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+    end
+  end
+
+  it "rejects a non-positive --limit with the shared usage code" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(["tool", "list", "all", "--limit", "0"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+    end
+  end
+end
+
+describe "hwaro tool stats (--top)" do
+  it "accepts --top and rejects a non-positive value" do
+    with_initialized_project do |project_dir|
+      status, _, _ = run_hwaro(["tool", "stats", "--top", "3"], chdir: project_dir)
+      status.success?.should be_true
+
+      bad, _, err = run_hwaro(["tool", "stats", "--top", "0"], chdir: project_dir)
+      bad.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("HWARO_E_USAGE")
+    end
+  end
+end
+
+describe "hwaro tool unused-assets (--templates-dir)" do
+  it "scans a custom templates directory for references" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "static", "special.png"), "x")
+      custom = File.join(project_dir, "mytemplates")
+      FileUtils.mkdir_p(custom)
+      File.write(File.join(custom, "extra.html"), %(<img src="/special.png">))
+
+      _, default_out, _ = run_hwaro(["tool", "unused-assets", "--json"], chdir: project_dir)
+      JSON.parse(default_out.strip)["unused_files"].as_a.map(&.as_s)
+        .should contain("static/special.png")
+
+      _, custom_out, _ = run_hwaro(
+        ["tool", "unused-assets", "--json", "--templates-dir", "mytemplates"], chdir: project_dir
+      )
+      JSON.parse(custom_out.strip)["unused_files"].as_a.map(&.as_s)
+        .should_not contain("static/special.png")
+    end
+  end
+end
+
+describe "hwaro tool import (--json / --dry-run)" do
+  it "emits a per-file manifest under --json and writes nothing with --dry-run" do
+    with_initialized_project do |project_dir|
+      Dir.mktmpdir do |src|
+        posts = File.join(src, "_posts")
+        FileUtils.mkdir_p(posts)
+        File.write(File.join(posts, "2024-01-01-hi.md"), "---\ntitle: Hi\n---\n\nBody\n")
+        out_dir = File.join(project_dir, "imported")
+
+        status, output, _ = run_hwaro(
+          ["tool", "import", "jekyll", src, "-o", "imported", "--dry-run", "--json"],
+          chdir: project_dir
+        )
+        status.success?.should be_true
+        parsed = JSON.parse(output.strip)
+        parsed["dry_run"].as_bool.should be_true
+        parsed["imported_count"].as_i.should eq(1)
+        parsed["files"].as_a.first["action"].as_s.should eq("imported")
+        Dir.exists?(out_dir).should be_false
+      end
+    end
+  end
+
+  it "actually imports without --dry-run and reports the destination in the manifest" do
+    with_initialized_project do |project_dir|
+      Dir.mktmpdir do |src|
+        posts = File.join(src, "_posts")
+        FileUtils.mkdir_p(posts)
+        File.write(File.join(posts, "2024-01-01-hi.md"), "---\ntitle: Hi\n---\n\nBody\n")
+
+        status, output, _ = run_hwaro(
+          ["tool", "import", "jekyll", src, "-o", "imported", "--json"],
+          chdir: project_dir
+        )
+        status.success?.should be_true
+        parsed = JSON.parse(output.strip)
+        file = parsed["files"].as_a.first
+        file["action"].as_s.should eq("imported")
+        File.exists?(File.join(project_dir, file["path"].as_s)).should be_true
+      end
+    end
+  end
+end
+
+describe "hwaro tool export (--json / --dry-run / classified errors)" do
+  it "emits a per-file manifest under --json and writes nothing with --dry-run" do
+    with_initialized_project do |project_dir|
+      out_dir = File.join(project_dir, "exported")
+
+      status, output, _ = run_hwaro(
+        ["tool", "export", "jekyll", "-o", "exported", "--dry-run", "--json"],
+        chdir: project_dir
+      )
+      status.success?.should be_true
+      parsed = JSON.parse(output.strip)
+      parsed["dry_run"].as_bool.should be_true
+      parsed["exported_count"].as_i.should be > 0
+      parsed["files"].as_a.should_not be_empty
+      Dir.exists?(out_dir).should be_false
+    end
+  end
+
+  it "exits with HWARO_E_IO instead of a bare 1 when the export fails" do
+    with_initialized_project do |project_dir|
+      status, _, err = run_hwaro(
+        ["tool", "export", "jekyll", "-c", "no-such-dir", "-o", "exported"],
+        chdir: project_dir
+      )
+      status.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+      err.should contain("HWARO_E_IO")
+    end
+  end
+end
+
+describe "hwaro tool convert (--dry-run)" do
+  it "previews the conversion without touching any file" do
+    with_initialized_project do |project_dir|
+      before = Dir.glob(File.join(project_dir, "content", "**", "*.md")).sort.map { |f| {f, File.read(f)} }
+      before.should_not be_empty
+
+      status, output, _ = run_hwaro(["tool", "convert", "to-yaml", "--dry-run"], chdir: project_dir)
+      status.success?.should be_true
+      output.should contain("would convert")
+
+      before.each do |(path, content)|
+        File.read(path).should eq(content)
+      end
+    end
+  end
+end
+
+describe "hwaro tool agents-md (site-specific preservation)" do
+  it "preserves the Site-Specific Instructions section on regeneration" do
+    with_initialized_project do |project_dir|
+      agents_md = File.join(project_dir, "AGENTS.md")
+      run_hwaro(["tool", "agents-md", "--write", "--force"], chdir: project_dir)
+
+      File.write(agents_md, File.read(agents_md) + "\n- NEVER touch data/secret.yml\n")
+
+      status, _, _ = run_hwaro(["tool", "agents-md", "--write", "--force"], chdir: project_dir)
+      status.success?.should be_true
+      File.read(agents_md).should contain("NEVER touch data/secret.yml")
+
+      # Preservation survives a mode switch too.
+      run_hwaro(["tool", "agents-md", "--remote", "--write", "--force"], chdir: project_dir)
+      File.read(agents_md).should contain("NEVER touch data/secret.yml")
+    end
+  end
+end

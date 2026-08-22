@@ -7,6 +7,7 @@ module Hwaro
         property content_dir : String
         property drafts : Bool
         property verbose : Bool
+        property dry_run : Bool
 
         def initialize(
           @target_type : String = "",
@@ -14,6 +15,7 @@ module Hwaro
           @content_dir : String = "content",
           @drafts : Bool = false,
           @verbose : Bool = false,
+          @dry_run : Bool = false,
         )
         end
       end

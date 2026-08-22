@@ -1,6 +1,7 @@
 require "file_utils"
 require "yaml"
 require "toml"
+require "../file_action"
 require "../../config/options/export_options"
 require "../../utils/errors"
 require "../../utils/file_safe"
@@ -132,6 +133,17 @@ module Hwaro
 
         abstract def run(options : Config::Options::ExportOptions) : ExportResult
 
+        # When set, the run resolves and reports every destination (counts,
+        # manifest) but writes nothing to disk.
+        property dry_run : Bool = false
+
+        # Per-file manifest of this run, in write order. Unlike import, an
+        # export OVERWRITES an existing destination by design (re-exporting
+        # into the same directory is the normal refresh workflow) — the
+        # manifest marks those rows `overwritten` so the caller can see
+        # exactly which pre-existing files a run replaced.
+        getter file_actions = [] of FileAction
+
         # Scan content directory for markdown files
         protected def scan_content_files(content_dir : String) : Array(String)
           files = [] of String
@@ -164,7 +176,10 @@ module Hwaro
           # `within_output_dir?` is lexical. If the destination directory —
           # or any ancestor — is a symlink out of the tree, `Dir.exists?`
           # follows it and `File.copy` would write straight through it.
-          return 0 unless Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
+          # A dry run never created `dest_dir`, so the resolved check can't
+          # run there — the lexical check above still applies, and the real
+          # run re-checks with symlinks resolved.
+          return 0 unless @dry_run || Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
 
           copied = 0
           Dir.children(source_dir).sort!.each do |entry|
@@ -175,9 +190,11 @@ module Hwaro
             dest = File.join(dest_dir, entry)
             next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest, output_dir)
 
-            Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
-            File.copy(src, dest)
-            Logger.debug "Exported bundle asset: #{dest}" if verbose
+            unless @dry_run
+              Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
+              File.copy(src, dest)
+            end
+            Logger.debug "#{@dry_run ? "Would export" : "Exported"} bundle asset: #{dest}" if verbose
             copied += 1
           rescue ex
             Logger.warn "Could not export bundle asset #{src}: #{ex.message}"
@@ -304,9 +321,13 @@ module Hwaro
           safe_path = Hwaro::Utils::OutputGuard.safe_output_path(path, output_dir)
           return false unless safe_path
 
-          Hwaro::Utils::FileSafe.mkdir_p(File.dirname(safe_path))
-          File.write(safe_path, content)
-          Logger.debug "Exported: #{path}" if verbose
+          action = File.exists?(safe_path) ? "overwritten" : "exported"
+          unless @dry_run
+            Hwaro::Utils::FileSafe.mkdir_p(File.dirname(safe_path))
+            File.write(safe_path, content)
+          end
+          @file_actions << FileAction.new(safe_path, action)
+          Logger.debug "#{@dry_run ? "Would export" : "Exported"}: #{path}" if verbose
           true
         end
 

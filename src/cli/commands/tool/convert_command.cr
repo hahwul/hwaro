@@ -27,6 +27,7 @@ module Hwaro
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             CONTENT_DIR_FLAG,
+            DRY_RUN_FLAG,
             JSON_FLAG,
             HELP_FLAG,
           ]
@@ -45,10 +46,12 @@ module Hwaro
             content_dir = "content"
             format : String? = nil
             json_output = false
+            dry_run = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool convert <to-yaml|to-toml|to-json> [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
+              CLI.register_flag(parser, DRY_RUN_FLAG) { |_| dry_run = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
               parser.unknown_args do |unknown|
@@ -66,7 +69,7 @@ module Hwaro
               )
             end
 
-            converter = Services::FrontmatterConverter.new(content_dir)
+            converter = Services::FrontmatterConverter.new(content_dir, dry_run: dry_run)
 
             fmt = format.as(String).downcase
             if POSITIONAL_CHOICES.includes?(fmt)

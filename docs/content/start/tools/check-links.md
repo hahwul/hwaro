@@ -18,6 +18,9 @@ hwaro tool check-links --timeout 30 --concurrency 4
 # Check only external or internal links
 hwaro tool check-links --external-only
 hwaro tool check-links --internal-only
+
+# Silence a known-flaky host, and accept bot-blocking status codes
+hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 ```
 
 ## Options
@@ -29,17 +32,35 @@ hwaro tool check-links --internal-only
 | --concurrency N | Max concurrent requests (default: 8) |
 | --external-only | Check external links only |
 | --internal-only | Check internal links only |
+| --ignore-url PATTERN | Skip links whose URL matches PATTERN (repeatable) |
+| --allow-status CODES | Treat these HTTP status codes as healthy (comma-separated) |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
+
+`--ignore-url` matches the URL as written in the source, as a substring —
+`--ignore-url twitter.com` skips every link containing `twitter.com`, and `*`
+matches any run of characters (`--ignore-url 'https://example.com/*'`). The
+flag can be passed multiple times; matching links are never contacted at all,
+and the scan line reports how many were ignored.
+
+`--allow-status` is for hosts that answer link checkers with `403`/`429`
+while serving browsers fine: a listed status counts as healthy instead of
+failing CI.
 
 ## How It Works
 
 1. Scans all Markdown files in the `content/` directory
 2. Finds external URLs (http/https links) and internal links (relative/absolute paths)
-3. Sends concurrent HEAD requests to external URLs
+3. Sends concurrent HEAD requests to external URLs (falling back to GET when a
+   host rejects HEAD with 405/403/501, following up to 5 redirects)
 4. Verifies internal link targets exist on disk (checks `.md`, `_index.md`, `index.md`)
 5. Accepts routes the build generates rather than reads from disk
 6. Reports broken or unreachable links
+
+External links that resolve to private or internal addresses (localhost,
+RFC 1918 ranges, `.local`/`.internal` hosts) are never contacted — they are
+reported as skipped instead, both in the human output and under
+`skipped_external` in the JSON payload.
 
 ### Generated routes
 
@@ -108,6 +129,17 @@ command exits non-zero when dead links are found, so it can gate CI.
       },
       "status": 404,
       "error": null
+    }
+  ],
+  "skipped_external": [
+    {
+      "link": {
+        "file": "content/notes/intranet.md",
+        "url": "http://wiki.internal/page",
+        "kind": "external"
+      },
+      "status": -1,
+      "error": "Skipped: private/internal address"
     }
   ]
 }

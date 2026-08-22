@@ -529,11 +529,19 @@ hwaro tool agents-md --write      # AGENTS.md를 파일로 쓰기
 
 # JSON 출력
 hwaro tool list all --json
+hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
 hwaro tool doctor --json
 hwaro tool check-links --json
+hwaro tool import jekyll /path --json
+hwaro tool export hugo --json
+
+# 파괴적/대량 작업을 쓰기 없이 미리보기
+hwaro tool convert to-yaml --dry-run
+hwaro tool import jekyll /path --dry-run
+hwaro tool export hugo --dry-run
 ```
 
 **서브커맨드:**
@@ -556,7 +564,7 @@ hwaro tool check-links --json
 
 | 플래그 | 설명 |
 |------|-------------|
-| -c, --content DIR | 특정 콘텐츠 디렉터리로 제한 |
+| -c, --content-dir DIR | 특정 콘텐츠 디렉터리로 제한 |
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
 

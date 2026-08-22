@@ -48,8 +48,35 @@ hwaro tool import hugo path/to/site --verbose
 |------|-------------|
 | -o, --output DIR | Output content directory (default: `content`) |
 | -d, --drafts | Include draft content |
+| --force | Overwrite existing files instead of skipping |
+| --dry-run | Preview every destination without writing anything |
 | -v, --verbose | Show detailed output |
+| -j, --json | Output a per-file manifest as JSON |
 | -h, --help | Show help |
+
+`--dry-run` resolves every destination — collision renames and skip decisions
+included — and reports the counts and manifest without touching disk, so you
+can inspect exactly what a large import will do before running it for real.
+
+## JSON Output
+
+```json
+{
+  "success": true,
+  "dry_run": false,
+  "imported_count": 2,
+  "skipped_count": 1,
+  "error_count": 0,
+  "files": [
+    { "path": "content/posts/hello.md", "action": "imported" },
+    { "path": "content/posts/second.md", "action": "imported" },
+    { "path": "content/posts/existing.md", "action": "skipped" }
+  ]
+}
+```
+
+`action` is `imported`, `skipped` (destination already exists and `--force`
+was not passed), or `overwritten` (`--force` replaced an existing file).
 
 ## Behavior
 
