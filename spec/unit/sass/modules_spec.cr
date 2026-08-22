@@ -145,3 +145,18 @@ describe "Sass module system extensions" do
     end
   end
 end
+
+private def compile_ns_url : String
+  loader = Hwaro::Assets::Sass::MemoryLoader.new({
+    "sass/_assets.scss" => %($img: "a.png";),
+    "sass/main.scss"    => %(@use "assets" as v;\n.a { b: url(v.$img); }),
+  })
+  Hwaro::Assets::Sass.compile(%(@use "assets" as v;\n.a { b: url(v.$img); }),
+    path: "sass/main.scss", loader: loader)
+end
+
+describe "Sass namespaced variables inside url()" do
+  it "resolves ns.$var as a unit" do
+    compile_ns_url.should contain(%(b: url("a.png");))
+  end
+end

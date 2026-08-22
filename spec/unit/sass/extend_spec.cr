@@ -38,7 +38,7 @@ describe "Sass @extend" do
   # ===========================================================================
   it "extends a class selector" do
     css = compile(".error { border: red; }\n.fatal { @extend .error; font-weight: bold; }")
-    css.should contain(".error,\n.fatal {\n  border: red;")
+    css.should contain(".error, .fatal {\n  border: red;")
     css.should contain(".fatal {\n  font-weight: bold;")
   end
 
@@ -75,7 +75,7 @@ describe "Sass @extend" do
 
   it "prepends the extender's ancestor compounds" do
     css = compile(".t { c: red; }\n.x .y { @extend .t; }")
-    css.should contain(".t,\n.x .y {")
+    css.should contain(".t, .x .y {")
   end
 
   it "merges a shared leading prefix instead of duplicating it" do
@@ -93,13 +93,13 @@ describe "Sass @extend" do
 
   it "extends rules inside at-rules" do
     css = compile("@media print { .b { x: 1; } }\n.a { @extend .b; }")
-    css.should contain("@media print {\n  .b,\n  .a {")
+    css.should contain("@media print {\n  .b, .a {")
   end
 
   it "supports comma-separated targets" do
     css = compile(".x { a: 1; }\n.y { b: 2; }\n.z { @extend .x, .y; }")
-    css.should contain(".x,\n.z {")
-    css.should contain(".y,\n.z {")
+    css.should contain(".x, .z {")
+    css.should contain(".y, .z {")
   end
 
   it "resolves chained extends through placeholders" do
@@ -147,6 +147,6 @@ describe "Sass @extend" do
 
   it "supports interpolation in the target" do
     css = compile(".item-2 { c: red; }\n.a { @extend .item-\#{1 + 1}; }")
-    css.should contain(".item-2,\n.a {")
+    css.should contain(".item-2, .a {")
   end
 end

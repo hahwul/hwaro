@@ -84,7 +84,11 @@ module Hwaro
           if lex = @lexeme
             lex
           elsif opaque?
-            "#%02x%02x%02x" % {red8, green8, blue8}
+            # A computed color that lands exactly on a CSS keyword prints
+            # its name (dart-sass: `darken(white, 100%)` is `black`).
+            # Literal colors never reach here — they keep their lexeme.
+            NAME_BY_RGB[(red8 << 16) | (green8 << 8) | blue8]? ||
+              "#%02x%02x%02x" % {red8, green8, blue8}
           else
             "rgba(#{red8}, #{green8}, #{blue8}, #{Number.format(@alpha)})"
           end
@@ -500,6 +504,20 @@ module Hwaro
           "yellow"               => {255, 255, 0},
           "yellowgreen"          => {154, 205, 50},
         }
+
+        # Reverse lookup for serializing computed colors by name. Aliases
+        # resolve to the alphabetically-first spelling, which is the one
+        # dart-sass prints (`aqua` not `cyan`, `gray` not `grey`,
+        # `fuchsia` not `magenta`).
+        NAME_BY_RGB = begin
+          names = {} of Int32 => String
+          NAMED_COLORS.each do |name, (r, g, b)|
+            key = (r << 16) | (g << 8) | b
+            existing = names[key]?
+            names[key] = name if existing.nil? || name < existing
+          end
+          names
+        end
       end
     end
   end

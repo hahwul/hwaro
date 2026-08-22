@@ -202,7 +202,7 @@ describe "Sass color additions" do
 
   it "builds colors from hwb channels" do
     # hwb(0, 0%, 0%) is pure red.
-    compile(%(@use "sass:color";\no { c: color.hwb(0 0% 0%); })).should contain("c: #ff0000;")
+    compile(%(@use "sass:color";\no { c: color.hwb(0 0% 0%); })).should contain("c: red;")
   end
 
   it "compares colors by value across spellings" do
@@ -320,12 +320,12 @@ end
 describe "Sass output structure" do
   it "resolves selector lists parent-major" do
     css = compile("a, b { c, d { x: 1; } }")
-    css.should contain("a c,\na d,\nb c,\nb d {")
+    css.should contain("a c, a d, b c, b d {")
   end
 
   it "keeps mixed parent-referencing parts in parent-major order" do
     css = compile("a, b { c, &:hover, d { x: 1; } }")
-    css.should contain("a c,\na:hover,\na d,\nb c,\nb:hover,\nb d {")
+    css.should contain("a c, a:hover, a d, b c, b:hover, b d {")
   end
 
   it "reopens a rule for declarations that follow a nested rule" do

@@ -1083,32 +1083,111 @@ module Hwaro
         # Raw `url(...)` span (cursor on '('): unquoted url contents are
         # token soup (data URIs contain `;` and `,`), so everything up to
         # the closing paren is verbatim except quoted strings and `#{...}`.
+        # `url($v)` / `url(ns.$img)` substitute the variable — `$` is not
+        # valid in a raw CSS url-token, and dart-sass reads such contents
+        # as SassScript. ONLY the whole-token spelling substitutes: a `$`
+        # embedded in a larger token (`url(plain$x.png)`, `url($h:8080/)`)
+        # is valid plain CSS, so it passes through byte-identical (dart
+        # hard-errors there; leniency wins). `url($a + $b)` stays verbatim
+        # for the same reason.
         private def read_url_span(buf : Buf, pieces : Array(Ast::Piece)) : Nil
           start_line = @s.line
           start_col = @s.column
           buf << @s.advance # '('
+          # Inner content collected separately so the whole-token decision
+          # can be made after the closing paren.
+          inner = [] of Ast::Piece
+          ibuf = Buf.new
           loop do
             c = @s.peek || @s.error("unterminated url(", start_line, start_col)
             case c
             when '\\'
-              buf << @s.advance
-              buf << @s.advance unless @s.eof?
+              ibuf << @s.advance
+              ibuf << @s.advance unless @s.eof?
             when ')'
-              buf << @s.advance
+              @s.advance
               break
             when '"', '\''
-              read_string_into(buf, pieces)
+              read_string_into(ibuf, inner)
             when '#'
               if @s.peek(1) == '{'
-                buf.flush_into(pieces)
-                pieces << parse_interp
+                ibuf.flush_into(inner)
+                inner << parse_interp
               else
-                buf << @s.advance
+                ibuf << @s.advance
+              end
+            when '$'
+              if @s.ident_start?(@s.peek(1))
+                var_line = @s.line
+                var_col = @s.column
+                @s.advance
+                name = @s.read_ident
+                @s.error("expected identifier after \"$\"", var_line, var_col) if name.empty?
+                ibuf.flush_into(inner)
+                inner << Ast::VarRef.new(name, nil, var_line, var_col)
+              else
+                ibuf << @s.advance
               end
             else
-              buf << @s.advance
+              if @s.ident_start?(c)
+                ident = @s.read_ident
+                if @s.peek == '.' && @s.peek(1) == '$'
+                  var_line = @s.line
+                  var_col = @s.column
+                  @s.advance # '.'
+                  @s.advance # '$'
+                  name = @s.read_ident
+                  @s.error("expected identifier after \"#{ident}.$\"", var_line, var_col) if name.empty?
+                  ibuf.flush_into(inner)
+                  inner << Ast::VarRef.new(name, ident, var_line, var_col)
+                else
+                  ibuf.append(ident)
+                end
+              else
+                ibuf << @s.advance
+              end
             end
           end
+          ibuf.flush_into(inner)
+
+          if whole_token_var?(inner)
+            # Padding whitespace goes with the substitution — dart prints
+            # `url( $v )` as `url(5px)`.
+            inner = inner.reject(String)
+          else
+            # Degrade every VarRef back to its literal `$name` spelling.
+            inner = inner.map do |piece|
+              piece.is_a?(Ast::VarRef) ? piece.lexeme.as(Ast::Piece) : piece
+            end
+          end
+          inner.each do |piece|
+            if piece.is_a?(String)
+              buf.append(piece)
+            else
+              buf.flush_into(pieces)
+              pieces << piece
+            end
+          end
+          buf << ')'
+        end
+
+        # True when the url() content is exactly one `$var` / `ns.$var`
+        # (surrounding whitespace allowed) — the only shape that
+        # substitutes.
+        private def whole_token_var?(inner : Array(Ast::Piece)) : Bool
+          saw_var = false
+          inner.each do |piece|
+            case piece
+            when Ast::VarRef
+              return false if saw_var
+              saw_var = true
+            when String
+              return false unless piece.blank?
+            else
+              return false # interpolation piece: not a bare-var span
+            end
+          end
+          saw_var
         end
 
         # Splits a loud comment's text into literal runs and `#{...}`

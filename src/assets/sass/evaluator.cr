@@ -102,6 +102,9 @@ module Hwaro
         @at_frames : Array(AtFrame)
         @current_at : Css::AtRule?
         @parent_selectors : Array(String)?
+        # Line-break flags for @parent_selectors (see Css::Rule#breaks);
+        # saved/restored wherever @parent_selectors is.
+        @parent_breaks : Array(Bool)?
         @content : ContentBlock?
         @in_keyframes : Bool
         @include_depth : Int32
@@ -114,6 +117,7 @@ module Hwaro
           @current_rule = nil
           @current_at = nil
           @parent_selectors = nil
+          @parent_breaks = nil
           @content = nil
           @in_keyframes = false
           @include_depth = 0
@@ -182,7 +186,16 @@ module Hwaro
           when Ast::FunctionDefNode
             @env.declare_function(node.name, FunctionClosure.new(node, @env, @path))
           when Ast::RuleNode
+            # A top-level style rule's output forms a "group" — the
+            # serializer puts a blank line after its last root node
+            # (dart-sass's isGroupEnd). At-rule statements never mark one,
+            # and rules nested in at-rules (@media children) don't either.
+            top_level = @current_rule.nil? && @at_frames.empty? &&
+                        @parent_selectors.nil? && !@in_keyframes
             eval_rule(node)
+            if top_level && (last = @sink.last?)
+              last.group_end = true
+            end
           when Ast::DeclarationNode
             eval_declaration(node)
           when Ast::NestedPropsNode
@@ -242,26 +255,59 @@ module Hwaro
 
         private def eval_rule(node : Ast::RuleNode) : Nil
           text = resolve_template(node.selector, allow_vars: false)
-          parts = Parser.split_top_level_commas(text).map { |s| collapse_ws(s) }.reject(&.empty?)
+          parts, part_breaks = selector_parts(text)
           error_at(node.line, node.column, "expected selector") if parts.empty?
 
-          selectors = @in_keyframes ? parts : combine_selectors(parts, node)
-          rule = Css::Rule.new(selectors)
+          if @in_keyframes
+            # dart-sass always joins keyframe selector lists onto one
+            # line, author line breaks notwithstanding (`0%,\n100%` prints
+            # `0%, 100%`).
+            selectors, breaks = parts, [] of Bool
+          else
+            selectors, breaks = combine_selectors(parts, part_breaks, node)
+          end
+          rule = Css::Rule.new(selectors, breaks)
           emit(rule)
 
           saved_rule = @current_rule
           saved_rule_sink = @current_rule_sink
           saved_parents = @parent_selectors
+          saved_breaks = @parent_breaks
           saved_env = @env
           @current_rule = rule
           @current_rule_sink = @sink
           @parent_selectors = selectors
+          @parent_breaks = breaks
           @env = Environment.new(saved_env) # each block is a variable scope
           eval_nodes(node.children)
           @current_rule = saved_rule
           @current_rule_sink = saved_rule_sink
           @parent_selectors = saved_parents
+          @parent_breaks = saved_breaks
           @env = saved_env
+        end
+
+        # Splits a selector list on top-level commas, remembering which
+        # selectors had a line break in the whitespace around their
+        # separating comma — the serializer preserves the author's line
+        # structure (dart-sass behavior). The first selector's flag is
+        # always false.
+        private def selector_parts(text : String) : {Array(String), Array(Bool)}
+          parts = [] of String
+          breaks = [] of Bool
+          carry = false
+          Parser.split_top_level_commas(text).each do |segment|
+            stripped = segment.strip
+            if stripped.empty?
+              carry ||= segment.includes?('\n')
+              next
+            end
+            lead = segment[0, segment.size - segment.lstrip.size]
+            breaks << (parts.empty? ? false : (carry || lead.includes?('\n')))
+            parts << collapse_ws(stripped)
+            carry = segment[segment.rstrip.size..].includes?('\n')
+          end
+          {parts, breaks}
         end
 
         # Emits a node into the current sink, reopening the innermost
@@ -282,7 +328,8 @@ module Hwaro
           @sink << node
         end
 
-        private def combine_selectors(parts : Array(String), node : Ast::RuleNode) : Array(String)
+        private def combine_selectors(parts : Array(String), part_breaks : Array(Bool),
+                                      node : Ast::RuleNode) : {Array(String), Array(Bool)}
           parents = @parent_selectors
           if parents.nil?
             parts.each do |part|
@@ -290,8 +337,9 @@ module Hwaro
                 error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
               end
             end
-            return parts
+            return {parts, part_breaks}
           end
+          parent_breaks = @parent_breaks
 
           amps_by_part = parts.map { |part| count_parent_refs(part) }
           amps_by_part.each do |amps|
@@ -321,18 +369,32 @@ module Hwaro
           # multi-`&` part the FIRST `&` slot is the one aligned with the
           # parent loop; the remaining slots run the full parent list.
           result = [] of String
+          result_breaks = [] of Bool
           parents.each_with_index do |parent, parent_i|
+            # Every combination inherits its parent's OR its child part's
+            # line-break flag (dart-sass repeats the break on each
+            # combination: `.a,\n.b { .c, .d }` breaks before `.b .c`
+            # AND `.b .d`). The overall first selector has no separator.
+            pbreak = parent_breaks.try(&.[parent_i]?) || false
             parts.each_with_index do |part, pi|
+              # A part carrying `&` loses its own break in dart-sass
+              # (`.q &,\n.r &` resolves onto one line); a plain nested
+              # part keeps it.
+              flag = pbreak || (amps_by_part[pi] == 0 && (part_breaks[pi]? || false))
+              push = ->(sel : String) do
+                result << sel
+                result_breaks << (result.size != 1 && flag)
+              end
               amps = amps_by_part[pi]
               if amps == 0
-                result << "#{parent} #{part}"
+                push.call("#{parent} #{part}")
               elsif amps > MAX_PARENT_REF_SLOTS
                 # Degraded single-combo expansion; emit once, on the first
                 # parent pass, mirroring parent_combinations' fallback.
-                result << substitute_parent(part, parents) if parent_i == 0
+                push.call(substitute_parent(part, parents)) if parent_i == 0
               else
                 parent_combinations(parents, amps - 1).each do |combo|
-                  result << substitute_parent(part, [parent] + combo)
+                  push.call(substitute_parent(part, [parent] + combo))
                 end
               end
               if result.size > MAX_RULE_SELECTORS
@@ -342,7 +404,7 @@ module Hwaro
               end
             end
           end
-          result
+          {result, result_breaks}
         end
 
         private def template_has_parent_ref?(template : Ast::TextTemplate) : Bool
@@ -490,7 +552,7 @@ module Hwaro
           return unless rule
           sink = @current_rule_sink
           return rule if sink.nil? || sink.last?.same?(rule)
-          fresh = Css::Rule.new(rule.selectors)
+          fresh = Css::Rule.new(rule.selectors, rule.breaks)
           sink << fresh
           @current_rule = fresh
           fresh
@@ -511,7 +573,10 @@ module Hwaro
         # ---------------------------------------------------------------
 
         private def eval_at_rule(node : Ast::RawAtRuleNode) : Nil
-          prelude = resolve_prelude(node.prelude)
+          # `@supports (width: calc(1px + 2px))` tests calc SUPPORT —
+          # dart-sass deliberately keeps calc() verbatim there; folding it
+          # would flip which browsers the block applies to.
+          prelude = resolve_prelude(node.prelude, fold_calc: node.name != "supports")
 
           children = node.children
           unless children
@@ -554,6 +619,7 @@ module Hwaro
           saved_rule_sink = @current_rule_sink
           saved_at = @current_at
           saved_parents = @parent_selectors
+          saved_breaks = @parent_breaks
           saved_keyframes = @in_keyframes
           saved_env = @env
 
@@ -564,6 +630,7 @@ module Hwaro
             @current_rule = nil
             @current_rule_sink = nil
             @parent_selectors = nil
+            @parent_breaks = nil
             @in_keyframes = true
           elsif (rule = saved_rule) && conditional_group?(node.name)
             # Conditional at-rule nested in a style rule: bubble the
@@ -572,7 +639,7 @@ module Hwaro
             # `@media (x) { .a { color } }`). Descriptor at-rules
             # (@font-face, @page, @property, ...) never take a selector
             # wrapper — their declarations belong to the at-rule itself.
-            synthetic = Css::Rule.new(rule.selectors)
+            synthetic = Css::Rule.new(rule.selectors, rule.breaks)
             at.children << synthetic
             @current_rule = synthetic
             @current_rule_sink = at.children
@@ -593,6 +660,7 @@ module Hwaro
           @current_rule_sink = saved_rule_sink
           @current_at = saved_at
           @parent_selectors = saved_parents
+          @parent_breaks = saved_breaks
           @in_keyframes = saved_keyframes
           @env = saved_env
         end
@@ -1235,8 +1303,10 @@ module Hwaro
           end
           saved_rule = @current_rule
           saved_parents = @parent_selectors
+          saved_breaks = @parent_breaks
           @current_rule = nil
           @parent_selectors = nil
+          @parent_breaks = nil
           begin
             if selector = node.selector
               # `&` in an `@at-root` selector still refers to the enclosing
@@ -1245,7 +1315,10 @@ module Hwaro
               # expose the parents for resolution. But the result is a
               # TOP-LEVEL rule: a selector without `&` left in it must not
               # be re-nested under the parents.
-              @parent_selectors = saved_parents if template_has_parent_ref?(selector)
+              if template_has_parent_ref?(selector)
+                @parent_selectors = saved_parents
+                @parent_breaks = saved_breaks
+              end
               eval_at_root_rule(selector, node, saved_parents)
             else
               # A plain block scope, not `scoped`: `@at-root` is not a
@@ -1262,6 +1335,7 @@ module Hwaro
           ensure
             @current_rule = saved_rule
             @parent_selectors = saved_parents
+            @parent_breaks = saved_breaks
           end
         end
 
@@ -1271,14 +1345,21 @@ module Hwaro
         private def eval_at_root_rule(selector : Ast::TextTemplate, node : Ast::AtRootNode,
                                       parents : Array(String)?) : Nil
           text = resolve_template(selector, allow_vars: false)
-          parts = Parser.split_top_level_commas(text).map { |s| collapse_ws(s) }.reject(&.empty?)
+          parts, part_breaks = selector_parts(text)
           error_at(node.line, node.column, "expected selector") if parts.empty?
 
           selectors = [] of String
-          parts.each do |part|
+          breaks = [] of Bool
+          parts.each_with_index do |part, part_i|
+            # Each combination repeats its part's break flag (same rule as
+            # combine_selectors); the overall first selector never breaks.
+            push = ->(sel : String) do
+              selectors << sel
+              breaks << (selectors.size != 1 && (part_breaks[part_i]? || false))
+            end
             amps = count_parent_refs(part)
             if amps == 0
-              selectors << part
+              push.call(part)
             elsif parents.nil?
               error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
             else
@@ -1301,7 +1382,7 @@ module Hwaro
                 else
                   [parents.dup]
                 end
-              combos.each { |combo| selectors << substitute_parent(part, combo) }
+              combos.each { |combo| push.call(substitute_parent(part, combo)) }
             end
             if selectors.size > MAX_RULE_SELECTORS
               error_at(node.line, node.column,
@@ -1310,15 +1391,17 @@ module Hwaro
             end
           end
 
-          rule = Css::Rule.new(selectors)
+          rule = Css::Rule.new(selectors, breaks)
           emit(rule)
           saved_rule = @current_rule
           saved_rule_sink = @current_rule_sink
           saved_parents = @parent_selectors
+          saved_breaks = @parent_breaks
           saved_env = @env
           @current_rule = rule
           @current_rule_sink = @sink
           @parent_selectors = selectors
+          @parent_breaks = breaks
           @env = Environment.new(saved_env)
           begin
             eval_nodes(node.children)
@@ -1326,7 +1409,13 @@ module Hwaro
             @current_rule = saved_rule
             @current_rule_sink = saved_rule_sink
             @parent_selectors = saved_parents
+            @parent_breaks = saved_breaks
             @env = saved_env
+          end
+          # A rule lifted to the root is its own output group — dart-sass
+          # separates it from what follows with a blank line.
+          if @at_frames.empty? && (last = @sink.last?)
+            last.group_end = true
           end
         end
 
@@ -1347,6 +1436,7 @@ module Hwaro
           saved_rule = @current_rule
           saved_rule_sink = @current_rule_sink
           saved_parents = @parent_selectors
+          saved_breaks = @parent_breaks
           saved_at = @current_at
           saved_env = @env
 
@@ -1356,6 +1446,7 @@ module Hwaro
           @current_rule = nil
           @current_rule_sink = nil
           @parent_selectors = query.escapes_rules? ? nil : saved_parents
+          @parent_breaks = query.escapes_rules? ? nil : saved_breaks
           @env = Environment.new(saved_env)
           begin
             if query.escapes_rules? || saved_parents.nil?
@@ -1364,12 +1455,18 @@ module Hwaro
               # Rules kept: re-wrap the body in the enclosing selectors so
               # declarations keep their rule (`e { @at-root (without:
               # media) { f {} } }` → `e f` outside the media).
-              rule = Css::Rule.new(saved_parents)
+              rule = Css::Rule.new(saved_parents, saved_breaks || [] of Bool)
               emit(rule)
               @current_rule = rule
               @current_rule_sink = @sink
               @parent_selectors = saved_parents
+              @parent_breaks = saved_breaks
               eval_nodes(node.children)
+              # Same group rule as eval_at_root_rule: content escaped to
+              # the root separates from what follows.
+              if @at_frames.empty? && (last = @sink.last?)
+                last.group_end = true
+              end
             end
           ensure
             @sink = saved_sink
@@ -1377,6 +1474,7 @@ module Hwaro
             @current_rule = saved_rule
             @current_rule_sink = saved_rule_sink
             @parent_selectors = saved_parents
+            @parent_breaks = saved_breaks
             @current_at = saved_at
             @env = saved_env
           end
@@ -1402,9 +1500,10 @@ module Hwaro
           # growing under it (self-extension aliases the two). Chains still
           # resolve through the per-rule fixpoint.
           extenders = rule.selectors.dup
+          extender_breaks = rule.breaks.dup
           targets.each do |target|
             @extends << Extend::Request.new(extenders, target, node.optional,
-              @path, node.line, node.column)
+              @path, node.line, node.column, extender_breaks)
           end
         end
 
@@ -1438,6 +1537,11 @@ module Hwaro
         # resolve. Terminates because additions are deduplicated and capped.
         private def extend_rule(rule : Css::Rule, matched : Array(Bool)) : Nil
           selectors = rule.selectors
+          breaks = rule.breaks
+          # Keep the flags index-aligned before inserting mid-list.
+          while breaks.size < selectors.size
+            breaks << false
+          end
           seen = selectors.to_set
           i = 0
           while i < selectors.size
@@ -1446,10 +1550,28 @@ module Hwaro
               results = Extend.extend_selector(sel, req.target, req.extenders)
               next unless results
               matched[ri] = true
-              results.each do |added|
+              # The cursor resets PER REQUEST: each request's additions go
+              # directly after the extended selector, so later requests
+              # land closer to it and push earlier ones right — dart-sass
+              # 1.103 emits `.b, .a` for `.a { @extend %p } .b { @extend
+              # %p }` (verified empirically; per-selector source order is
+              # NOT preserved).
+              offset = 1
+              results.each do |(added, ext_i)|
                 next if seen.includes?(added)
                 seen << added
-                selectors << added
+                # Insert right after the selector that was extended —
+                # dart-sass keeps the additions in place (the placeholder
+                # scrub then leaves `.uses, .direct`, not `.direct, .uses`)
+                # — with the extender's OR the extended selector's break
+                # flag (same OR rule as selector resolution): a multi-line
+                # extending rule keeps its structure (`.x,\n.y { @extend
+                # .t }` emits `.t, .x,\n.y`), and extending a broken
+                # selector stays broken.
+                flag = (ext_i >= 0 && (req.breaks[ext_i]? || false)) || (breaks[i]? || false)
+                selectors.insert(i + offset, added)
+                breaks.insert(i + offset, flag)
+                offset += 1
                 if selectors.size > MAX_RULE_SELECTORS
                   raise SyntaxError.new(
                     "@extend expanded a rule to more than #{MAX_RULE_SELECTORS} selectors " \
@@ -1568,6 +1690,7 @@ module Hwaro
           saved_rule = @current_rule
           saved_at = @current_at
           saved_parents = @parent_selectors
+          saved_parent_breaks = @parent_breaks
           saved_content = @content
           saved_keyframes = @in_keyframes
           saved_path = @path
@@ -1583,6 +1706,7 @@ module Hwaro
           @current_rule = nil
           @current_at = nil
           @parent_selectors = nil
+          @parent_breaks = nil
           @content = nil
           @in_keyframes = false
           @path = display
@@ -1604,6 +1728,7 @@ module Hwaro
             @current_rule = saved_rule
             @current_at = saved_at
             @parent_selectors = saved_parents
+            @parent_breaks = saved_parent_breaks
             @content = saved_content
             @in_keyframes = saved_keyframes
             @path = saved_path
@@ -1820,11 +1945,12 @@ module Hwaro
         # real null. The text can't carry that on its own — `inspect(null)`
         # legitimately yields the string "null", which must be emitted,
         # while a null-valued variable must omit the declaration.
-        private def resolve_decl_value(template : Ast::TextTemplate) : ResolvedValue
+        private def resolve_decl_value(template : Ast::TextTemplate,
+                                       fold_calc : Bool = true) : ResolvedValue
           if node = Expr.parse(template)
-            if Expr.computes?(node, self)
+            if Expr.computes?(node, self, fold_calc: fold_calc)
               begin
-                value = Expr::Evaluator.new(self).eval(node)
+                value = Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node)
                 return ResolvedValue.new(value.to_css, value.is_a?(NullV))
               rescue ex : NamespacedEvalError
                 warn_namespaced(template, ex)
@@ -1864,7 +1990,8 @@ module Hwaro
         # so `@media (min-width: map-get($bp, md))` and breakpoint
         # arithmetic work (dart-sass parity) while the query structure
         # itself stays verbatim.
-        private def resolve_prelude(template : Ast::TextTemplate) : String
+        private def resolve_prelude(template : Ast::TextTemplate,
+                                    fold_calc : Bool = true) : String
           segments = [] of {Bool, Ast::TextTemplate} # {is_value, sub-template}
           current = [] of Ast::Piece
           buf = String::Builder.new
@@ -1959,7 +2086,7 @@ module Hwaro
               # Feature values render like declaration values (CSS text,
               # not storage text) — the storage spellings `(10px,)` and
               # `(a b), (c d)` must not leak into a media query.
-              io << (is_value ? resolve_decl_value(sub).text : resolve_template(sub, allow_vars: true))
+              io << (is_value ? resolve_decl_value(sub, fold_calc: fold_calc).text : resolve_template(sub, allow_vars: true))
             end
           end
           collapse_ws(text)

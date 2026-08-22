@@ -82,12 +82,12 @@ describe "Sass colors" do
       value_of("darken(#336699, 10%)").should eq("#264d73")
       value_of("lighten(#336699, 10%)").should eq("#4080bf")
       value_of("darken(red, 10%)").should eq("#cc0000")
-      value_of("lighten(black, 50%)").should eq("#808080")
+      value_of("lighten(black, 50%)").should eq("gray")
     end
 
     it "clamps at the ends of the lightness range" do
-      value_of("darken(#336699, 100%)").should eq("#000000")
-      value_of("lighten(#336699, 100%)").should eq("#ffffff")
+      value_of("darken(#336699, 100%)").should eq("black")
+      value_of("lighten(#336699, 100%)").should eq("white")
     end
 
     it "rounds exact halves away from zero like dart-sass" do
@@ -100,7 +100,7 @@ describe "Sass colors" do
   describe "saturate / desaturate / grayscale" do
     it "shifts saturation" do
       value_of("saturate(#808080, 20%)").should eq("#996767")
-      value_of("desaturate(#996666, 20%)").should eq("#808080")
+      value_of("desaturate(#996666, 20%)").should eq("gray")
     end
 
     it "drops saturation entirely for grayscale" do
@@ -114,12 +114,12 @@ describe "Sass colors" do
   # ===========================================================================
   describe "hue rotation" do
     it "adjusts the hue by a signed angle" do
-      value_of("adjust-hue(#336699, 60deg)").should eq("#663399")
+      value_of("adjust-hue(#336699, 60deg)").should eq("rebeccapurple")
       value_of("adjust-hue(#336699, -60deg)").should eq("#339966")
     end
 
     it "wraps a negative hue back into range" do
-      value_of("adjust-hue(#ff0000, -120)").should eq("#0000ff")
+      value_of("adjust-hue(#ff0000, -120)").should eq("blue")
     end
 
     it "takes the opposite hue for complement" do
@@ -132,18 +132,18 @@ describe "Sass colors" do
   # ===========================================================================
   describe "mix / invert" do
     it "mixes evenly by default" do
-      value_of("mix(#ff0000, #0000ff)").should eq("#800080")
+      value_of("mix(#ff0000, #0000ff)").should eq("purple")
     end
 
     it "honours an explicit weight" do
       value_of("mix(#ff0000, #0000ff, 25%)").should eq("#4000bf")
-      value_of("mix(#ff0000, #0000ff, 100%)").should eq("#ff0000")
-      value_of("mix(#ff0000, #0000ff, 0%)").should eq("#0000ff")
+      value_of("mix(#ff0000, #0000ff, 100%)").should eq("red")
+      value_of("mix(#ff0000, #0000ff, 0%)").should eq("blue")
     end
 
     it "inverts each channel" do
       value_of("invert(#336699)").should eq("#cc9966")
-      value_of("invert(#000000)").should eq("#ffffff")
+      value_of("invert(#000000)").should eq("white")
     end
 
     it "blends toward the original for a partial invert weight" do
@@ -232,8 +232,8 @@ describe "Sass colors" do
 
     it "scales a component toward its limit without overshooting" do
       value_of("scale-color(#336699, $lightness: 20%)").should eq("#4785c2")
-      value_of("scale-color(#336699, $lightness: 100%)").should eq("#ffffff")
-      value_of("scale-color(#336699, $lightness: -100%)").should eq("#000000")
+      value_of("scale-color(#336699, $lightness: 100%)").should eq("white")
+      value_of("scale-color(#336699, $lightness: -100%)").should eq("black")
     end
 
     it "replaces a component outright" do
@@ -273,7 +273,7 @@ describe "Sass colors" do
       css.should contain("b: #4080bf;")
       css.should contain("c: #4785c2;")
       css.should contain("d: #146699;")
-      css.should contain("e: #800080;")
+      css.should contain("e: purple;")
       css.should contain("f: #996633;")
       css.should contain("g: #666666;")
       css.should contain("h: #cc9966;")

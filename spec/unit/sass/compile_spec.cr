@@ -73,7 +73,7 @@ describe Hwaro::Assets::Sass do
 
     it "combines selector lists as a cartesian product" do
       css = compile(".a, .b { .c & { color: red; } }")
-      css.should contain(".c .a,\n.c .b {")
+      css.should contain(".c .a, .c .b {")
     end
 
     it "substitutes & for pseudo-classes and BEM suffixes" do
