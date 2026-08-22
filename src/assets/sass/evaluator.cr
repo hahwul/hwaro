@@ -573,7 +573,10 @@ module Hwaro
         # ---------------------------------------------------------------
 
         private def eval_at_rule(node : Ast::RawAtRuleNode) : Nil
-          prelude = resolve_prelude(node.prelude)
+          # `@supports (width: calc(1px + 2px))` tests calc SUPPORT —
+          # dart-sass deliberately keeps calc() verbatim there; folding it
+          # would flip which browsers the block applies to.
+          prelude = resolve_prelude(node.prelude, fold_calc: node.name != "supports")
 
           children = node.children
           unless children
@@ -1547,6 +1550,12 @@ module Hwaro
               results = Extend.extend_selector(sel, req.target, req.extenders)
               next unless results
               matched[ri] = true
+              # The cursor resets PER REQUEST: each request's additions go
+              # directly after the extended selector, so later requests
+              # land closer to it and push earlier ones right — dart-sass
+              # 1.103 emits `.b, .a` for `.a { @extend %p } .b { @extend
+              # %p }` (verified empirically; per-selector source order is
+              # NOT preserved).
               offset = 1
               results.each do |(added, ext_i)|
                 next if seen.includes?(added)
@@ -1936,11 +1945,12 @@ module Hwaro
         # real null. The text can't carry that on its own — `inspect(null)`
         # legitimately yields the string "null", which must be emitted,
         # while a null-valued variable must omit the declaration.
-        private def resolve_decl_value(template : Ast::TextTemplate) : ResolvedValue
+        private def resolve_decl_value(template : Ast::TextTemplate,
+                                       fold_calc : Bool = true) : ResolvedValue
           if node = Expr.parse(template)
-            if Expr.computes?(node, self)
+            if Expr.computes?(node, self, fold_calc: fold_calc)
               begin
-                value = Expr::Evaluator.new(self).eval(node)
+                value = Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node)
                 return ResolvedValue.new(value.to_css, value.is_a?(NullV))
               rescue ex : NamespacedEvalError
                 warn_namespaced(template, ex)
@@ -1980,7 +1990,8 @@ module Hwaro
         # so `@media (min-width: map-get($bp, md))` and breakpoint
         # arithmetic work (dart-sass parity) while the query structure
         # itself stays verbatim.
-        private def resolve_prelude(template : Ast::TextTemplate) : String
+        private def resolve_prelude(template : Ast::TextTemplate,
+                                    fold_calc : Bool = true) : String
           segments = [] of {Bool, Ast::TextTemplate} # {is_value, sub-template}
           current = [] of Ast::Piece
           buf = String::Builder.new
@@ -2075,7 +2086,7 @@ module Hwaro
               # Feature values render like declaration values (CSS text,
               # not storage text) — the storage spellings `(10px,)` and
               # `(a b), (c d)` must not leak into a media query.
-              io << (is_value ? resolve_decl_value(sub).text : resolve_template(sub, allow_vars: true))
+              io << (is_value ? resolve_decl_value(sub, fold_calc: fold_calc).text : resolve_template(sub, allow_vars: true))
             end
           end
           collapse_ws(text)

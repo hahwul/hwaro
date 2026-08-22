@@ -1178,6 +1178,11 @@ module Hwaro
           return unless paren
           return unless stripped[0...paren].compare("calc", case_insensitive: true) == 0
           inner = stripped[(paren + 1)...-1]
+          # CSS requires whitespace around binary +/-; dart-sass errors on
+          # `calc(1px+2px)` and a browser drops the declaration. The Sass
+          # expression grammar is laxer, so folding without this check
+          # would silently ACTIVATE a declaration that never applied.
+          return unless calc_operator_spacing_ok?(inner)
           template = Ast::TextTemplate.new([inner.as(Ast::Piece)], 1, 1)
           node = parse(template)
           return unless node
@@ -1188,6 +1193,34 @@ module Hwaro
           Number.new(result.value, result.unit)
         rescue SoftEvalError
           nil
+        end
+
+        # Every binary `+`/`-` must have whitespace on both sides. `-` is
+        # binary when preceded by a value character; the scientific
+        # exponent (`1e-2`) is exempt. Anything doubtful declines the fold
+        # (verbatim is always safe).
+        private def self.calc_operator_spacing_ok?(inner : String) : Bool
+          chars = inner.chars
+          chars.each_with_index do |c, i|
+            next unless c == '+' || c == '-'
+            prev = i > 0 ? chars[i - 1] : nil
+            nxt = chars[i + 1]?
+            # A sign at the start / after an operator or open paren is
+            # unary — CSS allows `calc(-5px + 2px)`. After whitespace with
+            # no space following, it is unary too (`1px -2px` — the Sass
+            # side then parses a list, which never folds).
+            prev_ws = prev.try(&.ascii_whitespace?) || false
+            next_ws = nxt.try(&.ascii_whitespace?) || false
+            next if prev.nil? || prev == '(' || prev == ',' ||
+                    "+-*/".includes?(prev) || (prev_ws && !next_ws)
+            # Scientific notation: digit e±digit.
+            if (prev == 'e' || prev == 'E') && i >= 2 && chars[i - 2].ascii_number? &&
+               nxt.try(&.ascii_number?)
+              next
+            end
+            return false unless prev_ws && next_ws
+          end
+          true
         end
 
         private def self.fold_calc_node(node : Node) : Number?
@@ -1250,13 +1283,20 @@ module Hwaro
             args << folded
           end
           basis = args.find { |n| !n.unit.empty? }
+          # clamp with mixed unitless/united operands is invalid CSS and a
+          # dart-sass error — decline so the verbatim declaration stays
+          # (and the browser drops it, as before). min/max DO fold across
+          # the mix: dart folds `calc(min(5, 2px))` to `2px`.
+          if name == "clamp" && basis && args.any?(&.unit.empty?)
+            return
+          end
           values = [] of Float64
           args.each do |n|
             if (b = basis) && !n.unit.empty?
               values << (n.unit == b.unit ? n.value : b.coerce_value(n))
             else
               # Unitless compares by raw value even against united
-              # operands (dart folds `calc(min(5, 2px))` to `2px`).
+              # operands.
               values << n.value
             end
           end
@@ -1270,7 +1310,10 @@ module Hwaro
             values.each_with_index { |v, i| best = i if v > values[best] }
             args[best]
           else
-            values[1] < values[0] ? args[0] : (values[1] > values[2] ? args[2] : args[1])
+            # dart-sass clamps with <=/>=: at an exact boundary the BOUND
+            # operand wins, unit spelling included (`clamp(96px, 1in,
+            # 200px)` is `96px`, not `1in`).
+            values[1] <= values[0] ? args[0] : (values[1] >= values[2] ? args[2] : args[1])
           end
         end
 
@@ -1297,6 +1340,12 @@ module Hwaro
               result = n
             end
           end
+          # `0 / 0` is NaN; letting it out crashes min/max's Float
+          # comparison with an unlocated ArgumentError. Decline instead —
+          # the caller falls back to the verbatim text. (Infinity from
+          # `10 / 0` stays: it compares fine and loses a min/max the way
+          # dart's lazy division does.)
+          return if result && result.value.nan?
           result
         rescue SoftEvalError
           nil
@@ -1324,23 +1373,29 @@ module Hwaro
         #
         # `force_div` marks a division-forcing context (variable values,
         # interpolation): there a literal-operand `/` counts as work too.
-        def self.computes?(node : Node, host : Host, force_div : Bool = false) : Bool
+        def self.computes?(node : Node, host : Host, force_div : Bool = false,
+                           fold_calc : Bool = true) : Bool
           case node
           when Binary
             return true unless node.op == :div
+            # A bare literal operand (including a foldable `calc()`) does
+            # NOT make an un-forced slash compute: `font: calc(16px)/1.5`
+            # is the font-shorthand slash and must ship verbatim, exactly
+            # as it did before calc folding existed.
             force_div || div_operand_forces?(node.left) || div_operand_forces?(node.right) ||
-              computes?(node.left, host, force_div) || computes?(node.right, host, force_div)
+              (!node.left.is_a?(Lit) && computes?(node.left, host, force_div, fold_calc)) ||
+              (!node.right.is_a?(Lit) && computes?(node.right, host, force_div, fold_calc))
           when Unary
             # Even a plain `-$a` / `+$a` counts: the verbatim path renders
             # `+5` for `+$a` where dart-sass emits the evaluated `5`.
             true
           when CallE
             return true if host.expr_known_fn?(node.ns, node.name)
-            node.args.any? { |a| computes?(a, host, force_div) } ||
-              node.kwargs.any? { |kw| computes?(kw.value, host, force_div) } ||
-              node.spread.try { |s| computes?(s, host, force_div) } || false
+            node.args.any? { |a| computes?(a, host, force_div, fold_calc) } ||
+              node.kwargs.any? { |kw| computes?(kw.value, host, force_div, fold_calc) } ||
+              node.spread.try { |s| computes?(s, host, force_div, fold_calc) } || false
           when ListE
-            node.items.any? { |i| computes?(i, host, force_div) }
+            node.items.any? { |i| computes?(i, host, force_div, fold_calc) }
           when MapE
             # Map literals ALWAYS count as work, same rationale as ParenE:
             # `(a: b)` is Sass-only syntax with no CSS meaning. The verbatim
@@ -1356,7 +1411,7 @@ module Hwaro
             # values that no browser accepts. Evaluating consumes them.
             true
           when ConcatE
-            node.parts.any? { |p| computes?(p, host) }
+            node.parts.any? { |p| computes?(p, host, force_div, fold_calc) }
           when Lit
             # Two literals count as real work: a static `calc(...)` that
             # folds to a number (dart-sass emits `20px` for
@@ -1366,7 +1421,7 @@ module Hwaro
             # Every other literal resolves identically via verbatim.
             case value = node.value
             when NullV then true
-            when Raw   then !Expr.fold_calc(value.text).nil?
+            when Raw   then fold_calc && !Expr.fold_calc(value.text).nil?
             else            false
             end
           else
@@ -1463,16 +1518,17 @@ module Hwaro
           # slash sits under other arithmetic / a Sass function call — the
           # classic Sass division rule.
           def initialize(@host : Host, @strict : Bool = false, @force_div : Bool = false,
-                         @coercing : Bool = false)
+                         @coercing : Bool = false, @fold_calc : Bool = true)
           end
 
           def eval(node : Node) : Value
             case node
             when Lit
               # A static `calc(...)` span folds to its number (dart-sass
-              # simplification: `calc(10px + 5px * 2)` is `20px`).
+              # simplification: `calc(10px + 5px * 2)` is `20px`) —
+              # except where the caller preserves calc (@supports).
               value = node.value
-              if value.is_a?(Raw) && (folded = Expr.fold_calc(value.text))
+              if @fold_calc && value.is_a?(Raw) && (folded = Expr.fold_calc(value.text))
                 folded
               else
                 value

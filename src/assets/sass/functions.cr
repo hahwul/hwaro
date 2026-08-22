@@ -519,15 +519,18 @@ module Hwaro
         MATH_VARS = {
           "pi" => "3.1415926536",
           "e"  => "2.7182818285",
-          # Storage is text, so the constants are stored as the decimal
-          # spellings that parse back to the right Float64. dart-sass
-          # prints $epsilon as 0 (10-digit rounding) but compares it > 0;
-          # the full spelling keeps both behaviors.
-          "epsilon"          => "0.0000000000000002220446049250313",
+          # Storage is text, so the constants are stored as spellings that
+          # parse back to the right Float64. dart-sass prints $epsilon as
+          # 0 (10-digit rounding) but compares it > 0 — the scientific
+          # spelling keeps the comparison correct and short (a verbatim
+          # emission is invalid CSS either way). $max-number uses dart's
+          # zero-padded shortest-representation digits, which is also what
+          # Number.format prints for computed values of this magnitude.
+          "epsilon"          => "2.220446049250313e-16",
           "max-safe-integer" => "9007199254740991",
           "min-safe-integer" => "-9007199254740991",
-          "max-number"       => "%.0f" % Float64::MAX,
-          "min-number"       => "0." + "0" * 323 + "5",
+          "max-number"       => "17976931348623157" + "0" * 292,
+          "min-number"       => "5e-324",
         }
 
         # ---------------------------------------------------------------
@@ -1357,7 +1360,11 @@ module Hwaro
             end
           merged = sa.dup
           sb.each { |s| merged << s unless merged.includes?(s) }
-          element + merged.join
+          # Pseudo-classes/-elements sort after the other simple selectors
+          # (dart's compound ordering, same rule Extend.unify_compound
+          # documents): `.x:hover` + `.z` is `.x.z:hover`.
+          plain, pseudo = merged.partition { |s| !s.starts_with?(':') }
+          element + (plain + pseudo).join
         end
 
         # True when every element `sub` matches is also matched by `sup`
@@ -1394,7 +1401,7 @@ module Hwaro
 
         SELECTOR_FNS = {
           "parse" => Fn.new do |args, kwargs|
-            args = args_with_kwargs("selector.parse", args, kwargs, %w[selectors])
+            args = args_with_kwargs("selector.parse", args, kwargs, %w[selector])
             arity!("selector-parse", args, 1)
             selector_value(selector_complexes("selector.parse()", args[0]))
           end,
@@ -1519,9 +1526,17 @@ module Hwaro
                   grown << variant[0...index] + repl[0...-1] + [merged] + variant[index + 1..]
                 end
               end
-              variants = grown unless grown.empty?
+              # A matched compound whose replacement can't unify
+              # eliminates the variant (dart-sass fails the build when
+              # nothing is left — `selector.replace("a.foo", ".foo",
+              # "h1")` must not return `a.foo` with the target intact).
+              variants = grown
             end
             result.concat(variants)
+          end
+          if result.empty?
+            raise SoftEvalError.new(
+              "#{name}: $replacement can't be unified with $selector")
           end
           result
         end

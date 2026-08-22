@@ -37,9 +37,11 @@ describe "Sass dart parity fixes" do
   # url()
   # =========================================================================
   describe "url() variables" do
-    it "substitutes $var inside an unquoted url" do
+    it "substitutes a whole-token $var url" do
       compile("$v: 5px;\n.a { b: url($v); }").should contain("b: url(5px);")
-      compile("$y: img;\n.a { b: url(x-$y.png); }").should contain("b: url(x-img.png);")
+      compile("$v: 5px;\n.a { b: url( $v ); }").should contain("b: url(5px);")
+      # Mid-token `$` is valid plain CSS: verbatim, never substituted.
+      compile("$y: img;\n.a { b: url(x-$y.png); }").should contain("b: url(x-$y.png);")
     end
 
     it "keeps $ literal inside a quoted url" do
@@ -333,6 +335,82 @@ describe "Sass dart parity fixes" do
 
     it "lets a lazy division by zero lose a min()" do
       value_of("min(10 / 0, 8)").should eq("8")
+    end
+  end
+
+  # =========================================================================
+  # Second review pass regressions (2026-08-22)
+  # =========================================================================
+  describe "second review-pass regressions" do
+    it "declines a NaN lazy division instead of crashing" do
+      value_of("min(0 / 0, 8)").should eq("min(0 / 0, 8)")
+    end
+
+    it "matches dart's per-request extend insertion order" do
+      # dart-sass 1.103 (verified): each request inserts directly after
+      # the extended selector, so the LATER extender lands first.
+      css = compile("%p { c: red; }\n.a { @extend %p; }\n.b { @extend %p; }")
+      css.should contain(".b, .a {")
+    end
+
+    it "keeps a mid-token $ in url() verbatim (plain-CSS guarantee)" do
+      css = compile(".u { b: url(plain$x.png); c: url($h:8080/img.png); }")
+      css.should contain("b: url(plain$x.png);")
+      css.should contain("c: url($h:8080/img.png);")
+    end
+
+    it "preserves calc() inside @supports queries" do
+      compile("@supports (width: calc(1px + 2px)) { .s { x: 1; } }")
+        .should contain("@supports (width: calc(1px + 2px))")
+    end
+
+    it "keeps a literal calc()/x slash verbatim" do
+      compile(".k { font: calc(16px)/1.5 sans-serif; }")
+        .should contain("font: calc(16px)/1.5 sans-serif;")
+    end
+
+    it "declines folding calc with unspaced +/-" do
+      value_of("calc(1px+2px)").should eq("calc(1px+2px)")
+      value_of("calc(-5px + 2px)").should eq("-3px")
+    end
+
+    it "folds calc clamp with dart's boundary and unit rules" do
+      value_of("calc(clamp(96px, 1in, 200px))").should eq("96px")
+      value_of("calc(clamp(1px, 2in, 192px))").should eq("192px")
+      value_of("calc(clamp(1, 2px, 3))").should eq("calc(clamp(1, 2px, 3))")
+    end
+
+    it "formats huge magnitudes without inf or off-by-one" do
+      css = compile(<<-SCSS)
+        @use "sass:math";
+        .m { a: math.$max-safe-integer + 0; b: math.div(math.$max-number, 1); }
+        SCSS
+      css.should contain("a: 9007199254740991;")
+      css.should contain("b: 17976931348623157" + "0" * 292 + ";")
+      css.should_not contain("inf")
+    end
+
+    it "emits null !important without a double space" do
+      compile(".a { y: null !important; }").should contain("y: !important;")
+    end
+
+    it "orders pseudos last and refuses non-unifiable selector.replace" do
+      compile(%(@use "sass:selector";\n.s { r: selector.replace(".x:hover.y", ".y", ".z"); }))
+        .should contain("r: .x.z:hover;")
+      # Lenient value context: the failed call warns and reconstructs
+      # verbatim instead of returning the target intact.
+      compile(%(@use "sass:selector";\n.s { r: selector.replace("a.foo", ".foo", "h1"); }))
+        .should contain(%(r: selector.replace("a.foo", ".foo", "h1");))
+    end
+
+    it "accepts selector.parse's documented $selector keyword" do
+      compile(%(@use "sass:selector";\n.s { r: selector.parse($selector: ".a .b"); }))
+        .should contain("r: .a .b;")
+    end
+
+    it "parenthesizes constructed slash lists inside space lists" do
+      compile(%(@use "sass:list";\n.s { e: inspect(list.slash(1, 2) 9); }))
+        .should contain("e: (1 / 2) 9;")
     end
   end
 end

@@ -111,13 +111,39 @@ module Hwaro
             return "calc(NaN)" if value.nan?
             return value > 0 ? "calc(infinity)" : "calc(-infinity)"
           end
+          # Past 1e15 `round(10)` corrupts the value: the digit-shift
+          # multiply overflows to Infinity near Float64::MAX (printing the
+          # invalid token "inf") and double-rounds integers like 2^53-1 by
+          # one. Ten fractional digits are meaningless at this magnitude
+          # anyway — print the shortest-representation digits, zero-padded
+          # (dart-sass prints `math.$max-number` the same way).
+          return format_large(value) if value.abs >= 1e15
           rounded = value.round(10)
           rounded = 0.0 if rounded == 0 # avoid "-0"
-          return rounded.to_i64.to_s if rounded == rounded.trunc && rounded.abs < 1e15
+          return rounded.to_i64.to_s if rounded == rounded.trunc
 
           s = sprintf("%.10f", rounded)
           s = s.rstrip('0').rstrip('.') if s.includes?('.')
           s
+        end
+
+        private def self.format_large(value : Float64) : String
+          sign = value < 0 ? "-" : ""
+          text = value.abs.to_s
+          if idx = text.index('e')
+            mantissa = text[0...idx]
+            exp = text[(idx + 1)..].to_i
+            digits = mantissa.delete('.')
+            int_len = (mantissa.index('.') || mantissa.size) + exp
+            if digits.size <= int_len
+              sign + digits + "0" * (int_len - digits.size)
+            else
+              sign + digits[0, int_len] + "." + digits[int_len..]
+            end
+          else
+            text = text.rstrip('0').rstrip('.') if text.includes?('.')
+            sign + text
+          end
         end
 
         # Convertible-unit groups (dart-sass's known compatibilities):
@@ -327,7 +353,11 @@ module Hwaro
             # text storage must re-parse: bare `1 2 / 3` re-associates as
             # `1 (2/3)`, so the parens stay.
           in Sep::Slash then true
-          in Sep::Space then item.sep != Sep::Slash
+            # A LAZY slash pair stays bare inside a space list (the
+            # literal `font: 12px/30px` shape); a constructed
+            # `list.slash` keeps its parens or `(1 / 2) 9` re-reads as a
+            # different structure.
+          in Sep::Space then !(item.sep == Sep::Slash && item.lazy_slash?)
           end
         end
 

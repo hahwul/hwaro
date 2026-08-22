@@ -168,7 +168,14 @@ module Hwaro
             items.each do |item|
               case item
               in Decl
-                io << pad << item.name << ": " << item.value
+                io << pad << item.name << ":"
+                # A null value kept alive by !important is empty — don't
+                # print the value's leading space or the output carries a
+                # double space (`y:  !important`); dart emits `y: !important`.
+                # An empty value WITHOUT !important keeps the space: the
+                # custom-property `--empty: ;` serializes with it (dart).
+                io << " " unless item.value.empty? && item.important
+                io << item.value
                 io << " !important" if item.important
                 io << ";\n"
               in Comment
