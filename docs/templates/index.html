@@ -81,6 +81,9 @@
                         </button>
                     </div>
                 </div>
+                <a href="#speed" class="hero-scroll-cue" aria-label="{{ "landing.speed_title" | t }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </a>
             </section>
 
             <!-- ============================================================
@@ -365,7 +368,9 @@
         </main>
         {{ auto_includes_js }}
         <script>
-        // Ember particles rising from the hero art. Skipped entirely under
+        // Ember particles rising from the hero art. Two depth layers, a
+        // per-ember flicker, and the occasional bright spark. Spawn is
+        // biased toward the brazier at center. Skipped entirely under
         // prefers-reduced-motion; rAF pauses on hidden tabs by itself.
         (function() {
             var reduce = window.matchMedia &&
@@ -375,32 +380,59 @@
             var ctx = canvas.getContext('2d');
             var host = canvas.parentElement;
             var embers = [];
-            var MAX = 40;
+            var dpr = Math.min(window.devicePixelRatio || 1, 2);
+            var W = 0, H = 0;
+            var MAX = Math.min(64, Math.max(36, Math.round(window.innerWidth / 24)));
 
             function resize() {
-                canvas.width = host.offsetWidth;
-                canvas.height = host.offsetHeight;
+                W = host.offsetWidth;
+                H = host.offsetHeight;
+                canvas.width = W * dpr;
+                canvas.height = H * dpr;
+                canvas.style.width = W + 'px';
+                canvas.style.height = H + 'px';
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             }
             resize();
             window.addEventListener('resize', resize);
 
+            // Center-biased x: the average of two rolls clusters around the
+            // brazier; the far layer spreads wider than the near one.
+            function biasedX(spread) {
+                var r = (Math.random() + Math.random()) / 2;
+                return W * (0.5 + (r - 0.5) * spread);
+            }
+
             function Ember() {
                 this.reset();
-                this.y = Math.random() * canvas.height;
+                this.y = Math.random() * H;
+                this.life = Math.random();
             }
 
             Ember.prototype.reset = function() {
-                this.x = Math.random() * canvas.width;
-                this.y = canvas.height + 4;
-                this.r = Math.random() * 2.2 + 0.8;
-                this.vx = (Math.random() - 0.5) * 0.6;
-                this.vy = -(Math.random() * 1.2 + 0.4);
+                // ~1/4 far (small, slow, dim), ~3/4 near; 1 in 18 is a spark.
+                this.far = Math.random() < 0.28;
+                this.spark = !this.far && Math.random() < 0.055;
+                this.x = biasedX(this.far ? 1.7 : 1.1);
+                this.y = H + 4;
+                this.r = this.far
+                    ? Math.random() * 1.1 + 0.5
+                    : Math.random() * 2.2 + 0.9;
+                if (this.spark) this.r += 0.8;
+                var speed = this.far ? 0.5 : 1.0;
+                this.vx = (Math.random() - 0.5) * 0.6 * speed;
+                this.vy = -(Math.random() * 1.3 + 0.45) * speed;
+                if (this.spark) this.vy *= 1.6;
                 this.life = 1;
-                this.decay = Math.random() * 0.008 + 0.003;
-                this.drift = Math.random() * 0.3 + 0.1;
+                this.decay = (Math.random() * 0.008 + 0.003) * (this.far ? 1.25 : 1);
+                this.drift = (Math.random() * 0.3 + 0.1) * speed;
                 this.wobble = Math.random() * Math.PI * 2;
+                this.flicker = Math.random() * Math.PI * 2;
+                this.flickerSpeed = Math.random() * 0.25 + 0.08;
                 var hue = Math.random();
-                if (hue < 0.5) {
+                if (this.spark) {
+                    this.color = [255, 235 + Math.random() * 20 | 0, 150 + Math.random() * 60 | 0];
+                } else if (hue < 0.5) {
                     this.color = [255, 160 + Math.random() * 60 | 0, 30 + Math.random() * 30 | 0];
                 } else if (hue < 0.8) {
                     this.color = [255, 80 + Math.random() * 60 | 0, 20 + Math.random() * 20 | 0];
@@ -411,21 +443,24 @@
 
             Ember.prototype.update = function() {
                 this.wobble += 0.04;
+                this.flicker += this.flickerSpeed;
                 this.x += this.vx + Math.sin(this.wobble) * this.drift;
                 this.y += this.vy;
                 this.life -= this.decay;
-                if (this.life <= 0 || this.y < -10 || this.x < -10 || this.x > canvas.width + 10) {
+                if (this.life <= 0 || this.y < -10 || this.x < -10 || this.x > W + 10) {
                     this.reset();
                 }
             };
 
             Ember.prototype.draw = function(ctx) {
-                var a = this.life * 0.65;
+                var base = this.far ? 0.4 : 0.68;
+                var a = this.life * base * (0.75 + Math.sin(this.flicker) * 0.25);
+                if (a <= 0.01) return;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + a + ')';
-                ctx.shadowColor = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + (a * 0.5) + ')';
-                ctx.shadowBlur = this.r * 5;
+                ctx.shadowColor = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + (a * 0.55) + ')';
+                ctx.shadowBlur = this.r * (this.spark ? 8 : 5);
                 ctx.fill();
             };
 
@@ -434,7 +469,7 @@
             }
 
             function loop() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.clearRect(0, 0, W, H);
                 for (var i = 0; i < embers.length; i++) {
                     embers[i].update();
                     embers[i].draw(ctx);
@@ -444,6 +479,74 @@
                 requestAnimationFrame(loop);
             }
             loop();
+        })();
+        </script>
+        <script>
+        // Hero pointer parallax (fine pointers only) + bento spotlight +
+        // header glass on scroll. All rAF-throttled, all skipped under
+        // prefers-reduced-motion where they would move things.
+        (function() {
+            var reduce = window.matchMedia &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            // Header picks up its glass once the page leaves the very top.
+            var header = document.querySelector('.landing-header');
+            if (header) {
+                var scrolled = null;
+                function onScroll() {
+                    var now = window.scrollY > 12;
+                    if (now !== scrolled) {
+                        scrolled = now;
+                        header.classList.toggle('is-scrolled', now);
+                    }
+                }
+                window.addEventListener('scroll', onScroll, { passive: true });
+                onScroll();
+            }
+
+            // Bento spotlight follows the cursor inside each cell.
+            var cells = document.querySelectorAll('.bento-cell');
+            for (var i = 0; i < cells.length; i++) {
+                cells[i].addEventListener('mousemove', function(e) {
+                    var b = this.getBoundingClientRect();
+                    this.style.setProperty('--mx', (e.clientX - b.left) + 'px');
+                    this.style.setProperty('--my', (e.clientY - b.top) + 'px');
+                });
+            }
+
+            // Pointer parallax: the brazier drifts a few px against the
+            // cursor; the glow layer moves a little more (CSS multiplies).
+            if (reduce) return;
+            var fine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+            var bg = document.querySelector('.hero-bg');
+            var hero = document.querySelector('.hero');
+            if (!fine || !bg || !hero) return;
+            var tx = 0, ty = 0, cx = 0, cy = 0, raf = null;
+
+            function tick() {
+                cx += (tx - cx) * 0.06;
+                cy += (ty - cy) * 0.06;
+                bg.style.setProperty('--par-x', cx.toFixed(2) + 'px');
+                bg.style.setProperty('--par-y', cy.toFixed(2) + 'px');
+                if (Math.abs(tx - cx) > 0.05 || Math.abs(ty - cy) > 0.05) {
+                    raf = requestAnimationFrame(tick);
+                } else {
+                    raf = null;
+                }
+            }
+
+            hero.addEventListener('mousemove', function(e) {
+                var b = hero.getBoundingClientRect();
+                tx = ((e.clientX - b.left) / b.width - 0.5) * -14;
+                ty = ((e.clientY - b.top) / b.height - 0.5) * -8;
+                if (!raf) raf = requestAnimationFrame(tick);
+            });
+
+            hero.addEventListener('mouseleave', function() {
+                tx = 0;
+                ty = 0;
+                if (!raf) raf = requestAnimationFrame(tick);
+            });
         })();
         </script>
         <script>
@@ -496,6 +599,9 @@
                     }
                     this.setAttribute('aria-selected', 'true');
                     cmdEl.textContent = this.getAttribute('data-command');
+                    cmdEl.classList.remove('is-swapping');
+                    void cmdEl.offsetWidth; /* restart the dissolve */
+                    cmdEl.classList.add('is-swapping');
                 });
             }
 
@@ -564,6 +670,11 @@
             function show(el) {
                 el.classList.add('is-visible');
                 if (el.classList.contains('speed')) runSpeed(el);
+                // Once the child cascade has played out, drop the stagger
+                // delays so hover transitions respond instantly.
+                setTimeout(function() {
+                    el.classList.add('is-settled');
+                }, 1100);
             }
 
             if (reduce || !('IntersectionObserver' in window)) {

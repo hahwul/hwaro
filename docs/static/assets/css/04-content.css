@@ -62,6 +62,40 @@
     margin-top: var(--space-4);
     border-radius: 999px;
     background: var(--spark);
+    transform-origin: left center;
+}
+
+/* Entrance — one quiet rise for the content column and a drawn-in ember
+   rule under the title. CSS-only (runs without JS), once per navigation,
+   and skipped entirely under prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+    .docs-main {
+        animation: docs-enter 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .docs-main > h1:first-of-type::after {
+        animation: docs-rule 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s backwards;
+    }
+}
+
+@keyframes docs-enter {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes docs-rule {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
 }
 
 /* Page description directly under the title reads as a standfirst. */
