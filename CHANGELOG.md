@@ -3,6 +3,20 @@
 ## Unreleased
 
 ### Added
+- Sass: static `calc()` folding (dart-sass simplification) — `calc(10px + 5px * 2)` → `20px`, `calc(9 / 21 * 100%)` → `42.8571428571%`, nested `calc`/`min`/`max`/`clamp` included; anything not fully foldable (`calc(100% - 20px)`, `var()`, interpolated `#{…}`) keeps its verbatim text
+- Sass: built-in functions accept their documented keyword names (`list.append($l, x, $separator: comma)`, `string.slice($string: …, $start-at: 2)`, `map.get($map: …, $key: …)`, `math.div($number1: …, $number2: …)`) — previously only the color functions did
+- Sass: dart-sass output formatting — a blank line only after each top-level rule's output group (not between every rule), selector lists keep the author's line structure (`.a, .b` stays on one line; a source line break before a selector is preserved through nesting resolution), and `@keyframes` blocks no longer carry internal blank lines
+- Sass: computed colors whose integer-rounded channels land exactly on a CSS keyword serialize by name (`mix(red, blue)` → `purple`, `darken(white, 100%)` → `black`), in dart-sass's alias spellings (`aqua`, `gray`, `fuchsia`); note dart-sass 1.79+ keeps fractional channels (`rgb(50%, 0%, 50%)`), so this matches dart only for exact-integer results — consistent with the existing integer-channel deviation
+- Sass: `sass:math` module constants `math.$epsilon`, `math.$max-safe-integer`, `math.$min-safe-integer`, `math.$max-number`, `math.$min-number` (`$pi`/`$e` already existed)
+- Sass: `selector.replace` (compound `$original` targets, same subset limits as `@extend`) and `selector.simple-selectors` (plus the legacy global spellings), and `list.join`'s fourth `$bracketed` argument
+
+### Fixed (Sass)
+- `url($v)` substitutes the variable instead of shipping `url($v)` literally into the stylesheet (`$` is not valid in a raw CSS URL, dart-sass parses it as SassScript); custom properties keep it literal, as dart does
+- A literal `#{null}` interpolates as nothing — `"#{null}"` emitted the string `"null"` and `pre#{null}post` emitted `prenullpost`
+- `#{(1, 2, 3)}` interpolates as `1, 2, 3` — the parenthesized comma list previously kept its parens (and its verbatim text) because the parens didn't count as computation
+- An undivided slash pair divides when a numeric context coerces it: `min(10 / 2, 8)` is `5` (it previously fell back to verbatim text), matching dart-sass's lazy slash numbers
+- `inspect()` parenthesizes nested lists the way dart-sass does: a space list inside a comma list stays bare (`inspect(selector.parse(".a .b, .c"))` → `.a .b, .c`), only ambiguous nestings get parens; a single-element comma list inside a map is no longer double-wrapped
+- `map.get`/`map.has-key`/`map.remove` accept their `$map`/`$key` keyword spellings
 - Sass: classic `/` division (dart-sass 1.x rule) — `$w/2`, `(1/3)`, `percentage(1/4)` and `12 / 4 * 3` now divide, while literal-only slashes (`font: 12px/30px`, `grid-area: 1 / 2`) stay verbatim
 - Sass: unit conversion within the standard groups (`1in + 72pt`, `1in == 96px`, `math.min(1in, 50px)`, `math.compatible(1px, 1in)`)
 - Sass: nested properties (`font: 12px serif { family: sans; }`), `@content(args)` / `@include … using (...)`, `@at-root (with: ...)` / `(without: ...)` queries

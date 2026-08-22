@@ -1105,8 +1105,42 @@ module Hwaro
               else
                 buf << @s.advance
               end
+            when '$'
+              # `url($v)` is not a raw URL in dart-sass — `$` can't appear
+              # in the token, so the variable substitutes. Leaving it
+              # literal ships `url($v)` into the stylesheet.
+              if @s.ident_start?(@s.peek(1))
+                var_line = @s.line
+                var_col = @s.column
+                @s.advance
+                name = @s.read_ident
+                @s.error("expected identifier after \"$\"", var_line, var_col) if name.empty?
+                buf.flush_into(pieces)
+                pieces << Ast::VarRef.new(name, nil, var_line, var_col)
+              else
+                buf << @s.advance
+              end
             else
-              buf << @s.advance
+              # `url(ns.$var)` — the namespaced spelling must resolve as a
+              # unit, or the namespace text ships literally while the bare
+              # `$var` resolves against the wrong (global) scope.
+              if @s.ident_start?(c)
+                ident = @s.read_ident
+                if @s.peek == '.' && @s.peek(1) == '$'
+                  var_line = @s.line
+                  var_col = @s.column
+                  @s.advance # '.'
+                  @s.advance # '$'
+                  name = @s.read_ident
+                  @s.error("expected identifier after \"#{ident}.$\"", var_line, var_col) if name.empty?
+                  buf.flush_into(pieces)
+                  pieces << Ast::VarRef.new(name, ident, var_line, var_col)
+                else
+                  buf.append(ident)
+                end
+              else
+                buf << @s.advance
+              end
             end
           end
         end

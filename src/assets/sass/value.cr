@@ -260,8 +260,15 @@ module Hwaro
         getter items : Array(Value)
         getter sep : Sep
         getter bracketed : Bool
+        # True only for a slash pair PARSED as `a / b` (the classic lazy
+        # division): a numeric context may fold it into the quotient.
+        # Constructed slash lists (`list.slash`, `$separator: slash`) are
+        # real lists — dart-sass errors when math coerces them, so they
+        # must not divide. Never part of equality or serialization.
+        getter? lazy_slash : Bool
 
-        def initialize(@items : Array(Value), @sep : Sep = Sep::Space, @bracketed : Bool = false)
+        def initialize(@items : Array(Value), @sep : Sep = Sep::Space, @bracketed : Bool = false,
+                       @lazy_slash : Bool = false)
         end
 
         def to_css : String
@@ -287,7 +294,7 @@ module Hwaro
             # degrading into a plain value.
             item = @items[0]
             text = item.inspect_css
-            text = "(#{text})" if item.is_a?(ListV) && !item.bracketed
+            text = "(#{text})" if element_needs_parens?(Sep::Comma, item)
             return "(#{text},)"
           end
           joiner =
@@ -298,9 +305,34 @@ module Hwaro
             end
           inner = @items.map do |item|
             text = item.inspect_css
-            item.is_a?(ListV) && !item.bracketed ? "(#{text})" : text
+            element_needs_parens?(@sep, item) ? "(#{text})" : text
           end.join(joiner)
           @bracketed ? "[#{inner}]" : inner
+        end
+
+        # dart-sass's `_elementNeedsParens`: a nested list is
+        # parenthesized only where dropping the parens would merge it into
+        # the outer separator — a comma list inside a comma (or slash)
+        # list, anything inside a space list. Empty and single-element
+        # lists spell their own parens (`()`, `(1,)`); a space list inside
+        # a comma list needs none (`.a .b, .c`). Slash-in-space stays
+        # bare: the common source is an undivided literal slash, which
+        # dart-sass prints as a compact slash number.
+        protected def self.element_needs_parens?(outer : Sep, item : Value) : Bool
+          return false unless item.is_a?(ListV)
+          return false if item.bracketed || item.items.size < 2
+          case outer
+          in Sep::Comma then item.sep == Sep::Comma
+            # dart leaves a space list bare inside a slash list, but our
+            # text storage must re-parse: bare `1 2 / 3` re-associates as
+            # `1 (2/3)`, so the parens stay.
+          in Sep::Slash then true
+          in Sep::Space then item.sep != Sep::Slash
+          end
+        end
+
+        private def element_needs_parens?(outer : Sep, item : Value) : Bool
+          ListV.element_needs_parens?(outer, item)
         end
 
         def eq?(other : Value) : Bool
@@ -333,7 +365,11 @@ module Hwaro
           "(" + @entries.map do |e|
             value = e.value
             text = value.inspect_css
-            text = "(#{text})" if value.is_a?(ListV) && !value.bracketed && value.sep == ListV::Sep::Comma
+            # dart-sass wraps ANY unbracketed comma list in a map value —
+            # a singleton included (`(a: ((5,)))`), unlike list nesting.
+            if value.is_a?(ListV) && !value.bracketed && value.sep == ListV::Sep::Comma
+              text = "(#{text})"
+            end
             "#{e.key.inspect_css}: #{text}"
           end.join(", ") + ")"
         end

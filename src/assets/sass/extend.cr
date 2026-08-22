@@ -32,7 +32,13 @@ module Hwaro
         # One `@extend` directive: the extending rule's resolved selectors,
         # one target selector, and the location for error reporting.
         record Request, extenders : Array(String), target : String,
-          optional : Bool, path : String, line : Int32, column : Int32
+          optional : Bool, path : String, line : Int32, column : Int32,
+          # Line-break flags of the extending rule's selector list —
+          # additions carry the extender's own line structure into the
+          # extended rule (dart-sass: `.x,\n.y { @extend .t }` emits
+          # `.t, .x,\n.y`). May be shorter than `extenders`; missing
+          # entries read false.
+          breaks : Array(Bool) = [] of Bool
 
         # One parsed piece of a complex selector.
         record Compound, simples : Array(String)
@@ -43,19 +49,23 @@ module Hwaro
         # simple selector; otherwise every extension of `selector` by
         # `extenders` (possibly empty when no extender unifies — the
         # target still counts as found).
+        # Each result pairs the added selector with the index of the
+        # extender that produced it (-1 for a pseudo-argument extension,
+        # which rewrites the extended selector itself) so the caller can
+        # carry the extender's line-break flag.
         def extend_selector(selector : String, target : String,
-                            extenders : Array(String)) : Array(String)?
+                            extenders : Array(String)) : Array({String, Int32})?
           items = parse_items(selector)
           return unless items
           found = false
-          results = [] of String
+          results = [] of {String, Int32}
           items.each_with_index do |item, idx|
             next unless item.is_a?(Compound)
             if slot = item.simples.index(target)
               found = true
               rest = item.simples.dup
               rest.delete_at(slot)
-              extenders.each do |ext_sel|
+              extenders.each_with_index do |ext_sel, ext_i|
                 ext_items = parse_items(ext_sel)
                 next unless ext_items
                 last = ext_items.last?
@@ -64,7 +74,7 @@ module Hwaro
                 next unless merged
                 prefix = merge_prefixes(items[0...idx], ext_items[0...-1])
                 new_items = prefix + [Compound.new(merged).as(Item)] + items[idx + 1..]
-                results << serialize_items(new_items)
+                results << {serialize_items(new_items), ext_i}
               end
             end
             # A target inside a selector pseudo-class argument
@@ -80,7 +90,7 @@ module Hwaro
               new_simples[si] = extended
               new_items = items.dup
               new_items[idx] = Compound.new(new_simples)
-              results << serialize_items(new_items)
+              results << {serialize_items(new_items), -1}
             end
           end
           found ? results : nil
@@ -102,7 +112,7 @@ module Hwaro
             results = extend_selector(arg, target, extenders)
             next unless results
             found = true
-            results.each do |sel|
+            results.each do |(sel, _)|
               additions << sel unless args.includes?(sel) || additions.includes?(sel)
             end
           end
@@ -195,7 +205,19 @@ module Hwaro
           nodes.reject! do |node|
             case node
             when Css::Rule
-              node.selectors.reject! { |s| placeholder?(s) }
+              if node.selectors.any? { |s| placeholder?(s) }
+                # Remove selectors and their line-break flags in tandem —
+                # a bare reject! would shift flags onto the wrong selector.
+                kept = [] of String
+                kept_breaks = [] of Bool
+                node.selectors.each_with_index do |s, i|
+                  next if placeholder?(s)
+                  kept << s
+                  kept_breaks << (node.breaks[i]? || false)
+                end
+                node.selectors.replace(kept)
+                node.breaks.replace(kept_breaks)
+              end
               node.selectors.empty?
             when Css::AtRule
               scrub_placeholders(node.children) unless keyframes_name?(node.name)

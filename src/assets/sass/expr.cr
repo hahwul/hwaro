@@ -1061,7 +1061,11 @@ module Hwaro
                 items << parse_space
               end
               fail unless accept(TokKind::RParen)
-              return ListE.new(items, ListV::Sep::Comma)
+              # Wrapped in ParenE so the parens count as work (`computes?`):
+              # `(1, 2)` is Sass-only syntax — the verbatim path would ship
+              # the parens into CSS, and `#{(1, 2)}` must interpolate as
+              # `1, 2` (dart-sass parity).
+              return ParenE.new(ListE.new(items, ListV::Sep::Comma))
             end
 
             fail unless accept(TokKind::RParen)
@@ -1160,6 +1164,144 @@ module Hwaro
         # Division with the math.div unit rules plus convertible-group
         # cancelling: same units (or convertible ones) cancel, a unitless
         # divisor keeps the numerator's unit.
+        # Folds a verbatim `calc(...)` span to the single number dart-sass
+        # would emit (`calc(10px + 5px * 2)` → `20px`, `calc(9 / 21 * 100%)`
+        # → `42.8571428571%`). nil when the contents aren't statically
+        # foldable — unknown functions (`var()`, `env()`), incompatible or
+        # unitless↔united addition, keywords — in which case the span
+        # passes through verbatim as before (valid CSS the browser
+        # computes itself; a partial rewrite of working CSS buys nothing).
+        def self.fold_calc(text : String) : Number?
+          stripped = text.strip
+          return unless stripped.ends_with?(')')
+          paren = stripped.index('(')
+          return unless paren
+          return unless stripped[0...paren].compare("calc", case_insensitive: true) == 0
+          inner = stripped[(paren + 1)...-1]
+          template = Ast::TextTemplate.new([inner.as(Ast::Piece)], 1, 1)
+          node = parse(template)
+          return unless node
+          result = fold_calc_node(node)
+          return unless result && result.value.finite?
+          # A fresh Number: a lone literal keeps its lexeme (`calc(1e3px)`
+          # must print `1000px`, not the lexeme).
+          Number.new(result.value, result.unit)
+        rescue SoftEvalError
+          nil
+        end
+
+        private def self.fold_calc_node(node : Node) : Number?
+          case node
+          when Lit
+            case value = node.value
+            when Number then value
+            when Raw    then fold_calc(value.text) # a nested `calc(...)` span
+            end
+          when ParenE
+            fold_calc_node(node.inner)
+          when Unary
+            operand = fold_calc_node(node.operand)
+            return unless operand
+            case node.op
+            when :minus then Number.new(-operand.value, operand.unit)
+            when :plus  then operand
+            end
+          when Binary
+            left = fold_calc_node(node.left)
+            right = left ? fold_calc_node(node.right) : nil
+            return unless left && right
+            case node.op
+            when :plus, :minus
+              # CSS calc rejects unitless↔united addition (dart-sass
+              # errors there); decline the fold, keep the span verbatim.
+              return if left.unit.empty? != right.unit.empty?
+              return unless left.compatible_unit?(right)
+              rv = left.unit.empty? ? right.value : left.coerce_value(right)
+              Number.new(node.op == :plus ? left.value + rv : left.value - rv,
+                left.result_unit(right))
+            when :times
+              return if !left.unit.empty? && !right.unit.empty?
+              Number.new(left.value * right.value, left.unit.empty? ? right.unit : left.unit)
+            when :div
+              # Zero divides to Infinity (CSS calc semantics); the final
+              # finite check in fold_calc declines the whole fold then,
+              # but an infinite INTERMEDIATE may still lose a min/max.
+              value, unit = divide_numbers(left, right)
+              Number.new(value, unit)
+            end
+          when CallE
+            fold_calc_call(node)
+          end
+        end
+
+        # `min`/`max`/`clamp` nested in (or wrapping) a foldable
+        # calculation: fold when every argument folds and the units agree
+        # (identical, all-unitless, or convertible).
+        private def self.fold_calc_call(node : CallE) : Number?
+          return unless node.ns.nil? && node.kwargs.empty? && node.spread.nil?
+          name = node.name.downcase
+          return unless name == "min" || name == "max" || name == "clamp"
+          return if node.args.empty?
+          return if name == "clamp" && node.args.size != 3
+          args = [] of Number
+          node.args.each do |arg|
+            folded = fold_calc_node(arg)
+            return unless folded
+            args << folded
+          end
+          basis = args.find { |n| !n.unit.empty? }
+          values = [] of Float64
+          args.each do |n|
+            if (b = basis) && !n.unit.empty?
+              values << (n.unit == b.unit ? n.value : b.coerce_value(n))
+            else
+              # Unitless compares by raw value even against united
+              # operands (dart folds `calc(min(5, 2px))` to `2px`).
+              values << n.value
+            end
+          end
+          case name
+          when "min"
+            best = 0
+            values.each_with_index { |v, i| best = i if v < values[best] }
+            args[best]
+          when "max"
+            best = 0
+            values.each_with_index { |v, i| best = i if v > values[best] }
+            args[best]
+          else
+            values[1] < values[0] ? args[0] : (values[1] > values[2] ? args[2] : args[1])
+          end
+        end
+
+        # A slash run that was PARSED as `a / b` but never forced to
+        # divide (`min(10 / 2, 8)`) folds to its division when every
+        # element is a plain number — dart-sass's lazy-slash numbers
+        # divide the moment a numeric context coerces them. nil for
+        # constructed slash lists (`list.slash`; only lazy_slash pairs
+        # divide — dart errors on math over a real slash list) and when
+        # any element isn't a number. A zero divisor folds to Infinity,
+        # exactly as dart's lazy division does (`min(10 / 0, 8)` is `8`).
+        def self.slash_division?(list : ListV) : Number?
+          return unless list.lazy_slash?
+          return if list.bracketed || list.items.size < 2
+          return unless list.sep == ListV::Sep::Slash
+          result : Number? = nil
+          list.items.each do |item|
+            n = item.as?(Number)
+            return unless n
+            if prev = result
+              value, unit = divide_numbers(prev, n)
+              result = Number.new(value, unit)
+            else
+              result = n
+            end
+          end
+          result
+        rescue SoftEvalError
+          nil
+        end
+
         def self.divide_numbers(ln : Number, rn : Number) : {Float64, String}
           if ln.unit == rn.unit
             {ln.value / rn.value, ""}
@@ -1215,9 +1357,21 @@ module Hwaro
             true
           when ConcatE
             node.parts.any? { |p| computes?(p, host) }
+          when Lit
+            # Two literals count as real work: a static `calc(...)` that
+            # folds to a number (dart-sass emits `20px` for
+            # `calc(10px + 5px * 2)`), and a literal `null` — the verbatim
+            # path ships the four letters where dart elides the value
+            # (`#{null 1px}` is `1px`, `x: null 1px` emits `x: 1px`).
+            # Every other literal resolves identically via verbatim.
+            case value = node.value
+            when NullV then true
+            when Raw   then !Expr.fold_calc(value.text).nil?
+            else            false
+            end
           else
-            # RawSpanE and AmpE deliberately don't compute: a lone
-            # `calc(#{$a})` value or a bare `&` resolves identically via
+            # RawSpanE and AmpE deliberately don't compute: interpolated
+            # `calc(#{$a})` spans and a bare `&` resolve identically via
             # the verbatim path, which keeps existing output
             # byte-identical.
             false
@@ -1256,7 +1410,11 @@ module Hwaro
           template = Ast::TextTemplate.new([stripped.as(Ast::Piece)], 1, 1)
           node = parse(template)
           return Raw.new(stripped) unless node
-          Evaluator.new(CoerceHost.new).eval(node)
+          # coercing: true — slash text arriving through storage is always
+          # a CONSTRUCTED list (a literal lazy pair would have divided at
+          # its force_div declaration), so it must not re-acquire lazy
+          # division here. dart-sass errors on math over such a list.
+          Evaluator.new(CoerceHost.new, coercing: true).eval(node)
         rescue SoftEvalError
           Raw.new(text.strip)
         end
@@ -1304,16 +1462,27 @@ module Hwaro
           # values), a `/` divides only when an operand is computed or the
           # slash sits under other arithmetic / a Sass function call — the
           # classic Sass division rule.
-          def initialize(@host : Host, @strict : Bool = false, @force_div : Bool = false)
+          def initialize(@host : Host, @strict : Bool = false, @force_div : Bool = false,
+                         @coercing : Bool = false)
           end
 
           def eval(node : Node) : Value
             case node
-            when Lit     then node.value
+            when Lit
+              # A static `calc(...)` span folds to its number (dart-sass
+              # simplification: `calc(10px + 5px * 2)` is `20px`).
+              value = node.value
+              if value.is_a?(Raw) && (folded = Expr.fold_calc(value.text))
+                folded
+              else
+                value
+              end
             when VarE    then Expr.coerce(@host.expr_var(node.name, node.ns))
             when InterpE then Expr.coerce(@host.expr_interp(node.template))
             when StrE    then eval_str(node)
             when RawSpanE
+              # Interpolated spans stay opaque text — dart-sass doesn't
+              # simplify `calc(#{$w} * 2)` either.
               Raw.new(node.parts.join { |p| p.is_a?(String) ? p : @host.expr_interp(p) })
             when AmpE
               if parents = @host.expr_parent_selectors
@@ -1447,7 +1616,7 @@ module Hwaro
             items = [] of Value
             append_slash_items(items, left)
             append_slash_items(items, right)
-            ListV.new(items, ListV::Sep::Slash)
+            ListV.new(items, ListV::Sep::Slash, lazy_slash: !@coercing)
           end
 
           private def append_slash_items(items : Array(Value), value : Value) : Nil
@@ -1625,6 +1794,8 @@ module Hwaro
               Expr.coerce(value.text).as?(Number)
             when Str
               value.quoted ? nil : Expr.coerce(value.text).as?(Number)
+            when ListV
+              Expr.slash_division?(value)
             end
           end
 
