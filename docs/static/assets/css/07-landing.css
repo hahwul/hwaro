@@ -59,15 +59,24 @@
     left: 0;
     right: 0;
     height: 64px;
-    background: var(--glass);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--border-subtle);
+    background: transparent;
+    border-bottom: 1px solid transparent;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--space-5);
     z-index: 100;
+    transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* Once the page scrolls, the header picks up its glass. Without JS the
+   is-scrolled hook never lands, so keep the glass as the no-JS default. */
+html:not(.js) .landing-header,
+.landing-header.is-scrolled {
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom-color: var(--border-subtle);
 }
 
 .landing-header .logo {
@@ -141,11 +150,17 @@
 .btn-primary {
     background: var(--heading);
     color: var(--bg);
+    transition:
+        background var(--transition),
+        color var(--transition),
+        box-shadow 0.3s ease,
+        transform 0.1s ease;
 }
 
 .btn-primary:hover {
     background: #ffffff;
     color: var(--bg);
+    box-shadow: 0 0 28px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 /* =============================================================================
@@ -167,6 +182,10 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
+    /* Pointer parallax targets, driven by a lerped rAF loop in the page
+       script. Zero without JS or under reduced motion. */
+    --par-x: 0px;
+    --par-y: 0px;
 }
 
 /* Toned-down fire cover as an immersive backdrop. The pseudo-element is
@@ -181,7 +200,8 @@
     left: 50%;
     width: min(1240px, 94vw);
     aspect-ratio: 16 / 9;
-    transform: translate(-50%, -50%);
+    transform: translate(calc(-50% + var(--par-x)), calc(-50% + var(--par-y)));
+    will-change: transform;
     background-image:
         radial-gradient(
             ellipse 68% 60% at 50% 50%,
@@ -206,6 +226,37 @@
         rgba(0, 0, 0, 0.5) 58%,
         transparent 88%
     );
+}
+
+/* A slow breathing glow behind the brazier — the fire's light on the room.
+   Pure opacity animation on a composited layer, so it costs nothing. */
+.hero-bg::after {
+    content: "";
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    width: min(1100px, 100vw);
+    aspect-ratio: 16 / 10;
+    transform: translate(calc(-50% + var(--par-x) * 1.6), calc(-50% + var(--par-y) * 1.6));
+    background: radial-gradient(
+        ellipse 50% 42% at 50% 55%,
+        color-mix(in srgb, var(--primary) 14%, transparent),
+        rgba(255, 140, 60, 0.05) 45%,
+        transparent 72%
+    );
+    mix-blend-mode: screen;
+    opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .hero-bg::after {
+        animation: hero-breathe 5.5s ease-in-out infinite;
+    }
+}
+
+@keyframes hero-breathe {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 0.95; }
 }
 
 #ember-canvas {
@@ -242,6 +293,35 @@
 
 .hero-content .highlight {
     color: var(--primary);
+    /* Ember gradient sweep across the second line. Browsers without
+       background-clip:text keep the solid color above. */
+    background: linear-gradient(
+        100deg,
+        var(--rule-from) 0%,
+        var(--rule-to) 34%,
+        #ffb864 50%,
+        var(--rule-from) 66%,
+        var(--rule-to) 100%
+    );
+    background-size: 240% 100%;
+    background-position: 100% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    /* the h1 shadow would bleed through a transparent fill */
+    text-shadow: none;
+    filter: drop-shadow(0 2px 18px rgba(0, 0, 0, 0.55));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .hero-content .highlight {
+        animation: ember-sheen 9s ease-in-out 1.4s infinite;
+    }
+}
+
+@keyframes ember-sheen {
+    0%, 68%, 100% { background-position: 100% 0; }
+    18%, 50% { background-position: 0% 0; }
 }
 
 .hero-sub {
@@ -289,22 +369,33 @@
     color: var(--text);
 }
 
-/* Entry - a single quiet rise, only when motion is welcome. */
+/* Entry - a cinematic rise out of soft focus, only when motion is welcome. */
 @media (prefers-reduced-motion: no-preference) {
     .hero-content h1,
     .hero-content .hero-sub,
     .hero-content .hero-actions {
         opacity: 0;
-        transform: translateY(14px);
-        animation: lp-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        transform: translateY(22px) scale(0.985);
+        filter: blur(6px);
+        animation: lp-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     .hero-content .hero-sub {
-        animation-delay: 0.1s;
+        animation-delay: 0.15s;
     }
 
     .hero-content .hero-actions {
-        animation-delay: 0.2s;
+        animation-delay: 0.3s;
+    }
+
+    .hero-bg {
+        opacity: 0;
+        animation: lp-fade 1.4s ease 0.1s forwards;
+    }
+
+    .hero-scroll-cue {
+        opacity: 0;
+        animation: lp-fade 0.8s ease 1.1s forwards;
     }
 }
 
@@ -312,7 +403,47 @@
     to {
         opacity: 1;
         transform: none;
+        filter: none;
     }
+}
+
+@keyframes lp-fade {
+    to {
+        opacity: 1;
+    }
+}
+
+/* Scroll cue — a quiet pulse at the fold's edge. */
+.hero-scroll-cue {
+    position: absolute;
+    bottom: var(--space-5);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    display: flex;
+    color: var(--text-muted);
+    padding: var(--space-2);
+    transition: color var(--transition), opacity 0.3s ease;
+}
+
+.hero-scroll-cue:hover {
+    color: var(--primary);
+}
+
+.hero-scroll-cue svg {
+    width: 22px;
+    height: 22px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .hero-scroll-cue svg {
+        animation: cue-drift 2.2s ease-in-out infinite;
+    }
+}
+
+@keyframes cue-drift {
+    0%, 100% { transform: translateY(0); opacity: 0.7; }
+    50% { transform: translateY(6px); opacity: 1; }
 }
 
 /* =============================================================================
@@ -338,6 +469,30 @@
     text-wrap: balance;
 }
 
+/* Ember rule under each section title, drawn in as the section reveals. */
+.section-header h2::after,
+.speed-header h2::after {
+    content: "";
+    display: block;
+    width: 44px;
+    height: 3px;
+    border-radius: 999px;
+    margin-top: var(--space-3);
+    background: var(--spark);
+    transform-origin: left center;
+}
+
+html.js .reveal .section-header h2::after,
+html.js .reveal .speed-header h2::after {
+    transform: scaleX(0);
+    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.25s;
+}
+
+html.js .reveal.is-visible .section-header h2::after,
+html.js .reveal.is-visible .speed-header h2::after {
+    transform: scaleX(1);
+}
+
 .section-header p,
 .speed-header p {
     margin: 0;
@@ -358,9 +513,60 @@ html.js .reveal.is-visible {
     transform: none;
 }
 
+/* Child cascade — cards inside a revealed section rise one after another.
+   The section itself still fades as a unit; children add a second beat.
+   Everything is scoped to :not(.is-settled): once the entrance has played,
+   these rules vanish entirely so hover transforms win again. */
+html.js .reveal:not(.is-settled) .bento-cell,
+html.js .reveal:not(.is-settled) .speed-modes li,
+html.js .reveal:not(.is-settled) .showcase-card,
+html.js .reveal:not(.is-settled) .scaffold-card {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+        opacity 0.55s ease,
+        transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(0.08s + var(--stagger, 0) * 0.07s);
+}
+
+html.js .reveal.is-visible:not(.is-settled) .bento-cell,
+html.js .reveal.is-visible:not(.is-settled) .speed-modes li,
+html.js .reveal.is-visible:not(.is-settled) .showcase-card,
+html.js .reveal.is-visible:not(.is-settled) .scaffold-card {
+    opacity: 1;
+    transform: none;
+}
+
+.bento-cell:nth-child(1), .speed-modes li:nth-child(1),
+.showcase-card:nth-child(1), .scaffold-card:nth-child(1) { --stagger: 0; }
+.bento-cell:nth-child(2), .speed-modes li:nth-child(2),
+.showcase-card:nth-child(2), .scaffold-card:nth-child(2) { --stagger: 1; }
+.bento-cell:nth-child(3), .speed-modes li:nth-child(3),
+.showcase-card:nth-child(3), .scaffold-card:nth-child(3) { --stagger: 2; }
+.bento-cell:nth-child(4), .showcase-card:nth-child(4),
+.scaffold-card:nth-child(4) { --stagger: 3; }
+.bento-cell:nth-child(5), .showcase-card:nth-child(5),
+.scaffold-card:nth-child(5) { --stagger: 4; }
+.bento-cell:nth-child(6), .showcase-card:nth-child(6) { --stagger: 5; }
+
 @media (prefers-reduced-motion: reduce) {
     html.js .reveal {
         opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    html.js .reveal:not(.is-settled) .bento-cell,
+    html.js .reveal:not(.is-settled) .speed-modes li,
+    html.js .reveal:not(.is-settled) .showcase-card,
+    html.js .reveal:not(.is-settled) .scaffold-card {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    html.js .reveal .section-header h2::after,
+    html.js .reveal .speed-header h2::after {
         transform: none;
         transition: none;
     }
@@ -398,6 +604,28 @@ html.js .reveal.is-visible {
 
 .speed-stage.is-done .speed-number {
     color: var(--primary);
+}
+
+/* Finish beat — the number pops and the bar flashes when the build lands. */
+@media (prefers-reduced-motion: no-preference) {
+    .speed-stage.is-done .speed-figure {
+        animation: speed-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .speed-stage.is-done .speed-fill {
+        animation: speed-flash 0.7s ease-out;
+    }
+}
+
+@keyframes speed-pop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+
+@keyframes speed-flash {
+    0% { box-shadow: 0 0 24px 4px color-mix(in srgb, var(--primary) 65%, transparent); }
+    100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 .speed-track {
@@ -499,6 +727,7 @@ html.js .speed-fill {
 }
 
 .bento-cell {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
@@ -506,6 +735,48 @@ html.js .speed-fill {
     padding: var(--space-5);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Pointer spotlight — a soft ember glow that follows the cursor. The page
+   script feeds --mx/--my; without JS the layer simply never lights up. */
+.bento-cell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+        320px circle at var(--mx, 50%) var(--my, 50%),
+        color-mix(in srgb, var(--primary) 10%, transparent),
+        transparent 70%
+    );
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.bento-cell:hover {
+    border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+    transform: translateY(-2px);
+}
+
+.bento-cell:hover::before {
+    opacity: 1;
+}
+
+.bento-cell > * {
+    position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bento-cell,
+    .bento-cell::before {
+        transition: none;
+    }
+
+    .bento-cell:hover {
+        transform: none;
+    }
 }
 
 .bento-cell h3 {
@@ -544,6 +815,26 @@ html.js .speed-fill {
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* The fan spreads a touch wider when the cell is hovered. */
+.cell-seo:hover .og-fan img:nth-child(1) {
+    transform: rotate(-7.5deg) translate(-4%, -3%);
+}
+
+.cell-seo:hover .og-fan img:nth-child(2) {
+    transform: rotate(1.5deg) translateY(-6%);
+}
+
+.cell-seo:hover .og-fan img:nth-child(3) {
+    transform: rotate(8.5deg) translate(4%, -3%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .og-fan img {
+        transition: none;
+    }
 }
 
 .og-fan img:nth-child(1) {
@@ -626,6 +917,22 @@ html.js .speed-fill {
     border-radius: var(--radius);
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+
+.scaffold-card:hover img {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scaffold-card img {
+        transition: none;
+    }
+
+    .scaffold-card:hover img {
+        transform: none;
+    }
 }
 
 .scaffold-card figcaption {
@@ -849,6 +1156,18 @@ html.js .speed-fill {
     color: var(--text);
     white-space: nowrap;
     overflow-x: auto;
+}
+
+/* Tab switches swap the command with a quick dissolve. */
+@media (prefers-reduced-motion: no-preference) {
+    .install-cmd code.is-swapping {
+        animation: cmd-swap 0.28s ease;
+    }
+}
+
+@keyframes cmd-swap {
+    0% { opacity: 0; transform: translateY(4px); }
+    100% { opacity: 1; transform: none; }
 }
 
 .install-copy {
