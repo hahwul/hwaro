@@ -1,0 +1,156 @@
+# Hwaro
+
+> Fast and lightweight static site generator built with Crystal
+
+This is documentation for Hwaro, an open-source static site generator. Content is provided under the MIT license.
+
+## Pages
+
+- [Hwaro Documentation](https://hwaro.hahwul.com/): Hwaro is a fast static site generator built with Crystal
+- [Hwaro 문서](https://hwaro.hahwul.com/ko/): Hwaro는 Crystal로 만든 빠른 정적 사이트 생성기입니다
+
+## Deploy
+
+- [Cloudflare Pages](https://hwaro.hahwul.com/deploy/cloudflare-pages/): Deploy your Hwaro site to Cloudflare Pages
+- [Codeberg Pages](https://hwaro.hahwul.com/deploy/codeberg-pages/): Deploy your Hwaro site to Codeberg Pages
+- [Deploy Configuration](https://hwaro.hahwul.com/deploy/config/): Configure deployment targets, matchers, and options
+- [Docker](https://hwaro.hahwul.com/deploy/docker/): Deploy your Hwaro site using Docker
+- [GitHub Pages](https://hwaro.hahwul.com/deploy/github-pages/): Deploy your Hwaro site to GitHub Pages
+- [GitLab CI](https://hwaro.hahwul.com/deploy/gitlab-ci/): Deploy your Hwaro site using GitLab CI/CD
+- [Netlify](https://hwaro.hahwul.com/deploy/netlify/): Deploy your Hwaro site to Netlify
+- [Vercel](https://hwaro.hahwul.com/deploy/vercel/): Deploy your Hwaro site to Vercel
+- [Cloudflare Pages](https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/): Hwaro 사이트를 Cloudflare Pages에 배포
+- [Codeberg Pages](https://hwaro.hahwul.com/ko/deploy/codeberg-pages/): Hwaro 사이트를 Codeberg Pages에 배포
+- [배포 설정](https://hwaro.hahwul.com/ko/deploy/config/): 배포 타깃, 매처, 옵션 설정
+- [Docker](https://hwaro.hahwul.com/ko/deploy/docker/): Docker로 Hwaro 사이트 배포
+- [GitHub Pages](https://hwaro.hahwul.com/ko/deploy/github-pages/): Hwaro 사이트를 GitHub Pages에 배포
+- [GitLab CI](https://hwaro.hahwul.com/ko/deploy/gitlab-ci/): GitLab CI/CD로 Hwaro 사이트 배포
+- [Netlify](https://hwaro.hahwul.com/ko/deploy/netlify/): Hwaro 사이트를 Netlify에 배포
+- [Vercel](https://hwaro.hahwul.com/ko/deploy/vercel/): Hwaro 사이트를 Vercel에 배포
+
+## Features
+
+- [AMP](https://hwaro.hahwul.com/features/amp/): Generate AMP-compliant versions of content pages
+- [Asset Pipeline](https://hwaro.hahwul.com/features/asset-pipeline/): Built-in CSS/JS bundling, minification, and fingerprinting
+- [Auto Includes](https://hwaro.hahwul.com/features/auto-includes/): Automatically load CSS and JS files into all pages
+- [Build Hooks](https://hwaro.hahwul.com/features/build-hooks/): Run custom shell commands before and after the build process
+- [Cache Busting](https://hwaro.hahwul.com/features/cache-busting/): Append content hashes to asset URLs for cache invalidation
+- [Content Files](https://hwaro.hahwul.com/features/content-files/): Publish non-Markdown files from the content directory
+- [Deployment](https://hwaro.hahwul.com/features/deployment/): Configure deploy targets for hwaro deploy
+- [Environment-Specific Configuration](https://hwaro.hahwul.com/features/env-config/): Override config settings per deployment environment
+- [Environment Variables](https://hwaro.hahwul.com/features/env-variables/): Reference environment variables in configuration files and templates
+- [Image Processing](https://hwaro.hahwul.com/features/image-processing/): Automatic image resizing, LQIP placeholders, and dominant color extraction during build
+- [Incremental Build](https://hwaro.hahwul.com/features/incremental-build/): Only rebuild changed files for faster builds on large sites
+- [LLMs.txt](https://hwaro.hahwul.com/features/llms-txt/): Generate llms.txt files for AI and LLM crawlers
+- [Markdown Extensions](https://hwaro.hahwul.com/features/markdown-extensions/): Optional markdown extensions beyond standard CommonMark
+- [Menus](https://hwaro.hahwul.com/features/menus/): Hugo-style named navigation menus, config-defined or front-matter-registered
+- [Multilingual](https://hwaro.hahwul.com/features/multilingual/): Build multilingual sites with translation linking and hreflang tags
+- [Auto OG Images](https://hwaro.hahwul.com/features/og-images/): Auto-generate Open Graph preview images from page titles
+- [Output Formats](https://hwaro.hahwul.com/features/output-formats/): Render extra per-page/per-section output formats (JSON, XML, TXT, CSV) alongside HTML
+- [Pagination](https://hwaro.hahwul.com/features/pagination/): Split large content lists into multiple pages
+- [PWA](https://hwaro.hahwul.com/features/pwa/): Progressive Web App support with manifest.json and service worker
+- [Related Posts](https://hwaro.hahwul.com/features/related-posts/): Recommend related content based on shared taxonomy terms
+- [Sass/SCSS](https://hwaro.hahwul.com/features/sass/): Built-in SCSS compilation — pure Crystal, no external tools
+- [Search](https://hwaro.hahwul.com/features/search/): Generate a client-side search index with Fuse.js
+- [SEO](https://hwaro.hahwul.com/features/seo/): Built-in sitemaps, RSS feeds, robots.txt, and social sharing meta tags
+- [Series](https://hwaro.hahwul.com/features/series/): Group posts into ordered series for sequential reading
+- [Streaming Build](https://hwaro.hahwul.com/features/streaming-build/): Reduce memory usage by processing pages in batches
+- [Structured Data](https://hwaro.hahwul.com/features/structured-data/): Extended Schema.org JSON-LD support for rich search results
+- [Syntax Highlighting](https://hwaro.hahwul.com/features/syntax-highlighting/): Automatic syntax highlighting for code blocks
+- [AMP](https://hwaro.hahwul.com/ko/features/amp/): 콘텐츠 페이지의 AMP 호환 버전 생성
+- [에셋 파이프라인](https://hwaro.hahwul.com/ko/features/asset-pipeline/): 내장 CSS/JS 번들링, 압축, 핑거프린트
+- [자동 인클루드](https://hwaro.hahwul.com/ko/features/auto-includes/): CSS와 JS 파일을 모든 페이지에 자동으로 불러옵니다
+- [빌드 훅](https://hwaro.hahwul.com/ko/features/build-hooks/): 빌드 전후에 사용자 정의 셸 명령을 실행합니다
+- [캐시 버스팅](https://hwaro.hahwul.com/ko/features/cache-busting/): 에셋 URL에 콘텐츠 해시를 붙여 캐시를 무효화합니다
+- [콘텐츠 파일](https://hwaro.hahwul.com/ko/features/content-files/): content 디렉터리의 마크다운 이외 파일 게시
+- [배포 명령](https://hwaro.hahwul.com/ko/features/deployment/): hwaro deploy의 배포 대상 설정
+- [환경별 설정](https://hwaro.hahwul.com/ko/features/env-config/): 배포 환경마다 설정을 재정의합니다
+- [환경 변수](https://hwaro.hahwul.com/ko/features/env-variables/): 설정 파일과 템플릿에서 환경 변수를 참조합니다
+- [이미지 처리](https://hwaro.hahwul.com/ko/features/image-processing/): 빌드 시 자동 이미지 리사이즈, LQIP 플레이스홀더, 대표 색상 추출
+- [증분 빌드](https://hwaro.hahwul.com/ko/features/incremental-build/): 변경된 파일만 다시 빌드해 대규모 사이트의 빌드 속도를 높입니다
+- [LLMs.txt](https://hwaro.hahwul.com/ko/features/llms-txt/): AI와 LLM 크롤러를 위한 llms.txt 파일 생성
+- [마크다운 확장](https://hwaro.hahwul.com/ko/features/markdown-extensions/): 표준 CommonMark를 넘어서는 선택적 마크다운 확장
+- [메뉴](https://hwaro.hahwul.com/ko/features/menus/): 설정 또는 프론트 매터로 정의하는 Hugo 스타일의 이름 있는 내비게이션 메뉴
+- [다국어](https://hwaro.hahwul.com/ko/features/multilingual/): 번역 연결과 hreflang 태그를 갖춘 다국어 사이트 구축
+- [자동 OG 이미지](https://hwaro.hahwul.com/ko/features/og-images/): 페이지 제목으로 Open Graph 미리보기 이미지 자동 생성
+- [출력 포맷](https://hwaro.hahwul.com/ko/features/output-formats/): HTML과 함께 페이지/섹션별 추가 출력 포맷(JSON, XML, TXT, CSV) 렌더링
+- [페이지네이션](https://hwaro.hahwul.com/ko/features/pagination/): 긴 콘텐츠 목록을 여러 페이지로 분할
+- [PWA](https://hwaro.hahwul.com/ko/features/pwa/): manifest.json과 서비스 워커를 이용한 프로그레시브 웹 앱 지원
+- [관련 글](https://hwaro.hahwul.com/ko/features/related-posts/): 공유하는 택소노미 항목 기반 관련 콘텐츠 추천
+- [Sass/SCSS](https://hwaro.hahwul.com/ko/features/sass/): 순수 Crystal로 구현된 내장 SCSS 컴파일 — 외부 도구가 필요 없습니다
+- [검색](https://hwaro.hahwul.com/ko/features/search/): Fuse.js로 동작하는 클라이언트 사이드 검색 인덱스 생성
+- [SEO](https://hwaro.hahwul.com/ko/features/seo/): 기본 제공 사이트맵, RSS 피드, robots.txt, 소셜 공유 메타 태그
+- [시리즈](https://hwaro.hahwul.com/ko/features/series/): 글을 순서 있는 시리즈로 묶어 차례대로 읽게 하기
+- [스트리밍 빌드](https://hwaro.hahwul.com/ko/features/streaming-build/): 페이지를 배치 단위로 처리해 메모리 사용량을 줄입니다
+- [구조화된 데이터](https://hwaro.hahwul.com/ko/features/structured-data/): 리치 검색 결과를 위한 확장 Schema.org JSON-LD 지원
+- [구문 강조](https://hwaro.hahwul.com/ko/features/syntax-highlighting/): 코드 블록 자동 구문 강조
+
+## Integrations
+
+- [Agent Skills](https://hwaro.hahwul.com/integrations/skills/): Drop-in SKILL.md files for Claude Code, Cursor, OpenCode, Codex, and other skill-aware agents.
+- [에이전트 스킬](https://hwaro.hahwul.com/ko/integrations/skills/): Claude Code, Cursor, OpenCode, Codex 등 스킬 지원 에이전트에 바로 설치하는 SKILL.md 파일
+
+## Start
+
+- [CLI](https://hwaro.hahwul.com/ko/start/cli/): 사이트를 만들고, 빌드하고, 서빙하는 명령
+- [설정](https://hwaro.hahwul.com/ko/start/config/): config.toml 사이트 설정 레퍼런스
+- [첫 사이트 만들기](https://hwaro.hahwul.com/ko/start/first-site/): 5분 만에 첫 Hwaro 사이트 만들기
+- [설치](https://hwaro.hahwul.com/ko/start/installation/): 소스 또는 사전 빌드 바이너리로 Hwaro 설치
+- [CLI](https://hwaro.hahwul.com/start/cli/): Commands for creating, building, and serving your site
+- [Configuration](https://hwaro.hahwul.com/start/config/): Site configuration reference for config.toml
+- [First Site](https://hwaro.hahwul.com/start/first-site/): Create your first Hwaro site in 5 minutes
+- [Installation](https://hwaro.hahwul.com/start/installation/): Install Hwaro from source or pre-built binary
+
+## Tools & Completion
+
+- [agents-md](https://hwaro.hahwul.com/ko/start/tools/agents-md/): AGENTS.md 파일 생성 및 갱신
+- [check-links](https://hwaro.hahwul.com/ko/start/tools/check-links/): 콘텐츠 파일의 깨진 링크 검사
+- [ci (사용 중단)](https://hwaro.hahwul.com/ko/start/tools/ci/): CI/CD 워크플로 파일 생성 (사용 중단 — tool platform 사용)
+- [convert](https://hwaro.hahwul.com/ko/start/tools/convert/): 프론트 매터를 TOML, YAML, JSON 형식 간에 변환
+- [doctor](https://hwaro.hahwul.com/ko/start/tools/doctor/): 설정·템플릿·구조 문제 진단
+- [export](https://hwaro.hahwul.com/ko/start/tools/export/): 다른 플랫폼으로 콘텐츠 내보내기
+- [import](https://hwaro.hahwul.com/ko/start/tools/import/): 다양한 플랫폼에서 콘텐츠 가져오기
+- [list](https://hwaro.hahwul.com/ko/start/tools/list/): 상태별 콘텐츠 파일 목록 출력
+- [platform](https://hwaro.hahwul.com/ko/start/tools/platform/): 플랫폼 설정과 CI/CD 워크플로 파일 생성
+- [stats](https://hwaro.hahwul.com/ko/start/tools/stats/): 콘텐츠 통계 표시
+- [unused-assets](https://hwaro.hahwul.com/ko/start/tools/unused-assets/): 참조되지 않는 정적 파일 찾기
+- [validate](https://hwaro.hahwul.com/ko/start/tools/validate/): 콘텐츠 프론트 매터와 마크업 검증
+- [agents-md](https://hwaro.hahwul.com/start/tools/agents-md/): Generate or update AGENTS.md file
+- [check-links](https://hwaro.hahwul.com/start/tools/check-links/): Check for dead links in content files
+- [ci (deprecated)](https://hwaro.hahwul.com/start/tools/ci/): Generate CI/CD workflow files (deprecated — use tool platform)
+- [convert](https://hwaro.hahwul.com/start/tools/convert/): Convert frontmatter between TOML, YAML, and JSON formats
+- [doctor](https://hwaro.hahwul.com/start/tools/doctor/): Diagnose config, template, and structure issues
+- [export](https://hwaro.hahwul.com/start/tools/export/): Export content to other platforms
+- [import](https://hwaro.hahwul.com/start/tools/import/): Import content from various platforms
+- [list](https://hwaro.hahwul.com/start/tools/list/): List content files by status
+- [platform](https://hwaro.hahwul.com/start/tools/platform/): Generate platform config and CI/CD workflow files
+- [stats](https://hwaro.hahwul.com/start/tools/stats/): Show content statistics
+- [unused-assets](https://hwaro.hahwul.com/start/tools/unused-assets/): Find unreferenced static files
+- [validate](https://hwaro.hahwul.com/start/tools/validate/): Validate content frontmatter and markup
+
+## Templates
+
+- [데이터 모델](https://hwaro.hahwul.com/ko/templates/data-model/): 템플릿에서 사용하는 Site, Section, Page 데이터 타입
+- [필터](https://hwaro.hahwul.com/ko/templates/filters/): 파이프 연산자로 템플릿의 값 변환
+- [함수](https://hwaro.hahwul.com/ko/templates/functions/): 데이터 조회와 URL 생성을 위한 내장 함수
+- [렌더 훅](https://hwaro.hahwul.com/ko/templates/render-hooks/): Hugo/Zola 스타일 템플릿 훅으로 마크다운 요소의 렌더링 방식 재정의
+- [문법](https://hwaro.hahwul.com/ko/templates/syntax/): Jinja2 호환 템플릿 문법 레퍼런스
+- [Data Model](https://hwaro.hahwul.com/templates/data-model/): Site, Section, and Page data types available in templates
+- [Filters](https://hwaro.hahwul.com/templates/filters/): Transform values in templates with the pipe operator
+- [Functions](https://hwaro.hahwul.com/templates/functions/): Built-in functions for data retrieval and URL generation
+- [Render Hooks](https://hwaro.hahwul.com/templates/render-hooks/): Override how Markdown elements render with Hugo/Zola-style template hooks
+- [Syntax](https://hwaro.hahwul.com/templates/syntax/): Jinja2-compatible template syntax reference
+
+## Writing
+
+- [아키타입](https://hwaro.hahwul.com/ko/writing/archetypes/): 일관된 프론트 매터와 구조를 위한 콘텐츠 템플릿
+- [페이지](https://hwaro.hahwul.com/ko/writing/pages/): 프론트 매터 메타데이터가 있는 마크다운으로 페이지 생성
+- [섹션](https://hwaro.hahwul.com/ko/writing/sections/): 디렉터리 섹션으로 관련 콘텐츠 묶기
+- [숏코드](https://hwaro.hahwul.com/ko/writing/shortcodes/): 마크다운 콘텐츠에서 쓰는 재사용 가능한 템플릿 조각
+- [택소노미](https://hwaro.hahwul.com/ko/writing/taxonomies/): 태그, 카테고리, 커스텀 그룹으로 콘텐츠 구성
+- [Archetypes](https://hwaro.hahwul.com/writing/archetypes/): Content templates for consistent front matter and structure
+- [Pages](https://hwaro.hahwul.com/writing/pages/): Create pages from Markdown with front matter metadata
+- [Sections](https://hwaro.hahwul.com/writing/sections/): Group related content with directory sections
+- [Shortcodes](https://hwaro.hahwul.com/writing/shortcodes/): Reusable template snippets for Markdown content
+- [Taxonomies](https://hwaro.hahwul.com/writing/taxonomies/): Organize content with tags, categories, and custom groups
+
