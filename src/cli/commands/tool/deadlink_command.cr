@@ -31,6 +31,8 @@ module Hwaro
             FlagInfo.new(short: nil, long: "--concurrency", description: "Max concurrent requests (default: 8)", takes_value: true, value_hint: "N"),
             FlagInfo.new(short: nil, long: "--external-only", description: "Check external links only"),
             FlagInfo.new(short: nil, long: "--internal-only", description: "Check internal links only"),
+            FlagInfo.new(short: nil, long: "--ignore-url", description: "Skip links whose URL matches PATTERN (substring; * wildcards; repeatable)", takes_value: true, value_hint: "PATTERN"),
+            FlagInfo.new(short: nil, long: "--allow-status", description: "Treat these HTTP status codes as healthy (comma-separated, e.g. 403,429)", takes_value: true, value_hint: "CODES"),
             JSON_FLAG,
             HELP_FLAG,
           ]
@@ -78,6 +80,8 @@ module Hwaro
             concurrency = DEFAULT_CONCURRENCY
             external_only = false
             internal_only = false
+            ignore_patterns = [] of Regex
+            allowed_statuses = Set(Int32).new
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool check-links [options]"
@@ -106,6 +110,29 @@ module Hwaro
               end
               parser.on("--external-only", "Check external links only") { external_only = true }
               parser.on("--internal-only", "Check internal links only") { internal_only = true }
+              parser.on("--ignore-url PATTERN", "Skip links whose URL matches PATTERN (substring; * wildcards; repeatable)") do |v|
+                if v.strip.empty?
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "--ignore-url expects a non-empty pattern",
+                    hint: "Example: --ignore-url twitter.com or --ignore-url 'https://example.com/*'.",
+                  )
+                end
+                ignore_patterns << ignore_pattern_to_regex(v)
+              end
+              parser.on("--allow-status CODES", "Treat these HTTP status codes as healthy (comma-separated)") do |v|
+                v.split(',').each do |code|
+                  parsed = code.strip.to_i?
+                  unless parsed && (100..599).includes?(parsed)
+                    raise Hwaro::HwaroError.new(
+                      code: Hwaro::Errors::HWARO_E_USAGE,
+                      message: "Invalid --allow-status value: #{code.strip}",
+                      hint: "Pass comma-separated HTTP status codes between 100 and 599, e.g. --allow-status 403,429.",
+                    )
+                  end
+                  allowed_statuses << parsed
+                end
+              end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
@@ -136,14 +163,30 @@ module Hwaro
             external_links = internal_only ? [] of Link : find_external_links(target_dir)
             internal_links = external_only ? [] of Link : find_internal_links(target_dir)
 
+            # `--ignore-url` drops matching links BEFORE any check runs, so an
+            # ignored external host is never contacted at all — the point is
+            # silencing a known-flaky or paywalled domain in CI, not merely
+            # hiding its failure afterwards.
+            ignored_count = 0
+            unless ignore_patterns.empty?
+              before = external_links.size + internal_links.size
+              external_links = external_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
+              internal_links = internal_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
+              ignored_count = before - external_links.size - internal_links.size
+            end
+
             if external_links.empty? && internal_links.empty?
               if json_output
+                # `ignored_count` distinguishes "all healthy" from "an
+                # over-broad --ignore-url pattern checked nothing".
                 puts({
-                  "dead_internal" => [] of Result,
-                  "dead_external" => [] of Result,
+                  "dead_internal"    => [] of Result,
+                  "dead_external"    => [] of Result,
+                  "skipped_external" => [] of Result,
+                  "ignored_count"    => ignored_count,
                 }.to_json)
               else
-                Logger.outcome("checked", "no links found", :info)
+                Logger.outcome("checked", ignored_count > 0 ? "no links to check (#{ignored_count} ignored)" : "no links found", :info)
               end
               return
             end
@@ -151,7 +194,11 @@ module Hwaro
             # Check external links
             external_results = check_links_concurrently(external_links, timeout, concurrency)
             skipped_external = external_results.select { |r| r.error == "Skipped: private/internal address" }
-            dead_external = external_results.select { |r| !(200..299).includes?(r.status) && r.error != "Skipped: private/internal address" }
+            dead_external = external_results.select do |r|
+              !(200..299).includes?(r.status) &&
+                !allowed_statuses.includes?(r.status) &&
+                r.error != "Skipped: private/internal address"
+            end
 
             # Check internal links. Load taxonomy names from config.toml so
             # URLs like `/tags/` or `/categories/foo/` that Hwaro generates
@@ -174,9 +221,15 @@ module Hwaro
             dead_total = dead_external.size + dead_internal.size
 
             if json_output
+              # `skipped_external` names the links the SSRF guard refused to
+              # contact (private/localhost/.internal hosts). They used to be
+              # silently absent from the payload, so a JSON consumer could
+              # not tell "checked and healthy" from "never checked".
               puts({
-                "dead_internal" => dead_internal,
-                "dead_external" => dead_external,
+                "dead_internal"    => dead_internal,
+                "dead_external"    => dead_external,
+                "skipped_external" => skipped_external,
+                "ignored_count"    => ignored_count,
               }.to_json)
               # Exit non-zero so CI can gate on broken links (the JSON payload
               # has already been emitted to stdout for tooling to consume).
@@ -184,7 +237,9 @@ module Hwaro
               return
             end
 
-            Logger.section("scan", "#{external_links.size} external · #{internal_links.size} internal")
+            scan_detail = "#{external_links.size} external · #{internal_links.size} internal"
+            scan_detail += " · #{ignored_count} ignored" if ignored_count > 0
+            Logger.section("scan", scan_detail)
             links_noun = total == 1 ? "link" : "links"
 
             if dead_total == 0 && skipped_external.empty?
@@ -219,6 +274,15 @@ module Hwaro
             # usable as a CI gate; previously it always exited 0 regardless of
             # how many broken links were reported.
             exit(Hwaro::Errors::EXIT_GENERIC) if dead_total > 0
+          end
+
+          # Compile an `--ignore-url` pattern: matched as a SUBSTRING of the
+          # link URL as written, with `*` matching any run of characters.
+          # Everything else is literal — dots in domains don't need escaping.
+          # Matching is case-insensitive: URL hosts are case-insensitive, so
+          # `--ignore-url twitter.com` must also silence `https://Twitter.com/…`.
+          private def ignore_pattern_to_regex(pattern : String) : Regex
+            Regex.new(pattern.split('*').map { |part| Regex.escape(part) }.join(".*"), Regex::Options::IGNORE_CASE)
           end
 
           # Markdown links inside fenced code blocks or inline code spans are

@@ -528,11 +528,19 @@ hwaro tool agents-md --write      # Write AGENTS.md to file
 
 # JSON output
 hwaro tool list all --json
+hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
 hwaro tool doctor --json
 hwaro tool check-links --json
+hwaro tool import jekyll /path --json
+hwaro tool export hugo --json
+
+# Preview destructive/bulk operations without writing
+hwaro tool convert to-yaml --dry-run
+hwaro tool import jekyll /path --dry-run
+hwaro tool export hugo --dry-run
 ```
 
 **Subcommands:**
@@ -555,7 +563,7 @@ hwaro tool check-links --json
 
 | Flag | Description |
 |------|-------------|
-| -c, --content DIR | Limit to specific content directory |
+| -c, --content-dir DIR | Limit to specific content directory |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 

@@ -20,6 +20,9 @@ hwaro tool stats
 # Use a custom content directory
 hwaro tool stats -c posts
 
+# Chart the top 30 tags instead of the default 15
+hwaro tool stats --top 30
+
 # Output as JSON
 hwaro tool stats --json
 ```
@@ -28,7 +31,8 @@ hwaro tool stats --json
 
 | Flag | Description |
 |------|-------------|
-| -c, --content DIR | Content directory (default: content) |
+| -c, --content-dir DIR | Content directory (default: content) |
+| --top N | Show the top N tags in the chart (default: 15) |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
@@ -55,7 +59,9 @@ counted: 42 files, 37 published, 4 drafts · 1 future
 
 In a color terminal the same report renders as an `hwaro stats` heading, aligned
 receipt rows, proportional bar charts, and a `✦ counted` outcome line. When
-there are more than 15 tags, only the top 15 are charted (`tags: top 15`).
+there are more tags than the chart budget, only the top N are charted
+(`tags: top 15` by default — raise or lower it with `--top N`). The JSON
+output always contains every tag regardless of `--top`.
 
 ## JSON Output
 

@@ -76,6 +76,20 @@ module Hwaro
       Published
     end
 
+    # Sort key for listing content. `Date` is the historical default
+    # (newest first, path as tie-breaker); `Title` and `Path` sort
+    # ascending. `--reverse` flips whichever order the key produced.
+    #
+    # `Title` matches the template engine's `sort_by="title"` ordering
+    # (`Utils::SortUtils.compare_by_title`): a plain case-sensitive
+    # comparison with path as tie-breaker — the CLI listing and a rendered
+    # section index must not order the same titles differently.
+    enum ContentSort
+      Date
+      Title
+      Path
+    end
+
     # Publication state a file will have in a DEFAULT `hwaro build`.
     #
     # `draft` alone never described that: the build also drops future-dated
@@ -197,8 +211,15 @@ module Hwaro
         list_content(ContentFilter::Published)
       end
 
-      # List content files based on filter
-      def list_content(filter : ContentFilter) : Array(ContentInfo)
+      # List content files based on filter. `sort` picks the ordering key,
+      # `reverse` flips it, and `limit` caps the result AFTER sorting — so
+      # `--sort date --limit 5` means "the 5 newest", not 5 arbitrary files.
+      def list_content(
+        filter : ContentFilter,
+        sort : ContentSort = ContentSort::Date,
+        reverse : Bool = false,
+        limit : Int32? = nil,
+      ) : Array(ContentInfo)
         unless Dir.exists?(@content_dir)
           Logger.error "Content directory '#{@content_dir}' not found"
           return [] of ContentInfo
@@ -225,17 +246,33 @@ module Hwaro
           end
         end
 
-        # Sort by date (newest first), then by path
-        contents.sort_by! do |info|
-          {-(info.date.try(&.to_unix) || 0_i64), info.path}
+        case sort
+        in ContentSort::Date
+          # Sort by date (newest first), then by path
+          contents.sort_by! do |info|
+            {-(info.date.try(&.to_unix) || 0_i64), info.path}
+          end
+        in ContentSort::Title
+          # Case-sensitive, matching SortUtils.compare_by_title — see the
+          # enum comment. Path keeps equal titles deterministic.
+          contents.sort_by! { |info| {info.title, info.path} }
+        in ContentSort::Path
+          contents.sort_by!(&.path)
         end
+        contents.reverse! if reverse
+        contents = contents.first(limit) if limit
 
         contents
       end
 
       # Display content list in a formatted table
-      def display(filter : ContentFilter)
-        contents = list_content(filter)
+      def display(
+        filter : ContentFilter,
+        sort : ContentSort = ContentSort::Date,
+        reverse : Bool = false,
+        limit : Int32? = nil,
+      )
+        contents = list_content(filter, sort, reverse, limit)
 
         filter_name = case filter
                       when ContentFilter::Drafts    then "drafts"

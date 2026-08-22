@@ -23,8 +23,14 @@ module Hwaro
           POSITIONAL_ARGS    = [] of String
           POSITIONAL_CHOICES = [] of String
 
+          # Historical default for the tag chart; `--top` overrides it.
+          DEFAULT_TOP_TAGS = 15
+
+          TOP_FLAG = FlagInfo.new(short: nil, long: "--top", description: "Show the top N tags in the chart (default: #{DEFAULT_TOP_TAGS})", takes_value: true, value_hint: "N")
+
           FLAGS = [
             CONTENT_DIR_FLAG,
+            TOP_FLAG,
             JSON_FLAG,
             HELP_FLAG,
           ]
@@ -42,10 +48,22 @@ module Hwaro
           def run(args : Array(String))
             content_dir = "content"
             json_output = false
+            top = DEFAULT_TOP_TAGS
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool stats [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
+              CLI.register_flag(parser, TOP_FLAG) do |v|
+                parsed = v.to_i?
+                unless parsed && parsed > 0
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "Invalid --top value: #{v}",
+                    hint: "Pass a positive integer, e.g. --top 25.",
+                  )
+                end
+                top = parsed
+              end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
             end
@@ -108,17 +126,17 @@ module Hwaro
             # Top tags — bars scale against the most-used tag.
             unless result.tags.empty?
               Logger.info ""
-              Logger.section("tags", result.tags.size > 15 ? "top 15" : nil)
+              Logger.section("tags", result.tags.size > top ? "top #{top}" : nil)
               # Tag names come from semi-trusted front matter — strip control
               # bytes so a crafted tag can't inject ANSI into the report.
-              top_tags = result.tags.first(15).map { |tag, count| {Utils::TextUtils.strip_control(tag), count} }
+              top_tags = result.tags.first(top).map { |tag, count| {Utils::TextUtils.strip_control(tag), count} }
               max_count = top_tags.max_of { |_, count| count }
               label_width = top_tags.max_of { |tag, _| tag.size }.clamp(0, 20)
               top_tags.each do |tag, count|
                 Logger.info "    #{truncate_label(tag, label_width).ljust(label_width)}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
               end
-              if result.tags.size > 15
-                Logger.info "    … and #{result.tags.size - 15} more"
+              if result.tags.size > top
+                Logger.info "    … and #{result.tags.size - top} more"
               end
             end
 

@@ -59,6 +59,7 @@ module Hwaro
     OPEN_BROWSER_FLAG          = FlagInfo.new(short: nil, long: "--open", description: "Open browser after starting server")
     NO_OPEN_BROWSER_FLAG       = FlagInfo.new(short: nil, long: "--no-open", description: "Do not open browser after starting server (default behavior)")
     INPUT_DIR_FLAG             = FlagInfo.new(short: "-i", long: "--input", description: "Input directory (default: current directory)", takes_value: true, value_hint: "DIR")
+    DRY_RUN_FLAG               = FlagInfo.new(short: nil, long: "--dry-run", description: "Preview what would be written without changing any file")
     CONTENT_DIR_FLAG           = FlagInfo.new(short: "-c", long: "--content-dir", description: "Content directory (default: content)", takes_value: true, value_hint: "DIR")
 
     # Register a FlagInfo on an OptionParser, eliminating manual duplication

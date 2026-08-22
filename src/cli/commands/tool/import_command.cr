@@ -30,7 +30,9 @@ module Hwaro
             FlagInfo.new(short: "-o", long: "--output", description: "Output content directory (default: content)", takes_value: true, value_hint: "DIR"),
             DRAFTS_FLAG,
             FORCE_FLAG,
+            DRY_RUN_FLAG,
             VERBOSE_FLAG,
+            JSON_FLAG,
             HELP_FLAG,
           ]
 
@@ -45,7 +47,9 @@ module Hwaro
           end
 
           def run(args : Array(String))
-            options = parse_options(args)
+            options, json_output = parse_options(args)
+
+            Runner.enable_json_mode! if json_output
 
             supported = POSITIONAL_CHOICES.join(", ")
 
@@ -98,11 +102,13 @@ module Hwaro
                          )
                        end
 
-            Logger::Receipt.new(NAME, options.source_type)
+            receipt = Logger::Receipt.new(NAME, options.source_type)
               .row("source", options.path)
               .row("output", options.output_dir)
-              .emit
+            receipt.row("mode", "dry run — nothing will be written") if options.dry_run
+            receipt.emit
 
+            importer.dry_run = options.dry_run
             result = importer.run(options)
 
             unless result.success
@@ -122,10 +128,22 @@ module Hwaro
               )
             end
 
+            if json_output
+              puts({
+                "success"        => result.success,
+                "dry_run"        => options.dry_run,
+                "imported_count" => result.imported_count,
+                "skipped_count"  => result.skipped_count,
+                "error_count"    => result.error_count,
+                "files"          => importer.file_actions,
+              }.to_json)
+              return
+            end
+
             summary = "#{result.imported_count} files · #{result.skipped_count} skipped"
             summary += " · #{result.error_count} errors" if result.error_count > 0
             Logger.info "" if Logger.color_enabled?
-            Logger.outcome("imported", summary, glyph: result.error_count > 0 ? :err : :result)
+            Logger.outcome(options.dry_run ? "would import" : "imported", summary, glyph: result.error_count > 0 ? :err : :result)
 
             if result.skipped_count > 0 && !options.force
               Logger.warn "#{result.skipped_count} file(s) skipped because they may already exist (use --force to overwrite) or be drafts (use --drafts to import)."
@@ -158,11 +176,13 @@ module Hwaro
             end
           end
 
-          private def parse_options(args : Array(String)) : Config::Options::ImportOptions
+          private def parse_options(args : Array(String)) : {Config::Options::ImportOptions, Bool}
             output_dir = "content"
             drafts = false
             verbose = false
             force = false
+            dry_run = false
+            json_output = false
             positional = [] of String
 
             OptionParser.parse(args) do |parser|
@@ -170,7 +190,9 @@ module Hwaro
               parser.on("-o DIR", "--output DIR", "Output content directory (default: content)") { |dir| output_dir = dir }
               CLI.register_flag(parser, DRAFTS_FLAG) { |_| drafts = true }
               CLI.register_flag(parser, FORCE_FLAG) { |_| force = true }
+              CLI.register_flag(parser, DRY_RUN_FLAG) { |_| dry_run = true }
               CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
+              CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) do |_|
                 Logger.info parser.to_s
                 Logger.info ""
@@ -185,14 +207,16 @@ module Hwaro
             source_type = positional.shift? || ""
             path = positional.shift? || ""
 
-            Config::Options::ImportOptions.new(
+            options = Config::Options::ImportOptions.new(
               source_type: source_type,
               path: path,
               output_dir: output_dir,
               drafts: drafts,
               verbose: verbose,
               force: force,
+              dry_run: dry_run,
             )
+            {options, json_output}
           end
         end
       end

@@ -107,6 +107,8 @@ module Hwaro
             ["default-language-undefined"]),
           CheckSpec.new("markdown / pwa (valid enums)",
             ["markdown-math-engine-invalid", "pwa-cache-strategy-invalid"]),
+          CheckSpec.new("image processing (widths set)",
+            ["image-processing-widths-empty"]),
           CheckSpec.new("deployment / related (refs resolve)",
             ["deployment-target-undefined", "related-taxonomy-undefined"]),
           CheckSpec.new("menus (parent references)",
@@ -720,6 +722,16 @@ module Hwaro
         if config.markdown.math && !VALID_MATH_ENGINES.includes?(config.markdown.math_engine)
           issues << Issue.new(id: "markdown-math-engine-invalid", level: :warning, category: "config", file: @config_path,
             message: "markdown.math_engine \"#{config.markdown.math_engine}\" is not supported (expected: #{VALID_MATH_ENGINES.join(", ")})")
+        end
+
+        # An enabled [image_processing] with no widths is a silent no-op:
+        # the image hook returns early on an empty widths array and the
+        # renderer generates no srcset, so the user turns the feature on
+        # and nothing visibly happens. Same "enabled but silently does
+        # nothing" class as the math_engine and pwa checks around it.
+        if config.image_processing.enabled && config.image_processing.widths.empty?
+          issues << Issue.new(id: "image-processing-widths-empty", level: :warning, category: "config", file: @config_path,
+            message: "image_processing is enabled but widths is empty — no resized variants will be generated (set e.g. widths = [320, 640, 1024])")
         end
 
         # PWA cache_strategy is enforced at runtime via VALID_STRATEGIES.

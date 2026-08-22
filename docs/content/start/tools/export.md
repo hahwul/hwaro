@@ -35,10 +35,37 @@ hwaro tool export hugo --verbose
 | Flag | Description |
 |------|-------------|
 | -o, --output DIR | Output directory (default: export) |
-| -c, --content DIR | Content directory (default: content) |
+| -c, --content-dir DIR | Content directory (default: content) |
 | -d, --drafts | Include draft content |
+| --dry-run | Preview every destination without writing anything |
 | -v, --verbose | Show detailed output |
+| -j, --json | Output a per-file manifest as JSON |
 | -h, --help | Show help |
+
+Re-exporting into the same directory **replaces** the previous output — that
+is the normal refresh workflow. When a run replaces pre-existing files, the
+summary warns with the count, and the JSON manifest marks those rows
+`overwritten` (fresh destinations are `exported`). Use `--dry-run` to see the
+full manifest before writing.
+
+## JSON Output
+
+```json
+{
+  "success": true,
+  "dry_run": false,
+  "exported_count": 2,
+  "skipped_count": 0,
+  "error_count": 0,
+  "files": [
+    { "path": "export/_posts/2024-01-01-hello.md", "action": "exported" },
+    { "path": "export/about.md", "action": "overwritten" }
+  ]
+}
+```
+
+`files` lists every destination written — page-bundle assets included —
+while the counts cover content documents only.
 
 ## Field Mappings
 

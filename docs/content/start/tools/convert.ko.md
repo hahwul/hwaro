@@ -19,6 +19,9 @@ hwaro tool convert to-json
 # 특정 디렉터리만 변환
 hwaro tool convert to-yaml -c posts
 
+# 아무것도 바꾸지 않고 어떤 파일이 변환될지 미리보기
+hwaro tool convert to-yaml --dry-run
+
 # 결과를 JSON으로 출력
 hwaro tool convert to-yaml --json
 ```
@@ -27,9 +30,15 @@ hwaro tool convert to-yaml --json
 
 | 플래그 | 설명 |
 |------|-------------|
-| -c, --content DIR | 특정 콘텐츠 디렉터리로 변환 범위 제한 |
+| -c, --content-dir DIR | 특정 콘텐츠 디렉터리로 변환 범위 제한 |
+| --dry-run | 파일을 변경하지 않고 변환 대상만 미리보기 |
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
+
+변환은 파일을 제자리에서 다시 쓰며 프런트매터 주석을 보존할 수 없으므로,
+중요한 트리에는 `--dry-run`을 먼저 실행하세요. 파일을 쓰지 않을 뿐 파일별
+"dropping N comment line(s)" 경고를 포함한 전체 파이프라인이 동일하게
+동작합니다.
 
 ## JSON 출력
 
@@ -39,7 +48,8 @@ hwaro tool convert to-yaml --json
   "message": "Converted 5 files to YAML",
   "converted_count": 5,
   "skipped_count": 2,
-  "error_count": 0
+  "error_count": 0,
+  "dry_run": false
 }
 ```
 

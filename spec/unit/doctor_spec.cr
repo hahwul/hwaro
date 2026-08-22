@@ -158,6 +158,27 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # `[image_processing] enabled = true` with no widths is a silent
+      # no-op: the image hook returns early and no srcset is generated.
+      # Same "enabled but silently does nothing" class as math_engine.
+      it "warns when image_processing is enabled but widths is empty" do
+        config = base_config(%(\n[image_processing]\nenabled = true\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "image-processing-widths-empty" && i.level == :warning }.should be_true
+      end
+
+      it "does not warn when image_processing is enabled with widths set" do
+        config = base_config(%(\n[image_processing]\nenabled = true\nwidths = [320, 640]\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("image-processing-widths-empty")).should be_false
+      end
+
+      it "does not warn when image_processing is disabled" do
+        config = base_config(%(\n[image_processing]\nenabled = false\n))
+        issues = run_doctor(config)
+        issues.any?(&.id.==("image-processing-widths-empty")).should be_false
+      end
+
       # `Models::Config.load` silently coerces an unknown
       # `pwa.cache_strategy` back to "cache-first", so doctor reads the
       # raw TOML to surface what the user actually typed.

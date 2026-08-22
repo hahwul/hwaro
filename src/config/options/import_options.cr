@@ -8,6 +8,7 @@ module Hwaro
         property drafts : Bool
         property verbose : Bool
         property force : Bool
+        property dry_run : Bool
 
         def initialize(
           @source_type : String = "",
@@ -16,6 +17,7 @@ module Hwaro
           @drafts : Bool = false,
           @verbose : Bool = false,
           @force : Bool = false,
+          @dry_run : Bool = false,
         )
         end
       end

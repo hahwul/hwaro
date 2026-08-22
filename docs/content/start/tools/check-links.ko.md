@@ -18,6 +18,9 @@ hwaro tool check-links --timeout 30 --concurrency 4
 # 외부 또는 내부 링크만 검사
 hwaro tool check-links --external-only
 hwaro tool check-links --internal-only
+
+# 알려진 불안정 호스트 무시, 봇 차단 상태 코드 허용
+hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 ```
 
 ## 옵션
@@ -29,17 +32,35 @@ hwaro tool check-links --internal-only
 | --concurrency N | 최대 동시 요청 수 (기본값: 8) |
 | --external-only | 외부 링크만 검사 |
 | --internal-only | 내부 링크만 검사 |
+| --ignore-url PATTERN | URL이 PATTERN과 일치하는 링크는 건너뜀 (반복 가능) |
+| --allow-status CODES | 나열한 HTTP 상태 코드를 정상으로 취급 (쉼표 구분) |
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
+
+`--ignore-url`은 소스에 적힌 URL을 대소문자 구분 없는 부분 문자열로
+매칭합니다 — `--ignore-url twitter.com`은 `twitter.com`(또는 `Twitter.com`)이
+포함된 모든 링크를 건너뛰고, `*`는 임의 문자열과 매칭됩니다
+(`--ignore-url 'https://example.com/*'`). 여러 번 전달할 수 있으며, 매칭된
+링크에는 요청 자체를 보내지 않습니다. 무시된 개수는 스캔 라인과 JSON의
+`ignored_count`에 함께 표시되므로, "모두 정상"과 "패턴이 과하게 넓어 아무것도
+검사하지 않음"을 기계적으로 구분할 수 있습니다.
+
+`--allow-status`는 브라우저에는 정상 응답하면서 링크 검사기에는 `403`/`429`를
+돌려주는 호스트를 위한 것으로, 나열된 상태 코드는 CI를 실패시키지 않습니다.
 
 ## 동작 방식
 
 1. `content/` 디렉터리의 모든 마크다운 파일을 스캔
 2. 외부 URL(http/https 링크)과 내부 링크(상대/절대 경로)를 수집
-3. 외부 URL에 동시 HEAD 요청 전송
+3. 외부 URL에 동시 HEAD 요청 전송 (호스트가 HEAD를 405/403/501로 거부하면
+   GET으로 재시도, 리다이렉트는 최대 5회 추적)
 4. 내부 링크 대상이 디스크에 존재하는지 확인 (`.md`, `_index.md`, `index.md` 검사)
 5. 빌드가 생성하는 경로는 소스 파일 없이도 유효한 것으로 인정
 6. 깨졌거나 접근할 수 없는 링크 보고
+
+사설/내부 주소(localhost, RFC 1918 대역, `.local`/`.internal` 호스트)로
+해석되는 외부 링크에는 요청을 보내지 않습니다. 이런 링크는 사람용 출력과
+JSON의 `skipped_external` 항목 모두에 "건너뜀"으로 보고됩니다.
 
 ### 생성 경로
 
@@ -108,6 +129,18 @@ checked: 50 links, 3 dead
       "status": 404,
       "error": null
     }
-  ]
+  ],
+  "skipped_external": [
+    {
+      "link": {
+        "file": "content/notes/intranet.md",
+        "url": "http://wiki.internal/page",
+        "kind": "external"
+      },
+      "status": -1,
+      "error": "Skipped: private/internal address"
+    }
+  ],
+  "ignored_count": 0
 }
 ```

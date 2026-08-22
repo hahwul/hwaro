@@ -30,7 +30,7 @@ hwaro tool agents-md --write --force
 | `--local` (기본값) | 전체 내장 레퍼런스(약 260줄). 콘텐츠 형식, 템플릿 변수, 설정 레퍼런스, AI 에이전트 참고 사항 포함. 오프라인이나 로컬 LLM 환경에 적합 |
 | `--remote` | 경량 버전(약 50줄). 프로젝트 구조, 핵심 명령, 그리고 [온라인 문서](https://hwaro.hahwul.com)와 [LLM 레퍼런스](https://hwaro.hahwul.com/llms-full.txt) 링크가 담긴 AI 에이전트 참고 사항 포함 |
 
-두 모드 모두 프로젝트 고유의 규칙과 컨벤션을 적을 수 있는 **Site-Specific Instructions** 섹션을 포함합니다.
+두 모드 모두 프로젝트 고유의 규칙과 컨벤션을 적을 수 있는 **Site-Specific Instructions** 섹션을 포함합니다. `--write`로 다시 생성해도 이 섹션은 기존 파일에서 그대로 이어집니다 — 생성된 부분(모드 전환 포함)만 갱신되고 `## Site-Specific Instructions` 아래에 적은 내용은 변경 없이 보존됩니다. 보존은 정확히 이 헤딩을 기준으로 동작하므로, `## Site-Specific Instructions` 헤딩이 없는 기존 파일은 전체가 교체됩니다(실행 전에 프롬프트가, `--force`에서는 경고가 이를 알려줍니다).
 
 ## 옵션
 
@@ -39,10 +39,10 @@ hwaro tool agents-md --write --force
 | --remote | 온라인 문서 링크가 있는 경량 버전 생성 |
 | --local | 전체 내장 레퍼런스 생성 (기본값) |
 | --write | stdout 대신 AGENTS.md 파일로 저장 |
-| -f, --force | 기존 파일을 확인 없이 덮어쓰기 |
+| -f, --force | 확인 없이 기존 파일 재생성 (Site-Specific Instructions 섹션은 보존) |
 | -h, --help | 도움말 표시 |
 
-기본적으로 stdout에 출력하므로 저장하기 전에 내용을 살펴볼 수 있습니다. 파일로 저장하려면 `--write`를 사용합니다. `AGENTS.md`가 이미 있으면 `--force`를 쓰지 않는 한 확인을 요청합니다.
+기본적으로 stdout에 출력하므로 저장하기 전에 내용을 살펴볼 수 있습니다. 파일로 저장하려면 `--write`를 사용합니다. `AGENTS.md`가 이미 있으면 `--force`를 쓰지 않는 한 확인을 요청합니다. 어느 쪽이든 **Site-Specific Instructions** 섹션은 다시 쓰기 과정에서 보존됩니다.
 
 ## `hwaro init`와의 관계
 

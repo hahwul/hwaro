@@ -31,6 +31,9 @@ module Hwaro
       property converted_count : Int32
       property skipped_count : Int32
       property error_count : Int32
+      # True when the run only previewed: `converted_count` then means
+      # "would be converted" and no file was touched.
+      property dry_run : Bool
 
       def initialize(
         @success : Bool = true,
@@ -38,6 +41,7 @@ module Hwaro
         @converted_count : Int32 = 0,
         @skipped_count : Int32 = 0,
         @error_count : Int32 = 0,
+        @dry_run : Bool = false,
       )
       end
     end
@@ -77,7 +81,10 @@ module Hwaro
       # Content directory path
       @content_dir : String
 
-      def initialize(@content_dir : String = "content")
+      # A dry run performs the full detection/conversion pipeline — including
+      # the dropped-comment warnings, which are the main reason to preview an
+      # in-place bulk rewrite — but never writes a file back.
+      def initialize(@content_dir : String = "content", @dry_run : Bool = false)
       end
 
       # Convert all content files to YAML format
@@ -175,8 +182,12 @@ module Hwaro
         converted_content = convert_content(content, current_format, target_format)
 
         if converted_content
-          write_in_place(file_path, converted_content)
-          Logger.item(file_path, glyph: :ok)
+          if @dry_run
+            Logger.item("would convert: #{file_path}", glyph: :ok)
+          else
+            write_in_place(file_path, converted_content)
+            Logger.item(file_path, glyph: :ok)
+          end
           ConversionStatus::Converted
         else
           Logger.error "  Failed to convert: #{file_path}"
@@ -219,16 +230,17 @@ module Hwaro
         summary += " (#{skip_breakdown(skips, target_format)})" if skipped > 0
         summary += " · #{errors} errors" if errors > 0
         Logger.info "" if Logger.color_enabled?
-        Logger.outcome("converted", summary, glyph: errors > 0 ? :err : :result)
+        Logger.outcome(@dry_run ? "would convert" : "converted", summary, glyph: errors > 0 ? :err : :result)
 
         ConversionResult.new(
           success: errors == 0,
           # On failure `message` is what the CLI surfaces as the error, so it
           # has to describe the failure — not the (partial) success.
-          message: errors > 0 ? "#{errors} file(s) could not be converted to #{format_name}" : "Converted #{converted} files to #{format_name}",
+          message: errors > 0 ? "#{errors} file(s) could not be converted to #{format_name}" : "#{@dry_run ? "Would convert" : "Converted"} #{converted} files to #{format_name}",
           converted_count: converted,
           skipped_count: skipped,
-          error_count: errors
+          error_count: errors,
+          dry_run: @dry_run
         )
       end
 
