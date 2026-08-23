@@ -8,6 +8,12 @@ on:
       - shard.yml
       - shard.lock
       - docker/Dockerfile
+      # The image smoke test in build-docker exercises these two, so a PR that
+      # touches only them still has to run it — otherwise the job that exists
+      # to catch entrypoint/action regressions is skipped on exactly the PRs
+      # that can introduce one, and the failure lands on main instead.
+      - docker/entrypoint.sh
+      - action.yml
       - "**/*.cr"
   push:
     branches: [main]
@@ -59,11 +65,54 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: false
-          tags: ${{ steps.meta.outputs.tags }}
+          # A fixed local tag (rather than the metadata tags) so the smoke test
+          # below has a deterministic name to run. `load: true` puts the image
+          # in the runner's docker daemon; each matrix arch builds natively, so
+          # the single-platform load is valid.
+          load: true
+          tags: hwaro:ci
           labels: ${{ steps.meta.outputs.labels }}
           platforms: ${{ matrix.arch }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+      # Building the image proves it compiles; it does not prove it runs. The
+      # builder and the runner stage are different distros, so a glibc or
+      # SONAME mismatch (or a missing stage-package) surfaces only on `docker
+      # run` — which, without this, first happened in a user's workflow because
+      # this image is exactly what the composite action executes.
+      - name: Smoke test the image
+        env:
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+
+          # Both containers below run as uid 0 into the bind mount, so the tree
+          # comes out root-owned. Harmless on ephemeral hosted runners, but it
+          # would break the next run's checkout cleanup on a self-hosted one.
+          # Trap rather than a trailing rm so a failed assertion still cleans up.
+          trap 'sudo rm -rf smoke' EXIT
+
+          # 1. The binary links and starts.
+          docker run --rm hwaro:ci --version
+
+          # 2. Without GITHUB_ACTIONS the entrypoint passes through to the CLI.
+          mkdir -p smoke
+          docker run --rm -v "$PWD/smoke":/w -w /w hwaro:ci init --scaffold blog -q
+
+          # 3. With GITHUB_ACTIONS set, run the real action path end to end.
+          #    OUT_DIR is deliberately not the default, so this also covers the
+          #    build writing where the deploy step will look for it.
+          docker run --rm -v "$PWD/smoke":/github/workspace -w /github/workspace \
+            -e GITHUB_ACTIONS=true \
+            -e GITHUB_REPOSITORY="$REPO" \
+            -e GITHUB_ACTOR="$ACTOR" \
+            -e BUILD_ONLY=true \
+            -e OUT_DIR=dist \
+            hwaro:ci
+
+          test -f smoke/dist/index.html
+          echo "Smoke test passed."
   lint:
     runs-on: ubuntu-latest
     steps:
