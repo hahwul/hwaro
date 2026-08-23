@@ -113,9 +113,27 @@ main() {
         BUILD_FLAGS="--cache"
     fi
 
+    # The deploy step below publishes whatever is in "$OUT_DIR", so the build
+    # has to write there. Without this, the `output_dir` input was accepted and
+    # then ignored: the build wrote to hwaro's own default and deploy died on
+    # `cd "$OUT_DIR"`, while build_only runs exited 0 having produced nothing
+    # at the declared path.
+    #
+    # `-o` is appended last rather than the flags being rewritten, which relies
+    # on hwaro's OptionParser letting the last occurrence win (see the -o/-i
+    # handling in src/cli/commands/build_command.cr). That keeps the build
+    # output and the deploy source the same directory by construction even when
+    # build_flags carries its own -o.
+    #
+    # The pattern matches the glued short form too (`-odist`), which hwaro
+    # accepts — matching only `-o<space>` would skip the note for that spelling.
+    if [[ " $BUILD_FLAGS " =~ [[:space:]](-o[^[:space:]]*|--output)([[:space:]=]|$) ]]; then
+        echo "Note: -o/--output in build_flags is overridden; the output_dir input (${OUT_DIR}) is what gets deployed."
+    fi
+
     # Build the site
-    echo "Building with flags: ${BUILD_FLAGS:-(none)}"
-    hwaro build $BUILD_FLAGS
+    echo "Building with flags: ${BUILD_FLAGS:-(none)} -o ${OUT_DIR}"
+    hwaro build $BUILD_FLAGS -o "$OUT_DIR"
 
     if [[ "$BUILD_ONLY" == "true" ]]; then
         echo "✅ Build complete. Deployment skipped by request."
