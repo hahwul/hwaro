@@ -2668,16 +2668,31 @@ module Hwaro::Core::Build::Phases::Render
   # Head markup wiring up the `[pwa]` outputs: the manifest link, a
   # theme-color meta, and a service-worker registration for sw.js (both
   # URLs go through `with_base_path` so sub-path deploys keep working).
+  #
+  # Every interpolated value is config-authored free text, so each one is
+  # escaped for the context it lands in — `HTML.escape` inside the two
+  # attributes (a `theme_color` carrying a quote used to close the
+  # attribute early and inject markup into the `<head>` of every page),
+  # and a JSON string literal inside the inline `<script>`, where HTML
+  # entities are NOT decoded and would corrupt the URL instead.
   private def pwa_tags(config : Models::Config) : String
     return "" unless config.pwa.enabled
 
     manifest_url = config.with_base_path("/manifest.json")
     sw_url = config.with_base_path("/sw.js")
     String.build do |str|
-      str << %(<link rel="manifest" href="#{manifest_url}">\n)
-      str << %(<meta name="theme-color" content="#{config.pwa.theme_color}">\n)
-      str << %(<script>if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("#{sw_url}"); }); }</script>)
+      str << %(<link rel="manifest" href="#{HTML.escape(manifest_url)}">\n)
+      str << %(<meta name="theme-color" content="#{HTML.escape(config.pwa.theme_color)}">\n)
+      str << %(<script>if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register(#{js_string_literal(sw_url)}); }); }</script>)
     end
+  end
+
+  # A JS string literal safe to embed in an inline `<script>`: JSON quoting
+  # handles quotes/backslashes/control characters, and `</` is split so a
+  # value containing `</script>` cannot terminate the element early (the
+  # HTML parser looks for that byte sequence without parsing JS).
+  private def js_string_literal(value : String) : String
+    value.to_json.gsub("</", "<\\/")
   end
 
   private def warn_missing_local_highlight_assets(config : Models::Config)

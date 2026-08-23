@@ -66,10 +66,15 @@ describe "Scaffold embedded assets" do
         Hwaro::Services::Scaffolds::Book.new.static_files["js/book.js"],
       }.each do |js|
         # Descending sort + negated content offset = earlier-is-better;
-        # the un-negated form ranked later occurrences higher (and let a
-        # content match at offset > 100 outrank every title match).
-        js.should contain("? 100 - titleIdx : -contentIdx")
-        js.should_not contain("? 100 - titleIdx : contentIdx")
+        # the un-negated form ranked later occurrences higher.
+        js.should contain("? 1e9 - titleIdx : -contentIdx")
+        js.should_not contain(": contentIdx")
+        # The title bonus must exceed every offset a title can reach, or a
+        # match late in a long title scores below a content-only hit. The
+        # old `100 - titleIdx` went negative past column 100, so a title
+        # matching at index 150 (-50) lost to a content match at index 10
+        # (-10) — the exact inversion this rank order exists to prevent.
+        js.should_not contain("100 - titleIdx")
       end
     end
 
