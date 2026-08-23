@@ -55,11 +55,11 @@ module Hwaro
         # book-container so `footer.html`'s closing tags match the
         # body's open tags.
         #
-        # Taxonomy templates are not shipped by default because the book
-        # config no longer enables `[[taxonomies]]` (book scaffolds are
-        # ordered chapter-style and don't use tags). They're still emitted
-        # if the user opts in via `--include-taxonomies` (skip_taxonomies
-        # = false is the default; the flag flips this to true).
+        # Taxonomy templates are never shipped: the book config enables no
+        # `[[taxonomies]]` (book scaffolds are ordered chapter-style and
+        # don't use tags — see `ships_taxonomies?`), so the templates would
+        # be dead files. Users who want taxonomies can copy them from the
+        # simple/blog scaffolds along with a `[[taxonomies]]` block.
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           {
             "header.html"               => header_template,
@@ -83,7 +83,7 @@ module Hwaro
         def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           config = String.build do |str|
             str << base_config(config_title, config_description)
-            str << multilingual_config(multilingual_languages)
+            str << multilingual_config(multilingual_languages, skip_taxonomies)
             str << plugins_config
             str << content_files_config
             str << highlight_config
@@ -120,6 +120,16 @@ module Hwaro
           ConfigSnippets.related(commented: true)
         end
 
+        # No `[[taxonomies]]` anywhere in book's config — the DEFAULT
+        # (balanced/minimal) path previously still emitted the block via
+        # `minimal_taxonomies_toml`, contradicting the full-config opt-out
+        # above. This hook also keeps multilingual `[languages.<code>]`
+        # blocks from carrying dead per-language `taxonomies = [...]`
+        # lists (see `Base`).
+        protected def ships_taxonomies? : Bool
+          false
+        end
+
         # Book header — `page.title` and `page.description` are guarded
         # so untitled pages don't render `<title> - Site</title>` or an
         # empty description meta.
@@ -139,6 +149,7 @@ module Hwaro
               {{ jsonld }}
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
+              {{ pwa_tags }}
               #{styles}
               {# The syntax theme is inlined in css/style.css, so no highlight theme
                  stylesheet link is emitted here (sub-path safe). Highlight.js itself
@@ -182,7 +193,7 @@ module Hwaro
             MD
         end
 
-        # The stylesheet opens with the shared ember `:root` prelude (see
+        # The stylesheet opens with the shared flare `:root` prelude (see
         # DesignTokens): every color token carries both schemes, so this
         # one sheet serves light and dark — the theme switcher pins one
         # side via `data-theme`. Book's geometry (header
@@ -520,7 +531,7 @@ module Hwaro
               left: 0;
               bottom: 0;
               width: 2.75rem;
-              height: 3px;
+              height: 4px;
               border-radius: 999px;
               background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
@@ -1340,7 +1351,9 @@ module Hwaro
                   var titleIdx = item.title.toLowerCase().indexOf(q);
                   var contentIdx = item.content.toLowerCase().indexOf(q);
                   if (titleIdx !== -1 || contentIdx !== -1) {
-                    var score = titleIdx !== -1 ? 100 - titleIdx : contentIdx;
+                    // Earlier matches rank higher; every title match outranks
+                    // every content-only match (hence the negated offset).
+                    var score = titleIdx !== -1 ? 100 - titleIdx : -contentIdx;
                     results.push({ item: item, score: score });
                   }
                 }
@@ -1385,6 +1398,7 @@ module Hwaro
                 input.addEventListener('keydown', function (e) {
                   var items = resultsEl.querySelectorAll('.search-result-item');
                   var count = items.length;
+                  if (count === 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
                   if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     activeIndex = (activeIndex + 1) % count;

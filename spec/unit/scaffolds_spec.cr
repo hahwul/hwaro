@@ -105,6 +105,20 @@ describe Hwaro::Services::Scaffolds::Simple do
       end
     end
 
+    it "wires PWA tags into the header of styled scaffolds" do
+      # Regression: enabling [pwa] wrote manifest.json + sw.js but no page
+      # linked the manifest or registered the service worker. The header
+      # includes `{{ pwa_tags }}` (empty string while [pwa] is disabled).
+      {
+        Hwaro::Services::Scaffolds::Simple.new,
+        Hwaro::Services::Scaffolds::Blog.new,
+        Hwaro::Services::Scaffolds::Docs.new,
+        Hwaro::Services::Scaffolds::Book.new,
+      }.each do |scaffold|
+        scaffold.template_files["header.html"].should contain("{{ pwa_tags }}")
+      end
+    end
+
     it "renders the header nav through the menu system (get_menu + active_path)" do
       # The nav used to hardcode links, with an inert commented-out
       # `{% raw %}`-wrapped dynamic-loop example for users to copy out. It's

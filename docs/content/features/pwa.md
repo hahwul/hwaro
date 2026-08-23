@@ -61,7 +61,19 @@ Place icon files in your `static/` directory so they are copied to the build out
 
 ## Template Integration
 
-Add the manifest link and service worker registration to your base template:
+The easiest wiring is the `{{ pwa_tags }}` template variable — it expands to
+the manifest link, a theme-color meta, and the service worker registration
+(already base-path-prefixed), and renders as an empty string while `[pwa]` is
+disabled. The scaffold header templates include it out of the box:
+
+```jinja
+<head>
+  {{ pwa_tags }}
+</head>
+```
+
+To wire things manually instead, add the manifest link and service worker
+registration to your base template:
 
 ```html
 <head>

@@ -90,19 +90,57 @@ end
 # multilingual blog emitted a dead `/ko/authors/` link.
 describe "scaffold multilingual taxonomy config integrity" do
   scaffold_fixtures.each do |name, scaffold|
-    it "#{name}: every per-language taxonomies list covers the global taxonomy set" do
-      config = load_config_from_string(scaffold.minimal_config_content(false, ["en", "ko"]))
+    # Both config paths: the default/minimal one and --full-config (the
+    # full path previously emitted [languages.X] blocks with no
+    # per-language taxonomies line at all).
+    {"minimal", "full"}.each do |mode|
+      it "#{name} (#{mode} config): every per-language taxonomies list covers the global taxonomy set" do
+        toml = mode == "minimal" ? scaffold.minimal_config_content(false, ["en", "ko"]) : scaffold.config_content(false, ["en", "ko"])
+        config = load_config_from_string(toml)
 
-      global_taxonomies = config.taxonomies.map(&.name).to_set
-      next if global_taxonomies.empty? # scaffolds without taxonomies (e.g. bare)
+        global_taxonomies = config.taxonomies.map(&.name).to_set
+        next if global_taxonomies.empty? # scaffolds without taxonomies (e.g. bare/book)
 
-      config.languages.each do |lang_code, lang_cfg|
-        missing = global_taxonomies - lang_cfg.taxonomies.to_set
-        missing.should(
-          eq(Set(String).new),
-          "language '#{lang_code}' omits taxonomies #{missing.to_a} that the global [[taxonomies]] " \
-          "defines; the root would emit them but '#{lang_code}' would not, leaving dead links"
-        )
+        config.languages.each do |lang_code, lang_cfg|
+          missing = global_taxonomies - lang_cfg.taxonomies.to_set
+          missing.should(
+            eq(Set(String).new),
+            "language '#{lang_code}' omits taxonomies #{missing.to_a} that the global [[taxonomies]] " \
+            "defines; the root would emit them but '#{lang_code}' would not, leaving dead links"
+          )
+        end
+      end
+    end
+  end
+end
+
+# Multilingual menu regression: a language with no `menus` key inherits the
+# top-level `[[menus.main]]` entries verbatim, whose URLs are not locale
+# prefixed — so the nav on a `/ko/…` page pointed straight back at the
+# default-language pages. Menu-driven scaffolds must emit
+# `[[languages.<code>.menus.main]]` mirrors with `/<code>/…` URLs for every
+# non-default language.
+describe "scaffold multilingual menu config integrity" do
+  {"blog", "simple"}.each do |name|
+    scaffold = scaffold_fixtures[name]
+    {"minimal", "full"}.each do |mode|
+      it "#{name} (#{mode} config): non-default languages get locale-prefixed main menus" do
+        toml = mode == "minimal" ? scaffold.minimal_config_content(false, ["en", "ko"]) : scaffold.config_content(false, ["en", "ko"])
+        toml.should contain("[[languages.ko.menus.main]]")
+        config = load_config_from_string(toml)
+
+        ko_menus = config.languages["ko"].menus
+        ko_menus.should_not be_nil
+        main = ko_menus.not_nil!["main"]
+        main.should_not be_empty
+        main.each do |entry|
+          entry.url.should(
+            start_with("/ko/"),
+            "ko menu entry '#{entry.name}' points at '#{entry.url}' — not locale-prefixed"
+          )
+        end
+        # The default language keeps the top-level entries (no mirror emitted).
+        toml.should_not contain("[[languages.en.menus.main]]")
       end
     end
   end

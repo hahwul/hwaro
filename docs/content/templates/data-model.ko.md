@@ -538,6 +538,7 @@ pros = ["Fast", "Reliable"]
 | auto_includes_css | 자동 인클루드된 CSS `<link>` 태그 |
 | auto_includes_js | 자동 인클루드된 JS `<script>` 태그 |
 | auto_includes | 모든 자동 인클루드 태그 |
+| pwa_tags | PWA manifest 링크, theme-color 메타, 서비스 워커 등록 태그(`[pwa]` 비활성 시 빈 문자열) |
 
 ```jinja
 <head>

@@ -121,7 +121,7 @@ module Hwaro
             str << base_config(config_title, config_description)
 
             # Content & Processing
-            str << multilingual_config(multilingual_languages)
+            str << multilingual_config(multilingual_languages, skip_taxonomies)
             str << plugins_config
             str << content_files_config
             str << highlight_config
@@ -175,6 +175,7 @@ module Hwaro
               {{ jsonld }}
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
+              {{ pwa_tags }}
               #{styles}
               {# The syntax theme is inlined in css/style.css, so no highlight theme
                  stylesheet link is emitted here (sub-path safe). Highlight.js itself
@@ -428,7 +429,7 @@ module Hwaro
               left: 0;
               bottom: 0;
               width: 2.75rem;
-              height: 3px;
+              height: 4px;
               border-radius: 999px;
               background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
@@ -1591,7 +1592,10 @@ module Hwaro
             description = "Page description for SEO"
             +++
 
-            # Your Content Here
+            ## Your first section
+
+            The templates already render `title` as the page's `<h1>`, so
+            the body starts at heading level 2.
             ```
 
             ## Sections
@@ -1628,15 +1632,19 @@ module Hwaro
 
             ## Template Directory
 
-            Templates are stored in `templates/`:
+            Templates are stored in `templates/`. This site ships:
 
             ```
             templates/
-            ├── base.html       # Base template with common structure
+            ├── header.html     # <head> + opening chrome, included everywhere
+            ├── footer.html     # Closing chrome + scripts
             ├── page.html       # Regular pages
             ├── section.html    # Section indexes
-            ├── partials/       # Partial templates
-            │   └── nav.html
+            ├── 404.html        # Not-found page
+            ├── partials/       # Shared fragments ({% include %})
+            │   ├── nav.html
+            │   ├── search.html
+            │   └── sidebar.html
             └── shortcodes/     # Shortcode templates
             ```
 
@@ -1653,7 +1661,9 @@ module Hwaro
 
             ## Template Inheritance
 
-            Extend base templates:
+            This site composes pages with `{% include %}` (header/footer/partials),
+            but Crinja also supports `{% extends %}` if you prefer a base layout —
+            create a `templates/base.html` and extend it:
 
             ```jinja
             {% extends "base.html" %}
@@ -1789,7 +1799,8 @@ module Hwaro
             | Option | Description |
             |--------|-------------|
             | `--scaffold TYPE` | Scaffold type: simple, bare, blog, docs, book (default: simple) |
-            | `--force` | Overwrite existing files |
+            | `--force` | Allow a non-empty directory (keeps existing files, adds only missing ones) |
+            | `--clean` | Remove the target directory's contents first (refuses if `.git/` exists) |
             | `--skip-sample-content` | Don't create sample content |
 
             **Examples:**
@@ -1881,7 +1892,7 @@ module Hwaro
             |-----|------|---------|-------------|
             | `enabled` | bool | false | Enable search index |
             | `format` | string | "fuse_json" | Index format |
-            | `fields` | array | ["title"] | Fields to index |
+            | `fields` | array | ["title", "content"] | Fields to index |
 
             ## Sitemap
 

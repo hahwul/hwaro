@@ -2582,6 +2582,13 @@ module Hwaro::Core::Build::Phases::Render
     vars["math_tags"] = Crinja::Value.new(config.markdown.math_tags)
     vars["mermaid_tags"] = Crinja::Value.new(config.markdown.mermaid_tags)
 
+    # PWA wiring. `[pwa] enabled = true` writes manifest.json + sw.js into
+    # the output, but neither does anything until a page links the manifest
+    # and registers the service worker. `{{ pwa_tags }}` carries both (plus
+    # a theme-color meta); it resolves to "" while [pwa] is disabled, so
+    # headers can include it unconditionally — same contract as math_tags.
+    vars["pwa_tags"] = Crinja::Value.new(pwa_tags(config))
+
     # Auto includes
     vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust))
     vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust))
@@ -2656,6 +2663,21 @@ module Hwaro::Core::Build::Phases::Render
       missing << "/assets/js/highlight.min.js" unless File.exists?(js_rel)
     end
     missing
+  end
+
+  # Head markup wiring up the `[pwa]` outputs: the manifest link, a
+  # theme-color meta, and a service-worker registration for sw.js (both
+  # URLs go through `with_base_path` so sub-path deploys keep working).
+  private def pwa_tags(config : Models::Config) : String
+    return "" unless config.pwa.enabled
+
+    manifest_url = config.with_base_path("/manifest.json")
+    sw_url = config.with_base_path("/sw.js")
+    String.build do |str|
+      str << %(<link rel="manifest" href="#{manifest_url}">\n)
+      str << %(<meta name="theme-color" content="#{config.pwa.theme_color}">\n)
+      str << %(<script>if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("#{sw_url}"); }); }</script>)
+    end
   end
 
   private def warn_missing_local_highlight_assets(config : Models::Config)

@@ -14,7 +14,7 @@ module Hwaro
         end
 
         def description : String
-          "Homepage, about page, taxonomies (tags/categories/authors), and search"
+          "Homepage, about page, taxonomies (tags/categories/authors), and a search index"
         end
 
         def content_files(skip_taxonomies : Bool = false) : Hash(String, String)
@@ -61,7 +61,7 @@ module Hwaro
             str << base_config
 
             # Content & Processing
-            str << multilingual_config(multilingual_languages)
+            str << multilingual_config(multilingual_languages, skip_taxonomies)
             str << plugins_config
             str << content_files_config
             str << highlight_config
@@ -71,7 +71,7 @@ module Hwaro
             str << series_config
             str << related_config
             str << taxonomies_config unless skip_taxonomies
-            str << menus_config
+            str << menus_config(multilingual_languages)
 
             # SEO & Feeds
             str << sitemap_config
@@ -101,27 +101,17 @@ module Hwaro
         # links the scaffold's own content creates (index.md, about.md).
         # Add a third entry here (or register a page/section into "main"
         # from its own front matter with `menus = ["main"]`) to extend the
-        # nav without touching a template.
-        private def menu_entries_toml : String
-          <<-TOML
-
-            [[menus.main]]
-            name = "Home"
-            url = "/"
-            weight = 1
-
-            [[menus.main]]
-            name = "About"
-            url = "/about/"
-            weight = 2
-
-            TOML
+        # nav without touching a template. Multilingual projects also get
+        # `[[languages.<code>.menus.main]]` mirrors with locale-prefixed
+        # URLs (see `Base#main_menu_toml`).
+        private def menu_entries_toml(multilingual_languages : Array(String) = [] of String) : String
+          main_menu_toml([{"Home", "/"}, {"About", "/about/"}], multilingual_languages)
         end
 
         # `--full-config` path: same entries as `minimal_config_content`
         # below, with a discoverability banner matching the rest of
         # `config_content`'s commented sections.
-        protected def menus_config : String
+        protected def menus_config(multilingual_languages : Array(String) = [] of String) : String
           banner = <<-TOML
 
             # =============================================================================
@@ -133,7 +123,7 @@ module Hwaro
             # front matter with `menus = ["main"]` — no template edit
             # required either way.
             TOML
-          banner + menu_entries_toml
+          banner + menu_entries_toml(multilingual_languages)
         end
 
         # `hwaro init`'s DEFAULT path (no `--full-config`) and
@@ -143,16 +133,18 @@ module Hwaro
         # config with no `[[menus.*]]` at all, rendering an empty nav out
         # of the box.
         def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
-          super + menu_entries_toml
+          super + menu_entries_toml(multilingual_languages)
         end
 
         # Overrides Base#navigation: renders the "main" menu instead of two
         # hardcoded links, so adding a nav item no longer requires editing
-        # this template.
+        # this template. `item.name` defaults to the page title when a menu
+        # is registered from front matter, so it's escaped like any other
+        # author-controlled value.
         protected def navigation : String
           <<-NAV
             <nav>
-              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>{% endfor %}
+              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
             </nav>
             NAV
         end

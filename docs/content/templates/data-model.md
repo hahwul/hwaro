@@ -541,6 +541,7 @@ Pre-rendered `<link>` and `<script>` tags for convenience. These are generated f
 | auto_includes_css | Auto-included CSS `<link>` tags |
 | auto_includes_js | Auto-included JS `<script>` tags |
 | auto_includes | All auto-include tags |
+| pwa_tags | PWA manifest link, theme-color meta, and service-worker registration (empty unless `[pwa]` is enabled) |
 
 ```jinja
 <head>

@@ -83,7 +83,9 @@ module Hwaro
             # =============================================================================
             # PWA (Progressive Web App) (Optional)
             # =============================================================================
-            # Generate manifest.json and service worker for offline access
+            # Generate manifest.json and service worker for offline access.
+            # The scaffold header templates emit {{ pwa_tags }}, which injects the
+            # manifest link and service-worker registration automatically once enabled.
 
             # [pwa]
             # enabled = true
@@ -102,7 +104,9 @@ module Hwaro
             # =============================================================================
             # PWA (Progressive Web App) (Optional)
             # =============================================================================
-            # Generate manifest.json and service worker for offline access and installability
+            # Generate manifest.json and service worker for offline access and installability.
+            # The scaffold header templates emit {{ pwa_tags }}, which injects the
+            # manifest link and service-worker registration automatically once enabled.
 
             # [pwa]
             # enabled = true

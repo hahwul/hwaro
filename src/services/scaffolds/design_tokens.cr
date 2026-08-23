@@ -105,8 +105,8 @@ module Hwaro
 
               /* Shape, depth, motion, measure. */
               --measure: 68ch;
-              --radius: 10px;
-              --radius-sm: 6px;
+              --radius: 12px;
+              --radius-sm: 8px;
               --shadow-sm: 0 1px 2px light-dark(rgba(42, 36, 31, 0.05), rgba(0, 0, 0, 0.3));
               --shadow:    0 2px 8px light-dark(rgba(42, 36, 31, 0.08), rgba(0, 0, 0, 0.4));
               --shadow-lg: 0 16px 70px light-dark(rgba(42, 36, 31, 0.18), rgba(0, 0, 0, 0.5));
@@ -203,10 +203,14 @@ module Hwaro
             .code-filename { padding: 0.35rem 0.85rem; font-family: var(--font-mono, monospace); font-size: 0.78rem; color: var(--text-muted); background: color-mix(in srgb, var(--code-bg, var(--surface)) 88%, var(--text-muted)); border: 1px solid var(--border); border-bottom: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 
             /* Copy button: [highlight] copy / {copy=true}. The theme-neutral inline
-               styles from {{ highlight_js }} ship in-body AFTER this stylesheet, so
+               styles from the highlight_js tag ship in-body AFTER this stylesheet, so
                at equal specificity they would win — the doubled .code-copy-btn class
                keeps every token-based rule here strictly more specific. Named blocks
-               anchor the button on .code-block itself (no extra wrapper). */
+               anchor the button on .code-block itself (no extra wrapper).
+               (No Jinja braces in this comment: the simple scaffold inlines this
+               CSS into a template, so a literal expression here would be rendered
+               — and the expanded tag's own closing style tag would cut this
+               stylesheet short, spilling the rest as page text.) */
             .code-wrapper { position: relative; }
             .code-copy-btn.code-copy-btn { position: absolute; top: 0.45rem; right: 0.45rem; padding: 0.25rem 0.6rem; font-family: var(--font-mono, monospace); font-size: 0.72rem; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); opacity: 0; cursor: pointer; transition: opacity 0.15s ease; }
             .code-wrapper:hover .code-copy-btn.code-copy-btn, .code-block:hover .code-copy-btn.code-copy-btn, .code-copy-btn.code-copy-btn:focus-visible { opacity: 1; }
