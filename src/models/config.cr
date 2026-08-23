@@ -680,6 +680,16 @@ module Hwaro
       # behavior: any template change rebuilds every page.
       property template_deps : Bool = true
 
+      # Defaults for the matching `hwaro build` flags. Nil means the key is
+      # absent from config.toml, which is what keeps the precedence chain
+      # honest: a command-line flag beats config.toml, config.toml beats the
+      # built-in default, and an absent key changes nothing. See
+      # `Config::Options::BuildOptions#apply_build_config!` for the merge.
+      property output_dir : String? = nil
+      property drafts : Bool? = nil
+      property parallel : Bool? = nil
+      property cache : Bool? = nil
+
       def initialize
         @hooks = BuildHooksConfig.new
       end
@@ -1971,6 +1981,22 @@ module Hwaro
         return unless s = config.raw["build"]?.try(&.as_h?)
 
         config.build.template_deps = bool_value(s["template_deps"]?, config.build.template_deps)
+
+        # Left nil when absent so the CLI/default layers below stay in charge.
+        # An empty `output_dir = ""` is dropped rather than accepted: it would
+        # otherwise resolve to the site root and hand the output guard a
+        # directory the build is about to wipe.
+        if raw_output = s["output_dir"]?.try(&.as_s?)
+          trimmed = raw_output.strip
+          if trimmed.empty?
+            Logger.warn "Ignoring empty [build] output_dir in config; using #{config.build.output_dir || "the default"}."
+          else
+            config.build.output_dir = trimmed
+          end
+        end
+        config.build.drafts = s["drafts"]?.try(&.as_bool?)
+        config.build.parallel = s["parallel"]?.try(&.as_bool?)
+        config.build.cache = s["cache"]?.try(&.as_bool?)
 
         if hooks_section = s["hooks"]?.try(&.as_h?)
           if pre_hooks = hooks_section["pre"]?.try(&.as_a?)

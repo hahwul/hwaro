@@ -65,8 +65,7 @@ module Hwaro
         end
 
         def run(args : Array(String))
-          result, input_dir, json_output = parse_options(args)
-          options, output_dir_explicit = result
+          options, input_dir, json_output = parse_options(args)
 
           # --json implies quiet so only the final JSON document reaches stdout.
           Runner.enable_json_mode! if json_output
@@ -88,7 +87,7 @@ module Hwaro
             # Only resolve output_dir to absolute path when -o was explicitly
             # specified, so it stays relative to the original CWD.
             # The default "public" should remain relative to the input directory.
-            if output_dir_explicit && !Path[options.output_dir].absolute?
+            if options.output_dir_explicit && !Path[options.output_dir].absolute?
               options.output_dir = File.expand_path(options.output_dir)
             end
 
@@ -161,7 +160,7 @@ module Hwaro
           end
         end
 
-        def parse_options(args : Array(String)) : { {Config::Options::BuildOptions, Bool}, String?, Bool }
+        def parse_options(args : Array(String)) : {Config::Options::BuildOptions, String?, Bool}
           # Path & URL
           input_dir = nil.as(String?)
           output_dir = "public"
@@ -243,7 +242,7 @@ module Hwaro
             Logger.warn "--jobs #{workers} is ignored because --no-parallel disables parallel rendering."
           end
 
-          { {Config::Options::BuildOptions.new(
+          build_options = Config::Options::BuildOptions.new(
             output_dir: output_dir,
             base_url: base_url,
             drafts: drafts,
@@ -264,7 +263,11 @@ module Hwaro
             env: env_name,
             skip_og_image: skip_og_image,
             skip_image_processing: skip_image_processing,
-          ), output_dir_explicit}, input_dir, json_output }
+          )
+          # Carried on the struct rather than alongside it: the Builder needs it
+          # to decide whether `[build] output_dir` may override the flag.
+          build_options.output_dir_explicit = output_dir_explicit
+          {build_options, input_dir, json_output}
         end
       end
     end

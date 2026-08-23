@@ -1609,6 +1609,10 @@ module Hwaro
           # build pipeline rewrapping the exception.
           config = Models::Config.load(env: options.env)
           @config = config
+          # `[build]` supplies output_dir/drafts/parallel/cache for anything the
+          # command line left at its default. Applied before the BuildContext is
+          # built so every phase (and the output guard) sees the same values.
+          options.apply_build_config!(config.build)
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post
 
