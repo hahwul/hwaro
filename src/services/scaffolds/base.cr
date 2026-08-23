@@ -387,6 +387,17 @@ module Hwaro
           [] of String
         end
 
+        # Whether this scaffold ships `[[taxonomies]]` at all. Scaffolds
+        # that opt out (bare's "no batteries" promise, book's
+        # chapter-ordered structure) return false so neither the global
+        # `[[taxonomies]]` block nor the per-language `taxonomies = [...]`
+        # lines are emitted — otherwise a multilingual bare/book config
+        # carried dead per-language taxonomy lists pointing at taxonomies
+        # that don't exist.
+        protected def ships_taxonomies? : Bool
+          true
+        end
+
         # Site identity + optional `[languages]` block. Split out of
         # `minimal_config_content` so a scaffold that opts out of individual
         # feature sections (see `Bare`) can recompose the same header instead
@@ -405,7 +416,7 @@ module Hwaro
               str << "[languages]\n"
               lang_blocks = multilingual_languages.map_with_index do |lang, index|
                 lang_name = language_display_name(lang)
-                tax_line = skip_taxonomies ? "" : "\n  taxonomies = [\"tags\", \"categories\", \"authors\"]"
+                tax_line = skip_taxonomies || !ships_taxonomies? ? "" : "\n  taxonomies = [\"tags\", \"categories\", \"authors\"]"
                 "  [languages.#{lang}]\n" \
                 "  language_name = \"#{lang_name}\"\n" \
                 "  weight = #{index + 1}\n" \
@@ -441,7 +452,7 @@ module Hwaro
         end
 
         protected def minimal_taxonomies_toml(skip_taxonomies : Bool) : String
-          return "" if skip_taxonomies
+          return "" if skip_taxonomies || !ships_taxonomies?
 
           String.build do |str|
             str << "\n[[taxonomies]]\n"
@@ -479,6 +490,34 @@ module Hwaro
             str << "\n[search]\n"
             str << "enabled = true\n"
             str << "format = \"fuse_json\"\n"
+          end
+        end
+
+        # Renders `[[menus.main]]` entries from {name, url} pairs — plus,
+        # for a multilingual project, `[[languages.<code>.menus.main]]`
+        # mirrors with locale-prefixed URLs for every non-default language.
+        # Without those, a language with no `menus` key inherits the
+        # top-level entries verbatim (see `Content::Menus.build`), so the
+        # nav on a `/ko/…` page pointed at the default-language URLs.
+        protected def main_menu_toml(items : Array(Tuple(String, String)), multilingual_languages : Array(String) = [] of String) : String
+          String.build do |str|
+            items.each_with_index do |(name, url), index|
+              str << "\n[[menus.main]]\n"
+              str << "name = \"#{name}\"\n"
+              str << "url = \"#{url}\"\n"
+              str << "weight = #{index + 1}\n"
+            end
+            if multilingual_languages.size > 1
+              multilingual_languages[1..].each do |lang|
+                items.each_with_index do |(name, url), index|
+                  str << "\n[[languages.#{lang}.menus.main]]\n"
+                  str << "name = \"#{name}\"\n"
+                  str << "url = \"/#{lang}#{url}\"\n"
+                  str << "weight = #{index + 1}\n"
+                end
+              end
+            end
+            str << "\n"
           end
         end
 
@@ -542,6 +581,7 @@ module Hwaro
               {{ jsonld }}
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
+              {{ pwa_tags }}
               #{styles}
               {# The syntax theme is inlined in the CSS above, so no highlight
                  theme stylesheet link is emitted here (sub-path safe). Highlight.js
@@ -729,7 +769,7 @@ module Hwaro
                  hwaro scaffold shares — and its first paragraph reads as a
                  serif lede, giving the page a real focal point. */
               .site-main > h1:first-child { position: relative; padding-bottom: 1rem; margin-bottom: 1.1rem; }
-              .site-main > h1:first-child::after { content: ""; position: absolute; left: 0; bottom: 0; width: 3.25rem; height: 3px; border-radius: 999px; background: linear-gradient(90deg, var(--rule-from), var(--rule-to)); }
+              .site-main > h1:first-child::after { content: ""; position: absolute; left: 0; bottom: 0; width: 2.75rem; height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--rule-from), var(--rule-to)); }
               .site-main > h1:first-child + p { font-family: var(--font-serif); font-size: var(--step-1); line-height: 1.55; color: var(--text-secondary); }
 
               /* Links: ember, with an underline that warms up on hover. */
@@ -827,7 +867,7 @@ module Hwaro
                    isn't executed here.)
                    {% raw %}
                    {% for s in site.sections | sort(attribute="title") %}
-                     {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title }}</a>{% endif %}
+                     {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title | e }}</a>{% endif %}
                    {% endfor %}
                    {% endraw %}
               -->
@@ -851,19 +891,24 @@ module Hwaro
             TOML
         end
 
-        protected def multilingual_config(multilingual_languages : Array(String) = [] of String) : String
+        protected def multilingual_config(multilingual_languages : Array(String) = [] of String, skip_taxonomies : Bool = false) : String
           # When `--include-multilingual` requested 2+ languages, emit a real,
           # enabled languages block so the full config honors the flag (gh: the
           # full-config path used to drop multilingual entirely, leaving
           # `.ko.md` variants routed as literal `/about.ko/` pages).
           if multilingual_languages.size > 1
             default_lang = multilingual_languages.first
+            # Per-language taxonomies mirror `minimal_site_toml`: taxonomy
+            # pages for a language only generate when that language lists
+            # the taxonomy, so omitting this line left localized `/ko/tags/`
+            # links dead under `--full-config`.
+            tax_line = skip_taxonomies || !ships_taxonomies? ? "" : "\n  taxonomies = [\"tags\", \"categories\", \"authors\"]"
             lang_blocks = multilingual_languages.map_with_index do |lang, index|
               "  [languages.#{lang}]\n" \
               "  language_name = \"#{language_display_name(lang)}\"\n" \
               "  weight = #{index + 1}\n" \
               "  generate_feed = true\n" \
-              "  build_search_index = true"
+              "  build_search_index = true#{tax_line}"
             end
             return String.build do |str|
               str << "\n"
@@ -1164,7 +1209,9 @@ module Hwaro
                   var titleIdx = item.title.toLowerCase().indexOf(q);
                   var contentIdx = item.content.toLowerCase().indexOf(q);
                   if (titleIdx !== -1 || contentIdx !== -1) {
-                    var score = titleIdx !== -1 ? 100 - titleIdx : contentIdx;
+                    // Earlier matches rank higher; every title match outranks
+                    // every content-only match (hence the negated offset).
+                    var score = titleIdx !== -1 ? 100 - titleIdx : -contentIdx;
                     results.push({ item: item, score: score });
                   }
                 }
@@ -1209,6 +1256,7 @@ module Hwaro
                 input.addEventListener('keydown', function (e) {
                   var items = resultsEl.querySelectorAll('.search-result-item');
                   var count = items.length;
+                  if (count === 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
                   if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     activeIndex = (activeIndex + 1) % count;

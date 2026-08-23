@@ -91,7 +91,7 @@ module Hwaro
             str << base_config(config_title, config_description)
 
             # Content & Processing
-            str << multilingual_config(multilingual_languages)
+            str << multilingual_config(multilingual_languages, skip_taxonomies)
             str << plugins_config
             str << content_files_config
             str << highlight_config
@@ -101,7 +101,7 @@ module Hwaro
             str << series_config
             str << related_config
             str << taxonomies_config unless skip_taxonomies
-            str << menus_config
+            str << menus_config(multilingual_languages)
 
             # SEO & Feeds
             str << sitemap_config
@@ -131,32 +131,17 @@ module Hwaro
         # scaffold's own content creates (posts/_index.md, archives.md,
         # about.md). Add a fourth entry here (or register a page into
         # "main" from its own front matter with `menus = ["main"]`) to
-        # extend the nav without touching a template.
-        private def menu_entries_toml : String
-          <<-TOML
-
-            [[menus.main]]
-            name = "Posts"
-            url = "/posts/"
-            weight = 1
-
-            [[menus.main]]
-            name = "Archives"
-            url = "/archives/"
-            weight = 2
-
-            [[menus.main]]
-            name = "About"
-            url = "/about/"
-            weight = 3
-
-            TOML
+        # extend the nav without touching a template. Multilingual
+        # projects also get `[[languages.<code>.menus.main]]` mirrors
+        # with locale-prefixed URLs (see `Base#main_menu_toml`).
+        private def menu_entries_toml(multilingual_languages : Array(String) = [] of String) : String
+          main_menu_toml([{"Posts", "/posts/"}, {"Archives", "/archives/"}, {"About", "/about/"}], multilingual_languages)
         end
 
         # `--full-config` path: same entries as `minimal_config_content`
         # below, with a discoverability banner matching the rest of
         # `config_content`'s commented sections.
-        protected def menus_config : String
+        protected def menus_config(multilingual_languages : Array(String) = [] of String) : String
           banner = <<-TOML
 
             # =============================================================================
@@ -168,7 +153,7 @@ module Hwaro
             # front matter with `menus = ["main"]` — no template edit
             # required either way.
             TOML
-          banner + menu_entries_toml
+          banner + menu_entries_toml(multilingual_languages)
         end
 
         # `hwaro init`'s DEFAULT path (no `--full-config`) and
@@ -177,7 +162,7 @@ module Hwaro
         # `get_menu(name="main")` would resolve against a config with no
         # `[[menus.*]]` at all, rendering an empty nav out of the box.
         def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
-          super + menu_entries_toml
+          super + menu_entries_toml(multilingual_languages)
         end
 
         # Override styles for blog - external CSS file
@@ -207,6 +192,7 @@ module Hwaro
               {{ jsonld }}
               {{ hreflang_tags }}
               {{ pagination_seo_links }}
+              {{ pwa_tags }}
               #{styles}
               {# The syntax theme is inlined in css/style.css, so no highlight theme
                  stylesheet link is emitted here (sub-path safe). Highlight.js itself
@@ -416,7 +402,7 @@ module Hwaro
               left: 0;
               bottom: 0;
               width: 2.75rem;
-              height: 3px;
+              height: 4px;
               border-radius: 999px;
               background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
@@ -582,7 +568,7 @@ module Hwaro
               left: 0;
               bottom: 0;
               width: 2.75rem;
-              height: 3px;
+              height: 4px;
               border-radius: 999px;
               background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
             }
@@ -1105,7 +1091,7 @@ module Hwaro
                        register a page/section into "main" from its own front
                        matter with `menus = ["main"]` — no template edit
                        required either way. -->
-                  {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>{% endfor %}
+                  {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
                 </nav>
                 <div class="header-right">
                   {% if page.translations | length > 0 %}
@@ -1350,7 +1336,7 @@ module Hwaro
         protected def navigation : String
           <<-NAV
             <nav>
-              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>{% endfor %}
+              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
             </nav>
             NAV
         end

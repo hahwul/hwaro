@@ -58,6 +58,32 @@ describe "Scaffold embedded assets" do
     end
   end
 
+  describe "search overlay JS" do
+    it "ranks earlier content matches above later ones and below title matches" do
+      {
+        Hwaro::Services::Scaffolds::Blog.new.static_files["js/search.js"],
+        Hwaro::Services::Scaffolds::Docs.new.static_files["js/search.js"],
+        Hwaro::Services::Scaffolds::Book.new.static_files["js/book.js"],
+      }.each do |js|
+        # Descending sort + negated content offset = earlier-is-better;
+        # the un-negated form ranked later occurrences higher (and let a
+        # content match at offset > 100 outrank every title match).
+        js.should contain("? 100 - titleIdx : -contentIdx")
+        js.should_not contain("? 100 - titleIdx : contentIdx")
+      end
+    end
+
+    it "guards arrow-key navigation against an empty result list (NaN index)" do
+      {
+        Hwaro::Services::Scaffolds::Blog.new.static_files["js/search.js"],
+        Hwaro::Services::Scaffolds::Docs.new.static_files["js/search.js"],
+        Hwaro::Services::Scaffolds::Book.new.static_files["js/book.js"],
+      }.each do |js|
+        js.should contain("if (count === 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;")
+      end
+    end
+  end
+
   describe "ember-warm syntax highlighting" do
     # The default is build-time highlighting (`mode = "server"`): no
     # JavaScript ships and the output uses hljs-compatible classes, so the

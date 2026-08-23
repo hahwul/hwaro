@@ -37,6 +37,19 @@ describe "scaffold token hygiene" do
     color_violations(css).should be_empty
   end
 
+  it "simple's inlined sheet carries no Jinja expressions beyond {{ base_url }}" do
+    # Regression: a CSS comment mentioning `{{ highlight_js }}` literally was
+    # rendered by Crinja (the sheet lives inside a template), and the expanded
+    # tag's own </style> terminated the block early — every rule after it
+    # spilled into the page as visible text. `{{ base_url }}` is the one
+    # deliberate expression (the @font-face URLs need it); anything else in
+    # the sheet — comments included — is a spill waiting to happen.
+    header = Hwaro::Services::Scaffolds::Simple.new.template_files["header.html"]
+    css = header[/<style>(.*)<\/style>/m, 1]? || ""
+    css.gsub("{{ base_url }}", "").should_not contain("{{")
+    css.should_not contain("{%")
+  end
+
   {% for pair in [{"blog", "Blog"}, {"docs", "Docs"}, {"book", "Book"}] %}
     it "{{ pair[0].id }}'s stylesheet has no colors outside token definitions" do
       css = external_sheet(Hwaro::Services::Scaffolds::{{ pair[1].id }}.new)

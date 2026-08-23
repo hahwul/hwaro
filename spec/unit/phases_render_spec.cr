@@ -786,3 +786,44 @@ describe Hwaro::Core::Build::Phases::Render do
     end
   end
 end
+
+# `{{ pwa_tags }}` wires up the [pwa] outputs: manifest.json + sw.js are
+# written by the PWA generator, but nothing referenced them — a page must
+# link the manifest and register the service worker for the feature to do
+# anything. The var resolves to "" while [pwa] is disabled so scaffold
+# headers can include it unconditionally (same contract as math_tags).
+describe "build_global_vars / pwa_tags" do
+  it "is empty when [pwa] is disabled" do
+    config = Hwaro::Models::Config.new
+    site = Hwaro::Models::Site.new(config)
+    site.build_lookup_index
+
+    vars = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)
+    vars["pwa_tags"].raw.should eq("")
+  end
+
+  it "emits the manifest link, theme-color meta, and SW registration when enabled" do
+    config = Hwaro::Models::Config.new
+    config.pwa.enabled = true
+    config.pwa.theme_color = "#123456"
+    site = Hwaro::Models::Site.new(config)
+    site.build_lookup_index
+
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    tags.should contain(%(<link rel="manifest" href="/manifest.json">))
+    tags.should contain(%(<meta name="theme-color" content="#123456">))
+    tags.should contain(%(navigator.serviceWorker.register("/sw.js")))
+  end
+
+  it "prefixes manifest and sw.js with the base path on sub-path deploys" do
+    config = Hwaro::Models::Config.new
+    config.base_url = "https://user.github.io/repo"
+    config.pwa.enabled = true
+    site = Hwaro::Models::Site.new(config)
+    site.build_lookup_index
+
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    tags.should contain(%(href="/repo/manifest.json"))
+    tags.should contain(%(register("/repo/sw.js")))
+  end
+end
