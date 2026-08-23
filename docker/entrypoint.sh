@@ -131,6 +131,31 @@ main() {
         echo "Note: -o/--output in build_flags is overridden; the output_dir input (${OUT_DIR}) is what gets deployed."
     fi
 
+    # `[build] output_dir` in config.toml loses to the flag above, which would
+    # otherwise make the config key look effective while the action quietly
+    # built somewhere else. Say so. Deliberately a heuristic — it reads the
+    # `[build]` table only, and an exotic spelling (inline table, quoted key)
+    # just means no note, never a wrong build.
+    if [[ -f config.toml ]]; then
+        config_out=$(awk '
+            /^[[:space:]]*\[/ { in_build = ($0 ~ /^[[:space:]]*\[build\][[:space:]]*$/); next }
+            in_build && /^[[:space:]]*output_dir[[:space:]]*=/ {
+                line = $0
+                sub(/^[^=]*=[[:space:]]*/, "", line)
+                sub(/[[:space:]]*#.*$/, "", line)
+                sub(/[[:space:]]+$/, "", line)
+                # One quote at each end, never `["'\'']. *$` — that alternative
+                # wins leftmost-longest and eats the whole value.
+                gsub(/^["'\'']|["'\'']$/, "", line)
+                print line
+                exit
+            }
+        ' config.toml 2>/dev/null)
+        if [[ -n "$config_out" && "$config_out" != "$OUT_DIR" ]]; then
+            echo "Note: config.toml sets [build] output_dir = \"${config_out}\", but this action builds and deploys \"${OUT_DIR}\". Set the action's output_dir input to \"${config_out}\" to use it."
+        fi
+    fi
+
     # Build the site
     echo "Building with flags: ${BUILD_FLAGS:-(none)} -o ${OUT_DIR}"
     hwaro build $BUILD_FLAGS -o "$OUT_DIR"

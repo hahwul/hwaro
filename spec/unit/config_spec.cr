@@ -1482,6 +1482,135 @@ describe Hwaro::Models::Config do
 
       config.build.output_dir.should be_nil
     end
+
+    # The dev server refuses to serve from outside the project, so honouring a
+    # `..` path would leave serve building one tree and serving another.
+    it "ignores a [build] output_dir that escapes the project" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "../escape"
+        TOML
+
+      config.build.output_dir.should be_nil
+    end
+
+    it "keeps an absolute [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "/srv/www/site"
+        TOML
+
+      config.build.output_dir.should eq("/srv/www/site")
+    end
+
+    # Quoting a bool is an easy TOML slip; treating it as absent would leave
+    # the setting off with no feedback at all.
+    it "ignores non-boolean [build] booleans rather than silently no-opping" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        drafts = "true"
+        parallel = 1
+        cache = "yes"
+        TOML
+
+      config.build.drafts.should be_nil
+      config.build.parallel.should be_nil
+      config.build.cache.should be_nil
+    end
+
+    it "ignores a non-string [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = 42
+        TOML
+
+      config.build.output_dir.should be_nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # [deployment] source_dir follows [build] output_dir
+  # ---------------------------------------------------------------------------
+
+  describe "deployment source_dir" do
+    it "defaults to public when neither section says otherwise" do
+      load_config(%(title = "Test")).deployment.source_dir.should eq("public")
+    end
+
+    # Both keys default to "public" independently, so without the fallback a
+    # site building into dist/ would have deploy reading a stale public/.
+    it "follows [build] output_dir when no [deployment] section exists" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+        TOML
+
+      config.deployment.source_dir.should eq("dist")
+    end
+
+    it "follows [build] output_dir when [deployment] omits source_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+
+        [deployment]
+        max_deletes = 10
+        TOML
+
+      config.deployment.source_dir.should eq("dist")
+    end
+
+    it "keeps an explicit [deployment] source_dir over [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+
+        [deployment]
+        source_dir = "explicit"
+        TOML
+
+      config.deployment.source_dir.should eq("explicit")
+    end
+
+    it "keeps the [deployment] source alias over [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+
+        [deployment]
+        source = "aliased"
+        TOML
+
+      config.deployment.source_dir.should eq("aliased")
+    end
+
+    # A rejected output_dir must not drag deploy off "public" with it.
+    it "stays at public when [build] output_dir was rejected" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "../escape"
+        TOML
+
+      config.deployment.source_dir.should eq("public")
+    end
   end
 
   # ---------------------------------------------------------------------------

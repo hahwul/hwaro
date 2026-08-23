@@ -1337,9 +1337,16 @@ module Hwaro
         }.to_json
       end
 
+      # An absolute path is allowed: `hwaro build -o /srv/site` and
+      # `[build] output_dir = "/srv/site"` both write there, and rejecting it
+      # here would leave serve building into that directory while serving an
+      # empty `public/` — every request a 404 for the whole session. The build's
+      # own `guard_output_dir!` is what refuses the genuinely dangerous roots.
+      # A `..` path still falls back, and config-loaded values never reach here
+      # with one (`Config::Loader.build_output_dir_value` drops those).
       private def sanitize_output_dir(dir : String) : String
         normalized = Path[dir].normalize.to_s
-        if normalized.starts_with?("..") || normalized.starts_with?("/")
+        if normalized.starts_with?("..")
           Logger.warn "Invalid output directory: #{dir}. Using 'public' instead."
           return "public"
         end
