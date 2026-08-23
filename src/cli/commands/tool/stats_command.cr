@@ -131,9 +131,13 @@ module Hwaro
               # bytes so a crafted tag can't inject ANSI into the report.
               top_tags = result.tags.first(top).map { |tag, count| {Utils::TextUtils.strip_control(tag), count} }
               max_count = top_tags.max_of { |_, count| count }
-              label_width = top_tags.max_of { |tag, _| tag.size }.clamp(0, 20)
+              # Measure and pad in terminal COLUMNS, not codepoints: a CJK or
+              # emoji tag renders wider than its codepoint count, so
+              # `size`/`ljust` misaligned every row after it.
+              label_width = top_tags.max_of { |tag, _| Utils::TextUtils.display_width(tag) }.clamp(0, 20)
               top_tags.each do |tag, count|
-                Logger.info "    #{truncate_label(tag, label_width).ljust(label_width)}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
+                label = Utils::TextUtils.pad_display(truncate_label(tag, label_width), label_width)
+                Logger.info "    #{label}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
               end
               if result.tags.size > top
                 Logger.info "    … and #{result.tags.size - top} more"
@@ -170,11 +174,25 @@ module Hwaro
             parts.empty? ? nil : parts.join(" · ")
           end
 
-          # Cap a bar-chart label to the column width, marking the cut with an
-          # ellipsis so rows stay aligned even for very long tag names.
+          # Cap a bar-chart label to `width` terminal COLUMNS, marking the cut
+          # with an ellipsis so rows stay aligned even for very long tag
+          # names. Walks characters by display width, the same way
+          # ContentLister#truncate does — codepoint slicing let a long CJK
+          # tag claim double the column and skipped truncating it at all.
           private def truncate_label(label : String, width : Int32) : String
-            return label if label.size <= width
-            "#{label[0, width - 1]}…"
+            return label if Utils::TextUtils.display_width(label) <= width
+
+            budget = width - 1
+            kept = String.build do |io|
+              used = 0
+              label.each_char do |c|
+                w = Utils::TextUtils.display_width(c.to_s)
+                break if used + w > budget
+                io << c
+                used += w
+              end
+            end
+            "#{kept}…"
           end
         end
       end

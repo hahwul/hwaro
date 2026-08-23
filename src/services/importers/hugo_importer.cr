@@ -149,9 +149,15 @@ module Hwaro
             # and every imported page loses its ordering.
             if weight_val = data["weight"]?
               case weight_raw = weight_val.raw
-              when Int64   then fields["weight"] = weight_raw
-              when Float64 then fields["weight"] = weight_raw.to_i64
-              when String  then fields["weight"] = weight_raw.to_i64?
+              when Int64 then fields["weight"] = weight_raw
+              when Float64
+                # Guard the conversion: 1e300 / Infinity / NaN would raise
+                # OverflowError out of `to_i64` and error the whole file.
+                # An absurd weight is ignored instead.
+                if weight_raw.finite? && weight_raw.in?(-9.0e18..9.0e18)
+                  fields["weight"] = weight_raw.to_i64
+                end
+              when String then fields["weight"] = weight_raw.to_i64?
               end
             end
 

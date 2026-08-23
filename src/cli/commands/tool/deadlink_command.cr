@@ -2,6 +2,7 @@ require "json"
 require "http/client"
 require "socket"
 require "uri"
+require "uri/punycode"
 require "file"
 require "option_parser"
 require "../../metadata"
@@ -121,7 +122,21 @@ module Hwaro
                 ignore_patterns << ignore_pattern_to_regex(v)
               end
               parser.on("--allow-status CODES", "Treat these HTTP status codes as healthy (comma-separated)") do |v|
-                v.split(',').each do |code|
+                segments = v.split(',')
+                # All-empty input (`--allow-status ","`) would otherwise be a
+                # silent no-op; reject it like any other unusable value.
+                if segments.all?(&.strip.empty?)
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "Invalid --allow-status value: #{v}",
+                    hint: "Pass comma-separated HTTP status codes between 100 and 599, e.g. --allow-status 403,429.",
+                  )
+                end
+                segments.each do |code|
+                  # A trailing/doubled comma (`--allow-status "403,"`) yields
+                  # empty segments; skip them instead of rejecting with a
+                  # confusing empty-value message.
+                  next if code.strip.empty?
                   parsed = code.strip.to_i?
                   unless parsed && (100..599).includes?(parsed)
                     raise Hwaro::HwaroError.new(
@@ -408,21 +423,50 @@ module Hwaro
             s.gsub { |c| c.control? ? "" : c }
           end
 
+          # Markdown link/image destinations share LINK_DEST +
+          # clean_external_target with the internal scan, so titled
+          # (`[x](https://url "t")`) and angle-bracket (`[x](<https://url>)`)
+          # external destinations are checked too — the old regex required
+          # `)` right after the URL and silently skipped both forms.
+          # Raw HTML (`<a href="https://…">`, `<img src="https://…">`) is also
+          # scanned here: the internal HTML pass drops scheme-carrying URLs
+          # via skip_internal?, so without this pass they were never checked.
           private def find_external_links(dir : String) : Array(Link)
             links = [] of Link
-            link_regex = /(?:!\[[^\]]*?\]|\[[^\]]*?\])\((https?:\/\/(?:\([^\s()]*\)|[^\s()])+)\)/
+            link_regex = /!?\[[^\]]*?\]\(#{LINK_DEST.source}\)/
 
             Dir.glob("#{dir}/**/*.md").each do |file|
               content = readable_markdown(file) || next
               content.scan(link_regex) do |match|
-                links << Link.new(file: file, url: match[1], kind: :external)
-              end
-              scan_reference_definitions(content) do |url|
-                next unless url.starts_with?("http://") || url.starts_with?("https://")
+                url = clean_external_target(match[1])
+                next unless external_url?(url)
                 links << Link.new(file: file, url: url, kind: :external)
+              end
+              scan_reference_definitions(content) do |raw|
+                url = clean_external_target(raw)
+                next unless external_url?(url)
+                links << Link.new(file: file, url: url, kind: :external)
+              end
+              content.scan(HTML_TAG_RE) do |tag|
+                tag[2].scan(HTML_ATTR_RE) do |attr|
+                  raw = attr[2]? || attr[3]? || attr[4]?
+                  next unless raw
+                  html_link_targets(attr[1], raw).each do |candidate|
+                    url = clean_external_target(candidate)
+                    next unless external_url?(url)
+                    # Unrendered template syntax — same guard as the internal
+                    # HTML pass; contacting the literal braces is never right.
+                    next if url.includes?("{{") || url.includes?("{%")
+                    links << Link.new(file: file, url: url, kind: :external)
+                  end
+                end
               end
             end
             links
+          end
+
+          private def external_url?(url : String) : Bool
+            url.starts_with?("http://") || url.starts_with?("https://")
           end
 
           # Read and code-strip one Markdown file, returning nil when the file
@@ -470,14 +514,19 @@ module Hwaro
           # `</my`, and even a space-free `</about/>` was reported dead while
           # the build resolved it correctly.
           private def clean_link_target(raw : String) : String
+            clean_external_target(raw).split("#").first.split("?").first.strip
+          end
+
+          # The external half of clean_link_target: strip the optional title
+          # and unwrap an angle-bracket destination, but KEEP query string and
+          # fragment — they are significant when contacting an external URL.
+          private def clean_external_target(raw : String) : String
             stripped = raw.strip
-            dest =
-              if stripped.starts_with?('<') && (close = stripped.index('>'))
-                stripped[1...close]
-              else
-                stripped.split(/\s/, 2).first
-              end
-            dest.split("#").first.split("?").first.strip
+            if stripped.starts_with?('<') && (close = stripped.index('>'))
+              stripped[1...close]
+            else
+              stripped.split(/\s/, 2).first
+            end
           end
 
           private def find_internal_links(dir : String) : Array(Link)
@@ -960,129 +1009,223 @@ module Hwaro
             nil
           end
 
+          # Identical external URLs are checked ONCE and the outcome fanned
+          # back out to every occurrence — 50 pages linking the same site used
+          # to fire 50 simultaneous requests and collect 429 false positives.
+          # The worker/channel accounting stays exact: one outcome per unique
+          # URL from the pool, then one reported Result per occurrence (each
+          # with its own file), in the caller's link order.
           private def check_links_concurrently(links : Array(Link), timeout_seconds : Int32, max_concurrency : Int32) : Array(Result)
-            results_channel = Channel(Result).new(links.size)
-            work_channel = Channel(Link?).new(max_concurrency)
+            unique_urls = [] of String
+            seen = Set(String).new
+            links.each do |link|
+              unique_urls << link.url if seen.add?(link.url)
+            end
+
+            outcomes = check_urls_concurrently(unique_urls, timeout_seconds, max_concurrency)
+
+            links.map do |link|
+              status, error_message = outcomes[link.url]
+              Result.new(link: link, status: status, error: error_message)
+            end
+          end
+
+          private def check_urls_concurrently(urls : Array(String), timeout_seconds : Int32, max_concurrency : Int32) : Hash(String, {Int32, String?})
+            results_channel = Channel({String, Int32, String?}).new(urls.size)
+            work_channel = Channel(String?).new(max_concurrency)
 
             # Spawn bounded worker pool
             max_concurrency.times do
               spawn do
-                while link = work_channel.receive?
-                  error_message : String? = nil
-                  status = begin
-                    current_uri = URI.parse(link.url)
-                    method = "HEAD"
-                    redirects_left = 5
-                    response_status = -1
-
-                    loop do
-                      host = current_uri.host
-                      if host && private_host?(host)
-                        error_message = "Skipped: private/internal address"
-                        response_status = -1
-                        break
-                      end
-
-                      client = HTTP::Client.new(current_uri)
-                      client.connect_timeout = timeout_seconds.seconds
-                      client.read_timeout = timeout_seconds.seconds
-
-                      begin
-                        headers = HTTP::Headers{"User-Agent" => "hwaro-link-checker/1.0"}
-                        response = if method == "HEAD"
-                                     client.head(current_uri.request_target, headers: headers)
-                                   else
-                                     client.get(current_uri.request_target, headers: headers)
-                                   end
-
-                        status_code = response.status_code
-
-                        if {301, 302, 307, 308}.includes?(status_code)
-                          if redirects_left > 0
-                            location = response.headers["Location"]?
-                            if location
-                              current_uri = current_uri.resolve(location)
-                              redirects_left -= 1
-                              next
-                            else
-                              error_message = "Redirect without Location header"
-                              response_status = status_code
-                              break
-                            end
-                          else
-                            error_message = "Too many redirects"
-                            response_status = status_code
-                            break
-                          end
-                        elsif method == "HEAD" && {405, 403, 501}.includes?(status_code)
-                          method = "GET"
-                          next
-                        else
-                          response_status = status_code
-                          break
-                        end
-                      ensure
-                        client.close
-                      end
-                    end
-
-                    response_status
-                  rescue ex : Socket::ConnectError
-                    error_message = "Connection failed: #{ex.message}"
-                    -1
-                  rescue IO::TimeoutError
-                    error_message = "Request timed out (#{timeout_seconds}s)"
-                    -1
-                  rescue ex : Socket::Addrinfo::Error
-                    error_message = "DNS resolution failed: #{ex.message}"
-                    -1
-                  rescue ex
-                    error_message = ex.message
-                    -1
-                  end
-                  results_channel.send(Result.new(link: link, status: status, error: error_message))
+                while url = work_channel.receive?
+                  status, error_message = check_external_url(url, timeout_seconds)
+                  results_channel.send({url, status, error_message})
                 end
               end
             end
 
-            # Feed links to workers
-            links.each { |link| work_channel.send(link) }
+            # Feed URLs to workers
+            urls.each { |url| work_channel.send(url) }
             max_concurrency.times { work_channel.send(nil) }
 
             # Collect all results
-            Array.new(links.size) { results_channel.receive }
+            outcomes = {} of String => {Int32, String?}
+            urls.size.times do
+              url, status, error_message = results_channel.receive
+              outcomes[url] = {status, error_message}
+            end
+            outcomes
           end
+
+          # Check one external URL, following redirects. Returns
+          # {status, error}. Redirect FAILURES (loop, missing Location,
+          # exhausted time budget) report the -1 sentinel, never the redirect
+          # code itself, so `--allow-status 301` only matches links whose
+          # TERMINAL response is 301 — a broken redirect used to be classified
+          # healthy by it.
+          private def check_external_url(url : String, timeout_seconds : Int32) : {Int32, String?}
+            error_message : String? = nil
+            status = begin
+              current_uri = URI.parse(url)
+              method = "HEAD"
+              redirects_left = 5
+              response_status = -1
+              # Total time budget for the whole redirect chain: each hop can
+              # take up to the per-request timeout (HEAD may retry as GET),
+              # so without this a slow chain multiplied the configured
+              # --timeout by up to 12×. 3× leaves room for a slow-but-healthy
+              # chain of a few hops while still bounding the worst case.
+              # Int64 math: an absurd-but-accepted --timeout must not
+              # overflow Int32 here and flip every link to "dead".
+              deadline = Time.instant + (timeout_seconds.to_i64 * 3).seconds
+
+              loop do
+                host = current_uri.host
+                # Non-ASCII (IDN) hosts are punycoded for DNS/connection;
+                # the original URL is kept for reporting.
+                connect_host = host ? ascii_host(host) : nil
+                if connect_host && private_host?(connect_host)
+                  error_message = "Skipped: private/internal address"
+                  response_status = -1
+                  break
+                end
+
+                request_uri = current_uri
+                if host && connect_host && connect_host != host
+                  request_uri = current_uri.dup
+                  request_uri.host = connect_host
+                end
+
+                client = HTTP::Client.new(request_uri)
+                client.connect_timeout = timeout_seconds.seconds
+                client.read_timeout = timeout_seconds.seconds
+
+                begin
+                  headers = HTTP::Headers{"User-Agent" => "hwaro-link-checker/1.0"}
+                  response = if method == "HEAD"
+                               client.head(request_uri.request_target, headers: headers)
+                             else
+                               client.get(request_uri.request_target, headers: headers)
+                             end
+
+                  status_code = response.status_code
+
+                  if {301, 302, 303, 307, 308}.includes?(status_code)
+                    if redirects_left > 0
+                      location = response.headers["Location"]?
+                      if location
+                        if Time.instant > deadline
+                          error_message = "Request timed out (#{timeout_seconds}s): redirect chain exceeded the time budget"
+                          response_status = -1
+                          break
+                        end
+                        current_uri = current_uri.resolve(location)
+                        # RFC 9110: 303 See Other is followed with GET.
+                        method = "GET" if status_code == 303
+                        redirects_left -= 1
+                        next
+                      else
+                        error_message = "Redirect without Location header (#{status_code})"
+                        response_status = -1
+                        break
+                      end
+                    else
+                      error_message = "Too many redirects (last status #{status_code})"
+                      response_status = -1
+                      break
+                    end
+                  elsif method == "HEAD" && {405, 403, 501}.includes?(status_code)
+                    method = "GET"
+                    next
+                  else
+                    response_status = status_code
+                    break
+                  end
+                ensure
+                  client.close
+                end
+              end
+
+              response_status
+            rescue ex : Socket::ConnectError
+              error_message = "Connection failed: #{ex.message}"
+              -1
+            rescue IO::TimeoutError
+              error_message = "Request timed out (#{timeout_seconds}s)"
+              -1
+            rescue ex : Socket::Addrinfo::Error
+              error_message = "DNS resolution failed: #{ex.message}"
+              -1
+            rescue ex
+              error_message = ex.message
+              -1
+            end
+            {status, error_message}
+          end
+
+          # RFC 3490 conversion for a host with non-ASCII labels
+          # (`例え.jp` → `xn--r8jz45g.jp`) so DNS resolution and the
+          # connection use the registrable form — such links used to fail
+          # DNS and be reported dead.
+          private def ascii_host(host : String) : String
+            return host if host.ascii_only?
+            URI::Punycode.to_ascii(host)
+          rescue ArgumentError
+            host
+          end
+
+          # Memoized per run: the same host used to be resolved synchronously
+          # on every occurrence and every redirect hop, stalling all workers
+          # on slow DNS. The cache is bounded by the finite host set of one
+          # invocation. Resolution happens OUTSIDE the mutex so a slow lookup
+          # for one host never serializes the others; a rare duplicate
+          # resolution for the same host is benign.
+          @private_host_cache = {} of String => Bool
+          @private_host_cache_mutex = Mutex.new
 
           # Check if a hostname resolves to a private/internal IP address (SSRF protection).
           private def private_host?(host : String) : Bool
+            @private_host_cache_mutex.synchronize do
+              if @private_host_cache.has_key?(host)
+                return @private_host_cache[host]
+              end
+            end
+            result = resolve_private_host?(host)
+            @private_host_cache_mutex.synchronize { @private_host_cache[host] = result }
+            result
+          end
+
+          private def resolve_private_host?(host : String) : Bool
             return true if host == "localhost" || host.ends_with?(".local") || host.ends_with?(".internal")
 
             begin
               addrs = Socket::Addrinfo.resolve(host, 80, type: Socket::Type::STREAM)
-              addrs.any? do |addr|
-                ip = addr.ip_address.address
-                ip.starts_with?("127.") ||
-                  ip.starts_with?("10.") ||
-                  ip.starts_with?("192.168.") ||
-                  ip.starts_with?("169.254.") ||
-                  ip == "0.0.0.0" ||
-                  ip == "::1" ||
-                  ip == "::" ||
-                  ip.starts_with?("fc") || ip.starts_with?("fd") || # IPv6 ULA
-                  ip.starts_with?("fe80") ||                        # IPv6 link-local
-                  private_172?(ip)
-              end
+              addrs.any? { |addr| private_ip_address?(addr.ip_address) }
             rescue Socket::Error
               false
             end
           end
 
-          private def private_172?(ip : String) : Bool
-            return false unless ip.starts_with?("172.")
-            parts = ip.split(".")
-            return false if parts.size < 2
-            second = parts[1].to_i? || return false
-            second >= 16 && second <= 31
+          # Structured classification via Socket::IPAddress predicates — the
+          # old string-prefix checks missed IPv4-mapped IPv6 loopback
+          # (`::ffff:127.0.0.1`) and the fe81–febf link-local range. An
+          # IPv4-mapped address is unmapped first because the stdlib
+          # predicates only classify the mapped form as loopback, not as
+          # private/link-local.
+          private def private_ip_address?(ip : Socket::IPAddress) : Bool
+            if mapped = ipv4_mapped_address(ip)
+              return private_ip_address?(mapped)
+            end
+            ip.loopback? || ip.private? || ip.link_local? || ip.unspecified?
+          end
+
+          private def ipv4_mapped_address(ip : Socket::IPAddress) : Socket::IPAddress?
+            return unless ip.family.inet6?
+            address = ip.address
+            return unless address.starts_with?("::ffff:") && address.includes?('.')
+            Socket::IPAddress.new(address.lchop("::ffff:"), 0)
+          rescue Socket::Error | ArgumentError
+            nil
           end
         end
       end

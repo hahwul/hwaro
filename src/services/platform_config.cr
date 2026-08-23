@@ -56,10 +56,37 @@ module Hwaro
       end
 
       # Escape a value for a TOML basic string. Front-matter aliases are
-      # arbitrary user input; an unescaped quote/backslash would produce an
-      # unparseable netlify.toml.
+      # arbitrary user input; an unescaped quote/backslash — or a raw control
+      # character such as a newline — would produce an unparseable
+      # netlify.toml. Control characters are ESCAPED rather than the alias
+      # skipped (the cloudflare generator skips because `_redirects` has no
+      # escape syntax; TOML does, so the user's redirect is preserved).
       private def toml_escape(s : String) : String
-        s.gsub('\\', "\\\\").gsub('"', "\\\"")
+        String.build do |io|
+          s.each_char do |char|
+            case char
+            when '\\' then io << "\\\\"
+            when '"'  then io << "\\\""
+            when '\n' then io << "\\n"
+            when '\t' then io << "\\t"
+            when '\r' then io << "\\r"
+            when '\b' then io << "\\b"
+            when '\f' then io << "\\f"
+            else
+              if char.control?
+                # TOML `\u` takes exactly four hex digits; codepoints above
+                # U+FFFF (e.g. Cf tag characters) need the 8-digit `\U` form.
+                if char.ord > 0xFFFF
+                  io << "\\U" << char.ord.to_s(16).upcase.rjust(8, '0')
+                else
+                  io << "\\u" << char.ord.to_s(16).upcase.rjust(4, '0')
+                end
+              else
+                io << char
+              end
+            end
+          end
+        end
       end
 
       private def generate_netlify : String
@@ -285,9 +312,24 @@ module Hwaro
       PAGE_EXTENSIONS = {".md", ".markdown"}
 
       private def scan_content_for_aliases(dir : String, redirects : Array(Tuple(String, String)))
-        Dir.each_child(dir) do |entry|
+        # An unreadable subdirectory (Dir.each_child raises on entry) skips
+        # that subtree with a warning instead of aborting the whole run.
+        children = begin
+          Dir.children(dir)
+        rescue ex : File::Error
+          Logger.warn "Skipping unreadable directory during alias scan: #{dir} (#{ex.message})"
+          return
+        end
+        children.each do |entry|
           path = File.join(dir, entry)
-          if File.directory?(path)
+          # `follow_symlinks: false` keeps a symlinked directory (including a
+          # cycle like `ln -s . content/loop`) from being recursed into —
+          # following one used to recurse until ELOOP aborted the whole
+          # command. Symlinked FILES still work: they fall through to the
+          # extension branch and File.read follows the link as usual.
+          info = File.info?(path, follow_symlinks: false)
+          next unless info
+          if info.directory?
             scan_content_for_aliases(path, redirects)
           elsif PAGE_EXTENSIONS.includes?(Path[entry].extension.downcase)
             extract_aliases_from_file(path, redirects)
@@ -353,6 +395,12 @@ module Hwaro
           to = with_base_path(target_url)
           redirects << {from, to}
         end
+      rescue ex : ArgumentError | Hwaro::HwaroError | IO::Error
+        # One bad content file (invalid UTF-8 → ArgumentError from PCRE2,
+        # malformed frontmatter → HwaroError, unreadable file → IO::Error)
+        # must not abort ALL platform config generation — degrade per file,
+        # matching how check-links skips unreadable Markdown.
+        Logger.warn "Skipping #{path} while collecting aliases: #{ex.message}"
       end
 
       # Calculate the URL for a page through the same shared resolver as the

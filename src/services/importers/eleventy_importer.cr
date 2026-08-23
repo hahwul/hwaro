@@ -16,7 +16,11 @@ module Hwaro
         @used_paths = Set(String).new
 
         def run(options : Config::Options::ImportOptions) : ImportResult
-          path = options.path
+          # Strip trailing separators once: "site/" otherwise broke the
+          # File.dirname-based prefix strip in `import_file` (dirname never
+          # carries the slash), misclassifying the site-root index.md.
+          path = options.path.rstrip('/')
+          path = "/" if path.empty? && !options.path.empty?
           output_dir = options.output_dir
           imported = 0
           skipped = 0
@@ -117,8 +121,11 @@ module Hwaro
                 end
                 data[relative_dir] = parsed
               end
-            rescue JSON::ParseException | File::Error
-              # Skip invalid or unreadable data files
+            rescue JSON::ParseException | IO::Error
+              # Skip invalid or unreadable data files. IO::Error, not just
+              # File::Error: a data-file path that turns out to be a
+              # directory raises a bare IO::Error ("Is a directory") from
+              # File.read, which used to abort the whole import.
             end
           end
 
@@ -252,12 +259,12 @@ module Hwaro
               end
 
               # Description
-              if desc = yaml_hash["description"]? || yaml_hash["excerpt"]? || yaml_hash["summary"]?
+              if desc = first_present(yaml_hash, "description", "excerpt", "summary")
                 fields["description"] = yaml_string(desc)
               end
 
               # Image
-              if image = yaml_hash["image"]? || yaml_hash["featuredImage"]? || yaml_hash["cover"]?
+              if image = first_present(yaml_hash, "image", "featuredImage", "cover")
                 fields["image"] = yaml_string(image)
               end
 

@@ -18,6 +18,13 @@ module Hwaro
       # `generate_frontmatter` renders it as TOML.
       alias FieldValue = (String | Bool | Int64 | Array(String))?
 
+      # Every importer computes `success: imported > 0 || errors == 0` —
+      # DELIBERATELY more lenient than the exporters' `errors == 0` rule.
+      # Imports digest messy third-party dumps where some items are simply
+      # unimportable; a best-effort partial migration is the expected
+      # outcome, and per-item failures are counted and reported alongside
+      # it. Exports and conversions operate on the user's own valid content,
+      # where any error means the run must fail.
       struct ImportResult
         property success : Bool
         property message : String
@@ -56,8 +63,13 @@ module Hwaro
         # leaking raw YAML into the page body. A leading U+FEFF does the same
         # to the `\A---` / `\A+++` anchors — every other reader hwaro hands
         # file text to already goes through `TextUtils.strip_bom`.
+        #
+        # `scrub` because sources are third-party exports: a single invalid
+        # UTF-8 byte made every downstream regex pass raise ArgumentError,
+        # dropping the whole file with a cryptic error. This is the single
+        # choke point, so scrubbing here protects every importer.
         protected def read_text(path : String) : String
-          Utils::TextUtils.strip_bom(File.read(path)).gsub("\r\n", "\n")
+          Utils::TextUtils.strip_bom(File.read(path).scrub).gsub("\r\n", "\n")
         end
 
         # Split YAML frontmatter from a document body. Returns {frontmatter, body}
@@ -88,7 +100,17 @@ module Hwaro
         end
 
         private def walk_files_into(dir : String, files : Array(String), extensions : Array(String), skip_dir : Proc(String, Bool)?)
-          Dir.children(dir).sort!.each do |entry|
+          # An unreadable subdirectory (permissions, or one removed mid-walk)
+          # raised straight out of the recursion and aborted the entire
+          # import. Skip it and keep importing everything that is readable.
+          entries = begin
+            Dir.children(dir).sort!
+          rescue ex : File::Error
+            Logger.warn "Skipped unreadable directory: #{dir} (#{ex.message})"
+            return
+          end
+
+          entries.each do |entry|
             full_path = File.join(dir, entry)
             if File.directory?(full_path)
               # A symlinked directory can close a cycle (`ln -s .. sub`), and
@@ -447,8 +469,12 @@ module Hwaro
         # carry a trailing ".md"). Unicode is preserved. We intentionally do NOT
         # URL-decode: the filesystem treats `%2f` as a literal, so decoding
         # would only manufacture separators that aren't really there.
+        # `scrub` first: URI-decoded slugs (`a%ffb`) can carry invalid UTF-8,
+        # and the split regex raises ArgumentError on an invalid byte
+        # sequence — scrubbing here protects every caller.
         protected def safe_filename_component(value : String) : String
-          value.delete(Char::ZERO)
+          value.scrub
+            .delete(Char::ZERO)
             .split(/[\/\\]/)
             .reject { |seg| seg.empty? || seg == "." || seg == ".." }
             .last? || ""
@@ -491,10 +517,36 @@ module Hwaro
         protected def collect_string_list(value : YAML::Any, into list : Array(String)) : Nil
           case value.raw
           when Array
-            value.as_a.each { |v| list << yaml_string(v) }
+            # Filter blank items like the string branch below does — an
+            # empty array element otherwise became an empty taxonomy term.
+            value.as_a.each do |v|
+              s = yaml_string(v)
+              list << s unless s.blank?
+            end
           when String
             value.as_s.split(/[\s,]+/).each { |v| list << v.strip unless v.strip.empty? }
           end
+        end
+
+        # First value among `keys` that is present AND non-null. The naive
+        # `yaml["a"]? || yaml["b"]?` chain can't express this: YAML::Any is a
+        # struct, so a present-but-null key (`pubDate:` with no value) is
+        # truthy and silently discards every fallback after it.
+        protected def first_present(yaml : YAML::Any, *keys : String) : YAML::Any?
+          keys.each do |key|
+            value = yaml[key]?
+            return value if value && !value.raw.nil?
+          end
+          nil
+        end
+
+        # :ditto:
+        protected def first_present(yaml : Hash(YAML::Any, YAML::Any), *keys : String) : YAML::Any?
+          keys.each do |key|
+            value = yaml[key]?
+            return value if value && !value.raw.nil?
+          end
+          nil
         end
       end
     end

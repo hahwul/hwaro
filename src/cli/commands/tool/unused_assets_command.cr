@@ -46,6 +46,7 @@ module Hwaro
           def run(args : Array(String))
             content_dir = "content"
             static_dir = "static"
+            static_dir_given = false
             templates_dir = "templates"
             templates_dir_given = false
             delete_mode = false
@@ -55,7 +56,10 @@ module Hwaro
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool unused-assets [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
-              parser.on("-s DIR", "--static-dir DIR", "Static files directory (default: static)") { |v| static_dir = v }
+              parser.on("-s DIR", "--static-dir DIR", "Static files directory (default: static)") do |v|
+                static_dir = v
+                static_dir_given = true
+              end
               # Without this flag a project with a non-default templates
               # directory silently scanned the wrong (empty) tree: every
               # template-referenced asset came back "unused", and `--delete`
@@ -90,10 +94,16 @@ module Hwaro
             # below survives.
             Runner.enable_json_mode! if json_output
 
+            # The `*_explicit` flags distinguish an explicitly passed
+            # `--templates-dir templates` / `--static-dir static` (validated
+            # against the CWD above) from the bare defaults: only the true
+            # defaults may be re-rooted to the resolved project root.
             service = Services::UnusedAssets.new(
               content_dir: content_dir,
               static_dir: static_dir,
               templates_dir: templates_dir,
+              templates_dir_explicit: templates_dir_given,
+              static_dir_explicit: static_dir_given,
             )
             result = service.run
 

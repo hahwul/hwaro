@@ -184,7 +184,9 @@ module Hwaro
             text = $1
             target = $2
             if target.ends_with?(".md") && !target.starts_with?("http://") && !target.starts_with?("https://")
-              target_decoded = URI.decode(target)
+              # `scrub`: URI.decode can materialize invalid UTF-8 (`%ff`),
+              # and the regex below raises on it — dropping the whole note.
+              target_decoded = URI.decode(target).scrub
               if /[0-9a-fA-F]{32}/.match(target_decoded)
                 filename = File.basename(target_decoded, ".md")
                 clean_name = filename.sub(/\s+[0-9a-f]{16,}$/i, "").strip

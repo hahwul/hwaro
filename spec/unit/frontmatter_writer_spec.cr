@@ -16,9 +16,12 @@ end
 describe Hwaro::Utils::FrontmatterWriter do
   describe ".serialize_time" do
     # The whole reason this helper exists: `to_rfc3339` converts to UTC, so a
-    # local date in any positive-offset zone rolls back a calendar day.
+    # local date in any positive-offset zone rolls back a calendar day. A
+    # parsed local date is midnight in the ambient LOCAL zone; a fixed-offset
+    # midnight is a genuine timestamp and keeps its offset (see the
+    # stability spec).
     it "emits a bare date when the value carries no time-of-day" do
-      time = Time.local(2026, 5, 20, 0, 0, 0, location: Time::Location.fixed(9 * 3600))
+      time = Time.local(2026, 5, 20)
       Hwaro::Utils::FrontmatterWriter.serialize_time(time).should eq("2026-05-20")
     end
 

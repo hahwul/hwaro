@@ -14,6 +14,7 @@ require "../content/processors/markdown"
 require "../content/processors/internal_link_resolver"
 require "../core/build/parallel"
 require "./config_snippets"
+require "./content_lister"
 
 module Hwaro
   module Services
@@ -302,12 +303,97 @@ module Hwaro
       # config forever.
       private def mentioned_sections(text : String) : Set(String)
         found = Set(String).new
-        text.each_line do |line|
+        lines = text.split('\n')
+        in_string = multiline_string_line_states(lines)
+        lines.each_with_index do |line, idx|
+          # A `[menus]`-looking line inside a TOML multi-line string is
+          # string CONTENT, not a header; counting it suppressed the real
+          # missing-section detection.
+          next if in_string[idx]
           next unless m = line.match(/^\s*(?:#\s*)?\[\[?\s*([^\[\]]+?)\s*\]\]?/)
           parts = m[1].downcase.split('.').map(&.strip)
           parts.each_index { |i| found << parts[0..i].join('.') }
         end
         found
+      end
+
+      # TOML multi-line strings (`"""…"""` / `'''…'''`) can span lines
+      # whose text looks exactly like a key assignment or a table header.
+      # Every line-oriented scanner in this service must skip those lines:
+      # matching them edits user DATA (violating the "--fix preserves
+      # content byte-exactly outside the fixed region" invariant), flips
+      # the header-tracking state, and fools `mentioned_sections`. Returns,
+      # for each line of `lines`, whether that line STARTS inside a
+      # multi-line string.
+      private def multiline_string_line_states(lines : Array(String)) : Array(Bool)
+        states = Array(Bool).new(lines.size)
+        delim = nil.as(Char?)
+        lines.each do |line|
+          states << !delim.nil?
+          delim = advance_multiline_string_state(line, delim)
+        end
+        states
+      end
+
+      # Advance the multi-line-string tracker across one line. `delim` is
+      # the quote character of the currently open multi-line string (nil
+      # when outside one). Handles delimiters that open and close on the
+      # same line, backslash escapes in basic strings, and single-line
+      # strings/comments whose quote characters could otherwise fake an
+      # opener.
+      private def advance_multiline_string_state(line : String, delim : Char?) : Char?
+        chars = line.chars
+        i = 0
+        while i < chars.size
+          c = chars[i]
+
+          if d = delim
+            if c == '\\' && d == '"'
+              i += 2 # escaped char in a basic multi-line string
+            elsif c == d && chars[i + 1]? == d && chars[i + 2]? == d
+              # Consume the whole quote run: TOML allows one or two extra
+              # quote chars of CONTENT adjacent to the delimiter (`""""`
+              # is `"` + close), and the closing delimiter is the last
+              # three of the run.
+              i += 3
+              while chars[i]? == d
+                i += 1
+              end
+              delim = nil
+            else
+              i += 1
+            end
+            next
+          end
+
+          case c
+          when '#'
+            break # comment — nothing after it can open a string
+          when '"', '\''
+            if chars[i + 1]? == c && chars[i + 2]? == c
+              delim = c
+              i += 3
+            else
+              # Single-line string: skip to its closing quote so a quote
+              # char inside it can't fake a multi-line opener.
+              i += 1
+              while i < chars.size
+                ch = chars[i]
+                if ch == '\\' && c == '"'
+                  i += 2
+                elsif ch == c
+                  i += 1
+                  break
+                else
+                  i += 1
+                end
+              end
+            end
+          else
+            i += 1
+          end
+        end
+        delim
       end
 
       # Sections that are advanced/niche or low-value for most users.
@@ -530,7 +616,13 @@ module Hwaro
       # so the caller can skip emitting a spurious ValueFix.
       private def trim_base_url_trailing_slash(text : String) : NamedTuple(text: String, fix: ValueFix)?
         lines = text.split('\n', remove_empty: false)
+        in_string = multiline_string_line_states(lines)
         lines.each_with_index do |line, idx|
+          # A base_url-looking line inside a TOML multi-line string is
+          # string CONTENT — editing it corrupts user data, and a
+          # `[section]`-looking line in one must not end the top-level
+          # scan early either.
+          next if in_string[idx]
           break if line =~ /^\s*\[/ # entered a section table; base_url is top-level only
           # `[^"']*` refuses values containing either quote char, so a
           # string this regex can't round-trip safely is skipped rather
@@ -563,10 +655,15 @@ module Hwaro
       # down the file — silent corruption of user data.
       private def clamp_sitemap_priority(text : String) : NamedTuple(text: String, fix: ValueFix)?
         lines = text.split('\n', remove_empty: false)
+        in_string = multiline_string_line_states(lines)
         in_sitemap = false
         top_level = true
         number = /[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/
         lines.each_with_index do |line, idx|
+          # Lines inside a TOML multi-line string are string CONTENT: a
+          # priority-looking line there must never be clamped, and a
+          # header-looking line there must not flip in_sitemap/top_level.
+          next if in_string[idx]
           if header = line.match(/^\s*\[\[?\s*([^\[\]]+?)\s*\]\]?\s*(?:#.*)?$/)
             in_sitemap = (header[1] == "sitemap")
             top_level = false
@@ -859,7 +956,21 @@ module Hwaro
       # templates as missing — and never syntax-checked any of them.
       private def template_files : Array(String)
         Dir.glob(File.join(@templates_dir, "**", "*")).select do |path|
-          !File.directory?(path) && path.matches?(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX)
+          next false unless path.matches?(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX)
+          # lstat first: `File.directory?` FOLLOWS symlinks, so a link
+          # cycle anywhere under templates/ raised ELOOP out of the whole
+          # doctor run. Mirror walk_section_dirs' guard — judge the entry
+          # itself, and skip a symlink whose target can't be resolved.
+          info = File.info?(path, follow_symlinks: false)
+          next false unless info
+          next info.file? unless info.symlink?
+          target = begin
+            File.info?(path, follow_symlinks: true)
+          rescue ex : File::Error
+            Logger.debug "Doctor: skipping unresolvable template symlink #{path}: #{ex.message}"
+            nil
+          end
+          target ? target.file? : false
         end
       end
 
@@ -1120,8 +1231,13 @@ module Hwaro
         files = [] of String
         Dir.glob(File.join(@content_dir, "**", "*.{md,markdown}")) do |path|
           # Skip things that aren't regular files (symlink to nowhere,
-          # directory matching the glob, etc.).
-          files << path if File.file?(path)
+          # directory matching the glob, etc.). `File.file?` FOLLOWS
+          # symlinks, so a link cycle (`ln -s loop.md content/loop.md`)
+          # raised File::Error (ELOOP) out of the whole doctor run —
+          # zero diagnostics, and no JSON payload under --json.
+          # `ContentWalk.readable_file?` stats lstat-first, exactly like
+          # the sibling `tool validate` walk.
+          files << path if ContentWalk.readable_file?(path)
         end
         return if files.empty?
 
@@ -1158,6 +1274,16 @@ module Hwaro
           first_line = (ex.message || "Invalid front matter").lines.first?.to_s.strip
           return [Issue.new(id: "content-frontmatter-invalid", level: :error, category: "content", file: path,
             message: first_line.empty? ? "Invalid front matter" : first_line)]
+        rescue ex
+          # A parse failure that isn't a classified HwaroError (invalid
+          # UTF-8 raising ArgumentError out of the front-matter regex,
+          # etc.) used to escape into ParallelHelper.map, whose
+          # success-only filter silently dropped the file — doctor said
+          # "no issues found" while `hwaro build` fails on the same file.
+          first_line = (ex.message || "").lines.first?.to_s.strip
+          detail = first_line.empty? ? ex.class.name : first_line
+          return [Issue.new(id: "content-frontmatter-invalid", level: :error, category: "content", file: path,
+            message: "Cannot parse content file (invalid encoding or front matter): #{detail}")]
         end
 
         issues = [] of Issue

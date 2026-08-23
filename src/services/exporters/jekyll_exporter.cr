@@ -60,20 +60,32 @@ module Hwaro
           # are content the user handed the exporter and did not get back.
           skipped += @unexported_assets
 
+          # Any per-file error fails the run: `exported > 0` used to mask
+          # errors, so a partial export reported success and exited 0.
           ExportResult.new(
-            success: exported > 0 || errors == 0,
-            message: "Exported #{exported} items, skipped #{skipped}, errors #{errors}",
+            success: errors == 0,
+            message: errors > 0 ? "#{errors} file(s) could not be exported (#{exported} exported, #{skipped} skipped)" : "Exported #{exported} items, skipped #{skipped}, errors #{errors}",
             exported_count: exported,
             skipped_count: skipped,
             error_count: errors
           )
         end
 
-        # Keys emitted explicitly below; everything else passes through as a
-        # Jekyll page variable (Jekyll accepts arbitrary front-matter keys, so
-        # dropping `slug`, `weight`, `layout`, `extra.*`, … was silent data
-        # loss — the same bug class gh#527 fixed for the Hugo exporter).
+        # Keys the explicit emitters below may claim; everything else passes
+        # through as a Jekyll page variable (Jekyll accepts arbitrary
+        # front-matter keys, so dropping `slug`, `weight`, `layout`,
+        # `extra.*`, … was silent data loss — the same bug class gh#527 fixed
+        # for the Hugo exporter). A key is only excluded from the passthrough
+        # when its emitter actually produced a line: a value the emitter
+        # cannot represent (hash-valued `tags`, array `title`, …) used to be
+        # swallowed — skipped by the emitter AND skipped by name here.
         HANDLED_KEYS = Set{"title", "date", "description", "draft", "tags", "categories", "authors", "image", "template"}
+
+        # Matches the date/timestamp shapes Jekyll's YAML loader reads
+        # natively; anything else is emitted via `yaml_scalar` — raw
+        # interpolation of an arbitrary string into `date:` let a newline or
+        # `: ` inject or break the frontmatter.
+        DATE_SHAPE_RE = /\A\d{4}-\d{2}-\d{2}([Tt ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?( ?([Zz]|[+-]\d{2}:?\d{2}))?)?\z/
 
         private def export_file(
           file_path : String,
@@ -94,32 +106,52 @@ module Hwaro
             return :skipped
           end
 
-          # Build Jekyll YAML frontmatter
+          # Build Jekyll YAML frontmatter. Keys are marked handled only when
+          # an emitter actually produced a line, so a value the emitters
+          # cannot represent falls through to `passthrough_yaml` instead of
+          # being silently dropped.
           yaml_lines = [] of String
+          handled = Set(String).new
+          # A boolean draft is fully translated (true → `published: false`,
+          # false → omitted, Jekyll's default); any other type falls through
+          # to passthrough_yaml like every other unrepresentable value.
+          handled << "draft" if fields["draft"]?.try(&.raw).is_a?(Bool)
 
-          if title = fields["title"]?.try(&.as_s?)
+          if title = scalar_string(fields["title"]?)
             yaml_lines << "title: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(title)}"
+            handled << "title"
           end
 
-          if date = fields["date"]?.try(&.as_s?)
-            yaml_lines << "date: #{date}"
+          if date = scalar_string(fields["date"]?)
+            yaml_lines << "date: #{yaml_date_value(date)}"
+            handled << "date"
           end
 
-          if desc = fields["description"]?.try(&.as_s?)
+          if desc = scalar_string(fields["description"]?)
             yaml_lines << "description: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(desc)}"
+            handled << "description"
           end
 
           # Hwaro's `template` is Jekyll's `layout`, the exact inverse of the
           # Jekyll importer's `layout` → `template` mapping. Passing the key
           # through verbatim meant Jekyll ignored it (rendering the page with
-          # no layout at all) and a re-import dropped it entirely.
-          if layout = fields["template"]?.try(&.as_s?)
+          # no layout at all) and a re-import dropped it entirely. An
+          # authored `layout` wins (existing-key-wins, like the Hugo
+          # renames): emitting both would produce a duplicate YAML key.
+          if (layout = scalar_string(fields["template"]?)) && fields["layout"]?.try(&.raw).nil?
             yaml_lines << "layout: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(layout)}"
+            handled << "template"
+            handled << "layout"
           end
 
-          # Jekyll uses `published: false` instead of `draft: true`
+          # Jekyll uses `published: false` instead of `draft: true`. The
+          # draft flag is hwaro's source of truth, so it also claims
+          # `published`: letting an authored `published: true` pass through
+          # would duplicate the key and (under Jekyll's last-wins loader)
+          # publish the draft.
           if is_draft
             yaml_lines << "published: false"
+            handled << "published"
           end
 
           # Accept both list (`tags: [a, b]`) and scalar (`tags: crystal`)
@@ -130,12 +162,14 @@ module Hwaro
           if tags = string_list_field(fields["tags"]?)
             yaml_lines << "tags:"
             tags.each { |t| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(t)}" }
+            handled << "tags"
           end
 
           # categories from taxonomies if present
           if cats = string_list_field(fields["categories"]?)
             yaml_lines << "categories:"
             cats.each { |c| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(c)}" }
+            handled << "categories"
           end
 
           # Jekyll natively understands an `authors` front-matter list, so
@@ -143,13 +177,15 @@ module Hwaro
           if authors = string_list_field(fields["authors"]?)
             yaml_lines << "authors:"
             authors.each { |a| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(a)}" }
+            handled << "authors"
           end
 
-          if image = fields["image"]?.try(&.as_s?)
+          if image = scalar_string(fields["image"]?)
             yaml_lines << "image: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(image)}"
+            handled << "image"
           end
 
-          if passthrough = passthrough_yaml(fields)
+          if passthrough = passthrough_yaml(fields, handled)
             yaml_lines << passthrough
           end
 
@@ -205,13 +241,38 @@ module Hwaro
           0
         end
 
-        # Serialize the non-allowlisted fields through the YAML emitter (which
-        # handles nesting, typing, and quoting), returning frontmatter lines
-        # without the `---` fences, or nil when there is nothing to carry.
-        private def passthrough_yaml(fields : Hash(String, YAML::Any)) : String?
+        # String form of a scalar front-matter value: strings pass through
+        # and Bool/Int/Float stringify (a non-string `title: 2024` used to be
+        # silently dropped). Structured or null values return nil so the
+        # caller leaves the key to `passthrough_yaml`. Time never reaches
+        # here — `parse_content` already normalizes it to a date string.
+        private def scalar_string(value : YAML::Any?) : String?
+          return unless value
+          if str = value.as_s?
+            return str
+          end
+          case raw = value.raw
+          when Bool, Int64, Float64
+            raw.to_s
+          end
+        end
+
+        # A well-formed date/timestamp is written raw so Jekyll's YAML loader
+        # reads it as a date; anything else goes through `yaml_scalar`.
+        private def yaml_date_value(date : String) : String
+          date.matches?(DATE_SHAPE_RE) ? date : Hwaro::Utils::FrontmatterWriter.yaml_scalar(date)
+        end
+
+        # Serialize the fields no emitter claimed through the YAML emitter
+        # (which handles nesting, typing, and quoting), returning frontmatter
+        # lines without the `---` fences, or nil when there is nothing to
+        # carry. `handled` holds the keys actually emitted above — filtering
+        # by the static HANDLED_KEYS list swallowed handled-key values the
+        # emitters had skipped as unrepresentable.
+        private def passthrough_yaml(fields : Hash(String, YAML::Any), handled : Set(String)) : String?
           leftovers = {} of YAML::Any => YAML::Any
           fields.each do |key, value|
-            next if HANDLED_KEYS.includes?(key)
+            next if handled.includes?(key)
             next if value.raw.nil?
             leftovers[YAML::Any.new(key)] = value
           end

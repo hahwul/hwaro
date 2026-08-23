@@ -132,7 +132,10 @@ module Hwaro
             end
 
             relative_path = file_path.sub(base_path, "").lstrip('/')
-            relative_path_no_ext = relative_path.sub(File.extname(relative_path), "")
+            # `rchop`, not `sub`: sub strips the FIRST occurrence of the
+            # extension substring, registering the wrong link-map key for a
+            # stem that itself contains ".md" (`a.md.old.md` → `a.old.md`).
+            relative_path_no_ext = relative_path.rchop(File.extname(relative_path))
 
             slug = slugify(title)
             url = "/#{section}/#{slug}/"

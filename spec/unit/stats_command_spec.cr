@@ -57,5 +57,52 @@ describe Hwaro::CLI::Commands::Tool::StatsCommand do
         output.should contain("counted: 2 files, 2 published, 0 drafts")
       end
     end
+
+    # Regression: the tag chart padded and truncated by CODEPOINTS, so CJK or
+    # emoji labels (2 columns per glyph) misaligned every row after them.
+    it "pads tag labels by display width so CJK tags stay aligned" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "one.md"),
+          "---\ntitle: One\ntags:\n  - 한글태그\n  - aa\n---\nwords here\n"
+        )
+        File.write(
+          File.join(dir, "two.md"),
+          "---\ntitle: Two\ntags:\n  - 한글태그\n---\nmore words\n"
+        )
+
+        output = with_captured_log do
+          cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
+          cmd.run(["-c", dir])
+        end
+
+        # The label column is 8 display columns wide (한글태그 = 4 chars × 2
+        # columns), so "aa" gets 6 columns of padding before the 2-space gap
+        # and the 4-wide right-aligned count. Codepoint padding gave it 2.
+        output.should contain("한글태그  " + "   2")
+        output.should contain("aa" + " " * 6 + "  " + "   1")
+      end
+    end
+
+    it "truncates overlong tag labels by display width" do
+      Dir.mktmpdir do |dir|
+        long_tag = "가" * 12 # 24 columns wide, but only 12 codepoints
+        File.write(
+          File.join(dir, "one.md"),
+          "---\ntitle: One\ntags:\n  - #{long_tag}\n---\nwords\n"
+        )
+
+        output = with_captured_log do
+          cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
+          cmd.run(["-c", dir])
+        end
+
+        # 24 columns exceed the 20-column cap: 9 chars (18 columns) fit the
+        # 19-column budget, then the ellipsis. Codepoint truncation saw only
+        # 12 "characters" and never truncated at all.
+        output.should_not contain(long_tag)
+        output.should contain("#{"가" * 9}…")
+      end
+    end
   end
 end

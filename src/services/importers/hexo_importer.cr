@@ -166,17 +166,14 @@ module Hwaro
             categories = categories.uniq
             fields["categories"] = categories unless categories.empty?
 
-            # Description
-            if desc = yaml["description"]?
+            # Description. `first_present`, not `if/elsif` on `[]?`: a
+            # present-but-null `description:` would discard the excerpt.
+            if desc = first_present(yaml, "description", "excerpt")
               fields["description"] = yaml_string(desc)
-            elsif excerpt = yaml["excerpt"]?
-              fields["description"] = yaml_string(excerpt)
             end
 
             # Image / thumbnail
-            if image = yaml["cover"]?
-              fields["image"] = yaml_string(image)
-            elsif image = yaml["thumbnail"]?
+            if image = first_present(yaml, "cover", "thumbnail")
               fields["image"] = yaml_string(image)
             end
 

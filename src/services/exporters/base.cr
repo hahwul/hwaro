@@ -193,6 +193,16 @@ module Hwaro
 
             dest = File.join(dest_dir, entry)
             next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest, output_dir)
+            # The directory was resolve-checked above, but the destination
+            # FILE itself can be a pre-existing symlink leaf: File.copy
+            # follows it and would write through it to a path outside the
+            # tree. Same resolved re-check write_file applies.
+            resolved_dest = Hwaro::Utils::PathUtils.resolved_real_path(dest)
+            resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
+            unless resolved_dest.starts_with?(resolved_root + File::SEPARATOR)
+              Logger.warn "Skipping bundle asset outside output directory (symlinked destination): #{dest}"
+              next
+            end
 
             action = File.exists?(dest) ? "overwritten" : "exported"
             unless @dry_run
@@ -326,6 +336,19 @@ module Hwaro
         protected def write_file(path : String, content : String, output_dir : String, verbose : Bool = false) : Bool
           safe_path = Hwaro::Utils::OutputGuard.safe_output_path(path, output_dir)
           return false unless safe_path
+
+          # `safe_output_path` is lexical; `mkdir_p` + `File.write` follow a
+          # pre-existing symlinked directory (or file) inside the destination,
+          # routing the write outside `output_dir`. Re-check the RESOLVED
+          # destination — deepest-existing-ancestor resolution, so a
+          # not-yet-created path still resolves — the same containment rule
+          # `copy_bundle_assets` applies.
+          resolved = Hwaro::Utils::PathUtils.resolved_real_path(safe_path)
+          resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
+          unless resolved == resolved_root || resolved.starts_with?(resolved_root + File::SEPARATOR)
+            Logger.warn "Skipping output outside output directory (symlinked destination): #{path}"
+            return false
+          end
 
           action = File.exists?(safe_path) ? "overwritten" : "exported"
           unless @dry_run

@@ -763,8 +763,17 @@ describe Hwaro::Services::ConversionResult do
     # zone. Forcing it through `to_rfc3339` (UTC) rolls the day back in any
     # positive-offset zone; these cases must keep the calendar day regardless of
     # the zone the value was parsed in.
-    it "keeps the calendar day for a positive-offset midnight (no UTC rollback)" do
+    it "keeps the calendar day for a fixed positive-offset midnight (no UTC rollback)" do
+      # A FIXED-offset midnight is a genuine timestamp, not a local date, so
+      # collapsing it to a bare `2026-05-20` silently shifted the instant.
+      # The calendar day is still preserved — via the offset, not by
+      # discarding it.
       time = Time.local(2026, 5, 20, 0, 0, 0, location: Time::Location.fixed(9 * 3600))
+      Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20T00:00:00+09:00")
+    end
+
+    it "keeps the calendar day for a local-zone midnight (a parsed local date)" do
+      time = Time.local(2026, 5, 20)
       Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20")
     end
 
@@ -773,9 +782,9 @@ describe Hwaro::Services::ConversionResult do
       Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20")
     end
 
-    it "keeps the calendar day for a negative-offset midnight" do
+    it "keeps the calendar day for a fixed negative-offset midnight" do
       time = Time.local(2026, 5, 20, 0, 0, 0, location: Time::Location.fixed(-5 * 3600))
-      Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20")
+      Hwaro::Services::FrontmatterConverter.serialize_time(time).should eq("2026-05-20T00:00:00-05:00")
     end
 
     it "preserves genuine timestamps as RFC 3339" do

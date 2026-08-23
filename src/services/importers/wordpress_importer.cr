@@ -16,14 +16,20 @@ module Hwaro
 
           reset_written_paths
 
-          unless File.exists?(wxr_path)
+          # `File.file?`, not `File.exists?`: a directory passes the latter
+          # and then crashes File.read with a bare "Is a directory".
+          unless File.file?(wxr_path)
+            message = Dir.exists?(wxr_path) ? "WXR path is a directory, not a file: #{wxr_path}" : "WXR file not found: #{wxr_path}"
             return ImportResult.new(
               success: false,
-              message: "WXR file not found: #{wxr_path}"
+              message: message
             )
           end
 
-          xml_content = File.read(wxr_path)
+          # `scrub` because the export is third-party bytes: a single invalid
+          # UTF-8 byte made the DOCTYPE guard's regex below raise
+          # ArgumentError, aborting the whole import.
+          xml_content = File.read(wxr_path).scrub
 
           # Guard against XML entity-expansion / recursive-entity DoS. A
           # malicious WXR can declare nested internal entities (e.g.
@@ -106,9 +112,19 @@ module Hwaro
           start = xml.index(/<!DOCTYPE/i)
           return false unless start
 
+          # A real DOCTYPE can only live in the prolog, before the root
+          # element. A `<!DOCTYPE` mention inside a post body (a DTD tutorial,
+          # escaped markup) must not seed the scan: its surrounding prose can
+          # hold unbalanced brackets/quotes that would never "close" and get
+          # the whole file refused.
+          if root = xml.index(/<[A-Za-z]/)
+            return false if start > root
+          end
+
           window = xml[start, 1 << 16]
           in_quote : Char? = nil
           depth = 0
+          closed = false
           doctype = String.build do |io|
             window.each_char do |c|
               io << c
@@ -121,10 +137,17 @@ module Hwaro
               elsif c == ']'
                 depth -= 1 if depth > 0
               elsif c == '>' && depth == 0
+                closed = true
                 break
               end
             end
           end
+          # The DOCTYPE never terminated inside the scan window, so an
+          # internal subset longer than the window could smuggle its
+          # `<!ENTITY` declarations past the scan. No legitimate WXR carries
+          # a DOCTYPE anywhere near this size — treat it as if it declared
+          # entities and refuse.
+          return true unless closed
           doctype.matches?(/<!ENTITY/i)
         end
 

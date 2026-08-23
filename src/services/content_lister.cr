@@ -248,9 +248,20 @@ module Hwaro
 
         case sort
         in ContentSort::Date
-          # Sort by date (newest first), then by path
+          # Sort by date (newest first), then by path. Undated entries used
+          # to key as epoch 0 — "older than everything post-1970" — so
+          # `--reverse` (oldest first) ranked them ABOVE every dated post and
+          # polluted `--reverse --limit` results. Undated means "date
+          # unknown": the leading field pins those AFTER every dated entry in
+          # both directions, which requires folding `reverse` into the key
+          # here (the blanket `reverse!` below would flip the pin too); the
+          # path tie-breaker keeps equal keys deterministic.
           contents.sort_by! do |info|
-            {-(info.date.try(&.to_unix) || 0_i64), info.path}
+            if date = info.date
+              {0, reverse ? date.to_unix : -date.to_unix, info.path}
+            else
+              {1, 0_i64, info.path}
+            end
           end
         in ContentSort::Title
           # Case-sensitive, matching SortUtils.compare_by_title — see the
@@ -259,7 +270,8 @@ module Hwaro
         in ContentSort::Path
           contents.sort_by!(&.path)
         end
-        contents.reverse! if reverse
+        # Date sort already applied `reverse` inside its key (see above).
+        contents.reverse! if reverse && sort != ContentSort::Date
         contents = contents.first(limit) if limit
 
         contents

@@ -38,6 +38,13 @@ describe Hwaro::CLI::Commands::Tool::ValidateCommand do
       end
     end
 
+    it "raises a classified usage error for a non-numeric --max-warnings" do
+      err = expect_raises(Hwaro::HwaroError) do
+        Hwaro::CLI::Commands::Tool::ValidateCommand.new.run(["--max-warnings", "abc"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+    end
+
     it "groups issues by file and prints a summary when problems exist" do
       Dir.mktmpdir do |dir|
         # Missing title triggers a validation issue.
@@ -57,6 +64,68 @@ describe Hwaro::CLI::Commands::Tool::ValidateCommand do
         output.should contain("bad.md")
         output.should match(/checked: \d+ errors?, \d+ warnings?, \d+ info/)
       end
+    end
+  end
+end
+
+# Service-level regressions for ContentValidator error classification and
+# the tag plumbing (previously smuggled through the frontmatter hash under
+# a fake "_tags" key).
+describe Hwaro::Services::ContentValidator do
+  it "distinguishes an unprocessable (invalid encoding) file from a read failure" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "bad.md")
+      File.open(path, "w") do |f|
+        f << "---\ntitle: ok\n---\n\nbody "
+        f.write(Bytes[0xff, 0xfe, 0xfa])
+      end
+
+      issues = Hwaro::Services::ContentValidator.new(content_dir: dir).run
+      issue = issues.find { |i| i.id == "content-read-error" }
+      issue.should_not be_nil
+      # A perfectly readable file must not be blamed on I/O: that message
+      # pointed authors at permissions/disk when the problem is encoding.
+      issue.not_nil!.message.should_not contain("Failed to read file")
+    end
+  end
+
+  it "does not misreport a real front matter key named _tags as tags" do
+    Dir.mktmpdir do |dir|
+      File.write(
+        File.join(dir, "post.md"),
+        "+++\ntitle = \"T\"\ndescription = \"D\"\n_tags = \"FooBar\"\n+++\n\nBody text.\n"
+      )
+
+      issues = Hwaro::Services::ContentValidator.new(content_dir: dir).run
+      issues.any? { |i| i.id == "content-tag-mixed-case" }.should be_false
+    end
+  end
+
+  it "keeps a tag containing a comma intact for the mixed-case check" do
+    Dir.mktmpdir do |dir|
+      File.write(
+        File.join(dir, "post.md"),
+        "+++\ntitle = \"T\"\ndescription = \"D\"\ntags = [\"Foo,Bar\"]\n+++\n\nBody text.\n"
+      )
+
+      issues = Hwaro::Services::ContentValidator.new(content_dir: dir).run
+      mixed = issues.select { |i| i.id == "content-tag-mixed-case" }
+      mixed.size.should eq(1)
+      mixed.first.message.should contain(%("Foo,Bar"))
+    end
+  end
+
+  it "still warns on ordinary mixed-case tags" do
+    Dir.mktmpdir do |dir|
+      File.write(
+        File.join(dir, "post.md"),
+        "+++\ntitle = \"T\"\ndescription = \"D\"\ntags = [\"FooBar\", \"fine\"]\n+++\n\nBody text.\n"
+      )
+
+      issues = Hwaro::Services::ContentValidator.new(content_dir: dir).run
+      mixed = issues.select { |i| i.id == "content-tag-mixed-case" }
+      mixed.size.should eq(1)
+      mixed.first.message.should contain(%("FooBar"))
     end
   end
 end

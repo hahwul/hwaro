@@ -574,3 +574,37 @@ describe Hwaro::Services::ContentInfo do
     end
   end
 end
+
+describe "ContentLister date sort with undated entries" do
+  # Regression: undated files keyed as epoch 0 — "older than everything
+  # post-1970" — so `--sort date --reverse` ranked them ABOVE every dated
+  # post and polluted `--reverse --limit N` results. Undated means "date
+  # unknown": those entries sort AFTER dated ones in both directions, with
+  # the path tie-breaker keeping the order deterministic.
+  it "sorts undated entries after dated ones in both directions" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      FileUtils.mkdir_p(content_dir)
+
+      File.write(File.join(content_dir, "new.md"), "---\ntitle: New\ndate: 2024-06-15\n---\nN")
+      File.write(File.join(content_dir, "old.md"), "---\ntitle: Old\ndate: 2023-01-01\n---\nO")
+      File.write(File.join(content_dir, "z-undated.md"), "---\ntitle: Undated Z\n---\nU")
+      File.write(File.join(content_dir, "a-undated.md"), "---\ntitle: Undated A\n---\nU")
+
+      lister = Hwaro::Services::ContentLister.new(content_dir)
+      all = Hwaro::Services::ContentFilter::All
+      date = Hwaro::Services::ContentSort::Date
+
+      forward = lister.list_content(all, date)
+      forward.map(&.title).should eq(["New", "Old", "Undated A", "Undated Z"])
+
+      reversed = lister.list_content(all, date, reverse: true)
+      reversed.map(&.title).should eq(["Old", "New", "Undated A", "Undated Z"])
+
+      # --reverse --limit returns the oldest DATED entries, not the undated
+      # ones.
+      limited = lister.list_content(all, date, reverse: true, limit: 2)
+      limited.map(&.title).should eq(["Old", "New"])
+    end
+  end
+end

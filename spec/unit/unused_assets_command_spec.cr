@@ -71,5 +71,41 @@ describe Hwaro::CLI::Commands::Tool::UnusedAssetsCommand do
         output.should contain("found: 1 unused asset")
       end
     end
+
+    # Regression: an explicitly passed `--templates-dir templates` was
+    # indistinguishable from the default inside the service and got silently
+    # re-rooted to <project_root>/templates — even though the command had
+    # just existence-checked ./templates. Every template-referenced asset
+    # then came back "unused", and `--delete --force` removed in-use files.
+    it "scans an explicitly passed --templates-dir even when it matches the default name" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          # ./templates exists (the command existence-checks it) and holds
+          # the only reference to keep.png...
+          FileUtils.mkdir_p("templates")
+          File.write(File.join("templates", "base.html"), %(<img src="/keep.png">))
+
+          # ...while the project root resolves to proj/, which has no
+          # templates directory of its own.
+          proj = File.join(dir, "proj")
+          FileUtils.mkdir_p(File.join(proj, "content"))
+          FileUtils.mkdir_p(File.join(proj, "static"))
+          File.write(File.join(proj, "config.toml"), "title = \"P\"\n")
+          File.write(File.join(proj, "static", "keep.png"), "png")
+          File.write(File.join(proj, "content", "post.md"), "---\ntitle: P\n---\nBody\n")
+
+          output = with_captured_log do
+            cmd = Hwaro::CLI::Commands::Tool::UnusedAssetsCommand.new
+            cmd.run([
+              "-c", File.join(proj, "content"),
+              "-s", File.join(proj, "static"),
+              "--templates-dir", "templates",
+            ])
+          end
+
+          output.should contain("found: no unused assets")
+        end
+      end
+    end
   end
 end

@@ -22,6 +22,16 @@ module Hwaro
 
       alias FrontmatterValue = String | Bool | Int64 | Float64?
 
+      # Parsed front matter plus the tag list carried OUT-OF-BAND. Tags
+      # used to be smuggled through the field hash under a fake "_tags"
+      # key joined with commas, so a real front matter key named `_tags`
+      # triggered bogus mixed-case tag warnings for non-tag data, and
+      # genuine tags containing commas were split apart before the
+      # convention check ever saw them.
+      private record ParsedFrontmatter,
+        fields : Hash(String, FrontmatterValue),
+        tags : Array(String) = [] of String
+
       @content_dir : String
 
       def initialize(@content_dir : String = "content")
@@ -66,13 +76,14 @@ module Hwaro
         # BOM'd file isn't reported as missing every front matter field.
         content = Utils::TextUtils.strip_bom(File.read(file_path))
 
-        frontmatter = parse_frontmatter(file_path, content, issues) || {} of String => FrontmatterValue
+        parsed = parse_frontmatter(file_path, content, issues)
+        frontmatter = parsed.try(&.fields) || {} of String => FrontmatterValue
+        tags = parsed.try(&.tags) || [] of String
 
         title = frontmatter["title"]?
         description = frontmatter["description"]?
         date = frontmatter["date"]?
         draft = frontmatter["draft"]?
-        tags = frontmatter["_tags"]?
 
         # title check
         if title.nil? || title == "Untitled"
@@ -98,21 +109,26 @@ module Hwaro
         end
 
         # tag convention check (mixed-case warning)
-        if tags.is_a?(String) && !tags.as(String).empty?
-          check_tag_conventions(file_path, tags.as(String), issues)
-        end
+        check_tag_conventions(file_path, tags, issues) unless tags.empty?
 
         # image alt text check
         check_image_alt(file_path, content, issues)
 
         # internal link check
         check_internal_links(file_path, content, issues)
-      rescue ex
+      rescue ex : IO::Error | File::Error
         issues << Issue.new(id: "content-read-error", level: :error, category: "content", file: file_path,
           message: "Failed to read file: #{ex.message}")
+      rescue ex
+        # A readable file can still blow up the scanners — invalid UTF-8
+        # makes the front-matter regex raise ArgumentError. Calling that a
+        # read failure pointed authors at permissions/disk when the
+        # problem is the file's encoding or structure.
+        issues << Issue.new(id: "content-read-error", level: :error, category: "content", file: file_path,
+          message: "Cannot process file (invalid encoding or malformed content): #{ex.message}")
       end
 
-      private def parse_frontmatter(file_path : String, content : String, issues : Array(Issue)) : Hash(String, FrontmatterValue)?
+      private def parse_frontmatter(file_path : String, content : String, issues : Array(Issue)) : ParsedFrontmatter?
         if match = content.match(TOML_FRONTMATTER_RE)
           begin
             toml_data = TOML.parse(match[1])
@@ -133,8 +149,7 @@ module Hwaro
             # sites were never tag-checked at all.
             tag_strs = toml_tag_list(toml_data["tags"]?)
             tag_strs = toml_tag_list(toml_data["taxonomies"]?.try(&.as_h?).try(&.["tags"]?)) if tag_strs.empty?
-            result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
-            return result
+            return ParsedFrontmatter.new(result, tag_strs)
           rescue ex
             issues << Issue.new(id: "content-frontmatter-toml-error", level: :error, category: "content", file: file_path,
               message: "TOML frontmatter parse error: #{ex.message}")
@@ -173,14 +188,13 @@ module Hwaro
               if tag_strs.empty?
                 tag_strs = yaml_tag_list(h[YAML::Any.new("taxonomies")]?.try(&.as_h?).try(&.[YAML::Any.new("tags")]?))
               end
-              result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
-              return result
+              return ParsedFrontmatter.new(result, tag_strs)
             end
             # Empty or non-mapping YAML frontmatter (e.g. `---\n---`) is valid
             # YAML but carries no title/description. Return an empty hash (not
             # nil) so the missing-field checks still fire — matching empty TOML,
             # which already reaches them via its `{}` result.
-            return {} of String => FrontmatterValue
+            return ParsedFrontmatter.new({} of String => FrontmatterValue)
           rescue ex
             issues << Issue.new(id: "content-frontmatter-yaml-error", level: :error, category: "content", file: file_path,
               message: "YAML frontmatter parse error: #{ex.message}")
@@ -214,8 +228,7 @@ module Hwaro
               end
               tag_strs = json_tag_list(h["tags"]?)
               tag_strs = json_tag_list(h["taxonomies"]?.try(&.as_h?).try(&.["tags"]?)) if tag_strs.empty?
-              result["_tags"] = tag_strs.join(",") unless tag_strs.empty?
-              return result
+              return ParsedFrontmatter.new(result, tag_strs)
             end
             return
           rescue ex
@@ -281,8 +294,7 @@ module Hwaro
         end
       end
 
-      private def check_tag_conventions(file_path : String, tags_csv : String, issues : Array(Issue))
-        tags = tags_csv.split(",")
+      private def check_tag_conventions(file_path : String, tags : Array(String), issues : Array(Issue))
         mixed = tags.select { |tag| tag != tag.downcase && tag != tag.upcase }
         mixed.each do |tag|
           issues << Issue.new(id: "content-tag-mixed-case", level: :info, category: "content", file: file_path,

@@ -59,4 +59,97 @@ describe "convert regressions" do
       end
     end
   end
+
+  # Stability audit 2026-08-23. `write_in_place` renamed the temp file over
+  # the given path, so converting a symlinked content file destroyed the
+  # symlink and left the real target unconverted.
+  describe "symlinked content files" do
+    it "converts the symlink's target and keeps the symlink" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        target = File.join(dir, "real.md")
+        File.write(target, "+++\ntitle = \"Linked\"\n+++\n\nBody.\n")
+        link = File.join(content_dir, "linked.md")
+        File.symlink(target, link)
+
+        result = Hwaro::Services::FrontmatterConverter.new(content_dir).convert_to_yaml
+        result.converted_count.should eq(1)
+
+        File.symlink?(link).should be_true
+        File.read(target).should start_with("---\ntitle: Linked\n---\n")
+      end
+    end
+  end
+
+  # Stability audit 2026-08-23. An empty source mapping serialized through
+  # `to_yaml` as `--- {}`, which ended up embedded inside the new fences.
+  describe "empty frontmatter blocks" do
+    it "converts empty JSON frontmatter to an empty YAML block" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        path = File.join(dir, "post.md")
+        File.write(path, "{}\n\nBody.\n")
+
+        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+
+        content = File.read(path)
+        content.should start_with("---\n---\n")
+        content.should_not contain("--- {}")
+      end
+    end
+
+    it "converts empty TOML frontmatter to an empty YAML block" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        path = File.join(dir, "post.md")
+        File.write(path, "+++\n+++\n\nBody.\n")
+
+        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+
+        content = File.read(path)
+        content.should eq("---\n---\n\nBody.\n")
+      end
+    end
+
+    # `YAML.parse("")` is nil, so `---\n---\n` was misclassified as "not
+    # front matter" and skipped instead of converting to `+++\n+++`.
+    it "converts an empty YAML frontmatter block to TOML" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        path = File.join(dir, "post.md")
+        File.write(path, "---\n---\n\nBody.\n")
+
+        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        File.read(path).should eq("+++\n+++\n\nBody.\n")
+      end
+    end
+  end
+
+  # Stability audit 2026-08-23. `detect_format` required the opener to be
+  # exactly `---\n`, while the build parser accepts trailing whitespace —
+  # `--- \n` files were skipped as "no frontmatter".
+  describe "delimiter trailing whitespace" do
+    it "detects frontmatter whose opening delimiter has trailing whitespace" do
+      converter = Hwaro::Services::FrontmatterConverter.new(".")
+      converter.detect_format("--- \ntitle: x\n---\n").should eq(Hwaro::Services::FrontmatterFormat::YAML)
+      converter.detect_format("+++\t\ntitle = \"x\"\n+++\n").should eq(Hwaro::Services::FrontmatterFormat::TOML)
+      converter.detect_format("--- \r\ntitle: x\n---\n").should eq(Hwaro::Services::FrontmatterFormat::YAML)
+    end
+
+    it "converts a file whose opening delimiter has a trailing space" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        path = File.join(dir, "post.md")
+        File.write(path, "--- \ntitle: X\n---\n\nBody.\n")
+
+        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+
+        content = File.read(path)
+        content.should start_with("+++\n")
+        content.should contain(%(title = "X"))
+      end
+    end
+  end
 end

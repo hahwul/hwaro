@@ -127,6 +127,31 @@ describe Hwaro::Services::UnusedAssets do
         end
       end
 
+      it "skips a config.toml containing invalid UTF-8 instead of aborting" do
+        # config.toml was the one scan source concatenated WITHOUT the UTF-8
+        # gate every other source goes through, so one bad byte in it still
+        # aborted the command with a PCRE2 ArgumentError.
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            scaffold_project(dir)
+            File.write("config.toml", Bytes[0x74, 0xFF, 0x0A])
+            File.write(File.join("static", "orphan.png"), "png")
+
+            result = nil
+            output = with_captured_log do
+              result = Hwaro::Services::UnusedAssets.new(
+                content_dir: File.join(dir, "content"),
+                static_dir: File.join(dir, "static"),
+                templates_dir: File.join(dir, "templates"),
+              ).run
+            end
+
+            output.should contain("config.toml")
+            result.not_nil!.unused_files.map { |f| File.basename(f) }.should eq(["orphan.png"])
+          end
+        end
+      end
+
       it "keeps working when a content file is invalid UTF-8" do
         Dir.mktmpdir do |dir|
           scaffold_project(dir)

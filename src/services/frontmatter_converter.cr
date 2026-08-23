@@ -102,11 +102,18 @@ module Hwaro
         convert_files(FrontmatterFormat::JSON)
       end
 
+      # Opening delimiter matchers. The build parser accepts trailing
+      # horizontal whitespace after the delimiter (`\A---\s*\n` in
+      # FrontmatterScanner), so detection must too — a `--- \n` file used to
+      # be skipped as "no frontmatter" while `hwaro build` parsed it fine.
+      TOML_OPENER_RE = /\A\+\+\+[ \t]*\r?\n/
+      YAML_OPENER_RE = /\A---[ \t]*\r?\n/
+
       # Detect the frontmatter format of a file
       def detect_format(content : String) : FrontmatterFormat
-        if content.starts_with?("#{TOML_DELIMITER}\n") || content.starts_with?("#{TOML_DELIMITER}\r\n")
+        if content.matches?(TOML_OPENER_RE)
           FrontmatterFormat::TOML
-        elsif content.starts_with?("#{YAML_DELIMITER}\n") || content.starts_with?("#{YAML_DELIMITER}\r\n")
+        elsif content.matches?(YAML_OPENER_RE)
           FrontmatterFormat::YAML
         elsif content.starts_with?('{') && json_frontmatter_object?(content)
           FrontmatterFormat::JSON
@@ -185,7 +192,9 @@ module Hwaro
           if @dry_run
             Logger.item("would convert: #{file_path}", glyph: :ok)
           else
-            write_in_place(file_path, converted_content)
+            # An unwritable target (e.g. the path stopped resolving mid-run)
+            # must surface as an error, not a false "converted".
+            return ConversionStatus::Error unless write_in_place(file_path, converted_content)
             Logger.item(file_path, glyph: :ok)
           end
           ConversionStatus::Converted
@@ -303,7 +312,11 @@ module Hwaro
         when FrontmatterFormat::YAML
           return false unless match = content.match(YAML_FRONTMATTER_RE)
           begin
-            YAML.parse(match[1]).as_h? ? true : false
+            parsed = YAML.parse(match[1])
+            # An empty block (`---\n---\n`) parses to nil; that is empty
+            # front matter, not body text — it must convert, not be skipped
+            # as "not front matter".
+            parsed.raw.nil? || parsed.as_h? ? true : false
           rescue YAML::ParseException
             true
           end
@@ -321,16 +334,27 @@ module Hwaro
       # rename(2) only needs directory permission, so check the file itself
       # first — a read-only file must fail instead of being silently replaced
       # — and carry its permissions onto the replacement.
-      private def write_in_place(file_path : String, content : String) : Nil
-        unless File::Info.writable?(file_path)
-          raise File::Error.new("File not writable", file: file_path)
+      # The rename must land on the RESOLVED path: renaming over a symlink
+      # replaces the symlink itself with a regular file, leaving the real
+      # target unconverted and a diverging copy in its place.
+      private def write_in_place(file_path : String, content : String) : Bool
+        target = begin
+          File.realpath(file_path)
+        rescue File::Error
+          Logger.warn "#{file_path}: could not resolve real path — left unchanged."
+          return false
         end
 
-        permissions = File.info(file_path).permissions
-        tmp_path = "#{file_path}.hwaro-convert.tmp"
+        unless File::Info.writable?(target)
+          raise File::Error.new("File not writable", file: target)
+        end
+
+        permissions = File.info(target).permissions
+        tmp_path = "#{target}.hwaro-convert.tmp"
         File.write(tmp_path, content)
         File.chmod(tmp_path, permissions)
-        File.rename(tmp_path, file_path)
+        File.rename(tmp_path, target)
+        true
       rescue ex
         File.delete(tmp_path) if tmp_path && File.exists?(tmp_path)
         raise ex
@@ -592,6 +616,9 @@ module Hwaro
             hash[key_str] = v
           end
         end
+        # An empty mapping serializes as `--- {}`, which would end up
+        # embedded verbatim inside the new fences; emit an empty block.
+        return "" if hash.empty?
         hash.to_yaml.lchop("---\n")
       end
 
@@ -601,6 +628,8 @@ module Hwaro
 
       private def convert_toml_to_yaml_string(toml : TOML::Table) : String
         yaml_hash = toml_to_hash(toml)
+        # See convert_json_to_yaml_string: `{}` must not leak into the fences.
+        return "" if yaml_hash.empty?
         yaml_hash.to_yaml.lchop("---\n")
       end
 

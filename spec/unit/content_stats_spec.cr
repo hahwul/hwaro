@@ -211,18 +211,23 @@ describe Hwaro::Services::ContentStats do
       end
     end
 
-    it "excludes code blocks from word count" do
+    it "counts fenced code blocks exactly like the build's page.word_count" do
+      # Expectation changed: stats used to strip fenced code blocks, but the
+      # build's `page.word_count` (the source of truth) does not — the two
+      # numbers drifted on any page with a code block.
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(content_dir)
 
-        File.write(File.join(content_dir, "code.md"), "---\ntitle: Code\n---\n\nReal words here\n\n```crystal\nputs \"not counted\"\nvar = 123\n```\n")
+        body = "\nReal words here\n\n```crystal\nputs \"not counted\"\nvar = 123\n```\n"
+        File.write(File.join(content_dir, "code.md"), "---\ntitle: Code\n---\n#{body}")
 
         stats = Hwaro::Services::ContentStats.new(content_dir)
         result = stats.run
 
-        # Only "Real words here" should count
-        result.words_total.should eq(3)
+        result.words_total.should eq(Hwaro::Utils::TextUtils.count_words(body))
+        # The fenced words are counted, not stripped.
+        result.words_total.should be > 3
       end
     end
 

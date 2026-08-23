@@ -23,7 +23,9 @@ module Hwaro
       # to be counted as published, so the report disagreed with the site.
       property future : Int32
       property expired : Int32
-      property words_total : Int32
+      # Int64: summing per-file Int32 counts overflowed Int32 on giant
+      # corpora (an Int32 total caps out around 2 billion words).
+      property words_total : Int64
       property words_avg : Int32
       property words_min : Int32
       property words_max : Int32
@@ -36,7 +38,7 @@ module Hwaro
         @published : Int32 = 0,
         @future : Int32 = 0,
         @expired : Int32 = 0,
-        @words_total : Int32 = 0,
+        @words_total : Int64 = 0_i64,
         @words_avg : Int32 = 0,
         @words_min : Int32 = 0,
         @words_max : Int32 = 0,
@@ -96,7 +98,14 @@ module Hwaro
             next
           end
 
-          body = extract_body(content)
+          # PCRE2 raises ArgumentError on invalid UTF-8 — the same escape
+          # extract_tags guards against; one bad file must not kill the
+          # whole report.
+          body = begin
+            extract_body(content)
+          rescue ArgumentError
+            next
+          end
           wc = count_words(body)
           word_counts << wc
 
@@ -112,12 +121,15 @@ module Hwaro
           end
         end
 
-        words_total = word_counts.sum
+        # Sum in Int64: a giant corpus overflows Int32 (Crystal raises
+        # OverflowError, killing the report).
+        words_total = word_counts.sum(0_i64)
         # Divide by the number of files actually read (word_counts), not the
         # published count — a file unreadable between listing and read is skipped
         # from word_counts but would otherwise dilute the average. Matches the
-        # population used by words_min/words_max below.
-        words_avg = word_counts.empty? ? 0 : words_total // word_counts.size
+        # population used by words_min/words_max below. The average of Int32
+        # per-file counts always fits Int32, so `.to_i` cannot overflow.
+        words_avg = word_counts.empty? ? 0 : (words_total // word_counts.size).to_i
         words_min = word_counts.min? || 0
         words_max = word_counts.max? || 0
 
@@ -147,12 +159,13 @@ module Hwaro
       end
 
       private def count_words(body : String) : Int32
-        # Strip code blocks, then count with the same tokenizer the build uses
-        # for `page.word_count` / `page.reading_time`. Splitting on whitespace
-        # alone counted `##`, `|` and `|-----|` as words, so the report
-        # disagreed with the numbers the site itself renders.
-        stripped = body.gsub(/(?ms)^(`{3,}|~{3,})[^\n]*\n.*?^\1\s*$/, "")
-        Utils::TextUtils.count_words(stripped)
+        # Exactly the code path the build uses for `page.word_count` /
+        # `page.reading_time`: `Models::Page#calculate_word_count` calls
+        # `TextUtils.count_words` on the frontmatter-stripped body, fenced
+        # code blocks included. Stats used to strip fences first, so the
+        # report drifted from the numbers the site itself renders — and the
+        # build is the source of truth.
+        Utils::TextUtils.count_words(body)
       end
 
       # Front matter that does not parse costs this file its tags, never the
