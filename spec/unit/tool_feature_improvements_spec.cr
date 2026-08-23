@@ -192,8 +192,12 @@ describe "tool feature improvements" do
         by_date = lister.list_content(all, Hwaro::Services::ContentSort::Date)
         by_date.map(&.title).should eq(["Beta", "alpha", "Gamma"])
 
+        # Expectation changed: undated entries ("Gamma") stay pinned AFTER
+        # dated ones even in reverse — undated means "date unknown", not
+        # "older than 1970" — so reverse now yields oldest-dated first with
+        # undated last instead of undated first.
         reversed = lister.list_content(all, Hwaro::Services::ContentSort::Date, reverse: true)
-        reversed.map(&.title).should eq(["Gamma", "alpha", "Beta"])
+        reversed.map(&.title).should eq(["alpha", "Beta", "Gamma"])
 
         limited = lister.list_content(all, Hwaro::Services::ContentSort::Date, limit: 2)
         limited.map(&.title).should eq(["Beta", "alpha"])

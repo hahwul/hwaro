@@ -24,13 +24,45 @@ module Hwaro
       # a bare `YYYY-MM-DD`; genuine timestamps keep their own offset
       # (`to_rfc3339` would silently convert `08:00+09:00` to the previous
       # day's `23:00Z`).
+      #
+      # The bare-date shortcut applies only to a UTC or LOCAL-ZONE midnight —
+      # the shapes a parsed bare date actually takes (TOML parses one as
+      # local midnight, YAML as UTC midnight) — so authored bare dates
+      # round-trip unchanged through their own format. Note the UTC branch is
+      # deliberately lossy for an *authored* `...T00:00:00Z` timestamp when
+      # the file is later reparsed as TOML (local zone); that trade-off keeps
+      # YAML bare dates stable and predates this rule. A midnight with any
+      # other fixed offset is a genuine timestamp: collapsing it to
+      # `YYYY-MM-DD` silently shifted the instant, so it keeps its offset.
+      # Fractional seconds are preserved in both timestamp forms.
       def self.serialize_time(time : Time) : String
-        if time.hour == 0 && time.minute == 0 && time.second == 0 && time.nanosecond == 0
+        midnight = time.hour == 0 && time.minute == 0 && time.second == 0 && time.nanosecond == 0
+        if midnight && (time.offset == 0 || time.location == Time::Location.local)
           time.to_s("%Y-%m-%d")
         elsif time.offset == 0
-          time.to_rfc3339
+          time.to_rfc3339(fraction_digits: rfc3339_fraction_digits(time.nanosecond))
         else
-          time.to_s("%Y-%m-%dT%H:%M:%S%:z")
+          "#{time.to_s("%Y-%m-%dT%H:%M:%S")}#{second_fraction(time.nanosecond)}#{time.to_s("%:z")}"
+        end
+      end
+
+      # Fraction width for `to_rfc3339`, which only accepts 0/3/6/9 digits.
+      private def self.rfc3339_fraction_digits(nanosecond : Int32) : Int32
+        return 0 if nanosecond == 0
+        return 3 if nanosecond % 1_000_000 == 0
+        return 6 if nanosecond % 1_000 == 0
+        9
+      end
+
+      # `.NNN` suffix for the offset format, at the same widths RFC 3339 uses.
+      private def self.second_fraction(nanosecond : Int32) : String
+        return "" if nanosecond == 0
+        if nanosecond % 1_000_000 == 0
+          ".#{(nanosecond // 1_000_000).to_s.rjust(3, '0')}"
+        elsif nanosecond % 1_000 == 0
+          ".#{(nanosecond // 1_000).to_s.rjust(6, '0')}"
+        else
+          ".#{nanosecond.to_s.rjust(9, '0')}"
         end
       end
 

@@ -373,30 +373,16 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
     end
   end
 
-  describe "#private_172?" do
-    it "returns true for 172.16.x.x" do
+  # 172.x classification now goes through Socket::IPAddress#private? inside
+  # private_ip_address? (the string-prefix helper it replaced missed
+  # IPv4-mapped IPv6 forms entirely).
+  describe "172.16.0.0/12 classification" do
+    it "classifies the range boundaries like the old helper" do
       cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
-      cmd.private_172_for_test?("172.16.0.1").should be_true
-    end
-
-    it "returns true for 172.31.x.x" do
-      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
-      cmd.private_172_for_test?("172.31.255.255").should be_true
-    end
-
-    it "returns false for 172.15.x.x (below range)" do
-      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
-      cmd.private_172_for_test?("172.15.0.1").should be_false
-    end
-
-    it "returns false for 172.32.x.x (above range)" do
-      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
-      cmd.private_172_for_test?("172.32.0.1").should be_false
-    end
-
-    it "returns false for non-172 addresses" do
-      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
-      cmd.private_172_for_test?("192.168.1.1").should be_false
+      cmd.private_ip_for_test?(Socket::IPAddress.new("172.16.0.1", 0)).should be_true
+      cmd.private_ip_for_test?(Socket::IPAddress.new("172.31.255.255", 0)).should be_true
+      cmd.private_ip_for_test?(Socket::IPAddress.new("172.15.0.1", 0)).should be_false
+      cmd.private_ip_for_test?(Socket::IPAddress.new("172.32.0.1", 0)).should be_false
     end
   end
 
@@ -612,28 +598,13 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
     @@disable_private_host_check = val
   end
 
+  # Delegate to the real implementation (memoization + structured
+  # Socket::IPAddress classification) instead of duplicating it, so the spec
+  # binary exercises exactly what ships; the flag only bypasses the guard for
+  # examples that talk to a local test server.
   private def private_host?(host : String) : Bool
     return false if @@disable_private_host_check
-    return true if host == "localhost" || host.ends_with?(".local") || host.ends_with?(".internal")
-
-    begin
-      addrs = Socket::Addrinfo.resolve(host, 80, type: Socket::Type::STREAM)
-      addrs.any? do |addr|
-        ip = addr.ip_address.address
-        ip.starts_with?("127.") ||
-          ip.starts_with?("10.") ||
-          ip.starts_with?("192.168.") ||
-          ip.starts_with?("169.254.") ||
-          ip == "0.0.0.0" ||
-          ip == "::1" ||
-          ip == "::" ||
-          ip.starts_with?("fc") || ip.starts_with?("fd") ||
-          ip.starts_with?("fe80") ||
-          private_172?(ip)
-      end
-    rescue Socket::Error
-      false
-    end
+    previous_def
   end
 
   def find_links_for_test(dir : String) : Array(Link)
@@ -656,8 +627,8 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
     private_host?(host)
   end
 
-  def private_172_for_test?(ip : String) : Bool
-    private_172?(ip)
+  def private_ip_for_test?(ip : Socket::IPAddress) : Bool
+    private_ip_address?(ip)
   end
 
   def sanitize_for_terminal_for_test(s : String) : String
@@ -810,6 +781,203 @@ describe "check-links ember output" do
 
       output.should contain("Skipped: private/internal address")
       output.should_not contain("✗")
+    end
+  end
+end
+
+describe "check-links redirect and dedup behavior" do
+  # Finding 8: 303 was missing from the followed-redirect set, so a live link
+  # behind a See Other was reported dead with status 303.
+  it "follows a 303 redirect with GET" do
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = true
+    begin
+      target_methods = [] of String
+      server = HTTP::Server.new do |context|
+        case context.request.path
+        when "/see-other"
+          context.response.status_code = 303
+          context.response.headers["Location"] = "/result"
+        when "/result"
+          target_methods << context.request.method
+          context.response.status_code = 200
+        else
+          context.response.status_code = 404
+        end
+      end
+      address = server.bind_tcp("127.0.0.1", 0)
+      spawn { server.listen }
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: "test.md", url: "http://127.0.0.1:#{address.port}/see-other", kind: :external
+      )
+      results = cmd.check_links_concurrently_for_test([link], 5, 1)
+
+      results.size.should eq(1)
+      results[0].status.should eq(200)
+      # RFC 9110: 303 is followed with GET regardless of the original method.
+      target_methods.should eq(["GET"])
+    ensure
+      server.try(&.close)
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
+    end
+  end
+
+  # Finding 9: redirect loops / Location-less redirects recorded the redirect
+  # code as the result status, so `--allow-status 301` classified broken
+  # redirects as healthy. They must carry the -1 sentinel like other failures.
+  it "reports a redirect loop with the -1 sentinel, not the redirect code" do
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = true
+    begin
+      server = HTTP::Server.new do |context|
+        context.response.status_code = 301
+        context.response.headers["Location"] = "/loop"
+      end
+      address = server.bind_tcp("127.0.0.1", 0)
+      spawn { server.listen }
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: "test.md", url: "http://127.0.0.1:#{address.port}/loop", kind: :external
+      )
+      results = cmd.check_links_concurrently_for_test([link], 5, 1)
+
+      results.size.should eq(1)
+      results[0].status.should eq(-1)
+      results[0].error.not_nil!.should contain("Too many redirects")
+    ensure
+      server.try(&.close)
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
+    end
+  end
+
+  it "reports a Location-less redirect with the -1 sentinel" do
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = true
+    begin
+      server = HTTP::Server.new do |context|
+        context.response.status_code = 302
+      end
+      address = server.bind_tcp("127.0.0.1", 0)
+      spawn { server.listen }
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: "test.md", url: "http://127.0.0.1:#{address.port}/nowhere", kind: :external
+      )
+      results = cmd.check_links_concurrently_for_test([link], 5, 1)
+
+      results.size.should eq(1)
+      results[0].status.should eq(-1)
+      results[0].error.not_nil!.should contain("Redirect without Location")
+    ensure
+      server.try(&.close)
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
+    end
+  end
+
+  # Finding 10: identical external URLs were contacted once per occurrence,
+  # so 50 pages linking the same site produced 50 simultaneous requests and
+  # 429 false positives. Each unique URL must be contacted once, with the
+  # result fanned back out to every occurrence.
+  it "contacts an identical external URL only once but reports every occurrence" do
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = true
+    begin
+      hits = Atomic(Int32).new(0)
+      server = HTTP::Server.new do |context|
+        hits.add(1) if context.request.path == "/dup"
+        context.response.status_code = 200
+      end
+      address = server.bind_tcp("127.0.0.1", 0)
+      spawn { server.listen }
+
+      url = "http://127.0.0.1:#{address.port}/dup"
+      links = ["a.md", "b.md", "c.md"].map do |file|
+        Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(file: file, url: url, kind: :external)
+      end
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      results = cmd.check_links_concurrently_for_test(links, 5, 4)
+
+      # One reported result per occurrence, each with its own file...
+      results.size.should eq(3)
+      results.map(&.link.file).sort!.should eq(["a.md", "b.md", "c.md"])
+      results.all? { |r| r.status == 200 }.should be_true
+      # ...but the server was contacted exactly once.
+      hits.get.should eq(1)
+    ensure
+      server.try(&.close)
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
+    end
+  end
+
+  # Finding 13: each redirect hop could take up to the full --timeout, so a
+  # slow chain multiplied the budget. Elapsed time is now tracked across hops
+  # and following stops once 3× the configured timeout is exceeded (the
+  # headroom keeps slow-but-healthy few-hop chains passing).
+  it "stops following redirects when the total time budget is exhausted" do
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = true
+    begin
+      server = HTTP::Server.new do |context|
+        case context.request.path
+        when "/r1", "/r2", "/r3", "/r4"
+          sleep 0.9.seconds
+          nxt = {"/r1" => "/r2", "/r2" => "/r3", "/r3" => "/r4", "/r4" => "/final"}[context.request.path]
+          context.response.status_code = 302
+          context.response.headers["Location"] = nxt
+        else
+          context.response.status_code = 200
+        end
+      end
+      address = server.bind_tcp("127.0.0.1", 0)
+      spawn { server.listen }
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: "test.md", url: "http://127.0.0.1:#{address.port}/r1", kind: :external
+      )
+      # Each hop stays under the 1s per-request timeout, but the chain as a
+      # whole (~3.6s of server sleeps) exceeds the 3s (1s × 3) total budget.
+      results = cmd.check_links_concurrently_for_test([link], 1, 1)
+
+      results.size.should eq(1)
+      results[0].status.should eq(-1)
+      results[0].error.not_nil!.downcase.should contain("timed out")
+    ensure
+      server.try(&.close)
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
+    end
+  end
+
+  # The 3× headroom exists so a slow-but-healthy short chain (every hop within
+  # the per-request timeout) is NOT converted into a false dead link.
+  it "still passes a slow-but-healthy two-hop redirect chain" do
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = true
+    begin
+      server = HTTP::Server.new do |context|
+        case context.request.path
+        when "/s1", "/s2"
+          sleep 0.6.seconds
+          nxt = {"/s1" => "/s2", "/s2" => "/final"}[context.request.path]
+          context.response.status_code = 302
+          context.response.headers["Location"] = nxt
+        else
+          context.response.status_code = 200
+        end
+      end
+      address = server.bind_tcp("127.0.0.1", 0)
+      spawn { server.listen }
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+        file: "test.md", url: "http://127.0.0.1:#{address.port}/s1", kind: :external
+      )
+      results = cmd.check_links_concurrently_for_test([link], 1, 1)
+
+      results.size.should eq(1)
+      results[0].status.should eq(200)
+    ensure
+      server.try(&.close)
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
     end
   end
 end

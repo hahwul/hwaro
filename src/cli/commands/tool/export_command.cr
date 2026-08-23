@@ -87,19 +87,12 @@ module Hwaro
             exporter.dry_run = options.dry_run
             result = exporter.run(options)
 
-            unless result.success
-              # A classified error instead of the old bare `exit(1)`: every
-              # sibling tool command reports failures through HwaroError, so
-              # `--json` consumers get the standard error payload and the
-              # exit code lands in the documented IO class.
-              raise Hwaro::HwaroError.new(
-                code: Hwaro::Errors::HWARO_E_IO,
-                message: result.message,
-                hint: "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
-              )
-            end
-
             if json_output
+              # The manifest is printed for failed runs too (success=false,
+              # error_count set), then the process exits with the same
+              # classified IO status the human path raises — mirroring
+              # `tool convert`, so a machine consumer branching on exit
+              # status gets the identical answer in both modes.
               puts({
                 "success"        => result.success,
                 "dry_run"        => options.dry_run,
@@ -108,7 +101,21 @@ module Hwaro
                 "error_count"    => result.error_count,
                 "files"          => exporter.file_actions,
               }.to_json)
+              exit(Hwaro::Errors::EXIT_IO) unless result.success
               return
+            end
+
+            unless result.success
+              # A classified error instead of the old bare `exit(1)`: every
+              # sibling tool command reports failures through HwaroError, so
+              # the exit code lands in the documented IO class. A run with
+              # ANY per-file error fails here — `success` no longer reports
+              # a partial export as clean.
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: result.message,
+                hint: "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
+              )
             end
 
             summary = "#{result.exported_count} files · #{result.skipped_count} skipped"

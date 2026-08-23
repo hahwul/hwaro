@@ -34,9 +34,11 @@ module Hwaro
             Logger.warn "Error exporting #{file_path}: #{ex.message}"
           end
 
+          # Any per-file error fails the run: `exported > 0` used to mask
+          # errors, so a partial export reported success and exited 0.
           ExportResult.new(
-            success: exported > 0 || errors == 0,
-            message: "Exported #{exported} items, skipped #{skipped}, errors #{errors}",
+            success: errors == 0,
+            message: errors > 0 ? "#{errors} file(s) could not be exported (#{exported} exported, #{skipped} skipped)" : "Exported #{exported} items, skipped #{skipped}, errors #{errors}",
             exported_count: exported,
             skipped_count: skipped,
             error_count: errors
@@ -73,15 +75,25 @@ module Hwaro
           # through cost the post every taxonomy it belonged to.
           # Source-iteration order is preserved so Hugo frontmatter reads
           # similarly to the original.
+          # A rename only applies when its TARGET key is not authored in the
+          # source — an authored target wins regardless of key order, the
+          # same existing-key-wins rule `flatten_taxonomies` uses (the source
+          # key is dropped, mirroring how the losing taxonomy entry is).
+          # Renaming unconditionally clobbered a coexisting authored key
+          # whenever the source key happened to iterate second.
           hugo_fields = {} of String => YAML::Any
-          flatten_taxonomies(fields).each do |key, value|
+          flattened = flatten_taxonomies(fields)
+          flattened.each do |key, value|
             next if value.raw.nil?
             case key
             when "updated"
+              next if authored?(flattened, "lastmod")
               hugo_fields["lastmod"] = value
             when "expires"
+              next if authored?(flattened, "expiryDate")
               hugo_fields["expiryDate"] = value
             when "image"
+              next if authored?(flattened, "images")
               if image = value.as_s?
                 hugo_fields["images"] = YAML::Any.new([YAML::Any.new(image)])
               else
@@ -108,10 +120,23 @@ module Hwaro
           # co-located resources out of this same directory, so carry them
           # across instead of exporting a post whose images all 404.
           if File.basename(relative).in?("index.md", "index.markdown") && relative.includes?('/')
-            copy_bundle_assets(File.dirname(file_path), File.dirname(out_path), output_dir, verbose)
+            begin
+              copy_bundle_assets(File.dirname(file_path), File.dirname(out_path), output_dir, verbose)
+            rescue ex : File::Error
+              # The bundle directory vanished or became unlistable after the
+              # post was written — the post itself exported, so warn instead
+              # of letting the counts/manifest disagree with disk.
+              Logger.warn "Could not export bundle assets for #{file_path}: #{ex.message}"
+            end
           end
 
           :exported
+        end
+
+        # An authored, non-null value for `key` exists in the source fields.
+        private def authored?(fields : Hash(String, YAML::Any), key : String) : Bool
+          value = fields[key]?
+          !value.nil? && !value.raw.nil?
         end
 
         private def generate_toml_frontmatter(fields : Hash(String, YAML::Any)) : String

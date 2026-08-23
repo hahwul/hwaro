@@ -77,8 +77,15 @@ module Hwaro
               CLI.register_flag(parser, MAX_WARNINGS_FLAG) do |v|
                 parsed = v.to_i?
                 unless parsed && parsed >= 0
-                  Logger.error "--max-warnings expects a non-negative integer (got: #{v.inspect})"
-                  exit(Hwaro::Errors::EXIT_GENERIC)
+                  # Raise the classified usage error exactly as `tool
+                  # validate` does: the runner maps it to EXIT_USAGE (2)
+                  # and renders the standard JSON error payload under
+                  # --json, where Logger.error + exit(1) emitted neither.
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "Invalid --max-warnings value: #{v}",
+                    hint: "Pass a non-negative integer, e.g. --max-warnings 0.",
+                  )
                 end
                 max_warnings = parsed
               end

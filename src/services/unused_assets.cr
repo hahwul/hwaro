@@ -76,16 +76,52 @@ module Hwaro
         @content_dir : String = "content",
         @static_dir : String = "static",
         @templates_dir : String = "templates",
+        templates_dir_explicit : Bool = false,
+        static_dir_explicit : Bool = false,
       )
-        if File.exists?("config.toml")
-          @project_root = "."
-        else
-          @project_root = find_project_root(@content_dir)
-        end
+        @project_root = resolve_project_root
 
-        if @templates_dir == "templates"
-          @templates_dir = File.join(@project_root, "templates")
+        # Only the true defaults get re-rooted. An explicitly passed
+        # `--templates-dir templates` (or `--static-dir static`) was
+        # existence-checked by the command against the CWD; silently
+        # re-rooting it would scan a different directory than the one the
+        # user named — the `*_explicit` flags keep that path as given.
+        if !templates_dir_explicit && @templates_dir == "templates"
+          @templates_dir = rooted("templates")
         end
+        if !static_dir_explicit && @static_dir == "static"
+          @static_dir = rooted("static")
+        end
+      end
+
+      # One coherent project root for every derived input (static/,
+      # templates/, data/, i18n/, config.toml). The root used to be pinned to
+      # "." as soon as the CWD held a config.toml — even when --content-dir
+      # pointed into a DIFFERENT project — so the scan mixed two trees:
+      # assets came from one project, references from another, and
+      # `--delete --force` removed files the other project still uses.
+      private def resolve_project_root : String
+        candidate = find_project_root(@content_dir)
+        # A config.toml next to the content tree is authoritative.
+        return candidate if File.exists?(File.join(candidate, "config.toml"))
+        # Fall back to the CWD only when the content tree actually lives
+        # inside it; a foreign tree without its own config.toml still roots
+        # at itself rather than borrowing the CWD's project files.
+        return "." if File.exists?("config.toml") && inside_cwd?(@content_dir)
+        candidate
+      end
+
+      private def inside_cwd?(path : String) : Bool
+        expanded = File.expand_path(path)
+        cwd = Dir.current
+        expanded == cwd || expanded.starts_with?(cwd + File::SEPARATOR)
+      end
+
+      # Join `name` under the project root, keeping the historical relative
+      # form ("static", not "./static") for the in-project case so reported
+      # paths stay byte-identical.
+      private def rooted(name : String) : String
+        @project_root == "." ? name : File.join(@project_root, name)
       end
 
       private def find_project_root(content_dir : String) : String
@@ -111,6 +147,15 @@ module Hwaro
         unused = [] of String
         assets.each do |asset_path|
           basename = File.basename(asset_path)
+          # A non-UTF-8 basename (possible on Linux filesystems; APFS refuses
+          # them) cannot be matched against the UTF-8 scan corpus — building
+          # a PCRE2 Regex from it raises ArgumentError, which used to abort
+          # the whole command. Warn and leave the file alone rather than flag
+          # it unused and let `--delete` remove something we could not check.
+          unless basename.valid_encoding?
+            Logger.warn "Skipping #{asset_path.inspect}: file name is not valid UTF-8"
+            next
+          end
           next if referenced.includes?(basename)
           # Safety net against the `delete_unused` data-loss path: the
           # reference regex only captures filenames built from [\w\-.], so a
@@ -123,8 +168,7 @@ module Hwaro
           # a raw substring) still rescues the space/paren names while keeping a
           # genuinely-unused `header.png` flagged when only `page-header.png` is
           # referenced (their shared suffix is preceded by `-`, inside the token).
-          next if scanned_text.matches?(/(?<![\w\-.])#{Regex.escape(basename)}(?![\w\-.])/)
-          next if scanned_text.matches?(/(?<![\w\-.])#{Regex.escape(URI.encode_path(basename))}(?![\w\-.])/)
+          next if UnusedAssets.boundary_referenced?(scanned_text, basename)
           unused << asset_path
         end
 
@@ -134,6 +178,18 @@ module Hwaro
           referenced_count: assets.size - unused.size,
           unused_count: unused.size,
         )
+      end
+
+      # Boundary-anchored literal check backing the safety net above. A class
+      # method so it stays testable on filesystems (APFS) that refuse to
+      # create non-UTF-8 filenames at all. A basename that is not valid UTF-8
+      # cannot become a PCRE2 pattern — `Regex.new` raises `ArgumentError` —
+      # so it is reported as not-referenced here without raising; `run` skips
+      # (and warns about) such assets before this check is reached.
+      def self.boundary_referenced?(scanned_text : String, basename : String) : Bool
+        return false unless basename.valid_encoding?
+        return true if scanned_text.matches?(/(?<![\w\-.])#{Regex.escape(basename)}(?![\w\-.])/)
+        scanned_text.matches?(/(?<![\w\-.])#{Regex.escape(URI.encode_path(basename))}(?![\w\-.])/)
       end
 
       def delete_unused(files : Array(String))
@@ -222,11 +278,13 @@ module Hwaro
             sb << text << '\n'
           end
 
+          # config.toml goes through the same UTF-8 gate as every other scan
+          # source: concatenated raw, one invalid byte in it aborted the whole
+          # command with a PCRE2 ArgumentError.
           config_path = File.join(@project_root, "config.toml")
           if File.exists?(config_path)
-            begin
-              sb << File.read(config_path) << '\n'
-            rescue IO::Error
+            if text = readable_scan_source(config_path)
+              sb << text << '\n'
             end
           end
         end

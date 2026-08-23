@@ -79,7 +79,10 @@ module Hwaro
               # Only promise preservation when the merge can actually deliver
               # it: an existing file without the marker heading gets a full
               # overwrite, and the prompt must say so instead of reassuring.
-              has_marker = existing.try(&.includes?(SITE_SECTION_MARKER)) || false
+              # Uses the same line-anchored, fence-aware detection as the
+              # merge itself so the prompt never promises what the merge
+              # won't do.
+              has_marker = existing ? !site_section_index(existing).nil? : false
               if existed && !force
                 question = if has_marker
                              "AGENTS.md already exists. Regenerate it? (your Site-Specific Instructions are kept)"
@@ -128,12 +131,56 @@ module Hwaro
           # drift apart.
           SITE_SECTION_MARKER = Services::Defaults::AgentsMd::SITE_SECTION_MARKER
 
+          # The heading only counts when it is a whole line on its own
+          # (trailing blanks aside). A first-substring `index` let a mention
+          # inside a code fence or mid-prose shift the merge point —
+          # duplicating stale generated content or silently discarding user
+          # sections above the real heading.
+          # Up to three leading spaces still renders as the same ATX heading.
+          MARKER_LINE_RE = /\A {0,3}#{Regex.escape(Services::Defaults::AgentsMd::SITE_SECTION_MARKER)}[ \t]*\z/
+          FENCE_RE       = /\A {0,3}(`{3,}|~{3,})/
+
           private def merge_site_section(fresh : String, existing : String) : String
-            existing_idx = existing.index(SITE_SECTION_MARKER)
+            existing_idx = site_section_index(existing)
             return fresh unless existing_idx
-            fresh_idx = fresh.index(SITE_SECTION_MARKER)
+            fresh_idx = site_section_index(fresh)
             return fresh unless fresh_idx
             fresh[0...fresh_idx] + existing[existing_idx..]
+          end
+
+          # Char index of the real Site-Specific Instructions heading: the
+          # FIRST line equal to the marker that is not inside a fenced code
+          # block — deterministic, and identical to the old behavior for
+          # normal files, where the heading occurs exactly once. When an
+          # UNCLOSED fence swallowed the rest of the file, rescan ignoring
+          # fences: preserving the user's section on malformed markdown beats
+          # a full rewrite that silently discards it. (A marker inside a
+          # properly closed fence stays a non-match — that's the quoted
+          # example the fence tracking exists for.)
+          private def site_section_index(text : String) : Int32?
+            index, unterminated = scan_for_marker(text, fence_aware: true)
+            return index if index
+            return unless unterminated
+            scan_for_marker(text, fence_aware: false)[0]
+          end
+
+          private def scan_for_marker(text : String, fence_aware : Bool) : {Int32?, Bool}
+            offset = 0
+            fence_delim : String? = nil
+            text.each_line(chomp: false) do |raw_line|
+              line = raw_line.chomp
+              if delim = fence_delim
+                if closing = line.match(FENCE_RE).try(&.[1])
+                  fence_delim = nil if closing[0] == delim[0] && closing.size >= delim.size
+                end
+              elsif fence_aware && (opening = line.match(FENCE_RE).try(&.[1]))
+                fence_delim = opening
+              elsif line.matches?(MARKER_LINE_RE)
+                return {offset, false}
+              end
+              offset += raw_line.size
+            end
+            {nil, !fence_delim.nil?}
           end
         end
       end

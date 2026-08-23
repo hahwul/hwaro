@@ -168,11 +168,10 @@ module Hwaro
               end
             end
 
-            # Description
-            if excerpt = yaml["excerpt"]?
-              fields["description"] = yaml_string(excerpt)
-            elsif description = yaml["description"]?
-              fields["description"] = yaml_string(description)
+            # Description. `first_present`, not `if/elsif` on `[]?`: a
+            # present-but-null `excerpt:` would discard the description.
+            if desc = first_present(yaml, "excerpt", "description")
+              fields["description"] = yaml_string(desc)
             end
 
             # Image

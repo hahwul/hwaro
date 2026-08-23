@@ -82,14 +82,32 @@ describe "content analysis regressions" do
       Hwaro::Utils::TextUtils.count_words("<p>one two</p>").should eq(2)
     end
 
-    it "keeps excluding fenced code blocks from the stats report" do
+    it "agrees with Models::Page#calculate_word_count for a fenced body too" do
+      # Expectation changed: stats used to strip fenced code blocks while the
+      # build's `page.word_count` counted them, so the two "can never drift"
+      # numbers drifted on every page with a code block. The build is the
+      # source of truth, so stats now counts fences the same way.
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(content_dir)
-        File.write(File.join(content_dir, "code.md"),
-          "---\ntitle: Code\n---\n\nReal words here\n\n```crystal\nputs \"not counted\"\n```\n")
+        fenced = "Real words here\n\n```crystal\nputs \"not counted\"\n```\n"
+        File.write(File.join(content_dir, "code.md"), "---\ntitle: Code\n---\n\n#{fenced}")
 
-        Hwaro::Services::ContentStats.new(content_dir).run.words_total.should eq(3)
+        page = Hwaro::Models::Page.new(File.join(content_dir, "code.md"))
+        page.raw_content = "\n#{fenced}"
+
+        Hwaro::Services::ContentStats.new(content_dir).run.words_total
+          .should eq(page.calculate_word_count)
+      end
+    end
+
+    it "sums word counts in Int64 so a giant corpus cannot overflow Int32" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "a.md"), "---\ntitle: A\n---\none two\n")
+
+        Hwaro::Services::ContentStats.new(content_dir).run.words_total.should be_a(Int64)
       end
     end
   end

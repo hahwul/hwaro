@@ -101,13 +101,14 @@ module Hwaro
               fields["title"] = yaml_string(title)
             end
 
-            # Date (pubDate is Astro's convention)
-            if date_val = yaml["pubDate"]? || yaml["date"]? || yaml["publishDate"]?
+            # Date (pubDate is Astro's convention). `first_present`, not
+            # `||`: a present-but-null key would discard the fallbacks.
+            if date_val = first_present(yaml, "pubDate", "date", "publishDate")
               assign_date_field(fields, "date", date_val)
             end
 
             # Updated date
-            if updated = yaml["updatedDate"]? || yaml["updated"]? || yaml["lastmod"]?
+            if updated = first_present(yaml, "updatedDate", "updated", "lastmod")
               assign_date_field(fields, "updated", updated)
             end
 
@@ -144,7 +145,7 @@ module Hwaro
             fields["tags"] = tags unless tags.empty?
 
             # Image (heroImage is Astro's blog template convention)
-            if image = yaml["heroImage"]? || yaml["image"]? || yaml["cover"]?
+            if image = first_present(yaml, "heroImage", "image", "cover")
               case image.raw
               when String
                 fields["image"] = image.as_s

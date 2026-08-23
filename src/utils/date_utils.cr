@@ -43,8 +43,10 @@ module Hwaro
 
         begin
           return Time.parse_rfc3339(str)
-        rescue Time::Format::Error
-          # Not RFC 3339; fall through to the lenient formats.
+        rescue Time::Format::Error | ArgumentError
+          # Time::Format::Error → not RFC 3339 at all. ArgumentError → the
+          # shape is RFC 3339 but the value is impossible ("2024-02-30").
+          # Either way, fall through to the lenient formats.
         end
 
         formats.each do |fmt|

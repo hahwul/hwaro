@@ -18,7 +18,50 @@ module Hwaro
         # Longest anchor TEXT the link conversion will match. Bounding the lazy
         # body is what actually makes an unclosed-anchor document linear — see
         # the anchor pass below. Far above any real inline link.
+        #
+        # The bound is needed exactly where a pass's tail carries MORE THAN
+        # ONE closing literal (the anchor pass: `["'][^>]*>` then `</a>`;
+        # the pre+code pass: `</code>` then `</pre>`). A failed attempt then
+        # rescans between the literals from every opening tag — measured
+        # O(n^2), minutes of CPU inside the 4 MB cap. Passes whose tail is a
+        # SINGLE closing literal (`(.*?)</p>` and friends) are deliberately
+        # left open: PCRE2 satisfies those in linear time (the required-
+        # literal scan is memoized across bump-along attempts), and bounding
+        # them defeats that optimization — measured ~200x SLOWER on
+        # unclosed-tag spam with a `{0,n}?` body than with `(.*?)`.
         MAX_INLINE_BODY_CHARS = 4096
+
+        # Longest <pre><code> body the fenced-code pass will match — the
+        # bounded-lazy-body treatment for the one other multi-literal-tail
+        # pass (see MAX_INLINE_BODY_CHARS above), sized up because real code
+        # samples run far longer than inline spans. 65535 is PCRE2's {n,m}
+        # quantifier ceiling. An over-long body keeps its text: the plain
+        # `<pre>` pass right after has a single-literal tail and no bound.
+        MAX_CODE_BODY_CHARS = 65_535
+
+        # Innermost-list matcher (see the list pass below). The body is
+        # consumed in CHUNKS — possessive runs of non-`<` plus single `<`
+        # guarded against opening a nested list — rather than the previous
+        # per-character `(?:(?!<[uo]l[^>]*>).)*?`: PCRE2's JIT pushes a
+        # backtrack frame per lazy iteration onto a fixed-size JIT stack,
+        # and per-character iteration crashed the whole conversion with
+        # "JIT stack limit reached" on list bodies only a few thousand
+        # characters long. Chunking makes the frame count scale with the
+        # number of tags instead of characters; the language matched is
+        # identical (only `<` could ever start a nested-list open, and a
+        # match can only ever end before the `<` of the closing tag, which
+        # is always a chunk boundary). A `{0,n}` bound is no alternative —
+        # PCRE2 unrolls bounded GROUP repeats and the pattern blows the
+        # compile-size limit. A tag-spam body can still overflow the JIT
+        # stack, which raises Regex::Error — `convert` catches that and
+        # falls back to the linear tag strip.
+        INNERMOST_LIST_RE = /<(ul|ol)[^>]*>((?:[^<]++|<(?![uo]l[^>]*>))*?)<\/\1>/mi
+
+        # Maximum innermost-list conversion passes (one per nesting level).
+        # Real content nests a handful of levels; a crafted thousand-deep
+        # nest costs a full-document gsub per level, so cap it — deeper
+        # levels fall through to `strip_tags`, which keeps their text.
+        MAX_LIST_PASSES = 64
 
         # Cheap short-circuit for the anchor pass: a document with no closing
         # anchor tag has no link to convert. Exposed so the skip is assertable
@@ -40,15 +83,37 @@ module Hwaro
 
           if html.bytesize > MAX_REGEX_HTML_BYTES
             Logger.warn "HTML content is very large (#{html.bytesize} bytes); converting as plain text to avoid excessive processing time."
-            return html.gsub(/<[^>]*>/, " ").gsub(/[ \t]+/, " ").strip
+            return strip_to_text(html)
           end
 
+          convert_via_regexes(html)
+        rescue Regex::Error
+          # Belt and suspenders: pathological markup can still error inside
+          # PCRE2 (e.g. "JIT stack limit reached") despite the bounded
+          # passes. Fall back to the same linear tag strip as the size cap
+          # rather than dropping the whole item.
+          Logger.warn "HTML content is too complex to convert; converting as plain text."
+          strip_to_text(html)
+        end
+
+        # The plain-text fallback shared by the size cap and the
+        # Regex::Error rescue in `convert`: linear tag strip, no Markdown.
+        private def self.strip_to_text(html : String) : String
+          html.gsub(/<[^>]*>/, " ").gsub(/[ \t]+/, " ").strip
+        end
+
+        private def self.convert_via_regexes(html : String) : String
           result = html
 
           # Normalize line endings
           result = result.gsub("\r\n", "\n")
 
-          # Convert block elements first (order matters)
+          # Convert block elements first (order matters).
+          #
+          # Lazy-body policy: a pass whose tail is a single closing literal
+          # keeps an open `(.*?)` body — linear under PCRE2, and bounding it
+          # is a measured ~200x regression. A pass with a multi-literal tail
+          # is bounded. See the MAX_INLINE_BODY_CHARS comment.
 
           # Headings
           (1..6).each do |level|
@@ -62,13 +127,17 @@ module Hwaro
           # decode) would otherwise run INSIDE the code sample, converting or
           # stripping the HTML it demonstrates and double-decoding entities.
           code_stash = [] of String
-          result = result.gsub(/<pre[^>]*>\s*<code[^>]*>(.*?)<\/code>\s*<\/pre>/mi) do
+          result = result.gsub(/<pre[^>]*>\s*<code[^>]*>(.{0,#{MAX_CODE_BODY_CHARS}}?)<\/code>\s*<\/pre>/mi) do
             code = decode_html_entities($1)
             code_stash << "```\n#{code.strip}\n```\n\n"
             code_placeholder(code_stash.size - 1)
           end
           result = result.gsub(/<pre[^>]*>(.*?)<\/pre>/mi) do
-            code = decode_html_entities($1)
+            # A <pre><code> body longer than MAX_CODE_BODY_CHARS falls through
+            # to this pass with its <code> wrapper still attached — strip it
+            # here (both tags have single-literal tails, so this stays linear).
+            body = $1.sub(/\A\s*<code[^>]*>/mi, "").sub(/<\/code>\s*\z/mi, "")
+            code = decode_html_entities(body)
             code_stash << "```\n#{code.strip}\n```\n\n"
             code_placeholder(code_stash.size - 1)
           end
@@ -91,8 +160,9 @@ module Hwaro
           # so without those two things `<li>b<ul><li>b1</li></ul></li>`
           # collapsed to the single line `- b- b1` (and `2. second1. s1` for
           # ordered lists), which renders as literal text.
-          innermost_list = /<(ul|ol)[^>]*>((?:(?!<[uo]l[^>]*>).)*?)<\/\1>/mi
-          while result.matches?(innermost_list)
+          innermost_list = INNERMOST_LIST_RE
+          passes = 0
+          while (passes += 1) <= MAX_LIST_PASSES && result.matches?(innermost_list)
             result = result.gsub(innermost_list) do
               kind = $1.downcase
               items = $2.scan(/<li[^>]*>(.*?)<\/li>/mi)

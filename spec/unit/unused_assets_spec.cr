@@ -557,5 +557,122 @@ describe Hwaro::Services::UnusedAssets do
         end
       end
     end
+
+    # Regression: project-root resolution mixed two trees. With a config.toml
+    # in the CWD, @project_root was pinned to "." even when --content-dir
+    # pointed at a DIFFERENT project — so the default static/ (never
+    # re-rooted at all) plus data/, i18n/ and config.toml were read from the
+    # CWD project while content came from the other one, and
+    # `--delete --force` removed in-use files.
+    it "scans the static/, data/ and config.toml of the project the content dir belongs to" do
+      Dir.mktmpdir do |other|
+        Dir.mktmpdir do |cwd|
+          Dir.cd(cwd) do
+            # The CWD is itself a hwaro project with its own static tree...
+            FileUtils.mkdir_p("static")
+            File.write("config.toml", "title = \"CWD project\"\n")
+            File.write(File.join("static", "decoy.png"), "png")
+
+            # ...but --content-dir points into another project that carries
+            # its own config.toml, static/ and data/.
+            FileUtils.mkdir_p(File.join(other, "content"))
+            FileUtils.mkdir_p(File.join(other, "static"))
+            FileUtils.mkdir_p(File.join(other, "data"))
+            File.write(File.join(other, "config.toml"), <<-TOML)
+              title = "Other"
+              [og]
+              default_image = "static/og.png"
+              TOML
+            File.write(File.join(other, "content", "post.md"), "---\ntitle: P\n---\nBody\n")
+            File.write(File.join(other, "static", "og.png"), "png")
+            File.write(File.join(other, "static", "sponsor.png"), "png")
+            File.write(File.join(other, "data", "site.yml"), "logo: /sponsor.png\n")
+            File.write(File.join(other, "static", "orphan.png"), "png")
+
+            result = Hwaro::Services::UnusedAssets.new(
+              content_dir: File.join(other, "content"),
+            ).run
+
+            # THAT project's static tree is the one scanned (3 assets, not
+            # the CWD's decoy.png), its config.toml and data/ count as
+            # reference sources, and only its genuine orphan is reported.
+            result.total_assets.should eq(3)
+            result.unused_files.should eq([File.join(other, "static", "orphan.png")])
+          end
+        end
+      end
+    end
+
+    it "keeps resolving everything relative to an in-project CWD (defaults unchanged)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("static")
+          FileUtils.mkdir_p("templates")
+          File.write("config.toml", "title = \"T\"\n")
+          File.write(File.join("content", "post.md"), "---\ntitle: P\n---\n![x](/used.png)\n")
+          File.write(File.join("static", "used.png"), "png")
+          File.write(File.join("static", "orphan.png"), "png")
+
+          result = Hwaro::Services::UnusedAssets.new.run
+
+          # Paths keep their historical relative form ("static/…").
+          result.total_assets.should eq(2)
+          result.unused_files.should eq([File.join("static", "orphan.png")])
+        end
+      end
+    end
+
+    # Regression: the safety-net `Regex.new` built from an asset basename
+    # raised ArgumentError for a non-UTF-8 filename (possible on Linux
+    # filesystems), aborting the whole command.
+    describe "non-UTF-8 asset basenames" do
+      it "boundary_referenced? refuses an invalid basename instead of raising" do
+        bad = String.new(Bytes[0xFF]) + ".png"
+        Hwaro::Services::UnusedAssets.boundary_referenced?("some corpus", bad).should be_false
+      end
+
+      it "boundary_referenced? keeps the space/paren safety net intact" do
+        Hwaro::Services::UnusedAssets.boundary_referenced?("![t](/team photo.png)", "team photo.png").should be_true
+        Hwaro::Services::UnusedAssets.boundary_referenced?("![b](/page-header.png)", "header.png").should be_false
+      end
+
+      it "skips (with a warning) an asset whose file name is not valid UTF-8" do
+        Dir.mktmpdir do |dir|
+          content_dir = File.join(dir, "content")
+          static_dir = File.join(dir, "static")
+          FileUtils.mkdir_p(content_dir)
+          FileUtils.mkdir_p(static_dir)
+          File.write(File.join(content_dir, "post.md"), "---\ntitle: P\n---\nBody\n")
+          File.write(File.join(static_dir, "orphan.png"), "png")
+
+          bad_name = String.new(Bytes[0xC3]) + ".png" # truncated UTF-8 sequence
+          created = begin
+            File.write(File.join(static_dir, bad_name), "png")
+            true
+          rescue File::Error
+            # APFS refuses to create non-UTF-8 names at all; the in-loop
+            # guard is unreachable on this filesystem and is covered by the
+            # boundary_referenced? specs above.
+            false
+          end
+
+          result = nil
+          output = with_captured_log do
+            result = Hwaro::Services::UnusedAssets.new(
+              content_dir: content_dir,
+              static_dir: static_dir,
+              templates_dir: File.join(dir, "templates"),
+            ).run
+          end
+
+          r = result.not_nil!
+          # The bad name is never flagged (and so never handed to --delete);
+          # the genuine orphan still is.
+          r.unused_files.should eq([File.join(static_dir, "orphan.png")])
+          output.should contain("not valid UTF-8") if created
+        end
+      end
+    end
   end
 end

@@ -327,6 +327,19 @@ module Hwaro
           safe_path = Hwaro::Utils::OutputGuard.safe_output_path(path, output_dir)
           return false unless safe_path
 
+          # `safe_output_path` is lexical; `mkdir_p` + `File.write` follow a
+          # pre-existing symlinked directory (or file) inside the destination,
+          # routing the write outside `output_dir`. Re-check the RESOLVED
+          # destination — deepest-existing-ancestor resolution, so a
+          # not-yet-created path still resolves — the same containment rule
+          # `copy_bundle_assets` applies.
+          resolved = Hwaro::Utils::PathUtils.resolved_real_path(safe_path)
+          resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
+          unless resolved == resolved_root || resolved.starts_with?(resolved_root + File::SEPARATOR)
+            Logger.warn "Skipping output outside output directory (symlinked destination): #{path}"
+            return false
+          end
+
           action = File.exists?(safe_path) ? "overwritten" : "exported"
           unless @dry_run
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(safe_path))
