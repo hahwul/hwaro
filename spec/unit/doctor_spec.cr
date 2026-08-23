@@ -1671,3 +1671,86 @@ describe "Hwaro::Services::Doctor#fix_config temp files" do
     end
   end
 end
+
+describe "sass diagnostics" do
+  it "warns when SCSS files sit in a Zola-style root sass/ directory" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+      FileUtils.mkdir_p(File.join(dir, "sass"))
+      File.write(File.join(dir, "sass", "style.scss"), ".a { color: red; }")
+
+      issues = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path).run
+      issue = issues.find { |i| i.id == "sass-dir-not-scanned" }
+      issue.should_not be_nil
+      issue.not_nil!.level.should eq(:warning)
+    end
+  end
+
+  it "does not warn for an empty or SCSS-less sass/ directory" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+      FileUtils.mkdir_p(File.join(dir, "sass"))
+      File.write(File.join(dir, "sass", "notes.txt"), "not scss")
+
+      issues = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path).run
+      issues.any? { |i| i.id == "sass-dir-not-scanned" }.should be_false
+    end
+  end
+
+  it "advises when static/ holds SCSS entries but [sass] is disabled" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+      static_dir = File.join(dir, "static", "css")
+      FileUtils.mkdir_p(static_dir)
+      File.write(File.join(static_dir, "style.scss"), ".a { color: red; }")
+      File.write(File.join(static_dir, "_partial.scss"), "$c: red;")
+
+      issues = Hwaro::Services::Doctor.new(
+        content_dir: File.join(dir, "content"),
+        config_path: config_path,
+        static_dir: File.join(dir, "static"),
+      ).run
+      issue = issues.find { |i| i.id == "sass-disabled-with-sources" }
+      issue.should_not be_nil
+      issue.not_nil!.level.should eq(:info)
+      issue.not_nil!.message.should contain("1 SCSS entry file(s)")
+    end
+  end
+
+  it "stays quiet when [sass] is enabled for static/ SCSS entries" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n\n[sass]\nenabled = true\n))
+      static_dir = File.join(dir, "static", "css")
+      FileUtils.mkdir_p(static_dir)
+      File.write(File.join(static_dir, "style.scss"), ".a { color: red; }")
+
+      issues = Hwaro::Services::Doctor.new(
+        content_dir: File.join(dir, "content"),
+        config_path: config_path,
+        static_dir: File.join(dir, "static"),
+      ).run
+      issues.any? { |i| i.id == "sass-disabled-with-sources" }.should be_false
+    end
+  end
+
+  it "stays quiet when only partials sit under static/ with [sass] disabled" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n))
+      static_dir = File.join(dir, "static", "css")
+      FileUtils.mkdir_p(static_dir)
+      File.write(File.join(static_dir, "_partial.scss"), "$c: red;")
+
+      issues = Hwaro::Services::Doctor.new(
+        content_dir: File.join(dir, "content"),
+        config_path: config_path,
+        static_dir: File.join(dir, "static"),
+      ).run
+      issues.any? { |i| i.id == "sass-disabled-with-sources" }.should be_false
+    end
+  end
+end

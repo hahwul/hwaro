@@ -161,6 +161,17 @@ module Hwaro
 
             target_type = positional.shift? || ""
 
+            # Mirror `tool import`: a second positional is almost always an
+            # attempted destination directory, and silently dropping it wrote
+            # the export somewhere else. The output directory is `-o`.
+            unless positional.empty?
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "unexpected extra argument(s): '#{positional.join("', '")}'",
+                hint: "hwaro tool export takes <#{supported_targets}>. To choose the output directory, pass -o/--output DIR.",
+              )
+            end
+
             options = Config::Options::ExportOptions.new(
               target_type: target_type,
               output_dir: output_dir,

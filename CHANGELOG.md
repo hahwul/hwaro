@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+### Changed
+- **`slugify` treats word-joining punctuation as a separator instead of deleting it.** A slash, backslash, or Unicode dash (‐ – — ― −) between two words used to vanish and weld the words together — a `security/xss` tag published at `/tags/securityxss/`, a "CI/CD" heading anchored as `#cicd`, `2010–2020` became `201020` — while every slug convention (and hwaro's own filename slugifier in `hwaro new`) separates them. They now emit a hyphen: `/tags/security-xss/`, `#ci-cd`, `2010-2020`. Other punctuation (`.`, `&`, apostrophes, …) keeps the historical drop behavior, so only slugs containing these characters move; affected taxonomy URLs and heading anchors change on the next build
+
 ### Added
+- `hwaro doctor` diagnoses the two silent ways SCSS ships broken: a Zola-style root `sass/` directory (never scanned — hwaro compiles SCSS from `static/`) warns, and `.scss` entry files under `static/` while `[sass]` is disabled (they publish raw, so the compiled `.css` URLs 404) gets an advisory info. Issue ids `sass-dir-not-scanned` / `sass-disabled-with-sources` for `[doctor] ignore`
+- `hwaro tool import` / `hwaro tool export` reject a stray positional argument instead of silently dropping it — `hwaro tool import jekyll ./site ./dest` (the cp-style source/dest shape) used to import into `./content` while the named destination stayed empty; both now fail with `HWARO_E_USAGE` and point at `-o/--output`
 - Sass: static `calc()` folding (dart-sass simplification) — `calc(10px + 5px * 2)` → `20px`, `calc(9 / 21 * 100%)` → `42.8571428571%`, nested `calc`/`min`/`max`/`clamp` included; anything not fully foldable (`calc(100% - 20px)`, `var()`, interpolated `#{…}`) keeps its verbatim text
 - Sass: built-in functions accept their documented keyword names (`list.append($l, x, $separator: comma)`, `string.slice($string: …, $start-at: 2)`, `map.get($map: …, $key: …)`, `math.div($number1: …, $number2: …)`) — previously only the color functions did
 - Sass: dart-sass output formatting — a blank line only after each top-level rule's output group (not between every rule), selector lists keep the author's line structure (`.a, .b` stays on one line; a source line break before a selector is preserved through nesting resolution), and `@keyframes` blocks no longer carry internal blank lines
