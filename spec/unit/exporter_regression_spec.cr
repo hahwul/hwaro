@@ -261,6 +261,42 @@ describe "exporter regressions" do
         content.should_not contain("published: false")
       end
     end
+
+    # Review follow-up: the template→layout and draft→published translations
+    # never claimed their TARGET keys, so an authored `published`/`layout`
+    # re-emerged from the passthrough as a duplicate YAML key — and under
+    # Jekyll's last-wins loader an authored `published: true` republished
+    # the draft.
+    it "does not emit duplicate keys for authored published/layout" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "content", "posts")
+        FileUtils.mkdir_p(posts_dir)
+        File.write(
+          File.join(posts_dir, "dup.md"),
+          "+++\ntitle = \"Dup\"\ndate = \"2024-01-01\"\ndraft = true\npublished = true\ntemplate = \"post\"\nlayout = \"custom\"\n+++\n\nBody.\n"
+        )
+
+        output_dir = File.join(dir, "export")
+        Hwaro::Services::Exporters::JekyllExporter.new.run(
+          Hwaro::Config::Options::ExportOptions.new(
+            target_type: "jekyll",
+            content_dir: File.join(dir, "content"),
+            output_dir: output_dir,
+            drafts: true,
+          ))
+
+        content = File.read(File.join(output_dir, "_drafts", "dup.md"))
+        # The draft flag is hwaro's source of truth: exactly one published
+        # line, and it says false.
+        content.scan(/^published:/m).size.should eq(1)
+        content.should contain("published: false")
+        # Authored layout wins; the unrenamed template passes through, so
+        # nothing is lost and no key is doubled.
+        content.scan(/^layout:/m).size.should eq(1)
+        content.should contain("layout: custom")
+        content.should contain(%(template: post))
+      end
+    end
   end
 
   # Stability audit 2026-08-23. `date` was interpolated raw into the YAML,
@@ -314,7 +350,9 @@ describe "exporter regressions" do
 
   # Stability audit 2026-08-23. The Hugo key renames (`updated`→`lastmod`,
   # `image`→`images`) clobbered a coexisting authored target key depending on
-  # source order. The authored target must win, like `flatten_taxonomies`.
+  # source order. The authored target must win, like `flatten_taxonomies` —
+  # and (review follow-up) the blocked source key passes through under its
+  # own name instead of being dropped: Hugo accepts arbitrary page params.
   describe "Hugo rename vs authored target key" do
     it "keeps an authored lastmod over a renamed updated" do
       Dir.mktmpdir do |dir|
@@ -335,7 +373,7 @@ describe "exporter regressions" do
 
         content = File.read(File.join(output_dir, "content", "p.md"))
         content.should contain(%(lastmod = "2024-07-01"))
-        content.should_not contain("2024-06-01")
+        content.should contain(%(updated = "2024-06-01"))
       end
     end
 
@@ -358,7 +396,7 @@ describe "exporter regressions" do
 
         content = File.read(File.join(output_dir, "content", "q.md"))
         content.should contain(%(images = ["a.jpg", "b.jpg"]))
-        content.should_not contain("c.jpg")
+        content.should contain(%(image = "c.jpg"))
       end
     end
   end
@@ -435,6 +473,36 @@ describe "exporter regressions" do
 
         Dir.glob(File.join(outside, "*.md")).should be_empty
         result.exported_count.should eq(0)
+      end
+    end
+
+    # Review follow-up: copy_bundle_assets resolve-checked the destination
+    # DIRECTORY but not the destination FILE, so a pre-existing symlink leaf
+    # inside the tree let File.copy write through it to an outside path.
+    it "refuses to copy a bundle asset over a symlink leaf pointing outside" do
+      Dir.mktmpdir do |dir|
+        bundle_dir = File.join(dir, "content", "posts", "bundle")
+        FileUtils.mkdir_p(bundle_dir)
+        File.write(File.join(bundle_dir, "index.md"), "+++\ntitle = \"B\"\ndate = \"2024-01-01\"\n+++\n\nBody.\n")
+        File.write(File.join(bundle_dir, "cover.png"), "png-bytes")
+
+        outside_target = File.join(dir, "victim.txt")
+        File.write(outside_target, "original")
+
+        output_dir = File.join(dir, "export")
+        # Hugo keeps the bundle layout: content/posts/bundle/cover.png.
+        dest_bundle = File.join(output_dir, "content", "posts", "bundle")
+        FileUtils.mkdir_p(dest_bundle)
+        File.symlink(outside_target, File.join(dest_bundle, "cover.png"))
+
+        Hwaro::Services::Exporters::HugoExporter.new.run(
+          Hwaro::Config::Options::ExportOptions.new(
+            target_type: "hugo",
+            content_dir: File.join(dir, "content"),
+            output_dir: output_dir,
+          ))
+
+        File.read(outside_target).should eq("original")
       end
     end
   end

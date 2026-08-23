@@ -141,6 +141,97 @@ describe "agents-md site-section merge" do
     end
   end
 
+  # Review follow-up: requiring the marker to be the ENTIRE line meant a
+  # user-annotated heading was no longer found and --force discarded the
+  # section the annotation asked to keep.
+  it "preserves a user section under an annotated marker heading" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("AGENTS.md", <<-MD)
+          # AGENTS.md - AI Agent Instructions for Hwaro Site
+
+          Stale body.
+
+          #{marker} (do not delete)
+
+          - Always deploy on Friday
+          MD
+
+        with_captured_log do
+          Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--force"])
+        end
+
+        File.read("AGENTS.md").should contain("Always deploy on Friday")
+      end
+    end
+  end
+
+  # Review follow-up: a closing fence carries no info string (CommonMark), so
+  # a ```text line inside an open block must NOT flip the parity and expose a
+  # quoted marker as the merge point.
+  it "does not treat an info-string fence line as a closer" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("AGENTS.md", <<-MD)
+          # AGENTS.md - AI Agent Instructions for Hwaro Site
+
+          ```markdown
+          ```text
+          #{marker}
+          ```
+
+          Stale generated body.
+
+          #{marker}
+
+          - Always deploy on Friday
+          MD
+
+        with_captured_log do
+          Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--force"])
+        end
+
+        merged = File.read("AGENTS.md")
+        merged.should contain("Always deploy on Friday")
+        merged.should_not contain("Stale generated body")
+      end
+    end
+  end
+
+  # Review follow-up: the unclosed-fence fallback must scan only FROM the
+  # open fence — a marker quoted in an earlier properly CLOSED fence must
+  # never become the merge point.
+  it "ignores a closed-fence quote even when a later fence is unclosed" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("AGENTS.md", <<-MD)
+          # AGENTS.md - AI Agent Instructions for Hwaro Site
+
+          ```markdown
+          #{marker}
+          ```
+
+          Stale generated body.
+
+          ```bash
+          hwaro build
+
+          #{marker}
+
+          - Always deploy on Friday
+          MD
+
+        with_captured_log do
+          Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--force"])
+        end
+
+        merged = File.read("AGENTS.md")
+        merged.should contain("Always deploy on Friday")
+        merged.should_not contain("Stale generated body")
+      end
+    end
+  end
+
   # Review follow-up: an unclosed fence above the marker swallowed the rest of
   # the file, so the real heading was invisible and --force destroyed the
   # user's section. The scanner now falls back to a fence-blind pass when the

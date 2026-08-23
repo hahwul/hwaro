@@ -96,4 +96,38 @@ describe "PlatformConfig alias-scan stability" do
       end
     end
   end
+
+  # Review follow-up: the alias walk itself had no rescue, so one unreadable
+  # subdirectory under content/ aborted the whole platform-config run (the
+  # same class walk_files_into was fixed for on the importer side).
+  it "skips an unreadable content subdirectory instead of aborting" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("content/locked")
+        File.write("content/posts/p.md", "---\ntitle: P\naliases:\n  - /kept/\n---\nBody\n")
+        File.write("content/locked/hidden.md", "---\ntitle: H\n---\nBody\n")
+        File.chmod("content/locked", 0o000)
+
+        readable_anyway = begin
+          Dir.children("content/locked")
+          true
+        rescue File::Error
+          false
+        end
+
+        begin
+          unless readable_anyway
+            config = Hwaro::Models::Config.new
+            generator = Hwaro::Services::PlatformConfig.new(config)
+            result = ""
+            with_captured_log { result = generator.generate("netlify") }
+            result.should contain("from = \"/kept/\"")
+          end
+        ensure
+          File.chmod("content/locked", 0o755)
+        end
+      end
+    end
+  end
 end

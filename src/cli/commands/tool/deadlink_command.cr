@@ -1075,7 +1075,9 @@ module Hwaro
               # so without this a slow chain multiplied the configured
               # --timeout by up to 12×. 3× leaves room for a slow-but-healthy
               # chain of a few hops while still bounding the worst case.
-              deadline = Time.instant + (timeout_seconds * 3).seconds
+              # Int64 math: an absurd-but-accepted --timeout must not
+              # overflow Int32 here and flip every link to "dead".
+              deadline = Time.instant + (timeout_seconds.to_i64 * 3).seconds
 
               loop do
                 host = current_uri.host

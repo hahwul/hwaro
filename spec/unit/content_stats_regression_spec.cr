@@ -76,6 +76,25 @@ describe "content analysis regressions" do
       end
     end
 
+    # Review follow-up: extract_body's frontmatter regex raises ArgumentError
+    # (PCRE2) on a body with invalid UTF-8, escaping the loop's IO::Error
+    # rescue and killing the whole report over one bad file.
+    it "skips a file whose body holds invalid UTF-8 instead of aborting" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "good.md"), "+++\ntitle = \"G\"\n+++\nfour words right here\n")
+        File.open(File.join(content_dir, "bad.md"), "w") do |f|
+          f << "+++\ntitle = \"B\"\n+++\nbody "
+          f.write_byte(0xFF_u8)
+          f << " tail\n"
+        end
+
+        result = Hwaro::Services::ContentStats.new(content_dir).run
+        result.words_total.should eq(4)
+      end
+    end
+
     it "does not count Markdown punctuation as words" do
       Hwaro::Utils::TextUtils.count_words("## Heading").should eq(1)
       Hwaro::Utils::TextUtils.count_words("| a | b |").should eq(2)

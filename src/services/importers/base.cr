@@ -18,6 +18,13 @@ module Hwaro
       # `generate_frontmatter` renders it as TOML.
       alias FieldValue = (String | Bool | Int64 | Array(String))?
 
+      # Every importer computes `success: imported > 0 || errors == 0` —
+      # DELIBERATELY more lenient than the exporters' `errors == 0` rule.
+      # Imports digest messy third-party dumps where some items are simply
+      # unimportable; a best-effort partial migration is the expected
+      # outcome, and per-item failures are counted and reported alongside
+      # it. Exports and conversions operate on the user's own valid content,
+      # where any error means the run must fail.
       struct ImportResult
         property success : Bool
         property message : String

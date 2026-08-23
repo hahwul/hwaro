@@ -135,15 +135,23 @@ module Hwaro
           # Hwaro's `template` is Jekyll's `layout`, the exact inverse of the
           # Jekyll importer's `layout` → `template` mapping. Passing the key
           # through verbatim meant Jekyll ignored it (rendering the page with
-          # no layout at all) and a re-import dropped it entirely.
-          if layout = scalar_string(fields["template"]?)
+          # no layout at all) and a re-import dropped it entirely. An
+          # authored `layout` wins (existing-key-wins, like the Hugo
+          # renames): emitting both would produce a duplicate YAML key.
+          if (layout = scalar_string(fields["template"]?)) && fields["layout"]?.try(&.raw).nil?
             yaml_lines << "layout: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(layout)}"
             handled << "template"
+            handled << "layout"
           end
 
-          # Jekyll uses `published: false` instead of `draft: true`
+          # Jekyll uses `published: false` instead of `draft: true`. The
+          # draft flag is hwaro's source of truth, so it also claims
+          # `published`: letting an authored `published: true` pass through
+          # would duplicate the key and (under Jekyll's last-wins loader)
+          # publish the draft.
           if is_draft
             yaml_lines << "published: false"
+            handled << "published"
           end
 
           # Accept both list (`tags: [a, b]`) and scalar (`tags: crystal`)

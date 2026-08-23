@@ -312,7 +312,15 @@ module Hwaro
       PAGE_EXTENSIONS = {".md", ".markdown"}
 
       private def scan_content_for_aliases(dir : String, redirects : Array(Tuple(String, String)))
-        Dir.each_child(dir) do |entry|
+        # An unreadable subdirectory (Dir.each_child raises on entry) skips
+        # that subtree with a warning instead of aborting the whole run.
+        children = begin
+          Dir.children(dir)
+        rescue ex : File::Error
+          Logger.warn "Skipping unreadable directory during alias scan: #{dir} (#{ex.message})"
+          return
+        end
+        children.each do |entry|
           path = File.join(dir, entry)
           # `follow_symlinks: false` keeps a symlinked directory (including a
           # cycle like `ln -s . content/loop`) from being recursed into —

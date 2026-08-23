@@ -77,24 +77,33 @@ module Hwaro
           # similarly to the original.
           # A rename only applies when its TARGET key is not authored in the
           # source — an authored target wins regardless of key order, the
-          # same existing-key-wins rule `flatten_taxonomies` uses (the source
-          # key is dropped, mirroring how the losing taxonomy entry is).
-          # Renaming unconditionally clobbered a coexisting authored key
-          # whenever the source key happened to iterate second.
+          # same existing-key-wins rule `flatten_taxonomies` uses. When the
+          # rename is blocked, the source key is passed through under its own
+          # name instead of being dropped: Hugo accepts arbitrary page
+          # params, and silent data loss is this exporter's cardinal sin
+          # (gh#527). Renaming unconditionally clobbered a coexisting
+          # authored key whenever the source key happened to iterate second.
           hugo_fields = {} of String => YAML::Any
           flattened = flatten_taxonomies(fields)
           flattened.each do |key, value|
             next if value.raw.nil?
             case key
             when "updated"
-              next if authored?(flattened, "lastmod")
-              hugo_fields["lastmod"] = value
+              if authored?(flattened, "lastmod")
+                hugo_fields[key] = value
+              else
+                hugo_fields["lastmod"] = value
+              end
             when "expires"
-              next if authored?(flattened, "expiryDate")
-              hugo_fields["expiryDate"] = value
+              if authored?(flattened, "expiryDate")
+                hugo_fields[key] = value
+              else
+                hugo_fields["expiryDate"] = value
+              end
             when "image"
-              next if authored?(flattened, "images")
-              if image = value.as_s?
+              if authored?(flattened, "images")
+                hugo_fields[key] = value
+              elsif image = value.as_s?
                 hugo_fields["images"] = YAML::Any.new([YAML::Any.new(image)])
               else
                 hugo_fields["images"] = value

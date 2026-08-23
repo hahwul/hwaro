@@ -98,7 +98,14 @@ module Hwaro
             next
           end
 
-          body = extract_body(content)
+          # PCRE2 raises ArgumentError on invalid UTF-8 — the same escape
+          # extract_tags guards against; one bad file must not kill the
+          # whole report.
+          body = begin
+            extract_body(content)
+          rescue ArgumentError
+            next
+          end
           wc = count_words(body)
           word_counts << wc
 

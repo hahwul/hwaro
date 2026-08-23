@@ -193,6 +193,16 @@ module Hwaro
 
             dest = File.join(dest_dir, entry)
             next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest, output_dir)
+            # The directory was resolve-checked above, but the destination
+            # FILE itself can be a pre-existing symlink leaf: File.copy
+            # follows it and would write through it to a path outside the
+            # tree. Same resolved re-check write_file applies.
+            resolved_dest = Hwaro::Utils::PathUtils.resolved_real_path(dest)
+            resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
+            unless resolved_dest.starts_with?(resolved_root + File::SEPARATOR)
+              Logger.warn "Skipping bundle asset outside output directory (symlinked destination): #{dest}"
+              next
+            end
 
             action = File.exists?(dest) ? "overwritten" : "exported"
             unless @dry_run

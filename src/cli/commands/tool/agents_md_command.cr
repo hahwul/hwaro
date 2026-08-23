@@ -131,14 +131,18 @@ module Hwaro
           # drift apart.
           SITE_SECTION_MARKER = Services::Defaults::AgentsMd::SITE_SECTION_MARKER
 
-          # The heading only counts when it is a whole line on its own
-          # (trailing blanks aside). A first-substring `index` let a mention
-          # inside a code fence or mid-prose shift the merge point —
-          # duplicating stale generated content or silently discarding user
-          # sections above the real heading.
-          # Up to three leading spaces still renders as the same ATX heading.
-          MARKER_LINE_RE = /\A {0,3}#{Regex.escape(Services::Defaults::AgentsMd::SITE_SECTION_MARKER)}[ \t]*\z/
+          # The heading only counts when the line STARTS with the marker
+          # (≤3 leading spaces still renders as the same ATX heading) — a
+          # first-substring `index` let a mid-prose mention shift the merge
+          # point. Trailing text after a separating blank is allowed so a
+          # user-annotated heading ("## Site-Specific Instructions (do not
+          # delete)") keeps being found; losing it meant `--write --force`
+          # discarded the user's whole section.
+          MARKER_LINE_RE = /\A {0,3}#{Regex.escape(Services::Defaults::AgentsMd::SITE_SECTION_MARKER)}(?:[ \t].*)?\z/
           FENCE_RE       = /\A {0,3}(`{3,}|~{3,})/
+          # A CLOSING fence carries no info string (CommonMark) — accepting
+          # one (```text) would flip the in/out-of-fence parity.
+          FENCE_CLOSE_RE = /\A {0,3}(`{3,}|~{3,})[ \t]*\z/
 
           private def merge_site_section(fresh : String, existing : String) : String
             existing_idx = site_section_index(existing)
@@ -149,38 +153,45 @@ module Hwaro
           end
 
           # Char index of the real Site-Specific Instructions heading: the
-          # FIRST line equal to the marker that is not inside a fenced code
-          # block — deterministic, and identical to the old behavior for
-          # normal files, where the heading occurs exactly once. When an
-          # UNCLOSED fence swallowed the rest of the file, rescan ignoring
-          # fences: preserving the user's section on malformed markdown beats
-          # a full rewrite that silently discards it. (A marker inside a
-          # properly closed fence stays a non-match — that's the quoted
-          # example the fence tracking exists for.)
+          # FIRST marker line that is not inside a fenced code block —
+          # deterministic, and identical to the old behavior for normal
+          # files, where the heading occurs exactly once. When an UNCLOSED
+          # fence swallowed the rest of the file, rescan fence-blind FROM
+          # that fence's opening: preserving the user's section on malformed
+          # markdown beats a full rewrite that silently discards it, while a
+          # marker quoted inside an earlier properly CLOSED fence stays a
+          # non-match either way.
           private def site_section_index(text : String) : Int32?
-            index, unterminated = scan_for_marker(text, fence_aware: true)
+            index, open_fence_at = scan_for_marker(text)
             return index if index
-            return unless unterminated
-            scan_for_marker(text, fence_aware: false)[0]
+            return unless open_fence_at
+            tail_index, _ = scan_for_marker(text[open_fence_at..], fences: false)
+            tail_index.try { |i| open_fence_at + i }
           end
 
-          private def scan_for_marker(text : String, fence_aware : Bool) : {Int32?, Bool}
+          # Returns {marker index, offset of a fence left open at EOF}.
+          private def scan_for_marker(text : String, fences : Bool = true) : {Int32?, Int32?}
             offset = 0
             fence_delim : String? = nil
+            fence_start : Int32? = nil
             text.each_line(chomp: false) do |raw_line|
               line = raw_line.chomp
               if delim = fence_delim
-                if closing = line.match(FENCE_RE).try(&.[1])
-                  fence_delim = nil if closing[0] == delim[0] && closing.size >= delim.size
+                if closing = line.match(FENCE_CLOSE_RE).try(&.[1])
+                  if closing[0] == delim[0] && closing.size >= delim.size
+                    fence_delim = nil
+                    fence_start = nil
+                  end
                 end
-              elsif fence_aware && (opening = line.match(FENCE_RE).try(&.[1]))
+              elsif fences && (opening = line.match(FENCE_RE).try(&.[1]))
                 fence_delim = opening
+                fence_start = offset
               elsif line.matches?(MARKER_LINE_RE)
-                return {offset, false}
+                return {offset, nil}
               end
               offset += raw_line.size
             end
-            {nil, !fence_delim.nil?}
+            {nil, fence_delim ? fence_start : nil}
           end
         end
       end
