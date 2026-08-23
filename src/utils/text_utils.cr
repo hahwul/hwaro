@@ -305,6 +305,8 @@ module Hwaro
       #   slugify("한글 제목")      # => "한글-제목"
       #   slugify("CJK 테스트!")   # => "cjk-테스트"
       #   slugify("日本語　テスト") # => "日本語-テスト"  (U+3000)
+      #   slugify("CI/CD")         # => "ci-cd"
+      #   slugify("보안—우회")      # => "보안-우회"  (em dash)
       #
       def slugify(text : String) : String
         # Single-pass: directly emit hyphens for separators, collapsing runs.
@@ -320,7 +322,7 @@ module Hwaro
             if char.ascii_letter? || char.ascii_number?
               io << char.downcase
               last_was_sep = false
-            elsif char.whitespace? || char == '-' || char == '_'
+            elsif char.whitespace? || char == '-' || char == '_' || slug_separator?(char)
               unless last_was_sep
                 io << '-'
                 last_was_sep = true
@@ -332,6 +334,19 @@ module Hwaro
             # All other characters (punctuation, symbols) are dropped
           end
         end.rstrip('-')
+      end
+
+      # Punctuation that joins two words WITHOUT surrounding spaces and so
+      # must become a hyphen rather than vanish. Dropping these welded the
+      # words together: "CI/CD" → "cicd", "security/xss" → "securityxss",
+      # "보안—우회" → "보안우회" — while every slug convention (and Hwaro's own
+      # `Creator.slugify` for filenames) separates them ("ci-cd").
+      # Deliberately narrow: slash, backslash, and the Unicode dash block
+      # (hyphen U+2010 … horizontal bar U+2015) plus minus sign U+2212.
+      # Other punctuation ('.', '&', apostrophes, …) keeps the historical
+      # drop behavior so existing heading anchors and term URLs don't move.
+      private def slug_separator?(char : Char) : Bool
+        char == '/' || char == '\\' || char.in?('‐'..'―') || char == '−'
       end
 
       # Longest slug `safe_slugify` returns, in bytes.

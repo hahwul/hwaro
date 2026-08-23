@@ -44,6 +44,14 @@ describe Hwaro::CLI::Commands::Tool::ExportCommand do
       ex.message.to_s.should contain("unknown target type")
     end
 
+    it "rejects a second positional instead of silently exporting to the default directory" do
+      cmd = Hwaro::CLI::Commands::Tool::ExportCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["hugo", "/tmp/dest"]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): '/tmp/dest'")
+      ex.hint.to_s.should contain("--output")
+    end
+
     # Regression: `-o .` (and `-o ""`) used to resolve every destination back
     # onto the source file the exporter had just read, so the command rewrote
     # the project's own content/ in place — YAML front matter re-emitted as

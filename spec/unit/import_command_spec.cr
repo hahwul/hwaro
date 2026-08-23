@@ -55,6 +55,17 @@ describe Hwaro::CLI::Commands::Tool::ImportCommand do
       ex.message.to_s.should contain("missing <path>")
     end
 
+    it "rejects a third positional instead of silently importing into ./content" do
+      # `hwaro tool import jekyll ./site ./dest` follows the cp-style
+      # source/dest convention; the extra positional used to be dropped and
+      # the import landed in the default output directory unannounced.
+      cmd = Hwaro::CLI::Commands::Tool::ImportCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["jekyll", "/tmp/x", "/tmp/dest"]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): '/tmp/dest'")
+      ex.hint.to_s.should contain("--output")
+    end
+
     it "includes a source-specific hint when nothing importable is found" do
       Dir.mktmpdir do |dir|
         # An empty directory: jekyll importer finds no _posts/, reports 0 items.

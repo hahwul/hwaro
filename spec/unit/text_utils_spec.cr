@@ -102,6 +102,41 @@ describe Hwaro::Utils::TextUtils do
       # ㄱ is in Hangul Jamo range 0x1100-0x11FF
       Hwaro::Utils::TextUtils.slugify("ᄀᄁ test").should eq("ᄀᄁ-test")
     end
+
+    # Word-joining punctuation must separate, not vanish — dropping it
+    # welded the words together ("CI/CD" → "cicd", "security/xss" →
+    # "securityxss"), unlike every slug convention and Hwaro's own
+    # Creator.slugify for filenames.
+    it "treats a slash between words as a separator" do
+      Hwaro::Utils::TextUtils.slugify("CI/CD").should eq("ci-cd")
+      Hwaro::Utils::TextUtils.slugify("security/xss").should eq("security-xss")
+      Hwaro::Utils::TextUtils.slugify("a/b testing").should eq("a-b-testing")
+    end
+
+    it "treats a backslash as a separator" do
+      Hwaro::Utils::TextUtils.slugify("dir\\file").should eq("dir-file")
+    end
+
+    it "treats Unicode dashes as separators" do
+      Hwaro::Utils::TextUtils.slugify("보안—우회").should eq("보안-우회")               # em dash
+      Hwaro::Utils::TextUtils.slugify("2010–2020").should eq("2010-2020")       # en dash
+      Hwaro::Utils::TextUtils.slugify("non‑breaking").should eq("non-breaking") # U+2011
+      Hwaro::Utils::TextUtils.slugify("−5 degrees").should eq("5-degrees")      # minus sign, leading hyphen suppressed
+    end
+
+    it "collapses slash runs mixed with spaces" do
+      Hwaro::Utils::TextUtils.slugify("a / b // c").should eq("a-b-c")
+    end
+
+    it "still drops other interior punctuation" do
+      Hwaro::Utils::TextUtils.slugify("don't panic").should eq("dont-panic")
+      Hwaro::Utils::TextUtils.slugify("v1.2.3").should eq("v123")
+    end
+
+    it "returns empty for separator-only input" do
+      Hwaro::Utils::TextUtils.slugify("///").should eq("")
+      Hwaro::Utils::TextUtils.slugify("—").should eq("")
+    end
   end
 
   describe ".safe_slugify" do

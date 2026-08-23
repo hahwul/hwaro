@@ -207,6 +207,19 @@ module Hwaro
             source_type = positional.shift? || ""
             path = positional.shift? || ""
 
+            # A third positional is almost always an attempted destination
+            # (`hwaro tool import jekyll ./site ./dest` — the source/dest
+            # convention of cp and of `hwaro init <path>`). Silently dropping
+            # it imported into ./content while the user watched a directory
+            # they named stay empty; the output directory is `-o`.
+            unless positional.empty?
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "unexpected extra argument(s): '#{positional.join("', '")}'",
+                hint: "hwaro tool import takes <source-type> <path>. To choose the output content directory, pass -o/--output DIR.",
+              )
+            end
+
             options = Config::Options::ImportOptions.new(
               source_type: source_type,
               path: path,

@@ -116,6 +116,8 @@ module Hwaro
             ["menu-parent-undefined"]),
           CheckSpec.new("referenced files & dirs",
             ["config-path-missing", "config-dir-missing"]),
+          CheckSpec.new("sass (sources & enablement)",
+            ["sass-dir-not-scanned", "sass-disabled-with-sources"]),
         ],
         blocked_by: CONFIG_BLOCKING_IDS,
       ),
@@ -220,7 +222,10 @@ module Hwaro
         check_templates(issues)
         check_directory_structure(issues, config)
         check_content_frontmatter(issues, config)
-        check_referenced_paths(issues, config) if config
+        if config
+          check_referenced_paths(issues, config)
+          check_sass(issues, config)
+        end
         @observed_blocking_ids = issues.map(&.id).to_set & ALL_BLOCKING_IDS
 
         ignore = config.try(&.doctor.ignore) || [] of String
@@ -1393,6 +1398,49 @@ module Hwaro
                 message: "#{label_prefix} files[#{f_idx}]: #{file} — file not found under #{source_dir.empty? ? "(repo root)" : source_dir}/",
               )
             end
+          end
+        end
+      end
+
+      # [sass] pitfalls that build and serve stay silent about: SCSS sources
+      # in a directory the compiler never scans, or sources in the right
+      # place with compilation left off. Both ship a site whose stylesheet
+      # URLs silently 404 — worth a diagnostic here since no build phase
+      # ever touches the files.
+      private def check_sass(issues : Array(Issue), config : Models::Config)
+        glob = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+
+        # Zola keeps SCSS under a root `sass/` directory, so that's where
+        # migrating users put it. Hwaro compiles from `static/`
+        # (features/sass) and never scans `sass/`. Anchored next to
+        # config.toml rather than the CWD so a doctor run pointed at
+        # another project (-i / spec temp dirs) inspects that project.
+        sass_dir = File.join(File.dirname(@config_path), "sass")
+        if Dir.exists?(sass_dir) && Dir.glob(File.join(sass_dir, "**", "*.scss"), match: glob).any? { |p| File.file?(p) }
+          issues << Issue.new(
+            id: "sass-dir-not-scanned",
+            level: :warning,
+            category: "config",
+            file: "sass/",
+            message: "SCSS files found under sass/, which Hwaro never scans — SCSS sources belong under #{@static_dir}/ (e.g. #{@static_dir}/css/style.scss). Move them there (see features/sass).",
+          )
+        end
+
+        # Entry files under static/ while [sass] is disabled: the raw
+        # `.scss` publishes verbatim and any `<link>` to the compiled
+        # `.css` 404s. Shipping raw sources can be deliberate (the bundles
+        # escape hatch), so this stays advisory.
+        unless config.sass.enabled
+          entries = Dir.glob(File.join(@static_dir, "**", "*.scss"), match: glob)
+            .select { |p| File.file?(p) && !File.basename(p).starts_with?("_") }
+          unless entries.empty?
+            issues << Issue.new(
+              id: "sass-disabled-with-sources",
+              level: :info,
+              category: "config",
+              file: entries.first,
+              message: "#{entries.size} SCSS entry file(s) under #{@static_dir}/ but [sass] is not enabled — they publish as raw .scss. Add a [sass] section with enabled = true to compile them to .css (see features/sass).",
+            )
           end
         end
       end
