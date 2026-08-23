@@ -13,7 +13,7 @@
 
         hwaro = pkgs.crystal.buildCrystalPackage rec {
           pname = "hwaro";
-          version = "0.18.1";
+          version = "0.19.0";
 
           src = ./.;
 
