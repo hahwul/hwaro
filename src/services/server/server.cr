@@ -931,6 +931,19 @@ module Hwaro
       def run(options : Config::Options::ServeOptions)
         build_options = options.to_build_options
         build_options.serve_mode = true
+        # The dev server derives its document root from `build_options.output_dir`
+        # (see `sanitize_output_dir` call sites), so `[build]` has to be merged
+        # here as well as in the Builder: BuildOptions is a struct, and the copy
+        # the Builder mutates is not this one. Without this, `[build] output_dir`
+        # would have serve building into one directory and serving another.
+        #
+        # A missing or invalid config is not fatal here — serve deliberately
+        # starts on a broken site, and the Builder reports the error on the
+        # initial build.
+        begin
+          build_options.apply_build_config!(Hwaro::Models::Config.load(env: build_options.env).build)
+        rescue Hwaro::HwaroError
+        end
         run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options, options.json, options.headers)
       end
 
@@ -1324,9 +1337,16 @@ module Hwaro
         }.to_json
       end
 
+      # An absolute path is allowed: `hwaro build -o /srv/site` and
+      # `[build] output_dir = "/srv/site"` both write there, and rejecting it
+      # here would leave serve building into that directory while serving an
+      # empty `public/` — every request a 404 for the whole session. The build's
+      # own `guard_output_dir!` is what refuses the genuinely dangerous roots.
+      # A `..` path still falls back, and config-loaded values never reach here
+      # with one (`Config::Loader.build_output_dir_value` drops those).
       private def sanitize_output_dir(dir : String) : String
         normalized = Path[dir].normalize.to_s
-        if normalized.starts_with?("..") || normalized.starts_with?("/")
+        if normalized.starts_with?("..")
           Logger.warn "Invalid output directory: #{dir}. Using 'public' instead."
           return "public"
         end

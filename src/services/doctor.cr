@@ -1349,7 +1349,7 @@ module Hwaro
         # found" warnings. Use a route-aware check that also accepts a matching
         # content source or a built output page.
         emit_route = ->(label : String, value : String) do
-          emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) || route_resolves?(s) }, id: "config-path-missing", kind: "file")
+          emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) || route_resolves?(s, config.build.output_dir || "public") }, id: "config-path-missing", kind: "file")
         end
 
         config.og.default_image.try { |v| emit_file.call("[og] default_image", v) }
@@ -1471,10 +1471,11 @@ module Hwaro
       # file exists. A route is considered valid when:
       #   - a content source exists (`content/about.md` or
       #     `content/about/index.md` for `/about/`), or
-      #   - the built output page exists (`public/about/index.html`).
+      #   - the built output page exists (`<output_dir>/about/index.html`,
+      #     which follows `[build] output_dir` rather than assuming `public/`).
       # This keeps doctor from flagging valid routes as "file not found" while
       # still catching genuinely-missing pages.
-      private def route_resolves?(path : String) : Bool
+      private def route_resolves?(path : String, output_dir : String) : Bool
         # Normalize to a slug: drop a leading slash, strip a trailing slash,
         # and remove a trailing `index.html` so `/about/` and
         # `/about/index.html` resolve the same way.
@@ -1497,12 +1498,13 @@ module Hwaro
                              end
         return true if content_candidates.any? { |c| File.exists?(File.join(@content_dir, c)) }
 
-        # A prior build's output (conventionally `public/`): a pretty route lands
+        # A prior build's output (`[build] output_dir`, "public" by default):
+        # a pretty route lands
         # at `<slug>/index.html`, while an explicit file (an `.html` alias or a
         # pipeline-built asset such as `/css/app.css`) lands at the path itself.
-        if Dir.exists?("public")
-          return true if File.exists?(File.join("public", slug, "index.html"))
-          return true if File.exists?(File.join("public", path.lchop("/")))
+        if Dir.exists?(output_dir)
+          return true if File.exists?(File.join(output_dir, slug, "index.html"))
+          return true if File.exists?(File.join(output_dir, path.lchop("/")))
         end
 
         # Otherwise it's a pretty route or listing (taxonomy/section page)

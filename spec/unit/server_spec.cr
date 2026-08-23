@@ -107,9 +107,14 @@ describe Hwaro::Services::Server do
       server.test_sanitize_output_dir("../foo").should eq("public")
     end
 
-    it "defaults to 'public' for absolute paths" do
+    # `hwaro build -o /srv/site` and `[build] output_dir = "/srv/site"` both
+    # write there, so rejecting an absolute path here would have serve building
+    # into that directory while serving an empty `public/` — every request a
+    # 404. The build's own guard_output_dir! refuses the dangerous roots.
+    it "keeps absolute paths" do
       server = Hwaro::Services::Server.new
-      server.test_sanitize_output_dir("/foo").should eq("public")
+      server.test_sanitize_output_dir("/foo").should eq("/foo")
+      server.test_sanitize_output_dir("/srv/www/site/").should eq("/srv/www/site")
     end
   end
 

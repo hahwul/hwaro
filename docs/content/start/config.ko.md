@@ -68,8 +68,21 @@ hooks.post = ["npm run minify"]
 | drafts | bool | false | 초안 콘텐츠 포함 |
 | parallel | bool | true | 병렬 처리 |
 | cache | bool | false | 빌드 캐시 사용 |
+| template_deps | bool | true | 템플릿 의존성을 추적해 템플릿 편집 시 해당 템플릿을 렌더링하는 페이지만 재빌드 |
 | hooks.pre | array | [] | 빌드 전에 실행할 명령 |
 | hooks.post | array | [] | 빌드 후에 실행할 명령 |
+
+`output_dir`, `drafts`, `parallel`, `cache`는 각각 `hwaro build` 플래그에 대응하며, 플래그가 우선합니다.
+
+```
+명령줄 플래그  >  config.toml  >  기본값
+```
+
+즉 `hwaro build -o dist`는 config의 `output_dir`를 덮어쓰고, `drafts = false`여도 `hwaro build --drafts`를 쓰면 초안이 포함됩니다. 반대 방향은 없습니다 — config 값을 다시 끄는 `--no-drafts`나 `--no-cache`는 존재하지 않으므로, 모든 빌드에 항상 적용할 때만 이 키들을 켜세요. `--no-parallel`만 예외로, `parallel = true`를 덮어씁니다.
+
+이 설정들은 `hwaro serve`에도 적용됩니다. serve는 `output_dir`로 빌드하고 그 디렉터리를 서빙합니다. `hwaro deploy`도 이를 따릅니다 — `[deployment] source_dir`가 설정되지 않았다면 `public`을 가정하지 않고 `output_dir`를 배포합니다.
+
+`output_dir`에는 프로젝트 상대 경로와 절대 경로를 모두 쓸 수 있습니다. 프로젝트 밖으로 벗어나는 경로(`../out`)는 거부됩니다. 개발 서버가 프로젝트 밖에서는 서빙하지 않기 때문에, 그대로 두면 빌드는 serve가 읽지 않는 곳에 결과를 쓰게 됩니다.
 
 오류 처리와 활용 사례는 [빌드 훅](/ko/features/build-hooks/)을 참고합니다.
 

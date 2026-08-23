@@ -48,6 +48,44 @@ module Hwaro
         # Hooks can use this to change behavior (e.g. lazy OG generation).
         property serve_mode : Bool = false
 
+        # True when `-o/--output` appeared on the command line. Without it a
+        # default `output_dir` is indistinguishable from an explicit
+        # `-o public`, and `[build] output_dir` would override the flag the
+        # user actually typed. Also decides whether the path is resolved
+        # against the original CWD under `-i` (see BuildCommand#run).
+        property output_dir_explicit : Bool = false
+
+        # Fill the config-backed fields from `[build]` in config.toml, leaving
+        # anything the command line set explicitly alone. Precedence is
+        # CLI flag > config.toml > the built-in defaults in `initialize`.
+        #
+        # The three booleans need no explicit-flag tracking because each has
+        # exactly one flag and that flag only ever moves the value away from
+        # its default (`--drafts`/`--cache` set true, `--no-parallel` sets
+        # false). So "still holds the default" and "the flag was absent" are
+        # the same condition. `output_dir` is a string with no such property,
+        # which is what `output_dir_explicit` above exists for.
+        #
+        # Idempotent: applying the same config twice is a no-op, which matters
+        # because `hwaro serve` merges config into its options and the Builder
+        # then merges again on every rebuild.
+        def apply_build_config!(build : Hwaro::Models::BuildConfig) : Nil
+          # Nil checks rather than truthiness: `parallel = false` is a real
+          # value to apply, and `if (v = build.parallel)` would skip it.
+          if (dir = build.output_dir) && !@output_dir_explicit
+            @output_dir = dir
+          end
+          unless (drafts = build.drafts).nil?
+            @drafts = drafts if @drafts == false
+          end
+          unless (parallel = build.parallel).nil?
+            @parallel = parallel if @parallel == true
+          end
+          unless (cache = build.cache).nil?
+            @cache = cache if @cache == false
+          end
+        end
+
         def initialize(
           @output_dir : String = "public",
           @base_url : String? = nil,

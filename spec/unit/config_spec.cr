@@ -1436,6 +1436,267 @@ describe Hwaro::Models::Config do
       config.build.hooks.pre.should eq(["npm ci", "npx tsc"])
       config.build.hooks.post.should eq(["./deploy.sh"])
     end
+
+    it "leaves the flag-backed keys nil when [build] omits them" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        template_deps = false
+        TOML
+
+      # Nil is what lets BuildOptions#apply_build_config! keep its hands off a
+      # field the command line or the defaults already settled.
+      config.build.output_dir.should be_nil
+      config.build.drafts.should be_nil
+      config.build.parallel.should be_nil
+      config.build.cache.should be_nil
+    end
+
+    it "loads output_dir, drafts, parallel and cache from [build]" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+        drafts = true
+        parallel = false
+        cache = true
+        TOML
+
+      config.build.output_dir.should eq("dist")
+      config.build.drafts.should be_true
+      # `false` must survive as false, not collapse to nil — the whole point of
+      # the key is to turn parallel rendering off.
+      config.build.parallel.should be_false
+      config.build.cache.should be_true
+    end
+
+    it "ignores a blank [build] output_dir instead of aiming the build at the site root" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "   "
+        TOML
+
+      config.build.output_dir.should be_nil
+    end
+
+    # The dev server refuses to serve from outside the project, so honouring a
+    # `..` path would leave serve building one tree and serving another.
+    it "ignores a [build] output_dir that escapes the project" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "../escape"
+        TOML
+
+      config.build.output_dir.should be_nil
+    end
+
+    it "keeps an absolute [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "/srv/www/site"
+        TOML
+
+      config.build.output_dir.should eq("/srv/www/site")
+    end
+
+    # Quoting a bool is an easy TOML slip; treating it as absent would leave
+    # the setting off with no feedback at all.
+    it "ignores non-boolean [build] booleans rather than silently no-opping" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        drafts = "true"
+        parallel = 1
+        cache = "yes"
+        TOML
+
+      config.build.drafts.should be_nil
+      config.build.parallel.should be_nil
+      config.build.cache.should be_nil
+    end
+
+    it "ignores a non-string [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = 42
+        TOML
+
+      config.build.output_dir.should be_nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # [deployment] source_dir follows [build] output_dir
+  # ---------------------------------------------------------------------------
+
+  describe "deployment source_dir" do
+    it "defaults to public when neither section says otherwise" do
+      load_config(%(title = "Test")).deployment.source_dir.should eq("public")
+    end
+
+    # Both keys default to "public" independently, so without the fallback a
+    # site building into dist/ would have deploy reading a stale public/.
+    it "follows [build] output_dir when no [deployment] section exists" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+        TOML
+
+      config.deployment.source_dir.should eq("dist")
+    end
+
+    it "follows [build] output_dir when [deployment] omits source_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+
+        [deployment]
+        max_deletes = 10
+        TOML
+
+      config.deployment.source_dir.should eq("dist")
+    end
+
+    it "keeps an explicit [deployment] source_dir over [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+
+        [deployment]
+        source_dir = "explicit"
+        TOML
+
+      config.deployment.source_dir.should eq("explicit")
+    end
+
+    it "keeps the [deployment] source alias over [build] output_dir" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "dist"
+
+        [deployment]
+        source = "aliased"
+        TOML
+
+      config.deployment.source_dir.should eq("aliased")
+    end
+
+    # A rejected output_dir must not drag deploy off "public" with it.
+    it "stays at public when [build] output_dir was rejected" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "../escape"
+        TOML
+
+      config.deployment.source_dir.should eq("public")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # [build] -> BuildOptions merge (CLI flag > config.toml > built-in default)
+  # ---------------------------------------------------------------------------
+
+  describe "BuildOptions#apply_build_config!" do
+    it "fills fields the command line left at their defaults" do
+      build = Hwaro::Models::BuildConfig.new
+      build.output_dir = "dist"
+      build.drafts = true
+      build.parallel = false
+      build.cache = true
+
+      options = Hwaro::Config::Options::BuildOptions.new
+      options.apply_build_config!(build)
+
+      options.output_dir.should eq("dist")
+      options.drafts.should be_true
+      options.parallel.should be_false
+      options.cache.should be_true
+    end
+
+    it "keeps an explicit -o over [build] output_dir" do
+      build = Hwaro::Models::BuildConfig.new
+      build.output_dir = "dist"
+
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "cli")
+      options.output_dir_explicit = true
+      options.apply_build_config!(build)
+
+      options.output_dir.should eq("cli")
+    end
+
+    # `-o public` is indistinguishable from the default by value alone, which
+    # is why explicitness is tracked rather than inferred.
+    it "keeps an explicit -o even when it names the default directory" do
+      build = Hwaro::Models::BuildConfig.new
+      build.output_dir = "dist"
+
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      options.output_dir_explicit = true
+      options.apply_build_config!(build)
+
+      options.output_dir.should eq("public")
+    end
+
+    it "keeps CLI flags that moved a boolean off its default" do
+      build = Hwaro::Models::BuildConfig.new
+      build.drafts = false
+      build.parallel = true
+      build.cache = false
+
+      # As if --drafts --cache --no-parallel were all passed.
+      options = Hwaro::Config::Options::BuildOptions.new(drafts: true, parallel: false, cache: true)
+      options.apply_build_config!(build)
+
+      options.drafts.should be_true
+      options.parallel.should be_false
+      options.cache.should be_true
+    end
+
+    it "changes nothing when [build] omits every key" do
+      options = Hwaro::Config::Options::BuildOptions.new
+      options.apply_build_config!(Hwaro::Models::BuildConfig.new)
+
+      options.output_dir.should eq("public")
+      options.drafts.should be_false
+      options.parallel.should be_true
+      options.cache.should be_false
+    end
+
+    # serve merges config into its own copy and the Builder merges again on
+    # every rebuild, so a second application must not drift.
+    it "is idempotent" do
+      build = Hwaro::Models::BuildConfig.new
+      build.output_dir = "dist"
+      build.parallel = false
+
+      options = Hwaro::Config::Options::BuildOptions.new
+      options.apply_build_config!(build)
+      options.apply_build_config!(build)
+
+      options.output_dir.should eq("dist")
+      options.parallel.should be_false
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -68,8 +68,21 @@ hooks.post = ["npm run minify"]
 | drafts | bool | false | Include draft content |
 | parallel | bool | true | Parallel processing |
 | cache | bool | false | Enable build caching |
+| template_deps | bool | true | Track template dependencies so a template edit only rebuilds the pages that render it |
 | hooks.pre | array | [] | Commands to run before build |
 | hooks.post | array | [] | Commands to run after build |
+
+`output_dir`, `drafts`, `parallel` and `cache` each back a `hwaro build` flag, and the flag wins:
+
+```
+command-line flag  >  config.toml  >  built-in default
+```
+
+So `hwaro build -o dist` overrides `output_dir` in config, and `hwaro build --drafts` still includes drafts when `drafts = false`. The reverse does not exist — there is no `--no-drafts` or `--no-cache` to turn a config value back off, so set those keys only when you want them on for every build. `--no-parallel` is the one exception, and it overrides `parallel = true`.
+
+These apply to `hwaro serve` as well, which builds into (and serves from) `output_dir`. `hwaro deploy` follows it too: when `[deployment] source_dir` is not set, it deploys `output_dir` rather than assuming `public`.
+
+`output_dir` may be relative to the project or absolute. A path that escapes the project (`../out`) is refused, because the dev server will not serve from outside the project and the build would otherwise write somewhere serve never reads.
 
 See [Build Hooks](/features/build-hooks/) for error handling and use cases.
 

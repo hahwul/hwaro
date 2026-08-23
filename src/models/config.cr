@@ -680,6 +680,16 @@ module Hwaro
       # behavior: any template change rebuilds every page.
       property template_deps : Bool = true
 
+      # Defaults for the matching `hwaro build` flags. Nil means the key is
+      # absent from config.toml, which is what keeps the precedence chain
+      # honest: a command-line flag beats config.toml, config.toml beats the
+      # built-in default, and an absent key changes nothing. See
+      # `Config::Options::BuildOptions#apply_build_config!` for the merge.
+      property output_dir : String? = nil
+      property drafts : Bool? = nil
+      property parallel : Bool? = nil
+      property cache : Bool? = nil
+
       def initialize
         @hooks = BuildHooksConfig.new
       end
@@ -1432,6 +1442,7 @@ module Hwaro
         load_doctor(config)
         load_static(config)
         load_deployment(config)
+        resolve_deployment_source_dir(config)
         load_outputs(config)
         load_links(config)
 
@@ -1967,10 +1978,61 @@ module Hwaro
         config.languages = languages
       end
 
+      # A `[build]` boolean, or nil when the key is absent. A present-but-wrong
+      # type warns rather than no-opping: `cache = "true"` (quoting a bool is
+      # an easy TOML slip) would otherwise leave caching off with no feedback,
+      # while the sibling `output_dir` branch does report what it refuses.
+      private def self.build_bool_value(s : Hash(String, TOML::Any), key : String) : Bool?
+        return unless raw = s[key]?
+        if value = raw.as_bool?
+          return value
+        end
+        # `as_bool?` returns nil for `false`, so distinguish a real false from a
+        # type mismatch before warning.
+        return false if raw.raw == false
+        Logger.warn "Ignoring non-boolean [build] #{key} value #{raw.raw.inspect}; expected true or false."
+        nil
+      end
+
+      # A `[build] output_dir`, or nil when it is unusable. Both rejections keep
+      # `hwaro build` and `hwaro serve` pointed at the same directory:
+      # an empty value resolves to the site root, which a cold build wipes, and
+      # a `..` path escapes the project — which the dev server refuses to serve
+      # from (`Server#sanitize_output_dir`) even though the build would write
+      # there, leaving serve publishing one tree and serving another.
+      private def self.build_output_dir_value(raw : TOML::Any) : String?
+        value = raw.as_s?
+        unless value
+          Logger.warn "Ignoring non-string [build] output_dir value #{raw.raw.inspect}; expected a directory path."
+          return
+        end
+
+        trimmed = value.strip
+        if trimmed.empty?
+          Logger.warn "Ignoring empty [build] output_dir in config; using the default."
+          return
+        end
+
+        if Path[trimmed].normalize.to_s.starts_with?("..")
+          Logger.warn "Ignoring [build] output_dir #{trimmed.inspect}: it points outside the project. Using the default."
+          return
+        end
+
+        trimmed
+      end
+
       private def self.load_build(config : Config)
         return unless s = config.raw["build"]?.try(&.as_h?)
 
         config.build.template_deps = bool_value(s["template_deps"]?, config.build.template_deps)
+
+        # Left nil when absent so the CLI/default layers below stay in charge.
+        if raw_output = s["output_dir"]?
+          config.build.output_dir = build_output_dir_value(raw_output)
+        end
+        config.build.drafts = build_bool_value(s, "drafts")
+        config.build.parallel = build_bool_value(s, "parallel")
+        config.build.cache = build_bool_value(s, "cache")
 
         if hooks_section = s["hooks"]?.try(&.as_h?)
           if pre_hooks = hooks_section["pre"]?.try(&.as_a?)
@@ -2201,6 +2263,23 @@ module Hwaro
         if exclude_any = s["exclude"]?
           config.static.exclude = string_or_array(exclude_any)
         end
+      end
+
+      # Point `hwaro deploy` at whatever `[build] output_dir` made the build
+      # write, unless the user named a source explicitly. `[build] output_dir`
+      # and `[deployment] source_dir` default to "public" independently, so
+      # without this a site that builds to `dist/` would have deploy reading a
+      # stale (or absent) `public/` — uploading nothing, or deleting the
+      # remote's files when max_deletes allows it.
+      #
+      # Runs at the call site rather than inside `load_deployment` because the
+      # common shape is a `[build] output_dir` with no `[deployment]` section
+      # at all, which `load_deployment` returns early on.
+      private def self.resolve_deployment_source_dir(config : Config)
+        return unless build_output = config.build.output_dir
+        explicit = config.raw["deployment"]?.try(&.as_h?).try { |s| s["source_dir"]? || s["source"]? }
+        return if explicit.try(&.as_s?)
+        config.deployment.source_dir = build_output
       end
 
       private def self.load_deployment(config : Config)

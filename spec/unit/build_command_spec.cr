@@ -5,11 +5,10 @@ describe Hwaro::CLI::Commands::BuildCommand do
   describe "#parse_options" do
     it "returns default options" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, input_dir = cmd.parse_options([] of String)
-      options, output_dir_explicit = result
+      options, input_dir = cmd.parse_options([] of String)
 
       input_dir.should be_nil
-      output_dir_explicit.should be_false
+      options.output_dir_explicit.should be_false
       options.output_dir.should eq("public")
       options.base_url.should be_nil
       options.drafts.should be_false
@@ -27,21 +26,18 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses output directory" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--output", "dist"])
-      options, output_dir_explicit = result
+      options, _ = cmd.parse_options(["--output", "dist"])
       options.output_dir.should eq("dist")
-      output_dir_explicit.should be_true
+      options.output_dir_explicit.should be_true
 
-      result, _ = cmd.parse_options(["-o", "out"])
-      options, output_dir_explicit = result
+      options, _ = cmd.parse_options(["-o", "out"])
       options.output_dir.should eq("out")
-      output_dir_explicit.should be_true
+      options.output_dir_explicit.should be_true
     end
 
     it "parses base url" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--base-url", "https://example.com"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--base-url", "https://example.com"])
       options.base_url.should eq("https://example.com")
     end
 
@@ -64,7 +60,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses boolean flags" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options([
+      options, _ = cmd.parse_options([
         "--drafts",
         "--minify",
         "--cache",
@@ -72,7 +68,6 @@ describe Hwaro::CLI::Commands::BuildCommand do
         "--profile",
         "--debug",
       ])
-      options, _ = result
 
       options.drafts.should be_true
       options.minify.should be_true
@@ -84,8 +79,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses short boolean flags" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["-d", "-v"])
-      options, _ = result
+      options, _ = cmd.parse_options(["-d", "-v"])
 
       options.drafts.should be_true
       options.verbose.should be_true
@@ -93,8 +87,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses negative flags" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--no-parallel", "--skip-highlighting"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--no-parallel", "--skip-highlighting"])
 
       options.parallel.should be_false
       options.highlight.should be_false
@@ -102,16 +95,14 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses --jobs into the worker count" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--jobs", "2"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--jobs", "2"])
       options.workers.should eq(2)
     end
 
     it "warns that --jobs is ignored when combined with --no-parallel" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
       log = with_captured_log do
-        result, _ = cmd.parse_options(["--no-parallel", "--jobs", "4"])
-        options, _ = result
+        options, _ = cmd.parse_options(["--no-parallel", "--jobs", "4"])
         options.parallel.should be_false
         options.workers.should eq(4)
       end
@@ -140,47 +131,41 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "defaults skip_og_image to false" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options([] of String)
-      options, _ = result
+      options, _ = cmd.parse_options([] of String)
       options.skip_og_image.should be_false
     end
 
     it "parses --skip-og-image flag" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--skip-og-image"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--skip-og-image"])
       options.skip_og_image.should be_true
     end
 
     it "defaults skip_image_processing to false" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options([] of String)
-      options, _ = result
+      options, _ = cmd.parse_options([] of String)
       options.skip_image_processing.should be_false
     end
 
     it "parses --skip-image-processing flag" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--skip-image-processing"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--skip-image-processing"])
       options.skip_image_processing.should be_true
     end
 
     it "parses mixed flags" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["-o", "build", "--drafts", "--base-url", "http://localhost:3000"])
-      options, output_dir_explicit = result
+      options, _ = cmd.parse_options(["-o", "build", "--drafts", "--base-url", "http://localhost:3000"])
 
       options.output_dir.should eq("build")
       options.drafts.should be_true
       options.base_url.should eq("http://localhost:3000")
-      output_dir_explicit.should be_true
+      options.output_dir_explicit.should be_true
     end
 
     it "parses input directory" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, input_dir = cmd.parse_options(["-i", "/tmp/my-site"])
-      options, _ = result
+      options, input_dir = cmd.parse_options(["-i", "/tmp/my-site"])
 
       input_dir.should eq("/tmp/my-site")
       options.output_dir.should eq("public")
@@ -188,26 +173,23 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses input directory with long flag" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, input_dir = cmd.parse_options(["--input", "/tmp/my-site"])
-      _, _ = result
+      _, input_dir = cmd.parse_options(["--input", "/tmp/my-site"])
 
       input_dir.should eq("/tmp/my-site")
     end
 
     it "parses input and output together" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, input_dir = cmd.parse_options(["-i", "/tmp/my-site", "-o", "dist"])
-      options, output_dir_explicit = result
+      options, input_dir = cmd.parse_options(["-i", "/tmp/my-site", "-o", "dist"])
 
       input_dir.should eq("/tmp/my-site")
       options.output_dir.should eq("dist")
-      output_dir_explicit.should be_true
+      options.output_dir_explicit.should be_true
     end
 
     it "parses --stream flag" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--stream"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--stream"])
 
       options.stream.should be_true
       options.streaming?.should be_true
@@ -215,8 +197,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses --memory-limit flag" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--memory-limit", "512M"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--memory-limit", "512M"])
 
       options.memory_limit.should eq("512M")
       options.streaming?.should be_true
@@ -224,8 +205,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
 
     it "parses --stream with --memory-limit" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
-      result, _ = cmd.parse_options(["--stream", "--memory-limit", "2G"])
-      options, _ = result
+      options, _ = cmd.parse_options(["--stream", "--memory-limit", "2G"])
 
       options.stream.should be_true
       options.memory_limit.should eq("2G")
@@ -236,8 +216,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
       ENV["HWARO_MEMORYLIMIT"] = "1G"
       begin
         cmd = Hwaro::CLI::Commands::BuildCommand.new
-        result, _ = cmd.parse_options([] of String)
-        options, _ = result
+        options, _ = cmd.parse_options([] of String)
 
         options.memory_limit.should eq("1G")
         options.streaming?.should be_true
@@ -268,8 +247,7 @@ describe Hwaro::CLI::Commands::BuildCommand do
       ENV["HWARO_MEMORYLIMIT"] = "1G"
       begin
         cmd = Hwaro::CLI::Commands::BuildCommand.new
-        result, _ = cmd.parse_options(["--memory-limit", "2G"])
-        options, _ = result
+        options, _ = cmd.parse_options(["--memory-limit", "2G"])
 
         options.memory_limit.should eq("2G")
       ensure

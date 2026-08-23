@@ -230,7 +230,9 @@ module Hwaro
             # reported dead.
             language_codes = translation_language_codes(config)
             generated_routes = generated_routes(config)
-            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes)
+            # Follow `[build] output_dir`; "public" only as the fallback.
+            output_dir = config.try(&.build.output_dir) || "public"
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, output_dir)
 
             total = external_links.size + internal_links.size
             dead_total = dead_external.size + dead_internal.size
@@ -653,7 +655,7 @@ module Hwaro
             !!(url =~ /\A[a-z][a-z0-9+.\-]*:/i)
           end
 
-          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new) : Array(Result)
+          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, output_dir : String = "public") : Array(Result)
             results = [] of Result
             project_root = find_project_root(content_dir)
 
@@ -675,7 +677,7 @@ module Hwaro
               # (`content/ko/posts/`), and that section outranks any
               # translation reading — stripping unconditionally reported such
               # links dead even though the build publishes them.
-              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names) ||
+              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, output_dir) ||
                        generated_routes.matches?(resolved_url) ||
                        feed_route?(resolved_url, generated_routes, content_dir, base_dir, language_codes) ||
                        paginated_route?(resolved_url, link, content_dir, base_dir, taxonomy_names)
@@ -932,7 +934,8 @@ module Hwaro
           # asset, read literally? This is the language-agnostic resolution the
           # checker has always performed.
           private def resolves?(url : String, link : Link, content_dir : String, base_dir : String,
-                                project_root : String, taxonomy_names : Array(String)) : Bool
+                                project_root : String, taxonomy_names : Array(String),
+                                output_dir : String) : Bool
             target = content_target(url, content_dir, base_dir)
             # Most internal URLs are written with a trailing slash (`/about/`,
             # `/posts/hello/`) — strip it before computing the leaf-file
@@ -950,14 +953,16 @@ module Hwaro
                            File.exists?(File.join(target_no_slash, "index.markdown")) ||
                            (link.kind != :image && taxonomy_url?(url, taxonomy_names))
 
-            # Also accept assets that live in static/ (source) or public/ (after
-            # build): images under static/images/, resized/LQIP variants the
-            # image pipeline emits into public/, and anything published via
-            # [content.files] or the asset pipeline. The public/ probe doubles
-            # as the oracle for generated routes on an already-built site.
+            # Also accept assets that live in static/ (source) or the build
+            # output (after build): images under static/images/, resized/LQIP
+            # variants the image pipeline emits, and anything published via
+            # [content.files] or the asset pipeline. The output probe doubles
+            # as the oracle for generated routes on an already-built site, and
+            # follows `[build] output_dir` so a site that builds elsewhere is
+            # not reported as one big pile of broken links.
             asset_path = url.lstrip("/")
             File.exists?(File.join(project_root, "static", asset_path)) ||
-              File.exists?(File.join(project_root, "public", asset_path))
+              File.exists?(File.join(project_root, output_dir, asset_path))
           end
 
           # Language-qualified resolution for a `/<code>/…` URL whose literal
