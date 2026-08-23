@@ -826,4 +826,36 @@ describe "build_global_vars / pwa_tags" do
     tags.should contain(%(href="/repo/manifest.json"))
     tags.should contain(%(register("/repo/sw.js")))
   end
+
+  # `theme_color` is config-authored free text that lands inside an HTML
+  # attribute. Unescaped, a quote in it closed the attribute early and the
+  # rest of the value became markup in the `<head>` of every page — the
+  # tag builders in `content/seo/tags.cr` all escape for this reason.
+  it "escapes a theme-color that would otherwise break out of the attribute" do
+    config = Hwaro::Models::Config.new
+    config.pwa.enabled = true
+    config.pwa.theme_color = %(#ff0000" onload="alert(1))
+    site = Hwaro::Models::Site.new(config)
+    site.build_lookup_index
+
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    tags.should_not contain(%(onload="alert(1)"))
+    tags.should contain(%(<meta name="theme-color" content="#ff0000&quot; onload=&quot;alert(1)">))
+  end
+
+  # The SW URL sits in a JS string inside an inline `<script>`, where HTML
+  # entities are NOT decoded — escaping it as HTML would corrupt the URL,
+  # so it is emitted as a JSON string literal instead.
+  it "emits the service-worker URL as a JS string literal, not HTML-escaped" do
+    config = Hwaro::Models::Config.new
+    config.base_url = %(https://example.com/a"b)
+    config.pwa.enabled = true
+    site = Hwaro::Models::Site.new(config)
+    site.build_lookup_index
+
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    script = tags.lines.find!(&.includes?("serviceWorker"))
+    script.should_not contain("&quot;")
+    script.should contain(%(register("/a\\"b/sw.js")))
+  end
 end

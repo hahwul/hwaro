@@ -1352,8 +1352,10 @@ module Hwaro
                   var contentIdx = item.content.toLowerCase().indexOf(q);
                   if (titleIdx !== -1 || contentIdx !== -1) {
                     // Earlier matches rank higher; every title match outranks
-                    // every content-only match (hence the negated offset).
-                    var score = titleIdx !== -1 ? 100 - titleIdx : -contentIdx;
+                    // every content-only match. The title bonus must stay
+                    // larger than any offset a title can reach, or a match
+                    // late in a long title scores below a content-only hit.
+                    var score = titleIdx !== -1 ? 1e9 - titleIdx : -contentIdx;
                     results.push({ item: item, score: score });
                   }
                 }
