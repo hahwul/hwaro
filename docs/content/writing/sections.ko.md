@@ -199,7 +199,7 @@ content/
 | section.redirect_to | String | 설정된 경우 리다이렉트 대상 |
 | section_list | String | `section.list`와 동일 |
 | pagination | String | 미리 렌더링된 페이지네이션 HTML |
-| paginator | Object | 구조화된 페이지네이션 객체 — [데이터 모델 › Paginator](/ko/templates/data-model/) 참고 |
+| paginator | Object | 구조화된 페이지네이션 객체 — [데이터 모델 › Paginator](/ko/templates/data-model/#paginator) 참고 |
 
 현재 섹션 URL은 `page.url`을 사용합니다.
 
@@ -211,7 +211,7 @@ content/
 </ul>
 ```
 
-`paginator`로 커스텀 페이지네이션 UI를 만드는 방법은 [데이터 모델 › Paginator](/ko/templates/data-model/)를 참고합니다.
+`paginator`로 커스텀 페이지네이션 UI를 만드는 방법은 [데이터 모델 › Paginator](/ko/templates/data-model/#paginator)를 참고합니다.
 
 ## 투명 섹션
 

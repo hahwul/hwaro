@@ -108,4 +108,4 @@ hwaro tool platform vercel --stdout
 ## 함께 보기
 
 - [GitHub Pages](/ko/deploy/github-pages/) | [GitLab CI](/ko/deploy/gitlab-ci/) | [Netlify](/ko/deploy/netlify/) | [Vercel](/ko/deploy/vercel/) | [Cloudflare Pages](/ko/deploy/cloudflare-pages/) | [Codeberg Pages](/ko/deploy/codeberg-pages/) — 플랫폼별 배포 가이드
-- [CLI](/ko/start/cli/) — 전체 tool 명령
+- [CLI](/ko/start/cli/#tool) — 전체 tool 명령

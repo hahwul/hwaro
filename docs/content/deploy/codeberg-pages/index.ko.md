@@ -195,7 +195,7 @@ static/
 └── .domains
 ```
 
-Hwaro는 콜드 빌드든 `--cache`/증분 빌드든 매번 `static/`의 숨김 dot 경로를 그대로 `public/`에 복사하므로, `static/.domains`는 항상 게시 브랜치에 포함됩니다. 자세한 내용은 [설정](/ko/start/config/) 문서의 정적 파일 항목을 참고합니다.
+Hwaro는 콜드 빌드든 `--cache`/증분 빌드든 매번 `static/`의 숨김 dot 경로를 그대로 `public/`에 복사하므로, `static/.domains`는 항상 게시 브랜치에 포함됩니다. 자세한 내용은 [설정](/ko/start/config/#정적-파일) 문서의 정적 파일 항목을 참고합니다.
 
 ### 2. DNS 설정
 

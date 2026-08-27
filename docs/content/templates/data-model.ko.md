@@ -209,7 +209,7 @@ john-doe:
 | 속성 | 타입 | 기본값 | 설명 |
 |----------|------|---------|-------------|
 | sort_by | String? | "date" | 정렬 기준: date(최신순), weight(낮은 값 우선), title(A→Z) |
-| reverse | Bool? | false | 기본 정렬 순서 뒤집기 — [콘텐츠 작성 › 섹션 › 정렬 방향](/ko/writing/sections/) 참고 |
+| reverse | Bool? | false | 기본 정렬 순서 뒤집기 — [콘텐츠 작성 › 섹션 › 정렬 방향](/ko/writing/sections/#정렬-방향) 참고 |
 | paginate | Int? | — | 한 페이지에 표시할 페이지 수 |
 | transparent | Bool | false | 페이지를 부모 섹션으로 전달 |
 | generate_feeds | Bool | false | RSS 피드 생성 |
@@ -609,7 +609,7 @@ pros = ["Fast", "Reliable"]
 
 ### Paginator
 
-섹션·택소노미 항목 템플릿에서 페이지네이션이 활성화된 경우([섹션 프론트 매터](/ko/writing/sections/)의 `paginate`, 택소노미는 `paginate_by`) 사용할 수 있습니다. 1페이지는 섹션 URL에, 이후 페이지는 `{url}/{paginate_path}/{n}/`에 생성됩니다.
+섹션·택소노미 항목 템플릿에서 페이지네이션이 활성화된 경우([섹션 프론트 매터](/ko/writing/sections/#프론트-매터)의 `paginate`, 택소노미는 `paginate_by`) 사용할 수 있습니다. 1페이지는 섹션 URL에, 이후 페이지는 `{url}/{paginate_path}/{n}/`에 생성됩니다.
 
 | 속성 | 타입 | 설명 |
 |----------|------|-------------|

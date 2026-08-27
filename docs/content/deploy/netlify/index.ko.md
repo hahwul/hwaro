@@ -89,5 +89,5 @@ Netlify는 풀 리퀘스트마다 배포 프리뷰를 자동 생성합니다. �
 ## 함께 보기
 
 - [platform](/ko/start/tools/platform/) — 플랫폼 설정 생성기 상세 옵션
-- [CLI](/ko/start/cli/) — tool 명령 전체
+- [CLI](/ko/start/cli/#tool) — tool 명령 전체
 - 다른 플랫폼: [Vercel](/ko/deploy/vercel/) | [Cloudflare Pages](/ko/deploy/cloudflare-pages/) | [GitHub Pages](/ko/deploy/github-pages/)

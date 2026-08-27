@@ -91,8 +91,8 @@ hooks.post = ["npm run minify"]
 ```toml
 [markdown]
 safe = false
-lazy_loading = true
-emoji = true
+lazy_loading = false
+emoji = false
 footnotes = true
 task_lists = true
 definition_lists = true
@@ -181,7 +181,7 @@ broken_internal = "error"
 |-----|------|---------|-------------|
 | broken_internal | string | "warn" | `"warn"`은 해석되지 않은 `@/` 링크를 하나씩 로그로 남기고 원본 마크업을 유지; `"error"`는 위반 전체를 하나의 목록으로 모아 빌드를 실패시킴 (종료 코드 5) |
 
-`@/` 링크 문법과 strict 모드의 `--cache` 주의 사항은 [페이지](/ko/writing/pages/)를 참고합니다.
+`@/` 링크 문법과 strict 모드의 `--cache` 주의 사항은 [페이지](/ko/writing/pages/#내부-링크)를 참고합니다.
 
 ## 택소노미
 
@@ -270,7 +270,7 @@ Cache-Control = "no-store"
 | fast | bool | false | `--fast`를 준 것처럼 서빙 (OG 이미지 생성과 이미지 처리 생략); 명시적 CLI skip 플래그는 그대로 적용 |
 | headers | table | {} | 모든 개발 서버 응답에 추가하는 커스텀 HTTP 응답 헤더; 키가 겹치면 CLI `--header` 값이 우선 |
 
-대응하는 CLI 플래그는 [CLI](/ko/start/cli/)의 serve 명령을 참고합니다.
+대응하는 CLI 플래그는 [CLI](/ko/start/cli/#serve)의 serve 명령을 참고합니다.
 
 ## 기능 설정 레퍼런스
 
@@ -289,8 +289,8 @@ Cache-Control = "no-store"
 | `[auto_includes]` | [자동 인클루드](/ko/features/auto-includes/) | CSS/JS 파일 자동 인클루드 |
 | `[assets]` | [에셋 파이프라인](/ko/features/asset-pipeline/) | CSS/JS 압축(minify) & 핑거프린팅 |
 | `[sass]` | [Sass/SCSS](/ko/features/sass/) | 내장 SCSS 컴파일 (순수 Crystal) |
-| `[image_processing]` | [이미지 처리](/ko/features/image-processing/) | 이미지 리사이즈 & LQIP |
-| `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/) | Base64 블러업 플레이스홀더 |
+| `[image_processing]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | 이미지 리사이즈 & LQIP |
+| `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | Base64 블러업 플레이스홀더 |
 | `[content.files]` | [콘텐츠 파일](/ko/features/content-files/) | 마크다운이 아닌 파일 게시 |
 | `[static]` | [정적 파일](#정적-파일) | `static/` 복사에서 잔여 파일 필터링 / 경로 제외 |
 | `[serve]` | [개발 서버](#개발-서버) | 개발 서버 응답 헤더 & 빠른 모드 |

@@ -122,7 +122,7 @@ url = "/ko/posts/"
 <a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
 ```
 
-루트 경로(`/`)는 `ancestor=true`여도 항상 정확히 일치할 때만 매칭됩니다 — 그렇지 않으면 홈 내비게이션 항목이 사이트의 모든 페이지에서 활성/펼침으로 보이게 됩니다. 외부 엔트리는 절대 매칭되지 않습니다(외부 URL에는 조상 관계를 따질 "현재 페이지"가 없음). [필터](/ko/templates/filters/)의 URL 필터 절을 참고합니다.
+루트 경로(`/`)는 `ancestor=true`여도 항상 정확히 일치할 때만 매칭됩니다 — 그렇지 않으면 홈 내비게이션 항목이 사이트의 모든 페이지에서 활성/펼침으로 보이게 됩니다. 외부 엔트리는 절대 매칭되지 않습니다(외부 URL에는 조상 관계를 따질 "현재 페이지"가 없음). [필터](/ko/templates/filters/#url-필터)의 URL 필터 절을 참고합니다.
 
 ## `href`와 `url`
 
@@ -152,8 +152,8 @@ url = "/ko/posts/"
 
 ## 함께 보기
 
-- [함수](/ko/templates/functions/) — `get_menu()` 레퍼런스
-- [필터](/ko/templates/filters/) — `active_path` 레퍼런스
-- [데이터 모델](/ko/templates/data-model/) — `site.menus`와 Entry 구조
-- [설정](/ko/start/config/) — `[[menus.*]]` 설정 레퍼런스
+- [함수](/ko/templates/functions/#get-menu) — `get_menu()` 레퍼런스
+- [필터](/ko/templates/filters/#url-필터) — `active_path` 레퍼런스
+- [데이터 모델](/ko/templates/data-model/#메뉴) — `site.menus`와 Entry 구조
+- [설정](/ko/start/config/#메뉴) — `[[menus.*]]` 설정 레퍼런스
 - [doctor](/ko/start/tools/doctor/) — `menu-parent-undefined` / `menu-undeclared` 검사기
