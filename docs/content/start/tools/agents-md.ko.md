@@ -56,5 +56,5 @@ hwaro init my-site --skip-agents-md # AGENTS.md 생성 생략
 
 ## 함께 보기
 
-- [CLI](/ko/start/cli/) — init 명령 옵션
-- [CLI](/ko/start/cli/) — 전체 tool 명령
+- [CLI](/ko/start/cli/#init) — init 명령 옵션
+- [CLI](/ko/start/cli/#tool) — 전체 tool 명령

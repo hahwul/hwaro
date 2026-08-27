@@ -79,5 +79,5 @@ Vercel은 프로덕션이 아닌 브랜치에 푸시할 때마다 프리뷰 배�
 ## 함께 보기
 
 - [platform](/ko/start/tools/platform/) — 플랫폼 설정 생성기 상세 옵션
-- [CLI](/ko/start/cli/) — tool 명령 전체
+- [CLI](/ko/start/cli/#tool) — tool 명령 전체
 - 다른 플랫폼: [Netlify](/ko/deploy/netlify/) | [Cloudflare Pages](/ko/deploy/cloudflare-pages/) | [GitHub Pages](/ko/deploy/github-pages/)

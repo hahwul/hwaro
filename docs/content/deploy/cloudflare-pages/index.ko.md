@@ -98,5 +98,5 @@ Cloudflare Pages는 브랜치에 푸시할 때마다 프리뷰 배포를 자동 
 ## 함께 보기
 
 - [platform](/ko/start/tools/platform/) — 플랫폼 설정 생성기 상세 옵션
-- [CLI](/ko/start/cli/) — tool 명령 전체
+- [CLI](/ko/start/cli/#tool) — tool 명령 전체
 - 다른 플랫폼: [Netlify](/ko/deploy/netlify/) | [Vercel](/ko/deploy/vercel/) | [GitHub Pages](/ko/deploy/github-pages/)

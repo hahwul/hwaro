@@ -21,7 +21,7 @@ hwaro build --minify
 
 보수적인 최적화만 수행합니다. HTML 주석과 줄 끝 공백을 제거하고 JSON/XML 공백을 줄이며, 코드 블록과 콘텐츠 구조는 모두 그대로 유지됩니다.
 
-`static/`의 모든 파일은 `public/`으로 복사되어 함께 배포됩니다. `.well-known/security.txt`, `.domains` 같은 숨김 dot 경로도 포함되며, 콜드 빌드와 `--cache`/증분 빌드에서 동일하게 동작합니다. `.DS_Store`, `.git/` 같은 OS·에디터·VCS 잔여 파일은 자동으로 걸러집니다. 조정 방법은 [설정](/ko/start/config/) 문서의 정적 파일 항목을 참고합니다.
+`static/`의 모든 파일은 `public/`으로 복사되어 함께 배포됩니다. `.well-known/security.txt`, `.domains` 같은 숨김 dot 경로도 포함되며, 콜드 빌드와 `--cache`/증분 빌드에서 동일하게 동작합니다. `.DS_Store`, `.git/` 같은 OS·에디터·VCS 잔여 파일은 자동으로 걸러집니다. 조정 방법은 [설정](/ko/start/config/#정적-파일) 문서의 정적 파일 항목을 참고합니다.
 
 ## 기본 절차
 

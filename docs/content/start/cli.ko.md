@@ -17,6 +17,8 @@ Hwaro는 사이트를 만들고, 빌드하고, 서빙하는 명령을 제공합�
 |----------------|-------------|
 | `-q`, `--quiet` | 정보성 출력과 시작 배너를 숨김. 경고와 오류는 stderr에 계속 표시 |
 | `NO_COLOR` (env) | 비어 있지 않은 값이면 모든 명령 출력에서 ANSI 색상 코드를 제거. [no-color.org](https://no-color.org)의 도구 공통 규약을 따름 |
+| `GC_MARKERS` (env) | GC 마커 스레드 수. `hwaro build`에 한해 Hwaro가 `1`을 기본값으로 지정합니다(할당이 많은 사이트에서 3~5배 빠르게 측정됨). 직접 export 하면 덮어쓸 수 있습니다. 다른 명령은 가비지 컬렉터의 기본 동작을 그대로 씁니다 |
+| `GC_INITIAL_HEAP_SIZE` (env) | GC 초기 힙 크기. `hwaro build`에 한해 Hwaro가 `256M`을 기본값으로 지정해 힙 확장-수집 사이클 반복을 피합니다. 직접 export 하면 덮어쓸 수 있습니다. `--memory-limit` / `HWARO_MEMORYLIMIT`가 설정되어 있으면 자동으로 건너뜁니다 |
 
 stdout이 TTY가 아니면(예: `cat`으로 파이프, 파일로 리디렉션, 대부분의
 CI 환경) 색상은 자동으로 꺼집니다. 어디서든 색상을 강제로 끄려면
@@ -369,7 +371,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --skip-image-processing | 이미지 리사이즈와 LQIP 생성 생략 |
 | --profile | 단계별·템플릿별 빌드 시간 출력 |
 
-> **대규모 사이트의 빠른 개발 서버:** `config.toml`에 `[og.auto_image] lazy_generate = true`를 설정하면 `hwaro serve` 중 일괄 OG 생성을 생략합니다. 이미지는 첫 요청 시 생성됩니다. 전체 설명과 `--fast-start`를 곁들인 권장 워크플로는 [자동 OG 이미지](/ko/features/og-images/) 문서를 참고합니다.
+> **대규모 사이트의 빠른 개발 서버:** `config.toml`에 `[og.auto_image] lazy_generate = true`를 설정하면 `hwaro serve` 중 일괄 OG 생성을 생략합니다. 이미지는 첫 요청 시 생성됩니다. 전체 설명과 `--fast-start`를 곁들인 권장 워크플로는 [개발 서버 속도 개선](/ko/features/og-images/#개발-서버-속도-개선) 절을 참고합니다.
 
 서버는 파일 변경을 감시해 자동으로 재빌드합니다. 무엇이 바뀌었는지에 따라 **스마트 재빌드 전략**을 사용합니다:
 

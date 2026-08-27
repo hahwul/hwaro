@@ -26,7 +26,7 @@ toc = true
 |------|------|-------------|
 | path | String | 소스 상대 경로(예: `about.md`) 또는 URL 경로(예: `/about/`) |
 
-**반환값:** Page? (못 찾으면 nil) — 표준 [Page 속성](/ko/templates/data-model/)을 노출하되, 렌더링 시점에 계산되는 필드(`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`)는 제외됩니다.
+**반환값:** Page? (못 찾으면 nil) — 표준 [Page 속성](/ko/templates/data-model/#page)을 노출하되, 렌더링 시점에 계산되는 필드(`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`)는 제외됩니다.
 
 **예시:**
 
@@ -521,5 +521,5 @@ data/
 ## 함께 보기
 
 - [데이터 모델](/ko/templates/data-model/) — Site, Section, Page 타입
-- [데이터 모델 › Paginator](/ko/templates/data-model/) — 섹션 템플릿의 페이지네이션 객체
+- [데이터 모델 › Paginator](/ko/templates/data-model/#paginator) — 섹션 템플릿의 페이지네이션 객체
 - [필터](/ko/templates/filters/) — 값 변환

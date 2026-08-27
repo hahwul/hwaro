@@ -51,6 +51,8 @@ hwaro build
 
 CLI `--memory-limit` 플래그가 항상 환경 변수보다 우선합니다.
 
+둘 중 하나라도 설정하면 `hwaro build`가 평소에 적용하는 GC 힙 사전 확보(`GC_INITIAL_HEAP_SIZE=256M`)도 함께 꺼집니다. 미리 확보한 힙은 그 하한 아래로 다시 줄어들지 않기 때문에, 지정한 메모리 한도와 반대로 작용하기 때문입니다.
+
 ### 플래그 조합
 
 `--stream`과 `--memory-limit`은 함께 쓸 수 있습니다. `--memory-limit`이 지정되면 `--stream` 여부와 관계없이 배치 크기는 이 값으로 결정됩니다.

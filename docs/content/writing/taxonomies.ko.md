@@ -94,7 +94,7 @@ tech = ["crystal", "security"]
 | `/tags/` | 전체 태그 목록 |
 | `/tags/crystal/` | "crystal" 태그가 붙은 페이지 |
 
-`paginate_by`를 설정하면 항목 페이지가 `/tags/crystal/page/2/`, `/tags/crystal/page/3/`, … 로 페이지네이션됩니다(1페이지는 `/tags/crystal/`에 그대로 있습니다). 페이저 객체는 [데이터 모델 › Paginator](/ko/templates/data-model/)에 설명되어 있습니다.
+`paginate_by`를 설정하면 항목 페이지가 `/tags/crystal/page/2/`, `/tags/crystal/page/3/`, … 로 페이지네이션됩니다(1페이지는 `/tags/crystal/`에 그대로 있습니다). 페이저 객체는 [데이터 모델 › Paginator](/ko/templates/data-model/#paginator)에 설명되어 있습니다.
 
 ## 템플릿
 

@@ -5,7 +5,7 @@ weight = 1
 toc = true
 +++
 
-페이지는 사이트의 HTML 페이지가 되는 마크다운 파일입니다. 이 문서는 **콘텐츠 작성 방법** — 프론트 매터 필드, 마크다운 문법, 파일 구성을 다룹니다. 이 필드를 템플릿에서 읽는 방법은 [데이터 모델](/ko/templates/data-model/)을 참고합니다.
+페이지는 사이트의 HTML 페이지가 되는 마크다운 파일입니다. 이 문서는 **콘텐츠 작성 방법** — 프론트 매터 필드, 마크다운 문법, 파일 구성을 다룹니다. 이 필드를 템플릿에서 읽는 방법은 [데이터 모델](/ko/templates/data-model/#page)을 참고합니다.
 
 ## 기본 구조
 
@@ -153,7 +153,7 @@ series_weight = 1
 First part of the series.
 ```
 
-`config.toml`에서 `[series]`를 켜면 빌드 시점에 `page.series_index`(1부터 시작하는 위치)와 `page.series_pages`(시리즈의 전체 페이지)가 계산됩니다. 둘 다 템플릿 전용 값이며 프론트 매터 필드가 아닙니다. [데이터 모델](/ko/templates/data-model/)을 참고합니다.
+`config.toml`에서 `[series]`를 켜면 빌드 시점에 `page.series_index`(1부터 시작하는 위치)와 `page.series_pages`(시리즈의 전체 페이지)가 계산됩니다. 둘 다 템플릿 전용 값이며 프론트 매터 필드가 아닙니다. [데이터 모델](/ko/templates/data-model/#계산-속성)을 참고합니다.
 
 ### 커스텀 템플릿
 

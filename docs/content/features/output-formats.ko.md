@@ -7,7 +7,7 @@ toc = true
 
 모든 페이지와 섹션이 항상 렌더링하는 HTML 페이지 외에, Hwaro는 나란히 놓이는 비HTML 파일도 추가로 렌더링할 수 있습니다 — 글의 JSON 표현, 섹션의 피드 형태 XML 목록, 일반 텍스트 내보내기 등. HTML 렌더링에는 영향이 없으며, 추가 포맷은 어디까지나 덧붙는 것입니다.
 
-사이트의 RSS/Atom 피드 마크업을 커스터마이즈하려는 거라면, 그건 출력 포맷이 아니라 [커스텀 피드 템플릿](/ko/features/seo/)(`templates/rss.xml.jinja`)입니다.
+사이트의 RSS/Atom 피드 마크업을 커스터마이즈하려는 거라면, 그건 출력 포맷이 아니라 [커스텀 피드 템플릿](/ko/features/seo/#커스텀-피드-템플릿)(`templates/rss.xml.jinja`)입니다.
 
 ## 설정
 
@@ -164,6 +164,6 @@ href는 `canonical`/`hreflang` 링크와 같은 방식으로 `base_url`을 거�
 ## 함께 보기
 
 - [설정](/ko/start/config/) — 전체 설정 레퍼런스
-- [섹션](/ko/writing/sections/) — `[cascade.extra]`와 캐스케이드 가능한 키
+- [섹션](/ko/writing/sections/#캐스케이드) — `[cascade.extra]`와 캐스케이드 가능한 키
 - [데이터 모델](/ko/templates/data-model/) — `page.extra`
 - [증분 빌드](/ko/features/incremental-build/) — `--cache` 의미론

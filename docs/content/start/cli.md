@@ -367,7 +367,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --skip-image-processing | Skip image resizing and LQIP generation |
 | --profile | Print phase-by-phase and per-template build timing |
 
-> **Fast dev server on large sites:** Set `[og.auto_image] lazy_generate = true` in `config.toml` to skip bulk OG generation during `hwaro serve`. Images are created on first request instead. See the [Performance in Development section](/features/og-images/#performance-in-development) for the full explanation and recommended workflow with `--fast-start`.
+> **Fast dev server on large sites:** Set `[og.auto_image] lazy_generate = true` in `config.toml` to skip bulk OG generation during `hwaro serve`. Images are created on first request instead. See the [Faster Dev Server section](/features/og-images/#faster-dev-server) for the full explanation and recommended workflow with `--fast-start`.
 
 The server watches for file changes and rebuilds automatically. It uses **smart rebuild strategies** based on what changed:
 

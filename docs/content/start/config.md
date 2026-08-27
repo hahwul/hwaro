@@ -91,8 +91,8 @@ See [Build Hooks](/features/build-hooks/) for error handling and use cases.
 ```toml
 [markdown]
 safe = false
-lazy_loading = true
-emoji = true
+lazy_loading = false
+emoji = false
 footnotes = true
 task_lists = true
 definition_lists = true
