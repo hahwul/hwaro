@@ -659,6 +659,16 @@ module Hwaro
         # term-page titles/RSS and split one term into two slug-disambiguated
         # term pages (slugification already trimmed; identity/display didn't).
         #
+        # …and then dropped when empty. An entry that is blank or all
+        # whitespace has no publishable identity: the taxonomy generator
+        # already skips it (no `/tags/<slug>/` page is ever written), so
+        # keeping it in `page.tags` only let templates render a term whose
+        # page does not exist — the stock scaffold's tag list emitted
+        # `<a class="tag" href="/tags/term-/"></a>`, an empty anchor pointing
+        # at a 404. `aliases` shares this helper and wants the same rule: a
+        # blank alias normalizes to `/`, which then loses a collision warning
+        # against the homepage instead of quietly doing nothing.
+        #
         # A bare scalar (`tags = "solo"`) is NOT silently coerced to a
         # one-element list — that would invent taxonomy term pages for sites
         # that build fine today — but it is no longer silent either: the key is
@@ -667,7 +677,7 @@ module Hwaro
           val = fm[key]?
           return [] of String unless val
           if arr = val.as_a?
-            return arr.compact_map(&.as_s?).map(&.strip)
+            return arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
           end
           Logger.warn "#{file_path}: `#{key}` must be a list of strings — ignored." unless file_path.empty? || val.raw.nil?
           [] of String
@@ -1190,13 +1200,15 @@ module Hwaro
 
           # Iterate all keys: TOML::Table yields {String, TOML::Any},
           # YAML::Any#as_h yields {YAML::Any, YAML::Any}. Unify via keys list.
-          # Terms are stripped for the same reason as `fm_string_array`:
-          # whitespace-padded terms must not become distinct taxonomy terms
-          # or leak padded strings into term-page titles and feeds.
+          # Terms are stripped and blank-dropped for the same reasons as
+          # `fm_string_array`: whitespace-padded terms must not become
+          # distinct taxonomy terms or leak padded strings into term-page
+          # titles and feeds, and a term that strips to "" never gets a
+          # written page, so exposing it renders a link to a 404.
           keys.each do |key|
             next if NON_TAXONOMY_ARRAY_KEYS.includes?(key)
             if arr = front_matter[key]?.try(&.as_a?)
-              values = arr.compact_map(&.as_s?).map(&.strip)
+              values = arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
               taxonomies[key] = values
             end
           end
@@ -1212,14 +1224,14 @@ module Hwaro
             when TOML::Any, JSON::Any
               table.as_h?.try &.each do |k, v|
                 if arr = v.as_a?
-                  taxonomies[k] = arr.compact_map(&.as_s?).map(&.strip)
+                  taxonomies[k] = arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
                 end
               end
             when YAML::Any
               table.as_h?.try &.each do |k, v|
                 next unless key_str = k.as_s?
                 if arr = v.as_a?
-                  taxonomies[key_str] = arr.compact_map(&.as_s?).map(&.strip)
+                  taxonomies[key_str] = arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
                 end
               end
             end

@@ -79,6 +79,33 @@ describe Hwaro::Content::Processors::Markdown do
       result[:taxonomies]["series"].should eq(["My Series"])
     end
 
+    it "drops blank tags and taxonomy terms" do
+      # A term that strips to "" never gets a written `/tags/<slug>/` page —
+      # the generator skips it — but it stayed on `page.tags`, so the stock
+      # scaffold's tag list rendered `<a class="tag" href="/tags/term-/"></a>`:
+      # an empty anchor pointing at a 404. (`term-` is `safe_slugify("")`.)
+      raw = <<-MD
+        +++
+        title = "Post"
+        tags = ["", "   ", "keep"]
+        authors = ["  ", "ada"]
+        aliases = ["", "/legacy/"]
+
+        [taxonomies]
+        series = ["\t", "My Series"]
+        +++
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:tags].should eq(["keep"])
+      result[:authors].should eq(["ada"])
+      result[:taxonomies]["series"].should eq(["My Series"])
+      # A blank alias normalizes to "/", which then lost a bogus collision
+      # warning against the homepage instead of quietly doing nothing.
+      result[:aliases].should eq(["/legacy/"])
+    end
+
     it "parses aliases array" do
       raw = <<-MD
         +++

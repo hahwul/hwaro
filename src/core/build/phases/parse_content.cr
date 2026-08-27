@@ -328,7 +328,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.render = data[:render]
     page.slug = data[:slug]
     page.custom_path = data[:custom_path]
-    page.aliases = data[:aliases]
+    page.aliases = site_relative_aliases(data[:aliases], page.path)
     page.tags = data[:tags]
     page.taxonomies = data[:taxonomies]
     page.menus = data[:menus]
@@ -609,15 +609,48 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.language || @config.try(&.default_language) || ""
   end
 
+  # An alias names an incoming path ON THIS SITE — the build writes a redirect
+  # stub at it — so anything carrying a URL scheme, or an authority
+  # (`//host/path`), is not something this build can publish.
+  #
+  # Both used to be treated as plain path text: `aliases = ["http://x.com/y"]`
+  # created the directory `public/http:/x.com/y/`, and `["//x.com/"]` created
+  # `public/x.com/`. Nonsense output on POSIX, and a hard build failure on
+  # Windows, where `:` is not a legal path character. Dropped here rather than
+  # at write time so `compute_output_url_winners` and `generate_aliases` see
+  # the same list — a value filtered in only one of them would still claim an
+  # output URL, or warn about colliding with a stub nothing ever writes.
+  ALIAS_SCHEME_RE = /\A[a-z][a-z0-9+.\-]*:/i
+
+  private def site_relative_aliases(aliases : Array(String), page_path : String) : Array(String)
+    return aliases unless aliases.any? { |a| external_alias?(a) }
+    aliases.reject do |a|
+      next false unless external_alias?(a)
+      Logger.warn "Skipping alias #{a.inspect} on #{page_path}: an alias is a path on this site, not an absolute or protocol-relative URL."
+      true
+    end
+  end
+
+  private def external_alias?(value : String) : Bool
+    # `.scrub` before the regex: PCRE2 runs in UTF mode and raises on an
+    # invalid-UTF-8 subject, which a latin-1 byte in a hand-edited front
+    # matter file would produce — one bad alias must not abort the build.
+    # No-op (returns `self`) for valid UTF-8, so nothing else changes.
+    trimmed = value.strip
+    trimmed.starts_with?("//") || ALIAS_SCHEME_RE.matches?(trimmed.scrub)
+  end
+
   # Cascade values arrive as ExtraValue; tags/taxonomies/authors need plain
   # string arrays. Non-string elements are skipped.
-  # Values are stripped to match `fm_string_array` — cascaded taxonomy
-  # terms must not become distinct whitespace-padded terms either.
+  # Values are stripped and blank-dropped to match `fm_string_array` —
+  # cascaded taxonomy terms must not become distinct whitespace-padded terms
+  # either, and a term that strips to "" gets no written page, so leaving it
+  # on the page renders a term link to a 404.
   private def cascade_string_array(value : Models::ExtraValue) : Array(String)?
     if value.is_a?(Array(String))
-      value.map(&.strip)
+      value.map(&.strip).reject(&.empty?)
     elsif value.is_a?(Array(Models::ExtraValue))
-      value.compact_map(&.as?(String)).map(&.strip)
+      value.compact_map(&.as?(String)).map(&.strip).reject(&.empty?)
     end
   end
 

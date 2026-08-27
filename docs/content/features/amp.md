@@ -42,6 +42,7 @@ The AMP converter automatically applies these transformations:
 | `<script>` (inline) | Removed |
 | `style="..."` attributes | Removed |
 | `onclick` handlers | Removed |
+| `loading="lazy"` attributes | Removed (AMP elements do their own lazy loading and reject the attribute) |
 
 Additionally injected:
 - AMP boilerplate CSS
