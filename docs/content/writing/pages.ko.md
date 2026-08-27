@@ -195,6 +195,11 @@ aliases = ["/old-url/", "/another-old-url/"]
 Redirects from old URLs to this page.
 ```
 
+각 alias는 **이 사이트 안의 경로**입니다 — 빌드가 해당 위치에 리다이렉트
+스텁을 씁니다. 절대 URL(`https://example.com/old/`)이나 프로토콜 상대
+URL(`//example.com/old/`)은 이 빌드가 게시할 수 있는 대상이 아니므로
+경고와 함께 건너뜁니다.
+
 ### 커스텀 메타데이터
 
 ```markdown

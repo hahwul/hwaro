@@ -129,6 +129,45 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("text")
     end
 
+    # Regression: `loading` is legal on <img>/<iframe> but is not an allowed
+    # attribute on amp-img/amp-iframe/amp-video, so it fails AMP validation as
+    # DISALLOWED_ATTR. hwaro emits it itself — `[markdown] lazy_loading`, the
+    # image pipeline, and the built-in youtube/vimeo/codepen/figure shortcodes
+    # all hard-code `loading="lazy"` — so it reached nearly every AMP page.
+    it "drops the loading attribute when converting to AMP elements" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = <<-HTML
+        <p><img loading="lazy" src="/a.png" alt="A"></p>
+        <iframe src="https://youtube.com/embed/x" width="560" height="315" loading="lazy"></iframe>
+        <video src="/v.mp4" loading=lazy></video>
+        HTML
+
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("<amp-img")
+      result.should contain("<amp-iframe")
+      result.should contain("<amp-video")
+      result.should_not contain("loading=")
+      # Only the disallowed attribute goes; the rest of the tag is intact.
+      result.should contain(%(src="/a.png"))
+      result.should contain(%(alt="A"))
+      result.should contain(%(width="560"))
+    end
+
+    # Scoped to the converted tag's attribute string, so `loading=` appearing
+    # inside <style amp-custom> or JSON-LD text is left alone.
+    it "does not strip loading= from stylesheet or ld+json text" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head><script type="application/ld+json">{"a":"x loading='lazy' y"}</script></head><body>t</body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("x loading='lazy' y")
+    end
+
     it "strips disallowed external stylesheets but keeps font-provider links" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"

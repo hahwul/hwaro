@@ -143,6 +143,101 @@ describe Hwaro::Assets::Pipeline do
       end
     end
 
+    # Regression: a bare "\n" between JS sources does not trigger automatic
+    # semicolon insertion when the next file opens with `(`. Two individually
+    # valid files concatenated into `1(function(){…})()` — a runtime
+    # TypeError, with exit 0 and nothing in the build log.
+    it "separates JS files with an explicit statement terminator" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+
+        File.write(File.join(static_dir, "a.js"), "const a = 1")
+        File.write(File.join(static_dir, "b.js"), "(function(){ window.x = 1 })()\n")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(
+          name: "app.js", files: ["a.js", "b.js"]
+        )
+
+        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+
+        content = File.read(File.join(output_dir, "assets", "app.js"))
+        content.should eq("const a = 1\n;\n(function(){ window.x = 1 })()\n")
+      end
+    end
+
+    # The `;` sits on its own line so a source ending in an unterminated
+    # `// line comment` cannot swallow it.
+    it "keeps the JS separator out of a trailing line comment" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+
+        File.write(File.join(static_dir, "a.js"), "const a = 1 // trailing")
+        File.write(File.join(static_dir, "b.js"), "[1].forEach(function(){})\n")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(
+          name: "app.js", files: ["a.js", "b.js"]
+        )
+
+        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+
+        content = File.read(File.join(output_dir, "assets", "app.js"))
+        content.lines[1].should eq(";")
+      end
+    end
+
+    # CSS keeps the bare newline: a stray top-level `;` is a parse error
+    # browsers only recover from.
+    it "does not add a semicolon between CSS sources" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+
+        File.write(File.join(static_dir, "a.css"), ".a{}")
+        File.write(File.join(static_dir, "b.css"), ".b{}")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(
+          name: "all.css", files: ["a.css", "b.css"]
+        )
+
+        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+
+        File.read(File.join(output_dir, "assets", "all.css")).should eq(".a{}\n.b{}")
+      end
+    end
+
+    # The separator is keyed off what was written, not the loop index: a
+    # skipped first entry used to leave the bundle starting with a separator.
+    it "does not emit a separator when the first source is missing" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+
+        File.write(File.join(static_dir, "b.js"), "var b = 1;")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(
+          name: "app.js", files: ["missing.js", "b.js"]
+        )
+
+        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+
+        File.read(File.join(output_dir, "assets", "app.js")).should eq("var b = 1;")
+      end
+    end
+
     it "handles single-file bundles" do
       Dir.mktmpdir do |dir|
         static_dir = File.join(dir, "static")

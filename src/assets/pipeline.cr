@@ -50,9 +50,11 @@ module Hwaro
       end
 
       private def process_bundle(bundle : Models::AssetBundleConfig, assets_output : String)
+        separator = bundle_separator(bundle.name)
         # Read and concatenate source files
         contents = String.build do |io|
-          bundle.files.each_with_index do |file, i|
+          wrote_any = false
+          bundle.files.each do |file|
             # Validate source path stays within source_dir
             source = File.join(@config.source_dir, file)
             source_real = File.expand_path(source)
@@ -73,7 +75,10 @@ module Hwaro
               Logger.warn "Asset pipeline: source outside source directory (symlink?): #{file}"
               next
             end
-            io << "\n" if i > 0
+            # Keyed off what was actually written, not the loop index: a
+            # skipped first entry (missing file, escaping symlink) used to
+            # leave the bundle starting with a stray separator.
+            io << separator if wrote_any
             content = File.read(source)
             # `.scss` bundle entries compile before concatenation when the
             # built-in Sass feature is on; verbatim otherwise.
@@ -81,6 +86,7 @@ module Hwaro
               content = SassCompiler.compile_source(content, source)
             end
             io << content
+            wrote_any = true
           end
         end
 
@@ -124,6 +130,24 @@ module Hwaro
         @manifest[bundle.name] = manifest_path
 
         Logger.debug "  Asset: #{bundle.name} → #{manifest_path} (#{contents.bytesize} bytes)"
+      end
+
+      # Separator placed between concatenated bundle sources.
+      #
+      # JavaScript needs an explicit statement terminator: a newline alone does
+      # NOT trigger automatic semicolon insertion when the next file opens with
+      # `(`, `[`, a backtick, `+`, `-` or `/`. Two individually valid files —
+      # `const a = 1` and `(function(){…})()` — then concatenate into
+      # `1(function(){…})()`, a runtime `TypeError` with nothing in the build
+      # log. The `;` sits on its own line so a source ending in an unterminated
+      # `// line comment` cannot swallow it (the minifier drops the blank
+      # framing lines, keeping the `;`). CSS keeps the bare newline: a stray
+      # top-level `;` is a parse error browsers only recover from.
+      private def bundle_separator(name : String) : String
+        case File.extname(name).downcase
+        when ".js", ".mjs" then "\n;\n"
+        else                    "\n"
+        end
       end
 
       private def minify(content : String, filename : String) : String

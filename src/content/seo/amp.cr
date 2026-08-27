@@ -166,6 +166,25 @@ module Hwaro
           end
         end
 
+        # Attributes that are legal on the HTML element but not on the AMP
+        # element it becomes, so they have to be dropped during conversion
+        # rather than carried through with the rest of the attribute string.
+        #
+        # `loading` is the one hwaro emits itself: the built-in youtube /
+        # vimeo / codepen / figure shortcodes hard-code `loading="lazy"`, the
+        # image pipeline adds it, and `[markdown] lazy_loading` adds it to
+        # every content image. None of `amp-img`, `amp-iframe` or `amp-video`
+        # accepts it — AMP does its own lazy loading — so every AMP page
+        # carrying an image or an embed failed validation on a DISALLOWED_ATTR
+        # the author never wrote. Scoped to the converted tag's attribute
+        # string (not a document-wide gsub) so a `loading=` appearing inside
+        # `<style amp-custom>` or JSON-LD text is untouched.
+        AMP_DISALLOWED_ATTR_RE = /\s+loading\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i
+
+        private def self.strip_non_amp_attributes(attrs : String) : String
+          attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")
+        end
+
         # Convert standard HTML to AMP-compliant HTML
         def self.convert_to_amp(html : String, page : Models::Page, config : Models::Config) : String
           result = html
@@ -216,7 +235,7 @@ module Hwaro
             # `[^>]*` greedily swallows the self-closing slash from `<img … />`,
             # which would otherwise be appended mid-tag as
             # `<amp-img … / layout="…">` — invalid AMP. Strip a trailing slash.
-            attrs = $1.sub(/\s*\/\s*$/, "")
+            attrs = strip_non_amp_attributes($1.sub(/\s*\/\s*$/, ""))
             has_width = attrs.includes?("width=")
             has_height = attrs.includes?("height=")
 
@@ -242,7 +261,7 @@ module Hwaro
           needs_amp_video = false
           result = result.gsub(/<video([^>]*)>(.*?)<\/video>/mi) do
             needs_amp_video = true
-            %(<amp-video#{$1} layout="responsive">#{$2}</amp-video>)
+            %(<amp-video#{strip_non_amp_attributes($1)} layout="responsive">#{$2}</amp-video>)
           end
 
           # Convert <iframe> to <amp-iframe>
@@ -251,7 +270,7 @@ module Hwaro
             needs_amp_iframe = true
             # Capture both groups before any inner match: `$~` is per-scope,
             # so the src lookup below would otherwise clobber `$2`.
-            attrs = $1
+            attrs = strip_non_amp_attributes($1)
             inner = $2
             unless attrs.includes?("layout=")
               attrs += %( layout="responsive")

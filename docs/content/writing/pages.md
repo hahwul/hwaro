@@ -195,6 +195,10 @@ aliases = ["/old-url/", "/another-old-url/"]
 Redirects from old URLs to this page.
 ```
 
+Each alias is a path **on this site** — the build writes a redirect stub at it.
+An absolute (`https://example.com/old/`) or protocol-relative (`//example.com/old/`)
+value is not something this build can publish, so it is skipped with a warning.
+
 ### Custom Metadata
 
 ```markdown
