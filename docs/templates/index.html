@@ -81,9 +81,6 @@
                         </button>
                     </div>
                 </div>
-                <a href="#speed" class="hero-scroll-cue" aria-label="{{ "landing.speed_title" | t }}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                </a>
             </section>
 
             <!-- ============================================================
@@ -106,8 +103,11 @@
                     </div>
 
                     <div class="speed-stage">
+                        <!-- The markup carries the finished figure so a no-JS
+                             page shows 0.44 beside its already-full bar; the
+                             replay script rewinds it before animating. -->
                         <p class="speed-figure" aria-hidden="true">
-                            <span class="speed-number">0.00</span><span class="speed-unit">s</span>
+                            <span class="speed-number">0.44</span><span class="speed-unit">s</span>
                         </p>
                         <div
                             class="speed-track"
@@ -186,6 +186,10 @@
                             <p>
                                 {{ "landing.templates_desc" | t }}
                             </p>
+                            {% raw %}<pre aria-hidden="true"><code class="hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">extends</span> <span class="hljs-string">"base.html"</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">block</span> <span class="hljs-title">content</span> <span class="hljs-meta">%}</span>
+  <span class="hljs-template-variable">{{ page.content | safe }}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endblock</span> <span class="hljs-meta">%}</span></code></pre>{% endraw %}
                         </article>
                         <article class="bento-cell cell-taxonomies">
                             <h3>taxonomies</h3>
@@ -215,7 +219,7 @@
                         </p>
                     </div>
                 </div>
-                <div class="scaffold-rail" tabindex="0">
+                <div class="scaffold-rail" tabindex="0" role="region" aria-label="{{ "landing.scaffolds_aria" | t }}">
                     {% set scaffolds = [
                         ["docs", "landing.scaffold_docs" | t],
                         ["blog", "landing.scaffold_blog" | t],
@@ -348,7 +352,7 @@
                             <button type="button" role="tab" aria-selected="false" data-command="nix profile install github:hahwul/hwaro">Nix</button>
                         </div>
                         <div class="install-cmd">
-                            <code id="install-command">brew install hahwul/hwaro/hwaro</code>
+                            <code id="install-command" aria-live="polite">brew install hahwul/hwaro/hwaro</code>
                             <button type="button" class="install-copy" id="install-copy" aria-label="{{ "landing.copy_command" | t }}">
                                 <svg class="copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                 <svg class="check-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5 11-11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -592,16 +596,41 @@
             var cmdEl = document.getElementById('install-command');
             var copyBtn = document.getElementById('install-copy');
 
+            function selectTab(tab) {
+                for (var j = 0; j < tabs.length; j++) {
+                    tabs[j].setAttribute('aria-selected', 'false');
+                    tabs[j].tabIndex = -1;
+                }
+                tab.setAttribute('aria-selected', 'true');
+                tab.tabIndex = 0;
+                cmdEl.textContent = tab.getAttribute('data-command');
+                cmdEl.classList.remove('is-swapping');
+                void cmdEl.offsetWidth; /* restart the dissolve */
+                cmdEl.classList.add('is-swapping');
+            }
+
             for (var i = 0; i < tabs.length; i++) {
+                // Roving tabindex: one stop for the group, arrows move within.
+                tabs[i].tabIndex = tabs[i].getAttribute('aria-selected') === 'true' ? 0 : -1;
                 tabs[i].addEventListener('click', function() {
-                    for (var j = 0; j < tabs.length; j++) {
-                        tabs[j].setAttribute('aria-selected', 'false');
+                    selectTab(this);
+                });
+                tabs[i].addEventListener('keydown', function(e) {
+                    var idx = Array.prototype.indexOf.call(tabs, this);
+                    var next = -1;
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                        next = (idx + 1) % tabs.length;
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                        next = (idx - 1 + tabs.length) % tabs.length;
+                    } else if (e.key === 'Home') {
+                        next = 0;
+                    } else if (e.key === 'End') {
+                        next = tabs.length - 1;
                     }
-                    this.setAttribute('aria-selected', 'true');
-                    cmdEl.textContent = this.getAttribute('data-command');
-                    cmdEl.classList.remove('is-swapping');
-                    void cmdEl.offsetWidth; /* restart the dissolve */
-                    cmdEl.classList.add('is-swapping');
+                    if (next < 0) return;
+                    e.preventDefault();
+                    selectTab(tabs[next]);
+                    tabs[next].focus();
                 });
             }
 

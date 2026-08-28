@@ -68,6 +68,7 @@ templates_desc = "Jinja2 templating with inheritance, filters, functions, and sh
 taxonomies_desc = "Tags, categories, and custom taxonomies with automatic index pages and pagination."
 extensible_desc = "Build hooks, asset pipeline, image processing, multilingual support, PWA, and AMP. All in one binary."
 scaffolds_title = "Start from a scaffold"
+scaffolds_aria = "Scaffold previews"
 scaffolds_sub = "Five complete starting points, one shared token system that adapts to light and dark on its own."
 scaffold_docs = "documentation with sidebar and search"
 scaffold_blog = "posts, tags, and feeds"
