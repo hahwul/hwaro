@@ -1043,13 +1043,13 @@ module Hwaro
             #
             # Exactly one result per dequeued URL — the same send-guarantee the
             # build's pools carry (see Core::Build::Parallel#process_parallel).
-            # The collector below blocks on `urls.size` receives, so a worker
-            # that died mid-URL would hang `hwaro tool check-links` forever
-            # with no output and no timeout; and an exception escaping a
-            # `spawn` body kills the PROCESS, since the CLI's top-level rescue
-            # only wraps the main fiber. `check_external_url` rescues its own
-            # network errors today — this makes surviving a raise a property of
-            # the pool rather than of one callee.
+            # A raise here does not kill the process (Crystal's `Fiber#run`
+            # prints `Unhandled exception in spawn` and carries on); it kills
+            # this WORKER, which is worse: the collector below blocks on
+            # `urls.size` receives with no timeout, so one lost result hangs
+            # `hwaro tool check-links` forever. `check_external_url` rescues
+            # its own network errors today — this makes surviving a raise a
+            # property of the pool rather than of one callee.
             max_concurrency.times do
               spawn do
                 while url = work_channel.receive?

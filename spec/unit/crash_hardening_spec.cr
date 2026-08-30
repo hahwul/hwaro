@@ -6,13 +6,18 @@ require "../../src/hwaro"
 # OverflowError surfacing as `Error: <stdlib message>` — no code, no file, no
 # hint) now produce a classified error or a defined fallback.
 
+# `File.tempfile`'s block form closes the file but does NOT delete it, and the
+# deep-dotted-key examples below write multi-megabyte configs — so clean up
+# explicitly rather than leaving a pile of them in the system temp dir.
 private def load_config(toml : String) : Hwaro::Models::Config
-  File.tempfile("hwaro-nul-config", ".toml") do |file|
-    file.print(toml)
-    file.flush
-    return Hwaro::Models::Config.load(file.path)
+  file = File.tempfile("hwaro-nul-config", ".toml")
+  begin
+    File.write(file.path, toml)
+    Hwaro::Models::Config.load(file.path)
+  ensure
+    file.close
+    File.delete?(file.path)
   end
-  raise "unreachable"
 end
 
 # As written in a config file: a well-formed TOML escape that decodes to a NUL.
@@ -81,6 +86,29 @@ describe "crash hardening" do
       err = expect_raises(Hwaro::HwaroError) { load_config(%([#{deep}]\nx = "#{TOML_NUL}"\n)) }
       err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
       (err.message || "").should contain("NUL")
+    end
+
+    # A quoted TOML key carries the escape exactly as a value does, and both
+    # `[languages.<code>]` and `[menus.<name>]` keys are joined into output
+    # paths downstream.
+    it "rejects a NUL in a quoted table key" do
+      err = expect_raises(Hwaro::HwaroError) do
+        load_config(%([languages."e#{TOML_NUL}n"]\nlanguage_name = "En"\n))
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+      (err.message || "").should contain("NUL")
+    end
+
+    it "rejects a NUL in a top-level key" do
+      err = expect_raises(Hwaro::HwaroError) { load_config(%("a#{TOML_NUL}b" = 1\n)) }
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
+
+    it "rejects a NUL in an inline-table key" do
+      err = expect_raises(Hwaro::HwaroError) do
+        load_config(%([markdown]\nx = { "k#{TOML_NUL}y" = 1 }\n))
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
     end
 
     it "leaves NUL-free configs untouched" do
