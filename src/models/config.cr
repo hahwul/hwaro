@@ -1476,7 +1476,7 @@ module Hwaro
 
       # Reject a NUL byte anywhere in a config STRING value, naming the key.
       #
-      # A NUL survives TOML parsing (`"a\\u0000b"` is a well-formed escape) but
+      # A NUL survives TOML parsing (the `\u0000` escape is well-formed) but
       # every filesystem call built from that string raises a bare
       # `ArgumentError: String contains null byte` from deep inside stdlib —
       # `Path.new`'s `check_no_null_byte`. That reached the CLI as the
@@ -1489,27 +1489,43 @@ module Hwaro
       #
       # No config string can legitimately contain a NUL, so this rejects them
       # once, at the boundary, for every current and future key.
-      private def self.reject_null_bytes!(value : TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any), path : String, key : String = "")
-        case value
-        when Hash(String, TOML::Any)
-          value.each { |k, v| reject_null_bytes!(v, path, key.empty? ? k : "#{key}.#{k}") }
-        when Array(TOML::Any)
-          value.each_with_index { |v, i| reject_null_bytes!(v, path, "#{key}[#{i}]") }
-        when TOML::Any
-          raw = value.raw
-          case raw
-          when String
-            if raw.includes?(Char::ZERO)
+      #
+      # ITERATIVE, not recursive: `[a.b.c…]` builds one nested table per dotted
+      # segment and bypasses the `parse_value` nesting cap in
+      # ext/toml_nesting_limit_fix.cr (that cap counts array/inline-table
+      # values, which a table HEADER never enters). A 50k-segment header is
+      # accepted by the parser, so a recursive walk over the result overflowed
+      # the stack — an unrescuable crash on a config the loaders themselves
+      # never descend into.
+      private def self.reject_null_bytes!(root : Hash(String, TOML::Any), path : String) : Nil
+        pending = [] of {TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any), String}
+        root.each { |k, v| pending << {v.as(TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any)), k} }
+
+        while entry = pending.pop?
+          node, key = entry
+          case node
+          when Hash(String, TOML::Any)
+            node.each { |k, v| pending << {v.as(TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any)), "#{key}.#{k}"} }
+          when Array(TOML::Any)
+            node.each_with_index { |v, i| pending << {v.as(TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any)), "#{key}[#{i}]"} }
+          when TOML::Any
+            raw = node.raw
+            case raw
+            when String
+              next unless raw.includes?(Char::ZERO)
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_CONFIG,
-                message: "#{key.empty? ? "A value" : key} in #{path} contains a NUL byte (\\u0000).",
+                # The key is capped: a `[a.b.c…]` header can be arbitrarily
+                # long, and an unreadable wall of segments is a worse
+                # diagnostic than a truncated one.
+                message: "#{Utils::TextUtils.truncate_error(key, 200)} in #{path} contains a NUL byte (\\u0000).",
                 hint: "Remove the \\u0000 escape from the value; NUL is not valid in a path, filename, URL, or title.",
               )
+            when Hash(String, TOML::Any)
+              pending << {raw, key}
+            when Array(TOML::Any)
+              pending << {raw, key}
             end
-          when Hash(String, TOML::Any)
-            reject_null_bytes!(raw, path, key)
-          when Array(TOML::Any)
-            reject_null_bytes!(raw, path, key)
           end
         end
       end

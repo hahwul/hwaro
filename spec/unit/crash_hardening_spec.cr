@@ -65,6 +65,24 @@ describe "crash hardening" do
       (err.message || "").should contain("title")
     end
 
+    # `[a.b.c…]` builds one nested table per dotted segment and never enters
+    # `parse_value`, so ext/toml_nesting_limit_fix.cr's cap does not apply: the
+    # parser accepts a 50k-segment header. A RECURSIVE scan of the result
+    # overflowed the stack — unrescuable, and on a config the section loaders
+    # never descend into. The scan is iterative for exactly this reason.
+    it "scans a pathologically deep dotted-key table without overflowing" do
+      deep = Array.new(20_000) { |i| "k#{i}" }.join('.')
+      config = load_config("[#{deep}]\nx = 1\n")
+      config.title.should_not be_nil
+    end
+
+    it "still finds a NUL buried in a pathologically deep table" do
+      deep = Array.new(20_000) { |i| "k#{i}" }.join('.')
+      err = expect_raises(Hwaro::HwaroError) { load_config(%([#{deep}]\nx = "#{TOML_NUL}"\n)) }
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+      (err.message || "").should contain("NUL")
+    end
+
     it "leaves NUL-free configs untouched" do
       config = load_config(%(title = "ok"\n[sitemap]\nenabled = true\nfilename = "sitemap.xml"\n))
       config.title.should eq("ok")
