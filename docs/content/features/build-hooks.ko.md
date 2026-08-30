@@ -87,11 +87,14 @@ Step 3
 
 ## serve 모드
 
-빌드 훅은 `hwaro serve` 중에도 실행됩니다.
+빌드 훅은 `hwaro serve` 중에도 실행되지만, **전체 재빌드**에서만 실행됩니다.
 
 - 서버 시작 시 **최초 빌드**에서 훅이 실행됩니다
-- 파일 변경으로 트리거되는 **재빌드마다 다시 실행**됩니다
+- **전체 재빌드**에서 다시 실행됩니다 — `config.toml` 변경, 파일 추가나 삭제, `data/` 아래 파일 변경이 여기에 해당합니다
+- **부분 재빌드에서는 건너뜁니다** — 기존 콘텐츠나 템플릿 파일을 수정하면 영향받는 페이지만 다시 렌더링하고 훅 명령은 다시 실행하지 않습니다
 - 설정 변경은 자동으로 반영됩니다 — `config.toml`의 `hooks.pre`나 `hooks.post`를 수정하면 다음 재빌드부터 새 명령이 적용됩니다
+
+덕분에 저장 후 새로고침이 빠르게 유지됩니다. 서버가 켜져 있는 동안 훅의 결과물을 갱신해야 한다면 `config.toml`을 건드리거나 `hwaro serve`를 재시작해 전체 재빌드를 유도하세요.
 
 ## 활용 사례
 
@@ -110,6 +113,30 @@ hooks.pre = [
   "npx tailwindcss -i src/styles.css -o static/assets/css/styles.css --minify"
 ]
 ```
+
+### API에서 데이터 가져오기
+
+`load_data()`는 디스크만 읽습니다. 따라서 원격 데이터는 빌드 전에 `data/`로 내려받아 정적으로 굽습니다. `data/` 아래 파일은 그대로 `site.data`로 노출됩니다.
+
+```toml
+[build]
+hooks.pre = ["curl -sfL https://api.example.com/team -o data/team.json"]
+```
+
+```jinja
+{% for member in site.data.team %}
+  <li>{{ member.name }}</li>
+{% endfor %}
+```
+
+`curl -f`는 HTTP 오류에서 0이 아닌 코드로 종료하므로, 데이터가 빠진 사이트를 배포하는 대신 빌드가 중단됩니다. 페이지네이션, 인증 헤더, 응답 가공처럼 요청 하나로 끝나지 않는 작업은 스크립트로 분리해 호출하세요.
+
+```toml
+[build]
+hooks.pre = ["./scripts/fetch-data.sh"]
+```
+
+오프라인에서도 동일한 빌드를 원한다면 내려받은 파일을 커밋하고, 항상 최신 데이터를 원한다면 `.gitignore`에 추가하세요.
 
 ### Pagefind 검색
 
@@ -163,7 +190,7 @@ hooks.post = [
 
 ## 팁
 
-- **훅은 빠르게 유지**: 느린 훅은 `hwaro serve` 중 재빌드할 때마다 실행됩니다. 캐싱이나 조건부 실행을 고려합니다.
+- **훅은 빠르게 유지**: 느린 훅은 `hwaro serve` 중 전체 재빌드마다 실행됩니다. 캐싱이나 조건부 실행을 고려합니다.
 - **복잡한 작업은 스크립트로**: 여러 단계가 필요하면 셸 스크립트를 작성해 훅에서 호출합니다: `hooks.pre = ["./scripts/setup.sh"]`
 - **의존성 확인**: 도구를 실행하기 전에 `command -v`로 사용 가능 여부를 확인합니다:
   ```bash

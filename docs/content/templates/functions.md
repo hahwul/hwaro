@@ -226,6 +226,8 @@ Load external data files (JSON, TOML, YAML, CSV):
 
 **Returns:** Parsed data or nil
 
+`load_data()` reads from the local filesystem only, and paths are resolved inside the project directory — it cannot read a file outside the project, and it cannot fetch a URL. To bake remote data into the site, fetch it into `data/` with a [pre-build hook](/features/build-hooks/); everything under `data/` is exposed as `site.data` without a `load_data()` call at all.
+
 **Supported Formats:**
 
 | Extension | Format |
