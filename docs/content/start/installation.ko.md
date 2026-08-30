@@ -70,6 +70,27 @@ nix run github:hahwul/hwaro -- --version
 nix develop github:hahwul/hwaro
 ```
 
+개발 셸에는 Crystal, `shards`, `just`, `crystal2nix`가 함께 들어 있어 다른 것을
+설치하지 않아도 `just build`와 `just test`를 바로 실행할 수 있습니다.
+
+### 플레이크 입력으로 사용하기
+
+```nix
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.hwaro.url = "github:hahwul/hwaro";
+
+  outputs = { nixpkgs, hwaro, ... }: {
+    # `hwaro.packages.<system>.hwaro`를 쓰거나, `hwaro.overlays.default`를
+    # nixpkgs 오버레이에 추가한 뒤 `pkgs.hwaro`로 사용하세요.
+  };
+}
+```
+
+지원 시스템은 `x86_64-linux`, `aarch64-linux`, `aarch64-darwin`입니다
+(nixpkgs-unstable가 Intel macOS 지원을 중단했습니다). 플레이크가 공식 Crystal
+툴체인을 고정해 두므로 컴파일러를 소스에서 빌드할 필요가 없습니다.
+
 ## 사전 빌드 바이너리
 
 macOS와 Linux용 사전 빌드 바이너리를 [GitHub Releases](https://github.com/hahwul/hwaro/releases) 페이지에서 받을 수 있습니다.

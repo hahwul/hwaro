@@ -15,6 +15,12 @@ on:
       - docker/entrypoint.sh
       - action.yml
       - "**/*.cr"
+      # The Nix packaging silently rotted for several releases because nothing
+      # built it; build-nix exists to catch that, so it has to run when these
+      # change too.
+      - flake.nix
+      - flake.lock
+      - shards.nix
   push:
     branches: [main]
   workflow_dispatch:
@@ -135,6 +141,43 @@ jobs:
         run: shards build
       - name: Run tests
         run: crystal spec
+  build-nix:
+    # One runner per system flake.nix declares: a bad tarball hash or a
+    # platform-specific link failure must not reach a user's `nix profile
+    # install` just because CI only ever built x86_64-linux.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - system: aarch64-darwin
+            runner: macos-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v31
+      # Builds the package and runs its `hwaro --help` install check. shards.nix
+      # is consumed offline inside the sandbox, so a dependency missing from it
+      # fails here rather than in a user's `nix profile install`.
+      - name: Build flake package
+        run: nix build --print-build-logs .#packages.${{ matrix.system }}.hwaro
+      - name: Smoke test
+        run: ./result/bin/hwaro --version
+      - name: Check flake outputs
+        run: nix flake check --print-build-logs
+      # A stale shards.nix still builds -- it just builds against the wrong
+      # dependency revisions -- so drift from shard.lock has to be checked
+      # explicitly. `nix develop -c` runs the crystal2nix pinned by flake.lock,
+      # the same one `just nix-update` uses, so this gate cannot fail on a
+      # crystal2nix version the author never ran.
+      - name: shards.nix matches shard.lock
+        if: matrix.system == 'x86_64-linux'
+        run: |
+          nix develop --command crystal2nix
+          git diff --exit-code -- shards.nix
   build-snapcraft:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

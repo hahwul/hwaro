@@ -70,6 +70,27 @@ nix run github:hahwul/hwaro -- --version
 nix develop github:hahwul/hwaro
 ```
 
+The dev shell brings its own Crystal, `shards`, `just`, and `crystal2nix`, so
+`just build` and `just test` work with nothing else installed.
+
+### As a flake input
+
+```nix
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.hwaro.url = "github:hahwul/hwaro";
+
+  outputs = { nixpkgs, hwaro, ... }: {
+    # `hwaro.packages.<system>.hwaro`, or add `hwaro.overlays.default` to your
+    # nixpkgs overlays and use `pkgs.hwaro`.
+  };
+}
+```
+
+Supported systems are `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`
+(nixpkgs-unstable no longer supports Intel macOS). The flake pins the official
+Crystal toolchain, so no compiler has to be built from source.
+
 ## Pre-built Binary
 
 Pre-built binaries for macOS and Linux are available on the [GitHub Releases](https://github.com/hahwul/hwaro/releases) page.

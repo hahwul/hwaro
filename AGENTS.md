@@ -16,6 +16,8 @@ Run the suite as a **single** `crystal spec` process. `crystal spec` links every
 
 Dependencies (shard.yml): `markd` (Markdown), `toml` (TOML parsing), `crinja` (Jinja2 templates), `emoji`.
 
+Anything that changes `shard.lock` must be followed by `just nix-update` — the Nix build resolves dependencies offline from `shards.nix`, so a stale one silently compiles against the wrong revisions. CI's `build-nix` job checks both. `flake.nix` reads the version and the minimum Crystal straight out of `shard.yml`, so release bumps never touch it.
+
 Hwaro requires Crystal >= 1.21 and gets its parallelism from Crystal's **execution contexts**: `src/main.cr` resizes the default `Fiber::ExecutionContext::Parallel` to `default_workers_count` (which honours `CRYSTAL_WORKERS`, defaulting to the CPU count). Do NOT reintroduce `-Dpreview_mt` — Crystal 1.21 deprecated it, and its legacy MT scheduler can spin forever at process exit (all `CRYSTAL-MT-*` threads stuck in `Crystal::SpinLock#lock` inside the event loop), so `hwaro build` never returns. Every `spawn` lands in the default context, so the build still runs fibers across cores: new code that mutates shared state from worker fibers must guard with a `Mutex` or use the existing `@crinja_cache_mutex`; new directory creation must go through `Hwaro::Utils::FileSafe.mkdir_p` rather than `FileUtils.mkdir_p` (the latter has a check-then-create race that fires under parallelism).
 
 ## Directory Structure
