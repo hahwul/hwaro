@@ -1396,6 +1396,7 @@ module Hwaro
         end
 
         warn_unknown_top_level_keys(config.raw, config_path)
+        reject_null_bytes!(config.raw, config_path)
 
         config.title = config.raw["title"]?.try(&.as_s?) || config.title
         config.description = config.raw["description"]?.try(&.as_s?) || config.description
@@ -1470,6 +1471,46 @@ module Hwaro
           next if KNOWN_TOP_LEVEL_KEYS.includes?(key)
           hint = Utils::CommandSuggester.suggest(key, KNOWN_TOP_LEVEL_KEYS).try { |s| " Did you mean '#{s}'?" } || ""
           Logger.warn "Unknown key '#{key}' in #{config_path} — hwaro does not read it.#{hint}"
+        end
+      end
+
+      # Reject a NUL byte anywhere in a config STRING value, naming the key.
+      #
+      # A NUL survives TOML parsing (`"a\\u0000b"` is a well-formed escape) but
+      # every filesystem call built from that string raises a bare
+      # `ArgumentError: String contains null byte` from deep inside stdlib —
+      # `Path.new`'s `check_no_null_byte`. That reached the CLI as the
+      # unclassified `Error: String contains null byte`, with no file, no key
+      # and no hint, from at least seven keys (`[build] output_dir`, the five
+      # `filename`/`full_filename` output keys, `[og.auto_image] output_dir`).
+      # Individual guards could not catch it: `validate_output_filename!` was
+      # itself defeated because its `File.basename(value)` operand raised
+      # before the NUL check it guarded could run.
+      #
+      # No config string can legitimately contain a NUL, so this rejects them
+      # once, at the boundary, for every current and future key.
+      private def self.reject_null_bytes!(value : TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any), path : String, key : String = "")
+        case value
+        when Hash(String, TOML::Any)
+          value.each { |k, v| reject_null_bytes!(v, path, key.empty? ? k : "#{key}.#{k}") }
+        when Array(TOML::Any)
+          value.each_with_index { |v, i| reject_null_bytes!(v, path, "#{key}[#{i}]") }
+        when TOML::Any
+          raw = value.raw
+          case raw
+          when String
+            if raw.includes?(Char::ZERO)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONFIG,
+                message: "#{key.empty? ? "A value" : key} in #{path} contains a NUL byte (\\u0000).",
+                hint: "Remove the \\u0000 escape from the value; NUL is not valid in a path, filename, URL, or title.",
+              )
+            end
+          when Hash(String, TOML::Any)
+            reject_null_bytes!(raw, path, key)
+          when Array(TOML::Any)
+            reject_null_bytes!(raw, path, key)
+          end
         end
       end
 
@@ -1593,7 +1634,11 @@ module Hwaro
         return if allow_empty && value.empty?
         # A NUL byte survives both TOML and File.basename, and then raises a
         # bare `ArgumentError: String contains null byte` out of the writer.
-        return unless NON_FILE_BASENAMES.includes?(File.basename(value)) || value.includes?(Char::ZERO)
+        # NUL FIRST: `File.basename` builds a `Path`, whose `check_no_null_byte`
+        # raises a bare ArgumentError before the `||` could ever reach the NUL
+        # test on its right. Ordering the cheap, non-raising check first is
+        # what makes this guard able to report the case it was written for.
+        return unless value.includes?(Char::ZERO) || NON_FILE_BASENAMES.includes?(File.basename(value))
 
         raise Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_CONFIG,

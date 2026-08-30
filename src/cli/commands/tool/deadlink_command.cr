@@ -1039,11 +1039,27 @@ module Hwaro
             results_channel = Channel({String, Int32, String?}).new(urls.size)
             work_channel = Channel(String?).new(max_concurrency)
 
-            # Spawn bounded worker pool
+            # Spawn bounded worker pool.
+            #
+            # Exactly one result per dequeued URL — the same send-guarantee the
+            # build's pools carry (see Core::Build::Parallel#process_parallel).
+            # The collector below blocks on `urls.size` receives, so a worker
+            # that died mid-URL would hang `hwaro tool check-links` forever
+            # with no output and no timeout; and an exception escaping a
+            # `spawn` body kills the PROCESS, since the CLI's top-level rescue
+            # only wraps the main fiber. `check_external_url` rescues its own
+            # network errors today — this makes surviving a raise a property of
+            # the pool rather than of one callee.
             max_concurrency.times do
               spawn do
                 while url = work_channel.receive?
-                  status, error_message = check_external_url(url, timeout_seconds)
+                  status, error_message = begin
+                    check_external_url(url, timeout_seconds)
+                  rescue ex
+                    # Pure construction — nothing here can raise — so the send
+                    # below always runs, exactly once per dequeued URL.
+                    {-1, ex.message || ex.class.name}
+                  end
                   results_channel.send({url, status, error_message})
                 end
               end

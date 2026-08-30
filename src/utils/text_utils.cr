@@ -27,6 +27,11 @@ module Hwaro
       # codepoint in the terminal). Returns the message untouched when it fits,
       # which is every ordinary error.
       def truncate_error(message : String, max : Int32 = MAX_ERROR_CHARS) : String
+        # A negative budget is nonsense, but `String#[0, negative]` answers it
+        # with `ArgumentError: Negative count` — turning a caller's bad cap
+        # into a crash while it was busy REPORTING another error, which is the
+        # worst possible moment to raise. Clamp to "keep nothing" instead.
+        max = 0 if max < 0
         return message if message.size <= max
         "#{message[0, max]}… (truncated, #{message.size} characters)"
       end
@@ -227,12 +232,22 @@ module Hwaro
         width
       end
 
+      # Widest padding run `pad_display` will emit. Far past any real terminal,
+      # so alignment is unaffected; it only bounds a nonsense width.
+      MAX_PAD_COLUMNS = 10_000
+
       # Left-align `s` in a field `width` terminal columns across. The
       # display-width counterpart of `String#ljust`; identical to it for
       # ASCII-only input.
       def pad_display(s : String, width : Int32) : String
-        pad = width - display_width(s)
-        pad > 0 ? "#{s}#{" " * pad}" : s
+        # Int64 subtraction: `width - display_width(s)` overflows Int32 for a
+        # width near either extreme (a terminal width read as Int32::MIN, a
+        # column computed from a pathological label), and `String#*` then gets
+        # a negative or absurd count. Both raise out of a pure FORMATTING
+        # helper. Cap the padding at a full screen's worth instead.
+        pad = width.to_i64 - display_width(s).to_i64
+        return s unless pad > 0
+        "#{s}#{" " * pad.clamp(0_i64, MAX_PAD_COLUMNS.to_i64)}"
       end
 
       # Space through `~`: one byte, one codepoint, one column each — the

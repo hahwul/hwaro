@@ -1154,6 +1154,16 @@ module Hwaro
           # `nil` without blocking.
           deferred_done.receive?
           watch_for_changes(watch_options)
+        rescue error
+          # `watch_for_changes` rescues every iteration of its poll loop, but
+          # its one-time setup (`initial_watch_mtimes`, a full stat sweep of
+          # the watched roots) runs before that loop and outside any handler.
+          # An exception escaping a `spawn` body is fatal to the PROCESS — the
+          # CLI's top-level rescue only wraps the main fiber — so a file that
+          # vanished or a permission flip during startup killed the whole dev
+          # server. Degrade to a server that still serves, and say so.
+          Logger.error "[Watch] Watcher could not start: #{error.message}. File changes will not trigger rebuilds; restart 'hwaro serve' to retry."
+          Logger.debug "[Watch] Backtrace: #{error.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
         end
 
         emit_ready_signal(host, port, json_output, base_path)
