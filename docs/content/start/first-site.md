@@ -67,7 +67,37 @@ my-site/
 │       └── hello.md
 ├── templates/       # Jinja2 templates
 ├── static/          # Static files (CSS, JS, images)
+├── data/            # Optional: JSON/YAML/TOML/CSV exposed as site.data
 └── public/          # Generated output
+```
+
+### Where files go
+
+Two rules cover most of it.
+
+**`data/` sits at the project root**, next to `config.toml` — not under `content/`. Every file in it is loaded automatically and keyed by its filename, so `data/team.json` is available in any template as `site.data.team`:
+
+```jinja
+{% for member in site.data.team %}
+  <li>{{ member.name }}</li>
+{% endfor %}
+```
+
+Subdirectories nest (`data/users/alice.yml` → `site.data.users.alice`). `hwaro init` does not create this directory; add it when you need it. See [Data Model](/templates/data-model/) for the full rules.
+
+**Assets go in `static/`.** `static/images/photo.jpg` is copied to the output as `/images/photo.jpg`, so you reference it with a leading slash:
+
+```
+{{ figure(src="/images/photo.jpg", caption="A photo") }}
+```
+
+Keep the leading `/` even when you deploy to a sub-path such as `example.com/my-site/` — Hwaro rewrites root-relative `src` and `href` values to include the `base_url` sub-path at build time, so the same content works in both places.
+
+You can also keep an asset next to the page that uses it, inside `content/`, but that is opt-in — enable [Content Files](/features/content-files/) first:
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "png", "svg", "pdf"]
 ```
 
 ## 4. Edit Configuration

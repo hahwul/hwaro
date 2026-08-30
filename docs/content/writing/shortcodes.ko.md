@@ -12,13 +12,13 @@ toc = true
 콘텐츠 파일에서는 두 가지 문법이 동작합니다:
 
 ```markdown
-{%raw%}{{ shortcode_name(arg1="value", arg2="value") }}{%endraw%}
+{{ shortcode_name(arg1="value", arg2="value") }}
 ```
 
 또는 명시적으로:
 
 ```markdown
-{%raw%}{{ shortcode("shortcode_name", arg1="value") }}{%endraw%}
+{{ shortcode("shortcode_name", arg1="value") }}
 ```
 
 ### 블록 숏코드 닫기
@@ -47,8 +47,8 @@ Hwaro에는 템플릿 파일 없이 바로 동작하는 내장 숏코드가 들�
 YouTube 동영상을 삽입합니다.
 
 ```markdown
-{%raw%}{{ youtube(id="dQw4w9WgXcQ") }}
-{{ youtube(id="dQw4w9WgXcQ", width="800", height="450") }}{%endraw%}
+{{ youtube(id="dQw4w9WgXcQ") }}
+{{ youtube(id="dQw4w9WgXcQ", width="800", height="450") }}
 ```
 
 | 파라미터 | 기본값 | 설명 |
@@ -63,7 +63,7 @@ YouTube 동영상을 삽입합니다.
 Vimeo 동영상을 삽입합니다.
 
 ```markdown
-{%raw%}{{ vimeo(id="123456789") }}{%endraw%}
+{{ vimeo(id="123456789") }}
 ```
 
 | 파라미터 | 기본값 | 설명 |
@@ -78,8 +78,8 @@ Vimeo 동영상을 삽입합니다.
 GitHub Gist를 삽입합니다.
 
 ```markdown
-{%raw%}{{ gist(user="octocat", id="abc123") }}
-{{ gist(user="octocat", id="abc123", file="hello.rb") }}{%endraw%}
+{{ gist(user="octocat", id="abc123") }}
+{{ gist(user="octocat", id="abc123", file="hello.rb") }}
 ```
 
 | 파라미터 | 기본값 | 설명 |
@@ -95,8 +95,8 @@ GitHub Gist를 삽입합니다.
 단순 닫기와 이름 있는 닫기를 모두 지원합니다(복잡한 페이지에는 이름 있는 닫기를 권장합니다):
 
 ```markdown
-{%raw%}{% alert(type="warning", title="Caution") %}Be careful with this!{% end %}
-{% alert(type="tip") %}Using named closer also works{% endalert %}{%endraw%}
+{% alert(type="warning", title="Caution") %}Be careful with this!{% end %}
+{% alert(type="tip") %}Using named closer also works{% endalert %}
 ```
 
 (명확성을 위해 이름 있는 닫기 스타일을 권장합니다.)
@@ -111,7 +111,7 @@ GitHub Gist를 삽입합니다.
 캡션을 붙일 수 있는 이미지입니다.
 
 ```markdown
-{%raw%}{{ figure(src="/img/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
+{{ figure(src="/img/photo.jpg", alt="A photo", caption="My caption") }}
 ```
 
 | 파라미터 | 기본값 | 설명 |
@@ -127,7 +127,7 @@ GitHub Gist를 삽입합니다.
 트윗을 삽입합니다.
 
 ```markdown
-{%raw%}{{ tweet(user="jack", id="20") }}{%endraw%}
+{{ tweet(user="jack", id="20") }}
 ```
 
 | 파라미터 | 기본값 | 설명 |
@@ -140,8 +140,8 @@ GitHub Gist를 삽입합니다.
 CodePen을 삽입합니다.
 
 ```markdown
-{%raw%}{{ codepen(user="chriscoyier", id="gfdDu") }}
-{{ codepen(user="chriscoyier", id="gfdDu", tab="css,result", height="400") }}{%endraw%}
+{{ codepen(user="chriscoyier", id="gfdDu") }}
+{{ codepen(user="chriscoyier", id="gfdDu", tab="css,result", height="400") }}
 ```
 
 | 파라미터 | 기본값 | 설명 |
@@ -173,7 +173,7 @@ CodePen을 삽입합니다.
 콘텐츠에서 사용:
 
 ```markdown
-{%raw%}{{ alert(type="warning", message="This is important!") }}{%endraw%}
+{{ alert(type="warning", message="This is important!") }}
 ```
 
 출력:
@@ -203,7 +203,7 @@ CodePen을 삽입합니다.
 콘텐츠에서 사용:
 
 ```markdown
-{%raw%}{{ youtube(id="dQw4w9WgXcQ") }}{%endraw%}
+{{ youtube(id="dQw4w9WgXcQ") }}
 ```
 
 ### 예시: 캡션 있는 figure
@@ -222,7 +222,7 @@ CodePen을 삽입합니다.
 콘텐츠에서 사용:
 
 ```markdown
-{%raw%}{{ figure(src="/images/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
+{{ figure(src="/images/photo.jpg", alt="A photo", caption="My caption") }}
 ```
 
 ### 예시: 이미지 갤러리(에셋 코로케이션)
@@ -247,7 +247,7 @@ CodePen을 삽입합니다.
 콘텐츠에서 사용(페이지 번들 디렉터리 안에서):
 
 ```markdown
-{%raw%}{{ gallery() }}{%endraw%}
+{{ gallery() }}
 ```
 
 마크다운 파일 옆에 있는 모든 JPG/PNG 이미지가 그리드로 렌더링됩니다.
@@ -257,9 +257,9 @@ CodePen을 삽입합니다.
 블록 숏코드는 여는 태그와 닫는 태그 사이의 콘텐츠를 감쌉니다:
 
 ```markdown
-{%raw%}{% note() %}
+{% note() %}
 This is the **body** content of the shortcode.
-{% end %}{%endraw%}
+{% end %}
 ```
 
 본문은 `body` 변수로 숏코드 템플릿에 전달됩니다. 마크다운 변환은 자동으로 적용되지 **않으므로**, 필요하면 템플릿에서 `markdownify` 필터를 사용합니다:
@@ -281,9 +281,9 @@ This is the **body** content of the shortcode.
 블록 숏코드는 최대 5단계까지 중첩할 수 있습니다:
 
 ```markdown
-{%raw%}{% outer() %}
+{% outer() %}
   Some text with {{ inner(type="info") }} inside.
-{% end %}{%endraw%}
+{% end %}
 ```
 
 ## 인자 문법
@@ -293,9 +293,9 @@ This is the **body** content of the shortcode.
 인자는 여러 따옴표 스타일을 지원합니다:
 
 ```markdown
-{%raw%}{{ alert(type="warning", message="Double quotes") }}
+{{ alert(type="warning", message="Double quotes") }}
 {{ alert(type='info', message='Single quotes') }}
-{{ alert(type=danger, message=No quotes for simple values) }}{%endraw%}
+{{ alert(type=danger, message=No quotes for simple values) }}
 ```
 
 ### 위치 인자
@@ -303,7 +303,7 @@ This is the **body** content of the shortcode.
 `key=value` 문법을 쓰지 않으면 인자가 `_0`, `_1`, … 로 할당됩니다:
 
 ```markdown
-{%raw%}{{ youtube("dQw4w9WgXcQ") }}{%endraw%}
+{{ youtube("dQw4w9WgXcQ") }}
 ```
 
 숏코드 템플릿에서는 `{{ _0 }}`으로 접근합니다:

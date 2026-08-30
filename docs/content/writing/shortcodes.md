@@ -12,13 +12,13 @@ Shortcodes are reusable template snippets you can use in Markdown content. Custo
 Two syntax patterns work in content files:
 
 ```markdown
-{%raw%}{{ shortcode_name(arg1="value", arg2="value") }}{%endraw%}
+{{ shortcode_name(arg1="value", arg2="value") }}
 ```
 
 Or explicitly:
 
 ```markdown
-{%raw%}{{ shortcode("shortcode_name", arg1="value") }}{%endraw%}
+{{ shortcode("shortcode_name", arg1="value") }}
 ```
 
 ### Block Shortcode Closers
@@ -47,8 +47,8 @@ Hwaro ships with built-in shortcodes that work out of the box — no template fi
 Embed a YouTube video.
 
 ```markdown
-{%raw%}{{ youtube(id="dQw4w9WgXcQ") }}
-{{ youtube(id="dQw4w9WgXcQ", width="800", height="450") }}{%endraw%}
+{{ youtube(id="dQw4w9WgXcQ") }}
+{{ youtube(id="dQw4w9WgXcQ", width="800", height="450") }}
 ```
 
 | Param | Default | Description |
@@ -63,7 +63,7 @@ Embed a YouTube video.
 Embed a Vimeo video.
 
 ```markdown
-{%raw%}{{ vimeo(id="123456789") }}{%endraw%}
+{{ vimeo(id="123456789") }}
 ```
 
 | Param | Default | Description |
@@ -78,8 +78,8 @@ Embed a Vimeo video.
 Embed a GitHub Gist.
 
 ```markdown
-{%raw%}{{ gist(user="octocat", id="abc123") }}
-{{ gist(user="octocat", id="abc123", file="hello.rb") }}{%endraw%}
+{{ gist(user="octocat", id="abc123") }}
+{{ gist(user="octocat", id="abc123", file="hello.rb") }}
 ```
 
 | Param | Default | Description |
@@ -95,8 +95,8 @@ Display an alert box. Use as a block shortcode to wrap content.
 Both bare and named closers are supported (named closers are recommended for complex pages):
 
 ```markdown
-{%raw%}{% alert(type="warning", title="Caution") %}Be careful with this!{% end %}
-{% alert(type="tip") %}Using named closer also works{% endalert %}{%endraw%}
+{% alert(type="warning", title="Caution") %}Be careful with this!{% end %}
+{% alert(type="tip") %}Using named closer also works{% endalert %}
 ```
 
 (We recommend the named closer style for clarity.)
@@ -111,7 +111,7 @@ Both bare and named closers are supported (named closers are recommended for com
 Image with optional caption.
 
 ```markdown
-{%raw%}{{ figure(src="/img/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
+{{ figure(src="/img/photo.jpg", alt="A photo", caption="My caption") }}
 ```
 
 | Param | Default | Description |
@@ -127,7 +127,7 @@ Image with optional caption.
 Embed a tweet.
 
 ```markdown
-{%raw%}{{ tweet(user="jack", id="20") }}{%endraw%}
+{{ tweet(user="jack", id="20") }}
 ```
 
 | Param | Default | Description |
@@ -140,8 +140,8 @@ Embed a tweet.
 Embed a CodePen.
 
 ```markdown
-{%raw%}{{ codepen(user="chriscoyier", id="gfdDu") }}
-{{ codepen(user="chriscoyier", id="gfdDu", tab="css,result", height="400") }}{%endraw%}
+{{ codepen(user="chriscoyier", id="gfdDu") }}
+{{ codepen(user="chriscoyier", id="gfdDu", tab="css,result", height="400") }}
 ```
 
 | Param | Default | Description |
@@ -173,7 +173,7 @@ Create `templates/shortcodes/alert.html`:
 Use in content:
 
 ```markdown
-{%raw%}{{ alert(type="warning", message="This is important!") }}{%endraw%}
+{{ alert(type="warning", message="This is important!") }}
 ```
 
 Output:
@@ -203,7 +203,7 @@ Create `templates/shortcodes/youtube.html`:
 Use in content:
 
 ```markdown
-{%raw%}{{ youtube(id="dQw4w9WgXcQ") }}{%endraw%}
+{{ youtube(id="dQw4w9WgXcQ") }}
 ```
 
 ### Example: Figure with Caption
@@ -222,7 +222,7 @@ Create `templates/shortcodes/figure.html`:
 Use in content:
 
 ```markdown
-{%raw%}{{ figure(src="/images/photo.jpg", alt="A photo", caption="My caption") }}{%endraw%}
+{{ figure(src="/images/photo.jpg", alt="A photo", caption="My caption") }}
 ```
 
 ### Example: Image Gallery (Asset Colocation)
@@ -247,7 +247,7 @@ Create `templates/shortcodes/gallery.html`:
 Use in content (inside a Page Bundle directory):
 
 ```markdown
-{%raw%}{{ gallery() }}{%endraw%}
+{{ gallery() }}
 ```
 
 This will render a grid of all JPG and PNG images found alongside the Markdown file.
@@ -257,9 +257,9 @@ This will render a grid of all JPG and PNG images found alongside the Markdown f
 Block shortcodes wrap content between opening and closing tags:
 
 ```markdown
-{%raw%}{% note() %}
+{% note() %}
 This is the **body** content of the shortcode.
-{% end %}{%endraw%}
+{% end %}
 ```
 
 The body is passed to the shortcode template as the `body` variable. Markdown conversion is **not** applied automatically — use the `markdownify` filter in your template if needed:
@@ -281,9 +281,9 @@ Or use the body as-is for raw content:
 Block shortcodes can be nested up to 5 levels deep:
 
 ```markdown
-{%raw%}{% outer() %}
+{% outer() %}
   Some text with {{ inner(type="info") }} inside.
-{% end %}{%endraw%}
+{% end %}
 ```
 
 ## Argument Syntax
@@ -293,9 +293,9 @@ Block shortcodes can be nested up to 5 levels deep:
 Arguments support multiple quote styles:
 
 ```markdown
-{%raw%}{{ alert(type="warning", message="Double quotes") }}
+{{ alert(type="warning", message="Double quotes") }}
 {{ alert(type='info', message='Single quotes') }}
-{{ alert(type=danger, message=No quotes for simple values) }}{%endraw%}
+{{ alert(type=danger, message=No quotes for simple values) }}
 ```
 
 ### Positional Arguments
@@ -303,7 +303,7 @@ Arguments support multiple quote styles:
 When no `key=value` syntax is used, arguments are assigned as `_0`, `_1`, etc.:
 
 ```markdown
-{%raw%}{{ youtube("dQw4w9WgXcQ") }}{%endraw%}
+{{ youtube("dQw4w9WgXcQ") }}
 ```
 
 In the shortcode template, access via `{{ _0 }}`:

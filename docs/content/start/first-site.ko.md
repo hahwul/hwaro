@@ -67,7 +67,37 @@ my-site/
 │       └── hello.md
 ├── templates/       # Jinja2 templates
 ├── static/          # Static files (CSS, JS, images)
+├── data/            # 선택: site.data로 노출되는 JSON/YAML/TOML/CSV
 └── public/          # Generated output
+```
+
+### 파일을 어디에 둘까
+
+두 가지만 기억하면 됩니다.
+
+**`data/`는 프로젝트 루트에 둡니다.** `content/` 안이 아니라 `config.toml` 옆입니다. 이 디렉터리의 파일은 자동으로 로드되고 파일 이름이 키가 되므로, `data/team.json`은 어느 템플릿에서든 `site.data.team`으로 쓸 수 있습니다.
+
+```jinja
+{% for member in site.data.team %}
+  <li>{{ member.name }}</li>
+{% endfor %}
+```
+
+하위 디렉터리는 중첩됩니다(`data/users/alice.yml` → `site.data.users.alice`). `hwaro init`은 이 디렉터리를 만들지 않으니 필요할 때 직접 추가하세요. 자세한 규칙은 [데이터 모델](/templates/data-model/)을 참고하세요.
+
+**이미지 같은 정적 파일은 `static/`에 둡니다.** `static/images/photo.jpg`는 출력물에서 `/images/photo.jpg`로 복사되므로, 앞에 슬래시를 붙여 참조합니다.
+
+```
+{{ figure(src="/images/photo.jpg", caption="A photo") }}
+```
+
+`example.com/my-site/`처럼 하위 경로에 배포할 때도 앞의 `/`를 그대로 두세요. Hwaro가 빌드 시점에 루트 상대 `src`와 `href`에 `base_url`의 하위 경로를 붙여 주기 때문에, 같은 콘텐츠가 양쪽에서 모두 동작합니다.
+
+에셋을 그 파일을 쓰는 페이지 옆, 즉 `content/` 안에 두는 것도 가능하지만 이는 선택 기능입니다. 먼저 [콘텐츠 파일](/features/content-files/)을 활성화하세요.
+
+```toml
+[content.files]
+allow_extensions = ["jpg", "png", "svg", "pdf"]
 ```
 
 ## 4. 설정 수정

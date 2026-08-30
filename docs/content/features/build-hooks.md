@@ -87,11 +87,14 @@ Step 3
 
 ## Serve Mode
 
-Build hooks also run during `hwaro serve`:
+Build hooks also run during `hwaro serve`, but only on **full** rebuilds:
 
 - Hooks execute on the **initial build** when the server starts
-- Hooks **re-execute on each rebuild** triggered by file changes
+- Hooks **re-execute on full rebuilds** — a `config.toml` change, a file added or removed, or a change to any file under `data/`
+- Hooks are **skipped on partial rebuilds** — editing an existing content or template file re-renders only the affected pages and does not re-run your commands
 - Config changes are picked up automatically — if you modify `hooks.pre` or `hooks.post` in `config.toml`, the new commands take effect on the next rebuild
+
+This keeps save-to-reload fast. If a hook produces something you need refreshed while the server is running, touch `config.toml` or restart `hwaro serve` to force a full rebuild.
 
 ## Use Cases
 
@@ -110,6 +113,30 @@ hooks.pre = [
   "npx tailwindcss -i src/styles.css -o static/assets/css/styles.css --minify"
 ]
 ```
+
+### Fetching Data from an API
+
+`load_data()` reads from disk only, so remote data is baked in by fetching it into `data/` before the build. Every file under `data/` is then exposed as `site.data`:
+
+```toml
+[build]
+hooks.pre = ["curl -sfL https://api.example.com/team -o data/team.json"]
+```
+
+```jinja
+{% for member in site.data.team %}
+  <li>{{ member.name }}</li>
+{% endfor %}
+```
+
+`curl -f` exits non-zero on an HTTP error, which aborts the build rather than publishing a site with missing data. For anything beyond a single request — pagination, auth headers, reshaping the response — write a script and call that instead:
+
+```toml
+[build]
+hooks.pre = ["./scripts/fetch-data.sh"]
+```
+
+Commit the fetched file if you want reproducible builds offline; add it to `.gitignore` if you always want it fresh.
 
 ### Pagefind Search
 
@@ -163,7 +190,7 @@ This design ensures that critical setup tasks (pre-build) must succeed, while op
 
 ## Tips
 
-- **Keep hooks fast**: Slow hooks run on every rebuild during `hwaro serve`. Consider caching or conditional execution.
+- **Keep hooks fast**: Slow hooks run on every full rebuild during `hwaro serve`. Consider caching or conditional execution.
 - **Use scripts for complexity**: For multi-step processes, write a shell script and call it from the hook: `hooks.pre = ["./scripts/setup.sh"]`
 - **Check dependencies**: Use `command -v` to check if tools are available before running them:
   ```bash
