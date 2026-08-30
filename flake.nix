@@ -137,14 +137,20 @@
         # nixpkgs' builder, retargeted at whichever compiler was selected above.
         buildCrystalPackage = pkgs.crystal.buildCrystalPackage.override { inherit crystal; };
 
-        # Crystal's stdlib pulls these in through `compress/*`, `openssl` and
-        # `xml`, and neither toolchain supplies them: the pinned tarball bundles
-        # only pcre2/bdwgc/libyaml/libffi, and nixpkgs' crystal wrapper exports
-        # its own build inputs, not ours.
+        # Crystal's stdlib links these through `compress/*`, `openssl`, `xml`
+        # and `yaml`, and neither toolchain supplies them.
+        #
+        # libyaml looks redundant on macOS and is not: the darwin tarball's
+        # bin/crystal is a wrapper script that appends its bundled embedded/lib
+        # (which does contain libyaml) to CRYSTAL_LIBRARY_PATH, while the Linux
+        # tarballs ship a bare static ELF whose only library directory is
+        # lib/crystal -- and that holds libgc.a alone. Dropping libyaml here
+        # builds fine on darwin and fails Linux with `cannot find -lyaml`.
         linkLibs = [
           pkgs.zlib
           pkgs.openssl
           pkgs.libxml2
+          pkgs.libyaml
         ]
         ++ lib.optional pkgs.stdenv.hostPlatform.isDarwin pkgs.libiconv;
 
