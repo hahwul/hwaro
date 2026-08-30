@@ -17,10 +17,13 @@ build:
     shards install
     shards build
 
-# Update shards.nix.
+# Update shards.nix. Run this whenever shard.lock changes — the Nix build
+# resolves dependencies offline from shards.nix, and CI gates on the two
+# agreeing. `nix develop` pins crystal2nix via flake.lock so the output matches
+# what CI regenerates.
 [group('build')]
 nix-update:
-    nix-shell -p crystal2nix --run crystal2nix
+    nix develop --command crystal2nix
 
 # Clean build artifacts.
 [group('build')]
