@@ -1154,6 +1154,18 @@ module Hwaro
           # `nil` without blocking.
           deferred_done.receive?
           watch_for_changes(watch_options)
+        rescue error
+          # `watch_for_changes` rescues every iteration of its poll loop, but
+          # its one-time setup (`initial_watch_mtimes`, a full stat sweep of
+          # the watched roots) runs before that loop and outside any handler.
+          # An exception there does not kill the process — Crystal's
+          # `Fiber#run` prints `Unhandled exception in spawn` and the server
+          # keeps serving — which is precisely the bad outcome: a raw
+          # backtrace scrolls past, and from then on saves silently stop
+          # rebuilding for the rest of the session with nothing to say why.
+          # Report it as what it is, and name the way out.
+          Logger.error "[Watch] Watcher could not start: #{error.message}. File changes will not trigger rebuilds; restart 'hwaro serve' to retry."
+          Logger.debug "[Watch] Backtrace: #{error.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
         end
 
         emit_ready_signal(host, port, json_output, base_path)

@@ -1396,6 +1396,7 @@ module Hwaro
         end
 
         warn_unknown_top_level_keys(config.raw, config_path)
+        reject_null_bytes!(config.raw, config_path)
 
         config.title = config.raw["title"]?.try(&.as_s?) || config.title
         config.description = config.raw["description"]?.try(&.as_s?) || config.description
@@ -1471,6 +1472,109 @@ module Hwaro
           hint = Utils::CommandSuggester.suggest(key, KNOWN_TOP_LEVEL_KEYS).try { |s| " Did you mean '#{s}'?" } || ""
           Logger.warn "Unknown key '#{key}' in #{config_path} — hwaro does not read it.#{hint}"
         end
+      end
+
+      # Reject a NUL byte anywhere in a config string — value OR key.
+      #
+      # A NUL survives TOML parsing (the `\u0000` escape is well-formed, in a
+      # quoted key just as in a value) but every filesystem call built from
+      # that string raises a bare `ArgumentError: String contains null byte`
+      # from deep inside stdlib — `Path.new`'s `check_no_null_byte`. That
+      # reached the CLI as the unclassified `Error: String contains null
+      # byte`, with no file, no key and no hint, from seven keys
+      # (`[build] output_dir`, the five `filename`/`full_filename` output
+      # keys, `[og.auto_image] output_dir`). Individual guards could not catch
+      # it: `validate_output_filename!` was itself defeated because its
+      # `File.basename(value)` operand raised before the NUL check it guarded
+      # could run.
+      #
+      # KEYS are checked too, not just values: `[languages."e\u0000n"]` puts a
+      # NUL into a language code, and `[menus."a\u0000b"]` into a menu name —
+      # both of which downstream code joins into output paths. No CLI input
+      # reaches that particular `File.join` today, but a key is a config
+      # string like any other and the point of a boundary check is not to
+      # depend on which consumer happens to be wired up.
+      #
+      # ITERATIVE, not recursive: `[a.b.c…]` builds one nested table per dotted
+      # segment and bypasses the `parse_value` nesting cap in
+      # ext/toml_nesting_limit_fix.cr (that cap counts array/inline-table
+      # values, which a table HEADER never enters). A 50k-segment header is
+      # accepted by the parser, so a recursive walk over the result overflowed
+      # the stack — an unrescuable crash on a config the loaders themselves
+      # never descend into.
+      private def self.reject_null_bytes!(root : Hash(String, TOML::Any), path : String) : Nil
+        pending = [] of {TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any), KeyTrail}
+        root.each do |k, v|
+          reject_null_key!(k, nil, path)
+          pending << {v.as(TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any)), KeyTrail.new(k, nil)}
+        end
+
+        while entry = pending.pop?
+          node, trail = entry
+          case node
+          when Hash(String, TOML::Any)
+            node.each do |k, v|
+              reject_null_key!(k, trail, path)
+              pending << {v.as(TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any)), KeyTrail.new(".#{k}", trail)}
+            end
+          when Array(TOML::Any)
+            node.each_with_index do |v, i|
+              pending << {v.as(TOML::Any | Hash(String, TOML::Any) | Array(TOML::Any)), KeyTrail.new("[#{i}]", trail)}
+            end
+          when TOML::Any
+            raw = node.raw
+            case raw
+            when String
+              next unless raw.includes?(Char::ZERO)
+              raise null_byte_error(trail.to_s, path)
+            when Hash(String, TOML::Any)
+              pending << {raw, trail}
+            when Array(TOML::Any)
+              pending << {raw, trail}
+            end
+          end
+        end
+      end
+
+      # One segment of a dotted key, linked to its parent.
+      #
+      # The trail is only ever READ on the raise path, so segments are linked
+      # rather than concatenated: building `"#{key}.#{k}"` at every node made
+      # the walk quadratic in depth, which is exactly the shape (a very deep
+      # `[a.b.c…]` header) the iterative rewrite exists to survive — 100k
+      # segments cost 6.3s of string building on top of a 0.9s parse.
+      private class KeyTrail
+        getter segment : String
+        getter parent : KeyTrail?
+
+        def initialize(@segment : String, @parent : KeyTrail?)
+        end
+
+        def to_s(io : IO) : Nil
+          segments = [] of String
+          node : KeyTrail? = self
+          while current = node
+            segments << current.segment
+            node = current.parent
+          end
+          segments.reverse_each { |s| io << s }
+        end
+      end
+
+      private def self.reject_null_key!(key : String, trail : KeyTrail?, path : String) : Nil
+        return unless key.includes?(Char::ZERO)
+        raise null_byte_error(trail ? "#{trail}.#{key}" : key, path)
+      end
+
+      private def self.null_byte_error(key : String, path : String) : Hwaro::HwaroError
+        Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          # The key is capped: a `[a.b.c…]` header can be arbitrarily long, and
+          # an unreadable wall of segments is a worse diagnostic than a
+          # truncated one.
+          message: "#{Utils::TextUtils.truncate_error(key, 200)} in #{path} contains a NUL byte (\\u0000).",
+          hint: "Remove the \\u0000 escape from the value; NUL is not valid in a path, filename, URL, or title.",
+        )
       end
 
       # Parse a TOML string, re-raising any parser failure as a classified
@@ -1593,7 +1697,11 @@ module Hwaro
         return if allow_empty && value.empty?
         # A NUL byte survives both TOML and File.basename, and then raises a
         # bare `ArgumentError: String contains null byte` out of the writer.
-        return unless NON_FILE_BASENAMES.includes?(File.basename(value)) || value.includes?(Char::ZERO)
+        # NUL FIRST: `File.basename` builds a `Path`, whose `check_no_null_byte`
+        # raises a bare ArgumentError before the `||` could ever reach the NUL
+        # test on its right. Ordering the cheap, non-raising check first is
+        # what makes this guard able to report the case it was written for.
+        return unless value.includes?(Char::ZERO) || NON_FILE_BASENAMES.includes?(File.basename(value))
 
         raise Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_CONFIG,
