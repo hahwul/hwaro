@@ -1739,6 +1739,12 @@ module Hwaro
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        # A user's own `static/.hwaro-dev` publishes like any hidden static
+        # file, so the copy above can land on top of serve's stamp. Only the
+        # full-build path re-stamps, so without this the dev dir would sit
+        # unmarked for the rest of the session — and `hwaro deploy` reads the
+        # marker by content, so the user's bytes would not stand in for it.
+        Hwaro::Utils::DevMarker.write(output_dir) unless Hwaro::Utils::DevMarker.present?(output_dir)
         # Changed image BYTES need their resized variants/LQIP regenerated
         # too — the resize hook only runs on full builds, so the copy above
         # alone left variants stale for the whole serve session (A12).
@@ -1940,14 +1946,20 @@ module Hwaro
       end
 
       # data/** and i18n/** are the only buckets whose FileStamp carries a
-      # content digest. They are the full-rebuild buckets, and only a full
-      # rebuild re-runs build.hooks.pre — the #755 loop needs both halves.
-      # content/ and templates/ stay stamp-only on purpose: their rebuild
-      # paths are incremental and hook-free (so they cannot loop), and
-      # hashing them would tax every save of every page. static/ likewise:
-      # a modified static file takes the :static copy path, which never
-      # re-runs hooks; only its first appearance is a (legitimate,
-      # one-time) added-file full rebuild.
+      # content digest. They are the buckets #755 reported: a full rebuild is
+      # the only thing that re-runs build.hooks.pre, and a hook rewriting
+      # data/ byte-identically then looped forever on its own stamp.
+      #
+      # content/, templates/ and static/ stay stamp-only because hashing them
+      # would tax every save of every page for a rarer case: each has its own
+      # hook-free rebuild path (:incremental, :templates, :static copy), and a
+      # static file's only full rebuild is the one-time added-file case.
+      #
+      # That is a cost trade, not a proof of no-loop. Two constructive routes
+      # remain — a mixed static+template byte-identical rewrite falls to
+      # `rebuild_strategy`'s else branch (:full), and a byte-identical
+      # config.toml rewrite has no digest at all (nil) to compare. Both
+      # predate #757 and are tracked in issue #760.
       private def digest_watched?(path : String) : Bool
         path.starts_with?("data/") || path.starts_with?("i18n/")
       end
