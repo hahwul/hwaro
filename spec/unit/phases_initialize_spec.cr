@@ -16,8 +16,8 @@ module Hwaro::Core::Build
       load_templates
     end
 
-    def test_load_data_files(site : Models::Site)
-      load_data_files(site)
+    def test_load_data_files(site : Models::Site, config : Models::Config = Models::Config.new)
+      load_data_files(site, config)
     end
 
     def test_create_fresh_crinja_env : Crinja

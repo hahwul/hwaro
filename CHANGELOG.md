@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Declarative remote data sources: `[[data.remote]]` in `config.toml` fetches an HTTP(S) endpoint once per build into `site.data.<key>` — with format inference (`json`/`toml`/`yaml`/`csv`), `${VAR}` env interpolation in `url`/`headers`, a disk cache under `.hwaro/remote_data/` with a `cache` TTL that serve rebuilds and offline builds reuse, and explicit `on_error` handling (`fail` | `warn-and-use-cache` | `warn-and-skip`) (#753)
+
 ## v0.19.0
 
 ### Added

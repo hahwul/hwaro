@@ -63,7 +63,7 @@ module Hwaro::Core::Build::Phases::Initialize
       end
       site = Models::Site.new(config)
       @site = site
-      load_data_files(site)
+      load_data_files(site, config)
 
       # Load i18n translations
       i18n_dir = File.join("i18n")
@@ -720,6 +720,21 @@ module Hwaro::Core::Build::Phases::Initialize
     property source_path : String? = nil
   end
 
+  # Content digest of everything that feeds `site.data`, for cache
+  # invalidation: the `data/` directory (and i18n/) plus any fetched
+  # `[[data.remote]]` payloads.
+  private def compute_data_hash : String
+    disk = compute_disk_data_hash
+    # Remote payloads feed `site.data` exactly like `data/` files, so their
+    # bytes (captured by load_remote_data earlier in this phase) must feed
+    # the cache invalidation digest the same way — a changed payload has to
+    # invalidate cached pages. Empty (the "" no-remote-sources case) keeps
+    # the hash byte-identical to what it was before this feature existed.
+    remote = @remote_data_digest
+    return disk if remote.empty?
+    "#{disk}-remote:#{remote}"
+  end
+
   # Compute a content digest of the `data/` directory for cache invalidation.
   #
   # Globs every supported data file, sorts the paths for determinism, and folds
@@ -728,7 +743,7 @@ module Hwaro::Core::Build::Phases::Initialize
   # cache, while any real edit, add, or rename changes the digest and triggers
   # the existing "config change invalidates all entries" path. Returns "" when
   # there is no `data/` directory.
-  private def compute_data_hash : String
+  private def compute_disk_data_hash : String
     return "" unless Dir.exists?("data") || Dir.exists?("i18n")
 
     paths = [] of String
@@ -760,54 +775,94 @@ module Hwaro::Core::Build::Phases::Initialize
   # sibling file share the same stem (e.g. `data/users.yml` alongside
   # `data/users/`), the directory wins and a warning is emitted for the
   # shadowed file.
-  private def load_data_files(site : Models::Site)
+  private def load_data_files(site : Models::Site, config : Models::Config)
     site.data.clear
-
-    return unless Dir.exists?("data")
+    @remote_data_digest = ""
 
     root = DataTreeNode.new
 
-    # Process deeper paths first so directory namespaces are established
-    # before any same-stem root-level file can claim the key.
-    entries = [] of {Array(String), String, String}
-    Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
-      next if File.directory?(path)
-      rel = Path[path].relative_to("data")
-      parts = rel.parts
-      stem = Path[parts.last].stem
-      dir_parts = parts[0...-1]
-      entries << {dir_parts, stem, path}
-    end
-    entries.sort_by! { |(dir_parts, _, _)| -dir_parts.size }
-
-    entries.each do |(dir_parts, stem, path)|
-      value = parse_data_file(path)
-      next unless value
-
-      node = root
-      dir_parts.each do |segment|
-        node = node.children[segment] ||= DataTreeNode.new
+    if Dir.exists?("data")
+      # Process deeper paths first so directory namespaces are established
+      # before any same-stem root-level file can claim the key.
+      entries = [] of {Array(String), String, String}
+      Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
+        next if File.directory?(path)
+        rel = Path[path].relative_to("data")
+        parts = rel.parts
+        stem = Path[parts.last].stem
+        dir_parts = parts[0...-1]
+        entries << {dir_parts, stem, path}
       end
+      entries.sort_by! { |(dir_parts, _, _)| -dir_parts.size }
 
-      existing = node.children[stem]?
-      if existing && !existing.children.empty?
-        Logger.warn "Data file '#{path}' is shadowed by directory 'data/#{(dir_parts + [stem]).join('/')}/'; directory takes precedence."
-        next
-      end
+      entries.each do |(dir_parts, stem, path)|
+        value = parse_data_file(path)
+        next unless value
 
-      leaf = existing || DataTreeNode.new
-      if prior = leaf.source_path
-        Logger.warn "Duplicate data key for 'site.data.#{(dir_parts + [stem]).join('.')}': '#{path}' overwrites '#{prior}'."
+        node = root
+        dir_parts.each do |segment|
+          node = node.children[segment] ||= DataTreeNode.new
+        end
+
+        existing = node.children[stem]?
+        if existing && !existing.children.empty?
+          Logger.warn "Data file '#{path}' is shadowed by directory 'data/#{(dir_parts + [stem]).join('/')}/'; directory takes precedence."
+          next
+        end
+
+        leaf = existing || DataTreeNode.new
+        if prior = leaf.source_path
+          Logger.warn "Duplicate data key for 'site.data.#{(dir_parts + [stem]).join('.')}': '#{path}' overwrites '#{prior}'."
+        end
+        leaf.value = value
+        leaf.source_path = path
+        node.children[stem] = leaf
+        Logger.debug "Loaded data file: #{path} as site.data.#{(dir_parts + [stem]).join('.')}"
       end
-      leaf.value = value
-      leaf.source_path = path
-      node.children[stem] = leaf
-      Logger.debug "Loaded data file: #{path} as site.data.#{(dir_parts + [stem]).join('.')}"
     end
 
     root.children.each do |key, child|
       site.data[key] = data_tree_to_crinja(child)
     end
+
+    load_remote_data(site, config, root)
+  end
+
+  # `[[data.remote]]` sources, fetched once per build AFTER the disk tree is
+  # assembled so a key collision can name the exact disk source it clashes
+  # with. A collision is a hard config error rather than a precedence rule —
+  # silently preferring either side would make `site.data.<key>` depend on
+  # network state. Collisions are checked for every entry before the first
+  # fetch so the error never costs a network round-trip.
+  private def load_remote_data(site : Models::Site, config : Models::Config, root : DataTreeNode)
+    entries = config.data_remote
+    return if entries.empty?
+
+    entries.each do |entry|
+      next unless node = root.children[entry.key]?
+      disk_source = node.source_path || "data/#{entry.key}/"
+      raise Hwaro::HwaroError.new(
+        code: Hwaro::Errors::HWARO_E_CONFIG,
+        message: "site.data.#{entry.key} has two sources: '#{disk_source}' on disk and [[data.remote]] \"#{entry.key}\" (#{RemoteData.sanitized_url(entry.url)}).",
+        hint: "Rename the [[data.remote]] key or the data/ file — each site.data key must have exactly one source.",
+      )
+    end
+
+    digest = Digest::MD5.new
+    entries.each do |entry|
+      result = RemoteData.load(entry)
+      Utils::DigestUtils.update_length_prefixed(digest, entry.key)
+      if result
+        site.data[entry.key] = result.value
+        Utils::DigestUtils.update_length_prefixed(digest, result.body)
+      else
+        # warn-and-skip left the key unset: fold the absence too, so a
+        # payload that disappears invalidates cached pages the same way an
+        # edit does.
+        Utils::DigestUtils.update_length_prefixed(digest, "<skipped>")
+      end
+    end
+    @remote_data_digest = digest.final.hexstring
   end
 
   private def data_tree_to_crinja(node : DataTreeNode) : Crinja::Value
