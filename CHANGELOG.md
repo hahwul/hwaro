@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Content generation from data: `[[content.generate]]` in `config.toml` materializes each record of a `site.data` array (a `data/` file or a `[[data.remote]]` payload) into a first-class content page — section listings, `[permalinks]`, taxonomies, feeds, search, sitemap, OG images and output formats all apply. Field specs are record field names (dotted for nesting, hard errors naming the record and available keys on a typo) or Crinja templates over `item`; templates additionally see the whole record as `page.extra.item` and a `page.synthesized` flag; authored files always win a contested path; `hwaro tool list` shows generated pages with provenance
 - Declarative remote data sources: `[[data.remote]]` in `config.toml` fetches an HTTP(S) endpoint once per build into `site.data.<key>` — with format inference (`json`/`toml`/`yaml`/`csv`), `${VAR}` env interpolation in `url`/`headers`, a disk cache under `.hwaro/remote_data/` with a `cache` TTL that serve rebuilds and offline builds reuse, and explicit `on_error` handling (`fail` | `warn-and-use-cache` | `warn-and-skip`) (#753)
 
 ## v0.19.0

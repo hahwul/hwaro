@@ -12,7 +12,7 @@
 # That exhausts the stack: `Stack overflow (e.g., infinite or very deep
 # recursion)`, ~15.5k backtrace lines, exit 11. Crystal cannot rescue a
 # stack overflow, so it walks straight through both hwaro call sites —
-# `Initialize#parse_data_file` (which warns and drops the key) and
+# `DataDisk.parse_file` (which warns and drops the key) and
 # `Processors::Markdown#extract_from_toml` (which raises HWARO_E_CONTENT) —
 # both of which assume a malformed file arrives as a catchable exception.
 # The same input as JSON or YAML degrades cleanly, because Crystal's own

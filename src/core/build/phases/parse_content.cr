@@ -285,17 +285,25 @@ module Hwaro::Core::Build::Phases::ParseContent
   # Parse a single page: read file, parse frontmatter, assign properties
   private def parse_single_page(page : Models::Page)
     source_path = File.join("content", page.path)
-    unless File.exists?(source_path)
-      # A dangling symlink (or a file deleted mid-rebuild) must be filtered
-      # like any parse failure. Returning silently left a ghost page with
-      # url "" whose output path resolves to <output>/index.html — silently
-      # clobbering the homepage, nondeterministically under parallel render.
-      page.parse_failed = true
-      Logger.warn "Failed to parse #{page.path}: source file missing (deleted mid-build or dangling symlink)"
-      return
-    end
+    if synthesis = page.synthesis
+      # A `[[content.generate]]` page has no disk file: its source document
+      # was composed at read time (see Models::Page::Synthesis). Everything
+      # below — front matter, dates, taxonomies, draft/expiry filtering,
+      # URL resolution — runs on it unchanged, which is the whole design.
+      raw_content = synthesis.markdown
+    else
+      unless File.exists?(source_path)
+        # A dangling symlink (or a file deleted mid-rebuild) must be filtered
+        # like any parse failure. Returning silently left a ghost page with
+        # url "" whose output path resolves to <output>/index.html — silently
+        # clobbering the homepage, nondeterministically under parallel render.
+        page.parse_failed = true
+        Logger.warn "Failed to parse #{page.path}: source file missing (deleted mid-build or dangling symlink)"
+        return
+      end
 
-    raw_content = File.read(source_path)
+      raw_content = File.read(source_path)
+    end
     data = Processor::Markdown.parse(raw_content, source_path)
 
     # A serve incremental re-parse works on the LIVE page object, and
@@ -339,6 +347,12 @@ module Hwaro::Core::Build::Phases::ParseContent
     # New fields assignment
     page.authors = data[:authors]
     page.extra = data[:extra]
+    if synthesis = page.synthesis
+      # Publish the WHOLE source record to templates as `page.extra.item` —
+      # a single_template can read any record field without the
+      # [[content.generate]] rule having to map each one into front matter.
+      page.extra["item"] = ContentGenerate.item_to_extra(synthesis.item)
+    end
     page.in_search_index = data[:in_search_index]
     page.insert_anchor_links = data[:insert_anchor_links]
     page.weight = data[:weight]

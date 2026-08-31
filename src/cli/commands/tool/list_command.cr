@@ -10,6 +10,11 @@ require "json"
 require "option_parser"
 require "../../metadata"
 require "../../../services/content_lister"
+require "../../../models/config"
+require "../../../core/build/data_disk"
+require "../../../core/build/content_generate"
+require "../../../content/processors/template"
+require "../../../utils/date_utils"
 require "../../../utils/errors"
 require "../../../utils/logger"
 
@@ -109,7 +114,7 @@ module Hwaro
               )
             end
 
-            lister = Services::ContentLister.new(content_dir)
+            lister = Services::ContentLister.new(content_dir, generated_content_infos)
 
             content_filter = case filter.as(String).downcase
                              when "all"
@@ -132,6 +137,61 @@ module Hwaro
             else
               lister.display(content_filter, sort, reverse, limit)
             end
+          end
+
+          # Plan `[[content.generate]]` pages so the listing shows what a
+          # build actually publishes, not just what sits in content/ — a
+          # generated page has no file for the walker to find, and "where
+          # did my page go" needs an answer here. Planning uses DISK data
+          # only (plus nothing from the network): a rule backed by a
+          # not-yet-fetched [[data.remote]] key gets a note instead of rows,
+          # and any planning failure degrades to a warning — a bad record
+          # must not take down the listing of authored files.
+          private def generated_content_infos : Array(Services::ContentInfo)
+            return [] of Services::ContentInfo unless File.exists?("config.toml")
+
+            config = begin
+              Models::Config.load
+            rescue Exception
+              # An unloadable config disables generated rows, not the listing.
+              return [] of Services::ContentInfo
+            end
+            return [] of Services::ContentInfo if config.content_generate.empty?
+
+            disk_data = Core::Build::DataDisk.load_hash
+            remote_keys = config.data_remote.map(&.key)
+
+            plannable = config.content_generate.select do |rule|
+              root_key = rule.source.split('.').first
+              if !disk_data.has_key?(root_key) && remote_keys.includes?(root_key)
+                Logger.info "  [[content.generate]] \"#{rule.source}\": remote source — its pages appear after a build fetches site.data.#{root_key}."
+                false
+              else
+                true
+              end
+            end
+            return [] of Services::ContentInfo if plannable.empty?
+
+            config.content_generate = plannable
+            env = Content::Processors::TemplateEngine.new.env
+            plans = Core::Build::ContentGenerate.plan(config, disk_data, env, include_bodies: false)
+
+            now = Time.utc
+            plans.map do |plan|
+              date = plan.date_raw.try { |raw| Utils::DateUtils.parse_content_date(raw) }
+              status = date && date > now ? "future" : "published"
+              Services::ContentInfo.new(
+                path: plan.path,
+                title: plan.title,
+                draft: false,
+                date: date,
+                status: status,
+                generated_from: plan.origin,
+              )
+            end
+          rescue ex : Hwaro::HwaroError
+            Logger.warn "  Skipping [[content.generate]] rows: #{ex.message}"
+            [] of Services::ContentInfo
           end
         end
       end
