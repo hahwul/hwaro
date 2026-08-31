@@ -12,6 +12,8 @@
 # trigger the watcher, and `on_error = "warn-and-use-cache"` can build
 # offline from the last good payload.
 
+require "compress/deflate"
+require "compress/gzip"
 require "csv"
 require "digest/md5"
 require "http/client"
@@ -39,6 +41,11 @@ module Hwaro
         DEFAULT_MAX_BYTES = 20_i64 * 1024 * 1024
         CONNECT_TIMEOUT   = 10.seconds
         READ_TIMEOUT      = 30.seconds
+        # Overall wall-clock budget for one entry, spanning every redirect hop
+        # and every body read. READ_TIMEOUT bounds a single read OPERATION, so
+        # a source dripping one byte just inside it never trips a timeout at
+        # all and stalls the build indefinitely.
+        DEFAULT_FETCH_DEADLINE = 120.seconds
 
         # A fetch/parse failure that `on_error` may soften. Internal to this
         # module — callers only ever see a value, nil, or `HwaroError`.
@@ -55,12 +62,16 @@ module Hwaro
         # `on_error = "warn-and-skip"` failures; `fail` (and an unusable
         # cache under `warn-and-use-cache`) raise a classified `HwaroError`.
         #
-        # `now` and `max_bytes` are parameters for the specs; production
-        # callers use the defaults.
+        # `now`, `max_bytes` and `deadline` are parameters for the specs;
+        # production callers use the defaults.
         def load(entry : Models::RemoteDataConfig,
                  cache_dir : String = CACHE_DIR,
                  now : Time = Time.utc,
-                 max_bytes : Int64 = DEFAULT_MAX_BYTES) : Result?
+                 max_bytes : Int64 = DEFAULT_MAX_BYTES,
+                 deadline : Time::Span = DEFAULT_FETCH_DEADLINE) : Result?
+          # Before anything else, and deliberately outside the `on_error`
+          # rescue: an unset `${VAR}` is a config mistake, not a flaky source.
+          require_resolved_env_vars!(entry)
           digest = url_digest(entry.url)
 
           if cached = fresh_cached_result(entry, cache_dir, digest, now)
@@ -68,11 +79,14 @@ module Hwaro
           end
 
           begin
-            body, content_type = fetch(entry, max_bytes)
-            format = resolve_format(entry.format, content_type, entry.url) ||
+            body, content_type, final_url = fetch(entry, max_bytes, deadline)
+            # The extension fallback reads the url the redirects LANDED on:
+            # a bare `/team` that 302s to a CDN's `/…/team.json` served as
+            # application/octet-stream has no other way to be inferred.
+            format = resolve_format(entry.format, content_type, final_url) ||
                      raise FetchError.new("cannot infer the payload format (Content-Type #{content_type.inspect}, no recognized URL extension); set format = \"json\" | \"toml\" | \"yaml\" | \"csv\" on the [[data.remote]] entry")
             value = parse_body(body, format)
-          rescue ex : FetchError | Socket::Error | IO::Error | OpenSSL::SSL::Error | URI::Error | JSON::ParseException | YAML::ParseException | TOML::ParseException | CSV::MalformedCSVError | ArgumentError | InvalidByteSequenceError
+          rescue ex : FetchError | Socket::Error | IO::Error | OpenSSL::SSL::Error | URI::Error | Compress::Gzip::Error | Compress::Deflate::Error | JSON::ParseException | YAML::ParseException | TOML::ParseException | CSV::MalformedCSVError | ArgumentError | InvalidByteSequenceError
             return handle_failure(entry, cache_dir, digest, ex.message || ex.class.name)
           end
 
@@ -120,6 +134,47 @@ module Hwaro
             raise FetchError.new("unsupported format #{format.inspect}")
         end
 
+        # The braced no-default form of an env reference. Deliberately the
+        # ONLY form checked: `${VAR:-fallback}` was already resolved to its
+        # fallback by the file-wide pass, and bare `$WORD` keeps its
+        # warn-only behavior so a literal dollar sign in a URL can't break a
+        # build.
+        ENV_PLACEHOLDER = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/
+
+        # `${VAR}` interpolation runs file-wide BEFORE config.toml is parsed,
+        # so an unset variable simply leaves the literal `${VAR}` text in the
+        # value — which is what this detects.
+        #
+        # It used to be a hard error inside `Config.load`, which meant
+        # `hwaro deploy`, `hwaro new` and `hwaro tool ...` — none of which ever
+        # fetch — aborted on a remote source they would never touch, while
+        # serve (which rescues a failed config load) silently skipped its
+        # `[build]` merge instead. Config load now validates shape only and
+        # defers to here, the moment the entry is actually about to be used:
+        # same code, same wording, same hint, blast radius of one entry.
+        #
+        # Never echoes the value — header values hold credentials. Public so
+        # the serve-session memo can run it before deciding to reuse a
+        # payload: unsetting a header's variable mid-session is a config
+        # mistake, not a flaky source, and must not be papered over.
+        def require_resolved_env_vars!(entry : Models::RemoteDataConfig) : Nil
+          check_resolved_env_vars!(entry.url, %([[data.remote]] "#{entry.key}" url))
+          entry.headers.each do |name, value|
+            check_resolved_env_vars!(value, %([[data.remote]] "#{entry.key}" header "#{name}"))
+          end
+        end
+
+        private def check_resolved_env_vars!(value : String, where : String) : Nil
+          value.scan(ENV_PLACEHOLDER) do |match|
+            name = match[1]
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "Environment variable '#{name}' is not set (referenced in #{where}).",
+              hint: "Export #{name}=... before building, or write ${#{name}:-default} to provide a fallback.",
+            )
+          end
+        end
+
         # Secrets travel in headers and (via `${VAR}`) sometimes in the query
         # string, so log lines and error messages carry only
         # scheme://host[:port]/path — never headers, query, or userinfo.
@@ -131,12 +186,24 @@ module Hwaro
           "<unparseable url>"
         end
 
-        private def fetch(entry : Models::RemoteDataConfig, max_bytes : Int64) : {String, String?}
+        # Returns the body, the response Content-Type, and the FINAL url —
+        # the one the last hop actually served, which is what format
+        # inference must look at.
+        private def fetch(entry : Models::RemoteDataConfig, max_bytes : Int64,
+                          deadline : Time::Span) : {String, String?, String}
           original = URI.parse(entry.url)
           current = original
+          # Kept as the CONFIGURED string until a redirect actually moves it,
+          # so an un-redirected fetch infers its format from exactly the text
+          # the user wrote rather than from a URI round-trip.
+          final_url = entry.url
           redirects = 0
+          # One clock for the whole entry: hops and body reads share it, so a
+          # chain of individually-prompt responses can't outlast the budget.
+          started = Time.instant
 
           loop do
+            check_deadline!(started, deadline)
             validate_hop!(current)
             client = build_client(current)
             outcome = begin
@@ -146,7 +213,7 @@ module Hwaro
                              raise FetchError.new("redirect (HTTP #{response.status_code}) without a Location header")
                   {location, nil, nil}
                 elsif response.success?
-                  {nil, read_capped(response, max_bytes), response.headers["Content-Type"]?}
+                  {nil, read_capped(response, max_bytes, started, deadline), response.headers["Content-Type"]?}
                 else
                   raise FetchError.new("HTTP #{response.status_code}")
                 end
@@ -160,10 +227,16 @@ module Hwaro
               redirects += 1
               raise FetchError.new("too many redirects (limit #{MAX_REDIRECTS})") if redirects > MAX_REDIRECTS
               current = current.resolve(location)
+              final_url = current.to_s
             else
-              return {body.as(String), content_type}
+              return {body.as(String), content_type, final_url}
             end
           end
+        end
+
+        private def check_deadline!(started : Time::Instant, deadline : Time::Span) : Nil
+          return if Time.instant - started < deadline
+          raise FetchError.new("exceeded the #{deadline.total_seconds.round.to_i}s fetch deadline")
         end
 
         # Every hop must stay http(s) — a redirect to file:// or ftp:// is
@@ -204,18 +277,34 @@ module Hwaro
           uri.port || (uri.scheme.try(&.downcase) == "https" ? 443 : 80)
         end
 
-        private def read_capped(response : HTTP::Client::Response, max_bytes : Int64) : String
-          body = if io = response.body_io?
-                   buffer = IO::Memory.new
-                   IO.copy(io, buffer, max_bytes + 1)
-                   buffer.to_s
-                 else
-                   response.body
-                 end
-          if body.bytesize > max_bytes
-            raise FetchError.new("response exceeds the #{max_bytes.humanize_bytes} size cap")
+        # Chunk-at-a-time rather than `IO.copy` so the wall-clock deadline is
+        # re-checked between reads: each individual read can complete inside
+        # READ_TIMEOUT forever while the transfer as a whole never ends.
+        private def read_capped(response : HTTP::Client::Response, max_bytes : Int64,
+                                started : Time::Instant, deadline : Time::Span) : String
+          io = response.body_io?
+          unless io
+            body = response.body
+            raise size_cap_error(max_bytes) if body.bytesize > max_bytes
+            return body
           end
-          body
+
+          buffer = IO::Memory.new
+          chunk = Bytes.new(32 * 1024)
+          total = 0_i64
+          loop do
+            check_deadline!(started, deadline)
+            read = io.read(chunk)
+            break if read.zero?
+            total += read
+            raise size_cap_error(max_bytes) if total > max_bytes
+            buffer.write(chunk[0, read])
+          end
+          buffer.to_s
+        end
+
+        private def size_cap_error(max_bytes : Int64) : FetchError
+          FetchError.new("response exceeds the #{max_bytes.humanize_bytes} size cap")
         end
 
         # A cache entry is only usable when its digest matches the CURRENT
@@ -285,7 +374,9 @@ module Hwaro
           )
         end
 
-        private def url_digest(url : String) : String
+        # Public because the serve-session memo keys on it too: an edited url
+        # in config.toml must miss both the disk cache and the memo.
+        def url_digest(url : String) : String
           Digest::MD5.hexdigest(url)
         end
 

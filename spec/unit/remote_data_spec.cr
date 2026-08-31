@@ -273,28 +273,41 @@ describe "[[data.remote]] env interpolation" do
     end
   end
 
-  it "fails the config load when a url variable is unset, naming it" do
+  # An unset variable is a hard error, but only for the command that
+  # actually fetches. `hwaro deploy`, `hwaro new` and `hwaro tool ...` load
+  # the very same config.toml and never touch the network — they used to
+  # abort on a remote source they would never read. The error moved to
+  # RemoteData.load (see "[[data.remote]] unresolved ${VAR}" below).
+  it "loads the config cleanly when a url variable is unset, leaving the placeholder in place" do
     ENV.delete("HWARO_SPEC_REMOTE_UNSET")
-    err = expect_config_error(<<-TOML)
+    config = load_config(<<-TOML)
       [[data.remote]]
       key = "team"
       url = "https://api.example.com/team?v=${HWARO_SPEC_REMOTE_UNSET}"
       TOML
-    (err.message || "").should contain("HWARO_SPEC_REMOTE_UNSET")
-    (err.message || "").should contain("not set")
+    config.data_remote[0].url.should eq("https://api.example.com/team?v=${HWARO_SPEC_REMOTE_UNSET}")
   end
 
-  it "fails the config load when a header variable is unset, naming the variable and header but not its value" do
+  it "loads the config cleanly when a header variable is unset" do
     ENV.delete("HWARO_SPEC_REMOTE_UNSET")
-    err = expect_config_error(<<-TOML)
+    config = load_config(<<-TOML)
       [[data.remote]]
       key = "team"
       url = "https://api.example.com/team"
       headers = { Authorization = "Bearer ${HWARO_SPEC_REMOTE_UNSET}" }
       TOML
-    (err.message || "").should contain("HWARO_SPEC_REMOTE_UNSET")
-    (err.message || "").should contain("Authorization")
-    (err.message || "").should_not contain("Bearer")
+    config.data_remote[0].headers["Authorization"].should eq("Bearer ${HWARO_SPEC_REMOTE_UNSET}")
+  end
+
+  it "still validates the rest of the entry's shape when a variable is unset" do
+    ENV.delete("HWARO_SPEC_REMOTE_UNSET")
+    err = expect_config_error(<<-TOML)
+      [[data.remote]]
+      key = "team"
+      url = "https://api.example.com/${HWARO_SPEC_REMOTE_UNSET}/team"
+      on_error = "explode"
+      TOML
+    (err.message || "").should contain("on_error")
   end
 
   it "uses the fallback for ${VAR:-default} without erroring" do
@@ -738,6 +751,403 @@ describe "builder integration for [[data.remote]]" do
           err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
           (err.message || "").should contain("data/team.json")
           (err.message || "").should contain("[[data.remote]]")
+        end
+      end
+    end
+  end
+end
+
+# --- Post-merge review follow-ups (PR #759) ------------------------------
+#
+# Every example below is a regression guard for one verified finding: they
+# all failed (or crashed) against the merged implementation.
+
+describe "RemoteData compressed-body failures" do
+  # HTTP::Client sends `Accept-Encoding: gzip, deflate` by default, so a
+  # source answering `Content-Encoding: gzip` with bytes that are not gzip
+  # raises Compress::Gzip::Error out of the body read — a fetch failure like
+  # any other, which must flow through `on_error` instead of escaping
+  # unclassified and killing the build.
+  corrupt_gzip = ->(ctx : HTTP::Server::Context) do
+    ctx.response.headers["Content-Encoding"] = "gzip"
+    ctx.response.content_type = "application/json"
+    ctx.response.print "this is definitely not a gzip stream"
+  end
+
+  it "on_error = warn-and-skip warns and returns nil for a corrupt gzip body" do
+    with_test_server(corrupt_gzip) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/team.json", on_error: "warn-and-skip")
+        log = with_captured_log do
+          RemoteData.load(entry, cache_dir: File.join(dir, "cache")).should be_nil
+        end
+        log.should contain("missing this build")
+      end
+    end
+  end
+
+  it "on_error = fail raises a classified HWARO_E_NETWORK error for a corrupt gzip body" do
+    with_test_server(corrupt_gzip) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/team.json")
+        err = expect_raises(Hwaro::HwaroError) do
+          RemoteData.load(entry, cache_dir: File.join(dir, "cache"))
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+        (err.message || "").should contain("site.data.team")
+      end
+    end
+  end
+
+  it "classifies a corrupt deflate body the same way" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      ctx.response.headers["Content-Encoding"] = "deflate"
+      ctx.response.content_type = "application/json"
+      ctx.response.print "this is definitely not a deflate stream"
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/team.json", on_error: "warn-and-skip")
+        log = with_captured_log do
+          RemoteData.load(entry, cache_dir: File.join(dir, "cache")).should be_nil
+        end
+        log.should contain("missing this build")
+      end
+    end
+  end
+end
+
+describe "RemoteData fetch deadline" do
+  it "gives up on a slow-drip source at the overall fetch deadline" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      ctx.response.content_type = "application/json"
+      # Content-Length keeps the client reading until the deadline fires;
+      # each drip lands well inside READ_TIMEOUT, which is why a per-read
+      # timeout alone never trips here.
+      ctx.response.headers["Content-Length"] = "200"
+      200.times do
+        ctx.response.print "x"
+        ctx.response.flush
+        sleep 100.milliseconds
+      end
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/slow.json")
+        started = Time.instant
+        err = expect_raises(Hwaro::HwaroError) do
+          RemoteData.load(entry, cache_dir: File.join(dir, "cache"), deadline: 1.second)
+        end
+        elapsed = Time.instant - started
+        (err.message || "").should contain("fetch deadline")
+        # 20s of drip, abandoned after ~1s.
+        elapsed.should be < 10.seconds
+      end
+    end
+  end
+
+  it "leaves a prompt response untouched" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"ok": true})
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/team.json")
+        result = RemoteData.load(entry, cache_dir: File.join(dir, "cache"), deadline: 30.seconds).not_nil!
+        result.value["ok"].truthy?.should be_true
+      end
+    end
+  end
+end
+
+describe "RemoteData format inference after a redirect" do
+  it "infers the format from the URL the redirect actually landed on" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      if ctx.request.path == "/team"
+        ctx.response.status_code = 302
+        ctx.response.headers["Location"] = "/cdn/team.json"
+      else
+        # A CDN that serves everything as octet-stream: the response says
+        # nothing, so only the post-redirect extension can answer.
+        ctx.response.content_type = "application/octet-stream"
+        ctx.response.print %({"name": "redirected-team"})
+      end
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/team")
+        result = RemoteData.load(entry, cache_dir: File.join(dir, "cache")).not_nil!
+        result.value["name"].as_s.should eq("redirected-team")
+      end
+    end
+  end
+
+  it "still lets an explicit format win over the post-redirect extension" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      if ctx.request.path == "/team"
+        ctx.response.status_code = 302
+        ctx.response.headers["Location"] = "/cdn/team.json"
+      else
+        ctx.response.content_type = "application/octet-stream"
+        ctx.response.print %(name = "toml-team")
+      end
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/team", format: "toml")
+        result = RemoteData.load(entry, cache_dir: File.join(dir, "cache")).not_nil!
+        result.value["name"].as_s.should eq("toml-team")
+      end
+    end
+  end
+end
+
+describe "[[data.remote]] unresolved ${VAR}" do
+  it "raises a classified HWARO_E_CONFIG naming the variable when the entry is used" do
+    ENV.delete("HWARO_SPEC_REMOTE_UNSET")
+    Dir.mktmpdir do |dir|
+      entry = remote_entry("https://api.example.com/team?v=${HWARO_SPEC_REMOTE_UNSET}")
+      err = expect_raises(Hwaro::HwaroError) do
+        RemoteData.load(entry, cache_dir: File.join(dir, "cache"))
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+      (err.message || "").should contain("HWARO_SPEC_REMOTE_UNSET")
+      (err.message || "").should contain("not set")
+    end
+  end
+
+  it "names the header but never echoes its value" do
+    ENV.delete("HWARO_SPEC_REMOTE_UNSET")
+    Dir.mktmpdir do |dir|
+      entry = remote_entry("https://api.example.com/team",
+        headers: {"Authorization" => "Bearer ${HWARO_SPEC_REMOTE_UNSET}"})
+      err = expect_raises(Hwaro::HwaroError) do
+        RemoteData.load(entry, cache_dir: File.join(dir, "cache"))
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+      (err.message || "").should contain("HWARO_SPEC_REMOTE_UNSET")
+      (err.message || "").should contain("Authorization")
+      (err.message || "").should_not contain("Bearer")
+    end
+  end
+
+  # on_error softens flaky SOURCES, never a config mistake: silently
+  # skipping the key would leave site.data.<key> undefined and blame the
+  # template that dereferences it.
+  it "is not softened by on_error" do
+    ENV.delete("HWARO_SPEC_REMOTE_UNSET")
+    Dir.mktmpdir do |dir|
+      entry = remote_entry("https://api.example.com/team?v=${HWARO_SPEC_REMOTE_UNSET}", on_error: "warn-and-skip")
+      err = expect_raises(Hwaro::HwaroError) do
+        RemoteData.load(entry, cache_dir: File.join(dir, "cache"))
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
+  end
+
+  it "fails the build with that error, naming the variable" do
+    ENV.delete("HWARO_SPEC_REMOTE_UNSET")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "Test"
+
+          [[data.remote]]
+          key = "team"
+          url = "https://api.example.com/team?v=${HWARO_SPEC_REMOTE_UNSET}"
+          TOML
+        FileUtils.mkdir_p("content")
+        File.write("content/a.md", "---\ntitle: A\ndate: 2023-01-01\n---\nA\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        err = expect_raises(Hwaro::HwaroError) do
+          builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("HWARO_SPEC_REMOTE_UNSET")
+      end
+    end
+  end
+
+  it "lets a command that only reads the config run to completion" do
+    ENV.delete("HWARO_SPEC_REMOTE_UNSET")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "Test"
+          base_url = "https://example.com"
+
+          [[data.remote]]
+          key = "team"
+          url = "https://api.example.com/team"
+          headers = { Authorization = "Bearer ${HWARO_SPEC_REMOTE_UNSET}" }
+
+          [deployment]
+          source_dir = "public"
+          TOML
+
+        # `hwaro deploy` / `hwaro new` / `hwaro tool ...` all reach the site
+        # through Config.load and never fetch: this must not raise.
+        config = Hwaro::Models::Config.load
+        config.title.should eq("Test")
+        config.deployment.source_dir.should eq("public")
+        config.data_remote[0].headers["Authorization"].should contain("${HWARO_SPEC_REMOTE_UNSET}")
+      end
+    end
+  end
+end
+
+describe "[[data.remote]] case-colliding keys" do
+  # "Team" and "team" are two entries in config.toml but ONE pair of files
+  # under .hwaro/remote_data/ on macOS/Windows, so they overwrite each
+  # other's payload and meta every build.
+  it "rejects keys that differ only in case" do
+    err = expect_config_error(<<-TOML)
+      [[data.remote]]
+      key = "Team"
+      url = "https://api.example.com/team"
+
+      [[data.remote]]
+      key = "team"
+      url = "https://api.example.com/other"
+      TOML
+    (err.message || "").should contain("Duplicate")
+    (err.message || "").should contain("case-insensitive")
+  end
+
+  it "still accepts keys that differ by more than case" do
+    config = load_config(<<-TOML)
+      [[data.remote]]
+      key = "Team"
+      url = "https://api.example.com/team"
+
+      [[data.remote]]
+      key = "team_us"
+      url = "https://api.example.com/other"
+      TOML
+    config.data_remote.map(&.key).should eq(["Team", "team_us"])
+  end
+end
+
+describe "[[data.remote]] serve-session memo" do
+  private_config = ->(base : String, cache : String) do
+    <<-TOML
+      title = "Test"
+
+      [[data.remote]]
+      key = "team"
+      url = "#{base}/team.json"
+      #{cache}
+      TOML
+  end
+
+  it "fetches once per serve session and keeps rebuilding when the source goes away" do
+    hits = Atomic(Int32).new(0)
+    server = HTTP::Server.new do |ctx|
+      hits.add(1)
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"name": "hwaro-team"})
+    end
+    address = server.bind_tcp("127.0.0.1", 0)
+    spawn { server.listen }
+    Fiber.yield
+    base = "http://127.0.0.1:#{address.port}"
+
+    begin
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", private_config.call(base, ""))
+          FileUtils.mkdir_p("content")
+          File.write("content/a.md", "---\ntitle: A\ndate: 2023-01-01\n---\nA\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", serve_mode: true)
+
+          builder.run(options)
+          builder.site.not_nil!.data["team"]["name"].as_s.should eq("hwaro-team")
+          hits.get.should eq(1)
+
+          # The source is gone; a serve rebuild must still succeed, and the
+          # no-TTL entry must not even try to refetch.
+          server.close
+          builder.run(options)
+          builder.site.not_nil!.data["team"]["name"].as_s.should eq("hwaro-team")
+          hits.get.should eq(1)
+        end
+      end
+    ensure
+      server.close rescue nil
+    end
+  end
+
+  it "warns and reuses the session payload when a TTL-expired refetch fails" do
+    healthy = Atomic(Int32).new(1)
+    server = HTTP::Server.new do |ctx|
+      if healthy.get > 0
+        ctx.response.content_type = "application/json"
+        ctx.response.print %({"name": "hwaro-team"})
+      else
+        ctx.response.status_code = 503
+      end
+    end
+    address = server.bind_tcp("127.0.0.1", 0)
+    spawn { server.listen }
+    Fiber.yield
+    base = "http://127.0.0.1:#{address.port}"
+
+    begin
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          # on_error defaults to "fail", and the disk cache is never consulted
+          # in that mode — the memo is the only thing that can save this build.
+          File.write("config.toml", private_config.call(base, %(cache = "1s")))
+          FileUtils.mkdir_p("content")
+          File.write("content/a.md", "---\ntitle: A\ndate: 2023-01-01\n---\nA\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", serve_mode: true)
+          builder.run(options)
+          builder.site.not_nil!.data["team"]["name"].as_s.should eq("hwaro-team")
+
+          healthy.set(0)
+          sleep 1200.milliseconds
+          log = with_captured_log { builder.run(options) }
+          builder.site.not_nil!.data["team"]["name"].as_s.should eq("hwaro-team")
+          log.should contain("HTTP 503")
+          log.should contain("serve session")
+        end
+      end
+    ensure
+      server.close rescue nil
+    end
+  end
+
+  it "does not memoize for a plain build" do
+    hits = Atomic(Int32).new(0)
+    handler = ->(ctx : HTTP::Server::Context) do
+      hits.add(1)
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"name": "hwaro-team"})
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", private_config.call(base, ""))
+          FileUtils.mkdir_p("content")
+          File.write("content/a.md", "---\ntitle: A\ndate: 2023-01-01\n---\nA\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+          builder.run(options)
+          builder.run(options)
+          hits.get.should eq(2)
         end
       end
     end

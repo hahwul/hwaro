@@ -2280,17 +2280,19 @@ module Hwaro
         end
       end
 
-      # `[[data.remote]]` — declarative remote data sources. Validated
-      # strictly (every bad entry raises HWARO_E_CONFIG) because a mistake
-      # here otherwise surfaces as a network failure at build time, far from
-      # the config line that caused it.
+      # `[[data.remote]]` — declarative remote data sources. SHAPE is
+      # validated strictly here (every bad entry raises HWARO_E_CONFIG)
+      # because a mistake otherwise surfaces as a network failure at build
+      # time, far from the config line that caused it.
       #
-      # `${VAR}` interpolation already ran file-wide before TOML parsing (see
-      # `load`); for url and header values a `${VAR}` still present in the
-      # parsed value means the variable was unset. Elsewhere in config.toml
-      # that is a warning, but these values feed an HTTP request — usually
-      # credentials — so `require_env_var!` upgrades it to a hard error that
-      # names the variable.
+      # What is deliberately NOT validated here is whether an interpolated
+      # `${VAR}` resolved. Interpolation already ran file-wide before TOML
+      # parsing (see `load`), so an unset variable leaves the literal `${VAR}`
+      # text in the value — but raising on it at config-load time made every
+      # command that merely READS the config (`hwaro deploy`, `hwaro new`,
+      # `hwaro tool ...`, and serve's `[build]` merge) abort on a remote
+      # source it would never fetch. `RemoteData.load` raises the identical
+      # HWARO_E_CONFIG when the entry is actually used instead.
       private def self.load_data_remote(config : Config)
         return unless data_section = config.raw["data"]?.try(&.as_h?)
 
@@ -2317,13 +2319,18 @@ module Hwaro
           unless key.matches?(/\A[A-Za-z0-9_-]+\z/)
             raise remote_config_error("#{where}: key may contain only letters, digits, '_' and '-' (it becomes site.data.#{key} and a cache filename).")
           end
-          unless seen_keys.add?(key)
-            raise remote_config_error("Duplicate [[data.remote]] key \"#{key}\" — each key may be declared only once.")
+          # Compared case-insensitively: the key also names the cache files
+          # under .hwaro/remote_data/, so "Team" and "team" are two config
+          # entries but ONE pair of files on a case-insensitive filesystem
+          # (macOS APFS, Windows) — they would overwrite each other's payload
+          # and meta on every build, permanently defeating the TTL and the
+          # offline `warn-and-use-cache` fallback for whichever lost.
+          unless seen_keys.add?(key.downcase)
+            raise remote_config_error("Duplicate [[data.remote]] key \"#{key}\" — each key may be declared only once, and keys are compared case-insensitively because they name cache files under .hwaro/remote_data/, which collide on case-insensitive filesystems (macOS, Windows).")
           end
 
           url = entry_hash["url"]?.try(&.as_s?) ||
                 raise remote_config_error("#{where} is missing the required string 'url'.")
-          require_env_vars!(url, "#{where} url")
           validate_remote_url!(url, where)
 
           entry = RemoteDataConfig.new(key, url)
@@ -2343,7 +2350,6 @@ module Hwaro
             headers_hash.each do |name, value_any|
               value = value_any.as_s? ||
                       raise remote_config_error("#{where}: header \"#{name}\" must be a string.")
-              require_env_vars!(value, "#{where} header \"#{name}\"")
               entry.headers[name] = value
             end
           end
@@ -2372,25 +2378,12 @@ module Hwaro
         end
       end
 
-      # Only the braced no-default form is checked: `${VAR:-fallback}` was
-      # already resolved to its fallback by the file-wide pass, and bare
-      # `$WORD` keeps its warn-only behavior so a literal dollar sign in a
-      # URL can't break the build. The value itself is never echoed — header
-      # values hold secrets.
-      private def self.require_env_vars!(value : String, where : String) : Nil
-        value.scan(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/) do |match|
-          name = match[1]
-          next unless ENV[name]?.nil?
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONFIG,
-            message: "Environment variable '#{name}' is not set (referenced in #{where}).",
-            hint: "Export #{name}=... before building, or write ${#{name}:-default} to provide a fallback.",
-          )
-        end
-      end
-
       # Remote sources are http(s)-only, rejected here at config load; the
       # fetcher re-validates every redirect hop against the same rule.
+      #
+      # A url still carrying an unresolved `${VAR}` parses fine here (the
+      # placeholder lands in the host or the path) and is left alone —
+      # `RemoteData.load` names the variable when the entry is used.
       private def self.validate_remote_url!(url : String, where : String) : Nil
         uri = begin
           URI.parse(url)

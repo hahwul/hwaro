@@ -126,6 +126,20 @@ module Hwaro
         # cached pages like an edited data/ file. "" when no remote sources
         # are configured (keeps cache keys byte-identical to pre-feature).
         @remote_data_digest : String = ""
+        # Per-SERVE-SESSION memo of fetched [[data.remote]] payloads. The
+        # dev server holds one Builder for the whole session, so this lives
+        # exactly as long as `hwaro serve` does; `hwaro build` is one process
+        # per build and never populates it, which is why build semantics are
+        # untouched.
+        #
+        # Without it every full rebuild refetched every source synchronously:
+        # editing a paragraph offline failed the rebuild, and the default
+        # (no `cache`) entry re-hit the network on every unrelated save.
+        # Keyed by {entry key, url digest} — not the url itself, which can
+        # carry a credential in its query string — so editing either in
+        # config.toml misses the memo and refetches, exactly like the disk
+        # cache.
+        @remote_data_memo : Hash({String, String}, {RemoteData::Result, Time}) = {} of {String, String} => {RemoteData::Result, Time}
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
