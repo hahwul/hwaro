@@ -886,19 +886,14 @@ module Hwaro::Core::Build::Phases::Initialize
   end
 
   private def parse_data_file(path : String) : Crinja::Value?
-    ext = File.extname(path).downcase
     # JSON and TOML both reject a leading BOM outright, so a data file saved
     # by a Windows editor would warn-and-skip and leave `site.data.<key>`
     # undefined — which then fails the whole render.
     content = Utils::TextUtils.strip_bom(File.read(path))
-    case ext
-    when ".yml", ".yaml"
-      Utils::CrinjaUtils.from_yaml(YAML.parse(content))
-    when ".json"
-      Utils::CrinjaUtils.from_json(JSON.parse(content))
-    when ".toml"
-      Utils::CrinjaUtils.from_toml(TOML.parse(content))
-    end
+    # The glob feeding this method only matches .yml/.yaml/.json/.toml, so the
+    # shared dispatcher's .csv branch is unreachable here — `data/` has never
+    # read CSV, and this refactor does not change that.
+    Utils::CrinjaUtils.parse_data_string(content, File.extname(path).downcase.lchop('.'))
   rescue ex
     # This rescue also covers read errors and value-conversion failures, not
     # just parse errors, so it must not assert the file is malformed — it once

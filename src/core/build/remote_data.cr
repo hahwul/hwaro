@@ -110,23 +110,14 @@ module Hwaro
         end
 
         # Parse a payload the same way `data/` files parse, so a key can move
-        # between a local file and a remote source without templates noticing.
-        # CSV matches the template-facing `load_data()` shape: an array of
-        # rows, each an array of stripped string cells.
+        # between a local file and a remote source without templates noticing —
+        # both routes go through the one shared dispatcher. The BOM strip is
+        # this caller's, matching `data/`: JSON and TOML both reject a leading
+        # BOM outright.
         def parse_body(body : String, format : String) : Crinja::Value
           content = Utils::TextUtils.strip_bom(body)
-          case format
-          when "json" then Utils::CrinjaUtils.from_json(JSON.parse(content))
-          when "toml" then Utils::CrinjaUtils.from_toml(TOML.parse(content))
-          when "yaml" then Utils::CrinjaUtils.from_yaml(YAML.parse(content))
-          when "csv"
-            rows = CSV.parse(content).map do |row|
-              Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
-            end
-            Crinja::Value.new(rows)
-          else
+          Utils::CrinjaUtils.parse_data_string(content, format) ||
             raise FetchError.new("unsupported format #{format.inspect}")
-          end
         end
 
         # Secrets travel in headers and (via `${VAR}`) sometimes in the query

@@ -644,23 +644,28 @@ module Hwaro
 
         # Parse a data file's content by the extension carried on `path` (the
         # template-facing argument). Returns nil for unsupported types.
+        #
+        # The extension→format mapping stays a suffix match rather than
+        # `File.extname` (which reads a bare ".json" as a dotfile, not an
+        # extension), and the content is handed over WITHOUT a BOM strip —
+        # both are long-standing `load_data()` behavior. Only the
+        # format→Crinja parsing itself is shared with `data/` files and
+        # `[[data.remote]]`.
         private def parse_data_content(path : String, content : String) : Crinja::Value?
-          if path.ends_with?(".json")
-            json_to_crinja(JSON.parse(content))
-          elsif path.ends_with?(".toml")
-            toml_to_crinja(TOML.parse(content))
-          elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
-            yaml_to_crinja(YAML.parse(content))
-          elsif path.ends_with?(".csv")
-            # Parse CSV using stdlib parser (handles quoted fields correctly)
-            csv_data = CSV.parse(content).map do |row|
-              Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
-            end
-            Crinja::Value.new(csv_data)
-          else
+          format = if path.ends_with?(".json")
+                     "json"
+                   elsif path.ends_with?(".toml")
+                     "toml"
+                   elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
+                     "yaml"
+                   elsif path.ends_with?(".csv")
+                     "csv"
+                   end
+          unless format
             Logger.debug "load_data('#{path}'): unsupported file type '#{File.extname(path)}' (supported: .json, .toml, .yaml, .yml, .csv)"
-            nil
+            return
           end
+          Utils::CrinjaUtils.parse_data_string(content, format)
         end
 
         private def register_asset_functions
@@ -713,18 +718,6 @@ module Hwaro
               Crinja::Value.new("")
             end
           end
-        end
-
-        private def json_to_crinja(json : JSON::Any) : Crinja::Value
-          Utils::CrinjaUtils.from_json(json)
-        end
-
-        private def toml_to_crinja(toml : TOML::Table) : Crinja::Value
-          Utils::CrinjaUtils.from_toml(toml)
-        end
-
-        private def yaml_to_crinja(yaml : YAML::Any) : Crinja::Value
-          Utils::CrinjaUtils.from_yaml(yaml)
         end
       end
 
