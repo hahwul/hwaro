@@ -339,6 +339,8 @@ hwaro serve -i /path/to/my-site
 hwaro serve -i /path/to/my-site -p 8080
 ```
 
+> **serve 출력은 개발용 산출물입니다 — 절대 배포하지 마세요.** `hwaro serve`는 전용 디렉터리 `.hwaro/serve/`에 빌드하고, 설정된 `output_dir`(기본 `public/`)은 전혀 건드리지 않습니다. 따라서 serve 세션이 배포 가능한 빌드를 덮어쓰는 일은 생기지 않습니다. `.hwaro/serve/`의 페이지들은 모든 링크에 개발 서버의 `base_url`(예: `http://127.0.0.1:3000`)이 박혀 있고, 디렉터리에는 `hwaro deploy`가 거부하는 `.hwaro-dev` 마커가 찍힙니다. 배포할 사이트는 `hwaro build`로 만들고, `.hwaro/`는 `.hwaro_cache.json`과 마찬가지로 `.gitignore`에 추가해 버전 관리에서 제외하세요.
+
 **옵션:**
 
 | 플래그 | 설명 |
@@ -429,7 +431,7 @@ hwaro serve --header "X-Custom: foo" --header "Cache-Control: no-store"
 
 - CLI `--header` 값이 `config.toml`의 같은 키보다 우선합니다.
 - 헤더는 **모든** 개발 서버 응답(HTML, 에셋, 404, 리디렉션, 라이브 리로드가 주입된 페이지, CORS 프리플라이트(`OPTIONS`) 응답)에 붙습니다.
-- 이 기능은 `hwaro serve`에만 적용됩니다. `public/`에 쓰이는 파일은 그대로입니다.
+- 이 기능은 `hwaro serve`에만 적용됩니다. 빌드가 디스크에 쓰는 파일은 그대로입니다.
 
 ### deploy
 

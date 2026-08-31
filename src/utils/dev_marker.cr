@@ -19,12 +19,10 @@ module Hwaro
       # What the file says to whoever finds it in a directory listing or a
       # deploy artifact. The first line is the greppable contract; CI can
       # `test -f` the filename alone.
-      CONTENT = <<-TEXT
-      This directory was written by `hwaro serve` and is not deployable.
-      Its pages carry the dev server's base_url (e.g. http://127.0.0.1:3000).
-      Run `hwaro build` and deploy that output instead.
-
-      TEXT
+      CONTENT =
+        "This directory was written by `hwaro serve` and is not deployable.\n" \
+        "Its pages carry the dev server's base_url (e.g. http://127.0.0.1:3000).\n" \
+        "Run `hwaro build` and deploy that output instead.\n"
 
       def path(output_dir : String) : String
         File.join(output_dir, FILENAME)

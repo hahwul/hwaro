@@ -23,6 +23,8 @@ hwaro build --minify
 
 `static/`의 모든 파일은 `public/`으로 복사되어 함께 배포됩니다. `.well-known/security.txt`, `.domains` 같은 숨김 dot 경로도 포함되며, 콜드 빌드와 `--cache`/증분 빌드에서 동일하게 동작합니다. `.DS_Store`, `.git/` 같은 OS·에디터·VCS 잔여 파일은 자동으로 걸러집니다. 조정 방법은 [설정](/ko/start/config/#정적-파일) 문서의 정적 파일 항목을 참고합니다.
 
+> **`hwaro serve` 출력은 절대 배포하지 마세요.** 개발 서버는 전용 디렉터리 `.hwaro/serve/`에 빌드하고(`public/`은 건드리지 않습니다), 모든 링크에 개발용 `base_url`(예: `http://127.0.0.1:3000`)을 박아 넣으며, 그 디렉터리에 `.hwaro-dev` 마커를 찍습니다. `hwaro deploy`는 마커가 있는 소스 디렉터리를 거부합니다. 이 에러를 만나면 `hwaro build`를 실행해 새로 빌드한 출력을 배포하세요.
+
 ## 기본 절차
 
 1. 사이트 빌드: `hwaro build`
