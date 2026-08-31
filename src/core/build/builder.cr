@@ -23,6 +23,7 @@ require "crinja"
 require "./cache"
 require "./cache_manager"
 require "./parallel"
+require "./remote_data"
 require "./template_deps"
 require "./template_loader"
 require "./shortcode_processor"
@@ -120,6 +121,11 @@ module Hwaro
         @cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))?
         @cache : Cache?
         @config : Models::Config?
+        # Digest of the fetched [[data.remote]] payloads for this build,
+        # folded into compute_data_hash so a changed payload invalidates
+        # cached pages like an edited data/ file. "" when no remote sources
+        # are configured (keeps cache keys byte-identical to pre-feature).
+        @remote_data_digest : String = ""
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?

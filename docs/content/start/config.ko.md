@@ -292,6 +292,7 @@ Cache-Control = "no-store"
 | `[image_processing]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | 이미지 리사이즈 & LQIP |
 | `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | Base64 블러업 플레이스홀더 |
 | `[content.files]` | [콘텐츠 파일](/ko/features/content-files/) | 마크다운이 아닌 파일 게시 |
+| `[[data.remote]]` | [원격 데이터 소스](/ko/templates/data-model/#원격-데이터-소스) | 빌드 시 원격 데이터를 `site.data`로 가져오기 |
 | `[static]` | [정적 파일](#정적-파일) | `static/` 복사에서 잔여 파일 필터링 / 경로 제외 |
 | `[serve]` | [개발 서버](#개발-서버) | 개발 서버 응답 헤더 & 빠른 모드 |
 | `[links]` | [링크](#링크) | 깨진 내부 `@/` 링크 처리 (경고 또는 빌드 실패) |

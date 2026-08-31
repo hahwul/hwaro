@@ -115,6 +115,41 @@ Directories nest arbitrarily: `data/users/admins/root.yml` → `site.data.users.
 
 **Conflicts.** If a directory and a file share the same stem (e.g. `data/users.yml` alongside `data/users/`), the **directory wins** and the file is ignored. Hwaro emits a warning during the build so the shadowed file is not silently dropped.
 
+### Remote Data Sources
+
+`site.data` can also be fed from HTTP(S) endpoints, declared in `config.toml`. Each source is fetched **once per build, before anything renders** — templates never trigger network requests, and every endpoint the build talks to is visible in one place.
+
+```toml
+[[data.remote]]
+key = "team"                # exposed as site.data.team
+url = "https://api.example.com/team"
+format = "json"             # json | toml | yaml | csv (optional, see inference below)
+headers = { Authorization = "Bearer ${API_TOKEN}" }
+cache = "1h"                # skip the request while the cached copy is younger than this
+on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
+```
+
+Templates consume the result exactly like a local data file — `site.data.team` — so a key can move between `data/team.json` and a remote source without touching any template.
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `key` | yes | Name under `site.data`. Letters, digits, `_`, `-` only; each key may be declared once. |
+| `url` | yes | Absolute `http://` or `https://` URL. Other schemes are rejected at config load. |
+| `format` | no | `json`, `toml`, `yaml`, or `csv`. When omitted, inferred from the response `Content-Type`, then from the URL's file extension. If neither identifies a format, the fetch fails with a hint to set `format` explicitly. |
+| `headers` | no | Extra request headers. Treated as credentials: never logged, and dropped when a redirect leaves the original origin. |
+| `cache` | no | Disk-cache TTL such as `"90s"`, `"30m"`, `"1h"`, `"7d"` (units combine: `"1h30m"`). While the cached copy is fresh, the build skips the request entirely. Without `cache`, every build refetches — but the last payload is still saved for `warn-and-use-cache`. |
+| `on_error` | no | What to do when the fetch or parse fails. `fail` (default) aborts the build; `warn-and-use-cache` warns and builds from the last successfully fetched payload (any age); `warn-and-skip` warns and leaves `site.data.<key>` unset for this build. |
+
+CSV payloads parse to an array of rows, each an array of stripped string cells — the same shape `load_data()` produces for `.csv` files.
+
+**Environment variables.** `${VAR}` in `url` and `headers` values is replaced from the environment. A referenced variable that is not set fails the config load with an error naming the variable (elsewhere in `config.toml` this is only a warning); write `${VAR:-default}` to provide a fallback instead.
+
+**Caching.** Payloads are cached under `.hwaro/remote_data/` — outside `data/` and every other directory `hwaro serve` watches, so serve rebuilds within the TTL reuse the cache instead of re-hitting the API, and cache writes never trigger a rebuild. The cache also survives `hwaro build --full` (only the page cache is cleared), and it is what lets an offline build succeed with `on_error = "warn-and-use-cache"`. Add `.hwaro/` to your `.gitignore`. During a long `hwaro serve` session, a source is re-fetched on the first full rebuild after its TTL expires. A changed payload invalidates cached pages the same way an edited `data/` file does.
+
+**Collisions.** A remote `key` that also exists on disk (`data/team.json` next to `key = "team"`) is a config error naming both sources — a key must have exactly one source, so `site.data.team` never silently depends on which one wins.
+
+Remote sources are deliberately config-only: `load_data()` and shortcodes cannot take a URL. If you need more than a GET request per source — pagination, POST bodies, reshaping — fetch with a [pre-build hook](/features/build-hooks/#fetching-data-from-an-api) into `data/` instead.
+
 ### Site Authors
 
 Hwaro automatically aggregates all authors defined in the `authors` front matter field (`authors = ["id"]`) into `site.authors`.

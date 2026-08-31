@@ -1134,6 +1134,42 @@ module Hwaro
       end
     end
 
+    # One `[[data.remote]]` entry — a declarative remote data source fetched
+    # once per build (before render) into `site.data.<key>`. This class is
+    # the validated config shape; fetching, caching and error handling live
+    # in `Core::Build::RemoteData`. See docs/content/templates/data-model.md.
+    class RemoteDataConfig
+      # Accepted `format` values (also the set inference can produce).
+      VALID_FORMATS = %w[json toml yaml csv]
+      # Accepted `on_error` modes.
+      VALID_ON_ERROR = %w[fail warn-and-use-cache warn-and-skip]
+
+      # Template-facing name: the payload lands at `site.data.<key>`. Also
+      # used as the cache filename, hence the restricted character set.
+      property key : String
+      # Absolute http(s) URL, already env-substituted.
+      property url : String
+      # Explicit payload format; nil = infer from the response Content-Type,
+      # then from the URL's path extension, at fetch time.
+      property format : String?
+      # Extra request headers (values already env-substituted). Treated as
+      # credentials: never logged, and dropped on cross-origin redirects.
+      property headers : Hash(String, String)
+      # Disk-cache TTL; nil = refetch on every build. The cache file is
+      # written either way so `on_error = "warn-and-use-cache"` always has a
+      # fallback once one fetch has succeeded.
+      property cache_ttl : Time::Span?
+      # "fail" | "warn-and-use-cache" | "warn-and-skip"
+      property on_error : String
+
+      def initialize(@key : String, @url : String)
+        @format = nil
+        @headers = {} of String => String
+        @cache_ttl = nil
+        @on_error = "fail"
+      end
+    end
+
     class Config
       property title : String
       property description : String
@@ -1169,6 +1205,7 @@ module Hwaro
       property static : StaticConfig
       property outputs : OutputsConfig
       property links : LinksConfig
+      property data_remote : Array(RemoteDataConfig)
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_url_stripped : String? = nil
@@ -1210,6 +1247,7 @@ module Hwaro
         @static = StaticConfig.new
         @outputs = OutputsConfig.new
         @links = LinksConfig.new
+        @data_remote = [] of RemoteDataConfig
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -1446,6 +1484,7 @@ module Hwaro
         resolve_deployment_source_dir(config)
         load_outputs(config)
         load_links(config)
+        load_data_remote(config)
 
         config
       end
@@ -1460,7 +1499,7 @@ module Hwaro
       # top-level key is always dead configuration.
       KNOWN_TOP_LEVEL_KEYS = %w[
         title description base_url default_language
-        amp assets auto_includes build content deployment doctor feeds
+        amp assets auto_includes build content data deployment doctor feeds
         highlight image_processing languages links llms markdown menus og
         outputs pagination permalinks plugins pwa related robots sass search
         series serve sitemap static taxonomies
@@ -2239,6 +2278,156 @@ module Hwaro
             Logger.warn "Unknown [links] broken_internal value '#{mode}' — expected \"warn\" or \"error\"; keeping \"warn\"."
           end
         end
+      end
+
+      # `[[data.remote]]` — declarative remote data sources. Validated
+      # strictly (every bad entry raises HWARO_E_CONFIG) because a mistake
+      # here otherwise surfaces as a network failure at build time, far from
+      # the config line that caused it.
+      #
+      # `${VAR}` interpolation already ran file-wide before TOML parsing (see
+      # `load`); for url and header values a `${VAR}` still present in the
+      # parsed value means the variable was unset. Elsewhere in config.toml
+      # that is a warning, but these values feed an HTTP request — usually
+      # credentials — so `require_env_var!` upgrades it to a hard error that
+      # names the variable.
+      private def self.load_data_remote(config : Config)
+        return unless data_section = config.raw["data"]?.try(&.as_h?)
+
+        data_section.each_key do |key|
+          next if key == "remote"
+          Logger.warn "Unknown key 'data.#{key}' in config.toml — hwaro does not read it."
+        end
+
+        return unless remote_any = data_section["remote"]?
+        # A `[data.remote]` single table (or any other shape) would otherwise
+        # be ignored silently — the feature would just not run.
+        remote_list = remote_any.as_a? ||
+                      raise remote_config_error("'data.remote' must be an array of tables — declare each source with [[data.remote]] (double brackets).")
+
+        seen_keys = Set(String).new
+        config.data_remote = remote_list.map_with_index do |entry_any, index|
+          where = "[[data.remote]] entry #{index + 1}"
+          entry_hash = entry_any.as_h? ||
+                       raise remote_config_error("#{where} must be a table ([[data.remote]] with key/url fields).")
+
+          key = entry_hash["key"]?.try(&.as_s?) ||
+                raise remote_config_error("#{where} is missing the required string 'key' (it names site.data.<key>).")
+          where = "[[data.remote]] \"#{key}\""
+          unless key.matches?(/\A[A-Za-z0-9_-]+\z/)
+            raise remote_config_error("#{where}: key may contain only letters, digits, '_' and '-' (it becomes site.data.#{key} and a cache filename).")
+          end
+          unless seen_keys.add?(key)
+            raise remote_config_error("Duplicate [[data.remote]] key \"#{key}\" — each key may be declared only once.")
+          end
+
+          url = entry_hash["url"]?.try(&.as_s?) ||
+                raise remote_config_error("#{where} is missing the required string 'url'.")
+          require_env_vars!(url, "#{where} url")
+          validate_remote_url!(url, where)
+
+          entry = RemoteDataConfig.new(key, url)
+
+          if format_any = entry_hash["format"]?
+            format = format_any.as_s? || raise remote_config_error("#{where}: 'format' must be a string.")
+            format = "yaml" if format == "yml"
+            unless RemoteDataConfig::VALID_FORMATS.includes?(format)
+              raise remote_config_error("#{where}: unknown format \"#{format}\" — expected one of: #{RemoteDataConfig::VALID_FORMATS.join(", ")}.")
+            end
+            entry.format = format
+          end
+
+          if headers_any = entry_hash["headers"]?
+            headers_hash = headers_any.as_h? ||
+                           raise remote_config_error("#{where}: 'headers' must be a table of string values.")
+            headers_hash.each do |name, value_any|
+              value = value_any.as_s? ||
+                      raise remote_config_error("#{where}: header \"#{name}\" must be a string.")
+              require_env_vars!(value, "#{where} header \"#{name}\"")
+              entry.headers[name] = value
+            end
+          end
+
+          if cache_any = entry_hash["cache"]?
+            spec = cache_any.as_s? ||
+                   raise remote_config_error("#{where}: 'cache' must be a duration string such as \"30m\" or \"1h\".")
+            entry.cache_ttl = parse_cache_duration(spec) ||
+                              raise remote_config_error("#{where}: invalid cache duration \"#{spec}\" — use <number><unit> with units s/m/h/d (e.g. \"90s\", \"30m\", \"1h\", \"7d\").")
+          end
+
+          if on_error_any = entry_hash["on_error"]?
+            on_error = on_error_any.as_s?
+            unless on_error && RemoteDataConfig::VALID_ON_ERROR.includes?(on_error)
+              raise remote_config_error("#{where}: unknown on_error \"#{on_error_any.raw}\" — expected one of: #{RemoteDataConfig::VALID_ON_ERROR.join(", ")}.")
+            end
+            entry.on_error = on_error
+          end
+
+          entry_hash.each_key do |k|
+            next if {"key", "url", "format", "headers", "cache", "on_error"}.includes?(k)
+            Logger.warn "#{where}: unknown key '#{k}' — hwaro does not read it."
+          end
+
+          entry
+        end
+      end
+
+      # Only the braced no-default form is checked: `${VAR:-fallback}` was
+      # already resolved to its fallback by the file-wide pass, and bare
+      # `$WORD` keeps its warn-only behavior so a literal dollar sign in a
+      # URL can't break the build. The value itself is never echoed — header
+      # values hold secrets.
+      private def self.require_env_vars!(value : String, where : String) : Nil
+        value.scan(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/) do |match|
+          name = match[1]
+          next unless ENV[name]?.nil?
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Environment variable '#{name}' is not set (referenced in #{where}).",
+            hint: "Export #{name}=... before building, or write ${#{name}:-default} to provide a fallback.",
+          )
+        end
+      end
+
+      # Remote sources are http(s)-only, rejected here at config load; the
+      # fetcher re-validates every redirect hop against the same rule.
+      private def self.validate_remote_url!(url : String, where : String) : Nil
+        uri = begin
+          URI.parse(url)
+        rescue URI::Error
+          raise remote_config_error("#{where}: invalid url — expected an absolute http(s) URL.")
+        end
+        scheme = uri.scheme.try(&.downcase)
+        host = uri.host
+        return if {"http", "https"}.includes?(scheme) && host && !host.empty?
+        raise remote_config_error("#{where}: url must be absolute http:// or https:// (got #{url.inspect}).")
+      end
+
+      # "90s" / "30m" / "1h" / "7d", or combinations ("1h30m"). Returns nil
+      # on anything else — the caller owns the error message. Each component
+      # is capped so an absurd magnitude can't overflow Time::Span.
+      private def self.parse_cache_duration(spec : String) : Time::Span?
+        return unless spec.matches?(/\A(?:\d+[smhd])+\z/)
+        total = Time::Span.zero
+        spec.scan(/(\d+)([smhd])/) do |m|
+          amount = m[1].to_i64?
+          return unless amount && amount <= 10_000_000
+          total += case m[2]
+                   when "s" then amount.seconds
+                   when "m" then amount.minutes
+                   when "h" then amount.hours
+                   else          amount.days
+                   end
+        end
+        total
+      end
+
+      private def self.remote_config_error(message : String) : Hwaro::HwaroError
+        Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: message,
+          hint: "Each [[data.remote]] entry needs key + url (http/https); optional: format (json|toml|yaml|csv), headers (table), cache (duration such as \"1h\"), on_error (fail|warn-and-use-cache|warn-and-skip).",
+        )
       end
 
       private def self.load_permalinks(config : Config)
