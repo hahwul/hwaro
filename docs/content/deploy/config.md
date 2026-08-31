@@ -37,6 +37,12 @@ some — that combination is almost always "the site was never built" and
 would otherwise wipe the destination. Pass `--force` to clear a destination
 on purpose. A `command` target that never interpolates `{source}` is exempt.
 
+A source directory containing a `.hwaro-dev` marker is refused as well —
+that marker means the directory is `hwaro serve` output, with the dev
+server's `base_url` (e.g. `http://127.0.0.1:3000`) baked into every link.
+Run `hwaro build` and deploy its output instead; there is no override flag
+(deleting the marker file by hand is the deliberate escape hatch).
+
 `workers` is accepted for forward compatibility but not applied: the
 built-in sync copies serially and command targets manage their own
 concurrency. Setting it prints a warning.

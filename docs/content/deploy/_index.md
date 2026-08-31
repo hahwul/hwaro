@@ -23,6 +23,8 @@ This performs conservative optimization — HTML comments and trailing whitespac
 
 Everything in `static/` is copied into `public/` and deployed — including hidden dot-paths such as `.well-known/security.txt` and `.domains` — identically for cold and `--cache`/incremental builds. Common OS/editor/VCS cruft (`.DS_Store`, `.git/`, …) is filtered out automatically; see [Static Files](/start/config/#static-files) to tune it.
 
+> **Never deploy `hwaro serve` output.** The dev server builds into its own `.hwaro/serve/` directory (leaving `public/` untouched) with its dev `base_url` — e.g. `http://127.0.0.1:3000` — baked into every link, and stamps that directory with a `.hwaro-dev` marker. `hwaro deploy` refuses any source directory carrying the marker; if you hit that error, run `hwaro build` and deploy the freshly built output instead.
+
 ## General Steps
 
 1. Build the site: `hwaro build`

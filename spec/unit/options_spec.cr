@@ -123,7 +123,9 @@ describe Hwaro::Config::Options::ServeOptions do
     options = Hwaro::Config::Options::ServeOptions.new(drafts: true, base_url: "https://example.com")
     build_options = options.to_build_options
     build_options.drafts.should be_true
-    build_options.output_dir.should eq("public")
+    # Serve builds into its own dev directory, never the deployable
+    # output_dir (issue #756).
+    build_options.output_dir.should eq(Hwaro::Config::Options::ServeOptions::DEV_OUTPUT_DIR)
     build_options.base_url.should eq("https://example.com")
     build_options.cache_busting.should be_true
     build_options.stream.should be_false

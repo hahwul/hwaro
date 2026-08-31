@@ -2,6 +2,15 @@ module Hwaro
   module Config
     module Options
       struct ServeOptions
+        # Where `hwaro serve` builds. A dedicated directory, NOT the
+        # configured output_dir (issue #756): serve derives base_url from its
+        # bind address, so its pages carry dev URLs (http://127.0.0.1:3000) —
+        # sharing the output dir let a serve session silently poison a
+        # previously deployable `hwaro build`, and hosting the leftover tree
+        # leaked those dev links. Keep this directory out of version control
+        # (alongside .hwaro_cache.json).
+        DEV_OUTPUT_DIR = ".hwaro/serve"
+
         property host : String
         property port : Int32
         property base_url : String?
@@ -90,8 +99,8 @@ module Hwaro
           # so that generated URLs reflect the actual server address
           effective_base_url = @base_url || "http://#{ServeOptions.url_host(@host)}:#{@port}"
 
-          BuildOptions.new(
-            output_dir: "public",
+          build = BuildOptions.new(
+            output_dir: DEV_OUTPUT_DIR,
             base_url: effective_base_url,
             drafts: @drafts,
             include_expired: @include_expired,
@@ -113,6 +122,13 @@ module Hwaro
             fast_start: @fast_start,
             fast_start_count: @fast_start_count,
           )
+          # Pin the dev output dir the same way an explicit `-o` is pinned:
+          # `apply_build_config!` runs both in Server#run and inside
+          # Builder#run on EVERY watch rebuild, and without this flag a
+          # `[build] output_dir` in config.toml would pull serve right back
+          # into the deployable tree this directory exists to protect.
+          build.output_dir_explicit = true
+          build
         end
       end
     end

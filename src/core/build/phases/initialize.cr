@@ -1,3 +1,5 @@
+require "../../../utils/dev_marker"
+
 # Phase: Initialize — output dir setup, cache init, config loading, template loading
 #
 # Handles the first phase of the build lifecycle:
@@ -34,8 +36,25 @@ module Hwaro::Core::Build::Phases::Initialize
       # like image processing can actually short-circuit. For a cold build
       # we always wipe to guarantee a clean state.
       keep_output = cache_enabled || ctx.options.preserve_output
+      # Read before setup_output_dir — the cold-build wipe would erase the
+      # evidence that a serve session (an older hwaro shared the output dir)
+      # had written here.
+      dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
       setup_output_dir(output_dir, keep_output)
       copy_static_files(output_dir, verbose, keep_output)
+
+      if ctx.options.serve_mode
+        # Serve output is never deployable (dev base_url baked into every
+        # page) — stamp the directory so `hwaro deploy` can refuse it.
+        Utils::DevMarker.write(output_dir)
+      elsif dev_marker_found
+        # A `--cache`/preserved build keeps existing files, so the stale
+        # marker must go explicitly; on a cold build the wipe already took
+        # it. Warn either way — the user should know dev output sat in the
+        # deployable tree until now.
+        Utils::DevMarker.remove(output_dir)
+        Logger.warn "  A previous `hwaro serve` session had written dev output into #{output_dir} — this build replaces it with deployable output."
+      end
 
       config = @config || raise "Config not loaded"
       if url = ctx.options.base_url
