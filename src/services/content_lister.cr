@@ -257,12 +257,23 @@ module Hwaro
           end
         end
 
-        # `[[content.generate]]` entries join under the same filter rules;
-        # they can never be drafts (no draft front matter to flag them).
+        # `[[content.generate]]` entries join under the same filter rules.
+        # They carry no draft front matter of their own, but a parent
+        # section's `[cascade] draft = true` applies to them in the build
+        # (their synthetic path sits under the section like any authored
+        # file), so it must apply here too — publish-state parity with the
+        # build is this lister's contract.
         @generated.each do |info|
+          if cascaded_draft?(File.join(@content_dir, info.path), cascade)
+            info = info.dup
+            info.draft = true
+            info.status = PublishState::Draft.label
+          end
           case filter
           when ContentFilter::All
             contents << info
+          when ContentFilter::Drafts
+            contents << info if info.draft
           when ContentFilter::Published
             contents << info if info.published?
           end

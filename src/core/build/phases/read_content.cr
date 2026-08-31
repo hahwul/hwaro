@@ -163,17 +163,19 @@ module Hwaro::Core::Build::Phases::ReadContent
     return if plans.empty?
 
     # Authored content always wins a path. Collected paths cover what this
-    # build read; the disk probe additionally covers files the collect pass
-    # excluded (a draft without --drafts, a `.markdown` twin) — those still
-    # OWN their URL, and a generated page silently replacing an authored
-    # one is the one collision outcome this feature must never produce.
+    # build read; the shared disk probe additionally covers files the
+    # collect pass excluded (a draft without --drafts, a `.markdown` twin)
+    # and the leaf-bundle twin `<slug>/index.md` that publishes the same
+    # URL — those still OWN their URL, and a generated page silently
+    # replacing an authored one is the one collision outcome this feature
+    # must never produce.
     collected_paths = Set(String).new
     ctx.pages.each { |p| collected_paths << p.path }
     ctx.sections.each { |s| collected_paths << s.path }
 
     added = Hash(String, Int32).new(0)
     plans.each do |plan|
-      if collected_paths.includes?(plan.path) || authored_source_exists?(plan.path)
+      if collected_paths.includes?(plan.path) || ContentGenerate.authored_twin_exists?(plan.path)
         Logger.warn "  #{plan.origin}: skipping generated page '#{plan.path}' — an authored content file already claims that path (authored content wins)."
         next
       end
@@ -189,12 +191,5 @@ module Hwaro::Core::Build::Phases::ReadContent
     added.each do |origin, count|
       Logger.info "  Generated #{count} page(s) from #{origin}"
     end
-  end
-
-  # True when an authored source file exists at this content-relative .md
-  # path (or its .markdown twin), even if the collect pass filtered it out.
-  private def authored_source_exists?(path : String) : Bool
-    base = File.join("content", path)
-    File.exists?(base) || (path.ends_with?(".md") && File.exists?("#{base.rchop(".md")}.markdown"))
   end
 end

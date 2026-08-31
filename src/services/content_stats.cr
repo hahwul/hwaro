@@ -7,6 +7,7 @@ require "json"
 require "yaml"
 require "toml"
 require "./content_lister"
+require "./generated_content"
 require "../utils/errors"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
@@ -70,7 +71,9 @@ module Hwaro
           )
         end
 
-        lister = ContentLister.new(@content_dir)
+        # Same generated-page rows the list command shows, so `tool stats`
+        # and `tool list` never disagree about what a build ships.
+        lister = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir))
         items = lister.list_all
 
         return StatsResult.new if items.empty?

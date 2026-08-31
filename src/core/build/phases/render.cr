@@ -326,6 +326,10 @@ module Hwaro::Core::Build::Phases::Render
     section_set_changed = cache.section_set_changed?(section_set_fp)
     listing_memo = {} of String => Tuple(Bool, Bool)
     pages.select do |page|
+      # A synthesized page has no source file to fingerprint and records no
+      # cache entry (see record_page_cache_entry) — it is always dirty, so
+      # skip computing its template/asset hashes just to find that out.
+      next true if page.synthesized?
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
       next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page))

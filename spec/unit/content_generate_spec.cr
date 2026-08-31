@@ -249,6 +249,85 @@ describe "ContentGenerate.plan" do
   it "plans nothing for an empty source array" do
     plan_products(FULL_RULE, %({"items": []})).should be_empty
   end
+
+  it "reports a clean error when the source path descends past the record array" do
+    # Crinja's Resolver raises ArgumentError (not Crinja::Error) for a
+    # string key on an array — unrescued, this crashed the whole build.
+    rule = FULL_RULE.sub("products.items", "products.items.name")
+    err = expect_plan_error(rule)
+    err.message.to_s.should contain("site.data.products.items is an array, not a table")
+  end
+
+  it "degrades to zero pages when the source is a skippable [[data.remote]] key left unset" do
+    config = generate_config(<<-TOML
+      [[data.remote]]
+      key = "products"
+      url = "https://api.example.com/products.json"
+      on_error = "warn-and-skip"
+
+      [[content.generate]]
+      source = "products"
+      section = "products"
+      slug = "sku"
+      title = "name"
+      TOML
+    )
+    # The remote fetch was allowed to fail (on_error), so the rule must
+    # warn-and-generate-nothing rather than hard-fail the build.
+    plans = ContentGenerate.plan(config, {} of String => Crinja::Value, planner_env)
+    plans.should be_empty
+  end
+
+  it "rejects a slug that resolves to the reserved name index" do
+    json = %({"items": [{"sku": "_index", "name": "A"}]})
+    rule = "[[content.generate]]\nsource = \"products.items\"\nsection = \"products\"\nslug = \"sku\"\ntitle = \"name\""
+    err = expect_plan_error(rule, json)
+    err.message.to_s.should contain("reserved name \"index\"")
+  end
+end
+
+describe "ContentGenerate.authored_twin_exists?" do
+  it "detects flat, .markdown and leaf-bundle twins case-sensitively" do
+    Dir.mktmpdir do |dir|
+      FileUtils.cd(dir) do
+        FileUtils.mkdir_p("content/products/widget")
+        File.write("content/products/flat.md", "x")
+        File.write("content/products/legacy.markdown", "x")
+        File.write("content/products/widget/index.md", "x")
+
+        ContentGenerate.authored_twin_exists?("products/flat.md").should be_true
+        ContentGenerate.authored_twin_exists?("products/legacy.md").should be_true
+        ContentGenerate.authored_twin_exists?("products/widget.md").should be_true
+        ContentGenerate.authored_twin_exists?("products/other.md").should be_false
+        # Case differences are DIFFERENT paths — File.exists? would fold
+        # them on macOS and drop a page Linux CI publishes.
+        ContentGenerate.authored_twin_exists?("products/Flat.md").should be_false
+      end
+    end
+  end
+end
+
+describe "ContentLister with generated entries" do
+  it "applies a section's cascade draft to generated rows (publish-state parity)" do
+    Dir.mktmpdir do |dir|
+      FileUtils.cd(dir) do
+        FileUtils.mkdir_p("content/products")
+        File.write("content/products/_index.md", "+++\ntitle = 'P'\n[cascade]\ndraft = true\n+++\n")
+        generated = [
+          Hwaro::Services::ContentInfo.new(
+            path: "products/x.md", title: "X", draft: false, date: nil,
+            status: "published", generated_from: "data.products",
+          ),
+        ]
+        lister = Hwaro::Services::ContentLister.new("content", generated)
+
+        # The build drops these pages (cascade draft), so "published" must too.
+        lister.list_published.any?(&.generated_from).should be_false
+        drafts = lister.list_drafts
+        drafts.any? { |info| info.generated_from == "data.products" }.should be_true
+      end
+    end
+  end
 end
 
 describe "ContentGenerate.item_to_extra" do

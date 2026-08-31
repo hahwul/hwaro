@@ -111,6 +111,20 @@ describe "[[content.generate]] build integration" do
     end
   end
 
+  it "lets an authored leaf bundle win the same URL" do
+    contested = CONTENT_FILES.merge({
+      "products/red-widget/index.md" => "+++\ntitle = 'Bundle Red'\n+++\nBundle body.",
+    })
+    build_site(CONFIG, content_files: contested, template_files: TEMPLATE_FILES, data_files: DATA_FILES) do
+      File.read("public/products/red-widget/index.html").should contain("<h1>Bundle Red</h1>")
+      # The generated twin maps to the bundle's URL — it must be dropped,
+      # not doubled into the section listing.
+      listing = File.read("public/products/index.html")
+      listing.scan("Bundle Red").size.should eq(1)
+      listing.should_not contain("Red Widget</li>")
+    end
+  end
+
   it "applies [permalinks] patterns to generated pages" do
     config = CONFIG + "\n[permalinks]\nproducts = \"/shop/:slug/\"\n"
     build_site(config, content_files: CONTENT_FILES, template_files: TEMPLATE_FILES, data_files: DATA_FILES) do

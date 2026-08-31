@@ -31,6 +31,7 @@ require "../../models/page"
 require "../../utils/text_utils"
 require "../../utils/frontmatter_writer"
 require "../../utils/errors"
+require "../../utils/logger"
 require "../../utils/nesting"
 
 module Hwaro
@@ -62,14 +63,30 @@ module Hwaro
         # (`hwaro tool list`).
         def plan(config : Models::Config, data : Hash(String, Crinja::Value),
                  env : Crinja, include_bodies : Bool = true) : Array(Plan)
-          rules = config.content_generate
+          # Declared [[data.remote]] keys may legitimately be absent from
+          # `data`: on_error = "warn-and-skip"/"warn-and-use-cache" exists so
+          # a build survives the source being down, and a rule over that key
+          # must degrade the same way (warn, generate nothing) instead of
+          # turning the resilience setting into a hard failure. A key with
+          # on_error = "fail" can never be absent here — the fetch already
+          # aborted the build — so passing every declared key is safe.
+          plan(config.content_generate, data, env, include_bodies,
+            lenient_missing_keys: config.data_remote.map(&.key))
+        end
+
+        # Rule-list variant so callers with their own rule handling (`hwaro
+        # tool list` plans rule-by-rule to isolate failures) don't have to
+        # mutate a loaded Config.
+        def plan(rules : Array(Models::ContentGenerateConfig), data : Hash(String, Crinja::Value),
+                 env : Crinja, include_bodies : Bool = true,
+                 lenient_missing_keys : Array(String) = [] of String) : Array(Plan)
           return [] of Plan if rules.empty?
 
           plans = [] of Plan
           # path => "…" descriptor of the claim, for cross-rule collisions.
           claimed = {} of String => String
           rules.each do |rule|
-            plan_rule(rule, data, env, plans, claimed, include_bodies)
+            plan_rule(rule, data, env, plans, claimed, include_bodies, lenient_missing_keys)
           end
           plans
         end
@@ -79,9 +96,10 @@ module Hwaro
                               env : Crinja,
                               plans : Array(Plan),
                               claimed : Hash(String, String),
-                              include_bodies : Bool)
+                              include_bodies : Bool,
+                              lenient_missing_keys : Array(String))
           where = "[[content.generate]] \"#{rule.source}\""
-          records = resolve_source_records(rule.source, data, where)
+          records = resolve_source_records(rule.source, data, where, lenient_missing_keys)
           return if records.empty?
 
           # Compile each template spec once per rule, render once per record.
@@ -106,6 +124,12 @@ module Hwaro
             slug = Utils::TextUtils.slugify(slug_raw)
             if slug.empty?
               raise generate_error("#{record_where}: slug \"#{slug_raw}\" slugifies to \"\" — it has no letters or digits.")
+            end
+            if slug == "index"
+              # PermalinkResolver decides index-ness from the path stem, so
+              # `<section>/index.md` would silently claim the SECTION's own
+              # URL (or collide with its authored _index.md).
+              raise generate_error("#{record_where}: slug \"#{slug_raw}\" slugifies to the reserved name \"index\" — it would claim the section URL /#{rule.section}/ itself. Give the record a different slug.")
             end
             record_where = "#{where}: record ##{index + 1} (\"#{slug}\")"
 
@@ -156,18 +180,39 @@ module Hwaro
         # Resolve the rule's dotted `source` path into an array of records.
         # Missing keys and non-array values are hard errors that spell out
         # what WAS found — "generated zero pages, silently" is the failure
-        # mode this feature must never have.
-        private def resolve_source_records(source : String, data : Hash(String, Crinja::Value), where : String) : Array(Crinja::Value)
+        # mode this feature must never have. The one sanctioned exception:
+        # a root key in `lenient_missing_keys` (a declared [[data.remote]]
+        # source whose fetch was allowed to fail) degrades to a warning and
+        # zero records, honoring the remote source's own on_error contract.
+        private def resolve_source_records(source : String, data : Hash(String, Crinja::Value), where : String,
+                                           lenient_missing_keys : Array(String) = [] of String) : Array(Crinja::Value)
           parts = source.split('.')
-          current = data[parts.first]? ||
-                    raise generate_error("#{where}: site.data.#{parts.first} is missing — no data/ file or [[data.remote]] key provides it#{data.empty? ? "" : " (available: #{data.keys.sort!.first(8).join(", ")})"}.")
+          root = parts.first
+          current = data[root]?
+          if current.nil?
+            # Remote keys are case-insensitively unique (they name cache
+            # files), so match the same way.
+            if lenient_missing_keys.any? { |key| key.compare(root, case_insensitive: true) == 0 }
+              Logger.warn "  #{where}: site.data.#{root} is a [[data.remote]] source that was skipped this build (see its on_error setting) — generating no pages from it."
+              return [] of Crinja::Value
+            end
+            raise generate_error("#{where}: site.data.#{root} is missing — no data/ file or [[data.remote]] key provides it#{data.empty? ? "" : " (available: #{data.keys.sort!.first(8).join(", ")})"}.")
+          end
 
           parts.each_with_index do |part, i|
             next if i.zero?
             walked = "site.data.#{parts[0..i - 1].join('.')}"
+            # Guard the shape BEFORE indexing: Crinja's Resolver raises
+            # ArgumentError (not Crinja::Error) for a string key on an
+            # array — e.g. a source path with one segment too many, like
+            # "products.items.name" — and an unrescued raw exception here
+            # crashes the whole build instead of naming the bad rule.
+            unless current.raw.is_a?(Hash)
+              raise generate_error("#{where}: #{walked} is #{type_name(current)}, not a table — cannot descend into '.#{part}'.")
+            end
             child = begin
               current[part]
-            rescue Crinja::Error
+            rescue Crinja::Error | ArgumentError
               raise generate_error("#{where}: #{walked} is #{type_name(current)}, not a table — cannot descend into '.#{part}'.")
             end
             if child.raw.is_a?(Crinja::Undefined)
@@ -338,6 +383,44 @@ module Hwaro
             io << body
             io << '\n' unless body.empty? || body.ends_with?('\n')
           end
+        end
+
+        # True when an authored source claims this plan's path or URL: the
+        # flat file (`<stem>.md` / `.markdown`, mirroring the ReadContent
+        # phase's PAGE_EXTENSIONS) or its leaf-bundle twin
+        # (`<stem>/index.md`), which publishes the same `/section/slug/`
+        # URL. Shared by the build's authored-wins guard and `hwaro tool
+        # list`, so the two can't drift.
+        #
+        # Probed with a case-SENSITIVE directory-entry comparison, not
+        # File.exists?: APFS/NTFS fold case, so an exists? probe would drop
+        # a generated page on macOS that Linux CI publishes — the same
+        # config must produce the same page set on every platform
+        # (build-determinism invariant).
+        def authored_twin_exists?(path : String, content_root : String = "content") : Bool
+          dir = File.join(content_root, File.dirname(path))
+          stem = File.basename(path, ".md")
+          entries = dir_children(dir)
+          return false if entries.empty?
+
+          Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
+            return true if entries.includes?("#{stem}#{ext}")
+          end
+
+          if entries.includes?(stem)
+            bundle_entries = dir_children(File.join(dir, stem))
+            Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
+              return true if bundle_entries.includes?("index#{ext}")
+            end
+          end
+
+          false
+        end
+
+        private def dir_children(dir : String) : Array(String)
+          Dir.exists?(dir) ? Dir.children(dir) : [] of String
+        rescue File::Error
+          [] of String
         end
 
         # Convert a source record (Crinja::Value) into `page.extra` shape so
