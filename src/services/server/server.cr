@@ -1739,6 +1739,12 @@ module Hwaro
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        # A user's own `static/.hwaro-dev` publishes like any hidden static
+        # file, so the copy above can land on top of serve's stamp. Only the
+        # full-build path re-stamps, so without this the dev dir would sit
+        # unmarked for the rest of the session — and `hwaro deploy` reads the
+        # marker by content, so the user's bytes would not stand in for it.
+        Hwaro::Utils::DevMarker.write(output_dir) unless Hwaro::Utils::DevMarker.present?(output_dir)
         # Changed image BYTES need their resized variants/LQIP regenerated
         # too — the resize hook only runs on full builds, so the copy above
         # alone left variants stale for the whole serve session (A12).

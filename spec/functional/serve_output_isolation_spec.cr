@@ -2,6 +2,7 @@ require "digest/md5"
 require "../spec_helper"
 require "../../src/services/server/server"
 require "../../src/services/deployer"
+require "../../src/utils/dev_marker"
 require "../../src/config/options/deploy_options"
 
 # Regression coverage for issue #756: deploying serve output leaked the dev
@@ -26,6 +27,10 @@ module Hwaro
 
       def isolation_serve_build_options(options : Config::Options::ServeOptions) : Config::Options::BuildOptions
         serve_build_options(options)
+      end
+
+      def isolation_copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
+        copy_static(changeset, build_options)
       end
     end
   end
@@ -190,7 +195,7 @@ describe "serve output isolation (issue #756)" do
       Dir.cd(dir) do
         write_isolation_site
         FileUtils.mkdir_p("public")
-        File.write("public/.hwaro-dev", "leftover from an old serve session")
+        File.write("public/.hwaro-dev", Hwaro::Utils::DevMarker::CONTENT)
 
         log = with_captured_log do
           isolation_production_builder.run(isolation_build_options).should be_true
@@ -209,7 +214,7 @@ describe "serve output isolation (issue #756)" do
       Dir.cd(dir) do
         write_isolation_site
         FileUtils.mkdir_p("public")
-        File.write("public/.hwaro-dev", "leftover from an old serve session")
+        File.write("public/.hwaro-dev", Hwaro::Utils::DevMarker::CONTENT)
         File.write("public/keep.txt", "cached artifact")
 
         options = isolation_build_options
@@ -247,7 +252,7 @@ describe "serve output isolation (issue #756)" do
         source = File.join(dir, "site")
         FileUtils.mkdir_p(source)
         File.write(File.join(source, "index.html"), "x")
-        File.write(File.join(source, ".hwaro-dev"), "dev output")
+        File.write(File.join(source, ".hwaro-dev"), Hwaro::Utils::DevMarker::CONTENT)
 
         config = Hwaro::Models::Config.new
         target = Hwaro::Models::DeploymentTarget.new
@@ -279,7 +284,7 @@ describe "serve output isolation (issue #756)" do
         source = File.join(dir, "site")
         FileUtils.mkdir_p(source)
         File.write(File.join(source, "index.html"), "x")
-        File.write(File.join(source, ".hwaro-dev"), "dev output")
+        File.write(File.join(source, ".hwaro-dev"), Hwaro::Utils::DevMarker::CONTENT)
 
         config = Hwaro::Models::Config.new
         target = Hwaro::Models::DeploymentTarget.new
@@ -321,6 +326,186 @@ describe "serve output isolation (issue #756)" do
           Hwaro::Services::Deployer.new.run(options, config).should be_true
         end
         File.exists?(File.join(dir, "dest", "index.html")).should be_true
+      end
+    end
+  end
+  # Post-merge review of #758: the marker was identified by FILENAME alone, so
+  # a legitimate user file `static/.hwaro-dev` was mistaken for one. Build 1
+  # published it and `hwaro deploy` refused the tree blaming a serve session
+  # that never ran; build 2 saw it pre-wipe and deleted the user's published
+  # file after the static copy, with a warning about dev output. A marker is
+  # now only a marker when its first line is the documented contract line.
+  describe "a user-owned static/.hwaro-dev" do
+    it "is published, survives consecutive builds, and never warns" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_isolation_site
+          FileUtils.mkdir_p("static")
+          user_content = "my own dotfile\nnothing to do with hwaro serve\n"
+          File.write("static/.hwaro-dev", user_content)
+
+          first_log = with_captured_log do
+            isolation_production_builder.run(isolation_build_options).should be_true
+          end
+          # Pre-fix this already passed — the damage lands on build 2.
+          File.read("public/.hwaro-dev").should eq(user_content)
+          first_log.should_not contain("hwaro serve` session")
+
+          second_log = with_captured_log do
+            isolation_production_builder.run(isolation_build_options).should be_true
+          end
+          # Pre-fix: build 2 read the published copy as a leftover marker and
+          # deleted it after the static copy, warning about dev output.
+          File.exists?("public/.hwaro-dev").should be_true
+          File.read("public/.hwaro-dev").should eq(user_content)
+          second_log.should_not contain("hwaro serve` session")
+        end
+      end
+    end
+
+    it "survives consecutive --cache builds too" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_isolation_site
+          FileUtils.mkdir_p("static")
+          File.write("static/.hwaro-dev", "user data\n")
+
+          options = isolation_build_options
+          options.cache = true
+          with_captured_log { isolation_production_builder.run(options).should be_true }
+          File.read("public/.hwaro-dev").should eq("user data\n")
+
+          # The preserved-output path removes a leftover marker explicitly, so
+          # pre-fix build 2 deleted the user's file here as well.
+          log = with_captured_log { isolation_production_builder.run(options).should be_true }
+          File.read("public/.hwaro-dev").should eq("user data\n")
+          log.should_not contain("hwaro serve` session")
+        end
+      end
+    end
+
+    it "does not block deploy" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "site")
+        FileUtils.mkdir_p(source)
+        File.write(File.join(source, "index.html"), "x")
+        File.write(File.join(source, ".hwaro-dev"), "a user file that is not a marker\n")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "production"
+        target.url = "file://#{dir}/dest"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: source,
+          targets: ["production"],
+        )
+
+        # Pre-fix: raised HWARO_E_CONFIG, blaming a serve session.
+        with_captured_log do
+          Hwaro::Services::Deployer.new.run(options, config).should be_true
+        end
+        File.exists?(File.join(dir, "dest", ".hwaro-dev")).should be_true
+      end
+    end
+
+    it "loses to serve's own stamp inside the dev output dir" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_isolation_site
+          FileUtils.mkdir_p("static")
+          File.write("static/.hwaro-dev", "user data\n")
+
+          server = Hwaro::Services::Server.new
+          with_captured_log do
+            server.isolation_builder.run(isolation_session_options).should be_true
+          end
+
+          # The dev dir is never deployable, so serve stamps it regardless —
+          # the static copy runs before the stamp.
+          File.read(".hwaro/serve/.hwaro-dev").should eq(Hwaro::Utils::DevMarker::CONTENT)
+          Hwaro::Utils::DevMarker.present?(".hwaro/serve").should be_true
+        end
+      end
+    end
+
+    it "is not a marker by name, while genuine content is" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, ".hwaro-dev"), "not a marker\n")
+        Hwaro::Utils::DevMarker.present?(dir).should be_false
+
+        # A body that merely mentions serve is still not the contract line.
+        File.write(File.join(dir, ".hwaro-dev"), "written by hwaro serve\n")
+        Hwaro::Utils::DevMarker.present?(dir).should be_false
+
+        Hwaro::Utils::DevMarker.write(dir)
+        Hwaro::Utils::DevMarker.present?(dir).should be_true
+
+        # Only the first line is the contract — the rest of the body may drift
+        # between versions without un-marking an older serve session's output.
+        File.write(File.join(dir, ".hwaro-dev"),
+          "#{Hwaro::Utils::DevMarker::CONTENT.lines.first}\nan older version said something else\n")
+        Hwaro::Utils::DevMarker.present?(dir).should be_true
+
+        Hwaro::Utils::DevMarker.remove(dir)
+        Hwaro::Utils::DevMarker.present?(dir).should be_false
+        File.exists?(File.join(dir, ".hwaro-dev")).should be_false
+      end
+    end
+
+    it "cannot un-stamp the dev dir on a serve static rebuild" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_isolation_site
+          FileUtils.mkdir_p("static")
+          File.write("static/.hwaro-dev", "user data\n")
+
+          serve_options = isolation_session_options
+          server = Hwaro::Services::Server.new
+          with_captured_log { server.isolation_builder.run(serve_options).should be_true }
+
+          # A watch-triggered :static rebuild copies the user's file straight
+          # over serve's stamp; only full rebuilds re-stamp, so the dev dir
+          # would stay unmarked (and deployable) for the rest of the session.
+          changeset = Hwaro::Services::ChangeSet.new(
+            modified_content: [] of String,
+            modified_templates: [] of String,
+            modified_static: ["static/.hwaro-dev"],
+            added_files: [] of String,
+            removed_files: [] of String,
+            config_changed: false,
+          )
+          with_captured_log do
+            server.isolation_copy_static(changeset, serve_options).should be_true
+          end
+
+          Hwaro::Utils::DevMarker.present?(".hwaro/serve").should be_true
+        end
+      end
+    end
+
+    it "is left alone by the build that removes a genuine leftover marker" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_isolation_site
+          FileUtils.mkdir_p("static")
+          File.write("static/.hwaro-dev", "user data\n")
+          # A real serve leftover in the deployable tree AND a user file that
+          # the static copy republishes over it: the warning is still owed,
+          # but the file standing there afterwards is the user's.
+          FileUtils.mkdir_p("public")
+          File.write("public/.hwaro-dev", Hwaro::Utils::DevMarker::CONTENT)
+
+          options = isolation_build_options
+          options.cache = true
+          log = with_captured_log do
+            isolation_production_builder.run(options).should be_true
+          end
+
+          log.should contain("previous `hwaro serve` session")
+          File.read("public/.hwaro-dev").should eq("user data\n")
+        end
       end
     end
   end

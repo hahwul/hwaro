@@ -38,7 +38,9 @@ module Hwaro::Core::Build::Phases::Initialize
       keep_output = cache_enabled || ctx.options.preserve_output
       # Read before setup_output_dir — the cold-build wipe would erase the
       # evidence that a serve session (an older hwaro shared the output dir)
-      # had written here.
+      # had written here. `present?` matches the marker's content, so a user's
+      # own `static/.hwaro-dev` (published by copy_static_files below like any
+      # hidden static file) is not mistaken for one.
       dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
       setup_output_dir(output_dir, keep_output)
       copy_static_files(output_dir, verbose, keep_output)
@@ -51,7 +53,8 @@ module Hwaro::Core::Build::Phases::Initialize
         # A `--cache`/preserved build keeps existing files, so the stale
         # marker must go explicitly; on a cold build the wipe already took
         # it. Warn either way — the user should know dev output sat in the
-        # deployable tree until now.
+        # deployable tree until now. `remove` re-checks the content, so a
+        # user's `static/.hwaro-dev` just published over the leftover stays.
         Utils::DevMarker.remove(output_dir)
         Logger.warn "  A previous `hwaro serve` session had written dev output into #{output_dir} — this build replaces it with deployable output."
       end
