@@ -103,6 +103,8 @@
           url: /features/auto-includes/
         - title: Content Files
           url: /features/content-files/
+        - title: Content Generation
+          url: /features/content-generation/
     - title: Platform
       items:
         - title: Multilingual

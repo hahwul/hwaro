@@ -1,4 +1,5 @@
 require "html"
+require "crinja"
 require "../utils/text_utils"
 require "../content/processors/fence_tracker"
 
@@ -70,6 +71,35 @@ module Hwaro
       property toc : Bool
       property generated : Bool
       property image : String?
+
+      # Provenance of a page materialized from `[[content.generate]]` (see
+      # Core::Build::ContentGenerate). Unlike `generated` — which marks the
+      # SYNTHETIC taxonomy listing pages that every content surface (feeds,
+      # search, related, OG, AMP, output formats) deliberately excludes —
+      # a synthesized page is first-class content: it enters the build in
+      # the ReadContent phase and flows through parse/transform/render like
+      # an authored file. The parse phase reads `markdown` instead of a
+      # disk file, and re-exposes `item` (the source record) under
+      # `page.extra.item` after front matter parsing.
+      class Synthesis
+        # Full synthetic markdown document (TOML front matter + body).
+        getter markdown : String
+        # The source record, bound to `item` in body_template renders and
+        # published to templates as `page.extra.item`.
+        getter item : Crinja::Value
+        # Human-readable origin for logs/tooling, e.g. "data.products".
+        getter origin : String
+
+        def initialize(@markdown : String, @item : Crinja::Value, @origin : String)
+        end
+      end
+
+      property synthesis : Synthesis?
+
+      # True for pages materialized from `[[content.generate]]`.
+      def synthesized? : Bool
+        !@synthesis.nil?
+      end
 
       # New: Assets - static files in this page directory
       property assets : Array(String)

@@ -15,6 +15,7 @@ module Hwaro::Core::Build::Phases::ReadContent
     result = @lifecycle.run_phase(Lifecycle::Phase::ReadContent, ctx) do
       Logger.status_phase("read")
       collect_content_paths(ctx, ctx.options.drafts)
+      synthesize_generated_pages(ctx)
       # Count surfaces in the closing build receipt's "read" row instead of an
       # inline line, keeping the build quiet until the summary.
       ctx.stats.pages_read = ctx.all_pages.size
@@ -143,5 +144,52 @@ module Hwaro::Core::Build::Phases::ReadContent
     return lang_code if config.languages.has_key?(lang_code) || lang_code == config.default_language
 
     nil
+  end
+
+  # `[[content.generate]]` — materialize planned data pages into the build's
+  # page list, HERE, so they enter the pipeline at the same point authored
+  # files do and every later phase (parse, cascade/draft filtering,
+  # taxonomies, feeds, search, sitemap, render, output formats) treats them
+  # as ordinary content. See Core::Build::ContentGenerate for the plan
+  # contract and Models::Page::Synthesis for why these pages must NOT carry
+  # the `generated` flag.
+  private def synthesize_generated_pages(ctx : Lifecycle::BuildContext)
+    config = ctx.config
+    return unless config
+    return if config.content_generate.empty?
+    site = @site || return
+
+    plans = ContentGenerate.plan(config, site.data, crinja_env)
+    return if plans.empty?
+
+    # Authored content always wins a path. Collected paths cover what this
+    # build read; the shared disk probe additionally covers files the
+    # collect pass excluded (a draft without --drafts, a `.markdown` twin)
+    # and the leaf-bundle twin `<slug>/index.md` that publishes the same
+    # URL — those still OWN their URL, and a generated page silently
+    # replacing an authored one is the one collision outcome this feature
+    # must never produce.
+    collected_paths = Set(String).new
+    ctx.pages.each { |p| collected_paths << p.path }
+    ctx.sections.each { |s| collected_paths << s.path }
+
+    added = Hash(String, Int32).new(0)
+    plans.each do |plan|
+      if collected_paths.includes?(plan.path) || ContentGenerate.authored_twin_exists?(plan.path)
+        Logger.warn "  #{plan.origin}: skipping generated page '#{plan.path}' — an authored content file already claims that path (authored content wins)."
+        next
+      end
+      page = Models::Page.new(plan.path)
+      page.section = plan.section
+      page.synthesis = Models::Page::Synthesis.new(plan.markdown, plan.item, plan.origin)
+      ctx.pages << page
+      collected_paths << plan.path
+      added[plan.origin] += 1
+    end
+    ctx.invalidate_all_pages_cache
+
+    added.each do |origin, count|
+      Logger.info "  Generated #{count} page(s) from #{origin}"
+    end
   end
 end

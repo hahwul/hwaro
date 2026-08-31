@@ -131,7 +131,7 @@ cache = "1h"                # 캐시된 사본이 이 시간보다 젊으면 요
 on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 ```
 
-템플릿에서는 로컬 데이터 파일과 똑같이 `site.data.team`으로 사용합니다. 따라서 어떤 키를 `data/team.json`과 원격 소스 사이에서 옮겨도 템플릿은 손댈 필요가 없습니다.
+템플릿에서는 로컬 데이터 파일과 똑같이 `site.data.team`으로 사용합니다. 따라서 어떤 키를 `data/team.json`과 원격 소스 사이에서 옮겨도 템플릿은 손댈 필요가 없습니다. 레코드를 템플릿에 공급하는 대신 페이지 자체로 만들려면 [콘텐츠 생성](/ko/features/content-generation/)을 참고하세요.
 
 | 필드 | 필수 | 의미 |
 |------|------|------|

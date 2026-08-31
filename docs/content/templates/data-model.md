@@ -129,7 +129,7 @@ cache = "1h"                # skip the request while the cached copy is younger 
 on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 ```
 
-Templates consume the result exactly like a local data file — `site.data.team` — so a key can move between `data/team.json` and a remote source without touching any template.
+Templates consume the result exactly like a local data file — `site.data.team` — so a key can move between `data/team.json` and a remote source without touching any template. To turn the records themselves into pages instead of feeding templates, see [Content Generation](/features/content-generation/).
 
 | Field | Required | Meaning |
 |-------|----------|---------|

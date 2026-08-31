@@ -10,6 +10,7 @@ require "json"
 require "option_parser"
 require "../../metadata"
 require "../../../services/content_lister"
+require "../../../services/generated_content"
 require "../../../utils/errors"
 require "../../../utils/logger"
 
@@ -109,7 +110,7 @@ module Hwaro
               )
             end
 
-            lister = Services::ContentLister.new(content_dir)
+            lister = Services::ContentLister.new(content_dir, Services::GeneratedContent.infos(content_dir))
 
             content_filter = case filter.as(String).downcase
                              when "all"

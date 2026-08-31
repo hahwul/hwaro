@@ -22,7 +22,7 @@ module Hwaro
       #
       # `depth` guards against a self-referencing YAML anchor, whose parsed
       # graph is cyclic and would otherwise recurse until the stack dies
-      # (see `Utils::Nesting`). Both call sites — `Initialize#parse_data_file`
+      # (see `Utils::Nesting`). Both call sites — `DataDisk.parse_file`
       # and the `load_data` template function — already rescue and degrade, so
       # the raise surfaces as "data file skipped" rather than a crash.
       def from_yaml(value : YAML::Any, depth : Int32 = 0) : Crinja::Value
@@ -144,7 +144,7 @@ module Hwaro
 
       # Parse a data payload into the `Crinja::Value` templates see, dispatching
       # on a bare format name ("json", "toml", "yaml"/"yml", "csv"). This is the
-      # one place that mapping lives: `data/` files (Initialize#parse_data_file),
+      # one place that mapping lives: `data/` files (DataDisk.parse_file),
       # the `load_data()` template function, and `[[data.remote]]` payloads
       # (RemoteData#parse_body) all route through it, so a key can move between
       # a disk file, a template call and a remote source and parse identically.

@@ -81,6 +81,7 @@ module Hwaro
             "render"      => Crinja::Value.new(@page.render),
             "is_index"    => Crinja::Value.new(@page.is_index),
             "generated"   => Crinja::Value.new(@page.generated),
+            "synthesized" => Crinja::Value.new(@page.synthesized?),
             "in_sitemap"  => Crinja::Value.new(@page.in_sitemap),
           }
           vars["page"] = Crinja::Value.new(page_obj)

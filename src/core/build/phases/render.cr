@@ -326,6 +326,10 @@ module Hwaro::Core::Build::Phases::Render
     section_set_changed = cache.section_set_changed?(section_set_fp)
     listing_memo = {} of String => Tuple(Bool, Bool)
     pages.select do |page|
+      # A synthesized page has no source file to fingerprint and records no
+      # cache entry (see record_page_cache_entry) — it is always dirty, so
+      # skip computing its template/asset hashes just to find that out.
+      next true if page.synthesized?
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
       next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page))
@@ -698,6 +702,12 @@ module Hwaro::Core::Build::Phases::Render
   # is resolved and it becomes the rightful writer.
   private def record_page_cache_entry(page : Models::Page, cache : Cache, templates : Hash(String, String), site : Models::Site, output_dir : String)
     return unless cache.enabled?
+    # A `[[content.generate]]` page has no source file to stat or hash —
+    # `cache.update` would raise on the missing path. Skipping keeps it
+    # always-dirty under --cache, which is also correct: its content moves
+    # with `site.data`, whose digest already invalidates the global config
+    # hash, not with any per-file fingerprint.
+    return if page.synthesized?
     return if collision_suppressed?(page, page.url)
     source_path, output_path = cache_paths_for(page, output_dir)
     # No output file was written for an escaping page, so recording it as
@@ -1178,7 +1188,12 @@ module Hwaro::Core::Build::Phases::Render
     by_fold = Hash(String, String).new
     folds_case : Bool? = nil
 
-    writers = all_pages.select(&.render).sort_by!(&.path)
+    # Authored pages claim before `[[content.generate]]` pages: when a
+    # generated slug lands on an authored URL, the authored page must own
+    # the file deterministically — never "whichever path sorts first".
+    # Sites without generated pages sort identically to the plain
+    # path sort this replaces (every key is {0, path}).
+    writers = all_pages.select(&.render).sort_by! { |p| {p.synthesized? ? 1 : 0, p.path} }
 
     # Cleared before every pass, not just set: this runs again on incremental
     # and serve rerenders, so a collision the author has since resolved must
@@ -2071,6 +2086,7 @@ module Hwaro::Core::Build::Phases::Render
       "render"       => Crinja::Value.new(p.render),
       "is_index"     => Crinja::Value.new(p.is_index),
       "generated"    => Crinja::Value.new(p.generated),
+      "synthesized"  => Crinja::Value.new(p.synthesized?),
       "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
       "language"     => Crinja::Value.new(p.language || default_language),
       "translations" => Crinja::Value.new(translations),
@@ -2879,6 +2895,7 @@ module Hwaro::Core::Build::Phases::Render
       "render"       => Crinja::Value.new(page.render),
       "is_index"     => Crinja::Value.new(page.is_index),
       "generated"    => Crinja::Value.new(page.generated),
+      "synthesized"  => Crinja::Value.new(page.synthesized?),
       "in_sitemap"   => Crinja::Value.new(page.in_sitemap),
       "language"     => Crinja::Value.new(page_language),
       "translations" => translations_crinja,

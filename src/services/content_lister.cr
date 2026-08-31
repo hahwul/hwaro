@@ -133,6 +133,11 @@ module Hwaro
       @[JSON::Field(converter: Hwaro::Services::ContentInfo::TimeConverter, emit_null: true)]
       property expires : Time?
 
+      # Provenance of a `[[content.generate]]` page ("data.products"); nil
+      # for authored files. Omitted from JSON when nil, so existing `--json`
+      # consumers see no new key on authored entries.
+      property generated_from : String?
+
       def initialize(
         @path : String,
         @title : String = "Untitled",
@@ -140,6 +145,7 @@ module Hwaro
         @date : Time? = nil,
         @status : String = "published",
         @expires : Time? = nil,
+        @generated_from : String? = nil,
       )
       end
 
@@ -150,6 +156,7 @@ module Hwaro
         @date : Time?,
         state : PublishState,
         @expires : Time? = nil,
+        @generated_from : String? = nil,
       )
         @status = state.label
       end
@@ -192,8 +199,12 @@ module Hwaro
       # Content directory path
       @content_dir : String
       @default_language : String? = nil
+      # Pre-planned `[[content.generate]]` entries (no files on disk for the
+      # walker to find, but part of what a build publishes) — the list
+      # command computes these; see ListCommand#generated_content_infos.
+      @generated : Array(ContentInfo)
 
-      def initialize(@content_dir : String = "content")
+      def initialize(@content_dir : String = "content", @generated : Array(ContentInfo) = [] of ContentInfo)
       end
 
       # List all content files
@@ -242,6 +253,28 @@ module Hwaro
           when ContentFilter::Published
             # "Published" now means what the build ships, not merely
             # "not flagged draft": future and expired files are excluded.
+            contents << info if info.published?
+          end
+        end
+
+        # `[[content.generate]]` entries join under the same filter rules.
+        # They carry no draft front matter of their own, but a parent
+        # section's `[cascade] draft = true` applies to them in the build
+        # (their synthetic path sits under the section like any authored
+        # file), so it must apply here too — publish-state parity with the
+        # build is this lister's contract.
+        @generated.each do |info|
+          if cascaded_draft?(File.join(@content_dir, info.path), cascade)
+            info = info.dup
+            info.draft = true
+            info.status = PublishState::Draft.label
+          end
+          case filter
+          when ContentFilter::All
+            contents << info
+          when ContentFilter::Drafts
+            contents << info if info.draft
+          when ContentFilter::Published
             contents << info if info.published?
           end
         end
@@ -305,7 +338,11 @@ module Hwaro
         # before they reach the terminal (a raw ANSI escape could repaint the
         # console, and it throws the column widths off either way).
         cells = contents.map do |info|
-          {Utils::TextUtils.strip_control(info.title), Utils::TextUtils.strip_control(info.path)}
+          # Generated entries carry their provenance in the path cell —
+          # there is no file at that path to open, and "where does this row
+          # come from" is the first question the marker answers.
+          path_cell = (origin = info.generated_from) ? "#{info.path} ← #{origin}" : info.path
+          {Utils::TextUtils.strip_control(info.title), Utils::TextUtils.strip_control(path_cell)}
         end
 
         # Cap long cells so the table stays scannable; the header labels are
