@@ -66,7 +66,7 @@ module Hwaro::Core::Build::Phases::Initialize
       end
       site = Models::Site.new(config)
       @site = site
-      load_data_files(site, config)
+      load_data_files(site, config, ctx.options.serve_mode)
 
       # Load i18n translations
       i18n_dir = File.join("i18n")
@@ -778,7 +778,7 @@ module Hwaro::Core::Build::Phases::Initialize
   # sibling file share the same stem (e.g. `data/users.yml` alongside
   # `data/users/`), the directory wins and a warning is emitted for the
   # shadowed file.
-  private def load_data_files(site : Models::Site, config : Models::Config)
+  private def load_data_files(site : Models::Site, config : Models::Config, serve_mode : Bool = false)
     site.data.clear
     @remote_data_digest = ""
 
@@ -828,7 +828,7 @@ module Hwaro::Core::Build::Phases::Initialize
       site.data[key] = data_tree_to_crinja(child)
     end
 
-    load_remote_data(site, config, root)
+    load_remote_data(site, config, root, serve_mode)
   end
 
   # `[[data.remote]]` sources, fetched once per build AFTER the disk tree is
@@ -837,7 +837,8 @@ module Hwaro::Core::Build::Phases::Initialize
   # silently preferring either side would make `site.data.<key>` depend on
   # network state. Collisions are checked for every entry before the first
   # fetch so the error never costs a network round-trip.
-  private def load_remote_data(site : Models::Site, config : Models::Config, root : DataTreeNode)
+  private def load_remote_data(site : Models::Site, config : Models::Config, root : DataTreeNode,
+                               serve_mode : Bool = false)
     entries = config.data_remote
     return if entries.empty?
 
@@ -851,9 +852,12 @@ module Hwaro::Core::Build::Phases::Initialize
       )
     end
 
+    live_memo_keys = Set({String, String}).new if serve_mode
     digest = Digest::MD5.new
     entries.each do |entry|
-      result = RemoteData.load(entry)
+      memo_key = {entry.key, RemoteData.url_digest(entry.url)}
+      live_memo_keys.try(&.add(memo_key))
+      result = serve_mode ? load_remote_entry_for_serve(entry, memo_key) : RemoteData.load(entry)
       Utils::DigestUtils.update_length_prefixed(digest, entry.key)
       if result
         site.data[entry.key] = result.value
@@ -865,7 +869,56 @@ module Hwaro::Core::Build::Phases::Initialize
         Utils::DigestUtils.update_length_prefixed(digest, "<skipped>")
       end
     end
+    # Drop payloads for entries the user has since edited or deleted — a long
+    # serve session must not accumulate every url it ever pointed at.
+    live_memo_keys.try { |live| @remote_data_memo.select! { |k, _| live.includes?(k) } }
     @remote_data_digest = digest.final.hexstring
+  end
+
+  # Serve-only wrapper around `RemoteData.load`, tuned for the dev loop
+  # rather than for a deployable build:
+  #
+  # - An entry with no TTL is fetched ONCE per session. Without a `cache`
+  #   duration `hwaro build` refetches every time, which is right for a
+  #   one-shot build and wrong for a server that rebuilds on every save.
+  # - An entry with a TTL reuses the memo while the TTL is fresh, so the
+  #   session honors the configured freshness without re-reading the disk
+  #   cache each rebuild.
+  # - A refetch FAILURE with a memo in hand warns and reuses it, whatever
+  #   `on_error` says. `on_error` is a policy for a build that has to be
+  #   correct or fail; a serve session that already has the payload should
+  #   keep the editor working when the wifi drops, not stop rebuilding.
+  private def load_remote_entry_for_serve(entry : Models::RemoteDataConfig,
+                                          memo_key : {String, String}) : RemoteData::Result?
+    # Before the memo is even consulted: an unresolved `${VAR}` is a config
+    # error, and no cached payload makes it not one.
+    RemoteData.require_resolved_env_vars!(entry)
+
+    memoed = @remote_data_memo[memo_key]?
+    if memoed
+      ttl = entry.cache_ttl
+      if ttl.nil? || (Time.utc - memoed[1]) < ttl
+        Logger.debug "Remote data site.data.#{entry.key}: reusing this serve session's payload; skipping fetch"
+        return memoed[0]
+      end
+    end
+
+    result = begin
+      RemoteData.load(entry)
+    rescue ex : Hwaro::HwaroError
+      # Only a fetch/parse failure is softened. A config error (a disk/remote
+      # key collision, an unresolved variable) still fails the rebuild.
+      raise ex unless memoed && ex.code == Hwaro::Errors::HWARO_E_NETWORK
+      Logger.warn "Remote data site.data.#{entry.key} (#{RemoteData.sanitized_url(entry.url)}): #{ex.message} — reusing this serve session's last payload so the rebuild can finish."
+      return memoed[0]
+    end
+
+    # nil means the fetch failed under on_error = "warn-and-skip", which has
+    # already warned; the memo is still the better answer for a dev loop.
+    return memoed.try(&.[0]) unless result
+
+    @remote_data_memo[memo_key] = {result, Time.utc}
+    result
   end
 
   private def data_tree_to_crinja(node : DataTreeNode) : Crinja::Value
@@ -889,19 +942,14 @@ module Hwaro::Core::Build::Phases::Initialize
   end
 
   private def parse_data_file(path : String) : Crinja::Value?
-    ext = File.extname(path).downcase
     # JSON and TOML both reject a leading BOM outright, so a data file saved
     # by a Windows editor would warn-and-skip and leave `site.data.<key>`
     # undefined — which then fails the whole render.
     content = Utils::TextUtils.strip_bom(File.read(path))
-    case ext
-    when ".yml", ".yaml"
-      Utils::CrinjaUtils.from_yaml(YAML.parse(content))
-    when ".json"
-      Utils::CrinjaUtils.from_json(JSON.parse(content))
-    when ".toml"
-      Utils::CrinjaUtils.from_toml(TOML.parse(content))
-    end
+    # The glob feeding this method only matches .yml/.yaml/.json/.toml, so the
+    # shared dispatcher's .csv branch is unreachable here — `data/` has never
+    # read CSV, and this refactor does not change that.
+    Utils::CrinjaUtils.parse_data_string(content, File.extname(path).downcase.lchop('.'))
   rescue ex
     # This rescue also covers read errors and value-conversion failures, not
     # just parse errors, so it must not assert the file is malformed — it once
