@@ -1529,8 +1529,8 @@ module Hwaro
     class Server
       def test_detect_changes(old_mtimes : Hash(String, Time), new_mtimes : Hash(String, Time)) : ChangeSet
         detect_changes(
-          old_mtimes.transform_values { |t| {t, 0_i64} },
-          new_mtimes.transform_values { |t| {t, 0_i64} },
+          old_mtimes.transform_values { |t| {t, 0_i64, nil.as(String?)} },
+          new_mtimes.transform_values { |t| {t, 0_i64, nil.as(String?)} },
         )
       end
 
@@ -1620,8 +1620,8 @@ describe "Server#detect_changes" do
     server = Hwaro::Services::Server.new
     t1 = Time.utc(2025, 1, 1, 0, 0, 0)
 
-    old = {"content/posts/hello.md" => {t1, 10_i64}}
-    new_m = {"content/posts/hello.md" => {t1, 42_i64}}
+    old = {"content/posts/hello.md" => {t1, 10_i64, nil.as(String?)}}
+    new_m = {"content/posts/hello.md" => {t1, 42_i64, nil.as(String?)}}
 
     cs = server.test_detect_changes(old, new_m)
     cs.modified_content.should eq(["content/posts/hello.md"])
