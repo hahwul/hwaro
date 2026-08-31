@@ -10,6 +10,7 @@
 # - Static-only copy when only static files change
 
 require "http/server"
+require "digest/md5"
 require "json"
 require "mime"
 require "socket"
@@ -815,7 +816,15 @@ module Hwaro
       # same-tick rewrites on coarse-mtime filesystems (Docker bind mounts,
       # NFS/SMB shares, exFAT) where two quick saves can share a timestamp —
       # an mtime-only comparison would permanently miss the second save.
-      alias FileStamp = {Time, Int64}
+      #
+      # The third slot is a content digest, carried ONLY for the full-rebuild
+      # buckets (data/**, i18n/** — nil everywhere else). Those buckets force
+      # a full rebuild, and a full rebuild re-runs `build.hooks.pre` — so a
+      # hook that rewrites an identical payload into data/ (the pattern #752
+      # documents) retriggered itself forever under a stamp-only comparison
+      # (#755). The digest lets detect_changes drop stamp movement whose
+      # bytes are unchanged. See watch_digest for when it is (re)computed.
+      alias FileStamp = {Time, Int64, String?}
 
       @builder : Core::Build::Builder
       @live_reload_handler : LiveReloadHandler?
@@ -1392,7 +1401,7 @@ module Hwaro
           # otherwise kill this fiber and silently stop rebuilds for the rest
           # of the serve session while the HTTP server keeps running.
           begin
-            current_mtimes = scan_mtimes
+            current_mtimes = scan_mtimes(last_mtimes)
             if current_mtimes != last_mtimes
               changeset = detect_changes(last_mtimes, current_mtimes)
               last_mtimes = current_mtimes
@@ -1441,7 +1450,7 @@ module Hwaro
           sleep DEBOUNCE_INTERVAL
           iterations += 1
 
-          new_mtimes = scan_mtimes
+          new_mtimes = scan_mtimes(current_mtimes)
           if new_mtimes != current_mtimes
             additional = detect_changes(current_mtimes, new_mtimes)
             current_mtimes = new_mtimes
@@ -1474,13 +1483,19 @@ module Hwaro
         removed_files = [] of String
         config_changed = false
 
-        # --- Files that exist in both snapshots but with different mtime ---
-        new_mtimes.each do |path, new_mtime|
-          if old_mtime = old_mtimes[path]?
-            next if old_mtime == new_mtime # unchanged
+        # --- Files that exist in both snapshots but with different stamps ---
+        new_mtimes.each do |path, new_stamp|
+          if old_stamp = old_mtimes[path]?
+            next if old_stamp == new_stamp # unchanged
 
             if path == "config.toml" || path == @env_config_file
               config_changed = true
+            elsif identical_rewrite?(path, old_stamp, new_stamp)
+              # A data/i18n stamp that moved without a byte changing — the
+              # #755 hook loop: reporting it would force a full rebuild,
+              # which re-runs build.hooks.pre, which rewrites the file
+              # again. Dropping it lets the changeset settle to empty.
+              next
             else
               classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static, modified_data)
             end
@@ -1841,7 +1856,11 @@ module Hwaro
         false
       end
 
-      private def scan_mtimes : Hash(String, FileStamp)
+      # `prev` is the previous snapshot, used only to carry data/i18n digests
+      # forward without re-reading files whose stamps are unchanged (see
+      # watch_digest). Passing nil — the baseline scan, or a caller without a
+      # previous snapshot — computes them fresh.
+      private def scan_mtimes(prev : Hash(String, FileStamp)? = nil) : Hash(String, FileStamp)
         mtimes = {} of String => FileStamp
         dirs_to_watch = ["content", "templates", "static", "data", "i18n"]
 
@@ -1878,7 +1897,7 @@ module Hwaro
               next if info.nil?
               info = File.info?(file, follow_symlinks: true) if info.symlink?
               next if info.nil? || !info.type.file?
-              mtimes[file] = {info.modification_time, info.size.to_i64}
+              mtimes[file] = {info.modification_time, info.size.to_i64, watch_digest(file, info, prev)}
             rescue ex
               Logger.debug "Failed to read file info for #{file}: #{ex.message}"
             end
@@ -1894,13 +1913,72 @@ module Hwaro
           next unless File.exists?(cfg)
           begin
             info = File.info(cfg)
-            mtimes[cfg] = {info.modification_time, info.size.to_i64}
+            mtimes[cfg] = {info.modification_time, info.size.to_i64, nil}
           rescue ex
             Logger.debug "Failed to read #{cfg} info: #{ex.message}"
           end
         end
 
         mtimes
+      end
+
+      # data/** and i18n/** are the only buckets whose FileStamp carries a
+      # content digest. They are the full-rebuild buckets, and only a full
+      # rebuild re-runs build.hooks.pre — the #755 loop needs both halves.
+      # content/ and templates/ stay stamp-only on purpose: their rebuild
+      # paths are incremental and hook-free (so they cannot loop), and
+      # hashing them would tax every save of every page. static/ likewise:
+      # a modified static file takes the :static copy path, which never
+      # re-runs hooks; only its first appearance is a (legitimate,
+      # one-time) added-file full rebuild.
+      private def digest_watched?(path : String) : Bool
+        path.starts_with?("data/") || path.starts_with?("i18n/")
+      end
+
+      # The digest slot for a scanned file: nil for stamp-only buckets. For
+      # data/i18n, the previous scan's digest is carried forward when
+      # mtime+size are unchanged — the bytes can't differ without moving one
+      # of them, the same assumption the stamp comparison itself makes — so
+      # steady-state polls never re-read content. A read happens only on the
+      # poll that first sees a path or sees its stamp move; that includes
+      # size-only changes (the change decision doesn't need the digest then,
+      # but the next byte-identical hook rewrite does need a fresh baseline
+      # to compare against, and the read is amortized against the full
+      # rebuild the size change is about to trigger anyway).
+      private def watch_digest(file : String, info : File::Info, prev : Hash(String, FileStamp)?) : String?
+        return unless digest_watched?(file)
+
+        if prev && (old = prev[file]?) && old[0] == info.modification_time && old[1] == info.size.to_i64
+          return old[2]
+        end
+
+        digest = Digest::MD5.new
+        buffer = Bytes.new(8192)
+        File.open(file, "r") do |io|
+          while (bytes_read = io.read(buffer)) > 0
+            digest.update(buffer[0, bytes_read])
+          end
+        end
+        digest.final.hexstring
+      rescue ex
+        # Unreadable mid-rewrite (or vanished since the stat): return nil so
+        # identical_rewrite? can never match it — an error must fall back to
+        # the old behavior (rebuild), never silently drop a change.
+        Logger.debug "Failed to hash #{file}: #{ex.message}"
+        nil
+      end
+
+      # True only when a data/i18n stamp difference is PROVABLY
+      # byte-identical: equal sizes (a size change is always a real change —
+      # no digest consulted) and equal non-nil digests. A nil digest — a
+      # hash-read failure — never matches, so the event is reported and the
+      # full rebuild runs, exactly as before the digests existed.
+      private def identical_rewrite?(path : String, old_stamp : FileStamp, new_stamp : FileStamp) : Bool
+        return false unless digest_watched?(path)
+        return false unless old_stamp[1] == new_stamp[1]
+
+        old_digest = old_stamp[2]
+        !old_digest.nil? && old_digest == new_stamp[2]
       end
     end
   end
