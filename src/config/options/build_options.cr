@@ -53,6 +53,9 @@ module Hwaro
         # `-o public`, and `[build] output_dir` would override the flag the
         # user actually typed. Also decides whether the path is resolved
         # against the original CWD under `-i` (see BuildCommand#run).
+        # `hwaro serve` sets it too: its dedicated dev output dir
+        # (ServeOptions::DEV_OUTPUT_DIR) is pinned against the same override
+        # so a serve session can never build into the deployable tree.
         property output_dir_explicit : Bool = false
 
         # Fill the config-backed fields from `[build]` in config.toml, leaving

@@ -10,6 +10,9 @@ testapp
 # Hwaro build cache
 .hwaro_cache.json
 
+# Hwaro dev-server output (hwaro serve builds into .hwaro/serve)
+.hwaro/
+
 # Hwaro docs
 docs/public
 
