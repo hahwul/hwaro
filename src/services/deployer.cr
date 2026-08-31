@@ -8,6 +8,7 @@ require "../cli/prompt"
 require "../cli/runner"
 require "../models/config"
 require "../utils/command_runner"
+require "../utils/dev_marker"
 require "../utils/errors"
 require "../utils/file_safe"
 require "../utils/logger"
@@ -902,14 +903,30 @@ module Hwaro
         Logger.warn "deployment target '#{target.name}': #{unapplied.join("/")} #{unapplied.size == 1 ? "is" : "are"} not applied to command-based targets (s3/gs/az/command) — express the filtering in the deploy command itself."
       end
 
-      # Raise HWARO_E_CONFIG when the deploy source directory doesn't exist.
+      # Raise HWARO_E_CONFIG when the deploy source directory doesn't exist,
+      # or when it is dev-server output (issue #756). The single choke point
+      # for all three deploy paths (run / plan / deploy_structured), so
+      # `--dry-run` and `--json` refuse exactly like a real deploy.
       private def require_source_dir!(source_dir : String)
-        return if Dir.exists?(source_dir)
-        raise Hwaro::HwaroError.new(
-          code: Hwaro::Errors::HWARO_E_CONFIG,
-          message: "Source directory not found: #{source_dir}",
-          hint: "Run 'hwaro build' first, or pass '--source DIR'.",
-        )
+        unless Dir.exists?(source_dir)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Source directory not found: #{source_dir}",
+            hint: "Run 'hwaro build' first, or pass '--source DIR'.",
+          )
+        end
+
+        # No override flag on purpose: pages under a dev marker carry the dev
+        # server's base_url in every link, so deploying them is never what the
+        # user wants. Deleting the marker by hand is the deliberate-enough
+        # escape hatch.
+        if Utils::DevMarker.present?(source_dir)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Refusing to deploy #{source_dir}: it is `hwaro serve` output (#{Utils::DevMarker::FILENAME} marker present), with dev URLs baked into its pages.",
+            hint: "Run 'hwaro build' and deploy its output instead. If you are certain, delete #{File.join(source_dir, Utils::DevMarker::FILENAME)} to proceed.",
+          )
+        end
       end
 
       # An empty source is "the site was never built" (or was cleaned), and

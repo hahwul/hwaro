@@ -56,7 +56,10 @@ describe Hwaro::Config::Options::ServeOptions do
       )
 
       build = serve.to_build_options
-      build.output_dir.should eq("public")
+      # The dev output dir, pinned like an explicit -o so `[build] output_dir`
+      # can never pull serve back into the deployable tree (issue #756).
+      build.output_dir.should eq(Hwaro::Config::Options::ServeOptions::DEV_OUTPUT_DIR)
+      build.output_dir_explicit.should be_true
       build.base_url.should eq("https://example.com")
       build.drafts.should be_true
       build.include_expired.should be_true

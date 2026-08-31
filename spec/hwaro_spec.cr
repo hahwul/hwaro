@@ -48,7 +48,9 @@ describe Hwaro do
       options = Hwaro::Config::Options::ServeOptions.new(drafts: true)
       build_options = options.to_build_options
       build_options.drafts.should be_true
-      build_options.output_dir.should eq("public")
+      # Serve builds into its own dev directory, never the deployable
+      # output_dir (issue #756).
+      build_options.output_dir.should eq(Hwaro::Config::Options::ServeOptions::DEV_OUTPUT_DIR)
     end
   end
 

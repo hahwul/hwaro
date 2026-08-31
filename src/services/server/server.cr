@@ -20,6 +20,7 @@ require "../../utils/logger"
 require "../../config/options/serve_options"
 require "../../config/options/build_options"
 require "../../utils/command_runner"
+require "../../utils/dev_marker"
 require "./dev_path"
 require "./live_reload_handler"
 
@@ -929,22 +930,33 @@ module Hwaro
       end
 
       def run(options : Config::Options::ServeOptions)
+        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, serve_build_options(options), options.json, options.headers)
+      end
+
+      # The effective BuildOptions a serve session runs with. Extracted so
+      # specs can assert the serve/build output split (issue #756) without
+      # binding a socket.
+      #
+      # `[build]` is merged here as well as in the Builder: BuildOptions is a
+      # struct, and the copy the Builder mutates is not this one — without the
+      # merge, `[build] drafts`/`cache` would apply to rebuilds but not to the
+      # options the server derives its document root and mount point from.
+      # `output_dir` is the exception: serve always builds into its own
+      # `ServeOptions::DEV_OUTPUT_DIR` (never the configured output_dir, which
+      # stays untouched for deploys), enforced by `output_dir_explicit` in
+      # `to_build_options`.
+      #
+      # A missing or invalid config is not fatal here — serve deliberately
+      # starts on a broken site, and the Builder reports the error on the
+      # initial build.
+      protected def serve_build_options(options : Config::Options::ServeOptions) : Config::Options::BuildOptions
         build_options = options.to_build_options
         build_options.serve_mode = true
-        # The dev server derives its document root from `build_options.output_dir`
-        # (see `sanitize_output_dir` call sites), so `[build]` has to be merged
-        # here as well as in the Builder: BuildOptions is a struct, and the copy
-        # the Builder mutates is not this one. Without this, `[build] output_dir`
-        # would have serve building into one directory and serving another.
-        #
-        # A missing or invalid config is not fatal here — serve deliberately
-        # starts on a broken site, and the Builder reports the error on the
-        # initial build.
         begin
           build_options.apply_build_config!(Hwaro::Models::Config.load(env: build_options.env).build)
         rescue Hwaro::HwaroError
         end
-        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, build_options, options.json, options.headers)
+        build_options
       end
 
       private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false, headers : Hash(String, String) = {} of String => String)
@@ -1002,6 +1014,11 @@ module Hwaro
         # The static handler needs an existing root even when the initial
         # build failed before creating one.
         Hwaro::Utils::FileSafe.mkdir_p(output_dir)
+        # Stamp the served root as dev output no matter how the initial build
+        # went — a build that failed before its Initialize phase completed
+        # (bad config.toml) never reached the builder-side stamp, and the
+        # directory may still hold a previous session's dev pages.
+        Hwaro::Utils::DevMarker.write(output_dir)
 
         # Baseline for the restart-only [serve.*] warning after config edits.
         # Nil when the initial build never loaded a config; established lazily
