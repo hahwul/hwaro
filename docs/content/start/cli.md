@@ -335,7 +335,7 @@ hwaro serve -i /path/to/my-site
 hwaro serve -i /path/to/my-site -p 8080
 ```
 
-> **Serve output is a dev artifact — never deploy it.** `hwaro serve` builds into its own directory, `.hwaro/serve/`, and leaves the configured `output_dir` (`public/` by default) completely untouched, so a serve session can never overwrite a deployable build. The pages under `.hwaro/serve/` carry the dev server's `base_url` (e.g. `http://127.0.0.1:3000`) in every link, and the directory is stamped with a `.hwaro-dev` marker that `hwaro deploy` refuses. Run `hwaro build` to produce a deployable site, and keep `.hwaro/` out of version control (add it to `.gitignore`, next to `.hwaro_cache.json`).
+> **Serve output is a dev artifact — never deploy it.** `hwaro serve` builds into its own directory, `.hwaro/serve/`, and leaves the configured `output_dir` (`public/` by default) completely untouched, so a serve session can never overwrite a deployable build. The pages under `.hwaro/serve/` carry the dev server's `base_url` (e.g. `http://127.0.0.1:3000`) in every link, and the directory is stamped with a `.hwaro-dev` marker that `hwaro deploy` refuses. Run `hwaro build` to produce a deployable site. `.hwaro/` keeps itself out of version control — hwaro writes a self-ignoring `.hwaro/.gitignore` when it creates the directory, and `hwaro init` also scaffolds a project `.gitignore` covering the output dir, `.hwaro/`, and `.hwaro_cache.json`.
 
 **Options:**
 

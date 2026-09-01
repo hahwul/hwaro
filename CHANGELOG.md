@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `.hwaro/` keeps itself out of version control: hwaro writes a self-ignoring `.hwaro/.gitignore` when creating the workspace (serve output, remote-data cache), and `hwaro init` scaffolds a project `.gitignore` covering the output directory, `.hwaro/`, and `.hwaro_cache.json`
+
 ## v0.20.0
 
 ### Added

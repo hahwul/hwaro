@@ -103,7 +103,7 @@ The cache is stored in `.hwaro_cache.json` at the project root. This file contai
 - **Metadata** — template and config checksums from the last build
 - **Entries** — per-file records with path, mtime, content hash, and output path
 
-Add `.hwaro_cache.json` to your `.gitignore`:
+Add `.hwaro_cache.json` to your `.gitignore` (the one `hwaro init` scaffolds already lists it):
 
 ```gitignore
 .hwaro_cache.json

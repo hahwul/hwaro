@@ -103,7 +103,7 @@ template_deps = false  # 템플릿이 바뀌면 모든 페이지를 재빌드
 - **메타데이터** — 마지막 빌드의 템플릿·설정 체크섬
 - **항목** — 파일별 레코드(경로, mtime, 콘텐츠 해시, 출력 경로)
 
-`.hwaro_cache.json`은 `.gitignore`에 추가합니다.
+`.hwaro_cache.json`은 `.gitignore`에 추가합니다(`hwaro init`이 스캐폴드하는 `.gitignore`에는 이미 포함되어 있습니다).
 
 ```gitignore
 .hwaro_cache.json

@@ -22,6 +22,7 @@ require "../../config/options/serve_options"
 require "../../config/options/build_options"
 require "../../utils/command_runner"
 require "../../utils/dev_marker"
+require "../../utils/hwaro_dir"
 require "./dev_path"
 require "./live_reload_handler"
 
@@ -1058,6 +1059,10 @@ module Hwaro
         # (bad config.toml) never reached the builder-side stamp, and the
         # directory may still hold a previous session's dev pages.
         Hwaro::Utils::DevMarker.write(output_dir)
+        # Keep the freshly created `.hwaro/` workspace out of `git status`
+        # (the dev pages under it carry dev base_urls and must never be
+        # committed). No-op when the guard sees anything but `.hwaro` itself.
+        Hwaro::Utils::HwaroDir.ensure_self_ignore(File.dirname(output_dir))
 
         # Baseline for the restart-only [serve.*] warning after config edits.
         # Nil when the initial build never loaded a config; established lazily

@@ -1,4 +1,5 @@
 require "../../../utils/dev_marker"
+require "../../../utils/hwaro_dir"
 
 # Phase: Initialize — output dir setup, cache init, config loading, template loading
 #
@@ -49,6 +50,9 @@ module Hwaro::Core::Build::Phases::Initialize
         # Serve output is never deployable (dev base_url baked into every
         # page) — stamp the directory so `hwaro deploy` can refuse it.
         Utils::DevMarker.write(output_dir)
+        # And keep the `.hwaro/` workspace holding it out of `git status` —
+        # the basename guard makes this a no-op for any other output dir.
+        Utils::HwaroDir.ensure_self_ignore(File.dirname(output_dir))
       elsif dev_marker_found
         # A `--cache`/preserved build keeps existing files, so the stale
         # marker must go explicitly; on a cold build the wipe already took

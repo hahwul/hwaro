@@ -45,6 +45,32 @@ describe Hwaro::Services::Initializer do
       end
     end
 
+    describe ".gitignore scaffold" do
+      it "scaffolds a .gitignore covering the output dir and hwaro caches" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "mysite")
+          Hwaro::Services::Initializer.new.run(target)
+
+          gitignore = File.read(File.join(target, ".gitignore"))
+          gitignore.lines.should contain("public/")
+          gitignore.lines.should contain(".hwaro/")
+          gitignore.lines.should contain(".hwaro_cache.json")
+        end
+      end
+
+      it "never overwrites an existing .gitignore" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "mysite")
+          Dir.mkdir_p(target)
+          File.write(File.join(target, ".gitignore"), "my-own-rules\n")
+
+          Hwaro::Services::Initializer.new.run(target, force: true)
+
+          File.read(File.join(target, ".gitignore")).should eq("my-own-rules\n")
+        end
+      end
+    end
+
     describe "--force option" do
       it "overwrites non-empty directory with force=true" do
         Dir.mktmpdir do |dir|
