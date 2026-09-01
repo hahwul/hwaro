@@ -63,6 +63,7 @@ hwaro doctor --json
 - 참조한 파일·디렉터리가 존재하지 않음 (`[og] default_image`, `[pwa] icons`,
   `[auto_includes] dirs`, `[[assets.bundles]] files` 등). 자체 origin을 가진 값
   (`https://…`, `//cdn…`, `data:…`)은 원격 URL이라 검증할 수 없으므로 건너뜁니다.
+- 라우트 검사를 뒷받침할 수 없는 빌드 출력 (아래 [빌드 출력을 근거로 사용하기](#빌드-출력을-근거로-사용하기) 참고)
 
 **템플릿 진단:**
 
@@ -94,9 +95,12 @@ hwaro: doctor
     [ok]   search (format)
     [ok]   languages (default_language resolves)
     [ok]   markdown / pwa (valid enums)
+    [ok]   image processing (widths set)
     [ok]   deployment / related (refs resolve)
     [ok]   menus (parent references)
     [ok]   referenced files & dirs
+    [ok]   build output (route evidence)
+    [ok]   sass (sources & enablement)
 
   templates/
     [ok]   required files (page.html, section.html)
@@ -125,6 +129,29 @@ Tip: Use 'hwaro tool validate' for content checks
 색상 터미널에서는 검사 줄이 `hwaro doctor` 헤딩 아래 `✓`/`⚠`/`✗`/`ℹ` 기호로
 표시되고, 요약은 심각도별 색이 입혀진 `✦ checked` 결과 줄로 출력됩니다. 문제가
 없으면 `checked: no issues found — your site looks great`로 끝납니다.
+
+## 빌드 출력을 근거로 사용하기
+
+`[pwa] offline_page`와 `[pwa] precache_urls`는 파일이 아니라 라우트입니다.
+doctor는 먼저 `content/`에서 찾고, 확장자가 있는 값(컴파일된 스타일시트,
+리사이즈된 이미지 변형 등)은 마지막 빌드 결과인 `[build] output_dir`
+(기본값 `public/`)에서 찾습니다.
+
+이 디렉터리는 `hwaro build`가 만든 것이어야 합니다. Hwaro 0.19부터
+`hwaro serve`는 `.hwaro/serve/`에 빌드하고 `output_dir`은 건드리지 않으므로,
+serve만 쓰는 작업 흐름에서는 이 디렉터리가 없거나 예전 빌드에 멈춰 있습니다.
+이제 doctor가 그 사실을 알려줍니다:
+
+- **없거나 비어 있음** — 검증하지 못한 라우트와 함께 `build-output-unusable`로
+  보고합니다: *"public/ holds no build output — run `hwaro build` first"*.
+- **`hwaro serve` 출력** (`.hwaro-dev` 마커가 남은 경우) — `hwaro deploy`와 같은
+  규칙으로 근거에서 제외합니다. 마커는 `hwaro build`가 지웁니다.
+- **가장 최근 소스 파일보다 오래됨** — 그 트리로 통과시킨 라우트가 있으면
+  `build-output-stale`로 보고합니다. 삭제한 페이지의 `index.html`이 아직 남아
+  있을 수 있기 때문입니다.
+
+둘 다 `info` 수준이며, 실제로 그 트리가 필요했을 때만 나타납니다. 빌드가
+생성하는 경로를 참조하지 않는 사이트는 `public/` 이야기를 듣지 않습니다.
 
 ## 알려진 문제 무시
 
@@ -170,6 +197,8 @@ ignore = [
 | `menu-parent-undefined` | config | 메뉴 항목의 `parent`가 같은 메뉴의 identifier와 맞지 않음 |
 | `config-path-missing` | config | 참조한 파일이 존재하지 않음 |
 | `config-dir-missing` | config | 참조한 디렉터리가 존재하지 않음 |
+| `build-output-unusable` | config | `[build] output_dir`로 라우트를 검증할 수 없음 (없거나 `hwaro serve` 출력) |
+| `build-output-stale` | config | 소스보다 오래된 빌드 출력으로 라우트를 통과시킴 |
 | `missing-config-*` | config_missing | 설정 섹션 누락 (예: `missing-config-pwa`) |
 | `template-dir-missing` | template | 템플릿 디렉터리를 찾을 수 없음 ✗ |
 | `template-required-missing` | template | 필수 템플릿 누락 ✗ |

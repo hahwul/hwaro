@@ -8,6 +8,7 @@
 
 ### Fixed
 - `hwaro serve`: a `build.hooks.pre` command that rewrites the same bytes on every run no longer rebuilds forever. A mixed `templates/` + `static/` rewrite now takes the cheap hook-free rebuild instead of a full one, and a byte-identical `config.toml` rewrite made by the build's own hooks is ignored — a developer's `touch config.toml` still forces a full rebuild (#760)
+- `hwaro doctor` and `hwaro tool check-links` no longer validate routes and pipeline-emitted assets against a build output directory they cannot trust. An absent, empty or `hwaro serve`-written `[build] output_dir` is refused as evidence, and output older than the newest source file is reported as such — doctor as `build-output-unusable` / `build-output-stale`, `check-links` as a note under its report and an `output_hint` field in `--json` (#761)
 
 ## v0.19.0
 
