@@ -96,6 +96,17 @@ Build hooks also run during `hwaro serve`, but only on **full** rebuilds:
 
 This keeps save-to-reload fast. If a hook produces something you need refreshed while the server is running, touch `config.toml` or restart `hwaro serve` to force a full rebuild.
 
+### Rebuild loops
+
+A hook that writes into a watched directory (`content/`, `templates/`, `static/`, `data/`, `i18n/`) — or into `config.toml` itself — feeds the watcher its own output. The harmless case is handled for you: when a run lands the **same bytes** the build already read (`curl -o data/team.json` fetching an unchanged payload, a bundler re-emitting an identical file, a hook that only touches `config.toml`), the session settles instead of rebuilding forever. Depending on where the file lives, the rewrite is either ignored outright or absorbed by a partial rebuild that does not re-run your commands.
+
+Two patterns still rebuild on every run, because to the watcher they are genuine changes:
+
+- writing **different** bytes each time — an embedded timestamp, a build counter, a non-deterministic bundle hash
+- **creating and deleting** a file under a watched directory on every run
+
+Make the output deterministic, or write it somewhere the watcher does not look (`.hwaro/` is ignored, as is anything outside the directories listed above).
+
 ## Use Cases
 
 ### TypeScript Compilation

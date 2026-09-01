@@ -753,6 +753,22 @@ module Hwaro
       end
 
       # Determine the optimal rebuild strategy for this changeset.
+      #
+      # The `*_only?` predicates above are mutually exclusive by bucket
+      # emptiness, so a changeset mixing two non-content buckets —
+      # templates+static, templates+content-asset, static+content-asset —
+      # matched none of them and fell through to `else`, taking a FULL
+      # rebuild. That was wasted work (nothing structural changed, and each
+      # of those buckets has its own cheap path) and, worse, the #760 loop:
+      # a full rebuild is the ONLY strategy that re-runs `build.hooks.pre`,
+      # so a pre hook rewriting one templates/ and one static/ file
+      # byte-identically on every run retriggered itself forever — the #755
+      # mechanism, outside the two hashed buckets.
+      #
+      # The two trailing branches route those mixed sets to the cheapest
+      # strategy their heaviest bucket needs. Nothing is left stale:
+      # apply_changeset already copies static files and content assets
+      # alongside every non-full strategy.
       def rebuild_strategy : Symbol
         if needs_full_rebuild?
           :full
@@ -766,6 +782,14 @@ module Hwaro
           :static
         elsif content_files_only?
           :content_files
+        elsif !@modified_templates.empty?
+          # Templates plus static files and/or content assets. Markdown is
+          # necessarily empty here — content alongside templates already
+          # matched content_and_template_only?.
+          :templates
+        elsif !@modified_static.empty?
+          # Static files plus content assets.
+          :static
         else
           :full
         end
@@ -853,6 +877,12 @@ module Hwaro
       # during that window was absorbed into the baseline and never rebuilt.
       # Consumed once by the watch loop; nil afterwards.
       @watch_baseline : Hash(String, FileStamp)? = nil
+      # The stamps our own most recent hook-running build left on the watched
+      # config files it rewrote WITHOUT changing a byte. Empty for the
+      # overwhelmingly common build that touches no config at all. See
+      # built_config_rewrite? for what it buys and what it deliberately does
+      # not swallow.
+      @config_rewritten_by_build = {} of String => FileStamp
 
       # Extensions whose served bytes are UTF-8 text, each with the base type to
       # assume when the platform's MIME database has no opinion.
@@ -994,7 +1024,7 @@ module Hwaro
 
         initial_error : String? = nil
         begin
-          unless @builder.run(build_options)
+          unless run_full_build(build_options)
             initial_error = "Initial build failed — check the terminal, fix the error, and save to rebuild."
           end
         rescue ex : Hwaro::HwaroError
@@ -1505,7 +1535,16 @@ module Hwaro
           if old_stamp = old_mtimes[path]?
             next if old_stamp == new_stamp # unchanged
 
-            if path == "config.toml" || path == @env_config_file
+            if watched_config_file?(path)
+              # A config stamp that moved only because OUR OWN last build
+              # rewrote it byte-identically is the #760 config loop:
+              # config_changed forces a full rebuild, the full rebuild
+              # re-runs build.hooks.pre, the hook rewrites config.toml again,
+              # forever. Drop it — but only when the stamp is exactly the one
+              # that build left behind, so a developer's `touch config.toml`
+              # (the documented force-a-full-rebuild escape hatch) still
+              # rebuilds.
+              next if built_config_rewrite?(path, new_stamp)
               config_changed = true
             elsif identical_rewrite?(path, old_stamp, new_stamp)
               # A data/i18n stamp that moved without a byte changing — the
@@ -1626,7 +1665,7 @@ module Hwaro
 
         success = case strategy
                   when :full
-                    @builder.run(build_options)
+                    run_full_build(build_options)
                   when :templates
                     @builder.run_rerender(build_options)
                   when :incremental
@@ -1778,7 +1817,7 @@ module Hwaro
         # rebuild reuses the same options the watcher's :full strategy runs.
         if bundles_changed
           Logger.info "  Asset bundle fingerprints changed — rebuilding pages to update references."
-          return @builder.run(build_options)
+          return run_full_build(build_options)
         end
         true
       end
@@ -1927,12 +1966,10 @@ module Hwaro
           end
         end
 
-        config_files = ["config.toml"]
         # The env overlay feeds every rebuild through Models::Config.load —
         # its edits were invisible to the watcher (silently ignored for the
         # whole session) before it was stat'ed here.
-        @env_config_file.try { |ec| config_files << ec }
-        config_files.each do |cfg|
+        watched_config_files.each do |cfg|
           next unless File.exists?(cfg)
           begin
             info = File.info(cfg)
@@ -1945,6 +1982,93 @@ module Hwaro
         mtimes
       end
 
+      # config.toml plus the env overlay (`config.<env>.toml` under
+      # --env / HWARO_ENV): the files whose edits force a full rebuild.
+      private def watched_config_files : Array(String)
+        files = ["config.toml"]
+        @env_config_file.try { |ec| files << ec }
+        files
+      end
+
+      private def watched_config_file?(path : String) : Bool
+        path == "config.toml" || path == @env_config_file
+      end
+
+      # Stamp + content digest of each watched config file, taken either side
+      # of a hook-running build. These always carry a digest, unlike the
+      # watcher's own config stamps (scan_mtimes leaves that slot nil): this
+      # reads one or two small files once per full build, not a whole tree on
+      # every poll.
+      private def config_stamps : Hash(String, FileStamp)
+        stamps = {} of String => FileStamp
+        watched_config_files.each do |cfg|
+          info = File.info?(cfg)
+          next if info.nil? || !info.type.file?
+          stamps[cfg] = {info.modification_time, info.size.to_i64, file_digest(cfg)}
+        rescue ex
+          Logger.debug "Failed to stamp #{cfg}: #{ex.message}"
+        end
+        stamps
+      end
+
+      # Run a full build — the only strategy that executes `build.hooks` —
+      # and record which config files those hooks rewrote without changing a
+      # byte. Every full-build call site goes through here; one that didn't
+      # would leave built_config_rewrite? blind to its hooks and the #760
+      # loop reachable again. A build that raises still ran its pre hooks, so
+      # the bookkeeping sits in an ensure.
+      private def run_full_build(build_options : Config::Options::BuildOptions) : Bool
+        before = config_stamps
+        begin
+          @builder.run(build_options)
+        ensure
+          note_config_rewrites(before)
+        end
+      end
+
+      private def note_config_rewrites(before : Hash(String, FileStamp))
+        rewritten = {} of String => FileStamp
+        config_stamps.each do |path, stamp|
+          old = before[path]?
+          next if old.nil? || old == stamp
+          # Same size and same non-nil digest means the bytes the build read
+          # are still the bytes on disk. A hook that genuinely changed the
+          # config — or one whose file could not be hashed (nil digest) — is
+          # NOT recorded, so the next poll reports it and the site rebuilds
+          # with the new values.
+          next unless old[1] == stamp[1]
+          old_digest = old[2]
+          next if old_digest.nil? || old_digest != stamp[2]
+          rewritten[path] = stamp
+        end
+        @config_rewritten_by_build = rewritten
+      end
+
+      # True when `new_stamp` is precisely the stamp the last hook-running
+      # build left on a config file it rewrote byte-identically — which makes
+      # it a stamp whose BYTES that build already read (it loads the config
+      # before running a single hook, and the entry exists only because the
+      # bytes never moved after that). Nothing is owed a rebuild, so the
+      # event is dropped even if the developer edited the config in between:
+      # the build that followed the edit read it.
+      #
+      # Comparing
+      # the STAMP, not just the bytes, is what keeps `touch config.toml`
+      # alive: a touch after the build moves the mtime off the recorded one
+      # and is reported as a config change, exactly as documented. (On a
+      # filesystem with 1-second mtime granularity a touch landing in the
+      # same second as the build's own rewrite is indistinguishable from it
+      # and gets absorbed; touching again a moment later forces the rebuild.)
+      #
+      # Only mtime and size are compared because the watcher's config stamps
+      # carry no digest — byte-identity was already established, against the
+      # pre-build bytes, when the entry was recorded.
+      private def built_config_rewrite?(path : String, new_stamp : FileStamp) : Bool
+        built = @config_rewritten_by_build[path]?
+        return false if built.nil?
+        built[0] == new_stamp[0] && built[1] == new_stamp[1]
+      end
+
       # data/** and i18n/** are the only buckets whose FileStamp carries a
       # content digest. They are the buckets #755 reported: a full rebuild is
       # the only thing that re-runs build.hooks.pre, and a hook rewriting
@@ -1955,11 +2079,12 @@ module Hwaro
       # hook-free rebuild path (:incremental, :templates, :static copy), and a
       # static file's only full rebuild is the one-time added-file case.
       #
-      # That is a cost trade, not a proof of no-loop. Two constructive routes
-      # remain — a mixed static+template byte-identical rewrite falls to
-      # `rebuild_strategy`'s else branch (:full), and a byte-identical
-      # config.toml rewrite has no digest at all (nil) to compare. Both
-      # predate #757 and are tracked in issue #760.
+      # That is a cost trade, not a proof of no-loop — it is only the reason
+      # THESE buckets are hashed. The two routes that used to bypass it (#760)
+      # are closed without hashing anything else: `rebuild_strategy` no longer
+      # sends a mixed templates+static changeset to :full (so no hook re-runs
+      # for it), and a config.toml that only our own hooks rewrote is dropped
+      # by built_config_rewrite?.
       private def digest_watched?(path : String) : Bool
         path.starts_with?("data/") || path.starts_with?("i18n/")
       end
@@ -1981,19 +2106,24 @@ module Hwaro
           return old[2]
         end
 
+        file_digest(file)
+      end
+
+      # Streamed digest of a file's bytes, nil when it can't be read
+      # (unreadable mid-rewrite, or vanished since the stat). Callers treat
+      # nil as "no proof of identity", so an error always falls back to the
+      # pre-digest behavior — rebuild — and never silently drops a change.
+      private def file_digest(path : String) : String?
         digest = Digest::MD5.new
         buffer = Bytes.new(8192)
-        File.open(file, "r") do |io|
+        File.open(path, "r") do |io|
           while (bytes_read = io.read(buffer)) > 0
             digest.update(buffer[0, bytes_read])
           end
         end
         digest.final.hexstring
       rescue ex
-        # Unreadable mid-rewrite (or vanished since the stat): return nil so
-        # identical_rewrite? can never match it — an error must fall back to
-        # the old behavior (rebuild), never silently drop a change.
-        Logger.debug "Failed to hash #{file}: #{ex.message}"
+        Logger.debug "Failed to hash #{path}: #{ex.message}"
         nil
       end
 
