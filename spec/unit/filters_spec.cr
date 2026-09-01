@@ -205,6 +205,28 @@ describe "DateFilters" do
       result.strip.should eq("not a date")
     end
 
+    # Regression: a malformed strftime pattern (a trailing `%`) made
+    # Crystal's `Time#to_s` raise a bare `IndexError`, which is not a
+    # `Crinja::Error` and so escaped TemplateEngine#render's rescue —
+    # the whole build died with `Index out of bounds` and no template
+    # file:line. It must surface as a located template error naming the
+    # bad format instead.
+    it "raises a located Crinja error for a malformed format string" do
+      vars = {"d" => Crinja::Value.new("2024-06-15")}
+      ex = expect_raises(Hwaro::HwaroError) do
+        render_filter("{{ d | date(format='%') }}", vars)
+      end
+      ex.message.not_nil!.should contain("invalid date format")
+    end
+
+    it "raises a located Crinja error for a malformed format on a Time value" do
+      vars = {"d" => Crinja::Value.new(Time.utc(2024, 3, 20))}
+      ex = expect_raises(Hwaro::HwaroError) do
+        render_filter("{{ d | date(format='%') }}", vars)
+      end
+      ex.message.not_nil!.should contain("invalid date format")
+    end
+
     it "converts non-string non-time values to string" do
       vars = {"d" => Crinja::Value.new(12345)}
       result = render_filter("{{ d | date }}", vars)
@@ -1403,5 +1425,63 @@ describe "MenuFilters" do
       vars = {"page_url" => Crinja::Value.new("/posts/")}
       render_filter("{{ '//cdn.example.com/x' | active_path }}", vars).should eq("false")
     end
+  end
+end
+
+# =============================================================================
+# first / last (Crinja built-ins overridden for empty sequences)
+# =============================================================================
+describe "first/last filters" do
+  # Regression: `{{ items | first }}` on an EMPTY array called
+  # `Enumerable#first`, which raises `Empty enumerable` — a plain Crystal
+  # error, so it bypassed the Crinja error path and aborted the entire
+  # build with no template location. `last` did the same with
+  # `Index out of bounds`. An empty section is ordinary site state.
+  it "returns undefined (empty output) for first on an empty array" do
+    render_filter("<{{ [] | first }}>").should eq("<>")
+  end
+
+  it "returns undefined (empty output) for last on an empty array" do
+    render_filter("<{{ [] | last }}>").should eq("<>")
+  end
+
+  it "returns undefined for first/last on an empty string" do
+    vars = {"s" => Crinja::Value.new("")}
+    render_filter("<{{ s | first }}|{{ s | last }}>", vars).should eq("<|>")
+  end
+
+  it "returns undefined for first/last on an empty hash" do
+    vars = {"h" => Crinja::Value.new({} of Crinja::Value => Crinja::Value)}
+    render_filter("<{{ h | first }}|{{ h | last }}>", vars).should eq("<|>")
+  end
+
+  it "is falsy so {% if %} guards work on an empty collection" do
+    render_filter("{% if [] | first %}yes{% else %}no{% endif %}").should eq("no")
+  end
+
+  it "still returns the first/last element of a non-empty array" do
+    render_filter("{{ [1, 2, 3] | first }}-{{ [1, 2, 3] | last }}").should eq("1-3")
+  end
+
+  it "still returns the first/last character of a non-empty string" do
+    render_filter("{{ 'abc' | first }}-{{ 'abc' | last }}").should eq("a-c")
+  end
+end
+
+# =============================================================================
+# now() function
+# =============================================================================
+describe "now() function" do
+  it "formats with a valid format string" do
+    render_filter("{{ now(format='%Y') }}").should eq(Time.local.to_s("%Y"))
+  end
+
+  # Regression: same bare `IndexError` as the `date` filter — a malformed
+  # format killed the build with `Index out of bounds` and no location.
+  it "raises a located Crinja error for a malformed format string" do
+    ex = expect_raises(Hwaro::HwaroError) do
+      render_filter("{{ now(format='%') }}")
+    end
+    ex.message.not_nil!.should contain("invalid date format")
   end
 end

@@ -325,7 +325,11 @@ module Hwaro
             if format.none?
               Crinja::Value.new(time.to_s("%Y-%m-%d %H:%M:%S"))
             else
-              Crinja::Value.new(time.to_s(format.to_s))
+              # Same guard as the `date` filter: a malformed format string
+              # (`now(format="%")`) makes Crystal's `Time#to_s` raise a bare
+              # `IndexError`, which is not a `Crinja::Error` and so kills the
+              # build with `Index out of bounds` and no template file:line.
+              Crinja::Value.new(Filters::DateFilters.format_time(time, format.to_s))
             end
           end
         end

@@ -48,8 +48,8 @@ same text renders in page bodies. The rest of the extension pipeline
 | Filter | Description | Example |
 |--------|-------------|---------|
 | length | Get length | {{ items \| length }} |
-| first | First element | {{ items \| first }} |
-| last | Last element | {{ items \| last }} |
+| first | First element (empty on an empty collection) | {{ items \| first }} |
+| last | Last element (empty on an empty collection) | {{ items \| last }} |
 | reverse | Reverse order | {{ items \| reverse }} |
 | sort | Sort array | {{ items \| sort }} |
 | join | Join elements | {{ tags \| join(", ") }} |
