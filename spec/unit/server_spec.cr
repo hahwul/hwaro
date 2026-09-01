@@ -1382,6 +1382,64 @@ describe Hwaro::Services::ChangeSet do
       )
       cs.rebuild_strategy.should eq(:content_files)
     end
+
+    # #760: mixed non-content changesets used to match none of the `*_only?`
+    # predicates and fall through to :full — the one strategy that re-runs
+    # build.hooks.pre, which is what let a hook rewriting a template AND a
+    # static file loop forever. They take the cheapest hook-free strategy
+    # their heaviest bucket needs; apply_changeset copies the static files
+    # and content assets alongside it.
+    it "returns :templates for template+static changes (no Markdown)" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: ["templates/page.html"],
+        modified_static: ["static/css/style.css"],
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+      )
+      cs.rebuild_strategy.should eq(:templates)
+      cs.needs_full_rebuild?.should be_false
+    end
+
+    it "returns :templates for template+content-asset changes (no Markdown)" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: ["templates/page.html"],
+        modified_static: [] of String,
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/foo/cover.jpg"],
+      )
+      cs.rebuild_strategy.should eq(:templates)
+    end
+
+    it "returns :static for static+content-asset changes" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: [] of String,
+        modified_static: ["static/css/style.css"],
+        added_files: [] of String,
+        removed_files: [] of String,
+        config_changed: false,
+        modified_content_files: ["content/projects/foo/cover.jpg"],
+      )
+      cs.rebuild_strategy.should eq(:static)
+    end
+
+    # A mixed set still escalates the moment anything structural rides along.
+    it "still returns :full when a mixed set carries a structural change" do
+      cs = Hwaro::Services::ChangeSet.new(
+        modified_content: [] of String,
+        modified_templates: ["templates/page.html"],
+        modified_static: ["static/css/style.css"],
+        added_files: [] of String,
+        removed_files: ["content/gone.md"],
+        config_changed: false,
+      )
+      cs.rebuild_strategy.should eq(:full)
+    end
   end
 
   describe "#content_files_only?" do
