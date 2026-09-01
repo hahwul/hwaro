@@ -390,6 +390,27 @@ describe "RemoteData.load" do
     seen_ua.should eq("Hwaro")
   end
 
+  it "makes a freshly created .hwaro/ cache workspace ignore itself" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"ok": true})
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        # The default layout: CACHE_DIR = ".hwaro/remote_data".
+        cache_dir = File.join(dir, ".hwaro", "remote_data")
+        RemoteData.load(remote_entry("#{base}/a"), cache_dir: cache_dir)
+        File.read(File.join(dir, ".hwaro", ".gitignore")).should eq("*\n")
+
+        # A custom cache location gets no .gitignore sprinkled next to it.
+        custom = File.join(dir, "custom-cache")
+        RemoteData.load(remote_entry("#{base}/b"), cache_dir: custom)
+        File.exists?(File.join(dir, ".gitignore")).should be_false
+      end
+    end
+  end
+
   it "skips the request while the disk cache is within the TTL and refetches after it expires" do
     hits = Atomic(Int32).new(0)
     handler = ->(ctx : HTTP::Server::Context) do

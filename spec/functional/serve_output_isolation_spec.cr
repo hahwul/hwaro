@@ -126,6 +126,11 @@ describe "serve output isolation (issue #756)" do
         # Defense in depth: the dev dir is stamped, the deployable one is not.
         File.exists?(".hwaro/serve/.hwaro-dev").should be_true
         File.exists?("public/.hwaro-dev").should be_false
+
+        # And the whole `.hwaro/` workspace ignores itself, so none of the
+        # dev pages ever show up in `git status`.
+        File.read(".hwaro/.gitignore").should eq("*\n")
+        File.exists?("public/.gitignore").should be_false
       end
     end
   end

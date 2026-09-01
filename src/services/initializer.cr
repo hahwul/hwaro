@@ -4,6 +4,7 @@
 # templates, and configuration based on the selected scaffold.
 
 require "file_utils"
+require "toml"
 require "../config/options/init_options"
 require "../utils/errors"
 require "../utils/file_safe"
@@ -200,6 +201,14 @@ module Hwaro
         end
 
         create_file(File.join(target_path, "config.toml"), config_content)
+
+        # Keep generated artifacts out of version control from the first
+        # commit: `git init && hwaro init .` is the canonical first-site
+        # workflow (see occupied_entries), so the ignore list ships with the
+        # scaffold instead of living only in the docs. `create_file` never
+        # overwrites, so an existing .gitignore (user's own, or one a remote
+        # scaffold shipped) always wins.
+        create_file(File.join(target_path, ".gitignore"), gitignore_content(config_content))
 
         # Create AGENTS.md unless skipped
         unless skip_agents_md
@@ -458,6 +467,44 @@ module Hwaro
           @created_count += 1
           @entries << ScaffoldEntry.new(:create, path, dir: false)
         end
+      end
+
+      # The scaffolded .gitignore: the build output tree, hwaro's `.hwaro/`
+      # workspace (serve output and remote-data cache — also self-ignoring
+      # via Utils::HwaroDir, so pre-existing repos are covered too), and the
+      # incremental-build cache, which lives at the root NEXT TO `.hwaro/`.
+      private def gitignore_content(config_content : String) : String
+        String.build do |io|
+          if output_dir = scaffold_output_dir(config_content)
+            io << "# Build output (`hwaro build`)\n"
+            io << output_dir << "/\n\n"
+          end
+          io << "# Hwaro workspace (`hwaro serve` output, remote-data cache) and build cache\n"
+          io << ".hwaro/\n"
+          io << ".hwaro_cache.json\n"
+        end
+      end
+
+      # The output_dir the generated config will build into, for the
+      # .gitignore. Built-in scaffolds never set `[build] output_dir`, but a
+      # remote scaffold's config is used verbatim and may — honor it so the
+      # ignore matches what `hwaro build` will actually write. Returns nil
+      # (omit the entry) for a path .gitignore cannot express safely:
+      # absolute, escaping, or the project root itself.
+      private def scaffold_output_dir(config_content : String) : String?
+        dir = TOML.parse(config_content)["build"]?
+          .try(&.as_h?)
+          .try(&.["output_dir"]?)
+          .try(&.as_s?) || "public"
+        dir = dir.strip.rstrip('/')
+        return if dir.empty? || dir == "." || dir.starts_with?('/') || dir.starts_with?('\\')
+        return if dir.split('/').includes?("..")
+        dir
+      rescue
+        # A config.toml that does not parse (possible for a remote scaffold's
+        # verbatim config) fails the build later with a proper error; the
+        # .gitignore just falls back to the default output tree.
+        "public"
       end
 
       # Builds a balanced default config for Hybrid C.

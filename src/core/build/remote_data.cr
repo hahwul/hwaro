@@ -25,6 +25,7 @@ require "../../models/config"
 require "../../utils/crinja_utils"
 require "../../utils/errors"
 require "../../utils/file_safe"
+require "../../utils/hwaro_dir"
 require "../../utils/logger"
 require "../../utils/text_utils"
 
@@ -417,6 +418,10 @@ module Hwaro
         private def write_cache(entry : Models::RemoteDataConfig, cache_dir : String,
                                 digest : String, now : Time, body : String, format : String) : Nil
           Utils::FileSafe.mkdir_p(cache_dir)
+          # First write may have just created `.hwaro/` — make it ignore
+          # itself so the cache never shows up in `git status`. The basename
+          # guard makes this a no-op for a custom cache_dir (specs, callers).
+          Utils::HwaroDir.ensure_self_ignore(File.dirname(cache_dir))
           Utils::FileSafe.atomic_write(body_path(cache_dir, entry.key), body)
           meta = {url_digest: digest, fetched_at: now.to_unix, format: format}
           Utils::FileSafe.atomic_write(meta_path(cache_dir, entry.key), meta.to_json)

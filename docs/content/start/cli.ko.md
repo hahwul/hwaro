@@ -339,7 +339,7 @@ hwaro serve -i /path/to/my-site
 hwaro serve -i /path/to/my-site -p 8080
 ```
 
-> **serve 출력은 개발용 산출물입니다 — 절대 배포하지 마세요.** `hwaro serve`는 전용 디렉터리 `.hwaro/serve/`에 빌드하고, 설정된 `output_dir`(기본 `public/`)은 전혀 건드리지 않습니다. 따라서 serve 세션이 배포 가능한 빌드를 덮어쓰는 일은 생기지 않습니다. `.hwaro/serve/`의 페이지들은 모든 링크에 개발 서버의 `base_url`(예: `http://127.0.0.1:3000`)이 박혀 있고, 디렉터리에는 `hwaro deploy`가 거부하는 `.hwaro-dev` 마커가 찍힙니다. 배포할 사이트는 `hwaro build`로 만들고, `.hwaro/`는 `.hwaro_cache.json`과 마찬가지로 `.gitignore`에 추가해 버전 관리에서 제외하세요.
+> **serve 출력은 개발용 산출물입니다 — 절대 배포하지 마세요.** `hwaro serve`는 전용 디렉터리 `.hwaro/serve/`에 빌드하고, 설정된 `output_dir`(기본 `public/`)은 전혀 건드리지 않습니다. 따라서 serve 세션이 배포 가능한 빌드를 덮어쓰는 일은 생기지 않습니다. `.hwaro/serve/`의 페이지들은 모든 링크에 개발 서버의 `base_url`(예: `http://127.0.0.1:3000`)이 박혀 있고, 디렉터리에는 `hwaro deploy`가 거부하는 `.hwaro-dev` 마커가 찍힙니다. 배포할 사이트는 `hwaro build`로 만드세요. `.hwaro/`는 알아서 버전 관리에서 빠집니다 — hwaro가 디렉터리를 만들 때 자기 자신을 무시하는 `.hwaro/.gitignore`를 함께 쓰고, `hwaro init`도 출력 디렉터리·`.hwaro/`·`.hwaro_cache.json`을 포함한 프로젝트 `.gitignore`를 스캐폴드합니다.
 
 **옵션:**
 
