@@ -56,7 +56,9 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
    GET으로 재시도, 리다이렉트는 최대 5회 추적)
 4. 내부 링크 대상이 디스크에 존재하는지 확인 (`.md`, `_index.md`, `index.md` 검사)
 5. 빌드가 생성하는 경로는 소스 파일 없이도 유효한 것으로 인정
-6. 깨졌거나 접근할 수 없는 링크 보고
+6. 파이프라인이 만들어 내는 에셋은 직전 빌드 출력에서 확인
+   ([빌드 출력을 근거로 사용하기](#빌드-출력을-근거로-사용하기) 참고)
+7. 깨졌거나 접근할 수 없는 링크 보고
 
 사설/내부 주소(localhost, RFC 1918 대역, `.local`/`.internal` 호스트)로
 해석되는 외부 링크에는 요청을 보내지 않습니다. 이런 링크는 사람용 출력과
@@ -141,6 +143,42 @@ checked: 50 links, 3 dead
       "error": "Skipped: private/internal address"
     }
   ],
-  "ignored_count": 0
+  "ignored_count": 0,
+  "output_hint": null
 }
 ```
+
+`output_hint`는 빌드 출력 때문에 결과를 다르게 읽어야 할 때만 값이 들어가고,
+그 외에는 `null`입니다(아래 참고). 사람용 출력에도 같은 문장이 나오며, JSON에
+같이 담아 두어 터미널 출력을 보지 않는 CI에서도 놓치지 않게 했습니다.
+
+## 빌드 출력을 근거로 사용하기
+
+컴파일된 스타일시트, 리사이즈된 이미지 변형, `[content.files]`나 에셋
+파이프라인으로 발행된 파일처럼 원본 소스로는 설명되지 않는 링크가 있습니다.
+`check-links`는 이런 경로를 직전 빌드 결과인 `[build] output_dir`(기본값
+`public/`)에서 찾으면 유효한 것으로 인정합니다. 빌드 밖에서 도는 명령에게는
+그것이 유일한 근거이기 때문입니다.
+
+이 디렉터리는 `hwaro build`가 만든 것이어야 합니다. Hwaro 0.19부터
+`hwaro serve`는 `.hwaro/serve/`에 빌드하고 `output_dir`은 건드리지 않으므로,
+serve만 쓰는 작업 흐름에는 아무것도 없습니다. 이제 이유 없이 깨진 링크 목록만
+쏟아내는 대신 그 사실을 알려줍니다:
+
+```
+checked: 4 links, 1 dead
+  [info] public/ holds no build output — run `hwaro build` first; check-links
+         validates build output, not `hwaro serve` output (.hwaro/serve/)
+```
+
+- **없거나 비어 있음** — 그 때문에 죽은 것으로 보고된 링크와 함께 안내가
+  출력됩니다.
+- **`hwaro serve` 출력** (`.hwaro-dev` 마커가 남은 경우) — `hwaro deploy`와 같은
+  규칙으로 근거에서 제외합니다. 마커는 `hwaro build`가 지웁니다.
+- **가장 최근 소스 파일보다 오래됨** — 문제가 없어 보이는 결과 아래에 안내가
+  붙습니다. 삭제한 페이지의 `index.html`이 그 트리에 남아 있으면 링크가 계속
+  통과하기 때문입니다.
+
+CI에서는 `check-links` 전에 `hwaro build`를 돌려 실제 출력과 대조하세요.
+소스만으로 판단되는 경로(`/about/`, `/tags/`, 피드, 사이트맵)는 빌드 출력이
+없어도 됩니다.

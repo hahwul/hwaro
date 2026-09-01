@@ -10,6 +10,7 @@ require "crinja"
 require "../models/config"
 require "../utils/errors"
 require "../utils/logger"
+require "../utils/build_output"
 require "../content/processors/markdown"
 require "../content/processors/internal_link_resolver"
 require "../core/build/parallel"
@@ -116,6 +117,8 @@ module Hwaro
             ["menu-parent-undefined"]),
           CheckSpec.new("referenced files & dirs",
             ["config-path-missing", "config-dir-missing"]),
+          CheckSpec.new("build output (route evidence)",
+            ["build-output-unusable", "build-output-stale"]),
           CheckSpec.new("sass (sources & enablement)",
             ["sass-dir-not-scanned", "sass-disabled-with-sources"]),
         ],
@@ -1335,6 +1338,20 @@ module Hwaro
       end
 
       private def check_referenced_paths(issues : Array(Issue), config : Models::Config)
+        # A prior build's output is the only evidence doctor has for a route
+        # no source file explains (a pipeline-emitted asset, a generated
+        # listing). Since #758 `hwaro serve` builds into `.hwaro/serve/`, so a
+        # serve-only workflow leaves `output_dir` absent or frozen at an old
+        # build — consult it through the oracle, which refuses a tree it may
+        # not trust and explains itself instead of leaving the route reported
+        # missing with no clue why (#761).
+        oracle = Utils::BuildOutput.oracle(
+          config.build.output_dir || "public",
+          sources: [@config_path, @content_dir, @templates_dir, @static_dir, "data", "themes"],
+          tool: "doctor",
+        )
+        unresolved_routes = 0
+
         emit_file = ->(label : String, value : String) do
           emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) }, id: "config-path-missing", kind: "file")
         end
@@ -1349,7 +1366,9 @@ module Hwaro
         # found" warnings. Use a route-aware check that also accepts a matching
         # content source or a built output page.
         emit_route = ->(label : String, value : String) do
-          emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) || route_resolves?(s, config.build.output_dir || "public") }, id: "config-path-missing", kind: "file")
+          before = issues.size
+          emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) || route_resolves?(s, oracle) }, id: "config-path-missing", kind: "file")
+          unresolved_routes += 1 if issues.size > before
         end
 
         config.og.default_image.try { |v| emit_file.call("[og] default_image", v) }
@@ -1399,6 +1418,22 @@ module Hwaro
               )
             end
           end
+        end
+
+        # One advisory for the whole run, never one per route. `hint` is nil
+        # unless the tree could not be used at all (absent / serve output) or
+        # was used and predates the sources; the extra condition keeps an
+        # unusable tree quiet until a route actually failed because of it —
+        # a site that references no pipeline-emitted path does not need to
+        # hear about `public/`.
+        if (hint = oracle.hint) && (oracle.usable? || unresolved_routes > 0)
+          issues << Issue.new(
+            id: oracle.usable? ? "build-output-stale" : "build-output-unusable",
+            level: :info,
+            category: "config",
+            file: nil,
+            message: hint,
+          )
         end
       end
 
@@ -1472,10 +1507,11 @@ module Hwaro
       #   - a content source exists (`content/about.md` or
       #     `content/about/index.md` for `/about/`), or
       #   - the built output page exists (`<output_dir>/about/index.html`,
-      #     which follows `[build] output_dir` rather than assuming `public/`).
+      #     which follows `[build] output_dir` rather than assuming `public/`,
+      #     and only when that tree is trustworthy — see `Utils::BuildOutput`).
       # This keeps doctor from flagging valid routes as "file not found" while
       # still catching genuinely-missing pages.
-      private def route_resolves?(path : String, output_dir : String) : Bool
+      private def route_resolves?(path : String, oracle : Utils::BuildOutput::Oracle) : Bool
         # Normalize to a slug: drop a leading slash, strip a trailing slash,
         # and remove a trailing `index.html` so `/about/` and
         # `/about/index.html` resolve the same way.
@@ -1502,10 +1538,10 @@ module Hwaro
         # a pretty route lands
         # at `<slug>/index.html`, while an explicit file (an `.html` alias or a
         # pipeline-built asset such as `/css/app.css`) lands at the path itself.
-        if Dir.exists?(output_dir)
-          return true if File.exists?(File.join(output_dir, slug, "index.html"))
-          return true if File.exists?(File.join(output_dir, path.lchop("/")))
-        end
+        # The oracle answers false for a tree doctor may not trust — absent,
+        # empty, or written by `hwaro serve` (#761).
+        return true if oracle.exists?(File.join(slug, "index.html"))
+        return true if oracle.exists?(path.lchop("/"))
 
         # Otherwise it's a pretty route or listing (taxonomy/section page)
         # produced at build time — doctor runs BEFORE the build (often on a clean

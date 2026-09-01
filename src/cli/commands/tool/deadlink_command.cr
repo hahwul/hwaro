@@ -13,6 +13,7 @@ require "../../../utils/frontmatter_scanner"
 require "../../../utils/text_utils"
 require "../../../utils/errors"
 require "../../../utils/logger"
+require "../../../utils/build_output"
 
 module Hwaro
   module CLI
@@ -199,6 +200,9 @@ module Hwaro
                   "dead_external"    => [] of Result,
                   "skipped_external" => [] of Result,
                   "ignored_count"    => ignored_count,
+                  # Same key on every payload: a consumer reads one schema,
+                  # and "nothing to check" has no build-output caveat.
+                  "output_hint" => nil,
                 }.to_json)
               else
                 Logger.outcome("checked", ignored_count > 0 ? "no links to check (#{ignored_count} ignored)" : "no links found", :info)
@@ -230,9 +234,23 @@ module Hwaro
             # reported dead.
             language_codes = translation_language_codes(config)
             generated_routes = generated_routes(config)
-            # Follow `[build] output_dir`; "public" only as the fallback.
+            # Follow `[build] output_dir`; "public" only as the fallback. The
+            # tree is consulted through the oracle so a serve-only workflow
+            # (which since #758 never populates it) is told why its
+            # pipeline-emitted assets read as dead, instead of validating
+            # against an absent — or permanently stale — tree (#761).
             output_dir = config.try(&.build.output_dir) || "public"
-            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, output_dir)
+            oracle = Utils::BuildOutput.oracle(
+              output_dir,
+              root: project_root,
+              sources: [target_dir] + %w[config.toml templates static data themes].map { |d| File.join(project_root, d) },
+              tool: "check-links",
+            )
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, oracle)
+            # Say it only where it changes how the result should be read: an
+            # unusable tree explains dead internal links, a stale one explains
+            # links it just accepted.
+            output_hint = oracle.hint if !dead_internal.empty? || oracle.usable?
 
             total = external_links.size + internal_links.size
             dead_total = dead_external.size + dead_internal.size
@@ -247,6 +265,12 @@ module Hwaro
                 "dead_external"    => dead_external,
                 "skipped_external" => skipped_external,
                 "ignored_count"    => ignored_count,
+                # Null unless the build tree changed how this result should be
+                # read (absent/serve output that could not validate pipeline
+                # assets, or stale output that accepted some). The human line
+                # is suppressed under --json, and CI is exactly where a run
+                # against no build output is easiest to miss.
+                "output_hint" => output_hint,
               }.to_json)
               # Exit non-zero so CI can gate on broken links (the JSON payload
               # has already been emitted to stdout for tooling to consume).
@@ -285,6 +309,11 @@ module Hwaro
               else
                 Logger.outcome("checked", "#{total} #{links_noun} · #{dead_total} dead", :err)
               end
+            end
+
+            if hint = output_hint
+              Logger.info "" if Logger.color_enabled?
+              Logger.item(sanitize_for_terminal(hint), glyph: :info)
             end
 
             # A dead-links result must fail the process so `check-links` is
@@ -655,7 +684,7 @@ module Hwaro
             !!(url =~ /\A[a-z][a-z0-9+.\-]*:/i)
           end
 
-          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, output_dir : String = "public") : Array(Result)
+          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, oracle : Utils::BuildOutput::Oracle = Utils::BuildOutput.oracle("public", tool: "check-links")) : Array(Result)
             results = [] of Result
             project_root = find_project_root(content_dir)
 
@@ -677,7 +706,7 @@ module Hwaro
               # (`content/ko/posts/`), and that section outranks any
               # translation reading — stripping unconditionally reported such
               # links dead even though the build publishes them.
-              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, output_dir) ||
+              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, oracle) ||
                        generated_routes.matches?(resolved_url) ||
                        feed_route?(resolved_url, generated_routes, content_dir, base_dir, language_codes) ||
                        paginated_route?(resolved_url, link, content_dir, base_dir, taxonomy_names)
@@ -935,7 +964,7 @@ module Hwaro
           # checker has always performed.
           private def resolves?(url : String, link : Link, content_dir : String, base_dir : String,
                                 project_root : String, taxonomy_names : Array(String),
-                                output_dir : String) : Bool
+                                oracle : Utils::BuildOutput::Oracle) : Bool
             target = content_target(url, content_dir, base_dir)
             # Most internal URLs are written with a trailing slash (`/about/`,
             # `/posts/hello/`) — strip it before computing the leaf-file
@@ -959,10 +988,12 @@ module Hwaro
             # [content.files] or the asset pipeline. The output probe doubles
             # as the oracle for generated routes on an already-built site, and
             # follows `[build] output_dir` so a site that builds elsewhere is
-            # not reported as one big pile of broken links.
+            # not reported as one big pile of broken links — but only while
+            # that tree is trustworthy: absent, empty and `hwaro serve` output
+            # all answer false, and the run reports why (#761).
             asset_path = url.lstrip("/")
             File.exists?(File.join(project_root, "static", asset_path)) ||
-              File.exists?(File.join(project_root, output_dir, asset_path))
+              oracle.exists?(asset_path)
           end
 
           # Language-qualified resolution for a `/<code>/…` URL whose literal

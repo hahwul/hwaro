@@ -64,6 +64,8 @@ hwaro doctor --json
   `[pwa] icons`, `[auto_includes] dirs`, `[[assets.bundles]] files`, …).
   Values that carry their own origin (`https://…`, `//cdn…`, `data:…`) are
   left alone — doctor can't validate a remote URL.
+- Build output that cannot back a route check (see
+  [Build output as evidence](#build-output-as-evidence))
 
 **Template diagnostics:**
 
@@ -95,9 +97,12 @@ hwaro: doctor
     [ok]   search (format)
     [ok]   languages (default_language resolves)
     [ok]   markdown / pwa (valid enums)
+    [ok]   image processing (widths set)
     [ok]   deployment / related (refs resolve)
     [ok]   menus (parent references)
     [ok]   referenced files & dirs
+    [ok]   build output (route evidence)
+    [ok]   sass (sources & enablement)
 
   templates/
     [ok]   required files (page.html, section.html)
@@ -126,6 +131,31 @@ passing check — for example `template syntax` when `templates/` is missing.
 In a color terminal the check lines use `✓`/`⚠`/`✗`/`ℹ` glyphs under an
 `hwaro doctor` heading, and the summary is a severity-colored `✦ checked` outcome
 line. A clean run ends with `checked: no issues found — your site looks great`.
+
+## Build Output as Evidence
+
+`[pwa] offline_page` and `[pwa] precache_urls` are routes, not files. Doctor
+resolves them against `content/` first, and — for values that carry an
+extension, such as a compiled stylesheet or a resized image variant — against
+the last build in `[build] output_dir` (`public/` by default).
+
+That tree has to come from `hwaro build`. Since Hwaro 0.19, `hwaro serve`
+builds into `.hwaro/serve/` and leaves `output_dir` alone, so in a serve-only
+workflow it is either absent or frozen at an old build. Doctor now says so
+instead of leaving you to guess:
+
+- **Absent or empty** — reported as `build-output-unusable`, alongside the
+  route it could not validate: *"public/ holds no build output — run `hwaro
+  build` first"*.
+- **`hwaro serve` output** (a leftover `.hwaro-dev` marker) — never used as
+  evidence, the same rule `hwaro deploy` applies. `hwaro build` clears the
+  marker.
+- **Older than your newest source file** — reported as `build-output-stale`
+  when a route was accepted from it, because a page you deleted still has its
+  `index.html` standing in that tree.
+
+Both are `info` level and appear only when the tree actually mattered: a site
+that references no build-generated path never hears about `public/`.
 
 ## Ignoring Known Issues
 
@@ -171,6 +201,8 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `menu-parent-undefined` | config | Menu entry's `parent` matches no identifier in that menu |
 | `config-path-missing` | config | Referenced file does not exist |
 | `config-dir-missing` | config | Referenced directory does not exist |
+| `build-output-unusable` | config | `[build] output_dir` could not validate a route (absent, or `hwaro serve` output) |
+| `build-output-stale` | config | A route was accepted from build output older than the sources |
 | `missing-config-*` | config_missing | Missing config section (e.g. `missing-config-pwa`) |
 | `template-dir-missing` | template | Templates directory not found ✗ |
 | `template-required-missing` | template | Required template missing ✗ |
