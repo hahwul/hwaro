@@ -799,8 +799,11 @@ module Hwaro
             message: "sitemap.priority #{config.sitemap.priority} is out of range (expected: 0.0–1.0)")
         end
 
-        # taxonomy name duplicates
-        taxonomy_names = config.taxonomies.map(&.name)
+        # taxonomy name duplicates — read from the raw TOML: the loader now
+        # drops a repeated name (first declaration wins), so the parsed
+        # `config.taxonomies` can no longer show the duplicate.
+        taxonomy_names = (config.raw["taxonomies"]?.try(&.as_a?) || [] of TOML::Any)
+          .compact_map { |t| t.as_h?.try(&.["name"]?).try(&.as_s?) }
         duplicates = taxonomy_names.tally.select { |_, count| count > 1 }.keys
         duplicates.each do |name|
           issues << Issue.new(id: "taxonomy-duplicate", level: :warning, category: "config", file: @config_path,

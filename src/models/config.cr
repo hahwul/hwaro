@@ -2113,12 +2113,25 @@ module Hwaro
       private def self.load_taxonomies(config : Config)
         return unless taxonomies_section = config.raw["taxonomies"]?.try(&.as_a?)
 
+        # A name declared twice used to yield two TaxonomyConfig entries, and
+        # every consumer iterating `config.taxonomies` registered each page
+        # under the name twice: term pages listed every post two times, the
+        # term feed carried duplicate items, `paginate_by` split a doubled
+        # list, and a lookup by name could land on either declaration (so
+        # `terms_sort_by` set on the first one silently stopped applying).
+        # `hwaro doctor` already flags the duplicate; the build has to refuse
+        # it too. First declaration wins, like a table-array key.
+        seen = Set(String).new
         config.taxonomies = taxonomies_section.compact_map do |taxonomy_any|
           taxonomy_hash = taxonomy_any.as_h?
           next unless taxonomy_hash
 
           name = taxonomy_hash["name"]?.try(&.as_s?)
           next unless name
+          unless seen.add?(name)
+            Logger.warn "Duplicate [[taxonomies]] name #{name.inspect} in config.toml — the first declaration wins; remove the later one."
+            next
+          end
 
           taxonomy = TaxonomyConfig.new(name)
           taxonomy.feed = bool_value(taxonomy_hash["feed"]?, taxonomy.feed)
