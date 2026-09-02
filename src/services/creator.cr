@@ -138,6 +138,20 @@ module Hwaro
         title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-")
       end
 
+      # Derive a display title from a filename stem (`my-first-post` ->
+      # "My First Post"). Empty pieces are dropped so a stem carrying a
+      # doubled or trailing hyphen (`emoji-`, `a---b`) cannot leak a
+      # trailing/doubled space into `title = "..."`. A stem made only of
+      # hyphens has no words to title-case, so it is kept verbatim rather
+      # than collapsing to an empty title.
+      # Single source of truth for the filename->title mapping used by every
+      # `hwaro new` branch that infers a title from the path.
+      def self.titleize(stem : String) : String
+        words = stem.split("-").reject(&.empty?)
+        return stem if words.empty?
+        words.map(&.capitalize).join(" ")
+      end
+
       # True when the build's front-matter date parser can produce a real
       # `Time` from `value`, so `hwaro new` fails fast on a `--date` the
       # build would silently drop (`2026-13-45`, `not-a-date`) or, worse,
@@ -153,8 +167,16 @@ module Hwaro
           last_was_hyphen = false
           segment.each_char do |char|
             if url_safe_char?(char)
-              io << char
-              last_was_hyphen = false
+              io << char unless char == '-' && last_was_hyphen
+              # A literal `-` is URL-safe, but it still opens a hyphen run:
+              # without this the run-collapse only saw the hyphens it
+              # synthesized itself, so a literal hyphen sitting next to
+              # unsafe characters emitted `a - b.md` -> `a---b.md` and
+              # `emoji-<emoji>.md` -> `emoji-.md`. Treating both spellings as
+              # the same run keeps the documented "collapsed to a single -"
+              # contract and matches `.slugify`, which collapses hyphen runs
+              # the same way.
+              last_was_hyphen = (char == '-')
             else
               unless last_was_hyphen
                 io << '-'
@@ -224,7 +246,7 @@ module Hwaro
             base_dir = File.dirname(full_path)
             if title.empty?
               filename_without_ext = File.basename(full_path, ".md")
-              title = filename_without_ext.split("-").map(&.capitalize).join(" ")
+              title = Creator.titleize(filename_without_ext)
             end
           else
             base_dir = File.join("content", section)
@@ -280,7 +302,7 @@ module Hwaro
             # Extract title from filename if not provided
             if title.empty?
               filename_without_ext = File.basename(path, ".md")
-              title = filename_without_ext.split("-").map(&.capitalize).join(" ")
+              title = Creator.titleize(filename_without_ext)
             end
 
             full_path = path.starts_with?("content/") ? path : File.join("content", path)
@@ -291,7 +313,7 @@ module Hwaro
             base_dir = File.dirname(full_path)
             if title.empty?
               filename_without_ext = File.basename(full_path, ".md")
-              title = filename_without_ext.split("-").map(&.capitalize).join(" ")
+              title = Creator.titleize(filename_without_ext)
             end
           else
             base_dir = path || "content/drafts"
@@ -303,7 +325,7 @@ module Hwaro
             # demanded --title while the config-driven `bundle = true` derived
             # it — the explicit flag was strictly stricter than the default.
             if title.empty? && path && options.bundle == true
-              title = File.basename(path).split("-").map(&.capitalize).join(" ")
+              title = Creator.titleize(File.basename(path))
             end
           end
         end

@@ -17,7 +17,7 @@ module Hwaro
           "Documentation-focused structure with organized sections and sidebar"
         end
 
-        protected def config_title : String
+        def config_title : String
           # Distinct from the homepage `title = "Documentation"` so the
           # rendered <title> and the `{{ site.title }} <span>Documentation</span>`
           # logo don't collapse into "Documentation - Documentation".

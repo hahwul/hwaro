@@ -103,6 +103,29 @@ describe Hwaro::CLI::Commands::InitCommand do
       options.multilingual_languages.should eq(["en-US", "pt-BR", "zh-Hant"])
     end
 
+    it "drops duplicate language codes in --include-multilingual" do
+      # Regression: a repeated code emitted two `[languages.<code>]` tables
+      # into config.toml. The exact repeat is invalid TOML ("duplicated
+      # key"), so `hwaro init` exited 0 having written a config that build,
+      # serve and doctor all refuse to parse.
+      cmd = Hwaro::CLI::Commands::InitCommand.new
+
+      options = cmd.parse_options(["--include-multilingual", "en,en"])
+      options.multilingual_languages.should eq(["en"])
+
+      options = cmd.parse_options(["--include-multilingual", "en,ko,en"])
+      options.multilingual_languages.should eq(["en", "ko"])
+
+      # BCP 47 tags are case-insensitive: `EN` and `en` are the same
+      # language, and emitting both produced a duplicated language subtree.
+      # The first spelling the author typed wins.
+      options = cmd.parse_options(["--include-multilingual", "EN,en"])
+      options.multilingual_languages.should eq(["EN"])
+
+      options = cmd.parse_options(["--include-multilingual", "en,pt-BR,PT-br"])
+      options.multilingual_languages.should eq(["en", "pt-BR"])
+    end
+
     it "rejects invalid language codes in --include-multilingual" do
       cmd = Hwaro::CLI::Commands::InitCommand.new
       expect_raises(Hwaro::HwaroError, /Invalid language code: '@@@'/) do

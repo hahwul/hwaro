@@ -18,7 +18,7 @@ module Hwaro
           "Book-style structure with chapters, prev/next navigation, and keyboard shortcuts"
         end
 
-        protected def config_title : String
+        def config_title : String
           "My Book"
         end
 

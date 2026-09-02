@@ -16,6 +16,7 @@ require "../content/processors/internal_link_resolver"
 require "../core/build/parallel"
 require "./config_snippets"
 require "./content_lister"
+require "./scaffolds/registry"
 
 module Hwaro
   module Services
@@ -174,12 +175,21 @@ module Hwaro
       KNOWN_SUB_SECTIONS    = ConfigSnippets::KNOWN_SUB_SECTIONS
 
       # The scaffolded placeholder titles. `Models::Config` falls back to
-      # "Hwaro Site" when `title` is absent, but every site `hwaro init`
-      # creates ships "My Hwaro Site" — so checking only the internal
-      # fallback meant the advisory never fired on the sites that actually
-      # have a placeholder title, and it shipped into <title>, OG tags and
-      # feeds unnoticed.
-      DEFAULT_TITLES = {"Hwaro Site", "My Hwaro Site"}
+      # "Hwaro Site" when `title` is absent, and every site `hwaro init`
+      # creates ships its scaffold's placeholder — so checking only the
+      # internal fallback meant the advisory never fired on the sites that
+      # actually have a placeholder title, and it shipped into <title>, OG
+      # tags and feeds unnoticed.
+      #
+      # Sourced from the scaffold registry rather than a hand-kept literal
+      # list: hardcoding "My Hwaro Site" silently exempted every
+      # `--scaffold blog|docs|book` site, which ships "My Blog" / "My Docs" /
+      # "My Book". A new scaffold now joins the check automatically.
+      class_getter default_titles : Set(String) do
+        titles = Set{"Hwaro Site"}
+        Scaffolds::Registry.all.each { |scaffold| titles << scaffold.config_title }
+        titles
+      end
 
       # `missing-config-<section>` ids are generated per config section
       # rather than enumerated, so `[doctor] ignore` validation matches
@@ -772,7 +782,7 @@ module Hwaro
         if config.raw["title"]?.try(&.as_s?).nil?
           issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path,
             message: "title is not set (the site falls back to \"#{config.title}\")")
-        elsif DEFAULT_TITLES.includes?(config.title)
+        elsif Doctor.default_titles.includes?(config.title)
           issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path,
             message: "title is still the placeholder value \"#{config.title}\"")
         end

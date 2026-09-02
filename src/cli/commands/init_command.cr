@@ -72,6 +72,17 @@ module Hwaro
         @scaffold_given = false
 
         def run(args : Array(String))
+          # `--json` has to take effect BEFORE parsing. `parse_options` prints
+          # the scaffold list through `Logger.info` on an unknown `--scaffold`
+          # and `Initializer` prints the whole create/exist tree, so leaving
+          # JSON mode until after the parse let human text share stdout with
+          # the machine payload. Detected from the raw argv the same way
+          # `Runner.emit_hwaro_error` does.
+          if args.includes?("--json") || args.includes?("-j")
+            @json_output = true
+            Runner.enable_json_mode!
+          end
+
           # Parse first: introspection and wizard eligibility are decided from
           # parsed state, so an unknown flag is rejected in every mode.
           options = parse_options(args)
@@ -98,11 +109,31 @@ module Hwaro
               Logger.info "Cancelled."
               return
             end
-            Services::Initializer.new.run(wizard_options)
+            run_initializer(wizard_options)
             return
           end
 
-          Services::Initializer.new.run(options)
+          run_initializer(options)
+        end
+
+        # Run the initializer and, under `--json`, emit the single result
+        # document. Without it `hwaro init --json` printed the human receipt
+        # and no JSON at all, so a scripted caller got an unparseable stream
+        # on success while errors already arrived as JSON — every other
+        # `--json` command (`new`, `build`, `deploy`, `tool *`) emits a
+        # result object.
+        private def run_initializer(options : Config::Options::InitOptions)
+          initializer = Services::Initializer.new
+          initializer.run(options)
+          return unless @json_output
+
+          payload = {
+            "status"        => "ok",
+            "path"          => options.path,
+            "scaffold"      => options.scaffold_remote || options.scaffold.to_s,
+            "files_created" => initializer.created_count,
+          }
+          STDOUT.puts payload.to_json
         end
 
         private def wizard_eligible? : Bool
@@ -215,7 +246,19 @@ module Hwaro
                   hint: "Examples: 'en', 'ko', 'en,ko', 'pt-BR', 'zh-Hant'.",
                 )
               end
-              multilingual_languages = parsed
+              # A repeated code (`en,en`, or a case variant like `EN,en`)
+              # emits two `[languages.<code>]` tables into config.toml. The
+              # exact repeat is invalid TOML ("duplicated key"), so `hwaro
+              # init` exited 0 having written a config that no later command
+              # — build, serve, doctor — can parse. BCP 47 tags are
+              # case-insensitive, so dedupe on the folded code and keep the
+              # first spelling the author typed.
+              deduped = parsed.uniq(&.downcase)
+              if deduped.size != parsed.size
+                dropped = parsed.size - deduped.size
+                Logger.warn "  --include-multilingual: dropped #{dropped} duplicate language code(s); using #{deduped.join(", ")}."
+              end
+              multilingual_languages = deduped
             end
             parser.on("--minimal-config", "Generate minimal config.toml without comments and optional sections") { minimal_config = true }
             parser.on("--full-config", "Generate full config.toml with all comments and optional sections (maximum discoverability)") { full_config = true }
