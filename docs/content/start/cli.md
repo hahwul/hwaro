@@ -131,14 +131,17 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | --scaffold TYPE | Built-in (`simple`, `bare`, `blog`, `docs`, `book`) or remote source (`github:user/repo[/path]`, URL) |
 | --wizard | Run the interactive wizard (TTY only) |
 | --agents MODE | AGENTS.md content mode: `remote` (lightweight, default) or `local` (full embedded reference) |
-| -f, --force | Force creation even if directory is not empty |
+| -f, --force | Force creation even if directory is not empty (keeps existing files) |
+| --clean | Remove existing files in the target before scaffolding (implies `--force`; refuses if the target contains `.git/`) |
 | --skip-agents-md | Skip creating AGENTS.md file |
 | --skip-sample-content | Skip creating sample content files |
 | --skip-taxonomies | Skip taxonomies configuration and templates |
-| --include-multilingual LANGS | Enable multilingual support (e.g., `en,ko,ja`) |
+| --include-multilingual LANGS | Enable multilingual support (e.g., `en,ko,ja`). Repeated codes are dropped with a warning |
 | --minimal-config | Generate minimal `config.toml` without comments or optional sections |
+| --full-config | Generate full `config.toml` with every comment and optional section (maximum discoverability) |
 | --list-scaffolds | List available built-in scaffolds and exit |
-| --json | Emit machine-readable JSON output (with --list-scaffolds) |
+| -q, --quiet | Suppress info output and the banner (errors still go to stderr) |
+| -j, --json | Emit machine-readable JSON output: the scaffold list with `--list-scaffolds`, otherwise a `{"status","path","scaffold","files_created"}` result |
 
 ### new
 

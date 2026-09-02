@@ -59,6 +59,18 @@ describe Hwaro::Services::Doctor do
         issues.any? { |i| i.id == "title-default" }.should be_true
       end
 
+      # Regression: the placeholder list was the literal
+      # {"Hwaro Site", "My Hwaro Site"}, which exempted every
+      # `--scaffold blog|docs|book` site — they ship "My Blog" / "My Docs" /
+      # "My Book" and never got the nudge. Sourced from the registry now, so
+      # a new scaffold joins the check without touching Doctor.
+      it "warns for every built-in scaffold's placeholder title" do
+        Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+          issues = run_doctor(%(title = "#{scaffold.config_title}"\nbase_url = "https://example.com"\n))
+          issues.any? { |i| i.id == "title-default" }.should be_true
+        end
+      end
+
       it "does not warn when title is custom" do
         issues = run_doctor(base_config)
         issues.any? { |i| i.id == "title-default" }.should be_false

@@ -133,14 +133,17 @@ API 요청 제한을 피하려면 `GITHUB_TOKEN` 환경 변수를 설정합니�
 | --scaffold TYPE | 내장 스캐폴드(`simple`, `bare`, `blog`, `docs`, `book`) 또는 원격 소스(`github:user/repo[/path]`, URL) |
 | --wizard | 대화형 위저드 실행 (TTY 전용) |
 | --agents MODE | AGENTS.md 콘텐츠 모드: `remote`(가벼움, 기본값) 또는 `local`(전체 레퍼런스 내장) |
-| -f, --force | 디렉터리가 비어 있지 않아도 강제로 생성 |
+| -f, --force | 디렉터리가 비어 있지 않아도 강제로 생성 (기존 파일은 유지) |
+| --clean | 스캐폴드 전에 대상의 기존 파일을 삭제 (`--force` 포함, 대상에 `.git/`이 있으면 거부) |
 | --skip-agents-md | AGENTS.md 파일 생성 생략 |
 | --skip-sample-content | 샘플 콘텐츠 파일 생성 생략 |
 | --skip-taxonomies | 택소노미 설정과 템플릿 생략 |
-| --include-multilingual LANGS | 다국어 지원 활성화 (예: `en,ko,ja`) |
+| --include-multilingual LANGS | 다국어 지원 활성화 (예: `en,ko,ja`). 중복 코드는 경고와 함께 제거됩니다 |
 | --minimal-config | 주석과 선택 섹션 없는 최소 `config.toml` 생성 |
+| --full-config | 모든 주석과 선택 섹션을 포함한 전체 `config.toml` 생성 (탐색성 최대) |
 | --list-scaffolds | 사용 가능한 내장 스캐폴드 목록 출력 후 종료 |
-| --json | 기계가 읽을 수 있는 JSON 출력 (--list-scaffolds와 함께) |
+| -q, --quiet | 정보 출력과 배너 숨김 (오류는 stderr로 계속 출력) |
+| -j, --json | 기계가 읽을 수 있는 JSON 출력: `--list-scaffolds`와 함께면 스캐폴드 목록, 그 외에는 `{"status","path","scaffold","files_created"}` 결과 |
 
 ### new
 

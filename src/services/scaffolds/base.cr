@@ -364,8 +364,11 @@ module Hwaro
         # placeholder.
         abstract def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
 
-        # Returns the site title used in config (overridable per scaffold)
-        protected def config_title : String
+        # Returns the site title used in config (overridable per scaffold).
+        # Public so `hwaro doctor` can source its placeholder-title advisory
+        # from the scaffolds themselves instead of a hand-kept literal list
+        # that only ever covered "My Hwaro Site".
+        def config_title : String
           "My Hwaro Site"
         end
 

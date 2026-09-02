@@ -27,7 +27,9 @@ module Hwaro
 
       # Counts files/directories actually created so the closing receipt can
       # report "N files" (existing entries left in place are not counted).
-      @created_count = 0
+      # Exposed so `hwaro init --json` can report the same number the human
+      # receipt prints instead of maintaining a second tally.
+      getter created_count = 0
 
       @entries = [] of ScaffoldEntry
 

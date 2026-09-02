@@ -19,7 +19,7 @@ module Hwaro
           "Blog-focused structure with posts, archives, and taxonomies"
         end
 
-        protected def config_title : String
+        def config_title : String
           "My Blog"
         end
 

@@ -1485,12 +1485,42 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    it "collapses a literal hyphen into the surrounding synthesized run" do
+      # Regression: the run-collapse only tracked hyphens it synthesized
+      # itself, so a literal `-` next to unsafe characters reset the flag
+      # and each side emitted its own hyphen — `a - b.md` became
+      # `a---b.md`, and a trailing emoji left `emoji-.md` dangling.
+      Hwaro::Services::Creator.sanitize_url_path("posts/a - b.md").should eq("posts/a-b.md")
+      Hwaro::Services::Creator.sanitize_url_path("hello - world - again.md").should eq("hello-world-again.md")
+      Hwaro::Services::Creator.sanitize_url_path("posts/emoji-\u{1F389}.md").should eq("posts/emoji.md")
+      Hwaro::Services::Creator.sanitize_url_path("- lead/trail -.md").should eq("lead/trail.md")
+    end
+
     it "drops segments that sanitize to pure dots instead of synthesizing `..`" do
       # `>.>.` → `-.-.` → hyphen/dot collapse → `..` — a traversal segment
       # fabricated AFTER validate_and_normalize_path! already ran. It must
       # vanish like any empty segment, never join the on-disk path.
       Hwaro::Services::Creator.sanitize_url_path("posts/>.>./foo.md").should eq("posts/foo.md")
       Hwaro::Services::Creator.sanitize_url_path("a/>.>./>.>./b.md").should eq("a/b.md")
+    end
+  end
+
+  describe ".titleize" do
+    it "title-cases hyphen-separated words" do
+      Hwaro::Services::Creator.titleize("my-first-post").should eq("My First Post")
+    end
+
+    it "drops empty pieces so no doubled or trailing space reaches the title" do
+      # Regression: `split("-").map(&.capitalize).join(" ")` turned the stem
+      # `emoji-` into the front-matter title "Emoji " and `a---b` into
+      # "A   B".
+      Hwaro::Services::Creator.titleize("emoji-").should eq("Emoji")
+      Hwaro::Services::Creator.titleize("-lead").should eq("Lead")
+      Hwaro::Services::Creator.titleize("a---b").should eq("A B")
+    end
+
+    it "keeps a hyphen-only stem verbatim rather than producing an empty title" do
+      Hwaro::Services::Creator.titleize("---").should eq("---")
     end
   end
 end
