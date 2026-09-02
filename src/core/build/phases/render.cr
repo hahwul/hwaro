@@ -162,6 +162,15 @@ module Hwaro::Core::Build::Phases::Render
         # process_files_*); the refusals are surfaced separately.
         ctx.stats.pages_rendered = count
         ctx.stats.pages_unpublished = @unpublished_pages.get
+        # Pages the cache skipped still feed the Generate phase (search index,
+        # feeds read `page.content`), so give them the content a real render
+        # would have produced — unless the Generate phase is going to leave
+        # every output untouched anyway (warm build, nothing rendered,
+        # page/section set unchanged), in which case the work is wasted.
+        if cache_enabled && !ctx.options.streaming? && pages_to_build.size < all_pages.size &&
+           !generate_outputs_unchanged?(ctx)
+          hydrate_cached_page_content(all_pages - pages_to_build, site, templates, use_highlight, global_vars, parallel)
+        end
         # Strict [links] broken_internal = "error": fail the phase with one
         # aggregated error after the whole fan-out so every offender is
         # listed. The lifecycle manager re-raises HwaroError unchanged
@@ -964,33 +973,89 @@ module Hwaro::Core::Build::Phases::Render
     @published_pages.get - published_before
   end
 
-  private def render_page(
+  # Populate `page.content` for cache-hit pages on a warm `--cache` build.
+  #
+  # The render phase only runs `render_page` for pages whose cache entry is
+  # stale, so cache hits reach the Generate phase with an empty `content`.
+  # The search index and the feeds then fell back to a markdown-only render
+  # of `raw_content` — no shortcode expansion, no `@/` link resolution, no
+  # base_path prefix — and search.json / rss.xml carried raw `{% gal() %}`
+  # markup for every cached page (`hwaro build --cache` twice on any site
+  # with a block shortcode; also 4 pages of docs/). Running the same content
+  # pipeline a render runs, minus the template + write, makes a warm build's
+  # generated outputs byte-identical to a clean build's. Fans out across the
+  # same per-worker Crinja envs the render uses; a failure hydrating one page
+  # is logged and leaves that page on the old fallback rather than failing a
+  # build whose page output already succeeded.
+  private def hydrate_cached_page_content(
+    pages : Array(Models::Page),
+    site : Models::Site,
+    templates : Hash(String, String),
+    highlight : Bool,
+    global_vars : Hash(String, Crinja::Value),
+    parallel : Bool,
+  ) : Nil
+    pages = pages.select { |page| page.render && !page.has_redirect? }
+    return if pages.empty?
+    safe = site.config.markdown.safe
+
+    hydrate = ->(page : Models::Page, env : Crinja?, cache : Hash(UInt64, Crinja::Template)?) do
+      # Same reset `render_page` does: shortcode warnings are re-collected by
+      # the content pass, so a page hydrated on every serve rebuild must not
+      # accumulate duplicates.
+      page.build_warnings.clear
+      render_page_content(page, site, templates, highlight, safe, global_vars,
+        crinja_env_override: env, template_cache_override: cache)
+  rescue ex
+    Logger.debug "  Could not hydrate cached content for #{page.path}: #{ex.message}"
+    end
+
+    if parallel && pages.size > 1
+      worker_count = render_worker_count(pages, site, templates, pages.size)
+      worker_envs = Array.new(worker_count) { create_fresh_crinja_env }
+      worker_caches = Array.new(worker_count) { {} of UInt64 => Crinja::Template }
+      work_queue = Channel(Models::Page).new(pages.size)
+      pages.each { |page| work_queue.send(page) }
+      work_queue.close
+      done = Channel(Nil).new(pages.size)
+      worker_count.times do |worker_id|
+        spawn do
+          while page = work_queue.receive?
+            begin
+              hydrate.call(page, worker_envs[worker_id], worker_caches[worker_id])
+            ensure
+              done.send(nil)
+            end
+          end
+        end
+      end
+      pages.size.times { done.receive }
+    else
+      pages.each { |page| hydrate.call(page, nil, nil) }
+    end
+  end
+
+  # The content half of a page render: shortcodes → markdown → placeholder
+  # restore → internal-link resolution → subpath prefix → responsive images.
+  # Sets `page.content` and returns the HTML, the TOC headers and the template
+  # variables the shortcode pass built (so `apply_template` can reuse them).
+  #
+  # Split out of `render_page` so `hydrate_cached_page_content` can produce
+  # exactly what a real render produces for pages a warm `--cache` build
+  # skips: the search index and the feeds read `page.content`, and their
+  # markdown-only fallback (no shortcodes, no link resolution, no base_path)
+  # shipped raw `{% shortcode %}` markup into search.json / rss.xml.
+  private def render_page_content(
     page : Models::Page,
     site : Models::Site,
     templates : Hash(String, String),
-    output_dir : String,
-    minify : Bool,
-    highlight : Bool = true,
-    safe : Bool = false,
-    verbose : Bool = false,
-    global_vars : Hash(String, Crinja::Value)? = nil,
+    highlight : Bool,
+    safe : Bool,
+    global_vars : Hash(String, Crinja::Value)?,
     crinja_env_override : Crinja? = nil,
     template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
-    error_overlay : Bool = false,
     profiler : Profiler? = nil,
-  )
-    return unless page.render
-
-    # Clear warnings from previous renders (important for incremental rebuilds)
-    page.build_warnings.clear
-
-    # Handle redirect_to for pages AND sections
-    if page.has_redirect?
-      generate_redirect_page(page, site, output_dir, verbose)
-      generate_aliases(page, site, output_dir, verbose)
-      return
-    end
-
+  ) : {String, Array(Models::TocHeader), Hash(String, Crinja::Value)?}
     # Only build shortcode context and process shortcodes if content actually
     # contains shortcode syntax ({{ or {%).  This avoids the expensive
     # build_template_variables call for the majority of pages that have no
@@ -1085,6 +1150,38 @@ module Hwaro::Core::Build::Phases::Render
     # Store rendered HTML in page.content for reuse by Feed/Search generators
     # (avoids expensive re-rendering of Markdown in Generate phase)
     page.content = html_content
+    {html_content, toc_headers, shortcode_context}
+  end
+
+  private def render_page(
+    page : Models::Page,
+    site : Models::Site,
+    templates : Hash(String, String),
+    output_dir : String,
+    minify : Bool,
+    highlight : Bool = true,
+    safe : Bool = false,
+    verbose : Bool = false,
+    global_vars : Hash(String, Crinja::Value)? = nil,
+    crinja_env_override : Crinja? = nil,
+    template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
+    error_overlay : Bool = false,
+    profiler : Profiler? = nil,
+  )
+    return unless page.render
+
+    # Clear warnings from previous renders (important for incremental rebuilds)
+    page.build_warnings.clear
+
+    # Handle redirect_to for pages AND sections
+    if page.has_redirect?
+      generate_redirect_page(page, site, output_dir, verbose)
+      generate_aliases(page, site, output_dir, verbose)
+      return
+    end
+
+    html_content, toc_headers, shortcode_context = render_page_content(page, site, templates, highlight, safe, global_vars,
+      crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, profiler: profiler)
 
     # Only expose TOC data when page.toc is enabled
     if page.toc && !toc_headers.empty?

@@ -29,31 +29,37 @@ module Hwaro
           end
         end
 
+        # Route through the builder's skip-aware implementation whenever one is
+        # attached (every CLI build and `serve`). This hook used to hold a
+        # second copy of the generate phase's calls with no `skip_if_unchanged`,
+        # which made the phase's own skip logic dead code in real builds and
+        # regenerated feeds from un-hydrated cache-hit pages on every warm
+        # `--cache` build. The direct calls below remain only for embedding
+        # callers that trigger the hooks without a Builder.
         private def generate_seo_files(ctx : Core::Lifecycle::BuildContext)
+          if builder = ctx.builder
+            builder.generate_seo_outputs(ctx)
+            return
+          end
+
           site = ctx.site
           return unless site
 
           all_pages = ctx.all_pages
 
-          # Generate sitemap
           Content::Seo::Sitemap.generate(all_pages, site, ctx.output_dir, ctx.options.verbose)
-
-          # Generate feeds (RSS/Atom). User feed templates (rss.xml/atom.xml
-          # keys) override the built-in output; the renderer comes from the
-          # builder so hook-based generation matches the default Generate
-          # phase.
           Content::Seo::Feeds.generate(all_pages, site.config, ctx.output_dir, ctx.options.verbose,
-            templates: ctx.templates.empty? ? nil : ctx.templates,
-            renderer: ctx.builder.try(&.feed_template_renderer))
-
-          # Generate robots.txt
+            templates: ctx.templates.empty? ? nil : ctx.templates)
           Content::Seo::Robots.generate(site.config, ctx.output_dir, ctx.options.verbose)
-
-          # Generate llms.txt
           Content::Seo::Llms.generate(site.config, all_pages, ctx.output_dir, ctx.options.verbose)
         end
 
         private def generate_search_index(ctx : Core::Lifecycle::BuildContext)
+          if builder = ctx.builder
+            builder.generate_search_index(ctx)
+            return
+          end
+
           site = ctx.site
           return unless site
 
