@@ -220,11 +220,13 @@ tech = ["crystal", "security"]
 {% if page.tags %}
 <div class="post-tags">
 {% for tag in page.tags %}
-  <a href="/tags/{{ tag | slugify }}/">{{ tag }}</a>
+  <a href="{{ get_taxonomy_url(kind="tags", term=tag) }}">{{ tag }}</a>
 {% endfor %}
 </div>
 {% endif %}
 ```
+
+`{{ tag | slugify }}` 대신 `get_taxonomy_url()`(또는 `get_taxonomy()`의 `term.slug`)을 사용하세요. 두 용어가 같은 슬러그로 충돌하면(`Crystal`과 `crystal`) 생성기는 `/tags/crystal/`과 `/tags/crystal-2/`를 만드는데, 어느 쪽이 어느 용어인지는 함수만 알고 있습니다.
 
 ### 카테고리 내비게이션
 

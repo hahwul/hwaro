@@ -109,7 +109,7 @@ module Hwaro
           CheckSpec.new("languages (default_language resolves)",
             ["default-language-undefined"]),
           CheckSpec.new("markdown / pwa (valid enums)",
-            ["markdown-math-engine-invalid", "pwa-cache-strategy-invalid"]),
+            ["markdown-math-engine-invalid", "pwa-cache-strategy-invalid", "pwa-display-invalid"]),
           CheckSpec.new("image processing (widths set)",
             ["image-processing-widths-empty"]),
           CheckSpec.new("deployment / related (refs resolve)",
@@ -859,6 +859,16 @@ module Hwaro
           unless Models::PwaConfig::VALID_STRATEGIES.includes?(raw_strategy)
             issues << Issue.new(id: "pwa-cache-strategy-invalid", level: :warning, category: "config", file: @config_path,
               message: "pwa.cache_strategy \"#{raw_strategy}\" is not supported (expected: #{Models::PwaConfig::VALID_STRATEGIES.join(", ")})")
+          end
+        end
+        # Same shape for `display`: `Config.load` coerces an unknown value
+        # back to "standalone" with a build-time warning, so read the raw
+        # TOML value here too. Before this check a typo (`display = "weird"`)
+        # was invisible to doctor while browsers silently fell back.
+        if raw_pwa && (raw_display = raw_pwa["display"]?.try(&.as_s?))
+          unless Models::PwaConfig::VALID_DISPLAYS.includes?(raw_display)
+            issues << Issue.new(id: "pwa-display-invalid", level: :warning, category: "config", file: @config_path,
+              message: "pwa.display \"#{raw_display}\" is not supported (expected: #{Models::PwaConfig::VALID_DISPLAYS.join(", ")})")
           end
         end
 

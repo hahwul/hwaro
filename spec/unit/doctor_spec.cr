@@ -208,6 +208,23 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # Same shape for `pwa.display`: the manifest `display` member has four
+      # valid values and browsers silently fall back to `browser` on
+      # anything else, so a typo shipped a broken manifest with no signal.
+      it "warns on invalid pwa.display when pwa enabled" do
+        config = base_config(%(\n[pwa]\nenabled = true\ndisplay = "weird"\n))
+        issues = run_doctor(config)
+        issues.any? { |i| i.id == "pwa-display-invalid" && i.message.includes?("weird") }.should be_true
+      end
+
+      it "does not warn on valid pwa.display values" do
+        ["fullscreen", "standalone", "minimal-ui", "browser"].each do |display|
+          config = base_config(%(\n[pwa]\nenabled = true\ndisplay = "#{display}"\n))
+          issues = run_doctor(config)
+          issues.any?(&.id.==("pwa-display-invalid")).should be_false
+        end
+      end
+
       # `[deployment].target` selects which `[[deployment.targets]]`
       # block `hwaro deploy` uses. Pointing at an undefined name fails
       # at runtime; surfacing it here saves an actual deploy attempt.

@@ -38,7 +38,7 @@ cache_strategy = "cache-first"
 | short_name | string | name | 홈 화면용 짧은 이름 |
 | theme_color | string | "#ffffff" | 브라우저 툴바/상태 표시줄 색상 |
 | background_color | string | "#ffffff" | 스플래시 화면 배경색 |
-| display | string | "standalone" | 표시 모드 |
+| display | string | "standalone" | 표시 모드: `fullscreen`, `standalone`, `minimal-ui`, `browser` 중 하나 (알 수 없는 값은 `standalone`으로 대체) |
 | start_url | string | "/" | 앱 실행 시 열리는 URL |
 | icons | array | [] | 아이콘 파일 경로 |
 | offline_page | string | — | 오프라인일 때 보여줄 폴백 페이지 |

@@ -3008,4 +3008,21 @@ describe "Hwaro::Models::Config" do
       end
     end
   end
+
+  describe "[pwa] display" do
+    it "accepts every Web App Manifest display mode" do
+      %w[fullscreen standalone minimal-ui browser].each do |mode|
+        config = load_config(%(title = "x"\nbase_url = "https://example.com"\n\n[pwa]\nenabled = true\ndisplay = "#{mode}"\n))
+        config.pwa.display.should eq(mode)
+      end
+    end
+
+    # A typo used to flow straight into manifest.json, where browsers
+    # silently fall back to `browser`. Coerce with a warning, like
+    # `cache_strategy` already does, so the manifest stays valid.
+    it "falls back to standalone on an unknown display mode" do
+      config = load_config(%(title = "x"\nbase_url = "https://example.com"\n\n[pwa]\nenabled = true\ndisplay = "weird"\n))
+      config.pwa.display.should eq("standalone")
+    end
+  end
 end

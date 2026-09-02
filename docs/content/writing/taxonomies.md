@@ -230,11 +230,13 @@ Generate taxonomy term URL:
 {% if page.tags %}
 <div class="post-tags">
 {% for tag in page.tags %}
-  <a href="/tags/{{ tag | slugify }}/">{{ tag }}</a>
+  <a href="{{ get_taxonomy_url(kind="tags", term=tag) }}">{{ tag }}</a>
 {% endfor %}
 </div>
 {% endif %}
 ```
+
+Use `get_taxonomy_url()` (or `term.slug` from `get_taxonomy()`) rather than `{{ tag | slugify }}`: when two terms collide on a slug (`Crystal` and `crystal`), the generator writes `/tags/crystal/` and `/tags/crystal-2/`, and only the function knows which is which.
 
 ### Category Navigation
 
