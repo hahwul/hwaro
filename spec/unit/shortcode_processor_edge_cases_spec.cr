@@ -249,6 +249,21 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should_not contain("<span>fenced</span>")
     end
 
+    # The unmatched opener was emitted as literal text with nothing in the
+    # log, so `{% alert() %}` with a forgotten closer shipped the raw tag into
+    # the page. Warn once per name per build.
+    it "warns once when a block shortcode opener never finds its closer" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
+      result = nil
+      log = with_captured_log do
+        result = builder.test_sc_process("{% note %}\nforgot the closer\n\n{% note %}again\n", templates)
+      end
+      result.not_nil!.should contain("{% note %}")
+      log.scan("Block shortcode '{% note %}' is never closed").size.should eq(1)
+      log.should contain("{% endnote %}")
+    end
+
     it "keeps fence protection after an unclosed block shortcode opener" do
       builder = Hwaro::Core::Build::Builder.new
       templates = {"shortcodes/note" => "<span>{{ body }}</span>"}
