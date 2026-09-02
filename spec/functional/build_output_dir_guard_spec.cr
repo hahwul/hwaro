@@ -363,4 +363,40 @@ describe "build: output directory that already holds unrelated files" do
       end
     end
   end
+
+  it "clears a directory that carries a real serve marker" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        FileUtils.mkdir_p("shared")
+        File.write("shared/notes.txt", "keep")
+        Hwaro::Utils::DevMarker.write("shared")
+        run_build("shared").should be_true
+        File.exists?("shared/notes.txt").should be_false
+      end
+    end
+  end
+
+  # `DevMarker.present?` fails closed (true) so deploy never ships output
+  # it cannot rule out as serve output. Reusing that true here would invert
+  # into "clearable" and wipe a foreign directory whose `.hwaro-dev` we
+  # simply could not read.
+  it "does not treat an unreadable .hwaro-dev as a serve marker" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        FileUtils.mkdir_p("shared")
+        File.write("shared/notes.txt", "keep")
+        marker = File.join("shared", Hwaro::Utils::DevMarker::FILENAME)
+        File.write(marker, Hwaro::Utils::DevMarker::CONTENT)
+        File.chmod(marker, 0o000)
+        begin
+          run_build("shared").should be_true
+          File.exists?("shared/notes.txt").should be_true
+        ensure
+          File.chmod(marker, 0o644) if File.exists?(marker)
+        end
+      end
+    end
+  end
 end

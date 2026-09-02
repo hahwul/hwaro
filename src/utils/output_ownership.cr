@@ -1,6 +1,7 @@
 require "./hwaro_dir"
 require "./file_safe"
 require "./logger"
+require "./dev_marker"
 
 # Which output directories a cold `hwaro build` may clear.
 #
@@ -44,7 +45,11 @@ module Hwaro
         # `.hwaro/` is hwaro's own workspace (`hwaro serve` builds into
         # `.hwaro/serve`); nothing in there is a user's file.
         return true if resolved.starts_with?(File.join(project_root, HwaroDir::DIR) + File::SEPARATOR)
-        return true if DevMarker.present?(resolved)
+        # Fail OPEN: `present?` defaults to fail-closed so deploy never
+        # ships unreadably-marked output. The same true here would invert
+        # into "clearable" and wipe a foreign directory we could not
+        # identify as ours.
+        return true if DevMarker.present?(resolved, fail_closed: false)
         recorded?(resolved, project_root)
       end
 

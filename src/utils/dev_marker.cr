@@ -48,7 +48,12 @@ module Hwaro
       # drifted still counts. A user file whose first line happens to be
       # exactly that sentence is treated as a marker — it is announcing itself
       # as one, and that is the deliberate trade for not hashing whole bodies.
-      def present?(output_dir : String) : Bool
+      # `fail_closed` is the deploy/build-warn default: an unreadable file
+      # keeps its old existence-only meaning so we never ship (or silently
+      # treat as production) output we cannot rule out as serve output.
+      # Callers that would DELETE on a true result must pass `false` —
+      # the same true would invert into "clearable".
+      def present?(output_dir : String, *, fail_closed : Bool = true) : Bool
         marker = path(output_dir)
         return false unless File.exists?(marker)
 
@@ -62,12 +67,8 @@ module Hwaro
         # Deleted between the stat and the open — absent, not a marker.
         false
       rescue ex : IO::Error
-        # Unreadable (permissions, an exotic mount): fail closed. The safety
-        # property this file exists for is "never deploy dev output", so a
-        # file we cannot rule out keeps its old existence-only meaning rather
-        # than silently unblocking a deploy.
         Logger.debug "Could not read dev marker #{marker}: #{ex.message}"
-        true
+        fail_closed
       end
 
       def write(output_dir : String) : Nil
