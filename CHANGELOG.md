@@ -1,9 +1,20 @@
 # Changelog
 
-## Unreleased
+## v0.20.1
+
+### Added
+- Markdown: admonition custom titles (`> [!NOTE] Custom`) and tables inside blockquotes (#777)
 
 ### Fixed
-- macOS release tarballs are re-signed ad hoc after their dylib load paths are rewritten. `install_name_tool` invalidated the bundled OpenSSL signatures, and Apple Silicon SIGKILLs a process that maps a dylib with a stale signature — the v0.20.0 `osx-arm64` binary (and the Homebrew formula built from it) was killed at launch on every arm64 Mac. Packaging now verifies every signature and runs the extracted tarball before reporting success, and CI exercises it on an arm64 runner (#782)
+- macOS release tarballs are re-signed after their dylib load paths are rewritten — the v0.20.0 `osx-arm64` binary (and the Homebrew formula built from it) was SIGKILLed at launch on every Apple Silicon Mac (#782, #783)
+- `--cache`: warm builds no longer ship raw shortcodes into `search.json`/feeds, and static-copy/data-digest staleness gaps closed (#769, #775, #779, #781)
+- Template engine: three build-aborting crashes fixed, and every template error now reports its `file:line:col` (#768, #775, #781)
+- `hwaro build` keeps output directories it does not own instead of wiping them, and warns on silently skipped content and unknown config (#780)
+- Sass: `@import`/`@forward` module configuration and scope, list interpolation, `color.hwb()` alpha, `map.deep-remove()` keywords (#773, #778, #781)
+- Markdown: empty-heading ids, multi-backtick code spans, container closers, code-span restore no longer O(N²) (#771, #779, #781)
+- `hwaro serve`: request path restored after index rewrite, bind failures classified (#774, #781)
+- `hwaro tool`: `[build] output_dir` honored in platform configs, section feeds gated correctly in `check-links`, named `convert` failures (#770, #781)
+- Five `init`/`new`/`doctor` defects found by dogfooding every scaffold; `pwa.display` validated (#772, #776)
 
 ## v0.20.0
 
