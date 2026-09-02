@@ -329,6 +329,9 @@ module Hwaro::Core::Build::Phases::Initialize
   # Widest timestamp granularity a destination filesystem is likely to have
   # (FAT/exFAT store 2-second resolution).
   MTIME_SKIP_TOLERANCE = 2.seconds
+  # Read size for the byte comparison that resolves that window (see
+  # `same_contents?`).
+  CONTENT_COMPARE_CHUNK = 64 * 1024
 
   private def collect_static_files(
     src_dir : String,
@@ -390,26 +393,63 @@ module Hwaro::Core::Build::Phases::Initialize
       # `info` from above already carries the source mtime — re-statting
       # src_path here tripled the stat count over static/ on watch rebuilds.
       #
-      # Skip on SIZE equality plus mtime equality within a tolerance, the same
-      # shape the Write phase uses for bundle assets. Two reasons it is not an
-      # ordering test and not exact:
-      #   * `source <= destination` skipped any source whose mtime moved
-      #     BACKWARDS — what `git checkout`, `git stash pop` and
-      #     `rsync --times` do — serving the previous revision's asset forever.
-      #   * exact equality never holds when the DESTINATION filesystem stores
-      #     coarser timestamps than the source (exFAT/FAT32 2s, HFS+ 1s, some
-      #     SMB/NFS and Docker bind mounts), which would re-copy the whole
-      #     `static/` tree on every incremental build and every serve rebuild.
+      # Skip on SIZE equality plus mtime equality, the same shape the Write
+      # phase uses for bundle assets. It is not an ordering test:
+      # `source <= destination` skipped any source whose mtime moved
+      # BACKWARDS — what `git checkout`, `git stash pop` and `rsync --times`
+      # do — serving the previous revision's asset forever.
+      #
+      # The copy stamps the destination with the SOURCE mtime, so an EXACT
+      # match proves the destination already holds this exact source version
+      # and nothing is read. A near-match does not prove that: it is equally
+      # a DESTINATION filesystem storing coarser timestamps than the source
+      # (exFAT/FAT32 2s, HFS+ 1s, some SMB/NFS and Docker bind mounts,
+      # where exact equality never holds) and a real edit made within
+      # `MTIME_SKIP_TOLERANCE` of the previous build. Treating the whole
+      # window as "unchanged" silently dropped the second case whenever the
+      # edit kept the byte size — `#fff` → `#eee` in a stylesheet saved a
+      # second after the last build was never published, and stayed
+      # unpublished until some later edit moved the mtime clear of the
+      # window. Compare the bytes in that narrow window instead: coarse
+      # destinations still skip the copy, real edits still land.
       if incremental && (dest_info = File.info?(dest_path)) &&
-         info.size == dest_info.size &&
-         (info.modification_time - dest_info.modification_time).abs <= MTIME_SKIP_TOLERANCE
-        next
+         info.size == dest_info.size
+        delta = (info.modification_time - dest_info.modification_time).abs
+        next if delta.zero?
+        next if delta <= MTIME_SKIP_TOLERANCE && same_contents?(src_path, dest_path)
       end
 
       files_to_copy << {src_path, dest_path, info.modification_time}
     end
 
     files_to_copy
+  end
+
+  # Byte-compare two files already known to be the same size.
+  #
+  # Only reached in the narrow "mtimes differ but sit inside
+  # MTIME_SKIP_TOLERANCE" window, so a warm build on a filesystem that can
+  # store the stamped source mtime exactly (the overwhelmingly common case)
+  # never reads a byte. A read failure answers "not identical" so the caller
+  # falls back to copying — the safe direction.
+  private def same_contents?(src_path : String, dest_path : String) : Bool
+    buffer_src = Bytes.new(CONTENT_COMPARE_CHUNK)
+    buffer_dest = Bytes.new(CONTENT_COMPARE_CHUNK)
+    File.open(src_path, "rb") do |src_io|
+      File.open(dest_path, "rb") do |dest_io|
+        loop do
+          read = src_io.read(buffer_src)
+          break if read == 0
+          window = buffer_dest[0, read]
+          return false unless dest_io.read_fully?(window)
+          return false unless buffer_src[0, read] == window
+        end
+      end
+    end
+    true
+  rescue ex : File::Error | IO::Error
+    Logger.debug "Static copy: failed to compare #{src_path} with #{dest_path}: #{ex.message}"
+    false
   end
 
   # Copy the given `{src, dest}` pairs using a parallel worker pool. Directory
@@ -737,6 +777,15 @@ module Hwaro::Core::Build::Phases::Initialize
     "#{disk}-remote:#{remote}"
   end
 
+  # Extensions the digest below covers. WIDER than `DataDisk.load_tree`'s
+  # glob on purpose: `site.data` never reads CSV, but `load_data()` does
+  # (see the template function's `parse_data_content`), and a template
+  # calling `load_data(path="data/team.csv")` renders from a file that the
+  # digest has to see. Missing it meant editing a `data/*.csv` moved nothing
+  # in the cache key, so `build --cache` re-published every page with the
+  # previous CSV's values — forever, until an unrelated edit.
+  DATA_DIGEST_EXTENSIONS = "yml,yaml,json,toml,csv"
+
   # Compute a content digest of the `data/` directory for cache invalidation.
   #
   # Globs every supported data file, sorts the paths for determinism, and folds
@@ -753,7 +802,7 @@ module Hwaro::Core::Build::Phases::Initialize
     # feed templates — an i18n edit must invalidate cached pages too, or
     # `build --cache` ships stale translations while `serve` (which watches
     # i18n/) rebuilds correctly.
-    Dir.glob("data/**/*.{yml,yaml,json,toml}", "i18n/**/*.{yml,yaml,json,toml}") do |path|
+    Dir.glob("data/**/*.{#{DATA_DIGEST_EXTENSIONS}}", "i18n/**/*.{#{DATA_DIGEST_EXTENSIONS}}") do |path|
       next if File.directory?(path)
       paths << path
     end

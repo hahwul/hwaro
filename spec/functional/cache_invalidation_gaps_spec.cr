@@ -282,3 +282,88 @@ describe "cache: alternating output directories" do
     end
   end
 end
+
+describe "cache: data files read through load_data()" do
+  it "re-renders when a data/*.csv changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("data")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHome")
+        # `site.data` deliberately never exposes CSV, so the only way to read
+        # one is load_data() — which is exactly the path the digest missed.
+        File.write("templates/index.html",
+          %({% set rows = load_data(path="data/team.csv") %}) +
+          "{% for row in rows %}CELL:{{ row[0] }};{% endfor %}")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("data/team.csv", "name\nAlice\n")
+
+        cached_build
+        File.read("public/index.html").should contain("CELL:Alice;")
+
+        File.write("data/team.csv", "name\nZORBA\n")
+        cached_build
+        File.read("public/index.html").should contain("CELL:ZORBA;")
+        File.read("public/index.html").should_not contain("CELL:Alice;")
+      end
+    end
+  end
+end
+
+describe "cache: static files edited inside the mtime tolerance" do
+  it "re-copies a same-size static edit made right after the previous build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHome")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("static/app.css", "body { color: #fff; }\n")
+
+        cached_build
+        File.read("public/app.css").should eq("body { color: #fff; }\n")
+
+        # Same byte size, mtime moved by well under MTIME_SKIP_TOLERANCE —
+        # the shape of any quick edit-save-rebuild cycle. The old tolerance
+        # window swallowed it and kept publishing the previous bytes.
+        source_mtime = File.info("static/app.css").modification_time
+        File.write("static/app.css", "body { color: #eee; }\n")
+        File.touch("static/app.css", source_mtime + 200.milliseconds)
+
+        cached_build
+        File.read("public/app.css").should eq("body { color: #eee; }\n")
+      end
+    end
+  end
+
+  it "still skips a byte-identical static file whose mtime drifted inside the tolerance" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHome")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("static/app.css", "body { color: #fff; }\n")
+
+        cached_build
+        # A coarse destination filesystem stores a truncated copy of the
+        # stamped source mtime; the bytes still match, so the copy must
+        # still be skipped. Simulated by drifting the destination stamp.
+        dest_mtime = File.info("public/app.css").modification_time
+        File.touch("public/app.css", dest_mtime - 1.second)
+        marker = File.info("public/app.css").modification_time
+
+        cached_build
+        File.info("public/app.css").modification_time.should eq(marker)
+      end
+    end
+  end
+end
