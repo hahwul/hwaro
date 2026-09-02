@@ -78,6 +78,31 @@ describe Hwaro::Content::Processors::InlineMarkdown do
       out = Hwaro::Content::Processors::InlineMarkdown.render("x `` y")
       out.should eq("x `` y")
     end
+
+    # The opener must be a WHOLE backtick run. Without the opener lookbehind
+    # the scan restarted on the second backtick of the unmatched `` and paired
+    # it with the later single backtick: `` `<code> </code>a` ``.
+    it "keeps an unmatched longer run literal and pairs the later whole runs" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("`` `a`")
+      out.should eq("`` <code>a</code>")
+    end
+
+    it "does not start a span in the middle of a run" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("``` `` x ``")
+      out.should eq("``` <code>x</code>")
+    end
+
+    # Every backtick of an unclosed run used to be a fresh start position that
+    # possessively re-consumed the rest of the run — O(N²); a 200 KB run did
+    # not finish. The bound is generous on purpose: the quadratic form takes
+    # minutes here, the linear form about a millisecond.
+    it "renders a long unclosed backtick run in linear time" do
+      input = "`" * 100_000
+      started = Time.monotonic
+      out = Hwaro::Content::Processors::InlineMarkdown.render(input)
+      (Time.monotonic - started).should be < 5.seconds
+      out.should eq(input)
+    end
   end
 end
 

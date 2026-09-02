@@ -1671,6 +1671,10 @@ module Hwaro
           @cache_manager.clear_runtime
           @created_dirs.clear
           clear_broken_internal_links
+          # The load_data() memo is keyed by ms-mtime, which a rewrite inside
+          # one filesystem timestamp tick does not move; a build must read
+          # the data files as they are now, not as a previous build saw them.
+          Content::Processors::TemplateEngine.clear_load_data_cache
 
           # Execute build phases through lifecycle. The live status region
           # animates the current phase on a TTY; `ensure` guarantees the

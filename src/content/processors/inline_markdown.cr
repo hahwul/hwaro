@@ -31,12 +31,22 @@ module Hwaro
         # tags and literal delimiters inside table cells, footnote bodies, and
         # definition lists (the three callers of `render`).
         #
-        # The opening run is POSSESSIVE (`` `++ ``) and the closer is fenced by
-        # `(?<!`)`/`(?!`)` so both delimiters are whole runs: without those,
+        # The opening run is POSSESSIVE (`` `++ ``) and BOTH delimiters are
+        # fenced by `(?<!`)`/`(?!`)` so each is a whole run: without those,
         # `\1` would happily match two of a three-backtick run and pair
-        # mismatched delimiters. `[\s\S]` (not `.`) because a footnote or
-        # definition body may still carry a newline at this point.
-        INLINE_CODE_SPAN_RE = /(`++)([\s\S]+?)(?<!`)\1(?!`)/
+        # mismatched delimiters. The opener's lookbehind matters twice over:
+        #   * correctness — without it, an unmatched longer run bleeds into a
+        #     later shorter one: `` `` `a` `` became `` `<code> </code>a` ``
+        #     (the scan restarted on the SECOND backtick of the ``), where
+        #     CommonMark gives `` `` <code>a</code> ``;
+        #   * cost — without it, every backtick of a run is a fresh start
+        #     position that possessively re-consumes the rest of the run, so
+        #     an unclosed run of N backticks cost O(N²): a 200 KB cell of
+        #     backticks did not finish in ten minutes. With it, positions
+        #     inside a run are rejected in O(1) and the scan is linear again.
+        # `[\s\S]` (not `.`) because a footnote or definition body may still
+        # carry a newline at this point.
+        INLINE_CODE_SPAN_RE = /(?<!`)(`++)([\s\S]+?)(?<!`)\1(?!`)/
         INLINE_IMAGE_RE     = /!\[([^\]]*)\]\(([^)]*)\)/
         INLINE_LINK_RE      = /\[([^\]]+)\]\(([^)]*)\)/
         # Flanking guards (`(?=\S)` … `(?<=\S)`): a delimiter run that touches
