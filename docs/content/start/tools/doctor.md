@@ -195,6 +195,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `default-language-undefined` | config | default_language has no `[languages.<code>]` block |
 | `markdown-math-engine-invalid` | config | Unsupported markdown.math_engine |
 | `pwa-cache-strategy-invalid` | config | Unsupported pwa.cache_strategy |
+| `pwa-display-invalid` | config | Unsupported pwa.display |
 | `image-processing-widths-empty` | config | image_processing enabled but widths is empty (silent no-op) |
 | `deployment-target-undefined` | config | deployment.target names no `[[deployment.targets]]` |
 | `related-taxonomy-undefined` | config | `[related]` references an undefined taxonomy |

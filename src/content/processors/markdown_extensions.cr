@@ -992,6 +992,29 @@ module Hwaro
         ADMONITION_TYPES = {"NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"}
 
         # Captures a blockquote whose first paragraph starts with `[!TYPE]`.
+        # Non-void tags that markd's inline renderer can open on a title line.
+        # Balanced when every opener on the line is closed on the line: a
+        # `<strong>`/`<a>`/`<code>`… opened here and closed on a later line
+        # of the same paragraph means the author wrapped one inline element
+        # across the soft break, not that they wrote a title.
+        INLINE_TAG_RE    = /<(\/?)([a-zA-Z][\w-]*)[^>]*>/
+        VOID_INLINE_TAGS = Set{"br", "img", "wbr", "hr", "input"}
+
+        def inline_html_balanced?(fragment : String) : Bool
+          return true unless fragment.includes?('<')
+          open = [] of String
+          fragment.scan(INLINE_TAG_RE) do |m|
+            name = m[2].downcase
+            next if VOID_INLINE_TAGS.includes?(name) || m[0].ends_with?("/>")
+            if m[1].empty?
+              open << name
+            else
+              return false if open.empty? || open.pop != name
+            end
+          end
+          open.empty?
+        end
+
         # Group 1: type token (uppercased). Group 2: whatever else sat on the
         # marker's own line — the custom title (Obsidian / Hugo syntax:
         # `> [!NOTE] Custom Title`); empty for a bare marker. Group 3: the rest
@@ -1016,8 +1039,23 @@ module Hwaro
 
           html.gsub(ADMONITION_BLOCKQUOTE_RE) do |_|
             type = $1
-            custom_title = $2.strip
+            title_line = $2
             rest = $3
+            # Two or more trailing spaces on the marker line become a hard
+            # break in markd (`[!NOTE]  ` → `[!NOTE]<br />\n`), and the break
+            # tag sits before the newline group 2 stops at — so it landed in
+            # the title and a bare marker lost its "Note" heading to an empty
+            # `<br />`. It is line-end residue, never title text.
+            title_line = title_line.sub(/\s*<br\s*\/?>\s*\z/, "")
+            # An inline element that wraps from the marker line onto the next
+            # (`[!WARNING] see [the\n> docs](…)`) cannot be a title: cutting
+            # it at the soft break split `<a>` between title and body. Treat
+            # the whole paragraph as body, as before custom titles existed.
+            unless inline_html_balanced?(title_line)
+              rest = "#{title_line}\n#{rest}"
+              title_line = ""
+            end
+            custom_title = title_line.strip
             type_lower = type.downcase
             # The custom title is already inline-rendered (and escaped) by
             # markd — it was part of the paragraph — so it is emitted as-is.

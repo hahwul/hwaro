@@ -295,8 +295,9 @@ module Hwaro
         private def self.icon_size(icon_path : String, output_dir : String) : String
           ext = File.extname(icon_path).downcase
           # A scalable icon has no pixel size; `any` is the manifest spec's
-          # spelling for it and is what makes it eligible at every size.
-          return "any" if ext == ".svg" && !external_url?(icon_path)
+          # spelling for it and is what makes it eligible at every size. That
+          # holds for a remote SVG too — no bytes are needed to know it.
+          return "any" if ext == ".svg"
           # A remote icon (http(s)://) has no local file to read — use the
           # filename heuristic directly instead of warning on every build.
           if MEASURABLE_ICON_EXTS.includes?(ext) && !external_url?(icon_path)

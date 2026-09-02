@@ -118,3 +118,17 @@ describe "Sass color.hwb" do
     compile(%(@use "sass:color";\n.x { color: color.hwb(210 20% 30%); })).should contain("color: #3373b3")
   end
 end
+
+describe "review follow-ups on #773 built-ins" do
+  it "accepts color.hwb with a fourth alpha argument, positional or keyword" do
+    compile(%(@use "sass:color";\no { c: color.hwb(210, 20%, 30%, 0.5); })).should contain("c: rgba(51, 115, 179, 0.5);")
+    compile(%(@use "sass:color";\no { c: color.hwb(210, 20%, 30%, $alpha: 0.5); })).should contain("c: rgba(51, 115, 179, 0.5);")
+    compile(%(@use "sass:color";\no { c: color.hwb($hue: 0, $whiteness: 0%, $blackness: 0%); })).should contain("c: red;")
+  end
+
+  it "accepts map.deep-remove keyword arguments" do
+    css = compile(%(@use "sass:map";\n$m: (a: (b: 1, c: 2), d: 3);\n.x { content: "\#{map.deep-remove($map: $m, $key: a)}"; }))
+    css.should contain(%(content: "(d: 3)";))
+    css.should_not contain("map.deep-remove")
+  end
+end

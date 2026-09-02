@@ -133,9 +133,10 @@ module Hwaro::Core::Build::Phases::Initialize
     # incremental branch, and `build --cache -o content` used to exit 0 after
     # scattering `index.html` files through the source tree.
     guard_output_dir!(output_dir)
+    existed_before = Dir.exists?(output_dir)
     # In incremental mode (--cache), keep existing output to avoid
     # re-generating unchanged pages and re-copying unchanged static files.
-    if !incremental && Dir.exists?(output_dir)
+    if !incremental && existed_before
       # The guard above only refuses the catastrophic targets. Any OTHER
       # pre-existing directory — `-o ~/Documents/site`, a `dist/` shared
       # with a bundler — was emptied silently, exit 0. Only clear what hwaro
@@ -187,10 +188,15 @@ module Hwaro::Core::Build::Phases::Initialize
     end
     ensure_output_dir(output_dir)
     # Created, found empty, or cleared: from here on the directory is hwaro's
-    # to clear on the next cold build. Not recorded on the incremental paths
-    # (`--cache`, `serve`), which never clear anything and must not hand a
-    # foreign directory over.
-    unless incremental
+    # to clear on the next cold build. The incremental paths (`--cache`,
+    # `serve`) never clear anything and must not hand a PRE-EXISTING
+    # directory over — but one that did not exist a moment ago is hwaro's
+    # own creation, whatever mode created it. Without that, `build --cache -o
+    # dist` on a fresh checkout left `dist/` unrecorded, and every later cold
+    # build warned "entries hwaro did not write" about hwaro's own files and
+    # kept the stale ones forever. The conventional `public/` needs no record
+    # (`clearable?` accepts it by name), so plain builds leave no `.hwaro/`.
+    if (!incremental || !existed_before) && !Hwaro::Utils::OutputOwnership.conventional?(output_dir)
       Hwaro::Utils::OutputOwnership.record(
         Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(output_dir)),
         Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(Dir.current)),

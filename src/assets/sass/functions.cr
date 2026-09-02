@@ -841,7 +841,9 @@ module Hwaro
           # `deep-merge` shipped, so `@use "sass:map"` sheets that used it
           # fell through to the literal-text fallback and emitted invalid CSS.
           "deep-remove" => Fn.new do |args, kwargs|
-            no_kwargs!("map.deep-remove", kwargs)
+            # `deep-remove($map, $key, $keys...)` — `$map:`/`$key:` are legal
+            # keyword spellings, as for `map.remove`.
+            args = args_with_kwargs("map.deep-remove", args, kwargs, %w[map key])
             arity!("map.deep-remove", args, 2, Int32::MAX)
             map_deep_remove(map!("map.deep-remove", args[0]), args[1..])
           end,
@@ -1232,19 +1234,24 @@ module Hwaro
 
         # `color.hwb($hue $whiteness $blackness)` — the space-separated
         # channels form — and the separate-argument spelling
-        # `color.hwb($hue, $whiteness, $blackness)`, which dart-sass also
-        # accepts and which used to fail arity here. A slash-alpha
-        # (`… / 0.5`) is not modeled; use `color.change($c, $alpha: …)`.
+        # `color.hwb($hue, $whiteness, $blackness, $alpha: 1)`, which
+        # dart-sass also accepts and which used to fail arity here (first
+        # for any separate spelling, then for the fourth `$alpha`). A
+        # slash-alpha in the channels form (`… / 0.5`) is not modeled; use
+        # `color.change($c, $alpha: …)`.
         COLOR_FNS["hwb"] = Fn.new do |args, kwargs|
-          known_kwargs!("color.hwb", kwargs, ["channels", "hue", "whiteness", "blackness"])
-          arity!("color.hwb", args, 0, 3)
-          separate = args.size == 3 ||
+          known_kwargs!("color.hwb", kwargs, ["channels", "hue", "whiteness", "blackness", "alpha"])
+          arity!("color.hwb", args, 0, 4)
+          separate = args.size >= 3 ||
                      kwargs.has_key?("hue") || kwargs.has_key?("whiteness") || kwargs.has_key?("blackness")
+          alpha : Value? = nil
           items =
             if separate
-              bound = bind!("color.hwb", args, kwargs, ["hue", "whiteness", "blackness"], required: 3)
-              bound.map(&.as(Value))
+              bound = bind!("color.hwb", args, kwargs, ["hue", "whiteness", "blackness", "alpha"], required: 3)
+              alpha = bound[3]
+              bound[0, 3].map(&.as(Value))
             else
+              arity!("color.hwb", args, 0, 1)
               channels = args[0]? || kwargs["channels"]? ||
                          raise SoftEvalError.new("color.hwb() is missing required argument $channels")
               case channels
@@ -1256,7 +1263,8 @@ module Hwaro
           hue = finite!("color.hwb", number!("color.hwb", items[0]))
           whiteness = amount!("color.hwb", items[1])
           blackness = amount!("color.hwb", items[2])
-          Builtins.hwb_color(hue, whiteness, blackness)
+          color = Builtins.hwb_color(hue, whiteness, blackness)
+          alpha ? color.with_alpha(alpha!("color.hwb", alpha)) : color
         end
 
         # `ie-hex-str($color)` — the legacy `#AARRGGBB` spelling IE filters

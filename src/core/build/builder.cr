@@ -1675,6 +1675,10 @@ module Hwaro
           # one filesystem timestamp tick does not move; a build must read
           # the data files as they are now, not as a previous build saw them.
           Content::Processors::TemplateEngine.clear_load_data_cache
+          # Same lifetime for the once-per-BUILD shortcode warnings (missing
+          # template, unclosed block): a `serve` session that never cleared them
+          # reported each name only for the first rebuild it appeared in.
+          @shortcode_warnings_seen = nil
 
           # Execute build phases through lifecycle. The live status region
           # animates the current phase on a TTY; `ensure` guarantees the

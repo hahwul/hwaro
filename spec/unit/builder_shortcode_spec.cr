@@ -25,6 +25,11 @@ module Hwaro::Core::Build
       render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, warnings: warnings)
     end
 
+    def test_control_tag_open?(tag : String) : Bool
+      m = BLOCK_OPEN_RE.match(tag) || raise "#{tag.inspect} does not match BLOCK_OPEN_RE"
+      control_tag_open?(m)
+    end
+
     def test_warn_hugo_shortcode_syntax(raw, path)
       warn_hugo_shortcode_syntax(raw, path)
     end
@@ -1145,5 +1150,40 @@ describe Hwaro::Core::Build::Builder do
       end
       io.to_s.should be_empty
     end
+  end
+end
+
+describe "Jinja control tags with parenthesized expressions" do
+  # `{% if (a and b) or (c) %}` matches BLOCK_OPEN_RE's `name(...)` branch, and
+  # the classifier used to take any parenthesized form for a shortcode call.
+  # The blog scaffold's post.html carries exactly that condition, so every
+  # build of it logged a bogus "Block shortcode '{% if %}' is never closed".
+  it "classifies a keyword with a parenthesized condition as a Jinja control tag" do
+    builder = Hwaro::Core::Build::Builder.new
+    builder.test_control_tag_open?("{% if (page.lower and page.lower.section == page.section) or (page.higher) %}").should be_true
+    builder.test_control_tag_open?("{% if (x and (y or z)) %}").should be_true
+    builder.test_control_tag_open?("{% elif (a) %}").should be_true
+    builder.test_control_tag_open?("{% if(a) or (b) %}").should be_true
+    builder.test_control_tag_open?("{% endif %}").should be_true
+  end
+
+  it "still classifies a keyword-named shortcode in call syntax as a shortcode" do
+    builder = Hwaro::Core::Build::Builder.new
+    builder.test_control_tag_open?("{% include(name=\"promo\") %}").should be_false
+    builder.test_control_tag_open?("{% include(name=\"promo\", kind=\"(x)\") %}").should be_false
+    builder.test_control_tag_open?("{% include(label=\"a) b\") %}").should be_false
+    builder.test_control_tag_open?("{% if-banner(type=\"i\") %}").should be_false
+    builder.test_control_tag_open?("{% note() %}").should be_false
+  end
+
+  it "leaves a parenthesized Jinja if-expression alone and still expands a later block shortcode" do
+    builder = Hwaro::Core::Build::Builder.new
+    env = Crinja.new
+    templates = {"shortcodes/note" => "<div class=\"note\">{{ body }}</div>"}
+    context = {} of String => Crinja::Value
+
+    content = "{% if (page.lower and page.lower.section == page.section) or (page.higher) %}nav{% endif %}\n{% note() %}Body{% end %}"
+    result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+    result.should eq("{% if (page.lower and page.lower.section == page.section) or (page.higher) %}nav{% endif %}\n<div class=\"note\">Body</div>")
   end
 end

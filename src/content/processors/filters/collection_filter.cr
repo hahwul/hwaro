@@ -123,12 +123,19 @@ module Hwaro
             # renders as "" and is falsy), so do the same; every non-empty
             # input still goes through the upstream code path unchanged, and a
             # non-sequence target still raises Crinja's located `TypeError`.
+            #
+            # A FRESH Undefined each time, never the shared `Value::UNDEFINED`
+            # singleton: the evaluator renames an Undefined in place when it
+            # is stored under a new name (`{% set d = {'a': ([] | first)} %}`
+            # writes `d.a` into it), so handing out the singleton let one
+            # page's variable name leak into another page's error message —
+            # and race across render workers.
             env.filters["first"] = Crinja.filter do
-              CollectionFilters.empty_sequence?(target) ? Crinja::Value::UNDEFINED : target.first.raw
+              CollectionFilters.empty_sequence?(target) ? Crinja::Value.new(Crinja::Undefined.new) : target.first.raw
             end
 
             env.filters["last"] = Crinja.filter do
-              CollectionFilters.empty_sequence?(target) ? Crinja::Value::UNDEFINED : target.last.raw
+              CollectionFilters.empty_sequence?(target) ? Crinja::Value.new(Crinja::Undefined.new) : target.last.raw
             end
 
             # Compact filter — removes nil/empty values from an array
@@ -146,8 +153,13 @@ module Hwaro
           # upstream `first`/`last` crash on. Deliberately narrow: anything
           # that is not a string/hash/indexable (an Int, say) reports `false`
           # so the upstream filter still raises its located `TypeError`.
+          # An Undefined counts as empty: Jinja2 iterates it as nothing, and
+          # `{{ get_section(path='nope').pages | first }}` or a missing
+          # `page.extra.images | first` is the same "ordinary site state" an
+          # empty section is — Crinja's own `raw_each` already treats it so.
           def self.empty_sequence?(value : Crinja::Value) : Bool
             case raw = value.raw
+            when Crinja::Undefined  then true
             when String             then raw.empty?
             when Crinja::SafeString then raw.to_s.empty?
             when Hash               then raw.empty?

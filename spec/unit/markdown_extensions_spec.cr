@@ -696,10 +696,40 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("<p>body</p>")
     end
 
+    # markd turns two or more trailing spaces into a hard break, so the real
+    # shape of a bare marker with trailing spaces is `[!NOTE]<br />\n`, not
+    # `[!NOTE]   \n` — the earlier spec fed a shape markd never produces.
     it "keeps the default title for a bare marker with trailing spaces" do
-      html = "<blockquote>\n<p>[!NOTE]   \nbody</p>\n</blockquote>"
+      html = "<blockquote>\n<p>[!NOTE]<br />\nbody</p>\n</blockquote>"
       result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
       result.should contain(%(<p class="admonition-title">Note</p>))
+      result.should_not contain("<br")
+      result.should contain("<p>body</p>")
+    end
+
+    it "drops the hard break left by trailing spaces after a custom title" do
+      html = "<blockquote>\n<p>[!NOTE] Title<br />\nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Title</p>))
+      result.should_not contain("<br")
+    end
+
+    it "keeps an inline element that wraps past the marker line in the body" do
+      html = "<blockquote>\n<p>[!WARNING] see <a href=\"https://x\">the\ndocs</a> now\nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Warning</p>))
+      result.should contain(%(<p>see <a href="https://x">the\ndocs</a> now\nbody</p>))
+      html = "<blockquote>\n<p>[!NOTE] **Bold\ntitle**</p>\n</blockquote>".sub("**Bold\ntitle**", "<strong>Bold\ntitle</strong>")
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Note</p>))
+      result.should contain(%(<p><strong>Bold\ntitle</strong></p>))
+    end
+
+    it "still accepts a title whose inline elements close on the marker line" do
+      html = "<blockquote>\n<p>[!TIP] <em>Read</em> <a href=\"/x\">this</a><br />\nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title"><em>Read</em> <a href="/x">this</a></p>))
+      result.should contain("<p>body</p>")
     end
   end
 

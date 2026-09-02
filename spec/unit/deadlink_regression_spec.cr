@@ -18,6 +18,14 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
   def translation_language_codes_for_test(config : Hwaro::Models::Config?) : Array(String)
     translation_language_codes(config)
   end
+
+  def routes_for_test(config : Hwaro::Models::Config?) : GeneratedRoutes
+    generated_routes(config)
+  end
+
+  def resolve_with_routes_for_test(links : Array(Link), content_dir : String, routes : GeneratedRoutes) : Array(Result)
+    check_internal_links(links, content_dir, [] of String, "", [] of String, routes)
+  end
 end
 
 describe "check-links regressions" do
@@ -233,6 +241,57 @@ describe "check-links regressions" do
         cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         cmd.scan_internal_for_test(dir).should be_empty
       end
+    end
+  end
+end
+
+# Section feeds are gated by the section's own `generate_feeds` and always
+# written as rss.xml/atom.xml (see Seo::Feeds); the checker used to key them
+# on the ROOT feed's `enabled` flag and `filename`.
+private def feed_link(dir : String, url : String)
+  Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(file: File.join(dir, "index.md"), url: url, kind: :internal)
+end
+
+describe "check-links section feed routes" do
+  it "accepts /<section>/rss.xml when the section opts in even though the root feed is disabled" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "_index.md"), "---\ntitle: Posts\ngenerate_feeds: true\n---\n")
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = false
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      routes = cmd.routes_for_test(config)
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/posts/rss.xml")], dir, routes).should be_empty
+      # The root feed really is off.
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/rss.xml")], dir, routes).should_not be_empty
+    end
+  end
+
+  it "keeps section feeds at rss.xml when the root feed uses a custom filename" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "_index.md"), "---\ntitle: Posts\ngenerate_feeds: true\n---\n")
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.filename = "feed.xml"
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      routes = cmd.routes_for_test(config)
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/feed.xml")], dir, routes).should be_empty
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/posts/rss.xml")], dir, routes).should be_empty
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/posts/feed.xml")], dir, routes).should_not be_empty
+    end
+  end
+
+  it "still rejects a section feed for a section that did not opt in" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "_index.md"), "---\ntitle: Posts\n---\n")
+      config = Hwaro::Models::Config.new
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      routes = cmd.routes_for_test(config)
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/posts/rss.xml")], dir, routes).should_not be_empty
     end
   end
 end

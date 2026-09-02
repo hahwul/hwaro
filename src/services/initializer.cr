@@ -475,15 +475,20 @@ module Hwaro
       # workspace (serve output and remote-data cache — also self-ignoring
       # via Utils::HwaroDir, so pre-existing repos are covered too), and the
       # incremental-build cache, which lives at the root NEXT TO `.hwaro/`.
+      #
+      # Every pattern is root-anchored (leading `/`): git matches a
+      # slash-free pattern at ANY depth, so a bare `public/` also ignored a
+      # `content/public/` section and `.hwaro_cache.json` any nested file of
+      # that name.
       private def gitignore_content(config_content : String) : String
         String.build do |io|
           if output_dir = scaffold_output_dir(config_content)
             io << "# Build output (`hwaro build`)\n"
-            io << output_dir << "/\n\n"
+            io << '/' << output_dir << "/\n\n"
           end
           io << "# Hwaro workspace (`hwaro serve` output, remote-data cache) and build cache\n"
-          io << ".hwaro/\n"
-          io << ".hwaro_cache.json\n"
+          io << "/.hwaro/\n"
+          io << "/.hwaro_cache.json\n"
         end
       end
 
@@ -501,6 +506,9 @@ module Hwaro
         dir = dir.strip.rstrip('/')
         return if dir.empty? || dir == "." || dir.starts_with?('/') || dir.starts_with?('\\')
         return if dir.split('/').includes?("..")
+        # git does not normalize `./`: a `./public/` pattern matches nothing.
+        dir = dir.lchop("./")
+        return if dir.empty? || dir == "."
         dir
       rescue
         # A config.toml that does not parse (possible for a remote scaffold's

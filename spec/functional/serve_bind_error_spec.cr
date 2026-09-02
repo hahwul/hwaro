@@ -76,6 +76,19 @@ describe "hwaro serve bind failures" do
     error.hint.to_s.should contain("-b/--bind")
   end
 
+  # An address that resolves but this machine does not hold fails INSIDE
+  # bind (EADDRNOTAVAIL) — a `Socket::BindError` like port-in-use, which used
+  # to get the "another process is listening" hint. 192.0.2.1 is TEST-NET-1,
+  # never assigned to a real interface.
+  it "classifies an address this machine does not hold as a --bind usage error" do
+    error = expect_raises(Hwaro::HwaroError) do
+      Hwaro::Services::Server.new.bind_error_bind(bind_error_probe_server, "192.0.2.1", 0)
+    end
+    error.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+    error.hint.to_s.should contain("-b/--bind")
+    error.hint.to_s.should_not contain("--port")
+  end
+
   it "still classifies a port already in use as an IO error" do
     taken = TCPServer.new("127.0.0.1", 0)
     port = taken.local_address.port

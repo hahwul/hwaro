@@ -74,7 +74,7 @@ module Hwaro
           # 2. Generate Section Feeds — pre-group pages by section for O(1) lookup
           pages_by_section = {} of String => Array(Models::Page)
           pages.each do |p|
-            next if p.draft || p.unpublished || !p.render || p.is_a?(Models::Section)
+            next if p.draft || p.unpublished || !p.render || p.output_suppressed || p.is_a?(Models::Section)
             (pages_by_section[p.section] ||= [] of Models::Page) << p
           end
 
@@ -244,16 +244,23 @@ module Hwaro
         # one URL (path-sort-first winner, matching
         # render.cr#compute_output_url_winners). Used for main, section,
         # language, and taxonomy feeds so no surface advertises a loser.
+        #
+        # A page the build refused to write at all (`output_suppressed`: a
+        # URL that traverses out of the output directory, a collision loser
+        # already flagged upstream) is dropped first — its URL is unique, so
+        # the URL dedupe alone let `/posts/../../escape/` into every section
+        # and taxonomy feed while sitemap/search/llms correctly omitted it.
         def self.dedupe_by_output_url(pages : Array(Models::Page)) : Array(Models::Page)
           url_winners = {} of String => Models::Page
           pages.each do |p|
+            next if p.output_suppressed
             if prev = url_winners[p.url]?
               url_winners[p.url] = p if p.path < prev.path
             else
               url_winners[p.url] = p
             end
           end
-          pages.select { |p| url_winners[p.url].same?(p) }
+          pages.select { |p| (winner = url_winners[p.url]?) && winner.same?(p) }
         end
 
         # Config `feeds.filename` and empty custom names resolve to a single

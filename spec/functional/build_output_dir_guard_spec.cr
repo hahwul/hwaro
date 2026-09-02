@@ -325,6 +325,49 @@ describe "build: output directory that already holds unrelated files" do
     end
   end
 
+  # Ownership was recorded only on non-incremental builds, so a `dist/` that
+  # `build --cache` had just CREATED was never recorded: every later cold
+  # build warned "entries hwaro did not write" about hwaro's own files and
+  # kept the stale ones forever.
+  it "records a directory it created on a --cache build so the next cold build clears it" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        run_build_cached("dist").should be_true
+        File.write("dist/stale.html", "stale")
+
+        log = with_captured_log { run_build("dist").should be_true }
+
+        File.exists?("dist/stale.html").should be_false
+        log.should_not contain("did not write")
+      end
+    end
+  end
+
+  it "still never hands over a pre-existing directory on a --cache build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        FileUtils.mkdir_p("shared")
+        File.write("shared/notes.txt", "keep")
+        run_build_cached("shared").should be_true
+        log = with_captured_log { run_build("shared").should be_true }
+        File.read("shared/notes.txt").should eq("keep")
+        log.should contain("did not write")
+      end
+    end
+  end
+
+  it "leaves no .hwaro/ workspace behind for the conventional public/ directory" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        run_build("public").should be_true
+        Dir.exists?(".hwaro").should be_false
+      end
+    end
+  end
+
   it "clears a directory it found empty on an earlier build" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

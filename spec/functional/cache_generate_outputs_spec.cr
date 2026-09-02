@@ -132,6 +132,30 @@ describe "cache: generated outputs converge on the clean build" do
     end
   end
 
+  # Feeds never join the Generate skip while a user feed template exists, so
+  # an all-hit warm build regenerates rss.xml from `page.content` — which
+  # nothing hydrated: the feed carried raw shortcode markup again.
+  it "hydrates cache hits on a warm all-hit build when a user feed template forces feed regeneration" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        shortcode_project
+        File.write("templates/rss.xml.jinja", "<feed>{% for p in pages %}<item>{{ p.content }}</item>{% endfor %}</feed>")
+        clean_build
+        expected = File.read("public/rss.xml")
+        expected.should contain("<div class=\"gal\">")
+        expected.should contain("http://localhost/sub/")
+        expected.should_not contain("{%")
+
+        FileUtils.rm_rf("public")
+        FileUtils.rm_rf(".hwaro_cache.json")
+        run_builder(true, false) # cold
+        File.read("public/rss.xml").should eq(expected)
+        run_builder(true, false) # warm, every page a cache hit
+        File.read("public/rss.xml").should eq(expected)
+      end
+    end
+  end
+
   # `serve` keeps the Builder alive and regenerates search/feeds from the
   # in-memory page set after every edit. A `serve --cache` whose start was
   # an all-hit build had every page's content empty, so the first
