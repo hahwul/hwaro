@@ -137,6 +137,12 @@ module Hwaro
           @forward_variables = {} of String => String
           @forward_mixins = {} of String => MixinClosure
           @forward_functions = {} of String => SassFn
+          # The importing file's globals while a classic `@import` is being
+          # evaluated — dart-sass's "implicit configuration". A `@forward`
+          # reached through the import configures its module's `!default`
+          # variables from it (see `forward_config`); nil outside an import
+          # and inside any `@use` (which never inherits it).
+          @import_config = nil.as(Hash(String, String)?)
           # @extend requests, applied document-wide as a post-pass —
           # deliberately NOT saved/restored around module loads.
           @extends = [] of Extend::Request
@@ -1661,19 +1667,26 @@ module Hwaro
 
         # Loads (or returns the cached) module for a @use/@forward url.
         # `sass:` urls resolve to the built-in modules.
+        #
+        # `implicit` marks a configuration that came from an importing
+        # file's globals rather than a `with (...)` clause (see
+        # `@import_config`). dart-sass applies such a configuration only to
+        # the names the module declares with `!default`, never errors on
+        # names it does not declare, and silently ignores it when the
+        # module was already loaded — an explicit `with` does all three.
         private def load_module(url : String, line : Int32, column : Int32,
-                                config : Hash(String, String)) : SassModule
+                                config : Hash(String, String), implicit : Bool = false) : SassModule
           if url.starts_with?("sass:")
             name = url.lchop("sass:")
             mod = BUILTIN_MODULES[name]?
             error_at(line, column, "unknown built-in module \"sass:#{name}\"") unless mod
-            error_at(line, column, "built-in modules can't be configured") unless config.empty?
+            error_at(line, column, "built-in modules can't be configured") unless config.empty? || implicit
             return mod
           end
 
           canonical, source = @importer.load(url, @path, @path, line, column)
           if mod = @loaded_modules[canonical]?
-            unless config.empty?
+            unless config.empty? || implicit
               error_at(line, column,
                 "#{@importer.display_path(canonical)} was already loaded and can't be configured a second time")
             end
@@ -1683,7 +1696,19 @@ module Hwaro
           check_cycle(canonical, line, column)
           display = @importer.display_path(canonical)
           sheet = Parser.parse(source, display)
-          validate_configurable(sheet, config, url, line, column) unless config.empty?
+          seed = config
+          if implicit
+            # Only `!default` declarations consume an implicit configuration;
+            # a name the module assigns unconditionally keeps its own value.
+            # The unfiltered configuration still travels on through this
+            # module's own `@forward`s (a forwarding index declares nothing
+            # itself), so filter the seed, not `config`.
+            defaults = Set(String).new
+            collect_default_decls(sheet.children, defaults)
+            seed = config.select { |name, _| defaults.includes?(name) }
+          elsif !config.empty?
+            validate_configurable(sheet, config, url, line, column)
+          end
 
           saved_env = @env
           saved_sink = @sink
@@ -1697,9 +1722,14 @@ module Hwaro
           saved_fwd_vars = @forward_variables
           saved_fwd_mixins = @forward_mixins
           saved_fwd_fns = @forward_functions
+          saved_import_config = @import_config
+          # A `@forward` inside this module passes the implicit configuration
+          # on (dart-sass `Configuration#throughForward`); a `@use` starts
+          # from nothing, even when reached through an import.
+          @import_config = implicit ? config : nil
 
           module_env = Environment.new
-          config.each { |name, value| module_env.variables[name] = value }
+          seed.each { |name, value| module_env.variables[name] = value }
           module_sink = [] of Css::Node
           @env = module_env
           @sink = module_sink
@@ -1735,6 +1765,7 @@ module Hwaro
             @forward_variables = saved_fwd_vars
             @forward_mixins = saved_fwd_mixins
             @forward_functions = saved_fwd_fns
+            @import_config = saved_import_config
           end
 
           @loaded_modules[canonical] = mod
@@ -1789,8 +1820,9 @@ module Hwaro
         # current module's re-exports. Members do NOT enter local scope.
         # show/hide match the *prefixed* names (dart-sass semantics).
         private def eval_forward(node : Ast::ForwardNode) : Nil
-          mod = load_module(node.url, node.line, node.column, {} of String => String)
           prefix = node.prefix
+          config = forward_config(node, prefix)
+          mod = load_module(node.url, node.line, node.column, config, implicit: !config.empty?)
           mod.variables.each do |name, value|
             exported = prefix ? prefix + name : name
             next unless forward_visible?(node, "$" + exported)
@@ -1806,6 +1838,36 @@ module Hwaro
             next unless forward_visible?(node, exported)
             @forward_functions[exported] = fn
           end
+        end
+
+        # The importing file's globals that reach the module behind this
+        # `@forward` (dart-sass `Configuration#throughForward`): only the
+        # names this rule shows, with its prefix stripped so `$btn-pad`
+        # configures `$pad` behind `@forward "button" as btn-*`. Empty
+        # outside a classic `@import` — a `@use`d forwarding index is never
+        # configured by its user's globals.
+        #
+        # Without this, `$btn-pad: 99px; @import "components";` — the
+        # classic "set the variables, then import the library" pattern —
+        # lost the override: the forwarded module was loaded unconfigured,
+        # its `$btn-pad: 8px !default` took the default, and
+        # `bind_imported_forwards` then wrote that default over the
+        # importer's own value. dart-sass keeps 99px.
+        private def forward_config(node : Ast::ForwardNode, prefix : String?) : Hash(String, String)
+          config = {} of String => String
+          globals = @import_config
+          return config unless globals
+          globals.each do |name, value|
+            next if value == "null"
+            next unless forward_visible?(node, "$" + name)
+            if prefix
+              next unless name.starts_with?(prefix) && name.size > prefix.size
+              config[name[prefix.size..]] = value
+            else
+              config[name] = value
+            end
+          end
+          config
         end
 
         private def forward_visible?(node : Ast::ForwardNode, marker_name : String) : Bool
@@ -1902,35 +1964,46 @@ module Hwaro
           fwd_vars_before = @forward_variables.dup
           fwd_mixins_before = @forward_mixins.dup
           fwd_fns_before = @forward_functions.dup
+          saved_import_config = @import_config
+          # dart-sass "implicit configuration": the importer's globals, as
+          # they stand when the import runs, configure the `!default`
+          # variables of every module the imported sheet `@forward`s.
+          @import_config = @env.root.variables.dup
           begin
             # Classic import: evaluated inline in the current scope/sink.
             eval_nodes(sheet.children)
           ensure
             @load_stack.pop
             @path = saved_path
+            @import_config = saved_import_config
           end
           bind_imported_forwards(fwd_vars_before, fwd_mixins_before, fwd_fns_before)
         end
 
         # Bind members newly staged by `@forward`s inside a classic `@import`
-        # into the importing file's root scope. Only additions/changes are
-        # bound, so a `@forward` the importing file wrote itself (staged
-        # before this import ran) is left alone.
+        # into the importing scope. Only additions/changes are bound, so a
+        # `@forward` the importing file wrote itself (staged before this
+        # import ran) is left alone.
+        #
+        # The CURRENT scope, not the root: a nested import (`.wrap { @import
+        # "components"; }`) scopes its members to the block in dart-sass,
+        # exactly as this evaluator already scopes the variables of a plain
+        # nested import. Binding to the root leaked `$btn-pad` to rules
+        # after the block that dart-sass rejects as undefined.
         private def bind_imported_forwards(vars_before : Hash(String, String),
                                            mixins_before : Hash(String, MixinClosure),
                                            fns_before : Hash(String, SassFn)) : Nil
-          scope = @env.root
           @forward_variables.each do |name, value|
             next if vars_before[name]? == value
-            scope.variables[name] = value
+            @env.assign_var(name, value, default: false, global: false)
           end
           @forward_mixins.each do |name, closure|
             next if mixins_before[name]? == closure
-            scope.mixins[name] = closure
+            @env.declare_mixin(name, closure)
           end
           @forward_functions.each do |name, fn|
             next if fns_before[name]? == fn
-            scope.functions[name] = fn
+            @env.declare_function(name, fn)
           end
         end
 
