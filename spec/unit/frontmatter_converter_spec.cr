@@ -1030,6 +1030,34 @@ describe Hwaro::Services::ConversionResult do
       end
     end
 
+    # A conversion that failed to PARSE reported a bare
+    # "Failed to convert: <file>" and nothing else, while `hwaro build` and
+    # `hwaro tool validate` both named the same error for the same file.
+    # The per-format converters swallowed the reason into Logger.debug.
+    it "names the parse error that made a conversion fail" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "mixed.md")
+        # TOML 1.0 allows mixed-type arrays; the parser Hwaro vendors does
+        # not — whatever the cause, the author has to be told what it was.
+        File.write(file_path, "+++\ntitle = \"T\"\nmixed = [\"a\", 1, true]\n+++\n\nBody")
+
+        captured = IO::Memory.new
+        previous = Hwaro::Logger.err_io
+        Hwaro::Logger.err_io = captured
+        begin
+          converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_false
+        ensure
+          Hwaro::Logger.err_io = previous
+        end
+
+        reported = captured.to_s
+        reported.should contain("Failed to convert")
+        reported.should contain("mixed.md")
+        reported.should contain("cannot mix types in array")
+      end
+    end
+
     it "escapes control characters with TOML-legal sequences" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)

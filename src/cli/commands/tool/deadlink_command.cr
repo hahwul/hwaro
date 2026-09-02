@@ -816,7 +816,50 @@ module Hwaro
               prefix = "/#{segments.join("/")}"
             end
 
-            !section_index_path(prefix, content_dir, base_dir).nil?
+            return false unless index_path = section_index_path(prefix, content_dir, base_dir)
+            section_generates_feeds?(File.dirname(index_path))
+          end
+
+          # A per-section feed exists only when the section opts in with
+          # `generate_feeds = true` (see `Seo::Feeds`); `[feeds] sections`
+          # merely filters the SITE feed's items and emits nothing per
+          # section. Requiring a section index alone accepted
+          # `/posts/rss.xml` on every site with a `content/posts/_index.md`
+          # — a link the build never writes, waved through by the very check
+          # meant to catch it. Same discipline as `paginated_route?`, which
+          # reads `paginate_by` off the index before trusting `/page/N/`.
+          #
+          # Every `_index*` in the directory counts, not just `_index.md`:
+          # a multilingual section may declare the flag only in
+          # `_index.ko.md`, and `/ko/posts/rss.xml` is a real route then.
+          private def section_generates_feeds?(dir : String) : Bool
+            Dir.glob(File.join(dir, "_index*.{md,markdown}")).any? do |path|
+              frontmatter_flag?(path, "generate_feeds")
+            end
+          end
+
+          # True when a content file's front matter sets `key` to boolean
+          # true, in any of the three supported front-matter formats. An
+          # unreadable or malformed file reads as "not set" — the checker
+          # degrades to reporting the link rather than crashing the run.
+          private def frontmatter_flag?(path : String, key : String) : Bool
+            content = Utils::TextUtils.strip_bom(File.read(path))
+
+            if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
+              return TOML.parse(match[1])[key]?.try(&.raw) == true
+            elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
+              if h = YAML.parse(match[1]).as_h?
+                return h[YAML::Any.new(key)]?.try(&.raw) == true
+              end
+            elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
+              if h = JSON.parse(content.byte_slice(0, end_idx)).as_h?
+                return h[key]?.try(&.raw) == true
+              end
+            end
+
+            false
+          rescue
+            false
           end
 
           # Mirrors `Seo::Feeds.safe_feed_filename` for an unset filename.

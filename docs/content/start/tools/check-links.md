@@ -75,8 +75,10 @@ build (the order a lint-then-build CI pipeline uses):
 
 - `/sitemap.xml`, `/robots.txt`, `/llms.txt`, the search index, and `404.html`,
   each honouring its configured `filename`
-- Feeds (`/rss.xml`, `/atom.xml`), including the per-section and per-language
-  copies (`/posts/rss.xml`, `/ko/rss.xml`)
+- Feeds (`/rss.xml`, `/atom.xml`), including the per-language copies
+  (`/ko/rss.xml`) and the per-section ones (`/posts/rss.xml`) — a section feed
+  only counts when the section's `_index.md` sets `generate_feeds = true`,
+  since that is what makes the build write it
 - Taxonomy listing and term pages (`/tags/`, `/categories/rust/`)
 - Paginated listings (`/posts/page/2/`) — only for a section that actually
   declares `paginate_by`, so a `/page/N/` link under a non-paginated section

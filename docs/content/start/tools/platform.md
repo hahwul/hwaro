@@ -53,7 +53,10 @@ If the output file already exists, use `--force` to overwrite.
 Each config includes:
 
 - **Build command**: `hwaro build`
-- **Output directory**: `public/`
+- **Output directory**: your `[build] output_dir` (`public/` by default) —
+  a customized value is carried into every generated config, so the host
+  publishes the directory `hwaro build` actually writes. For `gitlab-ci` a
+  non-default directory also adds `publish:` to the `pages` job.
 - **Redirects**: 301 redirects from page [`aliases`](/writing/pages/) defined in frontmatter (e.g., `aliases: ["/old-url/"]`)
 - **Cache headers**: Long-lived caching for static assets
 
