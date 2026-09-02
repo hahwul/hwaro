@@ -85,7 +85,11 @@ module Hwaro
       #   # => "<!DOCTYPE html>..."
       #
       def simple_redirect(url : String) : String
-        escaped_url = HTML.escape(url)
+        # The target is a page URL hwaro computed from a filename or slug,
+        # so it can carry a raw space or non-ASCII. A `<meta refresh>` URL
+        # must be a valid URI: percent-encode the path (the sitemap and
+        # llms.txt emit the same page URLs the same way).
+        escaped_url = HTML.escape(TextUtils.encode_url_path(url))
         <<-HTML
           <!DOCTYPE html>
           <html>

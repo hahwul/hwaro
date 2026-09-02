@@ -2950,6 +2950,25 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  describe "non-string title / description" do
+    it "warns and keeps the default instead of silently shipping 'Hwaro Site'" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("title = 123\ndescription = false")
+      end
+      log.should contain("Ignoring non-string config value title = 123")
+      log.should contain("Ignoring non-string config value description = false")
+      config.not_nil!.title.should eq(Hwaro::Models::Config.new.title)
+    end
+
+    it "does not warn when they are absent or strings" do
+      log = with_captured_log do
+        load_config(%(title = "My Site"))
+      end
+      log.should_not contain("non-string")
+    end
+  end
+
   describe "unknown top-level key warnings" do
     it "warns with a did-you-mean suggestion for a typo'd section" do
       log = with_captured_log do

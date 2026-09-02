@@ -1485,8 +1485,8 @@ module Hwaro
         warn_unknown_top_level_keys(config.raw, config_path)
         reject_null_bytes!(config.raw, config_path)
 
-        config.title = config.raw["title"]?.try(&.as_s?) || config.title
-        config.description = config.raw["description"]?.try(&.as_s?) || config.description
+        config.title = string_or_default(config.raw, "title", config.title)
+        config.description = string_or_default(config.raw, "description", config.description)
         if raw_base_url = config.raw["base_url"]?.try(&.as_s?)
           begin
             validate_base_url!(raw_base_url)
@@ -1716,6 +1716,19 @@ module Hwaro
       end
 
       # Safe integer loader: handles both integer and float TOML values.
+      # Top-level string field with a default. A present-but-non-string value
+      # (`title = 123`, `description = false`) used to fall back to the
+      # default with zero feedback, so the site quietly shipped as
+      # "Hwaro Site" — the numeric loaders below already warn in that case.
+      private def self.string_or_default(raw : Hash(String, TOML::Any), key : String, default : String) : String
+        value = raw[key]?
+        return default unless value
+        value.as_s? || begin
+          Logger.warn "Ignoring non-string config value #{key} = #{value.raw.inspect}; using default #{default.inspect}"
+          default
+        end
+      end
+
       # Uses the 64-bit accessor and clamps to Int32 range so an oversized
       # config value (e.g. `per_page = 9999999999` or `1e30`) yields a clamped
       # Int32 instead of raising OverflowError out of `as_i?`/`to_i` — which

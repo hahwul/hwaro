@@ -153,7 +153,8 @@ module Hwaro
       property unpublished : Bool
 
       # True when the render phase resolved an output-path collision AGAINST
-      # this page, so no file was written for its URL (see
+      # this page, or found its URL unpublishable (a segment traverses out of
+      # the output directory), so no file was written for its URL (see
       # compute_output_url_winners). Recomputed from scratch on every build and
       # rerender — a collision introduced or resolved during a serve session
       # must not leave a stale verdict behind.

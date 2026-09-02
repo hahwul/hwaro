@@ -411,6 +411,28 @@ describe Hwaro::Core::Build::Phases::Render do
   end
 
   describe "#report_render_failures" do
+    it "prints the template location under a grouped summary" do
+      buffer = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      Hwaro::Logger.io = buffer
+      begin
+        builder = Hwaro::Core::Build::Builder.new
+        location = "template: templates/post.html:79:28 .. 80:9"
+        failures = [
+          {page_path: "index.md", message: "Template error for index.md: Unclosed tag, missing: endif\n#{location}"},
+          {page_path: "about.md", message: "Template error for about.md: Unclosed tag, missing: endif\n#{location}"},
+        ]
+        builder.test_report_render_failures(failures, verbose: false)
+      ensure
+        Hwaro::Logger.io = previous_io
+      end
+      output = buffer.to_s
+      output.should contain("Render failed for 2 pages: Unclosed tag, missing: endif")
+      output.should contain("  template: templates/post.html:79:28 .. 80:9")
+      # The location must not leak into the grouping key.
+      output.scan("Unclosed tag").size.should eq(1)
+    end
+
     it "groups identical failures into a single summary line" do
       buffer = IO::Memory.new
       previous_io = Hwaro::Logger.io

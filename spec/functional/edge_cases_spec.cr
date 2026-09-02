@@ -700,6 +700,56 @@ describe "Edge Cases: Duplicate output path detection" do
       end
     end
   end
+
+  # Same hole for the OTHER kind of unwritten page: a URL that traverses out
+  # of the output directory is refused at write time ("Not publishing"), but
+  # it was never marked suppressed, so sitemap.xml, search.json and llms.txt
+  # still advertised `/posts/../../escape/` — a guaranteed 404.
+  it "does not advertise the URL of a page it refuses to publish" do
+    log = with_captured_log do
+      build_site(
+        <<-TOML,
+          title = "Test Site"
+          base_url = "http://localhost"
+          [sitemap]
+          enabled = true
+          [search]
+          enabled = true
+          TOML
+        content_files: {
+          "posts/ok.md"        => "---\ntitle: Ok\n---\nOK-BODY",
+          "posts/traversal.md" => "---\ntitle: Traversal\nslug: ../../escape\n---\nESCAPE-BODY",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        File.read("public/sitemap.xml").should_not contain("escape")
+        File.read("public/search.json").should_not contain("escape")
+
+        llms = File.read("public/llms.txt")
+        llms.should contain("[Ok]")
+        llms.should_not contain("[Traversal]")
+      end
+    end
+
+    log.should contain("Not publishing posts/traversal.md")
+  end
+
+  # A Markdown link destination cannot hold a raw space, so a page whose slug
+  # has one rendered as `- [T](http://localhost/posts/custom slug/)` — not a
+  # link at all. The sitemap already percent-encoded; llms.txt and the alias
+  # redirect stub must agree with it.
+  it "percent-encodes page URLs with spaces in llms.txt and alias redirects" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "posts/spaced.md" => "---\ntitle: Spaced\nslug: custom slug\naliases:\n  - /old-url/\n---\nSPACED-BODY",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      File.read("public/llms.txt").should contain("[Spaced](http://localhost/posts/custom%20slug/)")
+      File.read("public/old-url/index.html").should contain("url=/posts/custom%20slug/")
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------

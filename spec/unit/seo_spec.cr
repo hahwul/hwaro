@@ -362,6 +362,31 @@ describe Hwaro::Content::Seo::Llms do
       end
     end
 
+    it "percent-encodes page URLs so a slug with a space still forms a Markdown link" do
+      config = Hwaro::Models::Config.new
+      config.title = "Test Site"
+      config.base_url = "https://example.com"
+      config.llms.enabled = true
+      config.llms.full_enabled = true
+
+      page = Hwaro::Models::Page.new("posts/spaced.md")
+      page.title = "Spaced"
+      page.url = "/posts/custom slug/"
+      page.render = true
+      page.raw_content = "Hello world"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [page], output_dir)
+
+        index = File.read(File.join(output_dir, "llms.txt"))
+        index.should contain("[Spaced](https://example.com/posts/custom%20slug/)")
+        index.should_not contain("custom slug")
+
+        full = File.read(File.join(output_dir, "llms-full.txt"))
+        full.should contain("URL: https://example.com/posts/custom%20slug/")
+      end
+    end
+
     it "ends with a trailing newline" do
       # Updated for #492 — the body now also includes the title and a
       # page index, but it should still end with a newline.
