@@ -330,14 +330,21 @@ module Hwaro
               end
               if open_count > 0 && CONTAINER_CLOSE_RE.matches?(stripped)
                 open_count -= 1
-                io << "\n</div>\n"
+                # Trailing blank line: `</div>` opens a type-6 HTML block that
+                # runs until the next blank line, so without one the FIRST line
+                # after the container (`- item`, `## Heading`, a paragraph) was
+                # swallowed into that block and emitted as raw, unparsed
+                # markdown. Markd drops the trailing blank from the block's
+                # literal, so a container followed by a blank line renders
+                # byte-identically.
+                io << "\n</div>\n\n"
                 next
               end
 
               io << line
             end
             # Auto-close unclosed containers at EOF (markdown-it behavior).
-            open_count.times { io << "\n</div>\n" }
+            open_count.times { io << "\n</div>\n\n" }
           end
         end
 

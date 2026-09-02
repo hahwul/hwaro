@@ -153,4 +153,48 @@ describe Hwaro::Content::Processors::Markdown do
       html.should_not contain(%(href="#old"))
     end
   end
+
+  # An empty heading (`##` with nothing after it) produces `<h2></h2>`, which
+  # the old `(.+?)` inner group could not match on its own — so the scan slid
+  # past it and paired that opening tag with the NEXT heading's `</h2>`,
+  # handing the empty heading the following heading's id and leaving the real
+  # heading with none. `HookedRenderer#heading` never had this bug, so the
+  # stock and render-hook paths also disagreed.
+  describe "empty headings" do
+    it "does not steal the following heading's id" do
+      content = <<-MARKDOWN
+        ##
+
+        ## Real Heading
+        MARKDOWN
+      html, toc = Hwaro::Content::Processors::Markdown.new.render(content)
+
+      html.should contain(%(<h2 id="heading"></h2>))
+      html.should contain(%(<h2 id="real-heading">Real Heading</h2>))
+      toc.map(&.id).should eq(["heading", "real-heading"])
+    end
+
+    it "gives a lone empty heading an id and a TOC entry" do
+      content = <<-MARKDOWN
+        ##
+
+        text
+        MARKDOWN
+      html, toc = Hwaro::Content::Processors::Markdown.new.render(content)
+
+      html.should contain(%(<h2 id="heading"></h2>))
+      toc.map(&.id).should eq(["heading"])
+    end
+
+    it "dedups repeated empty headings" do
+      content = <<-MARKDOWN
+        ##
+
+        ##
+        MARKDOWN
+      _, toc = Hwaro::Content::Processors::Markdown.new.render(content)
+
+      toc.map(&.id).should eq(["heading", "heading-1"])
+    end
+  end
 end
