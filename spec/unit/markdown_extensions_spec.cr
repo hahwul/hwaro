@@ -1049,6 +1049,43 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("</div>")
     end
 
+    # The generated `</div>` opens a type-6 HTML block that runs to the next
+    # blank line. Without one, the first line after the container was
+    # swallowed into that block and emitted as raw, unparsed markdown.
+    it "parses the line immediately after the closer as markdown" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        ":::note\nbody\n:::\nAfter with **bold**.",
+        markdown_config: cfg,
+      )
+      html.should contain("<p>After with <strong>bold</strong>.</p>")
+      html.should_not contain("After with **bold**.")
+    end
+
+    it "parses a heading immediately after the closer" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        ":::tip\nbody\n:::\n## Real Heading",
+        markdown_config: cfg,
+      )
+      html.should contain("<h2")
+      html.should contain("Real Heading</h2>")
+      html.should_not contain("## Real Heading")
+    end
+
+    it "parses a list immediately after the closer" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        ":::warning\nbody\n:::\n- one\n- two",
+        markdown_config: cfg,
+      )
+      html.should contain("<li>one</li>")
+      html.should contain("<li>two</li>")
+    end
+
     it "is off by default and skipped in safe mode" do
       html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: make_config)
       html.should_not contain("admonition")

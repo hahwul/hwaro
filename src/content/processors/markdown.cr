@@ -41,7 +41,15 @@ module Hwaro
 
         # Regex for post_process_html — lightweight replacements for XML.parse_html
         # Matches <h1>…</h1> through <h6>…</h6>, capturing tag name, level digit, attributes, and inner HTML
-        HEADING_TAG_REGEX = /<(h([1-6]))(\s(?:[^>"']|"[^"]*"|'[^']*')*)?>(.+?)<\/h\2>/mi
+        # The inner group is `.*?`, not `.+?`: an EMPTY heading (`##` with no
+        # text, or one whose only content was a stripped `{#id}` block) must
+        # still match on its own. With `.+?` the empty `<h2></h2>` could not
+        # match, so the scan slid on and paired that opening tag with the NEXT
+        # heading's `</h2>` — handing the empty heading the following
+        # heading's id and leaving the real one with none, which also broke
+        # the render-hooks convergence invariant (HookedRenderer#heading gets
+        # this right).
+        HEADING_TAG_REGEX = /<(h([1-6]))(\s(?:[^>"']|"[^"]*"|'[^']*')*)?>(.*?)<\/h\2>/mi
         # Matches <img ...> tags that do NOT already have a loading= attribute
         # (the lookahead is quote-aware too, so a loading= sitting after a
         # quoted `>` is still seen, and `data-loading=` doesn't count).

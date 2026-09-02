@@ -24,7 +24,19 @@ module Hwaro
         UNSAFE_PROTOCOL_RE      = /^\s*(javascript|vbscript|file|data):/i
         UNSAFE_DATA_PROTOCOL_RE = /^\s*data:image\/(?:png|gif|jpeg|webp)/i
 
-        INLINE_CODE_SPAN_RE = /`([^`]+)`/
+        # CommonMark code spans: a run of N backticks opens, and the next run
+        # of EXACTLY N backticks closes. The single-backtick-only form this
+        # replaced could not see `` `tick` `` or ``a`b`` at all — it matched
+        # the inner backticks instead, shredding the span into stray `<code>`
+        # tags and literal delimiters inside table cells, footnote bodies, and
+        # definition lists (the three callers of `render`).
+        #
+        # The opening run is POSSESSIVE (`` `++ ``) and the closer is fenced by
+        # `(?<!`)`/`(?!`)` so both delimiters are whole runs: without those,
+        # `\1` would happily match two of a three-backtick run and pair
+        # mismatched delimiters. `[\s\S]` (not `.`) because a footnote or
+        # definition body may still carry a newline at this point.
+        INLINE_CODE_SPAN_RE = /(`++)([\s\S]+?)(?<!`)\1(?!`)/
         INLINE_IMAGE_RE     = /!\[([^\]]*)\]\(([^)]*)\)/
         INLINE_LINK_RE      = /\[([^\]]+)\]\(([^)]*)\)/
         # Flanking guards (`(?=\S)` … `(?<=\S)`): a delimiter run that touches
@@ -124,7 +136,7 @@ module Hwaro
 
           code_spans = [] of String
           result = result.gsub(INLINE_CODE_SPAN_RE) do
-            code_spans << $1
+            code_spans << strip_code_span_padding($2)
             "\x00CODESPAN#{code_spans.size - 1}\x00"
           end
 
@@ -204,6 +216,17 @@ module Hwaro
           end
 
           result
+        end
+
+        # CommonMark strips ONE leading and ONE trailing space from a code
+        # span when both are present and the content isn't all spaces — that's
+        # what makes `` `tick` `` render as `` `tick` `` rather than
+        # `` ` tick ` ``. Markd already does this on the paragraph path; doing
+        # it here keeps the two paths agreeing.
+        private def strip_code_span_padding(content : String) : String
+          return content unless content.starts_with?(' ') && content.ends_with?(' ')
+          return content if content.each_char.all? { |c| c == ' ' }
+          content[1...-1]
         end
 
         # Replaces stashed placeholder tokens with the HTML-escaped comment

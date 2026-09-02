@@ -43,6 +43,42 @@ describe Hwaro::Content::Processors::InlineMarkdown do
       out.should contain(%(<img src="/caf%E9.png" alt="a">))
     end
   end
+
+  # Code spans in this renderer used to be single-backtick-only, so a
+  # multi-backtick span (the CommonMark way to show a literal backtick) had
+  # its INNER backticks matched instead — shredding the span into stray
+  # <code> tags and leaving the real delimiters as visible text.
+  describe ".render code spans" do
+    it "renders a double-backtick span containing single backticks" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("x `` `tick` `` y")
+      out.should eq("x <code>`tick`</code> y")
+    end
+
+    it "renders a double-backtick span with an interior backtick" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("``a`b``")
+      out.should eq("<code>a`b</code>")
+    end
+
+    it "renders a triple-backtick span" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("```x``y```")
+      out.should eq("<code>x``y</code>")
+    end
+
+    it "still renders plain single-backtick spans unchanged" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("a `b` c `d` e")
+      out.should eq("a <code>b</code> c <code>d</code> e")
+    end
+
+    it "keeps an all-space code span padded" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("`` ``")
+      out.should eq("<code> </code>")
+    end
+
+    it "leaves an unpaired backtick run alone" do
+      out = Hwaro::Content::Processors::InlineMarkdown.render("x `` y")
+      out.should eq("x `` y")
+    end
+  end
 end
 
 # `redirect_to` front matter reaches `safe_url?` verbatim, with no markdown
