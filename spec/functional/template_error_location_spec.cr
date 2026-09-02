@@ -150,6 +150,9 @@ describe "Template error location reporting" do
     message.should contain("slice(0)")
   end
 
+  # `range(0, 10, 0)` used to allocate forever (zero step never advances the
+  # iterator) — the src/ext patch makes it raise a plain ArgumentError, which
+  # the evaluator wrap then locates.
   it "locates a plain Crystal exception raised inside a function call" do
     err = expect_raises(Hwaro::HwaroError) do
       build_site(
@@ -163,7 +166,7 @@ describe "Template error location reporting" do
 
     err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
     message = err.message.not_nil!
-    message.should contain("Arithmetic overflow")
+    message.should contain("step must not be zero")
     message.should contain("templates/page.html:3:")
   end
 

@@ -15,8 +15,14 @@
 #      painted on a phantom line). `CharacterStream` counts a newline when the
 #      reader ARRIVES at it, and the first character is never arrived at.
 #
-# Patch order matters for nothing here; both are independent of the other
-# Crinja patches under src/ext/.
+#   3. `range(0, 10, 0)` never terminated: `RangeIterator` advances by
+#      `step.times { succ }`, so a zero step re-yields the start forever and
+#      `to_a` grows until the process is OOM-killed (it took the CI runner
+#      down with it). Reject a zero step up front, the way Crystal's own
+#      `Int#step(by: 0)` and Python's `range()` do.
+#
+# Patch order matters for nothing here; all three are independent of the
+# other Crinja patches under src/ext/.
 require "crinja"
 
 # === 1. Non-Crinja exceptions inside filters/tests/functions get a node ====
@@ -79,5 +85,17 @@ class Crinja::Parser::CharacterStream
     else
       StreamPosition.new
     end
+  end
+end
+
+# === 3. `range()` with a zero step must fail, not allocate forever =========
+#
+# A plain `ArgumentError`, like Crystal's `Int#step(by: 0)` raises; patch 1
+# above turns it into a located template error at the `range(...)` call.
+class Crinja::Function::RangeIterator(B, N)
+  def initialize(@range, step, @current = range.begin, @reached_end = false)
+    raise ArgumentError.new("range() step must not be zero") if step == 0
+    @step = step.abs
+    @direction_reversed = step < 0
   end
 end
