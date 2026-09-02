@@ -364,9 +364,14 @@ GitHub 스타일 알림 블록(admonition)이 스타일이 적용된 콜아웃�
 > [!WARNING]
 >
 > Body can also live in its own paragraph.
+
+> [!TIP] 커스텀 제목
+> 마커와 같은 줄에 적은 텍스트는 제목이 됩니다(Obsidian / Hugo 문법).
 ```
 
-출력은 `<div class="admonition admonition-{type}">`이며, 제목 문단(`<p class="admonition-title">`) 뒤에 본문이 이어집니다. 스타일은 사이트 CSS에서 지정합니다 — Hwaro는 시맨틱 마크업만 내보냅니다.
+출력은 `<div class="admonition admonition-{type}">`이며, 제목 문단(`<p class="admonition-title">`) 뒤에 본문이 이어집니다. 커스텀 제목이 없으면 타입 이름(`Note`, `Tip`, …)이 제목으로 쓰입니다. 스타일은 사이트 CSS에서 지정합니다 — Hwaro는 시맨틱 마크업만 내보냅니다.
+
+어드모니션과 일반 인용문 안에서도 테이블을 쓸 수 있습니다. 평소처럼 각 행 앞에 `>`를 붙이면 됩니다(`> | a | b |`, `> |---|---|`).
 
 `config.toml`의 `[markdown]` 아래에 `admonitions = false`를 두면 비활성화됩니다.
 
