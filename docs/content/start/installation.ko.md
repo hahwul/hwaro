@@ -96,7 +96,8 @@ nix develop github:hahwul/hwaro
 macOS와 Linux용 사전 빌드 바이너리를 [GitHub Releases](https://github.com/hahwul/hwaro/releases) 페이지에서 받을 수 있습니다.
 
 1. [최신 릴리스](https://github.com/hahwul/hwaro/releases/latest)에서 플랫폼에 맞는 바이너리를 내려받습니다.
-2. PATH에 포함된 디렉터리로 바이너리를 옮깁니다.
+2. PATH에 포함된 디렉터리로 바이너리를 옮깁니다. **macOS 배포물은 단일 바이너리가
+   아니라 tarball이므로, 옮기기 전에 아래 [macOS](#macos) 항목을 먼저 확인하세요.**
 
 ```bash
 # Linux(amd64) 예시
@@ -121,11 +122,19 @@ sudo ln -sf /usr/local/libexec/hwaro/hwaro /usr/local/bin/hwaro
 심볼릭 링크는 안전합니다. macOS가 `@executable_path`를 계산하기 전에 링크를
 먼저 해석하므로 dylib을 그대로 찾습니다. Homebrew도 같은 방식으로 설치합니다.
 
-> **v0.20.0 한정.** 이 릴리스의 macOS tarball은 코드 서명이 깨진 상태로
-> 배포되어, Apple Silicon에서는 실행 즉시 프로세스가 종료됩니다
-> (`zsh: killed hwaro`). Gatekeeper가 아니라 서명 검증 문제라 quarantine
-> 속성을 지워도 해결되지 않습니다. 상위 릴리스로 올리거나, 압축을 푼 자리에서
-> 직접 다시 서명하세요: `codesign --force --sign - lib/*.dylib hwaro`
+> **v0.20.0 한정.** 이 릴리스의 macOS tarball은 번들된 dylib의 코드 서명이 깨진
+> 상태로 배포되어, Apple Silicon에서는 실행 즉시 프로세스가 종료됩니다
+> (`zsh: killed hwaro`, 다른 메시지는 나오지 않습니다). quarantine 속성만 지워서는
+> 해결되지 않습니다 — 서명 자체가 깨져 있기 때문입니다. 반대로 다시 서명만 해도
+> 막힐 수 있습니다 — quarantine이 걸린 파일을 재서명하면 승인 상태가 초기화되기
+> 때문입니다. 압축을 푼 디렉터리에서 아래 순서로 둘 다 실행하세요.
+>
+> ```bash
+> xattr -dr com.apple.quarantine hwaro lib
+> codesign --force --sign - lib/*.dylib hwaro
+> ```
+>
+> 패치 릴리스가 나가면 이 과정은 필요 없습니다.
 
 ## 소스 빌드
 

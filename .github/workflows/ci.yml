@@ -22,9 +22,14 @@ on:
       - flake.lock
       - shards.nix
       # package-macos.sh only ever ran during a release before, so a break in
-      # it was discovered by users rather than by CI. package-macos exists to
-      # run it on every PR that touches it.
+      # it was discovered by users rather than by CI. These are the two files
+      # that decide what the macOS tarball contains -- the script itself and
+      # the workflow that chooses its arguments. (This list gates the whole
+      # workflow, not the package-macos job alone, so that job also runs on
+      # the `**/*.cr` PRs above; that is deliberate -- a source change can
+      # alter what the binary links.)
       - scripts/package-macos.sh
+      - .github/workflows/release-binary.yml
   push:
     branches: [main]
   workflow_dispatch:
@@ -209,9 +214,21 @@ jobs:
           export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig"
           mkdir -p build
           crystal build src/main.cr -o build/hwaro --no-debug
+      # The runtime half of this job only means anything on arm64: x86_64
+      # happily executes a stale signature. `macos-latest` is arm64 today but
+      # it is an alias GitHub has re-pointed before, and a silent move would
+      # leave the job green while testing nothing it exists to test.
+      - name: Assert the runner is arm64
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64 || {
+            echo "::error::package-macos must run on arm64; got $(uname -m)"
+            exit 1
+          }
       - name: Package and smoke test the tarball
         run: |
           set -euo pipefail
+          shopt -s nullglob
           scripts/package-macos.sh build/hwaro build/hwaro-ci-osx.tar.gz hwaro
 
           # package-macos.sh makes these assertions itself; repeating them
@@ -220,12 +237,34 @@ jobs:
           # exists to enforce.
           mkdir -p verify
           tar -xzf build/hwaro-ci-osx.tar.gz -C verify
+
+          # Every signature check below is vacuous if nothing was bundled, and
+          # the smoke test would still pass because brew's own OpenSSL is
+          # installed on this runner. Assert the archive actually carries the
+          # dylibs before trusting anything else about it.
+          libs=(verify/lib/*.dylib)
+          test "${#libs[@]}" -gt 0 || {
+            echo "::error::tarball bundled no dylibs; packaging silently stopped working"
+            exit 1
+          }
+          for want in libssl libcrypto; do
+            test -n "$(echo "verify/lib/$want".*.dylib)" || {
+              echo "::error::tarball is missing $want"
+              exit 1
+            }
+          done
+
           codesign --verify --strict verify/hwaro
-          for lib in verify/lib/*.dylib; do
+          for lib in "${libs[@]}"; do
             codesign --verify --strict "$lib"
           done
-          # Runs the packaged layout the way a user does: extracted tree, no
-          # brew dylibs on the load path, resolved via @executable_path/lib.
+
+          # Runs the packaged layout the way a user does: extracted tree,
+          # dylibs resolved via @executable_path/lib.
+          test -n "$(verify/hwaro version)" || {
+            echo "::error::packaged binary printed no version"
+            exit 1
+          }
           verify/hwaro version
   build-snapcraft:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'

@@ -96,7 +96,9 @@ Crystal toolchain, so no compiler has to be built from source.
 Pre-built binaries for macOS and Linux are available on the [GitHub Releases](https://github.com/hahwul/hwaro/releases) page.
 
 1. Download the binary for your platform from the [latest release](https://github.com/hahwul/hwaro/releases/latest).
-2. Move the binary to a directory in your PATH.
+2. Move the binary to a directory in your PATH. **On macOS the download is a
+   tarball, not a bare binary — see [macOS](#macos) below before moving
+   anything.**
 
 ```bash
 # Example for Linux (amd64)
@@ -122,10 +124,18 @@ The symlink is safe: macOS resolves it before computing `@executable_path`,
 so the dylibs are still found. Homebrew installs the tarball the same way.
 
 > **v0.20.0 only.** That release's macOS tarball shipped with an invalid code
-> signature, and Apple Silicon kills the process at launch (`zsh: killed
-> hwaro`). Clearing quarantine does not help — it is a signature check, not
-> Gatekeeper. Upgrade to a newer release, or re-sign the extracted files in
-> place: `codesign --force --sign - lib/*.dylib hwaro`.
+> signature on its bundled dylibs, and Apple Silicon kills the process at
+> launch — `zsh: killed hwaro`, with no other diagnostic. Clearing quarantine
+> on its own does not fix it, because the signature is stale as well; re-signing
+> on its own can also leave you stuck, because re-signing a quarantined file
+> resets its approval. Do both, in this order, from the extracted directory:
+>
+> ```bash
+> xattr -dr com.apple.quarantine hwaro lib
+> codesign --force --sign - lib/*.dylib hwaro
+> ```
+>
+> A patch release will carry the fix, after which no manual step is needed.
 
 ## From Source
 
