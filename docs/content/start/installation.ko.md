@@ -104,6 +104,29 @@ chmod +x hwaro-v*-linux-x86_64
 sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 ```
 
+### macOS
+
+macOS 배포물은 단일 바이너리가 아니라 tarball입니다. 압축을 풀면 `hwaro`와
+번들된 OpenSSL이 담긴 `lib/` 디렉터리가 나오고, 바이너리는 이 dylib들을
+`@executable_path/lib` 경로로 읽습니다. 따라서 **`lib/`를 항상 바이너리와 함께
+옮겨야 합니다.** 바이너리만 떼어 옮기면 실행되지 않습니다.
+
+```bash
+tar -xzf hwaro-v*-osx-arm64.tar.gz
+sudo mkdir -p /usr/local/libexec/hwaro
+sudo cp -R hwaro lib /usr/local/libexec/hwaro/
+sudo ln -sf /usr/local/libexec/hwaro/hwaro /usr/local/bin/hwaro
+```
+
+심볼릭 링크는 안전합니다. macOS가 `@executable_path`를 계산하기 전에 링크를
+먼저 해석하므로 dylib을 그대로 찾습니다. Homebrew도 같은 방식으로 설치합니다.
+
+> **v0.20.0 한정.** 이 릴리스의 macOS tarball은 코드 서명이 깨진 상태로
+> 배포되어, Apple Silicon에서는 실행 즉시 프로세스가 종료됩니다
+> (`zsh: killed hwaro`). Gatekeeper가 아니라 서명 검증 문제라 quarantine
+> 속성을 지워도 해결되지 않습니다. 상위 릴리스로 올리거나, 압축을 푼 자리에서
+> 직접 다시 서명하세요: `codesign --force --sign - lib/*.dylib hwaro`
+
 ## 소스 빌드
 
 ### 사전 요구 사항

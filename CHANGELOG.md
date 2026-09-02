@@ -5,6 +5,9 @@
 ### Added
 - `.hwaro/` keeps itself out of version control: hwaro writes a self-ignoring `.hwaro/.gitignore` when creating the workspace (serve output, remote-data cache), and `hwaro init` scaffolds a project `.gitignore` covering the output directory, `.hwaro/`, and `.hwaro_cache.json`
 
+### Fixed
+- macOS release tarballs are re-signed ad hoc after their dylib load paths are rewritten. `install_name_tool` invalidated the bundled OpenSSL signatures, and Apple Silicon SIGKILLs a process that maps a dylib with a stale signature — the v0.20.0 `osx-arm64` binary (and the Homebrew formula built from it) was killed at launch on every arm64 Mac. Packaging now verifies every signature and runs the extracted tarball before reporting success, and CI exercises it on an arm64 runner (#782)
+
 ## v0.20.0
 
 ### Added

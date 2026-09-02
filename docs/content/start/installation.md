@@ -104,6 +104,29 @@ chmod +x hwaro-v*-linux-x86_64
 sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 ```
 
+### macOS
+
+The macOS download is a tarball, not a bare binary. It extracts to `hwaro`
+plus a `lib/` directory holding the bundled OpenSSL, and the binary loads
+those through `@executable_path/lib` — so **`lib/` has to travel with it**.
+Move the whole extracted directory, not just the binary:
+
+```bash
+tar -xzf hwaro-v*-osx-arm64.tar.gz
+sudo mkdir -p /usr/local/libexec/hwaro
+sudo cp -R hwaro lib /usr/local/libexec/hwaro/
+sudo ln -sf /usr/local/libexec/hwaro/hwaro /usr/local/bin/hwaro
+```
+
+The symlink is safe: macOS resolves it before computing `@executable_path`,
+so the dylibs are still found. Homebrew installs the tarball the same way.
+
+> **v0.20.0 only.** That release's macOS tarball shipped with an invalid code
+> signature, and Apple Silicon kills the process at launch (`zsh: killed
+> hwaro`). Clearing quarantine does not help — it is a signature check, not
+> Gatekeeper. Upgrade to a newer release, or re-sign the extracted files in
+> place: `codesign --force --sign - lib/*.dylib hwaro`.
+
 ## From Source
 
 ### Prerequisites

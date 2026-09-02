@@ -21,6 +21,10 @@ on:
       - flake.nix
       - flake.lock
       - shards.nix
+      # package-macos.sh only ever ran during a release before, so a break in
+      # it was discovered by users rather than by CI. package-macos exists to
+      # run it on every PR that touches it.
+      - scripts/package-macos.sh
   push:
     branches: [main]
   workflow_dispatch:
@@ -178,6 +182,51 @@ jobs:
         run: |
           nix develop --command crystal2nix
           git diff --exit-code -- shards.nix
+  package-macos:
+    # scripts/package-macos.sh rewrites dylib load paths with install_name_tool,
+    # which invalidates the code signature of every Mach-O it touches. The
+    # linker-signed main binary is re-signed automatically; Homebrew's plainly
+    # ad-hoc-signed dylibs are not. arm64 SIGKILLs any process that maps a
+    # dylib with a stale signature, so the breakage is invisible on x86_64 and
+    # fatal for every Apple Silicon user -- that is how v0.20.0 shipped a
+    # tarball that could not run at all (#782). Packaging otherwise happens
+    # only in release-binary.yml, where the tag is already cut.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: 1.21.0
+      - name: Install build dependencies
+        run: brew install openssl@3 pkg-config
+      - name: Install shards
+        run: shards install
+      # Not --release: this job is about linkage and signatures, which are
+      # identical either way, and a release build would triple the runtime.
+      - name: Build binary
+        run: |
+          set -euo pipefail
+          export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig"
+          mkdir -p build
+          crystal build src/main.cr -o build/hwaro --no-debug
+      - name: Package and smoke test the tarball
+        run: |
+          set -euo pipefail
+          scripts/package-macos.sh build/hwaro build/hwaro-ci-osx.tar.gz hwaro
+
+          # package-macos.sh makes these assertions itself; repeating them
+          # against the extracted archive keeps the contract in CI, so a future
+          # edit to the script cannot quietly drop the guard that this job
+          # exists to enforce.
+          mkdir -p verify
+          tar -xzf build/hwaro-ci-osx.tar.gz -C verify
+          codesign --verify --strict verify/hwaro
+          for lib in verify/lib/*.dylib; do
+            codesign --verify --strict "$lib"
+          done
+          # Runs the packaged layout the way a user does: extracted tree, no
+          # brew dylibs on the load path, resolved via @executable_path/lib.
+          verify/hwaro version
   build-snapcraft:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
