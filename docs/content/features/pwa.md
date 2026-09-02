@@ -38,7 +38,7 @@ cache_strategy = "cache-first"
 | short_name | string | name | Short name for home screen |
 | theme_color | string | "#ffffff" | Browser toolbar / status bar color |
 | background_color | string | "#ffffff" | Splash screen background color |
-| display | string | "standalone" | Display mode |
+| display | string | "standalone" | Display mode: `fullscreen`, `standalone`, `minimal-ui` or `browser` (an unknown value falls back to `standalone`) |
 | start_url | string | "/" | URL when the app launches |
 | icons | array | [] | Icon file paths |
 | offline_page | string | — | Fallback page when offline |

@@ -991,6 +991,10 @@ module Hwaro
       property cache_strategy : String
 
       VALID_STRATEGIES = %w[cache-first network-first stale-while-revalidate]
+      # Web App Manifest `display` members. Anything else makes browsers
+      # silently fall back to `browser`, so an unknown value is coerced (with
+      # a warning) the same way `cache_strategy` is.
+      VALID_DISPLAYS = %w[fullscreen standalone minimal-ui browser]
 
       def initialize
         @enabled = false
@@ -2630,7 +2634,13 @@ module Hwaro
         config.pwa.short_name = s["short_name"]?.try(&.as_s?)
         config.pwa.theme_color = s["theme_color"]?.try(&.as_s?) || config.pwa.theme_color
         config.pwa.background_color = s["background_color"]?.try(&.as_s?) || config.pwa.background_color
-        config.pwa.display = s["display"]?.try(&.as_s?) || config.pwa.display
+        if display = s["display"]?.try(&.as_s?)
+          if PwaConfig::VALID_DISPLAYS.includes?(display)
+            config.pwa.display = display
+          else
+            Logger.warn "Unknown pwa.display '#{display}', using 'standalone'"
+          end
+        end
         config.pwa.start_url = s["start_url"]?.try(&.as_s?) || config.pwa.start_url
         config.pwa.offline_page = s["offline_page"]?.try(&.as_s?)
         if icons = s["icons"]?.try(&.as_a?)
