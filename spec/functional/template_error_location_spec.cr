@@ -126,4 +126,67 @@ describe "Template error location reporting" do
     # attaches their own filename to errors raised inside them.
     err.message.not_nil!.should contain("partials/head.html")
   end
+
+  # Regression: a plain Crystal exception raised inside a filter/function
+  # (`slice(0)` → DivisionByZeroError, `[] | random` → IndexError) is not a
+  # Crinja::Error, so nothing attached the node and the build died with
+  # `Render failed ...: Division by 0` and no template name or line. The
+  # src/ext evaluator patch wraps it into a located Crinja::RuntimeError.
+  it "locates a plain Crystal exception raised inside a filter" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello"},
+        template_files: {
+          "page.html" => "<html>\n{{ [1, 2, 3] | slice(0) }}\n</html>",
+        },
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    message = err.message.not_nil!
+    message.should contain("Division by 0")
+    message.should contain("templates/page.html:2:")
+    message.should contain("slice(0)")
+  end
+
+  # `range(0, 10, 0)` used to allocate forever (zero step never advances the
+  # iterator) — the src/ext patch makes it raise a plain ArgumentError, which
+  # the evaluator wrap then locates.
+  it "locates a plain Crystal exception raised inside a function call" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello"},
+        template_files: {
+          "page.html" => "<html>\n\n{{ range(0, 10, 0) }}\n</html>",
+        },
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    message = err.message.not_nil!
+    message.should contain("step must not be zero")
+    message.should contain("templates/page.html:3:")
+  end
+
+  # Regression: a template whose FIRST character is a newline reported every
+  # location one line early (`page.html:1:2` for a tag on line 2, the caret
+  # painted on a phantom line). Crinja's CharacterStream counts a newline when
+  # the reader arrives at it, and the first character is never arrived at.
+  it "counts a leading newline as a line break in error locations" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello"},
+        template_files: {
+          "page.html" => "\n{% for x in %}\n",
+        },
+      ) { }
+    end
+
+    message = err.message.not_nil!
+    message.should contain("templates/page.html:2:1")
+    message.should_not contain("templates/page.html:1:")
+  end
 end
