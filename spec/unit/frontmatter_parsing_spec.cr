@@ -132,6 +132,28 @@ describe Hwaro::Content::Processors::Markdown do
       result[:date].should_not be_nil
     end
 
+    # An unparseable date made the page silently undated — sorted last and
+    # absent from date-based listings — while only `tool validate` noticed.
+    it "warns about an unparseable date when a file path is given" do
+      toml = "+++\ntitle = \"Post\"\ndate = \"Sept 1, 2026\"\nupdated = \"2026-13-45\"\n+++\nBody"
+      yaml = "---\ntitle: Post\ndate: not-a-date\n---\nBody"
+
+      log = with_captured_log do
+        processor.parse(toml, "posts/a.md")[:date].should be_nil
+        processor.parse(yaml, "posts/b.md")[:date].should be_nil
+      end
+      log.should contain("posts/a.md: `date` \"Sept 1, 2026\" is not a recognised date")
+      log.should contain("posts/a.md: `updated` \"2026-13-45\" is not a recognised date")
+      log.should contain("posts/b.md: `date` \"not-a-date\" is not a recognised date")
+
+      # Library use (no path) keeps the quiet nil; an empty string is "unset".
+      log = with_captured_log do
+        processor.parse(toml)[:date].should be_nil
+        processor.parse("+++\ntitle = \"P\"\ndate = \"\"\n+++\nx", "posts/c.md")
+      end
+      log.should_not contain("not a recognised date")
+    end
+
     it "parses updated field" do
       raw = <<-MD
         +++

@@ -120,11 +120,11 @@ module Hwaro
               str << "## " << heading << "\n\n"
 
               by_section[section_name].sort_by(&.url).each do |p|
-                link = if base_url.empty?
-                         p.url
-                       else
-                         "#{base_url}#{p.url}"
-                       end
+                # Percent-encode like the sitemap does: a Markdown link
+                # destination cannot contain a raw space (`[t](/a b/)` is not
+                # a link), and a page whose slug or filename has one used to
+                # come out exactly that way.
+                link = Utils::TextUtils.encode_url_path(base_url.empty? ? p.url : "#{base_url}#{p.url}")
                 # The root index commonly has `title = ""` so its heading
                 # falls through to the site title; without this fallback
                 # the homepage rendered as `- [](url)` (no link label).
@@ -200,7 +200,7 @@ module Hwaro
               str << "Title: " << page.title << "\n"
 
               url = page.url
-              absolute_url = base_url.empty? ? url : "#{base_url}#{url}"
+              absolute_url = Utils::TextUtils.encode_url_path(base_url.empty? ? url : "#{base_url}#{url}")
               str << "URL: " << absolute_url << "\n"
               str << "Source: content/" << page.path << "\n"
 

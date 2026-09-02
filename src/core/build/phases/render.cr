@@ -914,6 +914,13 @@ module Hwaro::Core::Build::Phases::Render
         Logger.error "Render failed for #{group.first[:page_path]}: #{Utils::TextUtils.truncate_error(group.first[:message])}"
       else
         Logger.error "Render failed for #{group.size} pages: #{Utils::TextUtils.truncate_error(signature)}"
+        # The signature is the first line only; Crinja puts the template
+        # file and line on the next one. Sixteen pages failing on a shared
+        # partial is far more useful with `template: templates/post.html:79`
+        # than with the page list alone.
+        if location = render_error_location(group.first[:message])
+          Logger.error "  #{Utils::TextUtils.truncate_error(location)}"
+        end
         group.first(5).each { |f| Logger.error "  - #{f[:page_path]}" }
         if group.size > 5
           Logger.error "  … and #{group.size - 5} more"
@@ -930,6 +937,18 @@ module Hwaro::Core::Build::Phases::Render
     normalized = message.sub(/^Template error for [^:]+:\s*/, "")
     first_line = normalized.lines.first?.try(&.strip) || normalized.strip
     first_line.empty? ? normalized.strip : first_line
+  end
+
+  # The `template: <file>:<line>:<col> ..` line Crinja appends below the
+  # message (see ext/crinja_error_location_fix), or nil when the failure
+  # carries no location (a non-template exception, a message with only one
+  # line).
+  private def render_error_location(message : String) : String?
+    message.each_line do |line|
+      stripped = line.strip
+      return stripped if stripped.starts_with?("template:")
+    end
+    nil
   end
 
   private def process_files_sequential(
@@ -1330,7 +1349,14 @@ module Hwaro::Core::Build::Phases::Render
 
       # nil = this URL is unpublishable (a segment traverses or hides a
       # separator); write_output refuses it by itself and it claims nothing.
-      if file_key = Utils::PathUtils.output_file_key(url)
+      # It still has to be marked suppressed: the discovery surfaces
+      # (sitemap, feeds, search index, llms.txt) and the auto-OG generator
+      # only consult `output_suppressed`, so without this the build warned
+      # "Not publishing", wrote no file, and then advertised the URL in
+      # sitemap.xml and search.json anyway — and rendered an OG image for it.
+      file_key = Utils::PathUtils.output_file_key(url)
+      page.output_suppressed = true if file_key.nil?
+      if file_key
         if prev_path = by_file[file_key]?
           Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
           # Point the loser's own URL key at the winner: every sink asks

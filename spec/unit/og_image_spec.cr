@@ -869,6 +869,38 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
+    # A page that publishes no file (it lost an output-path collision, or its
+    # URL traverses out of the output directory) used to get a card anyway —
+    # named after the refused URL, e.g. `posts-..-..-escape.png`. Unpublished
+    # (future/expired, kept by a preview flag) follows the draft rule.
+    it "skips pages whose output is suppressed or unpublished" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+
+        suppressed = Hwaro::Models::Page.new("posts/traversal.md")
+        suppressed.title = "Traversal"
+        suppressed.url = "/posts/../../escape/"
+        suppressed.render = true
+        suppressed.output_suppressed = true
+
+        future = Hwaro::Models::Page.new("posts/future.md")
+        future.title = "Future"
+        future.url = "/posts/future/"
+        future.render = true
+        future.unpublished = true
+
+        Hwaro::Content::Seo::OgImage.eligible_for_auto_image?(suppressed).should be_false
+        Hwaro::Content::Seo::OgImage.eligible_for_auto_image?(future).should be_false
+
+        stats = Hwaro::Content::Seo::OgImage.generate([suppressed, future], config, dir)
+        stats[:generated].should eq(0)
+        suppressed.image.should be_nil
+        future.image.should be_nil
+        Dir.glob(File.join(dir, "og-images", "*.{png,svg}")).should be_empty
+      end
+    end
+
     it "uses custom output directory" do
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new

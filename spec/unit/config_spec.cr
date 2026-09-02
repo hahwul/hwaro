@@ -1330,6 +1330,36 @@ describe Hwaro::Models::Config do
       config.taxonomies[1].sitemap.should be_false
     end
 
+    # Two `[[taxonomies]]` blocks with one name produced two configs, and every
+    # consumer registered each page under the name twice: doubled term
+    # listings, duplicate feed items, and a by-name lookup that could land on
+    # the second block (dropping the first one's `terms_sort_by`).
+    it "keeps the first declaration and warns when a taxonomy name is declared twice" do
+      config = nil
+      log = with_captured_log do
+        config = load_config(<<-TOML)
+          title = "Test"
+
+          [[taxonomies]]
+          name = "tags"
+          feed = true
+          terms_sort_by = "count"
+
+          [[taxonomies]]
+          name = "tags"
+
+          [[taxonomies]]
+          name = "categories"
+          TOML
+      end
+
+      log.should contain("Duplicate [[taxonomies]] name \"tags\"")
+      taxonomies = config.not_nil!.taxonomies
+      taxonomies.map(&.name).should eq(["tags", "categories"])
+      taxonomies[0].feed.should be_true
+      taxonomies[0].terms_sort_by.should eq("count")
+    end
+
     it "defaults sorting to date / not reversed / name-ordered terms" do
       tax = Hwaro::Models::TaxonomyConfig.new("tags")
       tax.sort_by.should eq("date")
@@ -2947,6 +2977,25 @@ describe "Hwaro::Models::Config" do
       load_config("[og.auto_image]\nfont_size = -5").og.auto_image.font_size.should eq(8)
       # A usable size is untouched.
       load_config("[og.auto_image]\nfont_size = 72").og.auto_image.font_size.should eq(72)
+    end
+  end
+
+  describe "non-string title / description" do
+    it "warns and keeps the default instead of silently shipping 'Hwaro Site'" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("title = 123\ndescription = false")
+      end
+      log.should contain("Ignoring non-string config value title = 123")
+      log.should contain("Ignoring non-string config value description = false")
+      config.not_nil!.title.should eq(Hwaro::Models::Config.new.title)
+    end
+
+    it "does not warn when they are absent or strings" do
+      log = with_captured_log do
+        load_config(%(title = "My Site"))
+      end
+      log.should_not contain("non-string")
     end
   end
 

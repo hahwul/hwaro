@@ -81,6 +81,18 @@ describe Hwaro::Utils::RedirectHtml do
       result.should contain("/blog/new-post/")
     end
 
+    it "percent-encodes a target URL with spaces or non-ASCII" do
+      result = Hwaro::Utils::RedirectHtml.simple_redirect("/posts/custom slug/한글/")
+      result.should contain("url=/posts/custom%20slug/%ED%95%9C%EA%B8%80/")
+      result.should_not contain("custom slug")
+    end
+
+    it "leaves an already-encoded target alone" do
+      result = Hwaro::Utils::RedirectHtml.simple_redirect("/posts/custom%20slug/")
+      result.should contain("url=/posts/custom%20slug/")
+      result.should_not contain("%2520")
+    end
+
     it "does not include JavaScript" do
       result = Hwaro::Utils::RedirectHtml.simple_redirect("/about/")
       result.should_not contain("<script>")

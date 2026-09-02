@@ -627,7 +627,10 @@ module Hwaro
             end
 
             unless body_end
-              # No matching {% end %} found — emit the opening tag as literal text
+              # No matching {% end %} found — emit the opening tag as literal
+              # text, and say so: `{% alert() %}` with a forgotten closer used
+              # to ship the raw tag into the page with nothing in the log.
+              warn_unclosed_shortcode(name)
               result << open_match[0]
               pos = body_start
               next
@@ -977,6 +980,18 @@ module Hwaro
           end
           return unless should_warn
           Logger.warn "Shortcode template '#{template_key}' not found."
+        end
+
+        # Same once-per-build dedupe for a block opener that never finds its
+        # closer. Keyed separately from the missing-template set so a name
+        # that is both unclosed and unknown still gets both messages.
+        private def warn_unclosed_shortcode(name : String) : Nil
+          should_warn = @crinja_cache_mutex.synchronize do
+            seen = (@shortcode_warnings_seen ||= Set(String).new)
+            seen.add?("unclosed:#{name}")
+          end
+          return unless should_warn
+          Logger.warn "Block shortcode '{% #{name} %}' is never closed — it renders as literal text. Add `{% end#{name} %}` (or `{% end %}`) after its body."
         end
       end
     end

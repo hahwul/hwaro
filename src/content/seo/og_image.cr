@@ -559,8 +559,16 @@ module Hwaro
 
         # Pages auto-OG generation applies to (mirrors the Pass-1 filters,
         # minus the custom-image skip which callers evaluate themselves).
+        #
+        # A page that publishes no file of its own — it lost an output-path
+        # collision, or its URL traverses out of the output directory — has
+        # nothing to advertise a card for, and its `page.url`-derived slug
+        # produced names like `posts-..-..-escape.png`. An `unpublished`
+        # page (future/expired kept by a preview flag) follows the draft
+        # rule: it renders for preview but stays out of generated assets.
         def self.eligible_for_auto_image?(page : Models::Page) : Bool
-          !page.draft && !page.generated && page.render
+          !page.draft && !page.generated && page.render &&
+            !page.output_suppressed && !page.unpublished
         end
 
         # True when `image` was assigned by auto-OG generation — it points

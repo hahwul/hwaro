@@ -614,7 +614,12 @@ module Hwaro
         # the memo's whole purpose (parse once per build, not once per page)
         # survives a per-build reset intact.
         def self.clear_load_data_cache : Nil
-          @@load_data_mutex.synchronize { @@load_data_cache.clear }
+          @@load_data_mutex.synchronize do
+            @@load_data_cache.clear
+            # A new build (or serve rebuild) gets its warnings again — the
+            # author may have fixed the path, or not, and needs to see which.
+            @@load_data_warned.clear
+          end
         end
 
         private def register_data_function
@@ -657,14 +662,31 @@ module Hwaro
                     Crinja::Value.new(nil)
                   end
                 end
+              elsif resolved && !(resolved == project_root || resolved.starts_with?(project_root + "/"))
+                warn_load_data_once(path, "resolves outside the project directory and is refused")
+              else
+                warn_load_data_once(path, "is not a file (paths resolve against the project root)")
               end
             rescue ex
-              Logger.debug "load_data('#{path}'): #{ex.message}"
+              warn_load_data_once(path, "could not be loaded: #{ex.message}")
               result = Crinja::Value.new(nil)
             end
 
             result
           end
+        end
+
+        # A `load_data()` miss used to render as a bare `none` (or an empty
+        # loop) with nothing in the log — a typo'd path, a file dropped outside
+        # the project, or a malformed data file were indistinguishable from an
+        # intentionally empty dataset. Warn once per path per build: the
+        # function runs for every page that calls it, and the same typo on a
+        # 500-page site is one problem, not 500 lines.
+        @@load_data_warned = Set(String).new
+
+        private def warn_load_data_once(path : String, reason : String) : Nil
+          first = @@load_data_mutex.synchronize { @@load_data_warned.add?(path) }
+          Logger.warn "load_data(#{path.inspect}) #{reason}; the template receives none." if first
         end
 
         # Parse a data file's content by the extension carried on `path` (the

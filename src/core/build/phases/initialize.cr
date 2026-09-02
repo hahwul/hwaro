@@ -1,5 +1,6 @@
 require "../../../utils/dev_marker"
 require "../../../utils/hwaro_dir"
+require "../../../utils/output_ownership"
 
 # Phase: Initialize — output dir setup, cache init, config loading, template loading
 #
@@ -135,6 +136,22 @@ module Hwaro::Core::Build::Phases::Initialize
     # In incremental mode (--cache), keep existing output to avoid
     # re-generating unchanged pages and re-copying unchanged static files.
     if !incremental && Dir.exists?(output_dir)
+      # The guard above only refuses the catastrophic targets. Any OTHER
+      # pre-existing directory — `-o ~/Documents/site`, a `dist/` shared
+      # with a bundler — was emptied silently, exit 0. Only clear what hwaro
+      # can vouch for (see Utils::OutputOwnership); keep the rest and say so.
+      resolved = Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(output_dir))
+      project_root = Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(Dir.current))
+      existing = begin
+        Dir.children(output_dir)
+      rescue File::Error
+        [] of String
+      end
+      if !existing.empty? && !Hwaro::Utils::OutputOwnership.clearable?(output_dir, resolved, project_root)
+        Logger.warn "Output directory #{output_dir} already holds #{existing.size} entr#{existing.size == 1 ? "y" : "ies"} hwaro did not write — keeping them. hwaro only clears the conventional public/ directory and directories it created or found empty, so files from an earlier build there may be stale; empty the directory once for a clean build."
+        return ensure_output_dir(output_dir)
+      end
+
       # Trailing separators are stripped for the symlink test only: `-o public/`
       # is what shell completion types, and lstat on a path ending in `/`
       # follows the final link, so `public/` would report as a plain directory.
@@ -168,21 +185,33 @@ module Hwaro::Core::Build::Phases::Initialize
         FileUtils.rm_rf(output_dir)
       end
     end
-    begin
-      Hwaro::Utils::FileSafe.mkdir_p(output_dir)
-    rescue ex : File::Error
-      # `-o` pointing at an existing plain file (or /dev/null), a read-only
-      # parent, a name the filesystem rejects: ordinary misconfiguration the
-      # user can fix. Unclassified it reached the CLI as HWARO_E_INTERNAL /
-      # exit 70 — the code reserved for hwaro bugs — so CI that alerts on
-      # internal faults fired on a typo. Name the path and say what to do.
-      raise Hwaro::HwaroError.new(
-        code: Hwaro::Errors::HWARO_E_IO,
-        message: "Cannot create output directory #{output_dir.inspect}: #{ex.message}",
-        hint: "Remove or rename whatever occupies that path, or build into a different directory with -o/--output.",
-        cause: ex,
+    ensure_output_dir(output_dir)
+    # Created, found empty, or cleared: from here on the directory is hwaro's
+    # to clear on the next cold build. Not recorded on the incremental paths
+    # (`--cache`, `serve`), which never clear anything and must not hand a
+    # foreign directory over.
+    unless incremental
+      Hwaro::Utils::OutputOwnership.record(
+        Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(output_dir)),
+        Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(Dir.current)),
       )
     end
+  end
+
+  private def ensure_output_dir(output_dir : String)
+    Hwaro::Utils::FileSafe.mkdir_p(output_dir)
+  rescue ex : File::Error
+    # `-o` pointing at an existing plain file (or /dev/null), a read-only
+    # parent, a name the filesystem rejects: ordinary misconfiguration the
+    # user can fix. Unclassified it reached the CLI as HWARO_E_INTERNAL /
+    # exit 70 — the code reserved for hwaro bugs — so CI that alerts on
+    # internal faults fired on a typo. Name the path and say what to do.
+    raise Hwaro::HwaroError.new(
+      code: Hwaro::Errors::HWARO_E_IO,
+      message: "Cannot create output directory #{output_dir.inspect}: #{ex.message}",
+      hint: "Remove or rename whatever occupies that path, or build into a different directory with -o/--output.",
+      cause: ex,
+    )
   end
 
   # Directories a build READS. `output_dir` is wiped before a cold build, so

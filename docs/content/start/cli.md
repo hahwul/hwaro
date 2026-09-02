@@ -252,6 +252,17 @@ hwaro build -i /path/to/my-site -o ./dist
 | --profile | Print phase-by-phase and per-template build timing |
 | --debug | Print debug information after build |
 
+**About the output directory:** a full build starts from an empty output
+directory, but hwaro only clears a directory it can vouch for — the
+conventional `public/` next to the project, `hwaro serve`'s own `.hwaro/serve`,
+and any directory hwaro created (or found empty) on an earlier build. Pointing
+`-o` at a directory that already holds other files (`-o ~/Documents/site`, a
+`dist/` shared with a bundler) keeps those files: the site is written into it
+and the build warns that files from an earlier build there may be stale. Empty
+the directory once to hand it over. The filesystem root, your home directory,
+the project itself and its input directories (`content/`, `templates/`,
+`static/`, …) are refused outright.
+
 **About `--stream` / `--memory-limit` (Streaming Build):**
 
 For sites with thousands of pages, loading all rendered HTML into memory at once can cause high memory usage. Streaming build processes pages in batches during the Render phase, releasing rendered HTML after each batch is written to disk.
