@@ -2,9 +2,6 @@
 
 ## Unreleased
 
-### Added
-- `.hwaro/` keeps itself out of version control: hwaro writes a self-ignoring `.hwaro/.gitignore` when creating the workspace (serve output, remote-data cache), and `hwaro init` scaffolds a project `.gitignore` covering the output directory, `.hwaro/`, and `.hwaro_cache.json`
-
 ### Fixed
 - macOS release tarballs are re-signed ad hoc after their dylib load paths are rewritten. `install_name_tool` invalidated the bundled OpenSSL signatures, and Apple Silicon SIGKILLs a process that maps a dylib with a stale signature — the v0.20.0 `osx-arm64` binary (and the Homebrew formula built from it) was killed at launch on every arm64 Mac. Packaging now verifies every signature and runs the extracted tarball before reporting success, and CI exercises it on an arm64 runner (#782)
 
@@ -13,6 +10,7 @@
 ### Added
 - Remote data sources: `[[data.remote]]` in `config.toml` fetches an HTTP(S) endpoint into `site.data.<key>` — format inference (`json`/`toml`/`yaml`/`csv`), `${VAR}` env interpolation, a disk cache with TTL, and `on_error` handling (#753, #759, #763)
 - Content generation from data: `[[content.generate]]` turns each record of a `site.data` array into a first-class content page — listings, permalinks, taxonomies, feeds, search, sitemap and OG images all apply; authored files win a contested path (#764)
+- `.hwaro/` keeps itself out of version control: hwaro writes a self-ignoring `.hwaro/.gitignore` when creating the workspace (serve output, remote-data cache), and `hwaro init` scaffolds a project `.gitignore` covering the output directory, `.hwaro/`, and `.hwaro_cache.json` (#767)
 
 ### Changed
 - `hwaro serve` builds into `.hwaro/serve/` instead of the deployable output directory, and `deploy`/`build` refuse dev-marked output — serve output can no longer poison a production build (#758, #762)
