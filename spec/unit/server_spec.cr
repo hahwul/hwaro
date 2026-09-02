@@ -69,9 +69,14 @@ class DummyHandler
   include HTTP::Handler
 
   property called : Bool = false
+  # The request path as the DOWNSTREAM handler saw it. IndexRewriteHandler
+  # rewrites for the handlers below it and puts the request back on the way
+  # out, so the rewrite is only observable from here.
+  property seen_path : String? = nil
 
   def call(context)
     @called = true
+    @seen_path = context.request.path
   end
 end
 
@@ -184,8 +189,14 @@ describe Hwaro::Services::IndexRewriteHandler do
 
       handler.call(context)
 
-      request.path.should eq("/some/path/index.html")
       dummy.called.should be_true
+      # The handlers below see the index file...
+      dummy.seen_path.should eq("/some/path/index.html")
+      # ...and the request is restored on the way out, so `HTTP::LogHandler`
+      # (outermost, reading `resource` after call_next) reports the path the
+      # client actually sent.
+      request.path.should eq("/some/path/")
+      request.resource.should eq("/some/path/")
     end
   end
 

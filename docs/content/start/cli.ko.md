@@ -361,7 +361,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --include-future | 미래 날짜 콘텐츠 포함 |
 | -v, --verbose | 상세 출력 |
 | --debug | 재빌드마다 디버그 정보 출력 |
-| --access-log | HTTP 접근 로그 표시 (예: GET 요청) |
+| --access-log | HTTP 접근 로그 표시 (예: GET 요청). 각 줄에는 브라우저가 요청한 경로가 그대로 기록됩니다 — 개발 서버가 내부적으로 찾아가는 `/index.html`이 아니라 `/` |
 | --no-error-overlay | 브라우저 내 오류 오버레이 끄기 (기본값: 활성화) |
 | --live-reload | 파일 변경 시 브라우저 라이브 리로드 켜기 (기본값: 활성화; 하위 호환용으로 유지) |
 | --no-live-reload | 파일 변경 시 브라우저 라이브 리로드 끄기 |

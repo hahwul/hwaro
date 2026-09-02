@@ -357,7 +357,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --include-future | Include future-dated content |
 | -v, --verbose | Show detailed output |
 | --debug | Print debug information after each rebuild |
-| --access-log | Show HTTP access log (e.g. GET requests) |
+| --access-log | Show HTTP access log (e.g. GET requests). Each line reports the path the browser requested — `/`, not the `/index.html` the dev server resolves it to |
 | --no-error-overlay | Disable in-browser error overlay (default: enabled) |
 | --live-reload | Enable browser live reload on file changes (default: enabled; kept for backwards compatibility) |
 | --no-live-reload | Disable browser live reload on file changes |
