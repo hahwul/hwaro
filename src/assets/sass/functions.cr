@@ -836,7 +836,33 @@ module Hwaro
             arity!("map.deep-merge", args, 2)
             map_deep_merge(map!("map.deep-merge", args[0]), map!("map.deep-merge", args[1]))
           end,
+          # `map.deep-remove($map, $key, $keys...)` — the deep sibling of
+          # `map.remove`, drilling through intermediate keys. Missing while
+          # `deep-merge` shipped, so `@use "sass:map"` sheets that used it
+          # fell through to the literal-text fallback and emitted invalid CSS.
+          "deep-remove" => Fn.new do |args, kwargs|
+            no_kwargs!("map.deep-remove", kwargs)
+            arity!("map.deep-remove", args, 2, Int32::MAX)
+            map_deep_remove(map!("map.deep-remove", args[0]), args[1..])
+          end,
         }
+
+        # Remove `keys[-1]` from the nested map reached by `keys[0..-2]`.
+        # A key path that does not resolve to a map leaves the map untouched
+        # (dart-sass semantics).
+        private def self.map_deep_remove(map : MapV, keys : Array(Value)) : MapV
+          key = keys[0]
+          return MapV.new(map.entries.reject(&.key.eq?(key))) if keys.size == 1
+          idx = map.entries.index(&.key.eq?(key))
+          return map unless idx
+          inner = map.entries[idx].value
+          inner_map = inner.as?(MapV) ||
+                      (inner.is_a?(Raw) ? Expr.coerce(inner.text).as?(MapV) : nil)
+          return map unless inner_map
+          entries = map.entries.dup
+          entries[idx] = MapEntry.new(key, map_deep_remove(inner_map, keys[1..]))
+          MapV.new(entries)
+        end
 
         private def self.map_set(map : MapV, keys : Array(Value), value : Value) : MapV
           key = keys[0]
@@ -1205,17 +1231,26 @@ module Hwaro
         end
 
         # `color.hwb($hue $whiteness $blackness)` — the space-separated
-        # channels form. A slash-alpha (`… / 0.5`) is not modeled; use
-        # `color.change($c, $alpha: …)` instead.
+        # channels form — and the separate-argument spelling
+        # `color.hwb($hue, $whiteness, $blackness)`, which dart-sass also
+        # accepts and which used to fail arity here. A slash-alpha
+        # (`… / 0.5`) is not modeled; use `color.change($c, $alpha: …)`.
         COLOR_FNS["hwb"] = Fn.new do |args, kwargs|
-          known_kwargs!("color.hwb", kwargs, ["channels"])
-          arity!("color.hwb", args, 0, 1)
-          channels = args[0]? || kwargs["channels"]? ||
-                     raise SoftEvalError.new("color.hwb() is missing required argument $channels")
+          known_kwargs!("color.hwb", kwargs, ["channels", "hue", "whiteness", "blackness"])
+          arity!("color.hwb", args, 0, 3)
+          separate = args.size == 3 ||
+                     kwargs.has_key?("hue") || kwargs.has_key?("whiteness") || kwargs.has_key?("blackness")
           items =
-            case channels
-            when ListV then channels.items
-            else            raise SoftEvalError.new("color.hwb() expects a space-separated $hue $whiteness $blackness list")
+            if separate
+              bound = bind!("color.hwb", args, kwargs, ["hue", "whiteness", "blackness"], required: 3)
+              bound.map(&.as(Value))
+            else
+              channels = args[0]? || kwargs["channels"]? ||
+                         raise SoftEvalError.new("color.hwb() is missing required argument $channels")
+              case channels
+              when ListV then channels.items
+              else            raise SoftEvalError.new("color.hwb() expects a space-separated $hue $whiteness $blackness list")
+              end
             end
           arity!("color.hwb() channels", items, 3)
           hue = finite!("color.hwb", number!("color.hwb", items[0]))

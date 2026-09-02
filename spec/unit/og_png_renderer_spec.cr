@@ -29,6 +29,36 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
   end
 
+  # The logo occupies a LOGO_SIZE square BOX, but the image inside it must
+  # keep its aspect ratio (SVG's `<image>` already does — its default
+  # preserveAspectRatio is "xMidYMid meet"). Stretching to the full square
+  # squashed every non-square logo: a 400x300 mark rendered 48x48.
+  describe ".fit_dimensions" do
+    it "scales a landscape image to the box width" do
+      Hwaro::Content::Seo::OgPngRenderer.fit_dimensions(400, 300, 48, 48).should eq({48, 36})
+    end
+
+    it "scales a portrait image to the box height" do
+      Hwaro::Content::Seo::OgPngRenderer.fit_dimensions(300, 400, 48, 48).should eq({36, 48})
+    end
+
+    it "leaves a square image square" do
+      Hwaro::Content::Seo::OgPngRenderer.fit_dimensions(512, 512, 48, 48).should eq({48, 48})
+    end
+
+    it "upscales a small image into the box without distorting it" do
+      Hwaro::Content::Seo::OgPngRenderer.fit_dimensions(20, 10, 48, 48).should eq({48, 24})
+    end
+
+    it "never collapses an extreme aspect ratio to zero" do
+      Hwaro::Content::Seo::OgPngRenderer.fit_dimensions(4000, 10, 48, 48).should eq({48, 1})
+    end
+
+    it "falls back to the box for degenerate dimensions" do
+      Hwaro::Content::Seo::OgPngRenderer.fit_dimensions(0, 0, 48, 48).should eq({48, 48})
+    end
+  end
+
   describe ".find_system_font" do
     it "returns a string or nil" do
       result = Hwaro::Content::Seo::OgPngRenderer.find_system_font

@@ -3,6 +3,7 @@ require "digest/sha1"
 require "../../models/config"
 require "../../models/site"
 require "../../utils/logger"
+require "../processors/image_processor"
 
 module Hwaro
   module Content
@@ -278,18 +279,31 @@ module Hwaro
           File.file?(precache_file_path(url, output_dir, base_path))
         end
 
+        # Extensions whose intrinsic size can be read from the file header.
+        MEASURABLE_ICON_EXTS = {".png", ".jpg", ".jpeg", ".bmp"}
+
         # Resolve an icon's declared `sizes`. Prefer the real pixel dimensions
-        # read from the PNG header so a 200x60 logo isn't mislabeled "512x512";
-        # fall back to the filename heuristic for non-PNG icons or unparsable
-        # bytes.
+        # read from the image header so a 200x60 logo isn't mislabeled
+        # "512x512"; fall back to the filename heuristic only when the bytes
+        # cannot be measured.
+        #
+        # The measurement used to be PNG-only, so a JPEG icon fell through to
+        # the filename heuristic: `tiny.jpg` (100x100) was published as
+        # `"sizes": "512x512"` and `logo-2024.jpg` as `"2024x2024"`. Browsers
+        # pick the install icon by the declared `sizes`, so the lie is what
+        # ships to the home screen.
         private def self.icon_size(icon_path : String, output_dir : String) : String
+          ext = File.extname(icon_path).downcase
+          # A scalable icon has no pixel size; `any` is the manifest spec's
+          # spelling for it and is what makes it eligible at every size.
+          return "any" if ext == ".svg" && !external_url?(icon_path)
           # A remote icon (http(s)://) has no local file to read — use the
           # filename heuristic directly instead of warning on every build.
-          if File.extname(icon_path).downcase == ".png" && !external_url?(icon_path)
-            if dims = png_dimensions(resolve_icon_file(icon_path, output_dir))
+          if MEASURABLE_ICON_EXTS.includes?(ext) && !external_url?(icon_path)
+            if dims = Processors::ImageProcessor.dimensions(resolve_icon_file(icon_path, output_dir))
               return "#{dims[0]}x#{dims[1]}"
             end
-            Logger.warn "PWA: could not read PNG dimensions for icon #{icon_path.inspect}; falling back to filename-derived size #{extract_icon_size(icon_path).inspect}"
+            Logger.warn "PWA: could not read image dimensions for icon #{icon_path.inspect}; falling back to filename-derived size #{extract_icon_size(icon_path).inspect}"
           end
           extract_icon_size(icon_path)
         end
@@ -299,27 +313,6 @@ module Hwaro
         private def self.resolve_icon_file(icon_path : String, output_dir : String) : String
           rel = normalize_icon_path(icon_path).lchop('/')
           File.join(output_dir, rel)
-        end
-
-        # Read width/height from a PNG's IHDR chunk. Verifies the 8-byte PNG
-        # signature, then reads two big-endian UInt32s at offsets 16 (width)
-        # and 20 (height). Returns nil when the file is missing, too short, or
-        # not a PNG so the caller can fall back to the filename heuristic.
-        PNG_SIGNATURE = Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
-
-        private def self.png_dimensions(path : String) : {UInt32, UInt32}?
-          return unless File.file?(path)
-          header = Bytes.new(24)
-          read = File.open(path, &.read(header))
-          return if read < 24
-          return unless header[0, 8] == PNG_SIGNATURE
-          width = IO::ByteFormat::BigEndian.decode(UInt32, header[16, 4])
-          height = IO::ByteFormat::BigEndian.decode(UInt32, header[20, 4])
-          return if width.zero? || height.zero?
-          {width, height}
-        rescue ex : IO::Error | File::Error
-          Logger.debug "PWA: failed reading PNG header for #{path}: #{ex.message}"
-          nil
         end
 
         # Normalize icon path to a URL path.

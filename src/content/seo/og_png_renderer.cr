@@ -149,8 +149,21 @@ module Hwaro
           end
         end
 
-        # Decode an image file and resize it to target dimensions. Returns nil on failure.
-        def self.load_image(path : String, target_w : Int32, target_h : Int32) : CachedImage?
+        # Scale (w, h) to fit inside a box without distortion — the raster
+        # equivalent of SVG's default `preserveAspectRatio="xMidYMid meet"`.
+        def self.fit_dimensions(src_w : Int32, src_h : Int32, box_w : Int32, box_h : Int32) : {Int32, Int32}
+          return {box_w, box_h} if src_w <= 0 || src_h <= 0
+          scale = Math.min(box_w.to_f / src_w, box_h.to_f / src_h)
+          {Math.max((src_w * scale).round.to_i, 1), Math.max((src_h * scale).round.to_i, 1)}
+        end
+
+        # Decode an image file and resize it to target dimensions. Returns nil
+        # on failure. With `fit: true` the target is a bounding box the image
+        # is scaled into without distortion (its own dimensions come back on
+        # the CachedImage); otherwise it is stretched to exactly
+        # `target_w x target_h`.
+        def self.load_image(path : String, target_w : Int32, target_h : Int32,
+                            fit : Bool = false) : CachedImage?
           return unless File.exists?(path)
 
           src_w = uninitialized LibC::Int
@@ -161,6 +174,10 @@ module Hwaro
 
           begin
             return if src_w <= 0 || src_h <= 0
+
+            if fit
+              target_w, target_h = fit_dimensions(src_w.to_i32, src_h.to_i32, target_w, target_h)
+            end
 
             buf_size = target_w.to_i64 * target_h.to_i64 * 4
             return if buf_size > 64_000_000_i64 * 4
@@ -568,13 +585,21 @@ module Hwaro
               render_text_content(pixels, page, config, ctx, text_color, accent_color, bg_color)
             end
 
-            # 6. Logo image
+            # 6. Logo image. The logo occupies a LOGO_SIZE square box but is
+            # scaled to FIT it and centred inside, matching what the SVG
+            # renderer's `<image>` already does (its default
+            # preserveAspectRatio is "xMidYMid meet"). Stretching to the full
+            # square instead squashed every non-square logo — a 400x100
+            # wordmark came out as a 48x48 blob.
             if logo_image_path
               logo_x, logo_y = OgImage.logo_coordinates(ai.logo_position)
               if clogo = cached_logo
-                blit_cached_image(pixels, clogo, logo_x, logo_y)
+                blit_cached_image(pixels, clogo,
+                  logo_x + (OgImage::LOGO_SIZE - clogo.width) // 2,
+                  logo_y + (OgImage::LOGO_SIZE - clogo.height) // 2)
               else
-                composite_image(pixels, logo_image_path, logo_x, logo_y, OgImage::LOGO_SIZE, OgImage::LOGO_SIZE)
+                composite_image_fit(pixels, logo_image_path, logo_x, logo_y,
+                  OgImage::LOGO_SIZE, OgImage::LOGO_SIZE)
               end
             end
 
@@ -1148,6 +1173,18 @@ module Hwaro
         end
 
         # Composite an image file onto the pixel buffer, scaled to fit
+        # `composite_image` bounded by a box: the image is scaled to fit
+        # (no distortion) and centred inside `dw x dh` at `dx, dy`. Shares
+        # the decode+fit path with the cached-logo branch so both spellings
+        # place the logo identically.
+        private def self.composite_image_fit(pixels : UInt8*, image_path : String,
+                                             dx : Int32, dy : Int32, dw : Int32, dh : Int32)
+          fitted = load_image(image_path, dw, dh, fit: true)
+          return composite_image(pixels, image_path, dx, dy, dw, dh) unless fitted
+          blit_cached_image(pixels, fitted,
+            dx + (dw - fitted.width) // 2, dy + (dh - fitted.height) // 2)
+        end
+
         private def self.composite_image(pixels : UInt8*, image_path : String, dx : Int32, dy : Int32, dw : Int32, dh : Int32)
           return unless File.exists?(image_path)
 

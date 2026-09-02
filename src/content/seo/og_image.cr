@@ -101,7 +101,8 @@ module Hwaro
         # Bump to invalidate incremental OG caches when the renderer's
         # design changes without any config change (it feeds
         # compute_config_hash). rev 2: 2026-07 typography + style redesign.
-        RENDER_REVISION = 2
+        # rev 3: 2026-09 logo keeps its aspect ratio inside the LOGO_SIZE box.
+        RENDER_REVISION = 3
 
         # `default` ("masthead"): eyebrow on top, title anchored high.
         MASTHEAD_EYEBROW_Y    =  96 # eyebrow baseline
@@ -374,7 +375,10 @@ module Hwaro
 
           # Pre-decode and resize images once for PNG rendering
           if png_available
-            cached_logo = OgPngRenderer.load_image(logo_abs_path, LOGO_SIZE, LOGO_SIZE) if logo_abs_path
+            # `fit: true` — LOGO_SIZE is a bounding box, not a target shape;
+            # a non-square logo must keep its aspect ratio (the SVG renderer
+            # already does, via `<image>`'s default preserveAspectRatio).
+            cached_logo = OgPngRenderer.load_image(logo_abs_path, LOGO_SIZE, LOGO_SIZE, fit: true) if logo_abs_path
             cached_bg = OgPngRenderer.load_image(bg_abs_path, WIDTH, HEIGHT) if bg_abs_path
           end
 
