@@ -277,3 +277,90 @@ describe "build: output path occupied by a regular file" do
     end
   end
 end
+
+# =============================================================================
+# Pre-existing output directories hwaro did not create
+#
+# The guard refuses the catastrophic targets, but any OTHER existing
+# directory — `-o ~/Documents/site`, a `dist/` shared with a bundler — was
+# emptied by the cold build's `rm_rf` silently, exit 0. hwaro now clears only
+# what it can vouch for: the conventional `public/`, `hwaro serve` output,
+# and directories it created or found empty on an earlier build.
+# =============================================================================
+describe "build: output directory that already holds unrelated files" do
+  it "keeps the files, still publishes the site, and warns" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        FileUtils.mkdir_p("shared/sub")
+        File.write("shared/notes.txt", "keep")
+        File.write("shared/sub/deep.txt", "keep")
+
+        log = with_captured_log { run_build("shared").should be_true }
+
+        File.read("shared/notes.txt").should eq("keep")
+        File.read("shared/sub/deep.txt").should eq("keep")
+        File.exists?("shared/about/index.html").should be_true
+        log.should contain("already holds 2 entries hwaro did not write")
+
+        # Never handed over: the next cold build keeps them too.
+        run_build("shared").should be_true
+        File.exists?("shared/notes.txt").should be_true
+      end
+    end
+  end
+
+  it "clears a directory it created itself on the next cold build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        run_build("dist").should be_true
+        File.write("dist/stale.html", "stale")
+
+        log = with_captured_log { run_build("dist").should be_true }
+
+        File.exists?("dist/stale.html").should be_false
+        log.should_not contain("did not write")
+      end
+    end
+  end
+
+  it "clears a directory it found empty on an earlier build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        FileUtils.mkdir_p("dist")
+        run_build("dist").should be_true
+        File.write("dist/stale.html", "stale")
+        run_build("dist").should be_true
+        File.exists?("dist/stale.html").should be_false
+      end
+    end
+  end
+
+  it "still clears the conventional public/ directory" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        FileUtils.mkdir_p("public")
+        File.write("public/stale.html", "stale")
+        log = with_captured_log { run_build("public").should be_true }
+        File.exists?("public/stale.html").should be_false
+        log.should_not contain("did not write")
+      end
+    end
+  end
+
+  it "does not hand a foreign directory over through a --cache build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        guard_project(dir)
+        FileUtils.mkdir_p("shared")
+        File.write("shared/notes.txt", "keep")
+        run_build_cached("shared").should be_true
+        run_build("shared").should be_true
+        File.exists?("shared/notes.txt").should be_true
+      end
+    end
+  end
+end
