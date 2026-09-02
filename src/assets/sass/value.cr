@@ -69,6 +69,15 @@ module Hwaro
           to_css
         end
 
+        # CSS text for this value when it lands inside `#{...}`. dart-sass
+        # renders strings UNQUOTED at every nesting level there, so a list
+        # of quoted strings interpolates as `a, b` — `"a", "b"` would ship
+        # invalid CSS (`content: ""a", "b""`). Only `Str` and the
+        # containers that hold values override this.
+        def interp_css : String
+          to_css
+        end
+
         def truthy? : Bool
           true
         end
@@ -231,6 +240,10 @@ module Hwaro
           @quoted ? "#{@quote_char}#{@text}#{@quote_char}" : @text
         end
 
+        def interp_css : String
+          @text
+        end
+
         def eq?(other : Value) : Bool
           # Quoted and unquoted strings with the same text are equal
           # (dart-sass semantics).
@@ -298,13 +311,23 @@ module Hwaro
         end
 
         def to_css : String
+          serialize(&.to_css)
+        end
+
+        def interp_css : String
+          # Membership in the output is decided by `to_css` (that is what
+          # drops nulls), while each surviving member renders unquoted.
+          serialize(&.interp_css)
+        end
+
+        private def serialize(& : Value -> String) : String
           joiner =
             case @sep
             in Sep::Space then " "
             in Sep::Comma then ", "
             in Sep::Slash then " / "
             end
-          inner = @items.map(&.to_css).reject(&.empty?).join(joiner)
+          inner = @items.reject(&.to_css.empty?).map { |item| yield item }.join(joiner)
           @bracketed ? "[#{inner}]" : inner
         end
 

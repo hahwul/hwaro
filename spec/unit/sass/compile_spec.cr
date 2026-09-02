@@ -175,14 +175,17 @@ describe Hwaro::Assets::Sass do
       css.should contain("color: red;")
     end
 
-    it "does not unquote multi-token interpolation results" do
-      # Only ONE complete quoted string unquotes; a space-separated list of
-      # strings passes through verbatim (the subset boundary).
+    it "unquotes every string member of an interpolated list" do
+      # dart-sass renders strings unquoted at EVERY nesting level inside
+      # an interpolation, so a list of quoted strings comes out unquoted
+      # too. This used to stop at the single-string case, which shipped
+      # invalid CSS for a list (`content: ""a", "b""`).
+      # Verified against dart-sass 1.103: `font-family: a b;`.
       css = compile(<<-'SCSS')
         $pair: "a" "b";
         .x { font-family: #{$pair}; }
         SCSS
-      css.should contain(%q(font-family: "a" "b";))
+      css.should contain("font-family: a b;")
     end
 
     it "errors on pathological block nesting instead of overflowing the stack" do

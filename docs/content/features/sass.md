@@ -69,10 +69,10 @@ Hwaro implements a practical SCSS subset — the features hand-written site styl
 | `$variables` | ✅ with `!default` / `!global`, lexical scoping and shadowing |
 | Nested rules | ✅ including selector lists (cartesian combination) |
 | `&` parent selector | ✅ `&:hover`, `&.mod`, BEM `&__elem` / `&--mod` |
-| `#{...}` interpolation | ✅ selectors, property names, values, at-rule preludes, strings, `url()` — full expressions inside |
+| `#{...}` interpolation | ✅ selectors, property names, values, at-rule preludes, strings, `url()` — full expressions inside; strings render unquoted at every nesting level, lists included (`#{("a", "b")}` → `a, b`) |
 | Partials + `@use` | ✅ namespaces (`colors.$primary`), `as x`, `as *`, load-once, `with (...)` configuration |
 | `@forward` | ✅ `show` / `hide` filters, `as prefix-*` |
-| `@import` (Sass files) | ✅ classic global-merge semantics; plain-CSS forms pass through |
+| `@import` (Sass files) | ✅ classic global-merge semantics, including a partial that only `@forward`s (`@import "components"` → `components/_index.scss`); plain-CSS forms pass through |
 | `@mixin` / `@include` | ✅ default values, keyword arguments, variadic `$args...` (extra keywords land in `meta.keywords()`), spreads (keywords forward through `$args...`), `@content` blocks with arguments (`@content(1px)` / `@include m using ($a)`) |
 | `@function` / `@return` | ✅ user functions callable in values, defaults/keywords/variadic, recursion |
 | `@extend` + `%placeholders` | ✅ simple-selector targets, compound unification, `!optional`; un-extended placeholders never emit — see deviations |
@@ -81,7 +81,7 @@ Hwaro implements a practical SCSS subset — the features hand-written site styl
 | SassScript expressions | ✅ arithmetic (`+ - * / %`, classic slash-division rule), comparisons, `and`/`or`/`not`, strings, lists, maps — see deviations for `/` |
 | Unit conversion | ✅ `px`/`cm`/`mm`/`q`/`in`/`pt`/`pc`, `deg`/`grad`/`rad`/`turn`, `s`/`ms`, `Hz`/`kHz`, `dpi`/`dpcm`/`dppx` convert in arithmetic, comparisons, `==`, and `math.*` |
 | Nested properties | ✅ `font: 12px serif { family: sans; }` → `font`, `font-family` (recursive) |
-| Built-in functions | ✅ `sass:math` (incl. `log` / `hypot` / trigonometry), `sass:string` (incl. `insert` / `split`), `sass:list` (incl. `zip` / `set-nth` / `slash` / `is-bracketed`), `sass:map` (incl. `set` / `deep-merge`), `sass:meta` (incl. `keywords` / `variable-exists` / `function-exists` / `mixin-exists` / `content-exists` / `get-function` / `call`), `sass:selector` (string-level `parse` / `nest` / `append` / `unify` / `replace` / `is-superselector` / `simple-selectors` — `replace` shares the `@extend` subset's limits: compound `$original` only, no pseudo-class recursion, first prefix order only), `sass:color` subset (incl. `channel` / `hwb` / `ie-hex-str`) + legacy global names (`map-get`, `nth`, `darken`, `if()`, …) |
+| Built-in functions | ✅ `sass:math` (incl. `log` / `hypot` / trigonometry), `sass:string` (incl. `insert` / `split`), `sass:list` (incl. `zip` / `set-nth` / `slash` / `is-bracketed`), `sass:map` (incl. `set` / `deep-merge` / `deep-remove`), `sass:meta` (incl. `keywords` / `variable-exists` / `function-exists` / `mixin-exists` / `content-exists` / `get-function` / `call`), `sass:selector` (string-level `parse` / `nest` / `append` / `unify` / `replace` / `is-superselector` / `simple-selectors` — `replace` shares the `@extend` subset's limits: compound `$original` only, no pseudo-class recursion, first prefix order only), `sass:color` subset (incl. `channel` / `hwb` / `ie-hex-str`) + legacy global names (`map-get`, `nth`, `darken`, `if()`, …) |
 | Module constants | ✅ `math.$pi`, `math.$e`, `math.$epsilon`, `math.$max-safe-integer`, `math.$min-safe-integer`, `math.$max-number`, `math.$min-number` |
 | `@debug` / `@warn` / `@error` | ✅ `@error` fails the build with a located message |
 | `@at-root` | ✅ selector and block forms, `#{&}` suffixing, `(with: ...)` / `(without: ...)` queries |
@@ -138,7 +138,7 @@ $brand: #336699;
 | Alpha | `rgba($color, $alpha)`, `opacify` / `fade-in`, `transparentize` / `fade-out` |
 | Compound | `adjust-color`, `scale-color`, `change-color` |
 | Components | `red`, `green`, `blue`, `hue`, `saturation`, `lightness`, `alpha` / `opacity`, `color.channel` |
-| Misc | `ie-hex-str`, `color.hwb` |
+| Misc | `ie-hex-str`, `color.hwb` (both `color.hwb($h $w $b)` and `color.hwb($h, $w, $b)`) |
 
 The same functions are available under `sass:color` with the modern names — `color.adjust`, `color.scale`, `color.change`, `color.mix`, `color.complement`, `color.grayscale`, `color.invert`, and the component getters:
 

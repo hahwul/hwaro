@@ -1892,12 +1892,45 @@ module Hwaro
           saved_path = @path
           @path = display
           @load_stack << canonical
+          # `@forward` inside the imported sheet only STAGES members as the
+          # enclosing module's re-exports (`eval_forward`), so nothing landed
+          # in the importer's own scope: `@import "components"` — the classic
+          # spelling for a `components/_index.scss` that only `@forward`s its
+          # partials — left every forwarded `$var`/mixin/function undefined.
+          # dart-sass gives the importing file access to them, so diff the
+          # staging maps across the import and bind what it added.
+          fwd_vars_before = @forward_variables.dup
+          fwd_mixins_before = @forward_mixins.dup
+          fwd_fns_before = @forward_functions.dup
           begin
             # Classic import: evaluated inline in the current scope/sink.
             eval_nodes(sheet.children)
           ensure
             @load_stack.pop
             @path = saved_path
+          end
+          bind_imported_forwards(fwd_vars_before, fwd_mixins_before, fwd_fns_before)
+        end
+
+        # Bind members newly staged by `@forward`s inside a classic `@import`
+        # into the importing file's root scope. Only additions/changes are
+        # bound, so a `@forward` the importing file wrote itself (staged
+        # before this import ran) is left alone.
+        private def bind_imported_forwards(vars_before : Hash(String, String),
+                                           mixins_before : Hash(String, MixinClosure),
+                                           fns_before : Hash(String, SassFn)) : Nil
+          scope = @env.root
+          @forward_variables.each do |name, value|
+            next if vars_before[name]? == value
+            scope.variables[name] = value
+          end
+          @forward_mixins.each do |name, closure|
+            next if mixins_before[name]? == closure
+            scope.mixins[name] = closure
+          end
+          @forward_functions.each do |name, fn|
+            next if fns_before[name]? == fn
+            scope.functions[name] = fn
           end
         end
 
@@ -1974,7 +2007,11 @@ module Hwaro
           if node = Expr.parse(template)
             if Expr.computes?(node, self, force_div: true)
               begin
-                return Expr::Evaluator.new(self, force_div: true).eval(node).to_css
+                # `interp_css`, not `to_css`: inside `#{...}` dart-sass
+                # unquotes strings at every nesting level, so a list of
+                # quoted strings must render `a, b`. `unquote_interp` at the
+                # call site only ever handled the single-string case.
+                return Expr::Evaluator.new(self, force_div: true).eval(node).interp_css
               rescue ex : NamespacedEvalError
                 warn_namespaced(template, ex)
               rescue SoftEvalError
@@ -1982,7 +2019,22 @@ module Hwaro
               end
             end
           end
-          resolve_template(template, allow_vars: true)
+          unquote_list_interp(resolve_template(template, allow_vars: true))
+        end
+
+        # The verbatim path substitutes a variable's STORAGE text, which
+        # keeps strings quoted — correct for a value context, wrong inside
+        # `#{...}`. `#{$stack}` for `$stack: ("a", "b")` has to render
+        # `a, b`; the stored `"a", "b"` produced `content: ""a", "b""`.
+        # Only a text that round-trips exactly through a list is rewritten,
+        # so every other verbatim substitution stays byte-identical.
+        # (A lone quoted string is already handled by `unquote_interp`.)
+        private def unquote_list_interp(text : String) : String
+          return text unless text.includes?('"') || text.includes?('\'')
+          value = Expr.coerce(text)
+          return text unless value.is_a?(ListV)
+          return text unless value.to_css == text
+          value.interp_css
         end
 
         # At-rule preludes evaluate expressions only inside feature

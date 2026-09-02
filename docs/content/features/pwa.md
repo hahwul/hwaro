@@ -49,13 +49,24 @@ cache_strategy = "cache-first"
 
 ## Icon Sizing
 
-Icon sizes are automatically extracted from filenames:
+The `sizes` field of each icon is measured from the file itself — the real
+pixel dimensions read out of the PNG, JPEG, or BMP header. Browsers pick the
+install icon by this value, so a measured size is always preferred over a
+guess.
 
-| Filename | Detected Size |
-|----------|--------------|
-| `icon-192.png` | 192x192 |
-| `icon-512x512.png` | 512x512 |
-| `logo-180.svg` | 180x180 |
+| Icon | Declared `sizes` |
+|------|------------------|
+| `logo.png` (200x60 on disk) | 200x60 |
+| `icon-2024.jpg` (192x192 on disk) | 192x192 |
+| `favicon.svg` | `any` (scalable — no pixel size) |
+| `icon-192.png` (unreadable / missing) | 192x192 (from the filename) |
+| `icon-512x512.png` (unreadable / missing) | 512x512 (from the filename) |
+| `logo.webp`, `https://cdn.example/icon.png` | from the filename, else 512x512 |
+
+The filename heuristic is only a fallback: it applies to formats whose header
+Hwaro cannot read (WebP, ICO), to remote `http(s)://` icons, and to files whose
+bytes turn out to be unreadable — a build warning names the icon when that
+happens.
 
 Place icon files in your `static/` directory so they are copied to the build output.
 

@@ -23,6 +23,21 @@ private def write_png(path : String, width : UInt32, height : UInt32)
   File.write(path, io.to_slice)
 end
 
+# Write a minimal JPEG carrying just enough marker stream for the SOF0
+# frame header the dimension reader scans for.
+private def write_jpeg(path : String, width : UInt16, height : UInt16)
+  io = IO::Memory.new
+  io.write(Bytes[0xFF, 0xD8]) # SOI
+  io.write(Bytes[0xFF, 0xC0]) # SOF0
+  io.write_bytes(11_u16, IO::ByteFormat::BigEndian)
+  io.write_bytes(8_u8) # sample precision
+  io.write_bytes(height, IO::ByteFormat::BigEndian)
+  io.write_bytes(width, IO::ByteFormat::BigEndian)
+  io.write(Bytes[1, 1, 0x11, 0]) # one component
+  io.write(Bytes[0xFF, 0xD9])    # EOI
+  File.write(path, io.to_slice)
+end
+
 private def make_site(pwa_toml : String = "", base_url : String = "https://example.com") : Hwaro::Models::Site
   config_str = <<-TOML
     title = "Test Site"
@@ -260,6 +275,77 @@ describe Hwaro::Content::Seo::Pwa do
 
         manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
         manifest["icons"].as_a[0]["sizes"].as_s.should eq("256x256")
+      end
+    end
+
+    # The measurement used to be PNG-only, so a JPEG icon silently fell
+    # through to the filename heuristic: a 100x100 `tiny.jpg` was published
+    # as "512x512". Browsers pick the install icon by the declared `sizes`.
+    it "reads real JPEG dimensions for icon sizes" do
+      Dir.mktmpdir do |dir|
+        write_jpeg(File.join(dir, "tiny.jpg"), 100_u16, 100_u16)
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/tiny.jpg"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("100x100")
+      end
+    end
+
+    it "prefers JPEG header dimensions over a year-like number in the filename" do
+      Dir.mktmpdir do |dir|
+        write_jpeg(File.join(dir, "logo-2024.jpg"), 320_u16, 80_u16)
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/logo-2024.jpg"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("320x80")
+      end
+    end
+
+    it "falls back to the filename-derived size for an unreadable JPEG" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "icon-256.jpg"), "not a jpeg at all")
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/icon-256.jpg"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        manifest["icons"].as_a[0]["sizes"].as_s.should eq("256x256")
+      end
+    end
+
+    # A scalable icon has no pixel size; `any` is the manifest spec's
+    # spelling and is what keeps it eligible at every requested size.
+    it "declares sizes=any for an SVG icon" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "favicon.svg"), %(<svg xmlns="http://www.w3.org/2000/svg"/>))
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/favicon.svg"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        manifest = JSON.parse(File.read(File.join(dir, "manifest.json")))
+        icon = manifest["icons"].as_a[0]
+        icon["sizes"].as_s.should eq("any")
+        icon["type"].as_s.should eq("image/svg+xml")
       end
     end
 

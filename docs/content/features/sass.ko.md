@@ -69,10 +69,10 @@ Hwaro는 실용적인 SCSS 부분집합을 구현합니다 — 직접 작성하�
 | `$variables` | ✅ `!default` / `!global`, 렉시컬 스코프와 섀도잉 지원 |
 | 중첩 규칙 | ✅ 셀렉터 목록 포함(카테시안 조합) |
 | `&` 부모 셀렉터 | ✅ `&:hover`, `&.mod`, BEM `&__elem` / `&--mod` |
-| `#{...}` 보간 | ✅ 셀렉터, 속성 이름, 값, at-규칙 서두, 문자열, `url()` — 내부에서 전체 표현식 평가 |
+| `#{...}` 보간 | ✅ 셀렉터, 속성 이름, 값, at-규칙 서두, 문자열, `url()` — 내부에서 전체 표현식 평가. 문자열은 리스트 안까지 모든 중첩 수준에서 따옴표를 벗겨 출력합니다(`#{("a", "b")}` → `a, b`) |
 | 파셜 + `@use` | ✅ 네임스페이스(`colors.$primary`), `as x`, `as *`, 1회 로드, `with (...)` 설정 |
 | `@forward` | ✅ `show` / `hide` 필터, `as prefix-*` |
-| `@import`(Sass 파일) | ✅ 클래식 전역 병합 시맨틱, 순수 CSS 형태는 그대로 통과 |
+| `@import`(Sass 파일) | ✅ 클래식 전역 병합 시맨틱. `@forward`만 하는 파셜(`@import "components"` → `components/_index.scss`)도 포함하며, 순수 CSS 형태는 그대로 통과 |
 | `@mixin` / `@include` | ✅ 기본값, 키워드 인자, 가변 인자 `$args...`(남는 키워드는 `meta.keywords()`로 전달), 스프레드(키워드는 `$args...`를 통해 그대로 전달), 인자를 받는 `@content` 블록(`@content(1px)` / `@include m using ($a)`) |
 | `@function` / `@return` | ✅ 값 안에서 호출 가능한 사용자 함수, 기본값/키워드/가변 인자, 재귀 |
 | `@extend` + `%placeholders` | ✅ 단순 셀렉터 타깃, 컴파운드 통합, `!optional`. 확장되지 않은 플레이스홀더는 출력되지 않음 — 차이점 참고 |
@@ -81,7 +81,7 @@ Hwaro는 실용적인 SCSS 부분집합을 구현합니다 — 직접 작성하�
 | SassScript 표현식 | ✅ 산술(`+ - * / %`, 클래식 슬래시 나눗셈 규칙), 비교, `and`/`or`/`not`, 문자열, 리스트, 맵 — `/`는 차이점 참고 |
 | 단위 변환 | ✅ `px`/`cm`/`mm`/`q`/`in`/`pt`/`pc`, `deg`/`grad`/`rad`/`turn`, `s`/`ms`, `Hz`/`kHz`, `dpi`/`dpcm`/`dppx`가 산술·비교·`==`·`math.*`에서 변환됨 |
 | 중첩 속성 | ✅ `font: 12px serif { family: sans; }` → `font`, `font-family` (재귀 적용) |
-| 내장 함수 | ✅ `sass:math`(`log` / `hypot` / 삼각함수 포함), `sass:string`(`insert` / `split` 포함), `sass:list`(`zip` / `set-nth` / `slash` / `is-bracketed` 포함), `sass:map`(`set` / `deep-merge` 포함), `sass:meta`(`keywords` / `variable-exists` / `function-exists` / `mixin-exists` / `content-exists` / `get-function` / `call` 포함), `sass:selector`(문자열 수준의 `parse` / `nest` / `append` / `unify` / `replace` / `is-superselector` / `simple-selectors` — `replace`는 `@extend` 부분집합과 같은 제약을 공유합니다: `$original`은 컴파운드만, 의사 클래스 재귀 없음, 첫 번째 접두 순서만), `sass:color` 부분집합(`channel` / `hwb` / `ie-hex-str` 포함) + 레거시 전역 이름(`map-get`, `nth`, `darken`, `if()` 등) |
+| 내장 함수 | ✅ `sass:math`(`log` / `hypot` / 삼각함수 포함), `sass:string`(`insert` / `split` 포함), `sass:list`(`zip` / `set-nth` / `slash` / `is-bracketed` 포함), `sass:map`(`set` / `deep-merge` / `deep-remove` 포함), `sass:meta`(`keywords` / `variable-exists` / `function-exists` / `mixin-exists` / `content-exists` / `get-function` / `call` 포함), `sass:selector`(문자열 수준의 `parse` / `nest` / `append` / `unify` / `replace` / `is-superselector` / `simple-selectors` — `replace`는 `@extend` 부분집합과 같은 제약을 공유합니다: `$original`은 컴파운드만, 의사 클래스 재귀 없음, 첫 번째 접두 순서만), `sass:color` 부분집합(`channel` / `hwb` / `ie-hex-str` 포함) + 레거시 전역 이름(`map-get`, `nth`, `darken`, `if()` 등) |
 | 모듈 상수 | ✅ `math.$pi`, `math.$e`, `math.$epsilon`, `math.$max-safe-integer`, `math.$min-safe-integer`, `math.$max-number`, `math.$min-number` |
 | `@debug` / `@warn` / `@error` | ✅ `@error`는 위치 정보가 담긴 메시지로 빌드를 실패시킴 |
 | `@at-root` | ✅ 셀렉터 형태와 블록 형태, `#{&}` 접미, `(with: ...)` / `(without: ...)` 쿼리 |
@@ -138,7 +138,7 @@ $brand: #336699;
 | 알파 | `rgba($color, $alpha)`, `opacify` / `fade-in`, `transparentize` / `fade-out` |
 | 복합 | `adjust-color`, `scale-color`, `change-color` |
 | 성분 조회 | `red`, `green`, `blue`, `hue`, `saturation`, `lightness`, `alpha` / `opacity`, `color.channel` |
-| 기타 | `ie-hex-str`, `color.hwb` |
+| 기타 | `ie-hex-str`, `color.hwb`(`color.hwb($h $w $b)`와 `color.hwb($h, $w, $b)` 모두) |
 
 같은 함수들을 `sass:color` 모듈의 최신 이름으로도 쓸 수 있습니다 — `color.adjust`, `color.scale`, `color.change`, `color.mix`, `color.complement`, `color.grayscale`, `color.invert`, 그리고 성분 조회 함수들입니다.
 
