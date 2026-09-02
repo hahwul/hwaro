@@ -394,9 +394,9 @@ module Hwaro
             )
           end
 
-          date = parse_toml_time(toml_fm["date"]?)
-          updated = parse_toml_time(toml_fm["updated"]?)
-          expires = parse_toml_time(toml_fm["expires"]?)
+          date = parse_toml_time(toml_fm["date"]?, "date", file_path)
+          updated = parse_toml_time(toml_fm["updated"]?, "updated", file_path)
+          expires = parse_toml_time(toml_fm["expires"]?, "expires", file_path)
 
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
@@ -467,9 +467,9 @@ module Hwaro
           end
           return unless yaml_fm.as_h?
 
-          date = parse_yaml_time(yaml_fm["date"]?)
-          updated = parse_yaml_time(yaml_fm["updated"]?)
-          expires = parse_yaml_time(yaml_fm["expires"]?)
+          date = parse_yaml_time(yaml_fm["date"]?, "date", file_path)
+          updated = parse_yaml_time(yaml_fm["updated"]?, "updated", file_path)
+          expires = parse_yaml_time(yaml_fm["expires"]?, "expires", file_path)
 
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
@@ -536,9 +536,9 @@ module Hwaro
           fm_hash = json_fm.as_h?
           return unless fm_hash
 
-          date = parse_time(json_fm["date"]?.try(&.as_s?))
-          updated = parse_time(json_fm["updated"]?.try(&.as_s?))
-          expires = parse_time(json_fm["expires"]?.try(&.as_s?))
+          date = parse_time(json_fm["date"]?.try(&.as_s?), "date", file_path)
+          updated = parse_time(json_fm["updated"]?.try(&.as_s?), "updated", file_path)
+          expires = parse_time(json_fm["expires"]?.try(&.as_s?), "expires", file_path)
 
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
@@ -1109,13 +1109,13 @@ module Hwaro
         end
 
         # Parse a TOML value that may be a native Time or a String
-        private def parse_toml_time(val : TOML::Any?) : Time?
+        private def parse_toml_time(val : TOML::Any?, key : String = "date", file_path : String = "") : Time?
           return unless val
           raw = val.raw
           if raw.is_a?(Time)
             raw
           else
-            parse_time(val.as_s?)
+            parse_time(val.as_s?, key, file_path)
           end
         end
 
@@ -1123,19 +1123,27 @@ module Hwaro
         # YAML date (`date: 2024-03-15`) resolves to a native Time node, so the
         # old `.as_s?` returned nil and silently dropped the date — breaking
         # sorting/feeds/sitemap. Mirrors parse_toml_time and content_lister.cr.
-        private def parse_yaml_time(val : YAML::Any?) : Time?
+        private def parse_yaml_time(val : YAML::Any?, key : String = "date", file_path : String = "") : Time?
           return unless val
           if t = val.as_time?
             t
           else
-            parse_time(val.as_s?)
+            parse_time(val.as_s?, key, file_path)
           end
         end
 
         # Unparseable and out-of-range dates return nil so the rest of the
-        # front matter survives instead of the exception unwinding the parse.
-        private def parse_time(time_str : String?) : Time?
-          Utils::DateUtils.parse_content_date(time_str)
+        # front matter survives instead of the exception unwinding the parse —
+        # but not silently: `date = "2026-13-45"` or `date = "Sept 1, 2026"`
+        # used to make the page undated (sorted last, missing from date-based
+        # listings) with no feedback at all, while `tool validate` flagged it.
+        # Library callers (no file_path) keep the quiet nil.
+        private def parse_time(time_str : String?, key : String = "date", file_path : String = "") : Time?
+          parsed = Utils::DateUtils.parse_content_date(time_str)
+          if parsed.nil? && time_str && !time_str.strip.empty? && !file_path.empty?
+            Logger.warn "#{file_path}: `#{key}` #{time_str.inspect} is not a recognised date (use YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or RFC 3339) — treating it as unset."
+          end
+          parsed
         end
 
         # Extract named-menu front-matter registrations. Accepts the plural

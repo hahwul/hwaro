@@ -919,11 +919,47 @@ describe Hwaro::Content::Processors::Template do
           config = Hwaro::Models::Config.new
           context = Hwaro::Content::Processors::TemplateContext.new(page, config)
 
+          Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
           template = "[{{ load_data(path=\"../../../etc/passwd\") }}]"
-          result = Hwaro::Content::Processors::Template.process(template, context)
-          # Boundary check fails -> result stays Crinja nil. Crinja renders nil
-          # as the literal "none", so the traversal yields no file contents.
-          result.should eq("[none]")
+          log = with_captured_log do
+            result = Hwaro::Content::Processors::Template.process(template, context)
+            # Boundary check fails -> result stays Crinja nil. Crinja renders nil
+            # as the literal "none", so the traversal yields no file contents.
+            result.should eq("[none]")
+          end
+          # Refused either way — as "outside the project" when the target
+          # exists, or as "not a file" when the climb lands nowhere.
+          log.should contain("load_data(\"../../../etc/passwd\")")
+          log.should contain("the template receives none")
+        end
+      end
+    end
+
+    # A typo'd path rendered as a bare `none` with nothing in the log, so an
+    # empty menu built from `load_data(path="data/meun.json")` looked exactly
+    # like an intentionally empty one. Warn once per path per build, not once
+    # per page.
+    it "load_data warns once per build about a missing file" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+          page = Hwaro::Models::Page.new("test.md")
+          config = Hwaro::Models::Config.new
+          context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+          template = "[{{ load_data(path=\"data/meun.json\") }}]"
+          log = with_captured_log do
+            Hwaro::Content::Processors::Template.process(template, context).should eq("[none]")
+            Hwaro::Content::Processors::Template.process(template, context).should eq("[none]")
+          end
+          log.scan("load_data(\"data/meun.json\") is not a file").size.should eq(1)
+
+          # The next build must report it again.
+          Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+          log = with_captured_log do
+            Hwaro::Content::Processors::Template.process(template, context)
+          end
+          log.should contain("load_data(\"data/meun.json\") is not a file")
         end
       end
     end
