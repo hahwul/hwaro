@@ -103,6 +103,19 @@ describe Hwaro::Content::Processors::InlineMarkdown do
       (Time.monotonic - started).should be < 5.seconds
       out.should eq(input)
     end
+
+    # The placeholder restore ran one whole-string `gsub` per code span, so a
+    # cell with N spans was O(N²) even after the scan itself became linear:
+    # 20k spans took ~10 s. One pass per token kind now.
+    it "restores many code spans in linear time" do
+      input = Array.new(20_000) { |i| "`c#{i}`" }.join(" ")
+      started = Time.monotonic
+      out = Hwaro::Content::Processors::InlineMarkdown.render(input)
+      (Time.monotonic - started).should be < 3.seconds
+      out.should start_with("<code>c0</code> <code>c1</code>")
+      out.should end_with("<code>c19999</code>")
+      out.should_not contain("\x00")
+    end
   end
 end
 

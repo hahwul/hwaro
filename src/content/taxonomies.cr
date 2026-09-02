@@ -215,6 +215,10 @@ module Hwaro
 
         site.pages.each do |page|
           next if page.excluded_from_listings?
+          # Set by the render phase for pages it refused to write (URL
+          # traverses out of the output dir): the term page would link a
+          # 404 and the term feed would advertise it.
+          next if page.output_suppressed
 
           enabled_taxonomy_names.each do |tax_name|
             values = page.taxonomy_values(tax_name)
@@ -251,6 +255,9 @@ module Hwaro
 
         site.pages.each do |page|
           next if page.excluded_from_listings?
+          # Runs at generate time, after the render phase flagged the pages
+          # it refused to write — keep them off the term pages and feeds.
+          next if page.output_suppressed
 
           config.taxonomies.each do |taxonomy|
             name = taxonomy.name

@@ -166,3 +166,71 @@ describe "Sass @import of a forwarding partial: members bind into the importing 
     css.should contain(".after {\n  padding: 50px;")
   end
 end
+
+# Review follow-up on #778: the import used to diff the module-wide staging
+# maps before/after, so a SECOND import of the same forwarding index (another
+# block, a second @include, root after nested, or after the importer's own
+# @forward of the partial) saw "nothing new" and bound nothing — undefined
+# variable/mixin on valid Sass. The implicit configuration also read only the
+# root scope, so a block-local override was overwritten by the module default.
+describe "Sass @import of a forwarding partial: repeated imports and nested scopes" do
+  it "binds the forwarded members again when a second block imports the same index" do
+    css = compile_entry(FORWARDING_INDEX.merge({
+      "entry.scss" => %(.wrap { @import "components"; }\n.other { @import "components"; padding: $btn-pad; @include btn; }\n),
+    }))
+    css.should contain(".other {\n  padding: 8px;\n  padding: 8px;")
+  end
+
+  it "binds at the root after the same index was imported inside a block" do
+    css = compile_entry(FORWARDING_INDEX.merge({
+      "entry.scss" => %(.wrap { @import "components"; }\n@import "components";\n.z { padding: $btn-pad; }\n),
+    }))
+    css.should contain(".z {\n  padding: 8px;")
+  end
+
+  it "binds on every @include of a mixin that imports the index" do
+    css = compile_entry(FORWARDING_INDEX.merge({
+      "entry.scss" => %(@mixin wrap { @import "components"; padding: $btn-pad; }\n.z { @include wrap; }\n.y { @include wrap; }\n),
+    }))
+    css.should contain(".z {\n  padding: 8px;")
+    css.should contain(".y {\n  padding: 8px;")
+  end
+
+  it "binds after the importer already @forward-ed the same partial" do
+    css = compile_entry(FORWARDING_INDEX.merge({
+      "entry.scss" => %(@forward "components/button";\n@import "components";\n.z { padding: $btn-pad; }\n),
+    }))
+    css.should contain(".z {\n  padding: 8px;")
+  end
+
+  it "configures the forwarded module from a block-local variable" do
+    css = compile_entry(FORWARDING_INDEX.merge({
+      "entry.scss" => %(.wrap { $btn-pad: 99px; @import "components"; .z { padding: $btn-pad; @include btn; } }\n),
+    }))
+    css.should contain("padding: 99px;\n  padding: 99px;")
+    css.should_not contain("8px")
+  end
+
+  it "lets the innermost scope win over a global for the implicit configuration" do
+    css = compile_entry(FORWARDING_INDEX.merge({
+      "entry.scss" => %($btn-pad: 99px;\n.wrap { $btn-pad: 50px; @import "components"; .z { padding: $btn-pad; } }\n),
+    }))
+    css.should contain("padding: 50px;")
+  end
+
+  it "does not re-export members a nested @import forwarded inside a @use-d module" do
+    files = FORWARDING_INDEX.merge({
+      "_theme.scss" => %(.m { @import "components"; padding: $btn-pad; }\n),
+      "entry.scss"  => %(@use "theme";\n.z { padding: theme.$btn-pad; }\n),
+    })
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /btn-pad/) { compile_entry(files) }
+  end
+
+  it "still re-exports members a root-level @import forwarded inside a @use-d module" do
+    css = compile_entry(FORWARDING_INDEX.merge({
+      "_theme.scss" => %(@import "components";\n),
+      "entry.scss"  => %(@use "theme";\n.z { padding: theme.$btn-pad; }\n),
+    }))
+    css.should contain(".z {\n  padding: 8px;")
+  end
+end

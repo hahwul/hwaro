@@ -758,8 +758,12 @@ module Hwaro
             # bare basename anywhere would have declared `/nowhere/rss.xml`
             # live, hiding exactly the dead link this command exists to find.
             getter feed_filename : String?
+            # The filename section and language feeds are written under —
+            # always `rss.xml`/`atom.xml` from `[feeds] type`, regardless of
+            # the root feed's `filename` or `enabled` (see `Seo::Feeds`).
+            getter section_feed_filename : String?
 
-            def initialize(@paths : Set(String) = Set(String).new, @feed_filename : String? = nil)
+            def initialize(@paths : Set(String) = Set(String).new, @feed_filename : String? = nil, @section_feed_filename : String? = nil)
             end
 
             def matches?(url : String) : Bool
@@ -793,21 +797,39 @@ module Hwaro
               end
             end
 
-            GeneratedRoutes.new(paths, feed_filename)
+            GeneratedRoutes.new(paths, feed_filename, default_feed_filename(config.feeds.type))
           end
 
           # `/posts/rss.xml` / `/ko/rss.xml` / `/ko/posts/rss.xml` — a feed the
           # build emits beside a section or under a language prefix. The root
           # feed is already an exact path, so this only has to vouch for the
           # prefixed forms, and only when the prefix resolves to a section.
+          #
+          # Two different filenames are in play (see `Seo::Feeds.generate`):
+          # the ROOT feed honours `[feeds] filename` and `[feeds] enabled`,
+          # while section and language feeds are always written as
+          # `rss.xml`/`atom.xml` (from `[feeds] type`) and a section feed is
+          # gated by the section's own `generate_feeds`, not by the global
+          # switch. Keying the section route on the root feed's name and
+          # switch reported `/posts/rss.xml` dead on a site with `[feeds]
+          # enabled = false` + `generate_feeds = true` (the build writes it)
+          # and live as `/posts/feed.xml` under `filename = "feed.xml"` (the
+          # build never writes it).
           private def feed_route?(url : String, routes : GeneratedRoutes, content_dir : String, base_dir : String, language_codes : Array(String)) : Bool
-            name = routes.feed_filename
-            return false unless name
             return false unless url.starts_with?("/")
-            return false unless File.basename(url) == name
+            basename = File.basename(url)
+            if basename == routes.feed_filename
+              prefix = url[0, url.size - basename.size].rstrip("/")
+              return true if prefix.empty?
+            end
+            name = routes.section_feed_filename
+            return false unless name
+            return false unless basename == name
 
             prefix = url[0, url.size - name.size].rstrip("/")
-            return true if prefix.empty?
+            # `/rss.xml` at the root is only a route when the ROOT feed is
+            # enabled under that name — handled above.
+            return false if prefix.empty?
 
             segments = prefix.lstrip("/").split("/")
             if (code = segments.first?) && language_codes.includes?(code)

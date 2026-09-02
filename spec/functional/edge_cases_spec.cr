@@ -734,6 +734,42 @@ describe "Edge Cases: Duplicate output path detection" do
     log.should contain("Not publishing posts/traversal.md")
   end
 
+  # The section feed and the taxonomy term feed/page only deduped by URL, so
+  # the traversal page's UNIQUE `/posts/../../escape/` still rode into
+  # `posts/rss.xml`, `tags/t/rss.xml` and the term listing.
+  it "keeps a refused page out of section feeds, taxonomy feeds and term pages" do
+    with_captured_log do
+      build_site(
+        <<-TOML,
+          title = "Test Site"
+          base_url = "http://localhost"
+          [feeds]
+          enabled = true
+          [[taxonomies]]
+          name = "tags"
+          feed = true
+          TOML
+        content_files: {
+          "posts/_index.md"    => "---\ntitle: Posts\ngenerate_feeds: true\n---\n",
+          "posts/ok.md"        => "---\ntitle: Ok\ntags: [t]\n---\nOK-BODY",
+          "posts/traversal.md" => "---\ntitle: Traversal\ntags: [t]\nslug: ../../escape\n---\nESCAPE-BODY",
+        },
+        template_files: {
+          "page.html"          => "{{ content }}",
+          "section.html"       => "{{ content }}",
+          "taxonomy.html"      => "{{ content }}",
+          "taxonomy_term.html" => "{{ content }}",
+        },
+      ) do
+        section_feed = File.read("public/posts/rss.xml")
+        section_feed.should contain("Ok")
+        section_feed.should_not contain("escape")
+        File.read("public/tags/t/rss.xml").should_not contain("escape")
+        File.read("public/tags/t/index.html").should_not contain("escape")
+      end
+    end
+  end
+
   # A Markdown link destination cannot hold a raw space, so a page whose slug
   # has one rendered as `- [T](http://localhost/posts/custom slug/)` — not a
   # link at all. The sitemap already percent-encoded; llms.txt and the alias

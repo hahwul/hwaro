@@ -191,6 +191,7 @@ ignore = [
 | `default-language-undefined` | config | default_language에 대응하는 `[languages.<code>]` 없음 |
 | `markdown-math-engine-invalid` | config | 지원하지 않는 markdown.math_engine |
 | `pwa-cache-strategy-invalid` | config | 지원하지 않는 pwa.cache_strategy |
+| `pwa-display-invalid` | config | 지원하지 않는 pwa.display |
 | `image-processing-widths-empty` | config | image_processing이 켜져 있으나 widths가 비어 있음 (무음 no-op) |
 | `deployment-target-undefined` | config | deployment.target에 대응하는 `[[deployment.targets]]` 없음 |
 | `related-taxonomy-undefined` | config | `[related]`가 정의되지 않은 택소노미를 참조 |

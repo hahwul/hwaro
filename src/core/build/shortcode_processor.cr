@@ -460,14 +460,55 @@ module Hwaro
         }
 
         # True when a BLOCK_OPEN_RE match is really a Jinja control tag, not a
-        # shortcode opener. Parenthesized args are decisive: no Jinja control
-        # form matching BLOCK_OPEN_RE carries `name(...)` (Jinja's own
-        # `{% include "x.html" %}` / `{% call(u) m(l) %}` don't match the
-        # regex at all), so `{% include(name="promo") %}` is a user shortcode
-        # named `include` and must keep expanding.
+        # shortcode opener. `{% include(name="promo") %}` — the keyword hugging
+        # one balanced argument group — is a user shortcode named `include`
+        # and must keep expanding; Jinja's own `{% include "x.html" %}` never
+        # matches the regex. But a keyword's CONDITION can be parenthesized
+        # too (`{% if (a and b) or (c) %}` in the blog scaffold), and the
+        # regex's `name(...)` branch swallows it whole, so the group shape is
+        # what decides.
         private def control_tag_open?(m : Regex::MatchData) : Bool
-          return false if m[2]? # `name(...)` form — unambiguously a shortcode call
-          CRINJA_CONTROL_KEYWORDS.includes?(m[1].downcase)
+          return false unless CRINJA_CONTROL_KEYWORDS.includes?(m[1].downcase)
+          args = m[2]?
+          return true unless args # bare / `key=value` form of a keyword
+          # `name(...)` form on a keyword. A shortcode call hugs its name and
+          # encloses every argument in ONE balanced group; a Jinja condition
+          # such as `{% if (a and b) or (c) %}` or `{% elif (x) %}` puts
+          # whitespace between the keyword and the group, or closes the group
+          # before the tag's last `)`. Either shape is Jinja, not a shortcode.
+          return true if m.byte_begin(2) - 1 > m.byte_end(1)
+          !single_paren_group?(args)
+        end
+
+        # True when `args` (the text between a tag's first `(` and last `)`)
+        # never returns to depth zero before its end, i.e. the surrounding
+        # parens form one group. Parens inside quoted strings are skipped.
+        private def single_paren_group?(args : String) : Bool
+          depth = 0
+          quote : Char? = nil
+          escaped = false
+          args.each_char do |ch|
+            if quote
+              if escaped
+                escaped = false
+              elsif ch == '\\'
+                escaped = true
+              elsif ch == quote
+                quote = nil
+              end
+              next
+            end
+            case ch
+            when '"', '\''
+              quote = ch
+            when '('
+              depth += 1
+            when ')'
+              return false if depth == 0
+              depth -= 1
+            end
+          end
+          true
         end
 
         # Next BLOCK_OPEN_RE match at or after byte offset `from` that is a

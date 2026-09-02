@@ -166,7 +166,7 @@ describe "Template error location reporting" do
 
     err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
     message = err.message.not_nil!
-    message.should contain("step must not be zero")
+    message.should contain("step must be a non-zero integer")
     message.should contain("templates/page.html:3:")
   end
 
@@ -188,5 +188,54 @@ describe "Template error location reporting" do
     message = err.message.not_nil!
     message.should contain("templates/page.html:2:1")
     message.should_not contain("templates/page.html:1:")
+  end
+end
+
+# Review follow-ups on #775: the located-error wrap covered filters, tests and
+# calls, but not operators, and `Crinja::TemplateNotFoundError` inherits
+# `Exception` so a missing include/extends target escaped every rescue.
+describe "Template error location: operators and missing templates" do
+  it "locates a division by zero in a binary expression" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello"},
+        template_files: {"page.html" => "<html>\n\n{{ 10 // 0 }}\n</html>"},
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    message = err.message.not_nil!
+    message.should contain("Division by 0")
+    message.should contain("templates/page.html:3:")
+  end
+
+  it "locates a missing {% include %} target at the referencing tag" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello"},
+        template_files: {"page.html" => "<html>\n\n{% include \"missing.html\" %}\n</html>"},
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    message = err.message.not_nil!
+    message.should contain("missing.html")
+    message.should contain("templates/page.html:3:")
+  end
+
+  it "prints a wrapped cause once, not as message plus cause" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello"},
+        template_files: {"page.html" => "<html>\n\n{{ [1, 2] | slice(0) }}\n</html>"},
+      ) { }
+    end
+
+    message = err.message.not_nil!
+    message.should contain("Division by 0")
+    message.should_not contain("cause: Division by 0")
   end
 end

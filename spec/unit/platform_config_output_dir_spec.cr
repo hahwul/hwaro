@@ -76,3 +76,29 @@ describe "PlatformConfig honors [build] output_dir" do
     generator.generate("gitlab-ci").should contain(%(      - "my \\"site\\" out"))
   end
 end
+
+describe "PlatformConfig normalizes [build] output_dir" do
+  it "treats ./public and public/ as the default directory" do
+    %w[./public public/ ./public/].each do |dir|
+      generator = platform_config_with(dir)
+      generator.generate("gitlab-ci").should_not contain("publish:")
+      generator.generate("cloudflare").should contain(%(bucket = "./public"))
+      generator.generate("netlify").should contain(%(publish = "public"))
+    end
+  end
+
+  it "normalizes a ./-prefixed custom directory" do
+    generator = platform_config_with("./build/out/")
+    generator.generate("netlify").should contain(%(publish = "build/out"))
+    generator.generate("cloudflare").should contain(%(bucket = "./build/out"))
+  end
+
+  it "falls back to public for an absolute output_dir and says so" do
+    generator = platform_config_with("/tmp/hwaro-abs-out")
+    log = with_captured_log do
+      generator.generate("netlify").should contain(%(publish = "public"))
+    end
+    log.should contain("absolute")
+    generator.generate("gitlab-ci").should_not contain("/tmp/hwaro-abs-out")
+  end
+end

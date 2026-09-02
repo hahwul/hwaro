@@ -292,6 +292,9 @@ describe "hwaro tool ci" do
       # Co-signal: the actual workflow content was also generated to stdout,
       # confirming the deprecation log didn't short-circuit the command.
       output.should contain("workflow")
+      # The spacer under the notice belongs to stderr too: `--stdout >
+      # deploy.yml` must not start the file with a blank line.
+      output.should_not start_with("\n")
     end
   end
 end

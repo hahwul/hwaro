@@ -1485,3 +1485,12 @@ describe "now() function" do
     ex.message.not_nil!.should contain("invalid date format")
   end
 end
+
+describe "first/last filters on undefined input" do
+  # `{{ get_section(path='nope').pages | first }}` or a missing
+  # `page.extra.images | first`: Jinja2 iterates an Undefined as nothing, so
+  # `first` yields Undefined instead of a fatal TypeError.
+  it "returns undefined instead of raising when the target is undefined" do
+    render_filter("<{{ nope | first }}|{{ nope | last }}>").should eq("<|>")
+  end
+end

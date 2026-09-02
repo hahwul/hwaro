@@ -143,6 +143,8 @@ module Hwaro
           # variables from it (see `forward_config`); nil outside an import
           # and inside any `@use` (which never inherits it).
           @import_config = nil.as(Hash(String, String)?)
+          @last_load_cached = false
+          @reimported_forward_vars = Set(String).new
           # @extend requests, applied document-wide as a post-pass —
           # deliberately NOT saved/restored around module loads.
           @extends = [] of Extend::Request
@@ -1681,6 +1683,7 @@ module Hwaro
             mod = BUILTIN_MODULES[name]?
             error_at(line, column, "unknown built-in module \"sass:#{name}\"") unless mod
             error_at(line, column, "built-in modules can't be configured") unless config.empty? || implicit
+            @last_load_cached = true
             return mod
           end
 
@@ -1690,8 +1693,10 @@ module Hwaro
               error_at(line, column,
                 "#{@importer.display_path(canonical)} was already loaded and can't be configured a second time")
             end
+            @last_load_cached = true
             return mod
           end
+          @last_load_cached = false
 
           check_cycle(canonical, line, column)
           display = @importer.display_path(canonical)
@@ -1823,10 +1828,12 @@ module Hwaro
           prefix = node.prefix
           config = forward_config(node, prefix)
           mod = load_module(node.url, node.line, node.column, config, implicit: !config.empty?)
+          cached = @last_load_cached
           mod.variables.each do |name, value|
             exported = prefix ? prefix + name : name
             next unless forward_visible?(node, "$" + exported)
             @forward_variables[exported] = value
+            @reimported_forward_vars << exported if cached
           end
           mod.mixins.each do |name, closure|
             exported = prefix ? prefix + name : name
@@ -1959,16 +1966,29 @@ module Hwaro
           # in the importer's own scope: `@import "components"` — the classic
           # spelling for a `components/_index.scss` that only `@forward`s its
           # partials — left every forwarded `$var`/mixin/function undefined.
-          # dart-sass gives the importing file access to them, so diff the
-          # staging maps across the import and bind what it added.
-          fwd_vars_before = @forward_variables.dup
-          fwd_mixins_before = @forward_mixins.dup
-          fwd_fns_before = @forward_functions.dup
+          # dart-sass gives the importing file access to them. Stage the
+          # import's forwards into FRESH maps, bind everything it staged, and
+          # only then fold them into the enclosing module's re-exports.
+          #
+          # Fresh maps rather than a before/after diff of the module-wide
+          # ones: the diff saw a second import of the same index (another
+          # block, a second `@include`, root after nested, or after the
+          # importer's own `@forward` of the same partial) as "nothing new"
+          # and bound nothing, so `$btn-pad` was undefined on the very
+          # pattern #773 set out to fix.
+          saved_fwd_vars = @forward_variables
+          saved_fwd_mixins = @forward_mixins
+          saved_fwd_fns = @forward_functions
+          staged_vars = @forward_variables = {} of String => String
+          staged_mixins = @forward_mixins = {} of String => MixinClosure
+          staged_fns = @forward_functions = {} of String => SassFn
+          saved_reimported = @reimported_forward_vars
+          reimported = @reimported_forward_vars = Set(String).new
           saved_import_config = @import_config
-          # dart-sass "implicit configuration": the importer's globals, as
+          # dart-sass "implicit configuration": the importer's variables, as
           # they stand when the import runs, configure the `!default`
           # variables of every module the imported sheet `@forward`s.
-          @import_config = @env.root.variables.dup
+          @import_config = implicit_import_config
           begin
             # Classic import: evaluated inline in the current scope/sink.
             eval_nodes(sheet.children)
@@ -1976,35 +1996,72 @@ module Hwaro
             @load_stack.pop
             @path = saved_path
             @import_config = saved_import_config
+            @forward_variables = saved_fwd_vars
+            @forward_mixins = saved_fwd_mixins
+            @forward_functions = saved_fwd_fns
+            @reimported_forward_vars = saved_reimported
           end
-          bind_imported_forwards(fwd_vars_before, fwd_mixins_before, fwd_fns_before)
+          bind_imported_forwards(staged_vars, staged_mixins, staged_fns, reimported)
+          # Only a root-level import re-exports what it forwarded (dart-sass
+          # `importForwards`: nested imports go to `_nestedForwardedModules`
+          # and never leave the module), so `.m { @import "components"; }`
+          # inside a `@use`d sheet does not publish `$btn-pad` on it.
+          if @env.root?
+            @forward_variables.merge!(staged_vars)
+            @forward_mixins.merge!(staged_mixins)
+            @forward_functions.merge!(staged_fns)
+          end
         end
 
-        # Bind members newly staged by `@forward`s inside a classic `@import`
-        # into the importing scope. Only additions/changes are bound, so a
-        # `@forward` the importing file wrote itself (staged before this
-        # import ran) is left alone.
+        # The variables visible where an `@import` runs, innermost scope
+        # winning — dart-sass `Environment#toImplicitConfiguration` walks
+        # every enclosing scope, not just the root, so a block-local
+        # `.wrap { $btn-pad: 99px; @import "components"; }` configures the
+        # forwarded module the same way a global does. Snapshotting only the
+        # root missed that override, and `bind_imported_forwards` then wrote
+        # the module's `8px` default over the author's block-local value.
+        private def implicit_import_config : Hash(String, String)
+          chain = [] of Environment
+          env : Environment? = @env
+          while env
+            chain << env
+            env = env.parent
+          end
+          config = {} of String => String
+          chain.reverse_each { |scope| config.merge!(scope.variables) }
+          config
+        end
+
+        # Bind the members an `@import` staged through its `@forward`s into
+        # the importing scope.
         #
         # The CURRENT scope, not the root: a nested import (`.wrap { @import
         # "components"; }`) scopes its members to the block in dart-sass,
         # exactly as this evaluator already scopes the variables of a plain
         # nested import. Binding to the root leaked `$btn-pad` to rules
         # after the block that dart-sass rejects as undefined.
-        private def bind_imported_forwards(vars_before : Hash(String, String),
-                                           mixins_before : Hash(String, MixinClosure),
-                                           fns_before : Hash(String, SassFn)) : Nil
-          @forward_variables.each do |name, value|
-            next if vars_before[name]? == value
+        #
+        # `reimported` names the variables that came from a module this
+        # compilation had ALREADY loaded. In dart-sass a root assignment to a
+        # forwarded variable writes through to the module, so re-importing
+        # the module hands back the importer's own latest value; modules
+        # here are immutable snapshots, so emulate that by keeping the value
+        # the importer can already see. A name that is not in scope (another
+        # block, a fresh mixin call, the root after a nested import) still
+        # binds — that is the "second import binds nothing" bug.
+        private def bind_imported_forwards(vars : Hash(String, String),
+                                           mixins : Hash(String, MixinClosure),
+                                           fns : Hash(String, SassFn),
+                                           reimported : Set(String)) : Nil
+          vars.each do |name, value|
+            if reimported.includes?(name) && (current = @env.lookup_var(name))
+              vars[name] = current
+              next
+            end
             @env.assign_var(name, value, default: false, global: false)
           end
-          @forward_mixins.each do |name, closure|
-            next if mixins_before[name]? == closure
-            @env.declare_mixin(name, closure)
-          end
-          @forward_functions.each do |name, fn|
-            next if fns_before[name]? == fn
-            @env.declare_function(name, fn)
-          end
+          mixins.each { |name, closure| @env.declare_mixin(name, closure) }
+          fns.each { |name, fn| @env.declare_function(name, fn) }
         end
 
         private def check_cycle(canonical : String, line : Int32, column : Int32) : Nil

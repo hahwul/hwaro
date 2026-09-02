@@ -120,6 +120,8 @@ module Hwaro
         # bodies, and footnotes.
         SHORTCODE_PLACEHOLDER_RE = /<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->/
         SCPH_TOKEN_RE            = /\x00SCPH(\d+)\x00/
+        MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d+)\x00/
+        CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d+)\x00/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
@@ -204,25 +206,35 @@ module Hwaro
           result = result.gsub(INLINE_SUB_RE) { "<sub>#{$1}</sub>" } if flags.sub
           result = result.gsub(INLINE_SUP_RE) { "<sup>#{$1}</sup>" } if flags.sup
 
-          math_spans.each_with_index do |span, idx|
-            result = result.sub("\x00MATHSPAN#{idx}\x00", span)
+          # One pass per token kind, not one `gsub` per span: the per-span
+          # loop rescanned the whole string for every span, so a cell or
+          # footnote with N code spans cost O(N²) — 20k spans took 10 s and
+          # the 200 KB `` `a`a`a… `` pattern minutes, after #779 had made the
+          # code-span REGEX itself linear.
+          unless math_spans.empty?
+            result = result.gsub(MATHSPAN_TOKEN_RE) { math_spans[$1.to_i]? || $0 }
           end
 
-          code_spans.each_with_index do |content, idx|
+          unless code_spans.empty?
             # Tokens inside code spans restore ESCAPED, so a backticked
             # placeholder displays literally instead of being substituted —
             # the same thing Markd's own code-span escaping guarantees for
             # paragraph text.
-            restored = escape_placeholder_tokens(content, placeholders)
-            result = result.gsub("\x00CODESPAN#{idx}\x00", "<code>#{restored}</code>")
+            result = result.gsub(CODESPAN_TOKEN_RE) do
+              if content = code_spans[$1.to_i]?
+                "<code>#{escape_placeholder_tokens(content, placeholders)}</code>"
+              else
+                $0
+              end
+            end
           end
 
           # Remaining tokens sit in element-content positions: restore the
           # raw comment so the post-Markdown replacement pass resolves it
           # (consistent with paragraph text, where the comment also rides
           # through Markd verbatim).
-          placeholders.each_with_index do |comment, idx|
-            result = result.sub("\x00SCPH#{idx}\x00", comment)
+          unless placeholders.empty?
+            result = result.gsub(SCPH_TOKEN_RE) { placeholders[$1.to_i]? || $0 }
           end
 
           result

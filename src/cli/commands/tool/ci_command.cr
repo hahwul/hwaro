@@ -51,7 +51,10 @@ module Hwaro
             Logger.warn "DEPRECATED: 'tool ci' is deprecated. Use 'tool platform github-pages' instead."
             # A blank spacer, not a second warning: `Logger.warn ""` rendered
             # as an empty, prefix-only `[WARN] ` line above the usage output.
-            Logger.info ""
+            # On STDERR with the notice it spaces — `Logger.info` writes to
+            # stdout, which `--stdout > deploy.yml` captures, and the file
+            # then began with an empty line.
+            STDERR.puts
             provider : String? = nil
             output_file : String? = nil
             stdout_mode = false

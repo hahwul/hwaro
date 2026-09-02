@@ -1263,16 +1263,38 @@ module Hwaro
       # BindError-only rescue and reached the user as a bare, code-less
       # `Error: Hostname lookup for 300.1.1.1 failed: No address found` with no
       # hint and nothing naming the flag that produced it.
+      #
+      # Resolution is not the only `-b` mistake: an address that resolves but
+      # this machine does not hold (`-b 10.255.255.1`) fails INSIDE bind with
+      # EADDRNOTAVAIL, and a privileged port (`-p 80`) with EACCES — both
+      # arrive as `Socket::BindError`, so both used to get the "another
+      # process is listening, try -p/--port" hint, which is wrong for each.
       protected def bind_dev_server(server : HTTP::Server, host : String, port : Int32)
         server.bind_tcp host, port
       rescue ex : Socket::BindError
         # Socket::BindError#message already includes the address, so
         # use it verbatim rather than re-prefixing.
-        raise Hwaro::HwaroError.new(
-          code: Hwaro::Errors::HWARO_E_IO,
-          message: ex.message || "Could not bind to '#{host}:#{port}'",
-          hint: "Is another process already listening on this port? Try -p/--port with a different value.",
-        )
+        message = ex.message || "Could not bind to '#{host}:#{port}'"
+        case ex.os_error
+        when Errno::EADDRNOTAVAIL
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: message,
+            hint: "Check -b/--bind: #{host} is not an address this machine holds. Use 127.0.0.1, 0.0.0.0, ::1, or one of its interface addresses.",
+          )
+        when Errno::EACCES
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: message,
+            hint: "Port #{port} needs elevated privileges on this system. Try -p/--port with a value above 1023.",
+          )
+        else
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: message,
+            hint: "Is another process already listening on this port? Try -p/--port with a different value.",
+          )
+        end
       rescue ex : Socket::Error
         # Resolution failures and anything else the socket layer reports.
         # `host` is only ever the `-b/--bind` value, so the hint can name it.

@@ -52,9 +52,9 @@ describe Hwaro::Services::Initializer do
           Hwaro::Services::Initializer.new.run(target)
 
           gitignore = File.read(File.join(target, ".gitignore"))
-          gitignore.lines.should contain("public/")
-          gitignore.lines.should contain(".hwaro/")
-          gitignore.lines.should contain(".hwaro_cache.json")
+          gitignore.lines.should contain("/public/")
+          gitignore.lines.should contain("/.hwaro/")
+          gitignore.lines.should contain("/.hwaro_cache.json")
         end
       end
 

@@ -14,6 +14,8 @@ module Hwaro
 
       @config : Models::Config
 
+      @output_dir : String? = nil
+
       def initialize(@config : Models::Config)
       end
 
@@ -57,10 +59,27 @@ module Hwaro
       # produced — a hardcoded "public" made a site with a customized
       # output_dir deploy an empty (or stale) directory, with no error
       # anywhere: the build succeeded and the host published nothing.
-      # `Config.load` already rejects an empty or project-escaping value, so
-      # the fallback here is only for "not configured".
+      # `Config.load` rejects an empty or project-escaping value, but passes
+      # `./public`, `public/` and absolute paths through verbatim. Normalize
+      # here so every emitted key gets one clean relative spelling
+      # (cloudflare's `bucket = "./#{dir}"` produced `././public`, gitlab's
+      # default check missed `./public`); an absolute path is not expressible
+      # in any hosted-build config (netlify `publish`, gitlab `artifacts.paths`
+      # must be project-relative), so it is reported and the conventional
+      # `public` used — the host would otherwise publish nothing, silently.
       private def output_dir : String
-        @config.build.output_dir || "public"
+        @output_dir ||= begin
+          raw = @config.build.output_dir
+          if raw.nil?
+            "public"
+          elsif Path[raw].absolute?
+            Logger.warn "[build] output_dir #{raw.inspect} is an absolute path; platform configs need a project-relative directory. Using \"public\" — set a relative output_dir so the host publishes what hwaro built."
+            "public"
+          else
+            normalized = Path[raw].normalize.to_s.lchop("./").rstrip('/')
+            normalized.empty? || normalized == "." ? "public" : normalized
+          end
+        end
       end
 
       # Render a value as a shell word, leaving ordinary directory names bare

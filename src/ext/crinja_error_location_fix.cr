@@ -2,13 +2,14 @@
 #
 # Two upstream gaps threw away the location for whole classes of failures:
 #
-#   1. A plain Crystal exception raised inside a filter, test or function
-#      (`{{ [1, 2] | slice(0) }}` → `Division by 0`, `{{ [] | random }}` →
-#      `Can't sample empty collection`, any custom filter that trips on its
-#      input) is not a `Crinja::Error`, so `Evaluator`'s per-node rescue never
-#      attaches the node, hwaro's `rescue ex : Crinja::Error` sites never see
-#      it, and the build dies with `Render failed ...: Division by 0` and no
-#      template name or line.
+#   1. A plain Crystal exception raised inside a filter, test, function or
+#      operator (`{{ [1, 2] | slice(0) }}` → `Division by 0`, `{{ [] | random }}`
+#      → `Can't sample empty collection`, `{{ n // 0 }}`, any custom filter
+#      that trips on its input) is not a `Crinja::Error`, so `Evaluator`'s
+#      per-node rescue never attaches the node, hwaro's `rescue ex :
+#      Crinja::Error` sites never see it, and the build dies with `Render
+#      failed ...: Division by 0` and no template name or line. Same for a
+#      missing `{% include %}`/`{% extends %}` target.
 #
 #   2. A template whose FIRST character is a newline reported every location
 #      one line early (`templates/page.html:1:2` for a tag on line 2, caret
@@ -22,25 +23,40 @@
 #      `Int#step(by: 0)` and Python's `range()` do.
 #
 # Patch order matters for nothing here; all three are independent of the
-# other Crinja patches under src/ext/.
+# other Crinja patches under src/ext/ (crinja_render_perf reopens Renderer
+# for PrintStatement/FixedString only, so `previous_def` on TagNode binds to
+# the upstream visitor).
 require "crinja"
 
-# === 1. Non-Crinja exceptions inside filters/tests/functions get a node ====
+# === 1. Non-Crinja exceptions inside expressions get a node =================
 #
-# Wrap at the three evaluator visitors that invoke user/builtin code. The
-# wrapped error is a `Crinja::RuntimeError`, so the surrounding `visit`
+# Wrap at every evaluator visitor that can run code: the three that invoke
+# user/builtin callables (filters, tests, functions) and the operator
+# visitors — `{{ total // per_page }}` with a zero divisor, `{{ big + 1 }}`
+# past Int64::MAX and `{{ 2 ** 64 }}` raise plain `DivisionByZeroError` /
+# `OverflowError` and used to escape unlocated just like a filter's did.
+# The wrapped error is a `Crinja::RuntimeError`, so the surrounding `visit`
 # rescue (which only knows `Crinja::Error`) attaches the expression's
 # location exactly as it does for Crinja's own errors, and every hwaro
 # rescue site classifies it as HWARO_E_TEMPLATE with the source excerpt.
 # Crinja errors pass through untouched — an inner wrap must not be re-wrapped
 # by an outer filter expression.
+#
+# The wrapper carries NO message of its own: `SourceAttached#message`
+# already prints the cause as `<Class>:  <message>` when the message is nil,
+# whereas a message plus a cause printed the same text twice
+# (`Division by 0 (DivisionByZeroError)` / `cause: Division by 0`).
 class Crinja::Evaluator
+  private def locate_plain_error(ex : Exception, expression : AST::ExpressionNode) : Crinja::RuntimeError
+    Crinja::RuntimeError.new(nil, cause: ex).at(expression)
+  end
+
   def evaluate(expression : AST::FilterExpression)
     previous_def
   rescue ex : Crinja::Error
     raise ex
   rescue ex : Exception
-    raise Crinja::RuntimeError.new("#{ex.message} (#{ex.class})", cause: ex).at(expression)
+    raise locate_plain_error(ex, expression)
   end
 
   def evaluate(expression : AST::TestExpression)
@@ -48,7 +64,7 @@ class Crinja::Evaluator
   rescue ex : Crinja::Error
     raise ex
   rescue ex : Exception
-    raise Crinja::RuntimeError.new("#{ex.message} (#{ex.class})", cause: ex).at(expression)
+    raise locate_plain_error(ex, expression)
   end
 
   def evaluate(expression : AST::CallExpression)
@@ -56,7 +72,39 @@ class Crinja::Evaluator
   rescue ex : Crinja::Error
     raise ex
   rescue ex : Exception
-    raise Crinja::RuntimeError.new("#{ex.message} (#{ex.class})", cause: ex).at(expression)
+    raise locate_plain_error(ex, expression)
+  end
+
+  def evaluate(expression : AST::BinaryExpression | AST::ComparisonExpression)
+    previous_def
+  rescue ex : Crinja::Error
+    raise ex
+  rescue ex : Exception
+    raise locate_plain_error(ex, expression)
+  end
+
+  def evaluate(expression : AST::UnaryExpression)
+    previous_def
+  rescue ex : Crinja::Error
+    raise ex
+  rescue ex : Exception
+    raise locate_plain_error(ex, expression)
+  end
+end
+
+# `Crinja::TemplateNotFoundError` inherits `Exception`, not `Crinja::Error`,
+# so `{% include "missing.html" %}` / `{% extends %}` / `{% import %}` /
+# `{% from %}` naming a template that does not exist escaped every
+# `rescue Crinja::Error` — the renderer's per-tag rescue, hwaro's engine
+# rescue sites — as a raw, unlocated error that named neither the referencing
+# template nor the line. Wrap it at the tag node the same way. `{% include …
+# ignore missing %}` rescues the error inside the tag before it gets here, so
+# that contract is untouched.
+class Crinja::Renderer
+  def render(node : AST::TagNode)
+    previous_def
+  rescue ex : Crinja::TemplateNotFoundError
+    raise Crinja::RuntimeError.new(nil, cause: ex).at(node)
   end
 end
 
@@ -94,7 +142,9 @@ end
 # above turns it into a located template error at the `range(...)` call.
 class Crinja::Function::RangeIterator(B, N)
   def initialize(@range, step, @current = range.begin, @reached_end = false)
-    raise ArgumentError.new("range() step must not be zero") if step == 0
+    # `step` arrives truncated to Int (`as_number.to_i`), so a fractional
+    # 0.5 lands here as 0 too — say "integer" so that case is not a riddle.
+    raise ArgumentError.new("range() step must be a non-zero integer") if step == 0
     @step = step.abs
     @direction_reversed = step < 0
   end

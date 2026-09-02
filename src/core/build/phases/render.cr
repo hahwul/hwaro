@@ -1009,9 +1009,16 @@ module Hwaro::Core::Build::Phases::Render
   #     search.json / feeds / taxonomy pages from the in-memory page set
   #     after every edit, so a `serve --cache` whose start was an all-hit
   #     build served corrupted search.json and feeds from the first edit on.
+  #   * `generate_seo_outputs` never lets the feeds join the skip while a
+  #     user feed template exists (`feed_template_present?`), so an all-hit
+  #     warm build still regenerates rss.xml — from `page.content`. Without
+  #     hydration that feed carried raw shortcode markup, unresolved `@/`
+  #     links and no base_path: the exact corruption #775 fixed, back on the
+  #     one site shape that overrides the feed template.
   private def cached_content_needed?(ctx : Lifecycle::BuildContext, site : Models::Site) : Bool
     return true unless generate_outputs_unchanged?(ctx)
     return true if ctx.options.serve_mode
+    return true if feed_template_present?
     site.config.taxonomies.any?(&.feed)
   end
 
@@ -1049,7 +1056,11 @@ module Hwaro::Core::Build::Phases::Render
       render_page_content(page, site, templates, highlight, safe, global_vars,
         crinja_env_override: env, template_cache_override: cache)
   rescue ex
-    Logger.debug "  Could not hydrate cached content for #{page.path}: #{ex.message}"
+    # Loud, not debug: the page's HTML is already correct (it was a cache
+    # hit), but its search.json / feed entry now comes from the raw-markdown
+    # fallback — the corruption this pass exists to prevent — and the build
+    # still exits 0, so the log line is the only trace.
+    Logger.warn "Could not re-render cached content for #{page.path}: #{ex.message}. Its search index and feed entries fall back to unprocessed markdown for this build; run without --cache to refresh them."
     end
 
     if parallel && pages.size > 1
