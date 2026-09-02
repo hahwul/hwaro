@@ -310,6 +310,39 @@ describe "cache: data files read through load_data()" do
       end
     end
   end
+
+  # The example above flaked on CI: the data digest DID move and the page DID
+  # re-render, but load_data() answered from its process-wide memo, which is
+  # keyed by millisecond mtime — and a rewrite that lands inside the same
+  # filesystem timestamp tick (ext4's coarse clock, 1–10ms) keeps the previous
+  # mtime. The memo must not outlive the build that filled it. Pinning the
+  # mtime explicitly makes the same-tick case deterministic.
+  it "re-renders from the new bytes when a data/*.csv is rewritten within one mtime tick" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("data")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHome")
+        File.write("templates/index.html",
+          %({% set rows = load_data(path="data/team.csv") %}) +
+          "{% for row in rows %}CELL:{{ row[0] }};{% endfor %}")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("data/team.csv", "name\nAlice\n")
+
+        cached_build
+        File.read("public/index.html").should contain("CELL:Alice;")
+
+        stamp = File.info("data/team.csv").modification_time
+        File.write("data/team.csv", "name\nZORBA\n") # same size
+        File.touch("data/team.csv", stamp)           # same mtime
+        cached_build
+        File.read("public/index.html").should contain("CELL:ZORBA;")
+        File.read("public/index.html").should_not contain("CELL:Alice;")
+      end
+    end
+  end
 end
 
 describe "cache: static files edited inside the mtime tolerance" do

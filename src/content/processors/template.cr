@@ -597,6 +597,26 @@ module Hwaro
         @@load_data_cache = {} of String => {Int64, Crinja::Value}
         @@load_data_mutex = Mutex.new
 
+        # Drop every memoized load_data() result. Called at the start of each
+        # build (Builder#run), so the memo only ever spans ONE build.
+        #
+        # The mtime key alone is not a proof of identity: it is millisecond
+        # resolution, and a file rewritten inside one filesystem timestamp
+        # tick (ext4 stamps with the kernel's coarse clock, 1-10ms; FAT/HFS+
+        # are coarser still) keeps the previous mtime, so a same-size,
+        # same-tick rewrite of `data/team.csv` was served from the memo —
+        # the previous file's rows — even though the data digest had already
+        # moved and forced the page to re-render. That is the flake in
+        # "re-renders when a data/*.csv changes": in-process, the two builds
+        # can land in the same tick. `hwaro serve` has the same exposure on
+        # every rebuild. A build must see the disk as it is when it starts,
+        # and within one build a data file cannot legitimately change, so
+        # the memo's whole purpose (parse once per build, not once per page)
+        # survives a per-build reset intact.
+        def self.clear_load_data_cache : Nil
+          @@load_data_mutex.synchronize { @@load_data_cache.clear }
+        end
+
         private def register_data_function
           # load_data() function - load data from JSON/TOML/YAML files
           # Usage: {% set data = load_data(path="data/menu.json") %}
