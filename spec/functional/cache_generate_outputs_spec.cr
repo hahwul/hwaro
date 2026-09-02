@@ -104,6 +104,81 @@ describe "cache: generated outputs converge on the clean build" do
     end
   end
 
+  # The Generate phase's skip is not the only reader of a cache-hit page's
+  # content: the taxonomy hook regenerates every per-term feed on every
+  # build (skip or no skip), so an all-hit warm build with `taxonomy.feed`
+  # shipped the raw-markdown fallback into tags/<term>/rss.xml.
+  it "keeps taxonomy term feeds identical on a warm all-hit --cache build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        shortcode_project
+        File.write("config.toml", CACHE_CONFIG + "\n[[taxonomies]]\nname = \"tags\"\nfeed = true\n")
+        File.write("templates/taxonomy.html", "{{ content }}")
+        File.write("templates/taxonomy_term.html", "{{ content }}")
+        File.write("content/shorty.md",
+          "---\ntitle: S\ntags: [t]\n---\nIntro.\n\n{% gal() %}\nINNER\n{% end %}\n\n[home](@/index.md) and [root](/other/)\n\nOutro.\n")
+        clean_build
+        expected = File.read("public/tags/t/rss.xml")
+        expected.should contain("<div class=\"gal\">")
+        expected.should_not contain("{%")
+
+        FileUtils.rm_rf("public")
+        FileUtils.rm_rf(".hwaro_cache.json")
+        run_builder(true, false) # cold
+        File.read("public/tags/t/rss.xml").should eq(expected)
+        run_builder(true, false) # warm, every page a cache hit
+        File.read("public/tags/t/rss.xml").should eq(expected)
+      end
+    end
+  end
+
+  # `serve` keeps the Builder alive and regenerates search/feeds from the
+  # in-memory page set after every edit. A `serve --cache` whose start was
+  # an all-hit build had every page's content empty, so the first
+  # incremental rebuild served the raw fallback for every untouched page.
+  it "hydrates cache-hit pages on an all-hit start in serve mode so incremental rebuilds stay clean" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        shortcode_project
+        # The shortcode page lives in its own section: the incremental
+        # rebuild re-links and re-renders the edited page's section
+        # neighbours, and a re-rendered page hides the bug.
+        FileUtils.rm("content/shorty.md")
+        FileUtils.mkdir_p("content/blog")
+        File.write("templates/section.html", "{{ content }}")
+        File.write("content/blog/_index.md", "---\ntitle: Blog\n---\nBlog")
+        File.write("content/blog/shorty.md",
+          "---\ntitle: S\ndate: 2024-01-01\n---\nIntro.\n\n{% gal() %}\nINNER\n{% end %}\n\n[home](@/index.md) and [root](/other/)\n\nOutro.\n")
+        File.write("content/mid.md", "---\ntitle: Mid\ndate: 2024-01-02\n---\nMid body.\n")
+        File.write("content/other.md", "---\ntitle: Other\ndate: 2024-01-04\n---\nOther body.\n")
+        clean_build
+        expected = generated_outputs
+
+        FileUtils.rm_rf("public")
+        FileUtils.rm_rf(".hwaro_cache.json")
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true)
+        options.serve_mode = true
+        warm = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| warm.register(h) }
+        warm.run(options) # cold: primes the cache
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        builder.run(options) # all-hit start, like a second `serve --cache`
+        generated_outputs.should eq(expected)
+
+        File.write("content/other.md", "---\ntitle: Other\ndate: 2024-01-04\n---\nOther body edited.\n")
+        # The watcher hands the builder cwd-relative paths.
+        builder.run_incremental(["content/other.md"], options).should be_true
+        got = generated_outputs
+        got["search.json"].should contain("Other body edited")
+        got["search.json"].should contain("Intro. INNER")
+        got["search.json"].should_not contain("{%")
+        got["rss.xml"].should contain("<div class=\"gal\">")
+        got["rss.xml"].should_not contain("{%")
+      end
+    end
+  end
+
   it "leaves the previous outputs untouched on a warm all-hit build" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

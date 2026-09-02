@@ -164,12 +164,17 @@ module Hwaro::Core::Build::Phases::Render
         ctx.stats.pages_unpublished = @unpublished_pages.get
         # Pages the cache skipped still feed the Generate phase (search index,
         # feeds read `page.content`), so give them the content a real render
-        # would have produced — unless the Generate phase is going to leave
-        # every output untouched anyway (warm build, nothing rendered,
-        # page/section set unchanged), in which case the work is wasted.
+        # would have produced — unless nothing downstream is going to read it
+        # (see `cached_content_needed?`), in which case the work is wasted.
+        # Fast-start's deferred pages are excluded: they render for real in
+        # the background pass.
         if cache_enabled && !ctx.options.streaming? && pages_to_build.size < all_pages.size &&
-           !generate_outputs_unchanged?(ctx)
-          hydrate_cached_page_content(all_pages - pages_to_build, site, templates, use_highlight, global_vars, parallel)
+           cached_content_needed?(ctx, site)
+          skipped = all_pages - pages_to_build
+          if deferred = @deferred_pages
+            skipped -= deferred
+          end
+          hydrate_cached_page_content(skipped, site, templates, use_highlight, global_vars, parallel)
         end
         # Strict [links] broken_internal = "error": fail the phase with one
         # aggregated error after the whole fan-out so every offender is
@@ -971,6 +976,24 @@ module Hwaro::Core::Build::Phases::Render
     finalize_render_failures(failures, classified_error, verbose)
 
     @published_pages.get - published_before
+  end
+
+  # Does anything after the render phase read a cache-hit page's `content`?
+  #
+  # The Generate phase's skip (`generate_outputs_unchanged?`) is not the
+  # only consumer:
+  #   * the taxonomy hook (BeforeGenerate) regenerates every term page AND
+  #     every per-term feed on every build, skip or no skip, and the feeds
+  #     read `page.content` — an all-hit warm build with `taxonomy.feed`
+  #     shipped raw `{% shortcode %}` markup into `tags/<term>/rss.xml`;
+  #   * `serve` keeps the Builder alive: its incremental rebuilds regenerate
+  #     search.json / feeds / taxonomy pages from the in-memory page set
+  #     after every edit, so a `serve --cache` whose start was an all-hit
+  #     build served corrupted search.json and feeds from the first edit on.
+  private def cached_content_needed?(ctx : Lifecycle::BuildContext, site : Models::Site) : Bool
+    return true unless generate_outputs_unchanged?(ctx)
+    return true if ctx.options.serve_mode
+    site.config.taxonomies.any?(&.feed)
   end
 
   # Populate `page.content` for cache-hit pages on a warm `--cache` build.
