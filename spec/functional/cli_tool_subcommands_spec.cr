@@ -578,7 +578,9 @@ describe "hwaro tool check-links (generated routes)" do
         [feeds]
         enabled = true
         TOML
-      File.write(File.join(blog_dir, "_index.md"), "+++\ntitle = \"Blog\"\npaginate_by = 2\n+++\n")
+      # `generate_feeds` is what makes `/blog/rss.xml` a route at all — the
+      # case under test is the PREFIX check, so the section opts in.
+      File.write(File.join(blog_dir, "_index.md"), "+++\ntitle = \"Blog\"\npaginate_by = 2\ngenerate_feeds = true\n+++\n")
       File.write(File.join(blog_dir, "p1.md"), "+++\ntitle = \"P1\"\n+++\n")
       File.write(File.join(blog_dir, "p2.md"), "+++\ntitle = \"P2\"\n+++\n")
       File.write(File.join(blog_dir, "links.md"), <<-MD)
@@ -596,6 +598,64 @@ describe "hwaro tool check-links (generated routes)" do
       status.success?.should be_false
       dead = JSON.parse(output)["dead_internal"].as_a.map(&.["link"].["url"].as_s)
       dead.sort!.should eq(["/blog/page/99/", "/nowhere/rss.xml"])
+    end
+  end
+
+  # A per-section feed exists only when the section sets
+  # `generate_feeds = true`. `feed_route?` accepted `/<section>/rss.xml` for
+  # ANY section with an `_index.md`, so the checker waved through a link that
+  # 404s on the deployed site — including on `hwaro init --scaffold blog`,
+  # whose `[feeds] sections = ["posts"]` only filters the SITE feed's items.
+  it "reports a section feed for a section that never opted into feeds" do
+    with_initialized_project do |project_dir|
+      content_dir = File.join(project_dir, "content")
+      posts_dir = File.join(content_dir, "posts")
+      FileUtils.rm_rf(content_dir)
+      Dir.mkdir_p(posts_dir)
+      File.write(File.join(project_dir, "config.toml"), <<-TOML)
+        title = "Site"
+        base_url = "https://example.com"
+
+        [feeds]
+        enabled = true
+        sections = ["posts"]
+        TOML
+      File.write(File.join(posts_dir, "_index.md"), "+++\ntitle = \"Posts\"\n+++\n")
+      File.write(File.join(posts_dir, "links.md"), <<-MD)
+        +++
+        title = "Links"
+        +++
+
+        [site feed](/rss.xml)
+        [section feed](/posts/rss.xml)
+        MD
+
+      status, output, _ = run_hwaro(["tool", "check-links", "--internal-only", "--json"], chdir: project_dir)
+      status.success?.should be_false
+      dead = JSON.parse(output)["dead_internal"].as_a.map(&.["link"].["url"].as_s)
+      dead.should eq(["/posts/rss.xml"])
+    end
+  end
+
+  it "accepts a section feed once the section declares generate_feeds" do
+    with_initialized_project do |project_dir|
+      content_dir = File.join(project_dir, "content")
+      posts_dir = File.join(content_dir, "posts")
+      FileUtils.rm_rf(content_dir)
+      Dir.mkdir_p(posts_dir)
+      File.write(File.join(project_dir, "config.toml"), <<-TOML)
+        title = "Site"
+        base_url = "https://example.com"
+
+        [feeds]
+        enabled = true
+        TOML
+      File.write(File.join(posts_dir, "_index.md"), "+++\ntitle = \"Posts\"\ngenerate_feeds = true\n+++\n")
+      File.write(File.join(posts_dir, "links.md"), "+++\ntitle = \"Links\"\n+++\n\n[section feed](/posts/rss.xml)\n")
+
+      status, output, _ = run_hwaro(["tool", "check-links", "--internal-only", "--json"], chdir: project_dir)
+      status.success?.should be_true
+      JSON.parse(output)["dead_internal"].as_a.should be_empty
     end
   end
 

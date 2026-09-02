@@ -199,7 +199,8 @@ module Hwaro
           end
           ConversionStatus::Converted
         else
-          Logger.error "  Failed to convert: #{file_path}"
+          reason = @last_error
+          Logger.error "  Failed to convert: #{file_path}#{reason ? " — #{reason}" : ""}"
           ConversionStatus::Failed
         end
       rescue ex
@@ -286,7 +287,16 @@ module Hwaro
         files.sort
       end
 
+      # Why the last `convert_content` returned nil. The per-format converters
+      # rescue their own parse errors (a malformed block must not abort a bulk
+      # run), which used to swallow the reason entirely: the command printed a
+      # bare "Failed to convert: <file>" while `hwaro build` and
+      # `hwaro tool validate` both named the same parse error. Set on every
+      # failure path, cleared at the start of each conversion.
+      @last_error : String? = nil
+
       private def convert_content(content : String, from : FrontmatterFormat, to : FrontmatterFormat) : String?
+        @last_error = nil
         case {from, to}
         when {FrontmatterFormat::YAML, FrontmatterFormat::TOML}
           yaml_to_toml(content)
@@ -301,6 +311,15 @@ module Hwaro
         when {FrontmatterFormat::JSON, FrontmatterFormat::TOML}
           json_to_toml(content)
         end
+      end
+
+      # Remember a converter's parse error and signal failure (nil) to the
+      # caller in one step, so every rescue arm stays a single line.
+      private def record_error(ex : Exception) : Nil
+        message = ex.message
+        @last_error = message.presence
+        Logger.debug "Front matter parse error: #{message}"
+        nil
       end
 
       # True when the file's leading delimiter block both closes properly and
@@ -410,8 +429,7 @@ module Hwaro
 
             "#{TOML_DELIMITER}\n#{toml_str}#{TOML_DELIMITER}\n#{body}"
           rescue ex
-            Logger.debug "YAML parse error: #{ex.message}"
-            nil
+            record_error(ex)
           end
         end
       end
@@ -428,8 +446,7 @@ module Hwaro
 
             "#{YAML_DELIMITER}\n#{yaml_str}#{YAML_DELIMITER}\n#{body}"
           rescue ex
-            Logger.debug "TOML parse error: #{ex.message}"
-            nil
+            record_error(ex)
           end
         end
       end
@@ -443,8 +460,7 @@ module Hwaro
             json_str = yaml_to_json_string(yaml_data)
             "#{json_str}\n#{body}"
           rescue ex
-            Logger.debug "YAML parse error: #{ex.message}"
-            nil
+            record_error(ex)
           end
         end
       end
@@ -458,8 +474,7 @@ module Hwaro
             json_str = toml_to_json_string(toml_data)
             "#{json_str}\n#{body}"
           rescue ex
-            Logger.debug "TOML parse error: #{ex.message}"
-            nil
+            record_error(ex)
           end
         end
       end
@@ -472,8 +487,7 @@ module Hwaro
           yaml_body = convert_json_to_yaml_string(json_data)
           "#{YAML_DELIMITER}\n#{yaml_body}#{YAML_DELIMITER}\n#{body}"
         rescue ex
-          Logger.debug "JSON parse error: #{ex.message}"
-          nil
+          record_error(ex)
         end
       end
 
@@ -487,8 +501,7 @@ module Hwaro
           toml_body = Utils::FrontmatterWriter::TomlBuilder.new.build(yaml_any)
           "#{TOML_DELIMITER}\n#{toml_body}#{TOML_DELIMITER}\n#{body}"
         rescue ex
-          Logger.debug "JSON parse error: #{ex.message}"
-          nil
+          record_error(ex)
         end
       end
 

@@ -72,8 +72,10 @@ JSON의 `skipped_external` 항목 모두에 "건너뜀"으로 보고됩니다.
 
 - `/sitemap.xml`, `/robots.txt`, `/llms.txt`, 검색 인덱스, `404.html` — 각각
   설정된 `filename`을 따릅니다
-- 피드(`/rss.xml`, `/atom.xml`) — 섹션별·언어별 사본(`/posts/rss.xml`,
-  `/ko/rss.xml`) 포함
+- 피드(`/rss.xml`, `/atom.xml`) — 언어별 사본(`/ko/rss.xml`)과 섹션별
+  사본(`/posts/rss.xml`) 포함. 섹션 피드는 해당 섹션의 `_index.md`가
+  `generate_feeds = true`를 선언했을 때만 인정합니다. 빌드가 그때만 파일을
+  쓰기 때문입니다
 - 분류 목록·용어 페이지(`/tags/`, `/categories/rust/`)
 - 페이지네이션 경로(`/posts/page/2/`) — `paginate_by`를 실제로 선언한 섹션에만
   해당하므로, 페이지네이션이 없는 섹션의 `/page/N/` 링크는 여전히 보고됩니다

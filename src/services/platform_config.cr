@@ -3,6 +3,7 @@ require "../hwaro"
 require "../models/config"
 require "../models/page"
 require "../content/processors/markdown"
+require "../utils/frontmatter_writer"
 require "../utils/logger"
 require "./github_actions_workflow"
 
@@ -51,8 +52,24 @@ module Hwaro
         "hwaro build"
       end
 
+      # Directory the build writes to. Follows `[build] output_dir` so every
+      # generated platform config publishes the tree `hwaro build` actually
+      # produced — a hardcoded "public" made a site with a customized
+      # output_dir deploy an empty (or stale) directory, with no error
+      # anywhere: the build succeeded and the host published nothing.
+      # `Config.load` already rejects an empty or project-escaping value, so
+      # the fallback here is only for "not configured".
       private def output_dir : String
-        "public"
+        @config.build.output_dir || "public"
+      end
+
+      # Render a value as a shell word, leaving ordinary directory names bare
+      # so the default workflow is unchanged. `[build] output_dir` is trusted
+      # config, but it may legitimately contain a space — unquoted, that would
+      # split into two `cd` arguments.
+      private def shell_word(value : String) : String
+        return value if value.matches?(/\A[A-Za-z0-9._\/-]+\z/)
+        "'" + value.gsub("'", "'\\''") + "'"
       end
 
       # Escape a value for a TOML basic string. Front-matter aliases are
@@ -93,7 +110,7 @@ module Hwaro
         lines = [] of String
         lines << "[build]"
         lines << "  command = \"#{build_command}\""
-        lines << "  publish = \"#{output_dir}\""
+        lines << "  publish = \"#{toml_escape(output_dir)}\""
         lines << ""
         lines << "[build.environment]"
         lines << "  # Add environment variables here"
@@ -190,7 +207,7 @@ module Hwaro
         lines << "compatibility_date = \"#{Time.utc.to_s("%Y-%m-%d")}\""
         lines << ""
         lines << "[site]"
-        lines << "  bucket = \"./#{output_dir}\""
+        lines << "  bucket = \"./#{toml_escape(output_dir)}\""
         lines << ""
         lines << "# Build configuration (for Cloudflare Pages dashboard)"
         lines << "# Build command: #{build_command}"
@@ -226,9 +243,14 @@ module Hwaro
         lines << "  stage: deploy"
         lines << "  script:"
         lines << "    - hwaro build"
+        # GitLab Pages defaults to publishing `public/`; `pages.publish`
+        # (GitLab 16.1+) points it elsewhere. Emitted only for a customized
+        # `[build] output_dir` so the default pipeline stays compatible with
+        # older GitLab instances.
+        lines << "  publish: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(output_dir)}" unless output_dir == "public"
         lines << "  artifacts:"
         lines << "    paths:"
-        lines << "      - public"
+        lines << "      - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(output_dir)}"
         lines << "  rules:"
         lines << "    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
         lines << ""
@@ -281,7 +303,7 @@ module Hwaro
         lines << "        env:"
         lines << "          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}"
         lines << "        run: |"
-        lines << "          cd #{output_dir}"
+        lines << "          cd #{shell_word(output_dir)}"
         lines << "          git init -b \"$PAGES_BRANCH\""
         lines << "          git config user.name  \"${{ github.actor }}\""
         lines << "          git config user.email \"${{ github.actor }}@noreply.codeberg.org\""
