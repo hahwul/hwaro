@@ -38,60 +38,75 @@ module Hwaro
         path = context.request.path
 
         if path.ends_with?("/")
-          context.request.path += "index.html"
-        else
-          # No extname pre-filter here: deciding by extension 404'd every
-          # directory with a dot in its last segment (/docs/v1.2, /node.js)
-          # because stdlib's StaticFileHandler only appends the trailing
-          # slash when directory_listing is on. What's on disk decides.
-          #
-          # Resolve strictly (see DevPath) to prevent directory traversal and
-          # separator smuggling before filesystem access. A nil result is a
-          # path we refuse to route; an empty one is the output root itself,
-          # which must not produce `Location: //`.
-          sanitized = DevPath.safe_relative(path)
-          if sanitized.nil? || sanitized.empty?
+          context.request.path = path + "index.html"
+          begin
             call_next(context)
-            return
+          ensure
+            # Put the request back the way it arrived. `HTTP::LogHandler` sits
+            # outermost and reads `request.resource` AFTER call_next, so
+            # leaving the rewrite in place made `--access-log` report
+            # `GET /index.html` for a request to `/` (and
+            # `GET /about/index.html` for `/about/`) — an access log that no
+            # longer matches what the browser asked for is useless for
+            # correlating with the browser's own network panel. BasePathHandler
+            # already restores its own strip for exactly this reason; without a
+            # mount point nothing was undoing this rewrite.
+            context.request.path = path
           end
-          fs_path = Path[@public_dir, sanitized]
+          return
+        end
 
-          # Verify resolved path is within public_dir.
-          # Only attempt realpath if the path exists on disk; otherwise skip
-          # the redirect entirely so non-existent traversal paths cannot
-          # bypass the boundary check (realpath returns nil for missing paths).
-          public_real = begin
-            File.realpath(@public_dir)
-          rescue File::Error
-            @public_dir
-          end
-          resolved = if File.exists?(fs_path.to_s)
-                       begin
-                         File.realpath(fs_path)
-                       rescue File::Error
-                         nil
-                       end
+        # No extname pre-filter here: deciding by extension 404'd every
+        # directory with a dot in its last segment (/docs/v1.2, /node.js)
+        # because stdlib's StaticFileHandler only appends the trailing
+        # slash when directory_listing is on. What's on disk decides.
+        #
+        # Resolve strictly (see DevPath) to prevent directory traversal and
+        # separator smuggling before filesystem access. A nil result is a
+        # path we refuse to route; an empty one is the output root itself,
+        # which must not produce `Location: //`.
+        sanitized = DevPath.safe_relative(path)
+        if sanitized.nil? || sanitized.empty?
+          call_next(context)
+          return
+        end
+        fs_path = Path[@public_dir, sanitized]
+
+        # Verify resolved path is within public_dir.
+        # Only attempt realpath if the path exists on disk; otherwise skip
+        # the redirect entirely so non-existent traversal paths cannot
+        # bypass the boundary check (realpath returns nil for missing paths).
+        public_real = begin
+          File.realpath(@public_dir)
+        rescue File::Error
+          @public_dir
+        end
+        resolved = if File.exists?(fs_path.to_s)
+                     begin
+                       File.realpath(fs_path)
+                     rescue File::Error
+                       nil
                      end
-          if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
-            # 302, not 301: browsers cache permanent redirects per URL, so a
-            # 301 would keep redirecting to a section long after a rebuild
-            # removed or renamed it (or after a different project reuses the
-            # port) until the user clears their browser cache.
-            context.response.status_code = 302
-            # Build the Location from the already-resolved path to prevent
-            # CRLF injection and path traversal in the redirect target, then
-            # re-encode it: resolution decodes, so `/my page` would otherwise
-            # emit a raw space (and `/한글` raw UTF-8) into the header, which
-            # is not a valid URI reference. Keep the query string — /search?q=term
-            # must land on /search/?q=term, not an empty-query page. (A
-            # request-line query can't contain CR/LF.)
-            location = "/" + DevPath.encode_relative(sanitized) + "/"
-            if (query = context.request.query) && !query.empty?
-              location += "?#{query}"
-            end
-            context.response.headers["Location"] = location
-            return
+                   end
+        if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
+          # 302, not 301: browsers cache permanent redirects per URL, so a
+          # 301 would keep redirecting to a section long after a rebuild
+          # removed or renamed it (or after a different project reuses the
+          # port) until the user clears their browser cache.
+          context.response.status_code = 302
+          # Build the Location from the already-resolved path to prevent
+          # CRLF injection and path traversal in the redirect target, then
+          # re-encode it: resolution decodes, so `/my page` would otherwise
+          # emit a raw space (and `/한글` raw UTF-8) into the header, which
+          # is not a valid URI reference. Keep the query string — /search?q=term
+          # must land on /search/?q=term, not an empty-query page. (A
+          # request-line query can't contain CR/LF.)
+          location = "/" + DevPath.encode_relative(sanitized) + "/"
+          if (query = context.request.query) && !query.empty?
+            location += "?#{query}"
           end
+          context.response.headers["Location"] = location
+          return
         end
 
         call_next(context)
@@ -1099,17 +1114,7 @@ module Hwaro
         # so a port-conflict error produced misleading output that looked
         # like the server was running before the final `Error: Could not
         # bind …` line.
-        begin
-          server.bind_tcp host, port
-        rescue ex : Socket::BindError
-          # Socket::BindError#message already includes the address, so
-          # use it verbatim rather than re-prefixing.
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_IO,
-            message: ex.message || "Could not bind to '#{host}:#{port}'",
-            hint: "Is another process already listening on this port? Try -p/--port with a different value.",
-          )
-        end
+        bind_dev_server(server, host, port)
 
         url = serve_url(host, port, base_path)
         # Calm serve receipt: where it's live, reload state, what's watched,
@@ -1245,6 +1250,37 @@ module Hwaro
           )
           raise classified
         end
+      end
+
+      # Bind the dev server's listening socket, classifying every way that can
+      # fail. Extracted from `run_with_options` so specs can drive the real
+      # bind without standing up a whole serve session.
+      #
+      # `bind_tcp` does TWO things: it resolves `host`, then binds. Only the
+      # second half raises `Socket::BindError` — a `-b/--bind` value the
+      # resolver cannot answer for (a typo'd hostname, `-b 300.1.1.1`) raises
+      # `Socket::Addrinfo::Error`, which fell straight through the old
+      # BindError-only rescue and reached the user as a bare, code-less
+      # `Error: Hostname lookup for 300.1.1.1 failed: No address found` with no
+      # hint and nothing naming the flag that produced it.
+      protected def bind_dev_server(server : HTTP::Server, host : String, port : Int32)
+        server.bind_tcp host, port
+      rescue ex : Socket::BindError
+        # Socket::BindError#message already includes the address, so
+        # use it verbatim rather than re-prefixing.
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: ex.message || "Could not bind to '#{host}:#{port}'",
+          hint: "Is another process already listening on this port? Try -p/--port with a different value.",
+        )
+      rescue ex : Socket::Error
+        # Resolution failures and anything else the socket layer reports.
+        # `host` is only ever the `-b/--bind` value, so the hint can name it.
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_USAGE,
+          message: "Could not bind to '#{host}:#{port}': #{ex.message}",
+          hint: "Check -b/--bind: pass an address this machine holds (127.0.0.1, 0.0.0.0, ::1) or a hostname it can resolve.",
+        )
       end
 
       # Path component of `base_url`, mirroring `Models::Config#base_path`
