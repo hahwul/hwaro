@@ -48,8 +48,8 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터 — `upper`, `lower`, `join`, `map`
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
 | length | 길이 | {{ items \| length }} |
-| first | 첫 요소 | {{ items \| first }} |
-| last | 마지막 요소 | {{ items \| last }} |
+| first | 첫 요소(빈 컬렉션이면 빈 값) | {{ items \| first }} |
+| last | 마지막 요소(빈 컬렉션이면 빈 값) | {{ items \| last }} |
 | reverse | 순서 뒤집기 | {{ items \| reverse }} |
 | sort | 배열 정렬 | {{ items \| sort }} |
 | join | 요소 이어 붙이기 | {{ tags \| join(", ") }} |

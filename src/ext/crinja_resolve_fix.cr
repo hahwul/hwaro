@@ -117,3 +117,70 @@ module Crinja::Resolver
     value
   end
 end
+
+# === 4. Attribute access on a non-object no longer kills the build ======
+# `Crinja::Evaluator#name_for_expression` is used to LABEL the value that
+# member/index access produced — either the `Undefined` it returns, or the
+# `UndefinedError` it re-raises. Upstream only implements it for
+# `IdentifierLiteral`, `MemberExpression` and `IndexExpression`; every other
+# node hits a catch-all that does `raise "not implemented for #{...}"`.
+#
+# That catch-all fires on ordinary template code, and because it raises a
+# bare `Exception` (not a `Crinja::Error`) it escapes
+# `TemplateEngine#render`'s rescue: the build dies with
+# `not implemented for Crinja::AST::CallExpression` and NO template
+# file:line. The `Avoid: Multiple lookups` snippet in
+# docs/content/templates/functions.md is exactly this shape:
+#
+#   {{ get_section(path="blog").title }}   # CallExpression   → crash
+#   {{ none.foo }}                          # NullLiteral      → crash
+#   {{ "abc".foo }}                         # StringLiteral    → crash
+#   {{ [1, 2].foo }}                        # ArrayLiteral     → crash
+#
+# whenever the lookup misses. Naming a node must never be fatal, so the
+# catch-all now returns a readable placeholder and the common literal /
+# call shapes get a real name. With this, a missed lookup behaves like
+# Jinja2 (`Undefined`, i.e. empty output) and a genuine error — e.g.
+# `.attr` on a String, see patch 2 above — is reported as a located
+# `Crinja::Error` instead of an unlocatable crash.
+class Crinja::Evaluator
+  private def name_for_expression(expression)
+    expression.class.name.sub("Crinja::AST::", "").downcase
+  end
+
+  private def name_for_expression(expression : AST::CallExpression)
+    "#{name_for_expression(expression.identifier)}(…)"
+  end
+
+  private def name_for_expression(expression : AST::FilterExpression)
+    "#{name_for_expression(expression.target)} | #{expression.identifier.name}"
+  end
+
+  private def name_for_expression(expression : AST::NullLiteral)
+    "none"
+  end
+
+  private def name_for_expression(expression : AST::StringLiteral)
+    expression.value.inspect
+  end
+
+  private def name_for_expression(expression : AST::IntegerLiteral)
+    expression.value.to_s
+  end
+
+  private def name_for_expression(expression : AST::FloatLiteral)
+    expression.value.to_s
+  end
+
+  private def name_for_expression(expression : AST::BooleanLiteral)
+    expression.value.to_s
+  end
+
+  private def name_for_expression(expression : AST::ArrayLiteral)
+    "[…]"
+  end
+
+  private def name_for_expression(expression : AST::DictLiteral)
+    "{…}"
+  end
+end

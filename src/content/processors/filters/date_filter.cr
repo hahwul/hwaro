@@ -5,6 +5,18 @@ module Hwaro
     module Processors
       module Filters
         module DateFilters
+          # `Time#to_s(format)` raises a bare Crystal `IndexError` on a
+          # malformed format string (a trailing `%`, e.g. `date("%")`) — not a
+          # `Crinja::Error`, so it escapes TemplateEngine#render's rescue and
+          # aborts the whole build with `Index out of bounds` and no template
+          # file:line. Re-raise as a Crinja error so the failure names the bad
+          # format AND points at the template line that wrote it.
+          def self.format_time(time : Time, format : String) : String
+            time.to_s(format)
+          rescue ex : IndexError | ArgumentError
+            raise Crinja::TypeError.new("invalid date format #{format.inspect}: #{ex.message}")
+          end
+
           def self.register(env : Crinja)
             # Date formatting filter
             env.filters["date"] = Crinja.filter({format: "%Y-%m-%d"}) do
@@ -13,7 +25,7 @@ module Hwaro
 
               case value
               when Time
-                value.to_s(format)
+                DateFilters.format_time(value, format)
               when String
                 # Detect format heuristically to avoid exception-based control flow
                 parsed = if value.includes?('T')
@@ -33,7 +45,7 @@ module Hwaro
                          else
                            Time.parse(value, "%Y-%m-%d", Time::Location::UTC) rescue nil
                          end
-                parsed ? parsed.to_s(format) : value
+                parsed ? DateFilters.format_time(parsed, format) : value
               else
                 value.to_s
               end

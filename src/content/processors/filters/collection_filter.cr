@@ -111,6 +111,26 @@ module Hwaro
               end
             end
 
+            # `first` / `last` — override Crinja's built-ins, which call
+            # `Enumerable#first` / `Indexable#last` on the raw value and let
+            # the resulting Crystal exception escape. On an EMPTY sequence
+            # that aborted the whole build with a bare `Empty enumerable` /
+            # `Index out of bounds` and no template file:line, because those
+            # are plain Crystal errors rather than `Crinja::Error`s (see
+            # TemplateEngine#render). An empty section/collection is ordinary
+            # site state — `{{ section.pages | first }}` on a section with no
+            # pages must not be fatal. Jinja2 yields `Undefined` there (which
+            # renders as "" and is falsy), so do the same; every non-empty
+            # input still goes through the upstream code path unchanged, and a
+            # non-sequence target still raises Crinja's located `TypeError`.
+            env.filters["first"] = Crinja.filter do
+              CollectionFilters.empty_sequence?(target) ? Crinja::Value::UNDEFINED : target.first.raw
+            end
+
+            env.filters["last"] = Crinja.filter do
+              CollectionFilters.empty_sequence?(target) ? Crinja::Value::UNDEFINED : target.last.raw
+            end
+
             # Compact filter — removes nil/empty values from an array
             env.filters["compact"] = Crinja.filter do
               safe_array do
@@ -119,6 +139,20 @@ module Hwaro
                   item.raw.nil? || item.to_s.empty?
                 end
               end
+            end
+          end
+
+          # True when `value` is a sequence with no elements — the case
+          # upstream `first`/`last` crash on. Deliberately narrow: anything
+          # that is not a string/hash/indexable (an Int, say) reports `false`
+          # so the upstream filter still raises its located `TypeError`.
+          def self.empty_sequence?(value : Crinja::Value) : Bool
+            case raw = value.raw
+            when String             then raw.empty?
+            when Crinja::SafeString then raw.to_s.empty?
+            when Hash               then raw.empty?
+            when Indexable          then raw.empty?
+            else                         false
             end
           end
 
