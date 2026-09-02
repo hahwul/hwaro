@@ -992,11 +992,20 @@ module Hwaro
         ADMONITION_TYPES = {"NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"}
 
         # Captures a blockquote whose first paragraph starts with `[!TYPE]`.
-        # Group 1: type token (uppercased). Group 2: the rest of the blockquote
-        # body, possibly starting with `</p>` (when the marker was on its own
-        # paragraph) or with the inline body content (when the marker shared a
-        # paragraph with body text via a soft break).
-        ADMONITION_BLOCKQUOTE_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*?)<\/blockquote>/m
+        # Group 1: type token (uppercased). Group 2: whatever else sat on the
+        # marker's own line — the custom title (Obsidian / Hugo syntax:
+        # `> [!NOTE] Custom Title`); empty for a bare marker. Group 3: the rest
+        # of the blockquote body, possibly starting with `</p>` (when the
+        # marker line was a paragraph of its own) or with the inline body
+        # content (when body text followed the marker via a soft break).
+        #
+        # Group 2 stops at the line break, so a same-line title can never be
+        # confused with a soft-broken body. It used to be `\s*(.*?)`, which
+        # swallowed the title into the first body paragraph — `Custom Title`
+        # rendered as body text under the default "Note" heading. Obsidian's
+        # optional fold marker (`[!NOTE]+` / `[!NOTE]-`) is accepted and
+        # dropped; folding itself is not modeled.
+        ADMONITION_BLOCKQUOTE_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][+-]?([^\n]*?)(?:\n|(?=<\/p>))\s*(.*?)<\/blockquote>/m
 
         # Post-processing: rewrite GitHub `> [!TYPE]` blockquotes as admonition divs.
         # Note: the lazy match against `</blockquote>` means a nested blockquote
@@ -1007,9 +1016,12 @@ module Hwaro
 
           html.gsub(ADMONITION_BLOCKQUOTE_RE) do |_|
             type = $1
-            rest = $2
+            custom_title = $2.strip
+            rest = $3
             type_lower = type.downcase
-            type_title = type[0].to_s + type[1..].downcase
+            # The custom title is already inline-rendered (and escaped) by
+            # markd — it was part of the paragraph — so it is emitted as-is.
+            type_title = custom_title.empty? ? type[0].to_s + type[1..].downcase : custom_title
 
             body = if rest.lstrip.starts_with?("</p>")
                      # Marker was alone on its paragraph; remaining content

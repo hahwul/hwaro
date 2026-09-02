@@ -147,6 +147,41 @@ module Hwaro
               next
             end
 
+            # A table inside a single-level blockquote (`> | a | b |`), which is
+            # also how every admonition body is written. The parser only ever
+            # saw unprefixed lines, so a quoted table stayed a paragraph — and
+            # with smart_punctuation on, its `|---|---|` delimiter row was
+            # rewritten to em dashes on top. Strip the marker, parse the run
+            # of quoted lines as an ordinary table, and re-prefix the emitted
+            # HTML so it stays inside the quote.
+            # (FenceTracker already understands quoted fences — `> ```` — so a
+            # verbatim example inside a quote never reaches this branch.)
+            if quote = blockquote_prefix(lines[i])
+              inner = strip_blockquote(lines[i])
+              if table_row?(inner) && i + 1 < lines.size &&
+                 blockquote_prefix(lines[i + 1]) && separator_row?(strip_blockquote(lines[i + 1]))
+                quoted = [] of String
+                j = i
+                while j < lines.size && blockquote_prefix(lines[j])
+                  quoted << strip_blockquote(lines[j])
+                  j += 1
+                end
+                table, consumed = parse_table(quoted, 0)
+                if table
+                  table.to_html(flags: effective, hooks: hooks).each_line(chomp: true) do |html_line|
+                    result << "#{quote}#{html_line}"
+                  end
+                  # A `<table>` starts a type-6 HTML block that runs until a
+                  # blank line; the bare marker is a blank line inside the
+                  # quote, so a quoted paragraph right after the table is
+                  # parsed as markdown instead of being swallowed verbatim.
+                  result << quote.rstrip
+                  i += consumed
+                  next
+                end
+              end
+            end
+
             # Check if this could be the start of a table
             if table_row?(lines[i]) && i + 1 < lines.size && separator_row?(lines[i + 1])
               # Try to parse the table
@@ -165,6 +200,21 @@ module Hwaro
           result.join("\n")
         end
 
+        # The blockquote marker of a single-level quote line: up to three
+        # spaces of indentation, `>`, and the optional following space
+        # (CommonMark's block quote marker). Nil for anything else — including
+        # a nested `> >` quote, whose inner content is left to the paragraph
+        # path as before.
+        BLOCKQUOTE_PREFIX_RE = /\A {0,3}> ?/
+
+        private def blockquote_prefix(line : String) : String?
+          BLOCKQUOTE_PREFIX_RE.match(line).try(&.[0])
+        end
+
+        private def strip_blockquote(line : String) : String
+          line.sub(BLOCKQUOTE_PREFIX_RE, "")
+        end
+
         # Quick check if content might contain tables.
         # Detects the separator row pattern which is the definitive marker of a
         # markdown table (e.g. `|---|---|` or `---|---`).  This avoids false
@@ -176,7 +226,10 @@ module Hwaro
         # paragraph of literal pipes — the plain `|---|---|` form happened to
         # clear the bar, so the bug only showed up once an author added
         # alignment.
-        TABLE_SEPARATOR_CHECK = /^\s*\|?\s*:?-+:?\s*\|/m
+        # The optional `> ` lets a table quoted inside a blockquote (or an
+        # admonition body) past this gate; `process` then parses it through
+        # `blockquote_prefix`.
+        TABLE_SEPARATOR_CHECK = /^\s*(?:> ?)?\s*\|?\s*:?-+:?\s*\|/m
 
         def has_table?(content : String) : Bool
           TABLE_SEPARATOR_CHECK.matches?(content)

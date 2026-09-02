@@ -808,6 +808,30 @@ describe Hwaro::Content::Processors::TableParser do
       out.should_not contain("<table")
     end
 
+    # Regression: the parser only ever saw unprefixed lines, so a GFM table
+    # inside a blockquote — which is how every admonition body is written —
+    # stayed a paragraph of literal pipes (and smart punctuation then turned
+    # its `|---|---|` row into em dashes).
+    it "converts a table inside a single-level blockquote and keeps it quoted" do
+      md = "> intro\n> | a | b |\n> |---|---|\n> | 1 | 2 |"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should contain("> <table>")
+      out.should contain("> <td>1</td>")
+      out.each_line(chomp: true, &.should(start_with(">")))
+    end
+
+    it "ends the quoted table's HTML block so a following quoted paragraph is still markdown" do
+      md = "> | a | b |\n> |---|---|\n> | 1 | 2 |\n> after **bold**"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should contain("> </table>\n>\n> after **bold**")
+    end
+
+    it "leaves a nested `> >` quote's pipes to the paragraph path" do
+      md = "> > | a | b |\n> > |---|---|\n> > | 1 | 2 |"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should_not contain("<table")
+    end
+
     it "does not convert a 4-space-indented table example after a blank line" do
       # CommonMark renders this as an indented code block, not a table.
       md = "Example:\n\n    | a | b |\n    |---|---|\n    | 1 | 2 |"

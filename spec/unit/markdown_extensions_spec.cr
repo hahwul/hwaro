@@ -660,6 +660,47 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
       result.should eq(html)
     end
+
+    # Regression: text after the marker on the same line (`> [!NOTE] Custom
+    # Title`, Obsidian / Hugo syntax) was swallowed into the first body
+    # paragraph under the default "Note" heading.
+    it "uses text on the marker line as the title" do
+      html = "<blockquote>\n<p>[!NOTE] Custom <em>Title</em>\nBody here.</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Custom <em>Title</em></p>))
+      result.should contain("<p>Body here.</p>")
+      result.should_not contain("Custom <em>Title</em>\nBody")
+    end
+
+    it "uses a custom title with a separate-paragraph body" do
+      html = "<blockquote>\n<p>[!WARNING] Read me</p>\n<p>Body paragraph</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Read me</p>))
+      result.should contain("<p>Body paragraph</p>")
+    end
+
+    it "supports a custom title with no body" do
+      html = "<blockquote>\n<p>[!TIP] Only a title</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Only a title</p>))
+      result.should_not contain("<blockquote>")
+    end
+
+    it "accepts and drops Obsidian fold markers" do
+      html = "<blockquote>\n<p>[!TIP]+ Folded\nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Folded</p>))
+      html = "<blockquote>\n<p>[!TIP]-\nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Tip</p>))
+      result.should contain("<p>body</p>")
+    end
+
+    it "keeps the default title for a bare marker with trailing spaces" do
+      html = "<blockquote>\n<p>[!NOTE]   \nbody</p>\n</blockquote>"
+      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      result.should contain(%(<p class="admonition-title">Note</p>))
+    end
   end
 
   describe "heading ids" do

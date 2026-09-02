@@ -363,9 +363,14 @@ GitHub-style alert blocks render as styled callouts. Recognised types: `NOTE`, `
 > [!WARNING]
 >
 > Body can also live in its own paragraph.
+
+> [!TIP] Custom title
+> Text after the marker on the same line becomes the title (Obsidian / Hugo syntax).
 ```
 
-The output is a `<div class="admonition admonition-{type}">` with a title paragraph (`<p class="admonition-title">`) followed by the body. Style it from your CSS — Hwaro emits semantic markup only.
+The output is a `<div class="admonition admonition-{type}">` with a title paragraph (`<p class="admonition-title">`) followed by the body. Without a custom title the type name is used (`Note`, `Tip`, …). Style it from your CSS — Hwaro emits semantic markup only.
+
+Tables work inside admonitions and plain blockquotes: prefix every row with `>` as usual (`> | a | b |`, `> |---|---|`).
 
 Disable by setting `admonitions = false` under `[markdown]` in `config.toml`.
 
