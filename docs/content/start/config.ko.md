@@ -122,6 +122,21 @@ math_engine = "katex"
 
 문법 상세와 예시는 [마크다운 확장](/ko/features/markdown-extensions/)을 참고합니다.
 
+## 콘텐츠
+
+```toml
+[content]
+summary_length = 70
+summary_ellipsis = "…"
+```
+
+| 키 | 타입 | 기본값 | 설명 |
+|-----|------|---------|-------------|
+| summary_length | int | 70 | `<!-- more -->`도 `description`도 없는 페이지의 자동 요약 길이. 공백으로 구분되는 텍스트는 단어 수, CJK 위주 텍스트는 글자 수 ×2. `0`이면 자동 요약 비활성화 |
+| summary_ellipsis | string | "…" | 자동 요약이 잘린 경우에만 끝에 추가되는 문자열 |
+
+`page.summary`가 선택되는 방식은 [콘텐츠 요약](/ko/writing/pages/#콘텐츠-요약)을 참고하세요. `[content.files]`, `[content.new]`, `[[content.generate]]`는 아래 기능 설정 레퍼런스에 있습니다.
+
 ## 퍼머링크
 
 콘텐츠 디렉터리 경로를 다른 URL 경로로 다시 씁니다. 링크를 깨뜨리지 않고 사이트 구조를 바꿀 때 유용합니다.

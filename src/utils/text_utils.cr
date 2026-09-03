@@ -5,6 +5,7 @@
 # - escape_xml: Escape XML special characters
 
 require "digest/sha1"
+require "html"
 require "uri"
 
 module Hwaro
@@ -652,6 +653,127 @@ module Hwaro
             end
           end
         end.strip
+      end
+
+      # Elements whose CONTENT is not prose and must not seed an automatic
+      # summary: code (`<pre>`/`<code>`), raw-text elements, figures/images
+      # (captions and alt text read badly out of context) and headings (a
+      # summary that opens with the page's own title is noise). Matched
+      # with a lazy `[\s\S]*?` so multi-line blocks are removed whole; a
+      # nested `<code>` inside `<pre>` is consumed by the outer match.
+      # Unterminated tags fall through to the generic tag stripper.
+      EXCERPT_SKIP_ELEMENT = /<(pre|code|script|style|figure|h[1-6])(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
+      EXCERPT_SKIP_VOID    = /<img(?:\s[^>]*)?\/?>/i
+      # Markup the Markdown extensions emit whose text is not prose either:
+      # math (`<span class="math …">\(x\)</span>` holds TeX source until
+      # KaTeX/MathJax runs in the browser), footnote reference markers
+      # (`[1]`) and the trailing footnotes section.
+      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math|footnote-ref|footnotes)[^"]*"[^>]*>[\s\S]*?<\/\1\s*>/i
+
+      # Plain prose of a rendered HTML body, for the automatic summary:
+      # code/figure/heading/math/footnote blocks dropped, tags stripped,
+      # entities decoded
+      # (after stripping, so `&lt;p&gt;` can never be read as markup), and
+      # whitespace collapsed to single spaces. The result is TEXT — a
+      # consumer that embeds it in HTML must escape it again.
+      def excerpt_text(html : String) : String
+        cleaned = html.gsub(EXCERPT_SKIP_ELEMENT, " ").gsub(EXCERPT_SKIP_CLASSED, " ").gsub(EXCERPT_SKIP_VOID, " ")
+        text = HTML.unescape(strip_html(cleaned))
+        collapse_whitespace(text)
+      end
+
+      # Trailing characters dropped before the ellipsis so a cut never ends
+      # in `word,…` / `word;…`. Covers ASCII and the full-width CJK forms.
+      EXCERPT_TRAILING_PUNCT = {',', ';', ':', '&', '\uFF0C', '\uFF1B', '\uFF1A', '\u3001', '(', '\uFF08', '[', '-', '\u2013', '\u2014'}
+
+      # Truncate plain text for an automatic summary. Returns the excerpt
+      # and whether anything was cut.
+      #
+      # Units: space-delimited text is measured in WORDS. Text whose
+      # non-space characters are mostly CJK (Chinese/Japanese have no word
+      # boundaries; Korean has them but sentences pack far more meaning
+      # per word) is measured in CHARACTERS with the same numeric setting
+      # scaled ×2, so `length = 70` reads as ~70 words or ~140 CJK
+      # characters. The character cut is never placed inside a Latin word
+      # embedded in CJK text (it backs up to the preceding boundary), and
+      # every index is a Char index, so a multibyte sequence cannot be
+      # split. Entities are not a concern: callers pass decoded text.
+      # `length <= 0` means "no limit" — callers gate the feature on it.
+      def truncate_excerpt(text : String, length : Int32, ellipsis : String) : {String, Bool}
+        text = collapse_whitespace(text)
+        return {text, false} if text.empty? || length <= 0
+
+        cut = if cjk_dominant?(text)
+                truncate_excerpt_chars(text, length * 2)
+              else
+                truncate_excerpt_words(text, length)
+              end
+        return {text, false} unless cut
+
+        cut = cut.rstrip
+        while (last = cut[-1]?) && (last.ascii_whitespace? || EXCERPT_TRAILING_PUNCT.includes?(last))
+          cut = cut.rchop
+        end
+        # Degenerate input (all punctuation before the cut): keep the raw
+        # cut rather than emitting a bare ellipsis.
+        cut = text[0, length].rstrip if cut.empty?
+        {"#{cut}#{ellipsis}", true}
+      end
+
+      # CJK-dominant: more than half of the non-whitespace characters are
+      # CJK (same ranges `tokenize_cjk`/`slugify` use).
+      def cjk_dominant?(text : String) : Bool
+        cjk = 0
+        total = 0
+        text.each_char do |c|
+          next if c.ascii_whitespace?
+          total += 1
+          cjk += 1 if cjk_char?(c)
+        end
+        total > 0 && cjk * 2 > total
+      end
+
+      private def truncate_excerpt_words(text : String, max_words : Int32) : String?
+        words = text.split(' ')
+        return if words.size <= max_words
+        words[0, max_words].join(' ')
+      end
+
+      private def truncate_excerpt_chars(text : String, max_chars : Int32) : String?
+        return if text.size <= max_chars
+        chars = text.chars
+        idx = max_chars
+        # Inside a run of non-CJK, non-space characters (a Latin word or a
+        # number embedded in CJK prose)? Back up to where that run started.
+        if latin_word_char?(chars[idx]) && latin_word_char?(chars[idx - 1])
+          back = idx
+          while back > 0 && latin_word_char?(chars[back - 1])
+            back -= 1
+          end
+          idx = back if back > 0
+        end
+        chars[0, idx].join
+      end
+
+      private def latin_word_char?(c : Char) : Bool
+        !c.ascii_whitespace? && !cjk_char?(c) && (c.alphanumeric? || c == '\'' || c == '_')
+      end
+
+      private def collapse_whitespace(text : String) : String
+        String.build(text.bytesize) do |io|
+          pending = false
+          started = false
+          text.each_char do |c|
+            if c.whitespace?
+              pending = started
+            else
+              io << ' ' if pending
+              pending = false
+              started = true
+              io << c
+            end
+          end
+        end
       end
 
       # Check if a character is in a CJK Unicode range

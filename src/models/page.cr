@@ -115,6 +115,15 @@ module Hwaro
       # New: Summary - content before <!-- more --> marker or auto-generated
       property summary : String?
 
+      # Automatic summary: plain text cut from the rendered body when the
+      # page has neither a `<!-- more -->` marker nor a `description`
+      # (`[content] summary_length`). Populated by
+      # ParseContent#render_page_summaries; nil when the fallback is
+      # disabled, when a higher-precedence source exists, or when the body
+      # has no prose. `summary_truncated` is true only when the text was cut.
+      property auto_summary : String?
+      property summary_truncated : Bool
+
       # New: In search index - whether to include in search index
       property in_search_index : Bool
 
@@ -233,6 +242,8 @@ module Hwaro
         @extra = {} of String => ExtraValue
         @summary = nil
         @summary_html = nil
+        @auto_summary = nil
+        @summary_truncated = false
         @in_search_index = true
         @insert_anchor_links = nil
         @word_count = 0
@@ -450,14 +461,24 @@ module Hwaro
         permalink
       end
 
-      # Check if page has summary (either from <!-- more --> or description)
+      # Check if page has a summary: `<!-- more -->` marker, description, or
+      # the automatic body excerpt (same precedence as `effective_summary`).
       def has_summary? : Bool
-        !@summary.nil? || !@description.nil?
+        !@summary.nil? || !@description.nil? || !@auto_summary.nil?
       end
 
-      # Get effective summary (summary or description fallback)
+      # Get effective summary: `<!-- more -->` chunk > description > automatic
+      # excerpt. The excerpt is returned as a single escaped `<p>` so
+      # `{{ page.summary | safe }}` keeps working for every source.
       def effective_summary : String?
-        @summary || @description
+        @summary || @description || auto_summary_html
+      end
+
+      # The automatic excerpt as HTML: text is escaped (it was decoded from
+      # the rendered body, so `<`/`&` are literal characters) and wrapped in
+      # one paragraph. Nil when there is no automatic summary.
+      def auto_summary_html : String?
+        @auto_summary.try { |text| "<p>#{HTML.escape(text)}</p>" }
       end
 
       # plain_summary memo — see the method below. `@plain_summary_for`
@@ -472,13 +493,14 @@ module Hwaro
       # (`##` headings, code fences, math, literal newlines) never leaks
       # into meta tags — see https://github.com/hahwul/hwaro/issues/491.
       # Returns nil when the page has no summary. Soft-truncates to `limit`
-      # characters on a word boundary.
+      # characters on a word boundary. Falls back to the automatic body
+      # excerpt (already plain text) when no marker summary exists.
       def plain_summary(limit : Int32 = 200) : String?
         # Prefer the rendered summary HTML (populated during parsing); fall
         # back to the raw markdown chunk only if render hasn't run yet —
         # strip_html still removes any inline HTML there.
         source = @summary_html || @summary
-        return unless source
+        return soft_truncate_summary(@auto_summary, limit) unless source
         # Memoize the strip/unescape (it runs per page for og:description
         # AND again per feed item). Keyed on the source string's identity:
         # any reassignment of summary_html/summary swaps in a different
@@ -495,6 +517,10 @@ module Hwaro
           @plain_summary_text = text
           @plain_summary_for = source
         end
+        soft_truncate_summary(text, limit)
+      end
+
+      private def soft_truncate_summary(text : String?, limit : Int32) : String?
         return unless text
         return text if text.size <= limit
 

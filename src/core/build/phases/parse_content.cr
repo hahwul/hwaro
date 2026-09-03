@@ -83,7 +83,13 @@ module Hwaro::Core::Build::Phases::ParseContent
       # extract_summary is only a fallback for hook-based parse paths that
       # skipped it (it re-scans the whole raw_content, so don't repeat it).
       summary_md = page.summary || page.extract_summary
-      next unless summary_md
+      unless summary_md
+        # No marker: the automatic body excerpt, unless a description
+        # already provides the summary (precedence: marker > description >
+        # excerpt). Recorded in recomputed_paths for the same cache reason.
+        recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars)
+        next
+      end
 
       shortcode_results = {} of String => String
       processed = if content_may_contain_shortcodes?(summary_md)
@@ -161,6 +167,59 @@ module Hwaro::Core::Build::Phases::ParseContent
         @section_pages_url_index_cache.clear
       end
     end
+  end
+
+  # Automatic summary for a page with neither `<!-- more -->` nor a
+  # description: run the body through the same shortcode → Markdown →
+  # placeholder sub-pipeline the marker summary uses (so shortcode syntax,
+  # math placeholders and footnote markers never leak), reduce the HTML to
+  # prose (code, figures and headings dropped) and cut it to
+  # `[content] summary_length`. Link resolution is skipped: only text
+  # survives. Highlighting is off — code blocks are discarded anyway.
+  #
+  # Returns true when `page.auto_summary` changed (assigned, or cleared on
+  # a page object that had one). A shortcode
+  # failure here is not retried with a plain-Markdown pass the way the
+  # marker path does: rendering the raw body would put `{{ … }}` syntax in
+  # every listing, and the body pass will report the same error loudly.
+  private def assign_auto_summary(
+    page : Models::Page,
+    site : Models::Site,
+    templates : Hash(String, String),
+    global_vars : Hash(String, Crinja::Value)?,
+  ) : Bool
+    # `had` — a page object recomputed in place (serve rerender) whose
+    # excerpt is now cleared must still drop its cached Crinja value.
+    had = !page.auto_summary.nil?
+    page.auto_summary = nil
+    page.summary_truncated = false
+    summary_cfg = site.config.summary
+    return had unless summary_cfg.enabled?
+    return had if page.description
+    raw = page.raw_content
+    return had if raw.strip.empty?
+
+    md_config = site.config.markdown
+    shortcode_results = {} of String => String
+    processed = if content_may_contain_shortcodes?(raw)
+                  context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                  process_shortcodes_jinja(raw, templates, context, shortcode_results)
+                else
+                  raw
+                end
+    html, _ = Processor::Markdown.render(processed, false, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+    html = replace_shortcode_placeholders(html, shortcode_results)
+
+    text = Utils::TextUtils.excerpt_text(html)
+    return had if text.empty?
+
+    excerpt, truncated = Utils::TextUtils.truncate_excerpt(text, summary_cfg.length, summary_cfg.ellipsis)
+    page.auto_summary = excerpt
+    page.summary_truncated = truncated
+    true
+  rescue ex
+    Logger.warn "Automatic summary skipped for #{page.path}: #{ex.message}"
+    had || false # nil when the raise preceded the assignment above
   end
 
   # Default parsing when no hooks are registered.

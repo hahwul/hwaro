@@ -386,9 +386,9 @@ module Hwaro::Core::Build::Phases::Render
   # "re-render the edited page" into "re-render every listing on every edit".
   # Requiring `<receiver>.<field>` (or the bracket/`attribute=` spellings)
   # keeps prose and markup out of the match.
-  CONTENT_DERIVED_ATTR_RE  = /(?<![\w.])(\w+)\.(?:summary|word_count|reading_time)\b/
-  CONTENT_DERIVED_INDEX_RE = /(?<![\w.])(\w+)\[\s*["'](?:summary|word_count|reading_time)["']\s*\]/
-  CONTENT_DERIVED_ARG_RE   = /attribute\s*=\s*["'](?:summary|word_count|reading_time)\b/
+  CONTENT_DERIVED_ATTR_RE  = /(?<![\w.])(\w+)\.(?:summary(?:_truncated)?|word_count|reading_time)\b/
+  CONTENT_DERIVED_INDEX_RE = /(?<![\w.])(\w+)\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["']\s*\]/
+  CONTENT_DERIVED_ARG_RE   = /attribute\s*=\s*["'](?:summary(?:_truncated)?|word_count|reading_time)\b/
   EXTRA_ATTR_RE            = /(?<![\w.])(\w+)\.extra\b/
   EXTRA_INDEX_RE           = /(?<![\w.])(\w+)\[\s*["']extra["']\s*\]/
   EXTRA_ARG_RE             = /attribute\s*=\s*["']extra\b/
@@ -549,6 +549,8 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, extra_fp(p.extra)) if fields.extra
       if fields.content_derived
         fp_value(digest, p.summary || "")
+        fp_value(digest, p.auto_summary || "")
+        fp_value(digest, p.summary_truncated ? "1" : "0")
         fp_value(digest, p.word_count.to_s)
         fp_value(digest, p.reading_time.to_s)
       end
@@ -2231,26 +2233,27 @@ module Hwaro::Core::Build::Phases::Render
       })
     end
     Crinja::Value.new({
-      "path"         => Crinja::Value.new(p.path),
-      "title"        => Crinja::Value.new(p.title),
-      "description"  => Crinja::Value.new(p.description || ""),
-      "url"          => Crinja::Value.new(p.url),
-      "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-      "image"        => Crinja::Value.new(p.image || ""),
-      "section"      => Crinja::Value.new(p.section),
-      "draft"        => Crinja::Value.new(p.draft),
-      "toc"          => Crinja::Value.new(p.toc),
-      "render"       => Crinja::Value.new(p.render),
-      "is_index"     => Crinja::Value.new(p.is_index),
-      "generated"    => Crinja::Value.new(p.generated),
-      "synthesized"  => Crinja::Value.new(p.synthesized?),
-      "in_sitemap"   => Crinja::Value.new(p.in_sitemap),
-      "language"     => Crinja::Value.new(p.language || default_language),
-      "translations" => Crinja::Value.new(translations),
-      "weight"       => Crinja::Value.new(p.weight),
-      "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
-      "word_count"   => Crinja::Value.new(p.word_count),
-      "reading_time" => Crinja::Value.new(p.reading_time),
+      "path"              => Crinja::Value.new(p.path),
+      "title"             => Crinja::Value.new(p.title),
+      "description"       => Crinja::Value.new(p.description || ""),
+      "url"               => Crinja::Value.new(p.url),
+      "date"              => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+      "image"             => Crinja::Value.new(p.image || ""),
+      "section"           => Crinja::Value.new(p.section),
+      "draft"             => Crinja::Value.new(p.draft),
+      "toc"               => Crinja::Value.new(p.toc),
+      "render"            => Crinja::Value.new(p.render),
+      "is_index"          => Crinja::Value.new(p.is_index),
+      "generated"         => Crinja::Value.new(p.generated),
+      "synthesized"       => Crinja::Value.new(p.synthesized?),
+      "in_sitemap"        => Crinja::Value.new(p.in_sitemap),
+      "language"          => Crinja::Value.new(p.language || default_language),
+      "translations"      => Crinja::Value.new(translations),
+      "weight"            => Crinja::Value.new(p.weight),
+      "summary"           => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
+      "summary_truncated" => Crinja::Value.new(p.summary_truncated),
+      "word_count"        => Crinja::Value.new(p.word_count),
+      "reading_time"      => Crinja::Value.new(p.reading_time),
       # Leaf fields a full page_obj also exposes, so iterated lists
       # (section.pages / site.pages / term.pages) match the documented Page
       # shape. Only PAGE-LOCAL fields are cached here. `permalink` is omitted
@@ -3057,23 +3060,24 @@ module Hwaro::Core::Build::Phases::Render
       "language"     => Crinja::Value.new(page_language),
       "translations" => translations_crinja,
       # New properties
-      "authors"         => authors_crinja,
-      "tags"            => tags_crinja,
-      "taxonomies"      => cached_raw["taxonomies"].as(Crinja::Value),
-      "assets"          => assets_crinja,
-      "extra"           => extra_crinja,
-      "summary"         => Crinja::Value.new(page.summary_html || page.effective_summary || ""),
-      "word_count"      => Crinja::Value.new(page.word_count),
-      "reading_time"    => Crinja::Value.new(page.reading_time),
-      "permalink"       => Crinja::Value.new(page.permalink || ""),
-      "weight"          => Crinja::Value.new(page.weight),
-      "in_search_index" => Crinja::Value.new(page.in_search_index),
-      "lower"           => lower_obj || Crinja::Value.new(nil),
-      "higher"          => higher_obj || Crinja::Value.new(nil),
-      "ancestors"       => Crinja::Value.new(ancestors_array),
-      "series"          => Crinja::Value.new(page.series || ""),
-      "series_index"    => Crinja::Value.new(page.series_index),
-      "series_pages"    => if page.series.nil?
+      "authors"           => authors_crinja,
+      "tags"              => tags_crinja,
+      "taxonomies"        => cached_raw["taxonomies"].as(Crinja::Value),
+      "assets"            => assets_crinja,
+      "extra"             => extra_crinja,
+      "summary"           => Crinja::Value.new(page.summary_html || page.effective_summary || ""),
+      "summary_truncated" => Crinja::Value.new(page.summary_truncated),
+      "word_count"        => Crinja::Value.new(page.word_count),
+      "reading_time"      => Crinja::Value.new(page.reading_time),
+      "permalink"         => Crinja::Value.new(page.permalink || ""),
+      "weight"            => Crinja::Value.new(page.weight),
+      "in_search_index"   => Crinja::Value.new(page.in_search_index),
+      "lower"             => lower_obj || Crinja::Value.new(nil),
+      "higher"            => higher_obj || Crinja::Value.new(nil),
+      "ancestors"         => Crinja::Value.new(ancestors_array),
+      "series"            => Crinja::Value.new(page.series || ""),
+      "series_index"      => Crinja::Value.new(page.series_index),
+      "series_pages"      => if page.series.nil?
         # Mirror related_posts below: series-less pages (the default) must not
         # acquire the cache mutex just to hand back the same empty array.
         Crinja::Value.new([] of Crinja::Value)

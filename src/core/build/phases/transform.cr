@@ -713,16 +713,17 @@ module Hwaro::Core::Build::Phases::Transform
         # computed after this phase, and permalink lazily during render, so both
         # are intentionally omitted.)
         Crinja::Value.new({
-          "title"        => Crinja::Value.new(p.title),
-          "url"          => Crinja::Value.new(p.url),
-          "date"         => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
-          "description"  => Crinja::Value.new(p.description || ""),
-          "image"        => Crinja::Value.new(p.image || ""),
-          "summary"      => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
-          "tags"         => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
-          "reading_time" => Crinja::Value.new(p.reading_time),
-          "word_count"   => Crinja::Value.new(p.word_count),
-          "language"     => Crinja::Value.new(p.language || site.config.default_language),
+          "title"             => Crinja::Value.new(p.title),
+          "url"               => Crinja::Value.new(p.url),
+          "date"              => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
+          "description"       => Crinja::Value.new(p.description || ""),
+          "image"             => Crinja::Value.new(p.image || ""),
+          "summary"           => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
+          "summary_truncated" => Crinja::Value.new(p.summary_truncated),
+          "tags"              => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
+          "reading_time"      => Crinja::Value.new(p.reading_time),
+          "word_count"        => Crinja::Value.new(p.word_count),
+          "language"          => Crinja::Value.new(p.language || site.config.default_language),
         })
       end
 
