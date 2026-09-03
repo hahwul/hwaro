@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Search: opt-in sharded index — `[search] shards = "section" | "language" | "section-language"` splits `search.json` into `search/<id>.json` files plus a `search/index.json` manifest so clients lazy-load only the shards they need; `single_file = false` drops the classic file, `content_max_length` caps each entry's `content` at a word boundary
+
 ## v0.20.1
 
 ### Added

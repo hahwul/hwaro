@@ -758,6 +758,9 @@ module Hwaro
             filename = "search.json"
             exclude = []              # Exclude paths or patterns from search index
             tokenize_cjk = false      # Set true for Korean/Japanese/Chinese substring matching
+            # shards = "none"         # "section" | "language" | "section-language": emit search/<id>.json + search/index.json
+            # single_file = true      # With shards on, false drops the classic search.json
+            # content_max_length = 0  # > 0 truncates each entry's content (word boundary) to shrink the index
 
             TOML
         end
