@@ -67,6 +67,8 @@ module Hwaro
           # (path-sort-first winner, same rule as sitemap/search/feeds) so
           # the index never lists an unwritten loser.
           eligible = DiscoveryPages.dedupe_by_url(pages.select(&.search_index_eligible?))
+          # llms.txt describes the CURRENT docs: latest version only.
+          eligible.select! { |p| config.versions.in_llms?(p) } if config.versions.enabled?
 
           # Group by section, keyed by display heading. A section's heading
           # comes from its `_index.md`, which is the only page modeled as a
@@ -177,6 +179,7 @@ module Hwaro
           eligible_pages = DiscoveryPages.dedupe_by_url(pages.select(&.search_index_eligible?))
             .reject!(&.raw_content.empty?)
             .sort_by!(&.url)
+          eligible_pages.select! { |p| config.versions.in_llms?(p) } if config.versions.enabled?
 
           base_url = config.base_url
           base_url = base_url.rstrip('/') unless base_url.empty?

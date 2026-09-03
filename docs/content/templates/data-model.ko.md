@@ -316,6 +316,8 @@ john-doe:
 | page.updated | String? | 마지막 수정일 |
 | page.language | String | 적용된 언어 코드 |
 | page.translations | Array<TranslationLink> | 언어별 번역본 |
+| page.version | Object? | 문서 버전 (버전이 없으면 `nil`) — [page.version](#pageversion) 참고 |
+| page.version_links | Array<VersionLink> | 버전 전환기 행 (버전이 없으면 빈 배열) |
 
 렌더링된 HTML 콘텐츠는 최상위 `content` 변수로 제공됩니다.
 
@@ -433,6 +435,38 @@ john-doe:
   / <span>{{ page.title }}</span>
 </nav>
 ```
+
+### page.version
+
+`[[versions.list]]`가 있는 사이트에서만 제공됩니다([버전별 문서](/ko/features/versioned-docs/) 참고). 어떤 버전 디렉터리에도 속하지 않는 페이지에서는 `nil`입니다.
+
+| 속성 | 타입 | 설명 |
+|------|------|------|
+| .name | String | 버전 이름 (URL 세그먼트, 예: "v2") |
+| .label | String | 표시 라벨 |
+| .latest | Bool | 최신 버전인지 |
+| .url | String | 페이지 언어 기준 버전 루트 URL |
+
+### page.version_links
+
+설정된 버전마다 한 행씩, 설정 순서대로.
+
+| 속성 | 타입 | 설명 |
+|------|------|------|
+| .name | String | 버전 이름 |
+| .label | String | 표시 라벨 |
+| .latest | Bool | 최신 버전인지 |
+| .url | String | 그 버전에 같은 페이지가 있으면 그 URL, 없으면 그 버전의 루트 |
+| .exists | Bool | 대응 페이지 존재 여부 |
+| .current | Bool | 현재 페이지의 버전인지 |
+
+```jinja
+{% for v in page.version_links %}
+<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label }}</a>
+{% endfor %}
+```
+
+전역 `versions` 리스트(`{% for v in versions %}`, `versions.latest`, `versions.all`)는 현재 페이지 언어 기준 모든 버전의 루트 URL을 노출합니다.
 
 ### page.translations
 

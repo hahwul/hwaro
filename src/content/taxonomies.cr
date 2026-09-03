@@ -215,6 +215,7 @@ module Hwaro
 
         site.pages.each do |page|
           next if page.excluded_from_listings?
+          next unless site.config.versions.in_taxonomies?(page)
           # Set by the render phase for pages it refused to write (URL
           # traverses out of the output dir): the term page would link a
           # 404 and the term feed would advertise it.
@@ -255,6 +256,9 @@ module Hwaro
 
         site.pages.each do |page|
           next if page.excluded_from_listings?
+          # `[versions] taxonomies = "latest"` (default): only the latest
+          # version (plus unversioned content) populates term pages.
+          next unless config.versions.in_taxonomies?(page)
           # Runs at generate time, after the render phase flagged the pages
           # it refused to write — keep them off the term pages and feeds.
           next if page.output_suppressed

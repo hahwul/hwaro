@@ -17,4 +17,4 @@ Hwaro ships with a comprehensive set of built-in features — no plugins require
 
 **Files & Environment** — Environment variables, environment-specific config overrides, auto-includes for CSS/JS, and content file publishing.
 
-**Platform** — Multilingual support, image processing, PWA, AMP, and built-in deployment to multiple targets.
+**Platform** — Multilingual support, versioned docs, image processing, PWA, AMP, and built-in deployment to multiple targets.

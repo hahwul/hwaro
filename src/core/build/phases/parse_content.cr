@@ -21,6 +21,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     # Link multilingual translations between pages/sections (for language switchers)
     if config = ctx.config
       Content::Multilingual.link_translations!(ctx.all_pages, config)
+      Content::Versions.link!(ctx.all_pages, config)
     end
 
     # Build subsections first (needed for flat navigation ordering)
@@ -816,6 +817,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       language: page.language,
       date: page.date,
       title: page.title,
+      version: page.version,
     )
     page.url = url
     page.permalink_error = error

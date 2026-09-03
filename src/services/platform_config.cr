@@ -459,6 +459,7 @@ module Hwaro
           language: language,
           date: date,
           title: title,
+          version: @config.versions.for_path(relative_path),
         )
         return if error
         url

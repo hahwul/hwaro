@@ -53,10 +53,28 @@ module Hwaro
       # declaration order, front-matter registrations are folded in
       # `path`-sorted order, and `assemble_tree` sorts every level by
       # `{weight, name, identifier}`.
-      def self.build(config : Models::Config, pages : Array(Models::Page), sections : Array(Models::Section)) : Hash(String, Hash(String, Array(Entry)))
+      #
+      # `version` scopes front-matter registrations on a versioned site
+      # (`[[versions.list]]`): entries from unversioned pages always appear;
+      # entries from versioned pages appear only in that version's menus
+      # (`version` = that version) — and, for the unversioned menus
+      # (`version` = nil), only the LATEST version's entries do, so a site
+      # nav registered from `docs/v2/_index.md` shows up on the homepage
+      # without its v1 twin next to it. Config `[[menus.*]]` entries are
+      # static URLs and appear everywhere.
+      def self.build(config : Models::Config, pages : Array(Models::Page), sections : Array(Models::Section), version : Models::VersionConfig? = nil) : Hash(String, Hash(String, Array(Entry)))
         default_lang = config.default_language
         languages = ([default_lang] + config.languages.keys.sort!).uniq
         content = (pages + sections).sort_by(&.path)
+        if config.versions.enabled?
+          content.select! do |p|
+            if page_version = p.version
+              version ? page_version.same?(version) : page_version.latest
+            else
+              true
+            end
+          end
+        end
 
         result = {} of String => Hash(String, Array(Entry))
         languages.each do |lang|

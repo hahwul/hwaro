@@ -59,6 +59,10 @@ module Hwaro
         # navigational listing pages don't pollute search results. Both match
         # the guards sitemap.cr / feeds.cr / llms.cr already apply.
         search_pages = pages.reject { |p| !p.search_index_eligible? }
+        # `[versions] search = "latest"` (default) keeps older versions out
+        # of the index; "all" indexes every version (each record then
+        # carries a `version` field for client-side filtering).
+        search_pages.select! { |p| config.versions.in_search?(p) } if config.versions.enabled?
 
         search_pages = DiscoveryPages.dedupe_by_url(search_pages)
         DiscoveryPages.reject_excluded!(search_pages, config.search.exclude)
@@ -313,6 +317,9 @@ module Hwaro
           # Always include the page language so the client can scope results
           # to the current language (mirrors per-language feeds).
           data["lang"] = page.language || config.default_language
+          if version = page.version
+            data["version"] = version.name
+          end
 
           data
         end

@@ -141,10 +141,14 @@ module Hwaro
             end
           end
 
-          # 2. Add subsections (handling transparency)
+          # 2. Add subsections (handling transparency). A version root
+          # (`docs/v2`) is not a subsection of its unversioned parent
+          # (`docs`) — listings never cross a version boundary.
+          section_version = @config.versions.for_path(normalized_name)
           if subsections = @sections_by_parent[normalized_name]?
             subsections.each do |s|
               next unless s.language == language
+              next unless s.version.same?(section_version)
 
               if s.transparent
                 # Recursive bubble up: get pages from this sub-section
@@ -169,6 +173,7 @@ module Hwaro
 
         # Initial call: filter by language and collect all content to improve performance
         content_items = items || all_content.select { |p| p.language == language }
+        section_version = @config.versions.for_path(normalized_name)
 
         content_items.each do |p|
           if p.is_a?(Section)
@@ -184,6 +189,7 @@ module Hwaro
             parent_dir = "" if parent_dir == "."
 
             if parent_dir == normalized_name
+              next unless p.version.same?(section_version)
               if p.transparent
                 # Recursive bubble up: get pages from this sub-section
                 seen ||= Set{normalized_name}

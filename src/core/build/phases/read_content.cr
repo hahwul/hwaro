@@ -110,6 +110,10 @@ module Hwaro::Core::Build::Phases::ReadContent
         end
         page.is_index = is_index
         page.language = language
+        # Version membership is purely positional: whatever `[[versions.list]]`
+        # directory the file sits under. nil (the common case) when the site
+        # declares no versions.
+        page.version = config.try(&.versions.for_path(relative_path))
       else
         # Collect raw files (JSON, XML) and content files
         next if seen_raw.includes?(relative_path)
@@ -181,6 +185,7 @@ module Hwaro::Core::Build::Phases::ReadContent
       end
       page = Models::Page.new(plan.path)
       page.section = plan.section
+      page.version = config.versions.for_path(plan.path)
       page.synthesis = Models::Page::Synthesis.new(plan.markdown, plan.item, plan.origin)
       ctx.pages << page
       collected_paths << plan.path

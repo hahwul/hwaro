@@ -71,6 +71,7 @@ require "./content/processors/syntax_highlighter"
 require "./content/processors/image_processor"
 require "./content/processors/template"
 require "./content/multilingual"
+require "./content/versions"
 
 # Load lifecycle system
 require "./core/lifecycle"

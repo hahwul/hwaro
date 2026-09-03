@@ -121,9 +121,10 @@ module Hwaro
         language : String?,
         date : Time?,
         title : String,
+        version : Models::VersionConfig? = nil,
       ) : String
         url, error = resolve_url_lenient(relative_path, config,
-          slug: slug, custom_path: custom_path, language: language, date: date, title: title)
+          slug: slug, custom_path: custom_path, language: language, date: date, title: title, version: version)
         if error
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONTENT,
@@ -148,7 +149,22 @@ module Hwaro
         language : String?,
         date : Time?,
         title : String,
+        version : Models::VersionConfig? = nil,
       ) : {String, String?}
+        # Versioned content: swap the version's content directory for the
+        # directory it publishes under BEFORE anything else looks at the
+        # path, so `[permalinks]` rules, bundle detection and the index
+        # rules all see the published shape. `content/docs/v2/install.md`
+        # becomes `docs/install.md` for the latest version at root, and
+        # `docs/v1/install.md` for an older one (`docs/<name>/…`, which only
+        # differs from the source path when `name` != the directory's
+        # basename). An explicit `path` front matter still wins outright
+        # below, exactly like the language prefix rule.
+        if version && config && (rest = version.relative_path(relative_path))
+          dir = version.url_dir(config.versions.latest_at_root)
+          relative_path = dir.empty? ? rest : "#{dir}/#{rest}"
+        end
+
         stem = Path[relative_path].stem
 
         # Remove language suffix from stem (e.g. "hello-world.ko" -> "hello-world")
