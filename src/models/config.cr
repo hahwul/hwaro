@@ -1875,11 +1875,30 @@ module Hwaro
       rescue ex : Hwaro::HwaroError
         raise ex
       rescue ex
+        # `[versions]` (switch table) and `[[versions]]` (entry array) in one
+        # file is the natural first attempt at versioned docs, and TOML
+        # rejects it with a bare type mismatch ("expected versions to be an
+        # Array"). Name the fix instead of the symptom.
+        if mixed_versions_forms?(content)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "Invalid TOML in #{path}: `[versions]` and `[[versions]]` cannot both be used — a key is either a table or an array of tables.",
+            hint: "Keep the switches in [versions] and declare each version as [[versions.list]] (or drop the [versions] table and use bare [[versions]] entries with default switches). See https://hwaro.hahwul.com/features/versioned-docs/.",
+          )
+        end
         raise Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_CONFIG,
           message: "Invalid TOML in #{path}: #{ex.message}",
           hint: "Check TOML syntax in #{path}.",
         )
+      end
+
+      VERSIONS_TABLE_HEADER_RE = /^[ \t]*\[[ \t]*versions[ \t]*\][ \t]*(#.*)?$/m
+      VERSIONS_ARRAY_HEADER_RE = /^[ \t]*\[\[[ \t]*versions[ \t]*\]\][ \t]*(#.*)?$/m
+
+      private def self.mixed_versions_forms?(content : String) : Bool
+        text = content.scrub
+        text.matches?(VERSIONS_TABLE_HEADER_RE) && text.matches?(VERSIONS_ARRAY_HEADER_RE)
       end
 
       # Deep-merge two TOML hashes.  Values in `override` take precedence.

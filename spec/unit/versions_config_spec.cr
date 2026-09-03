@@ -115,6 +115,16 @@ describe Hwaro::Models::VersionsConfig do
       expect_config_error(BASE + "[[versions]]\nname = \"a\"\npath = \"/\"\n") { |msg| msg.should contain("invalid path") }
     end
 
+    it "explains a config that mixes [versions] with [[versions]]" do
+      expect_config_error(BASE + "[versions]\nlatest_at_root = true\n\n[[versions]]\nname = \"v1\"\n") do |msg|
+        msg.should contain("`[versions]` and `[[versions]]` cannot both be used")
+      end
+      # Reverse declaration order trips a different parser message; the hint must still fire.
+      expect_config_error(BASE + "[[versions]]\nname = \"v1\"\n\n[versions]\nlatest_at_root = true\n") do |msg|
+        msg.should contain("cannot both be used")
+      end
+    end
+
     it "rejects unknown switch values" do
       expect_config_error(BASE + "[versions]\nsearch = \"some\"\n[[versions.list]]\nname = \"a\"\n") { |msg| msg.should contain("must be \"latest\" or \"all\"") }
     end
