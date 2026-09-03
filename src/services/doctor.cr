@@ -432,6 +432,8 @@ module Hwaro
         "sass",
         # Useful but not essential to nag about
         "related", "series", "pagination",
+        # Git metadata — only meaningful inside a repository with full history
+        "git",
         # Navigation menus — many sites hardcode nav in the theme instead
         "menus",
         # Content authoring niceties

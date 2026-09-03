@@ -343,6 +343,7 @@ john-doe:
 | page.series_index | Int | 시리즈 안에서 1부터 시작하는 순번(`[series]` 활성화 필요) |
 | page.series_pages | Array<Page> | 같은 시리즈의 모든 페이지(`series_weight` 순 정렬) |
 | page.related_posts | Array<Page> | 택소노미 항목을 공유하는 페이지(`[related]` 활성화 필요) |
+| page.git | Object? | 소스 파일의 커밋 메타데이터(`[git]` 활성화 필요, 커밋되지 않았거나 생성된 페이지는 `nil`). 필드: `hash`, `short_hash`, `lastmod`(Time), `first_commit`(Time), `author_name`, `author_email` — [Git 메타데이터](/ko/features/git-info/) 참고 |
 
 ### 불리언 플래그
 

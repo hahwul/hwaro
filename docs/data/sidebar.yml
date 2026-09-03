@@ -81,6 +81,8 @@
           url: /features/menus/
         - title: Output Formats
           url: /features/output-formats/
+        - title: Git Metadata
+          url: /features/git-info/
     - title: Build & Performance
       items:
         - title: Incremental Build

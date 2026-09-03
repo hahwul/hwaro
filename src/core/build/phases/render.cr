@@ -346,7 +346,7 @@ module Hwaro::Core::Build::Phases::Render
       next true if page.synthesized?
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-      next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page))
+      next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page))
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
       next false unless page_set_changed || section_set_changed
@@ -540,6 +540,10 @@ module Hwaro::Core::Build::Phases::Render
       fp_list(digest, p.authors)
       fp_list(digest, p.tags)
       fp_list(digest, p.assets.sort)
+      # Listings can read `p.git.*` directly (not only the `updated` it feeds),
+      # so a new commit must move the set fingerprint; folded only when
+      # present so disabled sites keep their pre-feature digest.
+      fp_value(digest, page_git_hash(p)) if p.git
       fp_value(digest, "t#{p.taxonomies.size}")
       p.taxonomies.keys.sort!.each do |k|
         fp_value(digest, k)
@@ -730,7 +734,16 @@ module Hwaro::Core::Build::Phases::Render
     # up-to-date would let filter_changed_pages skip it forever.
     return unless output_path
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page))
+    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page))
+  end
+
+  # Fingerprint of the page's `[git]` metadata (see CacheEntry#git_hash):
+  # the commit id plus both timestamps, which is everything `page.git` and
+  # the `updated`/`date` fallbacks can render. "" when the page carries no
+  # git info so disabled sites and legacy entries compare equal.
+  private def page_git_hash(page : Models::Page) : String
+    return "" unless git = page.git
+    "#{git.hash}:#{git.lastmod.to_unix}:#{git.first_commit.to_unix}"
   end
 
   # Fingerprint of a page bundle's colocated asset names (see
@@ -2262,6 +2275,7 @@ module Hwaro::Core::Build::Phases::Render
       # cross-page value @page_crinja_value_cache cannot keep fresh on the
       # incremental `serve` path, where only the changed page is invalidated.
       "updated"         => Crinja::Value.new(p.updated.try(&.to_s("%Y-%m-%d")) || ""),
+      "git"             => git_crinja_for(p),
       "in_search_index" => Crinja::Value.new(p.in_search_index),
       "series"          => Crinja::Value.new(p.series || ""),
       "tags"            => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
@@ -2272,6 +2286,23 @@ module Hwaro::Core::Build::Phases::Render
         p.extra.each_with_object({} of String => Crinja::Value) { |(k, v), h|
           h[k] = Utils::CrinjaUtils.from_extra(v)
         }),
+    })
+  end
+
+  # `page.git` as templates see it: a mapping of the commit fields, or nil
+  # (renders empty, `{% if page.git %}` is false) when the page has no
+  # history. `lastmod`/`first_commit` are Time values so `| date(format=…)`
+  # formats them and comparisons work; their `to_s` keeps the author's
+  # UTC offset.
+  private def git_crinja_for(page : Models::Page) : Crinja::Value
+    return Crinja::Value.new(nil) unless git = page.git
+    Crinja::Value.new({
+      "hash"         => Crinja::Value.new(git.hash),
+      "short_hash"   => Crinja::Value.new(git.short_hash),
+      "lastmod"      => Crinja::Value.new(git.lastmod),
+      "first_commit" => Crinja::Value.new(git.first_commit),
+      "author_name"  => Crinja::Value.new(git.author_name),
+      "author_email" => Crinja::Value.new(git.author_email),
     })
   end
 
@@ -3071,6 +3102,7 @@ module Hwaro::Core::Build::Phases::Render
       "reading_time"      => Crinja::Value.new(page.reading_time),
       "permalink"         => Crinja::Value.new(page.permalink || ""),
       "weight"            => Crinja::Value.new(page.weight),
+      "git"               => cached_raw["git"].as(Crinja::Value),
       "in_search_index"   => Crinja::Value.new(page.in_search_index),
       "lower"             => lower_obj || Crinja::Value.new(nil),
       "higher"            => higher_obj || Crinja::Value.new(nil),

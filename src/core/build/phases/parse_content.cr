@@ -426,6 +426,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     # Redirect support — applies to both regular pages and sections
     page.redirect_to = data[:redirect_to]
 
+    # `[git]` metadata + date fallbacks. Must run before calculate_page_url
+    # so a `[permalinks]` date token can resolve from a git-derived `date`.
+    apply_git_info(page)
+
     # Calculate word count and reading time
     page.calculate_word_count
     page.calculate_reading_time
@@ -453,6 +457,26 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     # Calculate URL
     calculate_page_url(page)
+  end
+
+  # Attach the page's commit metadata (see Builder#@git_info) and fill the
+  # `updated`/`date` gaps front matter left, per `[git] use_lastmod` /
+  # `use_date`. Always resets `page.git` first: the serve re-parse works on
+  # the live page object, and a feature toggled off mid-session must not
+  # leave the previous build's value behind. Front matter always wins — a
+  # fallback only applies to a field the file did not set. Synthesized
+  # (`[[content.generate]]`) pages have no source file and never match.
+  private def apply_git_info(page : Models::Page)
+    page.git = nil
+    return unless info_map = @git_info
+    return if page.synthesized?
+    return unless info = info_map[page.path]?
+
+    page.git = info
+    git_config = @config.try(&.git)
+    return unless git_config
+    page.updated = info.lastmod if git_config.use_lastmod && page.updated.nil?
+    page.date = info.first_commit if git_config.use_date && page.date.nil?
   end
 
   private def parse_content_sequential(pages : Array(Models::Page))

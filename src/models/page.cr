@@ -2,6 +2,7 @@ require "html"
 require "crinja"
 require "../utils/text_utils"
 require "../content/processors/fence_tracker"
+require "./git_info"
 
 module Hwaro
   module Models
@@ -211,6 +212,11 @@ module Hwaro
       # New: Redirect to - URL to redirect this page to
       property redirect_to : String?
 
+      # Commit metadata for this page's source file (`[git] enabled = true`).
+      # Nil when the feature is off, the file is uncommitted, the site is not
+      # a git checkout, or the page is synthesized/generated.
+      property git : GitInfo?
+
       def initialize(@path : String)
         @title = "Untitled"
         @draft = false
@@ -258,6 +264,7 @@ module Hwaro
         @series_pages = [] of Page
         @related_posts = [] of Page
         @redirect_to = nil
+        @git = nil
         @cascade_fingerprint = ""
         @build_warnings = [] of String
         @parse_failed = false

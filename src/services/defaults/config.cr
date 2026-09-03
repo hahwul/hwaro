@@ -58,6 +58,10 @@ module Hwaro
             limit = 5
             taxonomies = ["tags"]
 
+            # Git Metadata - page.git + `updated` fallback from commit history
+            # [git]
+            # enabled = true
+
             # Plugins Configuration
             [plugins]
             processors = ["markdown"]  # List of enabled processors
@@ -152,6 +156,10 @@ module Hwaro
             enabled = true
             limit = 5
             taxonomies = ["tags"]
+
+            # Git Metadata - page.git + `updated` fallback from commit history
+            # [git]
+            # enabled = true
 
             # Plugins Configuration
             [plugins]
@@ -256,6 +264,9 @@ module Hwaro
             str << "enabled = true\n"
             str << "limit = 5\n"
             str << "taxonomies = [\"tags\"]\n\n"
+            str << "# Git Metadata - page.git + `updated` fallback from commit history\n"
+            str << "# [git]\n"
+            str << "# enabled = true\n\n"
             str << "# Plugins Configuration\n"
             str << "[plugins]\n"
             str << "processors = [\"markdown\"]  # List of enabled processors\n\n"

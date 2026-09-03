@@ -26,6 +26,7 @@ module Hwaro
         "pagination"       => {description: "Pagination settings", snippet: -> { pagination(commented: true) }},
         "series"           => {description: "Series grouping", snippet: -> { series(commented: true) }},
         "related"          => {description: "Related posts", snippet: -> { related(commented: true) }},
+        "git"              => {description: "Git commit metadata (page.git, lastmod fallback)", snippet: -> { git(commented: true) }},
         "markdown"         => {description: "Markdown parser options", snippet: -> { markdown(commented: true) }},
         "sitemap"          => {description: "Sitemap generation", snippet: -> { sitemap(commented: true) }},
         "robots"           => {description: "Robots.txt generation", snippet: -> { robots(commented: true) }},
@@ -718,6 +719,42 @@ module Hwaro
             enabled = true
             limit = 5
             taxonomies = ["tags"]
+
+            TOML
+        end
+      end
+
+      def self.git(commented : Bool = false) : String
+        if commented
+          <<-TOML
+
+            # =============================================================================
+            # Git Metadata (Optional)
+            # =============================================================================
+            # Expose each page's commit history as page.git (hash, short_hash, lastmod,
+            # first_commit, author_name, author_email) and fill a missing `updated`
+            # from the latest commit. Needs a full-history checkout (fetch-depth: 0).
+
+            # [git]
+            # enabled = true
+            # use_lastmod = true   # page.updated ← latest commit when front matter has none
+            # use_date = false     # page.date ← first commit when front matter has none
+
+            TOML
+        else
+          <<-TOML
+
+            # =============================================================================
+            # Git Metadata
+            # =============================================================================
+            # Expose each page's commit history as page.git (hash, short_hash, lastmod,
+            # first_commit, author_name, author_email) and fill a missing `updated`
+            # from the latest commit. Needs a full-history checkout (fetch-depth: 0).
+
+            [git]
+            enabled = true
+            use_lastmod = true   # page.updated ← latest commit when front matter has none
+            use_date = false     # page.date ← first commit when front matter has none
 
             TOML
         end

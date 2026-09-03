@@ -168,6 +168,21 @@ module Hwaro
       end
     end
 
+    # `[git]` — per-page commit metadata (see Core::Build::GitInfo).
+    class GitConfig
+      property enabled : Bool
+      # Fill `page.updated` from the latest commit when front matter has none.
+      property use_lastmod : Bool
+      # Fill `page.date` from the first commit when front matter has none.
+      property use_date : Bool
+
+      def initialize
+        @enabled = false
+        @use_lastmod = true
+        @use_date = false
+      end
+    end
+
     # Plugin configuration for extensibility
     class PluginConfig
       property processors : Array(String)
@@ -1284,6 +1299,7 @@ module Hwaro
       property markdown : MarkdownConfig
       property series : SeriesConfig
       property related : RelatedConfig
+      property git : GitConfig
       property deployment : DeploymentConfig
       property assets : AssetsConfig
       property sass : SassConfig
@@ -1328,6 +1344,7 @@ module Hwaro
         @markdown = MarkdownConfig.new
         @series = SeriesConfig.new
         @related = RelatedConfig.new
+        @git = GitConfig.new
         @deployment = DeploymentConfig.new
         @assets = AssetsConfig.new
         @sass = SassConfig.new
@@ -1565,6 +1582,7 @@ module Hwaro
         load_markdown(config)
         load_series(config)
         load_related(config)
+        load_git(config)
         load_permalinks(config)
         load_assets(config)
         load_sass(config)
@@ -1594,7 +1612,7 @@ module Hwaro
       KNOWN_TOP_LEVEL_KEYS = %w[
         title description base_url default_language
         amp assets auto_includes build content data deployment doctor feeds
-        highlight image_processing languages links llms markdown menus og
+        git highlight image_processing languages links llms markdown menus og
         outputs pagination permalinks plugins pwa related robots sass search
         series serve sitemap static taxonomies
       ]
@@ -2423,6 +2441,18 @@ module Hwaro
         config.related.limit = int_value(s["limit"]?, config.related.limit).clamp(0, Int32::MAX)
         if taxonomies = s["taxonomies"]?.try(&.as_a?)
           config.related.taxonomies = taxonomies.compact_map(&.as_s?)
+        end
+      end
+
+      private def self.load_git(config : Config)
+        return unless s = config.raw["git"]?.try(&.as_h?)
+
+        config.git.enabled = bool_value(s["enabled"]?, config.git.enabled)
+        config.git.use_lastmod = bool_value(s["use_lastmod"]?, config.git.use_lastmod)
+        config.git.use_date = bool_value(s["use_date"]?, config.git.use_date)
+        s.each_key do |key|
+          next if key.in?("enabled", "use_lastmod", "use_date")
+          Logger.warn "[git]: unknown key '#{key}' — hwaro does not read it."
         end
       end
 

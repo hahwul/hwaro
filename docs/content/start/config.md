@@ -314,6 +314,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[links]` | [Links](#links) | Broken internal `@/` link handling (warn or fail the build) |
 | `[series]` | [Series](/features/series/) | Group posts into ordered series |
 | `[related]` | [Related Posts](/features/related-posts/) | Related content recommendations |
+| `[git]` | [Git Metadata](/features/git-info/) | `page.git` commit info and `updated`/`date` fallbacks from history |
 | `[llms]` | [LLMs.txt](/features/llms-txt/) | AI/LLM crawler instructions |
 | `[pwa]` | [PWA](/features/pwa/) | Progressive Web App support |
 | `[amp]` | [AMP](/features/amp/) | Accelerated Mobile Pages |
@@ -375,7 +376,7 @@ url = "/posts/"
 # Feature sections — see Feature Configuration Reference above
 # [feeds], [sitemap], [robots], [og], [search], [highlight],
 # [pagination], [auto_includes], [assets], [sass], [image_processing],
-# [series], [related], [llms], [pwa], [amp], [deployment], etc.
+# [series], [related], [git], [llms], [pwa], [amp], [deployment], etc.
 ```
 
 ## See Also

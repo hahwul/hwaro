@@ -79,6 +79,8 @@
           url: /ko/features/menus/
         - title: 출력 포맷
           url: /ko/features/output-formats/
+        - title: Git 메타데이터
+          url: /ko/features/git-info/
     - title: 빌드와 성능
       items:
         - title: 증분 빌드
