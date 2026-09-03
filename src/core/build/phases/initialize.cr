@@ -72,6 +72,7 @@ module Hwaro::Core::Build::Phases::Initialize
       site = Models::Site.new(config)
       @site = site
       load_data_files(site, config, ctx.options.serve_mode)
+      collect_git_info(config)
 
       # Load i18n translations
       i18n_dir = File.join("i18n")
@@ -874,6 +875,15 @@ module Hwaro::Core::Build::Phases::Initialize
     end
 
     load_remote_data(site, config, root, serve_mode)
+  end
+
+  # `[git]`: one `git log` over content/ per full build. Reset first so a
+  # serve session whose config toggled the feature off never keeps serving
+  # the previous map.
+  private def collect_git_info(config : Models::Config)
+    @git_info = nil
+    return unless config.git.enabled
+    @git_info = GitInfo.collect
   end
 
   # `[[data.remote]]` sources, fetched once per build AFTER the disk tree is

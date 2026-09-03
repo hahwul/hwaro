@@ -128,6 +128,13 @@ module Hwaro
         # cached pages like an edited data/ file. "" when no remote sources
         # are configured (keeps cache keys byte-identical to pre-feature).
         @remote_data_digest : String = ""
+        # `[git]` commit metadata keyed by content-relative path, collected
+        # ONCE per full build in the Initialize phase (see GitInfo.collect)
+        # and read by parse_single_page — including the serve incremental
+        # re-parse, which deliberately reuses the last full build's map
+        # rather than shelling out to git on every keystroke. Nil when the
+        # feature is off or history is unavailable.
+        @git_info : Hash(String, Models::GitInfo)? = nil
         # Per-SERVE-SESSION memo of fetched [[data.remote]] payloads. The
         # dev server holds one Builder for the whole session, so this lives
         # exactly as long as `hwaro serve` does; `hwaro build` is one process

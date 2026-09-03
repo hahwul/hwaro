@@ -52,6 +52,7 @@ require "./config/options/serve_options"
 
 # Load models
 require "./models/config"
+require "./models/git_info"
 require "./models/page"
 require "./models/section"
 require "./models/site"
@@ -76,6 +77,7 @@ require "./core/lifecycle"
 
 # Load core modules
 require "./core/build/cache"
+require "./core/build/git_info"
 require "./core/build/parallel"
 require "./core/build/builder"
 

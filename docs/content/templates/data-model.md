@@ -343,6 +343,7 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.series_index | Int | 1-based position within the series (requires `[series]` enabled) |
 | page.series_pages | Array<Page> | All pages in the same series, sorted by `series_weight` |
 | page.related_posts | Array<Page> | Pages sharing taxonomy terms (requires `[related]` enabled) |
+| page.git | Object? | Commit metadata for the source file (requires `[git]` enabled; `nil` for uncommitted or generated pages). Fields: `hash`, `short_hash`, `lastmod` (Time), `first_commit` (Time), `author_name`, `author_email` — see [Git Metadata](/features/git-info/) |
 
 ### Boolean Flags
 

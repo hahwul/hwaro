@@ -45,6 +45,17 @@ module Hwaro
         @[JSON::Field(key: "assets_hash", emit_null: false)]
         property assets_hash : String
 
+        # Fingerprint of the page's git metadata (latest commit hash, lastmod,
+        # first_commit — see Render#page_git_hash) as of the build that wrote
+        # this entry. With `[git] enabled` a new commit to an unedited file
+        # changes `page.updated`/`page.git` and therefore the rendered output
+        # even though the source bytes are unchanged, so it must be part of
+        # the cache key. "" when the feature is off or the file has no
+        # history, AND for legacy entries — so a disabled site never rebuilds
+        # because of this field.
+        @[JSON::Field(key: "git_hash", emit_null: false)]
+        property git_hash : String
+
         # Secondary sibling output files this page emitted beyond
         # `output_path` (e.g. `index.json`, `index.xml` — see `[outputs]`).
         # Empty for pages with no extra formats and for every entry written
@@ -62,6 +73,7 @@ module Hwaro
           @cascade_hash : String = "",
           @output_paths : Array(String) = [] of String,
           @assets_hash : String = "",
+          @git_hash : String = "",
         )
         end
 
@@ -75,6 +87,7 @@ module Hwaro
           config_hash = ""
           cascade_hash = ""
           assets_hash = ""
+          git_hash = ""
           output_paths = [] of String
 
           pull.read_object do |key|
@@ -87,6 +100,7 @@ module Hwaro
             when "config_hash"   then config_hash = pull.read_string
             when "cascade_hash"  then cascade_hash = pull.read_string
             when "assets_hash"   then assets_hash = pull.read_string
+            when "git_hash"      then git_hash = pull.read_string
             when "output_paths"
               output_paths = [] of String
               pull.read_array { output_paths << pull.read_string }
@@ -96,7 +110,7 @@ module Hwaro
 
           new(path: path, mtime: mtime, hash: hash, output_path: output_path,
             template_hash: template_hash, config_hash: config_hash, cascade_hash: cascade_hash,
-            output_paths: output_paths, assets_hash: assets_hash)
+            output_paths: output_paths, assets_hash: assets_hash, git_hash: git_hash)
         end
       end
 
@@ -259,7 +273,7 @@ module Hwaro
         # `extra_outputs` are secondary sibling output files (see `[outputs]`)
         # that must also still exist on disk — a manually deleted `index.json`
         # forces a rebuild just like a deleted `index.html` does.
-        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, extra_outputs : Array(String) = [] of String, assets_hash : String = "") : Bool
+        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, extra_outputs : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "") : Bool
           return true unless @enabled
           return true unless File.exists?(file_path)
 
@@ -289,6 +303,11 @@ module Hwaro
           # Legacy entries store "" here, so an asset-carrying page rebuilds
           # once after upgrading (same handling as cascade_hash).
           return true if entry.assets_hash != assets_hash
+
+          # The file's git history moved (a new commit touched it) — with
+          # `[git]` enabled the page's lastmod/commit fields render differently
+          # though the source bytes are byte-for-byte the same.
+          return true if entry.git_hash != git_hash
 
           # A template in this page's dependency closure changed.
           if template_hash && entry.template_hash != template_hash
@@ -347,7 +366,7 @@ module Hwaro
         # `output_paths` are the secondary sibling output files this page
         # emitted (see `[outputs]`); empty when the feature isn't in use.
         # Thread-safe: protected by mutex for concurrent parallel builds.
-        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "")
+        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "")
           return unless @enabled
           return unless File.exists?(file_path)
 
@@ -361,7 +380,8 @@ module Hwaro
               existing = @entries[file_path]?
               if existing && existing.mtime == mtime && existing.output_path == output_path &&
                  existing.cascade_hash == cascade_hash && existing.template_hash == effective_template_hash &&
-                 existing.output_paths == output_paths && existing.assets_hash == assets_hash
+                 existing.output_paths == output_paths && existing.assets_hash == assets_hash &&
+                 existing.git_hash == git_hash
                 return
               end
             end
@@ -379,6 +399,7 @@ module Hwaro
               cascade_hash: cascade_hash,
               output_paths: output_paths,
               assets_hash: assets_hash,
+              git_hash: git_hash,
             )
 
             @mutex.synchronize do

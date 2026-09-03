@@ -314,6 +314,7 @@ Cache-Control = "no-store"
 | `[links]` | [링크](#링크) | 깨진 내부 `@/` 링크 처리 (경고 또는 빌드 실패) |
 | `[series]` | [시리즈](/ko/features/series/) | 글을 순서 있는 시리즈로 묶기 |
 | `[related]` | [관련 글](/ko/features/related-posts/) | 관련 콘텐츠 추천 |
+| `[git]` | [Git 메타데이터](/ko/features/git-info/) | `page.git` 커밋 정보와 이력 기반 `updated`/`date` 폴백 |
 | `[llms]` | [LLMs.txt](/ko/features/llms-txt/) | AI/LLM 크롤러 안내 |
 | `[pwa]` | [PWA](/ko/features/pwa/) | 프로그레시브 웹 앱 지원 |
 | `[amp]` | [AMP](/ko/features/amp/) | Accelerated Mobile Pages |
@@ -375,7 +376,7 @@ url = "/posts/"
 # 기능 섹션 — 위 기능 설정 레퍼런스 참고
 # [feeds], [sitemap], [robots], [og], [search], [highlight],
 # [pagination], [auto_includes], [assets], [sass], [image_processing],
-# [series], [related], [llms], [pwa], [amp], [deployment], etc.
+# [series], [related], [git], [llms], [pwa], [amp], [deployment], etc.
 ```
 
 ## 함께 보기

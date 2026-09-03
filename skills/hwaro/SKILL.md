@@ -216,7 +216,8 @@ section structure; a syntax error fails the build with `HWARO_E_CONFIG` (exit
 `3`). Common sections: `[plugins]`, `[highlight]`, `[og]` / `[og.auto_image]`,
 `[search]`, `[pagination]`, `[[taxonomies]]`, `[sitemap]`, `[feeds]`,
 `[image_processing]`, `[assets]`, `[auto_includes]`, `[markdown]`, `[pwa]`,
-`[deployment]`. After editing, run `hwaro doctor`; `--fix` normalizes values
+`[deployment]`, `[git]` (opt-in `page.git` commit metadata + `updated` fallback
+from history; needs a full-depth checkout). After editing, run `hwaro doctor`; `--fix` normalizes values
 (e.g. a base_url trailing slash) and `--approve` (or `--full`) adds recommended
 sections. When unsure of a key, check the [config reference](https://hwaro.hahwul.com/start/config/).
 

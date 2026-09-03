@@ -5,6 +5,7 @@
 ### Added
 - Search: opt-in sharded index — `[search] shards = "section" | "language" | "section-language"` splits `search.json` into `search/<id>.json` files plus a `search/index.json` manifest so clients lazy-load only the shards they need; `single_file = false` drops the classic file, `content_max_length` caps each entry's `content` at a word boundary
 - Automatic summaries: pages without a `<!-- more -->` marker or `description` now get `page.summary` from the first 70 words of the rendered body (characters ×2 for CJK text), configurable via `[content] summary_length` / `summary_ellipsis`; new `page.summary_truncated` template variable
+- `[git]` config table: one `git log` per build exposes each page's commit history as `page.git` (`hash`, `short_hash`, `lastmod`, `first_commit`, `author_name`, `author_email`) and fills a missing `updated` (`use_lastmod`, default on) or `date` (`use_date`, default off) from it, so sitemap `<lastmod>`, feeds and JSON-LD `dateModified` follow the file's real history. Off by default; degrades with a single warning outside a repository, without a `git` binary, or on a shallow clone. `--cache` keys pages on their commit metadata so a new commit re-renders exactly the pages it touched.
 
 ## v0.20.1
 
