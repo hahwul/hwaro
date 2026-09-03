@@ -28,6 +28,10 @@ module Hwaro
           # because another page owns its output file must not be advertised
           # as a URL — on a case-folding host it is a guaranteed 404.
           sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft && !p.unpublished && !p.output_suppressed }
+          # `[versions] search` governs the sitemap too: older versions are
+          # advertised only when it is "all" (same switch as search.json).
+          versions = site.config.versions
+          sitemap_pages.select! { |p| versions.in_search?(p) } if versions.enabled?
 
           sitemap_pages = DiscoveryPages.dedupe_by_url(sitemap_pages)
           DiscoveryPages.reject_excluded!(sitemap_pages, site.config.sitemap.exclude)

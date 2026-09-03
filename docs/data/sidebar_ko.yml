@@ -109,6 +109,8 @@
       items:
         - title: 다국어
           url: /ko/features/multilingual/
+        - title: 버전별 문서
+          url: /ko/features/versioned-docs/
         - title: 이미지 처리
           url: /ko/features/image-processing/
         - title: PWA

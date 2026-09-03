@@ -460,6 +460,17 @@ module Hwaro
             default_lang = env.resolve("_i18n_default_language").to_s
 
             menus_val = env.resolve("__menus__")
+            # Versioned page: its version's own menu set (`__menus_v__` is
+            # {version name => {lang => menus}}, built by the render phase)
+            # replaces the site-wide set, so registrations from another
+            # version never leak into this page's nav.
+            page_version = env.resolve("page_version")
+            unless page_version.undefined? || page_version.raw.nil?
+              versioned = env.resolve("__menus_v__").raw
+              if versioned.is_a?(Hash) && (own = versioned[page_version.to_s]?)
+                menus_val = own
+              end
+            end
             result = Crinja::Value.new([] of Crinja::Value)
 
             raw_menus = menus_val.raw

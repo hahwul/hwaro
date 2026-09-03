@@ -10,6 +10,10 @@ module Hwaro
       module Tags
         extend self
 
+        # Emitted after the canonical link for older docs versions when
+        # `[versions] noindex_old` is on (the default).
+        NOINDEX_TAG = %(<meta name="robots" content="noindex">)
+
         # Compute the canonical URL for a page (absolute URL with base_url).
         # `url_override` (the paginator's page-aware URL) self-canonicalizes
         # paginated pages instead of collapsing them onto page 1.

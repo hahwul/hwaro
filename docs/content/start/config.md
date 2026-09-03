@@ -321,6 +321,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[deployment]` | [Deploy](/deploy/) | Deploy targets configuration |
 | `[doctor]` | [Doctor](/start/tools/doctor/) | Suppress known diagnostic issues |
 | `languages.*` | [Multilingual](/features/multilingual/) | Multi-language support |
+| `[versions]` / `[[versions.list]]` | [Versioned Docs](/features/versioned-docs/) | Several documentation versions side by side |
 | `[[menus.*]]` | [Menus](/features/menus/) | Named navigation menus |
 
 ## Plugins

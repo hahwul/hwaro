@@ -316,6 +316,8 @@ An individual content file (`.md`).
 | page.updated | String? | Last updated date |
 | page.language | String | Effective language code |
 | page.translations | Array<TranslationLink> | Language variants |
+| page.version | Object? | Documentation version (`nil` when unversioned) — see [page.version](#pageversion) |
+| page.version_links | Array<VersionLink> | Version switcher rows (empty when unversioned) |
 
 Rendered HTML content is available as the top-level `content` variable.
 
@@ -433,6 +435,38 @@ Parent sections for breadcrumbs:
   / <span>{{ page.title }}</span>
 </nav>
 ```
+
+### page.version
+
+Only on sites with `[[versions.list]]` (see [Versioned Docs](/features/versioned-docs/)). `nil` for pages outside every version directory.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| .name | String | Version name (URL segment, e.g. "v2") |
+| .label | String | Display label |
+| .latest | Bool | Is the latest version |
+| .url | String | Root URL of the version in the page's language |
+
+### page.version_links
+
+One row per configured version, in config order.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| .name | String | Version name |
+| .label | String | Display label |
+| .latest | Bool | Is the latest version |
+| .url | String | Same page in that version if it exists, else that version's root |
+| .exists | Bool | Counterpart page exists |
+| .current | Bool | Row is the page's own version |
+
+```jinja
+{% for v in page.version_links %}
+<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label }}</a>
+{% endfor %}
+```
+
+The global `versions` list (`{% for v in versions %}`, `versions.latest`, `versions.all`) exposes every version's root URL in the current page's language.
 
 ### page.translations
 

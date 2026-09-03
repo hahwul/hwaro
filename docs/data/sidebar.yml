@@ -111,6 +111,8 @@
       items:
         - title: Multilingual
           url: /features/multilingual/
+        - title: Versioned Docs
+          url: /features/versioned-docs/
         - title: Image Processing
           url: /features/image-processing/
         - title: PWA

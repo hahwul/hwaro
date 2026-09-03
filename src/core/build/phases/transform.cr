@@ -55,19 +55,24 @@ module Hwaro::Core::Build::Phases::Transform
   # (build_subsections) and section listings (Site#pages_for_section) are
   # already scoped. Single-language sites (language nil everywhere) collapse
   # to one partition and keep the previous order exactly.
+  #
+  # Versions partition the same way: each `[[versions.list]]` directory is
+  # its own chain (a v1 page's "next" must never be a v2 page), keyed by
+  # {language, version name}. Unversioned content keeps the nil-version
+  # partition, so sites without versions are unaffected.
   private def build_reading_orders(
     sections : Array(Models::Section),
     pages : Array(Models::Page),
     default_lang : String,
   ) : Array(Array(Models::Page))
-    sections_by_lang = sections.group_by { |s| s.language || default_lang }
-    pages_by_lang = pages.group_by { |p| p.language || default_lang }
+    sections_by_lang = sections.group_by { |s| {s.language || default_lang, s.version.try(&.name)} }
+    pages_by_lang = pages.group_by { |p| {p.language || default_lang, p.version.try(&.name)} }
 
-    (sections_by_lang.keys | pages_by_lang.keys).map do |lang|
+    (sections_by_lang.keys | pages_by_lang.keys).map do |key|
       build_language_reading_order(
-        sections_by_lang[lang]? || [] of Models::Section,
-        pages_by_lang[lang]? || [] of Models::Page,
-        lang, default_lang)
+        sections_by_lang[key]? || [] of Models::Section,
+        pages_by_lang[key]? || [] of Models::Page,
+        key[0], default_lang, versioned: !key[1].nil?)
     end
   end
 
@@ -76,6 +81,7 @@ module Hwaro::Core::Build::Phases::Transform
     pages : Array(Models::Page),
     lang : String,
     default_lang : String,
+    versioned : Bool = false,
   ) : Array(Models::Page)
     # Build sections lookup
     sections_by_path = {} of String => Models::Section
@@ -105,7 +111,20 @@ module Hwaro::Core::Build::Phases::Transform
 
     # Find top-level sections (no parent) and sort by weight (path tiebreaker
     # so equal weights keep a stable, deterministic reading order).
-    top_sections = sections.select { |s| !s.section.includes?("/") }
+    #
+    # A version partition's roots are nested (`docs/v2`), so its top level is
+    # every section whose parent directory is not itself a section of the
+    # partition — the version root, plus any subtree with a missing
+    # intermediate `_index`. Unversioned partitions keep the literal
+    # top-level rule (byte-identical reading order for existing sites).
+    top_sections = if versioned
+                     sections.select do |s|
+                       idx = s.section.rindex('/')
+                       idx.nil? || !sections_by_path.has_key?(s.section[0, idx])
+                     end
+                   else
+                     sections.select { |s| !s.section.includes?("/") }
+                   end
     top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     # Recursively flatten sections into reading order
@@ -183,7 +202,7 @@ module Hwaro::Core::Build::Phases::Transform
       # to the default-language parent when its own language has no parent
       # `_index` — so keep only this language's subtree.
       if section.subsections.size > 0
-        same_lang = section.subsections.select { |sub| (sub.language || default_lang) == lang }
+        same_lang = section.subsections.select { |sub| (sub.language || default_lang) == lang && sub.version.same?(section.version) }
         # Path tiebreak mirrors top-level sections (compare_sections_by_weight):
         # equal-weight subsections otherwise follow insertion/glob order and
         # can flip prev/next blocks across rebuilds.
@@ -227,8 +246,12 @@ module Hwaro::Core::Build::Phases::Transform
       next if path_parts.size <= 1
 
       # Link to the immediate parent section when it exists (same-language first).
+      # Never across a version boundary: an unversioned `docs/_index.md` is
+      # not the parent of `docs/v1/_index.md` in any listing, and a version
+      # root's breadcrumb stops at the version.
       parent_path = path_parts[0..-2].join("/")
-      if parent = lookup_ancestor_section(sections_by_path, parent_path, section.language, default_lang)
+      if (parent = lookup_ancestor_section(sections_by_path, parent_path, section.language, default_lang)) &&
+         parent.version.same?(section.version)
         parent.add_subsection(section)
       end
 
@@ -240,7 +263,8 @@ module Hwaro::Core::Build::Phases::Transform
       current_path = ""
       path_parts[0..-2].each do |part|
         current_path = current_path.empty? ? part : "#{current_path}/#{part}"
-        if ancestor = lookup_ancestor_section(sections_by_path, current_path, section.language, default_lang)
+        if (ancestor = lookup_ancestor_section(sections_by_path, current_path, section.language, default_lang)) &&
+           ancestor.version.same?(section.version)
           section.ancestors << ancestor
         end
       end
@@ -254,7 +278,8 @@ module Hwaro::Core::Build::Phases::Transform
       current_path = ""
       path_parts.each do |part|
         current_path = current_path.empty? ? part : "#{current_path}/#{part}"
-        if ancestor = lookup_ancestor_section(sections_by_path, current_path, page.language, default_lang)
+        if (ancestor = lookup_ancestor_section(sections_by_path, current_path, page.language, default_lang)) &&
+           ancestor.version.same?(page.version)
           page.ancestors << ancestor
         end
       end
@@ -302,6 +327,9 @@ module Hwaro::Core::Build::Phases::Transform
       # get_taxonomy counts or terms_sort_by="count" relative to written
       # /tags/… pages and term feeds.
       next if page.excluded_from_listings?
+      # `[versions] taxonomies = "latest"` (default): older versions stay off
+      # the term pages, mirroring Content::Taxonomies.build_taxonomy_index.
+      next unless site.config.versions.in_taxonomies?(page)
 
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)
@@ -414,6 +442,7 @@ module Hwaro::Core::Build::Phases::Transform
       # stays aligned with build_taxonomy_index (and rebuild_taxonomies).
       next if excluded_paths.includes?(page_path)
       next if page.excluded_from_listings?
+      next unless site.config.versions.in_taxonomies?(page)
 
       page.taxonomies.each do |name, terms|
         site.taxonomies[name] ||= {} of String => Array(Models::Page)
@@ -621,7 +650,7 @@ module Hwaro::Core::Build::Phases::Transform
       end
 
       page.related_posts = scores.to_a
-        .select { |path, _| page_lookup[path]?.try(&.language) == page.language }
+        .select { |path, _| (other = page_lookup[path]?) && other.language == page.language && other.version.same?(page.version) }
         .sort_by! { |_, s| -s }
         .first(limit)
         .map { |path, _| page_lookup[path] }
@@ -825,7 +854,11 @@ module Hwaro::Core::Build::Phases::Transform
               next if other_path == page.path
               # page_lookup[other_path] is guaranteed present: the inverted
               # index is populated from the same `pages` iteration above.
-              next unless page_lookup[other_path].language == page_lang
+              other = page_lookup[other_path]
+              next unless other.language == page_lang
+              # Related posts never cross a version boundary either — a v2
+              # page recommending its own v1 twin is noise, not a relation.
+              next unless other.version.same?(page.version)
               scores[other_path] += 1
             end
           end

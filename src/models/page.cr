@@ -3,6 +3,7 @@ require "crinja"
 require "../utils/text_utils"
 require "../content/processors/fence_tracker"
 require "./git_info"
+require "./config"
 
 module Hwaro
   module Models
@@ -25,6 +26,29 @@ module Hwaro
         @title : String,
         @is_current : Bool = false,
         @is_default : Bool = false,
+      )
+      end
+    end
+
+    # One entry of `page.version_links` — the version switcher row for a
+    # versioned page. `url` is the SAME page in that version when it exists
+    # (matched by path relative to the version root, same language), else
+    # that version's root URL with `exists = false`.
+    struct VersionLink
+      property name : String
+      property label : String
+      property latest : Bool
+      property url : String
+      property exists : Bool
+      property current : Bool
+
+      def initialize(
+        @name : String,
+        @label : String,
+        @latest : Bool,
+        @url : String,
+        @exists : Bool,
+        @current : Bool = false,
       )
       end
     end
@@ -185,6 +209,13 @@ module Hwaro
       property is_index : Bool    # Is this an index file?
       property language : String? # Language code (e.g. "en", "ko", nil for default)
       property translations : Array(TranslationLink)
+      # Documentation version this page belongs to (`[[versions.list]]`),
+      # resolved from its content directory in ReadContent; nil for
+      # unversioned content. See Content::Versions.
+      property version : VersionConfig?
+      # Switcher rows, one per configured version (see VersionLink); empty
+      # for unversioned pages. Filled by Content::Versions.link!.
+      property version_links : Array(VersionLink)
 
       # New: Word count and reading time (computed)
       property word_count : Int32
@@ -241,6 +272,8 @@ module Hwaro
         @toc = false
         @language = nil
         @translations = [] of TranslationLink
+        @version = nil
+        @version_links = [] of VersionLink
         @assets = [] of String
 
         # New field defaults

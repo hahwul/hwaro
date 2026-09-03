@@ -41,6 +41,12 @@ module Hwaro
             end
           end
 
+          # `[versions] feeds = "latest"` (default): older versions publish
+          # no feed entries and no section feeds; "all" restores every
+          # version. Applied to the whole input so the main, section and
+          # per-language feeds below all agree.
+          pages = pages.select { |p| config.versions.in_feeds?(p) } if config.versions.enabled?
+
           # 1. Generate Main Site Feed
           if config.feeds.enabled
             # `output_suppressed`: the render phase declined to write this

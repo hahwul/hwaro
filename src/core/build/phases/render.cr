@@ -332,7 +332,7 @@ module Hwaro::Core::Build::Phases::Render
   # Markers in a page's resolved template closure that mean it renders content
   # derived from the global page/section set, so it must re-render when that set
   # changes (not only when its own source changes).
-  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__"]
+  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__", "version_links", "versions"]
   SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__"]
 
   private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site, page_set_fp : String = "", section_set_fp : String = "") : Array(Models::Page)
@@ -550,6 +550,13 @@ module Hwaro::Core::Build::Phases::Render
         fp_list(digest, p.taxonomies[k])
       end
       fp_menus(digest, p.menus)
+      # Version membership drives `version_links` on OTHER pages (a new
+      # counterpart flips `exists`), so it is part of the set identity.
+      # Only emitted on versioned sites — unversioned fingerprints stay
+      # byte-identical to previous releases.
+      if version = p.version
+        fp_value(digest, "v:#{version.name}")
+      end
       fp_value(digest, extra_fp(p.extra)) if fields.extra
       if fields.content_derived
         fp_value(digest, p.summary || "")
@@ -2245,7 +2252,7 @@ module Hwaro::Core::Build::Phases::Render
         "is_default" => Crinja::Value.new(t.is_default),
       })
     end
-    Crinja::Value.new({
+    hash = {
       "path"              => Crinja::Value.new(p.path),
       "title"             => Crinja::Value.new(p.title),
       "description"       => Crinja::Value.new(p.description || ""),
@@ -2286,7 +2293,15 @@ module Hwaro::Core::Build::Phases::Render
         p.extra.each_with_object({} of String => Crinja::Value) { |(k, v), h|
           h[k] = Utils::CrinjaUtils.from_extra(v)
         }),
-    })
+    } of String => Crinja::Value
+    # `page.version` / `page.version_links` exist only on versioned sites
+    # (`[[versions.list]]`), so unversioned page objects keep their exact
+    # key set (a `page | tojson` dump stays byte-identical).
+    if (cfg = @config) && cfg.versions.enabled?
+      hash["version"] = Content::Versions.page_version_value(p, cfg)
+      hash["version_links"] = Content::Versions.version_links_value(p)
+    end
+    Crinja::Value.new(hash)
   end
 
   # `page.git` as templates see it: a mapping of the commit fields, or nil
@@ -2583,6 +2598,7 @@ module Hwaro::Core::Build::Phases::Render
         "assets"             => Crinja::Value.new(s.assets.map { |a| Crinja::Value.new(a) }),
         "subsections"        => Crinja::Value.new([] of Crinja::Value),
       } of String => Crinja::Value
+      hash["version"] = Content::Versions.page_version_value(s, config) if config.versions.enabled?
       section_val = Crinja::Value.new(hash)
       section_data_by_path[s.path] = {pages: section_pages, hash: hash}
       all_sections_array << section_val
@@ -2745,6 +2761,25 @@ module Hwaro::Core::Build::Phases::Render
       menus_crinja[lang] = Crinja::Value.new(lang_hash)
     end
     vars["__menus__"] = Crinja::Value.new(menus_crinja)
+
+    # Per-version menu sets ({version name => {lang => menus}}) for pages
+    # inside a `[[versions.list]]` directory — get_menu picks the set named
+    # by `page_version`. Only built on versioned sites.
+    if config.versions.enabled?
+      menus_by_version = {} of String => Crinja::Value
+      config.versions.list.each do |version|
+        per_lang = {} of String => Crinja::Value
+        Content::Menus.build(config, site.pages, site.sections, version).each do |lang, menus|
+          lang_hash = {} of String => Crinja::Value
+          menus.each do |menu_name, entries|
+            lang_hash[menu_name] = Crinja::Value.new(entries.map { |e| menu_entry_to_crinja(e, config, pages_by_path) })
+          end
+          per_lang[lang] = Crinja::Value.new(lang_hash)
+        end
+        menus_by_version[version.name] = Crinja::Value.new(per_lang)
+      end
+      vars["__menus_v__"] = Crinja::Value.new(menus_by_version)
+    end
 
     # Site object with full data
     site_obj = {
@@ -3020,6 +3055,16 @@ module Hwaro::Core::Build::Phases::Render
     lang_prefix = page_language != default_lang && config.multilingual? ? "/#{page_language}" : ""
     vars["lang_prefix"] = Crinja::Value.new(lang_prefix)
 
+    # Versioned docs: `page_version` (the version NAME, read by get_menu to
+    # pick the version-scoped menu set) and the global `versions` list,
+    # whose root URLs carry this page's language prefix. Both exist only
+    # when `[[versions.list]]` is configured.
+    versions_enabled = config.versions.enabled?
+    if versions_enabled
+      vars["page_version"] = Crinja::Value.new(page.version.try(&.name))
+      vars["versions"] = Content::Versions.versions_value(config, lang_prefix)
+    end
+
     # Generate permalink only if not already set
     page.generate_permalink(config.base_url) unless page.permalink
 
@@ -3170,6 +3215,10 @@ module Hwaro::Core::Build::Phases::Render
         end
       end,
     }
+    if versions_enabled
+      page_obj["version"] = cached_raw["version"].as(Crinja::Value)
+      page_obj["version_links"] = cached_raw["version_links"].as(Crinja::Value)
+    end
     vars["page"] = Crinja::Value.new(page_obj)
 
     # Flat variables for new properties
@@ -3399,7 +3448,22 @@ module Hwaro::Core::Build::Phases::Render
       # Canonical and Hreflang tags. Pass page_url_override so paginated pages
       # (page/2/ …) self-canonicalize instead of all pointing at page 1, keeping
       # canonical consistent with og:url and rel=prev/next.
-      canonical_tag = Content::Seo::Tags.canonical_tag(page, config, page_url_override)
+      # Older docs versions canonicalize to their LATEST counterpart when it
+      # exists (self otherwise) and, with `noindex_old`, carry a robots
+      # noindex — appended to `canonical_tag` so every template that emits
+      # the canonical gets it without a new variable. A paginated override
+      # keeps self-canonicalizing (page/2/ of an old listing is not page/2/
+      # of the new one).
+      canonical_override = page_url_override
+      noindex = false
+      if versions_enabled && (page_version = page.version) && !page_version.latest
+        if canonical_override.nil? && (latest_link = page.version_links.find { |l| l.latest && l.exists })
+          canonical_override = latest_link.url
+        end
+        noindex = config.versions.noindex_old
+      end
+      canonical_tag = Content::Seo::Tags.canonical_tag(page, config, canonical_override)
+      canonical_tag = "#{canonical_tag}\n  #{Content::Seo::Tags::NOINDEX_TAG}" if noindex
       hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
       vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
       vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
@@ -3409,7 +3473,7 @@ module Hwaro::Core::Build::Phases::Render
       vars["alternate_output_tags"] = Crinja::Value.new(alternate_output_tags(page, config))
 
       # Structured SEO object for custom meta tag markup
-      canonical_url = Content::Seo::Tags.canonical_url(page, config, page_url_override)
+      canonical_url = Content::Seo::Tags.canonical_url(page, config, canonical_override)
       seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""
       seo_obj = {
         "canonical_url"   => Crinja::Value.new(canonical_url),
@@ -3421,6 +3485,7 @@ module Hwaro::Core::Build::Phases::Render
         "fb_app_id"       => Crinja::Value.new(config.og.fb_app_id || ""),
         "hreflang"        => translations_crinja,
       }
+      seo_obj["noindex"] = Crinja::Value.new(noindex) if versions_enabled
       vars["seo"] = Crinja::Value.new(seo_obj)
     end
 

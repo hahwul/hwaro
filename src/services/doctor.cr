@@ -108,6 +108,8 @@ module Hwaro
             ["search-format-invalid"]),
           CheckSpec.new("languages (default_language resolves)",
             ["default-language-undefined"]),
+          CheckSpec.new("versions (content paths exist)",
+            ["version-path-missing"]),
           CheckSpec.new("markdown / pwa (valid enums)",
             ["markdown-math-engine-invalid", "pwa-cache-strategy-invalid", "pwa-display-invalid"]),
           CheckSpec.new("image processing (widths set)",
@@ -834,6 +836,16 @@ module Hwaro
           known = config.languages.keys.sort!.join(", ")
           issues << Issue.new(id: "default-language-undefined", level: :warning, category: "config", file: @config_path,
             message: "default_language \"#{config.default_language}\" has no matching [languages.#{config.default_language}] block (defined: #{known})")
+        end
+
+        # Every `[[versions.list]]` path must be a real content directory:
+        # a typo'd path silently publishes an empty version (its switcher
+        # entry links to a 404 root).
+        config.versions.list.each do |version|
+          dir = File.join(@content_dir, version.path)
+          next if Dir.exists?(dir)
+          issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
+            message: "version \"#{version.name}\" points at content path \"#{version.path}\" which does not exist (#{dir})")
         end
 
         # markdown.math_engine only renders when set to a value the

@@ -321,6 +321,7 @@ Cache-Control = "no-store"
 | `[deployment]` | [배포](/ko/deploy/) | 배포 대상 설정 |
 | `[doctor]` | [doctor](/ko/start/tools/doctor/) | 알려진 진단 이슈 숨기기 |
 | `languages.*` | [다국어](/ko/features/multilingual/) | 다국어 지원 |
+| `[versions]` / `[[versions.list]]` | [버전별 문서](/ko/features/versioned-docs/) | 여러 문서 버전을 나란히 게시 |
 | `[[menus.*]]` | [메뉴](/ko/features/menus/) | 이름을 붙인 내비게이션 메뉴 |
 
 ## 플러그인
