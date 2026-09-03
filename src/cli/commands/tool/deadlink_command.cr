@@ -786,7 +786,10 @@ module Hwaro
             add_route.call(config.robots.filename) if config.robots.enabled
             add_route.call(config.llms.filename) if config.llms.enabled
             add_route.call(config.llms.full_filename) if config.llms.enabled && config.llms.full_enabled
-            add_route.call(config.search.filename) if config.search.enabled
+            add_route.call(config.search.filename) if config.search.enabled && (!config.search.sharded? || config.search.single_file)
+            # Sharded index: the manifest is a fixed well-known route; the
+            # per-shard files are only discoverable through it.
+            paths << "/#{Content::Search::SHARDS_DIR}/#{Content::Search::MANIFEST_FILENAME}" if config.search.enabled && config.search.sharded?
 
             feed_filename = nil
             if config.feeds.enabled
