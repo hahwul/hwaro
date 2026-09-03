@@ -54,7 +54,10 @@ my-site/
 ```
 
 Front matter is TOML (`+++ … +++`) or YAML (`--- … ---`). `<!-- more -->` marks
-the summary cutoff. `public/` is generated — edit sources, then rebuild.
+the summary cutoff; without it (and without `description`) `page.summary` is an
+automatic 70-word excerpt of the body (`[content] summary_length`, `0` disables;
+`page.summary_truncated` tells whether it was cut). `public/` is generated —
+edit sources, then rebuild.
 
 ## Agent-safe output contract
 

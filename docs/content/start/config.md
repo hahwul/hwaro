@@ -122,6 +122,21 @@ math_engine = "katex"
 
 See [Markdown Extensions](/features/markdown-extensions/) for syntax details and examples.
 
+## Content
+
+```toml
+[content]
+summary_length = 70
+summary_ellipsis = "…"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| summary_length | int | 70 | Automatic summary length for pages without `<!-- more -->` or `description`: words for space-delimited text, characters ×2 for CJK-dominant text. `0` disables the automatic summary |
+| summary_ellipsis | string | "…" | Appended to an automatic summary only when text was cut |
+
+See [Content Summary](/writing/pages/#content-summary) for how `page.summary` is chosen. `[content.files]`, `[content.new]` and `[[content.generate]]` are documented in the feature reference below.
+
 ## Permalinks
 
 Rewrite content directory paths to custom URL paths. Useful for site restructuring without breaking links.

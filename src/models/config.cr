@@ -238,6 +238,30 @@ module Hwaro
       end
     end
 
+    # Automatic summary fallback (`[content] summary_length` /
+    # `summary_ellipsis`). When a page has neither a `<!-- more -->` marker
+    # nor a `description`, `page.summary` is filled from the first
+    # `length` words of the rendered body (characters ×2 for CJK-dominant
+    # text — see Utils::TextUtils.truncate_excerpt). `length = 0` disables
+    # the fallback entirely, restoring the pre-0.21 behaviour where such
+    # pages had no summary at all.
+    class SummaryConfig
+      DEFAULT_LENGTH   = 70
+      DEFAULT_ELLIPSIS = "\u2026"
+
+      property length : Int32
+      property ellipsis : String
+
+      def initialize
+        @length = DEFAULT_LENGTH
+        @ellipsis = DEFAULT_ELLIPSIS
+      end
+
+      def enabled? : Bool
+        @length > 0
+      end
+    end
+
     # `hwaro new` content scaffolding configuration.
     #
     # Controls what `hwaro new` writes when there is no matching archetype:
@@ -1246,6 +1270,7 @@ module Hwaro
       property plugins : PluginConfig
       property content_files : ContentFilesConfig
       property content_new : ContentNewConfig
+      property summary : SummaryConfig
       property pagination : PaginationConfig
       property highlight : HighlightConfig
       property auto_includes : AutoIncludesConfig
@@ -1289,6 +1314,7 @@ module Hwaro
         @plugins = PluginConfig.new
         @content_files = ContentFilesConfig.new
         @content_new = ContentNewConfig.new
+        @summary = SummaryConfig.new
         @pagination = PaginationConfig.new
         @highlight = HighlightConfig.new
         @auto_includes = AutoIncludesConfig.new
@@ -1526,6 +1552,7 @@ module Hwaro
         load_plugins(config)
         load_content_files(config)
         load_content_new(config)
+        load_content_summary(config)
         load_pagination(config)
         load_highlight(config)
         load_auto_includes(config)
@@ -2314,6 +2341,29 @@ module Hwaro
 
         # Fast dev mode default (can be overridden by CLI flags like --fast or explicit --skip-*)
         config.serve.fast = bool_value(s["fast"]?, config.serve.fast)
+      end
+
+      # `[content] summary_length` / `summary_ellipsis` — the automatic
+      # summary fallback (see SummaryConfig). Flat keys on `[content]`, next
+      # to the other content-wide knobs; a negative length is clamped to 0
+      # (disabled) with a warning rather than crashing a slice later.
+      private def self.load_content_summary(config : Config)
+        return unless content_section = config.raw["content"]?.try(&.as_h?)
+
+        length = int_value(content_section["summary_length"]?, config.summary.length)
+        if length < 0
+          Logger.warn "config: [content] summary_length must be >= 0 (got #{length}); disabling the automatic summary"
+          length = 0
+        end
+        config.summary.length = length
+
+        if raw = content_section["summary_ellipsis"]?
+          if ellipsis = raw.as_s?
+            config.summary.ellipsis = ellipsis
+          else
+            Logger.warn "config: [content] summary_ellipsis must be a string; keeping #{config.summary.ellipsis.inspect}"
+          end
+        end
       end
 
       private def self.load_markdown(config : Config)

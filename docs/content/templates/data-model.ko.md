@@ -336,7 +336,8 @@ john-doe:
 |----------|------|-------------|
 | page.word_count | Int | 단어 수 |
 | page.reading_time | Int | 읽기 시간(분) |
-| page.summary | String? | `<!-- more -->` 앞부분을 렌더링한 HTML. 마커가 없으면 `page.description`으로 폴백. 삽입할 때는 `\| safe`와 함께 사용(예: `{{ page.summary \| safe }}`). `<meta name="description">`에는 `page.description`을 직접 사용 |
+| page.summary | String? | 요약 HTML: `<!-- more -->` 앞부분, 없으면 `page.description`, 그것도 없으면 렌더링된 본문의 자동 발췌문(`[content] summary_length`, 이스케이프된 `<p>` 하나). 삽입할 때는 `\| safe`와 함께 사용(예: `{{ page.summary \| safe }}`). `<meta name="description">`에는 `page.description`을 직접 사용 |
+| page.summary_truncated | Bool | `page.summary`가 잘린 자동 발췌문일 때만 `true` ("더 읽기" 링크에 유용) |
 | page.assets | Array<String> | 페이지 번들의 정적 파일 |
 | page.series | String | 프론트 매터의 시리즈 이름(없으면 빈 문자열) |
 | page.series_index | Int | 시리즈 안에서 1부터 시작하는 순번(`[series]` 활성화 필요) |

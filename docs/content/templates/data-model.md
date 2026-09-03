@@ -336,7 +336,8 @@ Rendered HTML content is available as the top-level `content` variable.
 |----------|------|-------------|
 | page.word_count | Int | Word count |
 | page.reading_time | Int | Reading time (minutes) |
-| page.summary | String? | Rendered HTML for the chunk before `<!-- more -->`, falling back to `page.description` when no marker is present. Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
+| page.summary | String? | Summary HTML: the chunk before `<!-- more -->`, else `page.description`, else an automatic excerpt of the rendered body (`[content] summary_length`, one escaped `<p>`). Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
+| page.summary_truncated | Bool | `true` only when `page.summary` is an automatic excerpt that was cut short (useful for a "Read more" link). |
 | page.assets | Array<String> | Static files in page bundle |
 | page.series | String | Series name from front matter (empty if none) |
 | page.series_index | Int | 1-based position within the series (requires `[series]` enabled) |

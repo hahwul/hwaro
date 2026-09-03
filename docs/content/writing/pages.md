@@ -251,7 +251,13 @@ custom_field = "value"
 
 ## Content Summary
 
-Use `<!-- more -->` to define a summary:
+`page.summary` is what list pages, feeds and social cards show for a post. It is filled from the first of these sources that exists:
+
+1. The content before a `<!-- more -->` marker (rendered as HTML)
+2. The `description` front matter field
+3. An automatic excerpt cut from the rendered body
+
+Use `<!-- more -->` to define a summary explicitly:
 
 ```markdown
 +++
@@ -264,6 +270,22 @@ This is the summary shown in listings.
 
 The full article continues here...
 ```
+
+### Automatic summaries
+
+A page with neither a marker nor a `description` gets an automatic summary: the first 70 words of its rendered body, wrapped in a single `<p>` and followed by an ellipsis (`…`) when text was cut. The excerpt is built from the rendered HTML, so shortcodes are expanded and code blocks, headings, images and figures are skipped — it reads as prose.
+
+For CJK-dominant text (Chinese, Japanese, Korean), where words are not space-delimited, the limit counts characters at twice the configured number: `summary_length = 70` yields up to 140 characters. Cuts land on word boundaries (character boundaries for CJK) and never split an entity or a multibyte character.
+
+Tune or disable it in `config.toml`:
+
+```toml
+[content]
+summary_length = 70      # words (CJK: characters ×2); 0 disables the automatic summary
+summary_ellipsis = "…"   # appended only when text was actually cut
+```
+
+`page.summary_truncated` is `true` only when the automatic excerpt was cut, so a template can show a "Read more" link only where it makes sense. Automatic summaries never replace a marker or a `description` — pages that have one keep their existing output.
 
 ## Markdown Syntax
 

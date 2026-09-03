@@ -641,10 +641,10 @@ module Hwaro
 
         # Summary text for `<description>` / atom `<summary>`. Prefers
         # frontmatter `description`, falls back to a plain-text rendering of
-        # the `<!-- more -->` summary, and finally to a plain-text excerpt
-        # of the body (gh#526). The summary is stripped of markup so raw
-        # markdown (`##` headings, code fences, math) never leaks into the
-        # feed `<description>` (gh#491).
+        # the `<!-- more -->` summary, then the automatic summary, and
+        # finally to a plain-text excerpt of the body (gh#526). The summary
+        # is stripped of markup so raw markdown (`##` headings, code fences,
+        # math) never leaks into the feed `<description>` (gh#491).
         private def self.summary_for_feed(page : Models::Page, config : Models::Config) : String
           if desc = page.description
             return desc unless desc.empty?
@@ -655,6 +655,13 @@ module Hwaro
           if summary_html = page.summary_html
             text = HTML.unescape(Utils::TextUtils.strip_html(summary_html)).strip
             return truncate_for_feed(text, limit) unless text.empty?
+          end
+
+          # Automatic summary (`[content] summary_length`): prose-only
+          # excerpt of the body, the same text listings show. Still bounded
+          # by the feed's own `truncate` limit.
+          if auto = page.auto_summary
+            return truncate_for_feed(auto, limit)
           end
 
           # Fall back to a stripped + truncated body. Prefer the

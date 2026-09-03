@@ -4,6 +4,7 @@
 
 ### Added
 - Search: opt-in sharded index — `[search] shards = "section" | "language" | "section-language"` splits `search.json` into `search/<id>.json` files plus a `search/index.json` manifest so clients lazy-load only the shards they need; `single_file = false` drops the classic file, `content_max_length` caps each entry's `content` at a word boundary
+- Automatic summaries: pages without a `<!-- more -->` marker or `description` now get `page.summary` from the first 70 words of the rendered body (characters ×2 for CJK text), configurable via `[content] summary_length` / `summary_ellipsis`; new `page.summary_truncated` template variable
 
 ## v0.20.1
 
