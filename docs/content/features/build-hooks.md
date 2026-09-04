@@ -127,7 +127,7 @@ hooks.pre = [
 
 ### Fetching Data from an API
 
-For the common case — a GET request whose payload should land in `site.data` — you don't need a hook at all: declare a [`[[data.remote]]` source](/templates/data-model/#remote-data-sources) in `config.toml` and Hwaro fetches it once per build, with disk caching and explicit error handling built in.
+For the common case — a GET request whose payload should land in `site.data` — you don't need a hook at all: declare a [`[[data.remote]]` source](/features/remote-data/) in `config.toml` and Hwaro fetches it once per build, with disk caching and explicit error handling built in.
 
 A pre-build hook remains the right tool when the fetch is more than a single request. `load_data()` reads from disk only, so remote data is baked in by fetching it into `data/` before the build. Every file under `data/` is then exposed as `site.data`:
 

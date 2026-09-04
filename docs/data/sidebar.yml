@@ -105,6 +105,8 @@
           url: /features/auto-includes/
         - title: Content Files
           url: /features/content-files/
+        - title: Remote Data Sources
+          url: /features/remote-data/
         - title: Content Generation
           url: /features/content-generation/
     - title: Platform

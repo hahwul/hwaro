@@ -308,7 +308,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
 | `[[content.generate]]` | [Content Generation](/features/content-generation/) | Materialize `site.data` records into pages |
-| `[[data.remote]]` | [Remote Data Sources](/templates/data-model/#remote-data-sources) | Fetch remote data into `site.data` at build time |
+| `[[data.remote]]` | [Remote Data Sources](/features/remote-data/) | Fetch remote data into `site.data` at build time |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
 | `[links]` | [Links](#links) | Broken internal `@/` link handling (warn or fail the build) |

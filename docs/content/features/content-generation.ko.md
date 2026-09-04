@@ -1,11 +1,11 @@
 +++
 title = "콘텐츠 생성"
 description = "[[content.generate]]로 site.data 레코드를 실제 페이지로 만들기"
-weight = 22
+weight = 23
 toc = true
 +++
 
-`[[content.generate]]`는 `site.data` 배열의 각 레코드 — 로컬 `data/` 파일 또는 [원격 데이터 소스](/ko/templates/data-model/#remote-data-sources) — 를 실제 콘텐츠 페이지로 만듭니다. 규칙 하나로 레코드 배열을 가리키고 어떤 필드가 슬러그·제목·본문이 될지 지정하면, 레코드마다 페이지가 빌드됩니다.
+`[[content.generate]]`는 `site.data` 배열의 각 레코드 — 로컬 `data/` 파일 또는 [원격 데이터 소스](/ko/features/remote-data/) — 를 실제 콘텐츠 페이지로 만듭니다. 규칙 하나로 레코드 배열을 가리키고 어떤 필드가 슬러그·제목·본문이 될지 지정하면, 레코드마다 페이지가 빌드됩니다.
 
 생성된 페이지는 **일급 콘텐츠**입니다. 작성한 파일과 같은 지점에서 빌드에 합류하므로 섹션 목록, `[permalinks]` 패턴, 택소노미, 피드, 검색 인덱스, 사이트맵, OG 이미지, 출력 포맷이 `content/`의 파일과 완전히 동일하게 적용됩니다. `[[data.remote]]`와 조합하면 헤드리스 CMS나 임의의 JSON API로 섹션 전체를 만들 수 있습니다 — 커밋할 파일도, 스크립트도 필요 없습니다.
 
