@@ -119,6 +119,9 @@ Directories nest arbitrarily: `data/users/admins/root.yml` → `site.data.users.
 
 `site.data` can also be fed from HTTP(S) endpoints, declared in `config.toml`. Each source is fetched **once per build, before anything renders** — templates never trigger network requests, and every endpoint the build talks to is visible in one place.
 
+For the standalone configuration guide, including cache behavior, offline error
+policies, timeouts, and security boundaries, see [Remote Data Sources](/features/remote-data/).
+
 ```toml
 [[data.remote]]
 key = "team"                # exposed as site.data.team

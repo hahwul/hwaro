@@ -1,11 +1,11 @@
 +++
 title = "Content Generation"
 description = "Materialize site.data records into real pages with [[content.generate]]"
-weight = 22
+weight = 23
 toc = true
 +++
 
-`[[content.generate]]` turns each record of a `site.data` array — a local `data/` file or a [remote data source](/templates/data-model/#remote-data-sources) — into a real content page. Point a rule at an array of records, say which fields become the slug, title and body, and every record builds into a page.
+`[[content.generate]]` turns each record of a `site.data` array — a local `data/` file or a [remote data source](/features/remote-data/) — into a real content page. Point a rule at an array of records, say which fields become the slug, title and body, and every record builds into a page.
 
 Generated pages are **first-class content**: they join the build at the same point authored files do, so section listings, `[permalinks]` patterns, taxonomies, feeds, the search index, the sitemap, OG images and output formats all apply to them exactly as they do to files in `content/`. Combined with `[[data.remote]]`, this builds an entire section from a headless CMS or any JSON API — no files committed, no scripts.
 

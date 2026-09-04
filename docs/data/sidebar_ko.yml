@@ -103,6 +103,8 @@
           url: /ko/features/auto-includes/
         - title: 콘텐츠 파일
           url: /ko/features/content-files/
+        - title: 원격 데이터 소스
+          url: /ko/features/remote-data/
         - title: 콘텐츠 생성
           url: /ko/features/content-generation/
     - title: 플랫폼

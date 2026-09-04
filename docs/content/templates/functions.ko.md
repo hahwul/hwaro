@@ -226,7 +226,7 @@ toc = true
 
 **반환값:** 파싱된 데이터 또는 nil
 
-`load_data()`는 로컬 파일 시스템만 읽으며, 경로는 프로젝트 디렉터리 안에서 해석됩니다. 프로젝트 밖의 파일도, URL도 읽을 수 없습니다. 원격 데이터를 사이트에 굽고 싶다면 [빌드 훅](/features/build-hooks/)으로 `data/`에 내려받으세요. `data/` 아래의 파일은 `load_data()` 호출 없이도 `site.data`로 노출됩니다.
+`load_data()`는 로컬 파일 시스템만 읽으며, 경로는 프로젝트 디렉터리 안에서 해석됩니다. 프로젝트 밖의 파일도, URL도 읽을 수 없습니다. HTTP(S) GET 요청 하나의 페이로드라면 [`[[data.remote]]`](/ko/features/remote-data/)로 `site.data`에 노출하세요. 여러 요청이나 변형이 필요하면 [빌드 훅](/ko/features/build-hooks/)으로 `data/`에 내려받습니다. `data/` 아래 파일은 `load_data()` 호출 없이도 `site.data`로 노출됩니다.
 
 **지원 포맷:**
 
