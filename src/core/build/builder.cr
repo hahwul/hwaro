@@ -501,80 +501,19 @@ module Hwaro
           minify = options.minify
           highlight = options.highlight && site.config.highlight.enabled
           verbose = options.verbose
-          include_drafts = options.drafts
 
           # --- 1. Identify changed pages and snapshot their state before re-parse ---
-          changed_pages = [] of Models::Page
-          affected_sections = Set(String).new
-          old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
-          old_series_names = {} of String => String?
-          # Output files each changed page occupied BEFORE re-parse — a slug/
-          # custom_path edit relocates the page, and the original file would
-          # otherwise keep serving 200 for the rest of the session (and ship
-          # if `public/` is deployed from it).
-          old_output_paths = {} of String => Array(String)
-
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
 
-          # Snapshot old neighbors before re-linking (for render set)
-          old_neighbors = {} of String => {Models::Page?, Models::Page?}
-
-          # Cascade context for re-applying section defaults to re-parsed pages
-          # (parse_single_page resets fields from front matter only). Prefer
-          # the cold build's pre-filter map: it still contains cascades from
-          # draft/expired _index sections that site.sections no longer holds.
-          cascade_map = @cascade_map || build_cascade_map(site.sections)
-
-          changed_content_files.each do |file|
-            relative_path = path_relative_to(file, "content")
-
-            page = pages_map[relative_path]?
-            unless page
-              # Not in the site model: an excluded page (draft / future /
-              # expired / parse-failed at startup) whose edit may have just
-              # made it publishable, or a filtered section _index whose
-              # [cascade] still reaches descendants. Incremental bookkeeping
-              # can't see either — un-drafting a post used to be silently
-              # skipped here until serve restart. A full rebuild re-admits
-              # whatever this save changed. Files gone from disk are the
-              # watcher's removed-file path; still skip those.
-              if File.exists?(file)
-                Logger.info "  Changed #{relative_path} is not in the site model — running full rebuild."
-                return run(options)
-              end
-              next
-            end
-
-            # Snapshot before re-parse (includes property-backed taxonomies
-            # like authors — see snapshot_page_taxonomies)
-            old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
-            old_series_names[page.path] = page.series
-            old_neighbors[page.path] = {page.lower, page.higher}
-            old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
-            old_output_paths[page.path] = collect_page_output_paths(page, output_dir)
-
-            # Re-read, re-parse front-matter and recalculate URL
-            parse_single_page(page)
-            page.generate_permalink(config.base_url)
-            # Content (shortcode usage) or front-matter template may have changed
-            @page_template_hash_mutex.synchronize { @page_template_hash_memo.delete(page.path) }
-
-            # A changed [cascade] affects descendant pages that are NOT in the
-            # changed set — incremental bookkeeping can't reach them, so
-            # escalate to a full rebuild (rare event, correctness first).
-            if (previous_cascade = old_cascade) && page.is_a?(Models::Section) && page.cascade != previous_cascade
-              Logger.info "  Section cascade changed in #{page.path} — running full rebuild."
-              return run(options)
-            end
-
-            apply_cascade_to(page, cascade_map)
-
-            changed_pages << page
-            affected_sections << page.section
-            # Also include ancestor sections that may list this page
-            page.ancestors.each { |ancestor| affected_sections << ancestor.section }
-          end
+          reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
+          return run(options) unless reparsed
+          changed_pages = reparsed.changed_pages
+          affected_sections = reparsed.affected_sections
+          old_taxonomies_snapshot = reparsed.old_taxonomies_snapshot
+          old_series_names = reparsed.old_series_names
+          old_output_paths = reparsed.old_output_paths
+          old_neighbors = reparsed.old_neighbors
 
           if changed_pages.empty?
             Logger.info "  No matching pages found – skipping."
@@ -592,24 +531,7 @@ module Hwaro
           # re-added to site.taxonomies — pages rendered in this same pass
           # would otherwise still show the drafted page in tag clouds and
           # term counts until the next full build.
-          excluded_pages = [] of Models::Page
-          now = Time.utc
-          # Re-stamp the publication window on re-parsed pages so pages kept
-          # via --include-future/--include-expired stay out of public
-          # artifacts and listings (same contract as the full parse phase).
-          changed_pages.each(&.refresh_unpublished!(now))
-          unless include_drafts
-            excluded_pages.concat(changed_pages.select(&.draft))
-            changed_pages.reject!(&.draft)
-          end
-          unless options.include_expired
-            excluded_pages.concat(changed_pages.select { |p| p.expires.try { |e| e <= now } || false })
-            changed_pages.reject! { |p| p.expires.try { |e| e <= now } || false }
-          end
-          unless options.include_future
-            excluded_pages.concat(changed_pages.select { |p| p.date.try { |d| d > now } || false })
-            changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
-          end
+          excluded_pages = apply_publication_exclusions!(changed_pages, options)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Date-token permalink errors deferred by the lenient parse (see
@@ -634,28 +556,7 @@ module Hwaro
           # their new terms from being re-added).
           update_taxonomies_incremental(site, changed_pages + excluded_pages, old_taxonomies_snapshot, excluded_paths)
 
-          # Remove excluded pages from site indices and delete stale output files
-          unless excluded_pages.empty?
-            site.pages.reject! { |p| excluded_paths.includes?(p.path) }
-            site.sections.reject! { |p| excluded_paths.includes?(p.path) }
-            excluded_pages.each do |p|
-              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
-              delete_orphaned_outputs(stale, output_dir)
-            end
-          end
-
-          # Delete outputs the edit orphaned — a relocation (slug/custom_path
-          # change) moves EVERY output, but a front-matter edit can also drop
-          # just a sibling format (`outputs = ["json"]` removed) while the
-          # primary path stays put, so diff the full old/new path sets
-          # instead of comparing only the primary path. Excluded pages were
-          # handled above.
-          relocated = [] of String
-          changed_pages.each do |page|
-            next unless olds = old_output_paths[page.path]?
-            relocated.concat(olds - collect_page_output_paths(page, output_dir))
-          end
-          delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
+          drop_excluded_and_orphaned_outputs(site, changed_pages, excluded_pages, old_output_paths, output_dir)
 
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
 
@@ -829,76 +730,19 @@ module Hwaro
 
           output_dir = options.output_dir
           pages_map = @pages_by_path || build_pages_by_path(site)
-          changed_pages = [] of Models::Page
-          affected_sections = Set(String).new
-          old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
-          old_series_names = {} of String => String?
-          old_output_paths = {} of String => Array(String)
 
-          # Same cascade context as run_incremental — re-parsed pages must
-          # get their inherited section defaults back before rendering.
-          cascade_map = @cascade_map || build_cascade_map(site.sections)
-
-          changed_content_files.each do |file|
-            relative_path = path_relative_to(file, "content")
-
-            page = pages_map[relative_path]?
-            unless page
-              # See run_incremental: an excluded page's edit may have just
-              # made it publishable, and an excluded section's _index can
-              # still cascade to descendants — escalate rather than miss it.
-              if File.exists?(file)
-                Logger.info "  Changed #{relative_path} is not in the site model — running full rebuild."
-                return run(options)
-              end
-              next
-            end
-
-            # Snapshot before re-parse (includes property-backed taxonomies
-            # like authors — see snapshot_page_taxonomies)
-            old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
-            old_series_names[page.path] = page.series
-            old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
-            old_output_paths[page.path] = collect_page_output_paths(page, output_dir)
-
-            parse_single_page(page)
-            page.generate_permalink(config.base_url)
-            @page_template_hash_mutex.synchronize { @page_template_hash_memo.delete(page.path) }
-
-            # A changed [cascade] affects descendants outside the changed set
-            # — escalate to a full rebuild, mirroring run_incremental.
-            if (previous_cascade = old_cascade) && page.is_a?(Models::Section) && page.cascade != previous_cascade
-              Logger.info "  Section cascade changed in #{page.path} — running full rebuild."
-              return run(options)
-            end
-
-            apply_cascade_to(page, cascade_map)
-
-            changed_pages << page
-            affected_sections << page.section
-            page.ancestors.each { |ancestor| affected_sections << ancestor.section }
-          end
+          reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
+          return run(options) unless reparsed
+          changed_pages = reparsed.changed_pages
+          affected_sections = reparsed.affected_sections
+          old_output_paths = reparsed.old_output_paths
 
           # Exclusion pass, mirroring run_incremental: a save that flips a
           # page to draft (or into the expired/future window) alongside a
           # template edit used to leave it published — still in listings,
           # feeds, and on disk — because only the content-only strategy
           # applied the filters.
-          excluded_pages = [] of Models::Page
-          now = Time.utc
-          changed_pages.each(&.refresh_unpublished!(now))
-          unless options.drafts
-            excluded_pages.concat(changed_pages.select(&.draft))
-            changed_pages.reject!(&.draft)
-          end
-          unless options.include_expired
-            excluded_pages.concat(changed_pages.select { |p| p.expires.try { |e| e <= now } || false })
-            changed_pages.reject! { |p| p.expires.try { |e| e <= now } || false }
-          end
-          unless options.include_future
-            excluded_pages.concat(changed_pages.select { |p| p.date.try { |d| d > now } || false })
-            changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
-          end
+          excluded_pages = apply_publication_exclusions!(changed_pages, options)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Deferred permalink errors — mirrors run_incremental.
@@ -907,29 +751,13 @@ module Hwaro
           # Update all derived relationships before full re-render (removal
           # runs for every re-parsed page; excluded pages' new terms are not
           # re-added — see update_taxonomies_incremental).
-          update_taxonomies_incremental(site, changed_pages + excluded_pages, old_taxonomies_snapshot, excluded_paths)
+          update_taxonomies_incremental(site, changed_pages + excluded_pages, reparsed.old_taxonomies_snapshot, excluded_paths)
 
-          unless excluded_pages.empty?
-            site.pages.reject! { |p| excluded_paths.includes?(p.path) }
-            site.sections.reject! { |p| excluded_paths.includes?(p.path) }
-            excluded_pages.each do |p|
-              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
-              delete_orphaned_outputs(stale, output_dir)
-            end
-          end
-
-          # Delete outputs the edit orphaned (relocation or a dropped sibling
-          # output format) — set diff, mirrors run_incremental.
-          relocated = [] of String
-          changed_pages.each do |page|
-            next unless olds = old_output_paths[page.path]?
-            relocated.concat(olds - collect_page_output_paths(page, output_dir))
-          end
-          delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
+          drop_excluded_and_orphaned_outputs(site, changed_pages, excluded_pages, old_output_paths, output_dir)
 
           site.build_lookup_index
           relink_navigation_for_sections(site, affected_sections)
-          recompute_series_for_pages(site, changed_pages, old_series_names) if site.config.series.enabled
+          recompute_series_for_pages(site, changed_pages, reparsed.old_series_names) if site.config.series.enabled
           recompute_related_posts_for_pages(site, changed_pages, excluded_paths) if site.config.related.enabled
 
           # Re-render with reloaded templates. The selective path inside
@@ -945,6 +773,165 @@ module Hwaro
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
           run_rerender(options, force_pages: changed_pages, membership_changed: !excluded_pages.empty?)
+        end
+
+        # Everything the incremental strategies need to know about the pages a
+        # save touched, captured BEFORE they were re-parsed (old taxonomy terms
+        # to retract, old series, old reading-order neighbours, old output
+        # files to delete on relocation).
+        private record ReparsedPages,
+          changed_pages : Array(Models::Page),
+          affected_sections : Set(String),
+          old_taxonomies_snapshot : Hash(String, Hash(String, Array(String))),
+          old_series_names : Hash(String, String?),
+          old_output_paths : Hash(String, Array(String)),
+          old_neighbors : Hash(String, {Models::Page?, Models::Page?})
+
+        # Re-parse the changed content files in place (front matter, URL,
+        # cascade defaults) and snapshot their pre-edit state. Shared by the
+        # content-only and content+template incremental strategies.
+        #
+        # Returns nil when the edit is beyond incremental bookkeeping — a file
+        # that is not in the site model (an excluded page that may have just
+        # become publishable, or a filtered section _index whose [cascade]
+        # still reaches descendants) or a changed section [cascade] — and the
+        # caller must run a full build. nil is a sentinel distinct from "no
+        # matching pages": that is a normal, empty result.
+        private def reparse_changed_pages(
+          changed_content_files : Array(String),
+          site : Models::Site,
+          config : Models::Config,
+          output_dir : String,
+          pages_map : Hash(String, Models::Page),
+        ) : ReparsedPages?
+          changed_pages = [] of Models::Page
+          affected_sections = Set(String).new
+          old_taxonomies_snapshot = {} of String => Hash(String, Array(String))
+          old_series_names = {} of String => String?
+          # Output files each changed page occupied BEFORE re-parse — a slug/
+          # custom_path edit relocates the page, and the original file would
+          # otherwise keep serving 200 for the rest of the session (and ship
+          # if `public/` is deployed from it).
+          old_output_paths = {} of String => Array(String)
+
+          # Snapshot old neighbors before re-linking (for render set)
+          old_neighbors = {} of String => {Models::Page?, Models::Page?}
+
+          # Cascade context for re-applying section defaults to re-parsed pages
+          # (parse_single_page resets fields from front matter only). Prefer
+          # the cold build's pre-filter map: it still contains cascades from
+          # draft/expired _index sections that site.sections no longer holds.
+          cascade_map = @cascade_map || build_cascade_map(site.sections)
+
+          changed_content_files.each do |file|
+            relative_path = path_relative_to(file, "content")
+
+            page = pages_map[relative_path]?
+            unless page
+              # Not in the site model: an excluded page (draft / future /
+              # expired / parse-failed at startup) whose edit may have just
+              # made it publishable, or a filtered section _index whose
+              # [cascade] still reaches descendants. Incremental bookkeeping
+              # can't see either — un-drafting a post used to be silently
+              # skipped here until serve restart. A full rebuild re-admits
+              # whatever this save changed. Files gone from disk are the
+              # watcher's removed-file path; still skip those.
+              if File.exists?(file)
+                Logger.info "  Changed #{relative_path} is not in the site model — running full rebuild."
+                return
+              end
+              next
+            end
+
+            # Snapshot before re-parse (includes property-backed taxonomies
+            # like authors — see snapshot_page_taxonomies)
+            old_taxonomies_snapshot[page.path] = snapshot_page_taxonomies(page, site)
+            old_series_names[page.path] = page.series
+            old_neighbors[page.path] = {page.lower, page.higher}
+            old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
+            old_output_paths[page.path] = collect_page_output_paths(page, output_dir)
+
+            # Re-read, re-parse front-matter and recalculate URL
+            parse_single_page(page)
+            page.generate_permalink(config.base_url)
+            # Content (shortcode usage) or front-matter template may have changed
+            @page_template_hash_mutex.synchronize { @page_template_hash_memo.delete(page.path) }
+
+            # A changed [cascade] affects descendant pages that are NOT in the
+            # changed set — incremental bookkeeping can't reach them, so
+            # escalate to a full rebuild (rare event, correctness first).
+            if (previous_cascade = old_cascade) && page.is_a?(Models::Section) && page.cascade != previous_cascade
+              Logger.info "  Section cascade changed in #{page.path} — running full rebuild."
+              return
+            end
+
+            apply_cascade_to(page, cascade_map)
+
+            changed_pages << page
+            affected_sections << page.section
+            # Also include ancestor sections that may list this page
+            page.ancestors.each { |ancestor| affected_sections << ancestor.section }
+          end
+
+          ReparsedPages.new(changed_pages, affected_sections, old_taxonomies_snapshot, old_series_names, old_output_paths, old_neighbors)
+        end
+
+        # Drop the re-parsed pages that the build options exclude (draft /
+        # expired / future) from `changed_pages`, returning them. Same
+        # contract as the full parse phase: the publication window is
+        # re-stamped first so pages kept via --include-future /
+        # --include-expired stay out of public artifacts and listings.
+        private def apply_publication_exclusions!(
+          changed_pages : Array(Models::Page),
+          options : Config::Options::BuildOptions,
+        ) : Array(Models::Page)
+          excluded_pages = [] of Models::Page
+          now = Time.utc
+          changed_pages.each(&.refresh_unpublished!(now))
+          unless options.drafts
+            excluded_pages.concat(changed_pages.select(&.draft))
+            changed_pages.reject!(&.draft)
+          end
+          unless options.include_expired
+            excluded_pages.concat(changed_pages.select { |p| p.expires.try { |e| e <= now } || false })
+            changed_pages.reject! { |p| p.expires.try { |e| e <= now } || false }
+          end
+          unless options.include_future
+            excluded_pages.concat(changed_pages.select { |p| p.date.try { |d| d > now } || false })
+            changed_pages.reject! { |p| p.date.try { |d| d > now } || false }
+          end
+          excluded_pages
+        end
+
+        # Remove excluded pages from the site indices and delete every output
+        # file the edit orphaned: the excluded pages' files, and for the
+        # surviving pages the set difference between their old and new output
+        # paths — a relocation (slug/custom_path change) moves EVERY output,
+        # but a front-matter edit can also drop just a sibling format
+        # (`outputs = ["json"]` removed) while the primary path stays put.
+        private def drop_excluded_and_orphaned_outputs(
+          site : Models::Site,
+          changed_pages : Array(Models::Page),
+          excluded_pages : Array(Models::Page),
+          old_output_paths : Hash(String, Array(String)),
+          output_dir : String,
+        ) : Nil
+          unless excluded_pages.empty?
+            excluded_paths = excluded_pages.map(&.path).to_set
+            site.pages.reject! { |p| excluded_paths.includes?(p.path) }
+            site.sections.reject! { |p| excluded_paths.includes?(p.path) }
+            excluded_pages.each do |p|
+              stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
+              delete_orphaned_outputs(stale, output_dir)
+            end
+          end
+
+          relocated = [] of String
+          changed_pages.each do |page|
+            next unless olds = old_output_paths[page.path]?
+            relocated.concat(olds - collect_page_output_paths(page, output_dir))
+          end
+          delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
         end
 
         # Re-render pages using reloaded templates without re-parsing content.
@@ -1355,40 +1342,14 @@ module Hwaro
           sass_on = config.try(&.sass.enabled) || false
           copied = 0
           changed_files.each do |src_path|
-            # lstat first — mirrors the full build's collect_static_files
+            # Same eligibility rule as the full build's collect_static_files
             # (phases/initialize.cr): a symlinked file whose target escapes
             # the project must not be published into the output during
-            # serve (e.g. `static/leak -> ~/.ssh/id_rsa` whose target's
-            # mtime change trips the watcher). Dangling symlinks and
-            # directories are skipped like before.
-            lstat = File.info?(src_path, follow_symlinks: false)
-            next if lstat.nil?
-
-            if lstat.symlink?
-              # `static_target_info` (phases/initialize.cr) turns an
-              # unresolvable link — a symlink cycle raises ELOOP out of a bare
-              # `File.info?` — into a skip. Raising here escaped into the
-              # watcher loop, which then failed every single iteration and
-              # could never rebuild again.
-              info = static_target_info(src_path)
-              next if info.nil? || info.directory?
-
-              unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
-                Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
-                next
-              end
-            else
-              next if lstat.directory?
-              info = lstat
-            end
-
-            # FIFOs, sockets and device nodes are not publishable and hang the
-            # copy forever (`open(2)` on a writer-less FIFO blocks) — same
-            # guard as the full build's collect_static_files.
-            unless info.type.file?
-              Logger.warn "Skipping non-regular static file: #{src_path}"
-              next
-            end
+            # serve either, and an unresolvable link must be a skip rather
+            # than a raise — raising here escaped into the watcher loop,
+            # which then failed every single iteration and could never
+            # rebuild again.
+            next unless publishable_static_info(src_path)
 
             relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)

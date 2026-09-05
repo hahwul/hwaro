@@ -247,13 +247,13 @@ module Hwaro::Core::Build::Phases::Initialize
     # guard and let the cold `rm_rf` delete `content/archive`, and
     # `ln -s templates public && hwaro build --cache` overwrote the site's
     # own templates with rendered HTML. Judge the RESOLVED destination.
-    expanded = resolved_real_path(expanded)
-    cwd = resolved_real_path(File.expand_path(Dir.current))
+    expanded = Hwaro::Utils::PathUtils.resolved_real_path(expanded)
+    cwd = Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(Dir.current))
 
     reason =
       if expanded == "/" || Path[expanded].parent.to_s == expanded
         "the filesystem root"
-      elsif expanded == resolved_real_path(Path.home.to_s)
+      elsif expanded == Hwaro::Utils::PathUtils.resolved_real_path(Path.home.to_s)
         # Resolved on both sides: `$HOME` is itself a symlink on plenty of
         # setups (/home/u -> /data/u), and comparing a resolved destination
         # against the unresolved `Path.home` would let `-o $HOME` through.
@@ -283,33 +283,9 @@ module Hwaro::Core::Build::Phases::Initialize
   # would otherwise never match the lexical `<cwd>/content`.
   private def protected_input_dir(expanded : String, cwd : String) : String?
     PROTECTED_INPUT_DIRS.find do |dir|
-      root = resolved_real_path(File.join(cwd, dir))
+      root = Hwaro::Utils::PathUtils.resolved_real_path(File.join(cwd, dir))
       expanded == root || expanded.starts_with?(root + File::SEPARATOR)
     end
-  end
-
-  # `path` with every symlink resolved, including when it does not exist yet:
-  # resolve the deepest existing ancestor and re-append the missing tail. A
-  # not-yet-created output directory is the normal case (`-o public` on a
-  # fresh checkout), so bailing out on a missing leaf would leave exactly the
-  # paths this guard exists for unresolved. Falls back to the given path when
-  # resolution fails (broken link, symlink loop, unreadable ancestor) —
-  # lexical matching is what we had before, so a failure never loosens the
-  # guard below the old behavior.
-  private def resolved_real_path(path : String) : String
-    suffix = [] of String
-    current = path
-    until File.exists?(current)
-      parent = File.dirname(current)
-      return path if parent == current
-      suffix << File.basename(current)
-      current = parent
-    end
-    real = File.realpath(current)
-    suffix.reverse_each { |part| real = File.join(real, part) }
-    real
-  rescue File::Error | IO::Error
-    path
   end
 
   private def copy_static_files(output_dir : String, verbose : Bool, incremental : Bool = false)
@@ -369,6 +345,52 @@ module Hwaro::Core::Build::Phases::Initialize
   # `same_contents?`).
   CONTENT_COMPARE_CHUNK = 64 * 1024
 
+  # The `File::Info` of a publishable file under `static/`, or nil (after
+  # warning where a warning is due) when `src_path` must be skipped. One
+  # rule for the cold build and the serve watcher — the two used to carry
+  # separate copies of it.
+  #
+  # lstat first: for the common regular-file case one syscall covers the
+  # directory check AND proves it isn't a symlink. Only actual symlinks pay
+  # the follow-up target stat and realpath cost:
+  #
+  # - dangling links (`info?` nil), directories and unresolvable links
+  #   (symlink cycles — see `static_target_info`) are skipped silently;
+  # - a symlinked file whose target escapes the project would publish
+  #   content from outside the site (e.g. `static/leak -> ~/.ssh/id_rsa`),
+  #   so it is skipped with a warning; in-repo symlinks resolve back within
+  #   the project root and are still copied;
+  # - only regular files are publishable. `static/` can also hold a FIFO, a
+  #   unix socket or a device node (a stray `mkfifo`, an editor/daemon socket
+  #   left in the tree): `FileUtils.cp` opens the source for reading and
+  #   `open(2)` on a FIFO with no writer BLOCKS FOREVER, so one such entry
+  #   hung the whole build with no output at all. Anything that isn't a file
+  #   is unpublishable and worth saying out loud.
+  private def publishable_static_info(src_path : String) : File::Info?
+    lstat = File.info?(src_path, follow_symlinks: false)
+    return if lstat.nil?
+
+    if lstat.symlink?
+      info = static_target_info(src_path)
+      return if info.nil? || info.directory?
+
+      unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
+        Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
+        return
+      end
+    else
+      return if lstat.directory?
+      info = lstat
+    end
+
+    unless info.type.file?
+      Logger.warn "Skipping non-regular static file: #{src_path}"
+      return
+    end
+
+    info
+  end
+
   private def collect_static_files(
     src_dir : String,
     output_dir : String,
@@ -383,41 +405,8 @@ module Hwaro::Core::Build::Phases::Initialize
       # the directory check AND proves it isn't a symlink (previously every
       # file paid a stat plus an lstat). Only actual symlinks pay the
       # follow-up target stat and realpath cost.
-      lstat = File.info?(src_path, follow_symlinks: false)
-      next if lstat.nil?
-
-      if lstat.symlink?
-        # Skip dangling symlinks (`info?` nil when the target is missing) so
-        # the copy worker doesn't log a spurious failure, and directories.
-        # Unresolvable links (symlink cycles) also come back nil here — see
-        # `static_target_info`.
-        info = static_target_info(src_path)
-        next if info.nil? || info.directory?
-
-        # A symlinked file whose target escapes the project would publish
-        # content from outside the site (e.g. `static/leak -> ~/.ssh/id_rsa`).
-        # Skip those; in-repo symlinks resolve back within the project root
-        # and are still copied.
-        unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
-          Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
-          next
-        end
-      else
-        next if lstat.directory?
-        info = lstat
-      end
-
-      # Only regular files are publishable. `static/` can also hold a FIFO, a
-      # unix socket or a device node (a stray `mkfifo`, an editor/daemon
-      # socket left in the tree): `FileUtils.cp` opens the source for reading
-      # and `open(2)` on a FIFO with no writer BLOCKS FOREVER, so one such
-      # entry hung the whole build with no output at all. Directories are
-      # already filtered above, so anything reaching here that isn't a file is
-      # unpublishable and worth saying out loud.
-      unless info.type.file?
-        Logger.warn "Skipping non-regular static file: #{src_path}"
-        next
-      end
+      info = publishable_static_info(src_path)
+      next unless info
 
       relative = Path[src_path].relative_to(src_dir).to_s
       next if static_config.excluded?(relative)
