@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Publish several documentation versions side by side with a version switcher">
+  <title>Versioned Docs - Hwaro</title>
+  <meta property="og:title" content="Versioned Docs">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/features/versioned-docs/">
+  <meta property="og:description" content="Publish several documentation versions side by side with a version switcher">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-versioned-docs.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Versioned Docs">
+  <meta name="twitter:description" content="Publish several documentation versions side by side with a version switcher">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-versioned-docs.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/features/versioned-docs/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/versioned-docs/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/versioned-docs/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=ff673853">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/versioned-docs/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/versioned-docs/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/git-info/">Git Metadata</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/remote-data/">Remote Data Sources</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-generation/">Content Generation</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/versioned-docs/" class="active">Versioned Docs</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+    
+    <li aria-current="page">Versioned Docs</li>
+  </ol>
+</nav>
+    <h1>Versioned Docs</h1>
+    <p>Hwaro can publish several versions of the same documentation (v1, v2, …) from one site, with a version switcher, per-version navigation and SEO that points search engines at the current release. Versioning is <strong>directory-based</strong> and modeled on <a href="/features/multilingual/">multilingual</a> support: a page belongs to the version whose content directory contains it.</p>
+<h2 id="configuration">Configuration</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">]</span>
+latest_at_root <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>     <span class="hljs-comment"># latest version renders at its section&#39;s natural URL</span>
+noindex_old <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>        <span class="hljs-comment"># older versions: &lt;meta name=&quot;robots&quot; content=&quot;noindex&quot;&gt; + canonical to the latest counterpart</span>
+search <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;latest&quot;</span>         <span class="hljs-comment"># &quot;latest&quot; | &quot;all&quot; — which versions enter search.json AND sitemap.xml</span>
+feeds <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;latest&quot;</span>          <span class="hljs-comment"># &quot;latest&quot; | &quot;all&quot; — which versions feed RSS/Atom</span>
+taxonomies <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;latest&quot;</span>     <span class="hljs-comment"># &quot;latest&quot; | &quot;all&quot; — which versions taxonomy term pages collect from</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">.</span>list<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v2&quot;</span>               <span class="hljs-comment"># URL segment, must be URL-safe (letters, digits, - _ . ~)</span>
+label <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;2.x (latest)&quot;</span>    <span class="hljs-comment"># switcher label (defaults to name)</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v2&quot;</span>          <span class="hljs-comment"># content directory relative to content/ (defaults to name)</span>
+latest <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">.</span>list<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v1&quot;</span>
+label <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;1.x&quot;</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v1&quot;</span>
+</code></pre>
+<p>TOML cannot make one key both a table and an array of tables, so the switches live in <code>[versions]</code> and the entries in <code>[[versions.list]]</code>. If you only need the defaults, a bare array works too:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v2&quot;</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v2&quot;</span>
+latest <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v1&quot;</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v1&quot;</span>
+</code></pre>
+<p>Validation (all of these fail the build with <code>HWARO_E_CONFIG</code>):</p>
+<ul>
+<li><code>name</code> is required, URL-safe and unique.</li>
+<li><code>path</code> must be a directory relative to <code>content/</code>; two versions can neither share a path nor nest inside each other.</li>
+<li>Exactly one entry is <code>latest = true</code>. If none is marked, the <strong>first</strong> entry is the latest; two or more marked entries are an error.</li>
+<li><code>search</code>, <code>feeds</code> and <code>taxonomies</code> accept only <code>&quot;latest&quot;</code> or <code>&quot;all&quot;</code>.</li>
+</ul>
+<p><code>hwaro doctor</code> warns (<code>version-path-missing</code>) when a version points at a content directory that does not exist.</p>
+<h2 id="content-structure">Content Structure</h2>
+<p>Each version is a normal content tree under its own directory. Files with the same path relative to the version root are treated as the same page in different versions. That is how the switcher finds counterparts.</p>
+<pre><code>content/
+└── docs/
+    ├── v2/
+    │   ├── _index.md
+    │   ├── install.md
+    │   └── plugins.md      # only in v2
+    └── v1/
+        ├── _index.md
+        ├── install.md
+        └── legacy.md       # only in v1
+</code></pre>
+<h3 id="url-mapping">URL Mapping</h3>
+<p>The version directory is swapped for the directory the version <em>publishes</em> under. With <code>latest_at_root = true</code> (the default) the latest version takes the parent's natural URL and older versions get a <code>/&lt;name&gt;/</code> segment:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content/docs/v2/_index.md</code></td>
+<td><code>/docs/</code></td>
+</tr>
+<tr>
+<td><code>content/docs/v2/install.md</code></td>
+<td><code>/docs/install/</code></td>
+</tr>
+<tr>
+<td><code>content/docs/v1/_index.md</code></td>
+<td><code>/docs/v1/</code></td>
+</tr>
+<tr>
+<td><code>content/docs/v1/install.md</code></td>
+<td><code>/docs/v1/install/</code></td>
+</tr>
+</tbody>
+</table>
+<p>With <code>latest_at_root = false</code> every version keeps its segment (<code>/docs/v2/install/</code>, <code>/docs/v1/install/</code>) and <code>/docs/</code> becomes a redirect stub to the latest version's root, unless you author your own <code>content/docs/_index.md</code>, which then keeps that URL.</p>
+<p>The URL segment is the version <strong>name</strong>, not the directory basename: <code>name = &quot;2.x&quot;</code> with <code>path = &quot;docs/v2&quot;</code> publishes at <code>/docs/2.x/…</code> when it is not at root. Version directories may also sit at the top level (<code>content/v2/…</code>), in which case the latest version <em>is</em> the site root.</p>
+<p>Notes:</p>
+<ul>
+<li>With <code>latest_at_root = true</code> do not also author <code>content/docs/_index.md</code>: it claims the same <code>/docs/</code> URL as the latest version's root and the build reports a duplicate output path (the authored file wins, the version root is not written).</li>
+<li><code>[permalinks]</code> rules and <code>slug</code> apply to the published path (<code>docs/install.md</code>), not the source path.</li>
+<li>An explicit <code>path = &quot;…&quot;</code> in front matter wins outright, exactly as it does for languages. A custom path is not prefixed, so keep them distinct across versions.</li>
+<li>Everything under a version directory is versioned: page bundles, assets, <code>_index.md</code> cascades and <code>[[content.generate]]</code> output whose target path falls inside it.</li>
+</ul>
+<h3 id="multilingual">Multilingual</h3>
+<p>Languages and versions combine: the language prefix comes first, the version after. <code>content/docs/v1/install.ko.md</code> renders at <code>/ko/docs/v1/install/</code>, and <code>foo.ko.md</code> files inside a version directory behave exactly as they do elsewhere (translations, hreflang, per-language menus).</p>
+<h2 id="template-variables">Template Variables</h2>
+<h3 id="pageversion">page.version</h3>
+<p><code>nil</code> for unversioned pages (so <code>{% if page.version %}</code> is the guard), otherwise:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.name</code></td>
+<td>String</td>
+<td>Version name (<code>&quot;v2&quot;</code>)</td>
+</tr>
+<tr>
+<td><code>.label</code></td>
+<td>String</td>
+<td>Display label (<code>&quot;2.x (latest)&quot;</code>)</td>
+</tr>
+<tr>
+<td><code>.latest</code></td>
+<td>Bool</td>
+<td>Is this the latest version</td>
+</tr>
+<tr>
+<td><code>.url</code></td>
+<td>String</td>
+<td>Root URL of the version in the page&#39;s language (<code>/docs/</code>, <code>/ko/docs/v1/</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pageversion-links">page.version_links</h3>
+<p>One entry per configured version, in config order. These are the switcher rows. Empty for unversioned pages.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.name</code></td>
+<td>String</td>
+<td>Version name</td>
+</tr>
+<tr>
+<td><code>.label</code></td>
+<td>String</td>
+<td>Display label</td>
+</tr>
+<tr>
+<td><code>.latest</code></td>
+<td>Bool</td>
+<td>Is the latest version</td>
+</tr>
+<tr>
+<td><code>.url</code></td>
+<td>String</td>
+<td>The <strong>same page</strong> in that version when it exists, else that version&#39;s root</td>
+</tr>
+<tr>
+<td><code>.exists</code></td>
+<td>Bool</td>
+<td>Whether the counterpart page exists (<code>false</code> → <code>url</code> is the version root)</td>
+</tr>
+<tr>
+<td><code>.current</code></td>
+<td>Bool</td>
+<td>Whether this row is the page&#39;s own version</td>
+</tr>
+</tbody>
+</table>
+<p>Counterparts are matched by path relative to the version root, in the same language: <code>docs/v1/install.md</code> ↔ <code>docs/v2/install.md</code>, <code>docs/v1/install.ko.md</code> ↔ <code>docs/v2/install.ko.md</code>. A <code>render = false</code> counterpart does not count as existing.</p>
+<h3 id="versions-global">versions (global)</h3>
+<p>Available on every page of a versioned site. It is a list (<code>{% for v in versions %}</code>) of <code>{name, label, latest, url}</code> entries whose <code>url</code> is each version's root in the current page's language, plus:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>versions.latest</code></td>
+<td>The latest version entry</td>
+</tr>
+<tr>
+<td><code>versions.all</code></td>
+<td>The same list as a plain array</td>
+</tr>
+<tr>
+<td><code>versions.size</code></td>
+<td>Number of versions</td>
+</tr>
+</tbody>
+</table>
+<p>Like <code>page.url</code>, every URL above is site-relative, so prefix it with <code>{{ base_url }}</code> (or <code>{{ base_path }}</code>) in links so <a href="/start/config/#base-url">subpath deployments</a> work.</p>
+<h2 id="version-switcher-example">Version Switcher Example</h2>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span> <span class="hljs-meta">%}</span>
+&lt;details class=&quot;version-switch&quot;&gt;
+  &lt;summary aria-label=&quot;Switch documentation version&quot;&gt;
+    <span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span>&lt;span class=&quot;badge&quot;&gt;old&lt;/span&gt;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+  &lt;/summary&gt;
+  &lt;ul&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">v</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version_links</span> <span class="hljs-meta">%}</span>
+    &lt;li&gt;
+      &lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+         <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.current</span> <span class="hljs-meta">%}</span>class=&quot;current&quot; aria-current=&quot;page&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+         <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable">v</span><span class="hljs-variable">.exists</span> <span class="hljs-meta">%}</span>title=&quot;This page does not exist in <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span> — opens the <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span> start page&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;
+        <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span> (latest)<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+      &lt;/a&gt;
+    &lt;/li&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+  &lt;/ul&gt;
+&lt;/details&gt;
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span>
+&lt;div class=&quot;version-banner&quot;&gt;
+  You are reading the <span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span> documentation.
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">v</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version_links</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span>
+  &lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.exists</span> <span class="hljs-meta">%}</span>Read this page in <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span>Go to the <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span> docs<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&lt;/a&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/div&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>A site-wide entry point that does not depend on the current page:</p>
+<pre><code class="language-jinja hljs">&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">versions</span><span class="hljs-variable">.latest</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;Docs (<span class="hljs-meta">{{</span> <span class="hljs-variable">versions</span><span class="hljs-variable">.latest</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>)&lt;/a&gt;
+&lt;select onchange=&quot;location.href=this.value&quot;&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">v</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">versions</span> <span class="hljs-meta">%}</span>
+  &lt;option value=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>&lt;/option&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/select&gt;
+</code></pre>
+<h2 id="scoping-rules">Scoping Rules</h2>
+<p>Every version is its own tree; nothing leaks across the boundary:</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>page.lower</code> / <code>page.higher</code></td>
+<td>The reading order is built per <code>{language, version}</code>. The last v1 page has no &quot;next&quot;; it never jumps into v2.</td>
+</tr>
+<tr>
+<td><code>page.ancestors</code> (breadcrumbs)</td>
+<td>Stop at the version root. An unversioned <code>docs/_index.md</code> is not an ancestor of <code>docs/v1/…</code>.</td>
+</tr>
+<tr>
+<td><code>get_section()</code>, <code>section.pages</code>, <code>section.subsections</code></td>
+<td>A version root is not a subsection or page of its unversioned parent; listings inside a version only see that version.</td>
+</tr>
+<tr>
+<td>Menus (<code>get_menu</code>)</td>
+<td>Config <code>[[menus.*]]</code> entries appear everywhere. Front-matter <code>menus = […]</code> registrations from a versioned page appear only in that version&#39;s menus; unversioned pages additionally see the <strong>latest</strong> version&#39;s registrations.</td>
+</tr>
+<tr>
+<td>Related posts</td>
+<td>Never cross a version boundary.</td>
+</tr>
+<tr>
+<td>Taxonomies</td>
+<td>Term pages collect from unversioned content plus the latest version (<code>taxonomies = &quot;latest&quot;</code>, the default). Set <code>taxonomies = &quot;all&quot;</code> to list every version.</td>
+</tr>
+</tbody>
+</table>
+<p>Series are not version-aware: a <code>series</code> shared by a v1 and a v2 page groups them together.</p>
+<h2 id="seo-discovery">SEO &amp; Discovery</h2>
+<h3 id="canonical-and-noindex">Canonical and noindex</h3>
+<p>Pages of an older version emit a canonical link to their <strong>latest counterpart</strong> when it exists (self-canonical otherwise) and, with <code>noindex_old = true</code> (default), a <code>&lt;meta name=&quot;robots&quot; content=&quot;noindex&quot;&gt;</code> right after it. Both come out of <code>{{ canonical_tag }}</code>, so templates that already print it need no change; <code>seo.canonical_url</code> follows the same rule and <code>seo.noindex</code> exposes the flag.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;canonical&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/docs/install/&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">meta</span> <span class="hljs-attr">name</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;robots&quot;</span> <span class="hljs-attr">content</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;noindex&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>Latest-version pages self-canonicalize as usual. Paginated listings keep self-canonicalizing (<code>page/2/</code> of an old section is not <code>page/2/</code> of the new one). <code>hreflang_tags</code> are unaffected, since they link translations of the same version.</p>
+<h3 id="discovery-surfaces">Discovery surfaces</h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Switch</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>search.json</code></td>
+<td><code>[versions] search</code></td>
+<td>latest only</td>
+</tr>
+<tr>
+<td><code>sitemap.xml</code></td>
+<td><code>[versions] search</code> (same switch)</td>
+<td>latest only</td>
+</tr>
+<tr>
+<td>RSS / Atom (main, section, per-language)</td>
+<td><code>[versions] feeds</code></td>
+<td>latest only</td>
+</tr>
+<tr>
+<td>Taxonomy term pages</td>
+<td><code>[versions] taxonomies</code></td>
+<td>latest only</td>
+</tr>
+<tr>
+<td><code>llms.txt</code> / <code>llms-full.txt</code></td>
+<td>—</td>
+<td>always latest only</td>
+</tr>
+</tbody>
+</table>
+<p>Unversioned pages always pass. With <code>search = &quot;all&quot;</code> every record in <code>search.json</code> carries a <code>version</code> field (the version name) so a client can filter results to the version being read:</p>
+<pre><code class="language-js hljs"><span class="hljs-keyword">const</span> current <span class="hljs-operator">=</span> <span class="hljs-built_in">document</span><span class="hljs-punctuation">.</span>documentElement<span class="hljs-punctuation">.</span>dataset<span class="hljs-punctuation">.</span>version<span class="hljs-punctuation">;</span> <span class="hljs-comment">// e.g. from data-version=&quot;{{ page.version.name }}&quot;
+</span><span class="hljs-comment"></span><span class="hljs-keyword">const</span> hits <span class="hljs-operator">=</span> results<span class="hljs-punctuation">.</span>filter<span class="hljs-punctuation">(</span><span class="hljs-punctuation">(</span>r<span class="hljs-punctuation">)</span> <span class="hljs-punctuation">=&gt;</span> <span class="hljs-operator">!</span>r<span class="hljs-punctuation">.</span>version <span class="hljs-operator">||</span> r<span class="hljs-punctuation">.</span>version <span class="hljs-operator">===</span> current<span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+</code></pre>
+<h2 id="build-cache-serve-and-doctor">Build Cache, Serve and Doctor</h2>
+<ul>
+<li><code>[versions]</code> is part of the config hash and version membership is part of the page-set fingerprint, so <code>hwaro build --cache</code> rebuilds what changes when you move a file between version directories, add a counterpart (the other version's <code>version_links</code> flips <code>exists</code>) or change the switches.</li>
+<li><code>hwaro serve</code> builds versioned sites like any other; edits inside a version directory are picked up incrementally.</li>
+<li><code>hwaro doctor</code> reports <code>version-path-missing</code> for a <code>[[versions.list]]</code> entry whose directory is absent.</li>
+</ul>
+<h2 id="not-included">Not Included</h2>
+<ul>
+<li>Redirect rules for URLs that exist only in the latest version (an old-version 404 is a plain 404).</li>
+<li>Version-aware series.</li>
+<li>The <code>docs</code> scaffold is unchanged; add <code>[versions]</code> to a generated site by hand using the snippet above.</li>
+</ul>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/features/multilingual/">Multilingual</a> — the language layer versions compose with</li>
+<li><a href="/templates/data-model/">Data Model</a> — every <code>page.*</code> and global variable</li>
+<li><a href="/features/seo/">SEO</a> — canonical, robots and sitemap details</li>
+<li><a href="/start/config/">Configuration</a> — full <code>config.toml</code> reference</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/image-processing/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">Image Processing</span>
+    <span class="pn-desc">Automatic image resizing, LQIP placeholders, and dominant color extraction during build</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/features/pwa/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">PWA</span>
+    <span class="pn-desc">Progressive Web App support with manifest.json and service worker</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Fast, lightweight static site generator built with Crystal.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>Docs</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+        <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+        <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+        <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+        <li><a href="https://hwaro.hahwul.com/deploy/">Deploy</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">Examples</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">Benchmark</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">Sitemap</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#configuration">Configuration</a></li><li><a href="#content-structure">Content Structure</a><ul><li><a href="#url-mapping">URL Mapping</a></li><li><a href="#multilingual">Multilingual</a></li></ul></li><li><a href="#template-variables">Template Variables</a><ul><li><a href="#pageversion">page.version</a></li><li><a href="#pageversion-links">page.version_links</a></li><li><a href="#versions-global">versions (global)</a></li></ul></li><li><a href="#version-switcher-example">Version Switcher Example</a></li><li><a href="#scoping-rules">Scoping Rules</a></li><li><a href="#seo-discovery">SEO &amp; Discovery</a><ul><li><a href="#canonical-and-noindex">Canonical and noindex</a></li><li><a href="#discovery-surfaces">Discovery surfaces</a></li></ul></li><li><a href="#build-cache-serve-and-doctor">Build Cache, Serve and Doctor</a></li><li><a href="#not-included">Not Included</a></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=ff673853"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=ff673853"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=ff673853"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=ff673853"></script>
+</body>
+</html>

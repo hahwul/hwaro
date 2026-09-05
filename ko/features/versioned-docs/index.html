@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="버전 전환기와 함께 여러 문서 버전을 나란히 게시">
+  <title>버전별 문서 - Hwaro</title>
+  <meta property="og:title" content="버전별 문서">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/versioned-docs/">
+  <meta property="og:description" content="버전 전환기와 함께 여러 문서 버전을 나란히 게시">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-versioned-docs.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="버전별 문서">
+  <meta name="twitter:description" content="버전 전환기와 함께 여러 문서 버전을 나란히 게시">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-versioned-docs.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/versioned-docs/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/versioned-docs/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/versioned-docs/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=ff673853">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=ff673853">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/versioned-docs/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/versioned-docs/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/git-info/">Git 메타데이터</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/remote-data/">원격 데이터 소스</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-generation/">콘텐츠 생성</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/versioned-docs/" class="active">버전별 문서</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">버전별 문서</li>
+  </ol>
+</nav>
+    <h1>버전별 문서</h1>
+    <p>Hwaro는 하나의 사이트에서 같은 문서의 여러 버전(v1, v2, …)을 게시할 수 있습니다. 버전 전환기, 버전별 내비게이션, 그리고 검색 엔진을 최신 릴리스로 안내하는 SEO를 제공합니다. 버전 관리는 <strong>디렉터리 기반</strong>이며 <a href="/ko/features/multilingual/">다국어</a> 지원을 본떠 설계되었습니다. 페이지는 자신을 담고 있는 콘텐츠 디렉터리의 버전에 속합니다.</p>
+<h2 id="설정">설정</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">]</span>
+latest_at_root <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>     <span class="hljs-comment"># 최신 버전은 섹션의 원래 URL에 렌더링</span>
+noindex_old <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>        <span class="hljs-comment"># 이전 버전: &lt;meta name=&quot;robots&quot; content=&quot;noindex&quot;&gt; + 최신 대응 페이지로 canonical</span>
+search <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;latest&quot;</span>         <span class="hljs-comment"># &quot;latest&quot; | &quot;all&quot; — search.json과 sitemap.xml에 들어갈 버전</span>
+feeds <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;latest&quot;</span>          <span class="hljs-comment"># &quot;latest&quot; | &quot;all&quot; — RSS/Atom에 들어갈 버전</span>
+taxonomies <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;latest&quot;</span>     <span class="hljs-comment"># &quot;latest&quot; | &quot;all&quot; — 택소노미 용어 페이지가 수집할 버전</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">.</span>list<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v2&quot;</span>               <span class="hljs-comment"># URL 세그먼트, URL-safe 문자만 허용 (영문자, 숫자, - _ . ~)</span>
+label <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;2.x (latest)&quot;</span>    <span class="hljs-comment"># 전환기 라벨 (기본값: name)</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v2&quot;</span>          <span class="hljs-comment"># content/ 기준 콘텐츠 디렉터리 (기본값: name)</span>
+latest <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">.</span>list<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v1&quot;</span>
+label <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;1.x&quot;</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v1&quot;</span>
+</code></pre>
+<p>TOML에서는 하나의 키가 테이블과 테이블 배열을 동시에 가질 수 없으므로, 스위치는 <code>[versions]</code>에, 항목은 <code>[[versions.list]]</code>에 둡니다. 기본값만 필요하다면 배열만 써도 됩니다:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v2&quot;</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v2&quot;</span>
+latest <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+
+<span class="hljs-punctuation">[</span><span class="hljs-punctuation">[</span>versions<span class="hljs-punctuation">]</span><span class="hljs-punctuation">]</span>
+name <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;v1&quot;</span>
+path <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;docs/v1&quot;</span>
+</code></pre>
+<p>검증 규칙 (모두 <code>HWARO_E_CONFIG</code>로 빌드가 실패합니다):</p>
+<ul>
+<li><code>name</code>은 필수이며 URL-safe하고 고유해야 합니다.</li>
+<li><code>path</code>는 <code>content/</code> 기준 디렉터리여야 하며, 두 버전이 같은 경로를 쓰거나 서로 중첩될 수 없습니다.</li>
+<li><code>latest = true</code>는 정확히 하나여야 합니다. 표시된 항목이 없으면 <strong>첫 번째</strong> 항목이 최신이 되고, 둘 이상이면 오류입니다.</li>
+<li><code>search</code>, <code>feeds</code>, <code>taxonomies</code>는 <code>&quot;latest&quot;</code> 또는 <code>&quot;all&quot;</code>만 허용합니다.</li>
+</ul>
+<p><code>hwaro doctor</code>는 존재하지 않는 콘텐츠 디렉터리를 가리키는 버전이 있으면 <code>version-path-missing</code> 경고를 냅니다.</p>
+<h2 id="콘텐츠-구조">콘텐츠 구조</h2>
+<p>각 버전은 자기 디렉터리 아래의 일반 콘텐츠 트리입니다. 버전 루트 기준 상대 경로가 같은 파일은 다른 버전의 같은 페이지로 취급되며, 전환기는 이 규칙으로 대응 페이지를 찾습니다.</p>
+<pre><code>content/
+└── docs/
+    ├── v2/
+    │   ├── _index.md
+    │   ├── install.md
+    │   └── plugins.md      # v2에만 존재
+    └── v1/
+        ├── _index.md
+        ├── install.md
+        └── legacy.md       # v1에만 존재
+</code></pre>
+<h3 id="url-매핑">URL 매핑</h3>
+<p>버전 디렉터리는 그 버전이 <em>게시되는</em> 디렉터리로 치환됩니다. <code>latest_at_root = true</code>(기본값)이면 최신 버전이 상위 디렉터리의 원래 URL을 차지하고, 이전 버전은 <code>/&lt;name&gt;/</code> 세그먼트를 갖습니다:</p>
+<table>
+<thead>
+<tr>
+<th>소스</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content/docs/v2/_index.md</code></td>
+<td><code>/docs/</code></td>
+</tr>
+<tr>
+<td><code>content/docs/v2/install.md</code></td>
+<td><code>/docs/install/</code></td>
+</tr>
+<tr>
+<td><code>content/docs/v1/_index.md</code></td>
+<td><code>/docs/v1/</code></td>
+</tr>
+<tr>
+<td><code>content/docs/v1/install.md</code></td>
+<td><code>/docs/v1/install/</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>latest_at_root = false</code>이면 모든 버전이 세그먼트를 유지하고(<code>/docs/v2/install/</code>, <code>/docs/v1/install/</code>), <code>/docs/</code>는 최신 버전 루트로 향하는 리디렉션 스텁이 됩니다. 직접 <code>content/docs/_index.md</code>를 작성했다면 그 페이지가 URL을 유지합니다.</p>
+<p>URL 세그먼트는 디렉터리 이름이 아니라 버전 <strong>name</strong>입니다. <code>name = &quot;2.x&quot;</code>, <code>path = &quot;docs/v2&quot;</code>라면 루트가 아닐 때 <code>/docs/2.x/…</code>에 게시됩니다. 버전 디렉터리는 최상위(<code>content/v2/…</code>)에 둘 수도 있으며, 이 경우 최신 버전이 사이트 루트가 됩니다.</p>
+<p>참고:</p>
+<ul>
+<li><code>latest_at_root = true</code>일 때는 <code>content/docs/_index.md</code>를 함께 두지 마세요. 최신 버전 루트와 같은 <code>/docs/</code> URL을 차지하므로 빌드가 출력 경로 중복을 보고합니다(작성한 파일이 우선하고 버전 루트는 기록되지 않습니다).</li>
+<li><code>[permalinks]</code> 규칙과 <code>slug</code>는 소스 경로가 아니라 게시 경로(<code>docs/install.md</code>)에 적용됩니다.</li>
+<li>프론트 매터의 명시적 <code>path = &quot;…&quot;</code>는 언어와 마찬가지로 항상 우선합니다. 커스텀 경로에는 접두어가 붙지 않으므로 버전 간에 서로 다르게 유지해야 합니다.</li>
+<li>버전 디렉터리 아래의 모든 것이 버전에 속합니다: 페이지 번들, 에셋, <code>_index.md</code> 캐스케이드, 대상 경로가 그 안에 있는 <code>[[content.generate]]</code> 결과물까지.</li>
+</ul>
+<h3 id="다국어">다국어</h3>
+<p>언어와 버전은 함께 사용할 수 있습니다. 언어 접두어가 먼저, 버전이 그 뒤에 옵니다. <code>content/docs/v1/install.ko.md</code>는 <code>/ko/docs/v1/install/</code>에 렌더링되며, 버전 디렉터리 안의 <code>foo.ko.md</code> 파일은 다른 곳과 똑같이 동작합니다(번역 연결, hreflang, 언어별 메뉴).</p>
+<h2 id="템플릿-변수">템플릿 변수</h2>
+<h3 id="pageversion">page.version</h3>
+<p>버전이 없는 페이지에서는 <code>nil</code>이므로(<code>{% if page.version %}</code>이 가드), 그 외에는:</p>
+<table>
+<thead>
+<tr>
+<th>속성</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.name</code></td>
+<td>String</td>
+<td>버전 이름 (<code>&quot;v2&quot;</code>)</td>
+</tr>
+<tr>
+<td><code>.label</code></td>
+<td>String</td>
+<td>표시 라벨 (<code>&quot;2.x (latest)&quot;</code>)</td>
+</tr>
+<tr>
+<td><code>.latest</code></td>
+<td>Bool</td>
+<td>최신 버전인지</td>
+</tr>
+<tr>
+<td><code>.url</code></td>
+<td>String</td>
+<td>페이지 언어 기준 버전 루트 URL (<code>/docs/</code>, <code>/ko/docs/v1/</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pageversion-links">page.version_links</h3>
+<p>설정된 버전마다 하나씩, 설정 순서대로 나열되며, 전환기의 각 행이 됩니다. 버전이 없는 페이지에서는 비어 있습니다.</p>
+<table>
+<thead>
+<tr>
+<th>속성</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.name</code></td>
+<td>String</td>
+<td>버전 이름</td>
+</tr>
+<tr>
+<td><code>.label</code></td>
+<td>String</td>
+<td>표시 라벨</td>
+</tr>
+<tr>
+<td><code>.latest</code></td>
+<td>Bool</td>
+<td>최신 버전인지</td>
+</tr>
+<tr>
+<td><code>.url</code></td>
+<td>String</td>
+<td>그 버전에 <strong>같은 페이지</strong>가 있으면 그 URL, 없으면 그 버전의 루트</td>
+</tr>
+<tr>
+<td><code>.exists</code></td>
+<td>Bool</td>
+<td>대응 페이지 존재 여부 (<code>false</code>면 <code>url</code>은 버전 루트)</td>
+</tr>
+<tr>
+<td><code>.current</code></td>
+<td>Bool</td>
+<td>이 행이 현재 페이지의 버전인지</td>
+</tr>
+</tbody>
+</table>
+<p>대응 페이지는 같은 언어에서 버전 루트 기준 상대 경로로 매칭됩니다: <code>docs/v1/install.md</code> ↔ <code>docs/v2/install.md</code>, <code>docs/v1/install.ko.md</code> ↔ <code>docs/v2/install.ko.md</code>. <code>render = false</code>인 대응 페이지는 존재하지 않는 것으로 취급합니다.</p>
+<h3 id="versions-전역">versions (전역)</h3>
+<p>버전 사이트의 모든 페이지에서 사용할 수 있습니다. <code>{name, label, latest, url}</code> 항목의 리스트(<code>{% for v in versions %}</code>)이며 <code>url</code>은 현재 페이지 언어 기준 각 버전의 루트입니다. 추가로:</p>
+<table>
+<thead>
+<tr>
+<th>속성</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>versions.latest</code></td>
+<td>최신 버전 항목</td>
+</tr>
+<tr>
+<td><code>versions.all</code></td>
+<td>같은 리스트를 일반 배열로</td>
+</tr>
+<tr>
+<td><code>versions.size</code></td>
+<td>버전 개수</td>
+</tr>
+</tbody>
+</table>
+<p><code>page.url</code>처럼 위의 모든 URL은 사이트 상대 경로입니다. <a href="/ko/start/config/#base-url">서브패스 배포</a>가 동작하도록 링크에는 <code>{{ base_url }}</code>(또는 <code>{{ base_path }}</code>)을 앞에 붙이세요.</p>
+<h2 id="버전-전환기-예시">버전 전환기 예시</h2>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span> <span class="hljs-meta">%}</span>
+&lt;details class=&quot;version-switch&quot;&gt;
+  &lt;summary aria-label=&quot;문서 버전 전환&quot;&gt;
+    <span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span>&lt;span class=&quot;badge&quot;&gt;old&lt;/span&gt;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+  &lt;/summary&gt;
+  &lt;ul&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">v</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version_links</span> <span class="hljs-meta">%}</span>
+    &lt;li&gt;
+      &lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;
+         <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.current</span> <span class="hljs-meta">%}</span>class=&quot;current&quot; aria-current=&quot;page&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+         <span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable">v</span><span class="hljs-variable">.exists</span> <span class="hljs-meta">%}</span>title=&quot;이 페이지는 <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>에 없습니다 — <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span> 시작 페이지로 이동&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;
+        <span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span> (latest)<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+      &lt;/a&gt;
+    &lt;/li&gt;
+    <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+  &lt;/ul&gt;
+&lt;/details&gt;
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span>
+&lt;div class=&quot;version-banner&quot;&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span> 문서를 보고 있습니다.
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">v</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page</span><span class="hljs-variable">.version_links</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.latest</span> <span class="hljs-meta">%}</span>
+  &lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">v</span><span class="hljs-variable">.exists</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>에서 이 페이지 보기<span class="hljs-meta">{%</span> <span class="hljs-keyword">else</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span> 문서로 이동<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&lt;/a&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span><span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/div&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>현재 페이지에 의존하지 않는 사이트 전역 진입점:</p>
+<pre><code class="language-jinja hljs">&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">versions</span><span class="hljs-variable">.latest</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;Docs (<span class="hljs-meta">{{</span> <span class="hljs-variable">versions</span><span class="hljs-variable">.latest</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>)&lt;/a&gt;
+&lt;select onchange=&quot;location.href=this.value&quot;&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">v</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">versions</span> <span class="hljs-meta">%}</span>
+  &lt;option value=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">base_url</span> <span class="hljs-meta">}}</span><span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">v</span><span class="hljs-variable">.label</span> <span class="hljs-meta">}}</span>&lt;/option&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+&lt;/select&gt;
+</code></pre>
+<h2 id="범위-규칙">범위 규칙</h2>
+<p>각 버전은 독립된 트리이며, 경계를 넘어 새는 것은 없습니다:</p>
+<table>
+<thead>
+<tr>
+<th>대상</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>page.lower</code> / <code>page.higher</code></td>
+<td>읽기 순서는 <code>{언어, 버전}</code>별로 만들어집니다. 마지막 v1 페이지에는 &quot;다음&quot;이 없고 v2로 넘어가지 않습니다.</td>
+</tr>
+<tr>
+<td><code>page.ancestors</code> (브레드크럼)</td>
+<td>버전 루트에서 멈춥니다. 버전 없는 <code>docs/_index.md</code>는 <code>docs/v1/…</code>의 조상이 아닙니다.</td>
+</tr>
+<tr>
+<td><code>get_section()</code>, <code>section.pages</code>, <code>section.subsections</code></td>
+<td>버전 루트는 버전 없는 상위 섹션의 하위 섹션이나 페이지가 아니며, 버전 안의 목록은 그 버전만 봅니다.</td>
+</tr>
+<tr>
+<td>메뉴 (<code>get_menu</code>)</td>
+<td>설정의 <code>[[menus.*]]</code> 항목은 어디에나 나타납니다. 버전 페이지의 프론트 매터 <code>menus = […]</code> 등록은 그 버전의 메뉴에만 나타나고, 버전 없는 페이지는 <strong>최신</strong> 버전의 등록을 추가로 봅니다.</td>
+</tr>
+<tr>
+<td>관련 글</td>
+<td>버전 경계를 넘지 않습니다.</td>
+</tr>
+<tr>
+<td>택소노미</td>
+<td>용어 페이지는 버전 없는 콘텐츠와 최신 버전에서 수집합니다(<code>taxonomies = &quot;latest&quot;</code>, 기본값). 모든 버전을 나열하려면 <code>taxonomies = &quot;all&quot;</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>시리즈는 버전을 인식하지 않습니다. v1 페이지와 v2 페이지가 같은 <code>series</code>를 쓰면 함께 묶입니다.</p>
+<h2 id="seo와-탐색-표면">SEO와 탐색 표면</h2>
+<h3 id="canonical과-noindex">Canonical과 noindex</h3>
+<p>이전 버전의 페이지는 <strong>최신 대응 페이지</strong>가 있으면 그쪽으로 canonical 링크를 내고(없으면 자기 자신), <code>noindex_old = true</code>(기본값)이면 바로 뒤에 <code>&lt;meta name=&quot;robots&quot; content=&quot;noindex&quot;&gt;</code>를 붙입니다. 둘 다 <code>{{ canonical_tag }}</code>에서 나오므로 이미 이 변수를 출력하는 템플릿은 수정이 필요 없습니다. <code>seo.canonical_url</code>도 같은 규칙을 따르고 <code>seo.noindex</code>가 플래그를 노출합니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;canonical&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://example.com/docs/install/&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">meta</span> <span class="hljs-attr">name</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;robots&quot;</span> <span class="hljs-attr">content</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;noindex&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>최신 버전 페이지는 평소처럼 자기 자신을 canonical로 가리킵니다. 페이지네이션된 목록은 계속 자기 자신을 가리킵니다(이전 섹션의 <code>page/2/</code>는 새 섹션의 <code>page/2/</code>가 아닙니다). <code>hreflang_tags</code>는 영향을 받지 않으며 같은 버전의 번역본을 연결합니다.</p>
+<h3 id="탐색-표면">탐색 표면</h3>
+<table>
+<thead>
+<tr>
+<th>표면</th>
+<th>스위치</th>
+<th>기본값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>search.json</code></td>
+<td><code>[versions] search</code></td>
+<td>최신만</td>
+</tr>
+<tr>
+<td><code>sitemap.xml</code></td>
+<td><code>[versions] search</code> (같은 스위치)</td>
+<td>최신만</td>
+</tr>
+<tr>
+<td>RSS / Atom (메인, 섹션, 언어별)</td>
+<td><code>[versions] feeds</code></td>
+<td>최신만</td>
+</tr>
+<tr>
+<td>택소노미 용어 페이지</td>
+<td><code>[versions] taxonomies</code></td>
+<td>최신만</td>
+</tr>
+<tr>
+<td><code>llms.txt</code> / <code>llms-full.txt</code></td>
+<td>—</td>
+<td>항상 최신만</td>
+</tr>
+</tbody>
+</table>
+<p>버전 없는 페이지는 항상 포함됩니다. <code>search = &quot;all&quot;</code>이면 <code>search.json</code>의 모든 레코드에 <code>version</code> 필드(버전 이름)가 들어가므로 클라이언트에서 읽고 있는 버전으로 결과를 필터링할 수 있습니다:</p>
+<pre><code class="language-js hljs"><span class="hljs-keyword">const</span> current <span class="hljs-operator">=</span> <span class="hljs-built_in">document</span><span class="hljs-punctuation">.</span>documentElement<span class="hljs-punctuation">.</span>dataset<span class="hljs-punctuation">.</span>version<span class="hljs-punctuation">;</span> <span class="hljs-comment">// 예: data-version=&quot;{{ page.version.name }}&quot;
+</span><span class="hljs-comment"></span><span class="hljs-keyword">const</span> hits <span class="hljs-operator">=</span> results<span class="hljs-punctuation">.</span>filter<span class="hljs-punctuation">(</span><span class="hljs-punctuation">(</span>r<span class="hljs-punctuation">)</span> <span class="hljs-punctuation">=&gt;</span> <span class="hljs-operator">!</span>r<span class="hljs-punctuation">.</span>version <span class="hljs-operator">||</span> r<span class="hljs-punctuation">.</span>version <span class="hljs-operator">===</span> current<span class="hljs-punctuation">)</span><span class="hljs-punctuation">;</span>
+</code></pre>
+<h2 id="빌드-캐시-serve-doctor">빌드 캐시, serve, doctor</h2>
+<ul>
+<li><code>[versions]</code>는 설정 해시에, 버전 소속은 페이지 집합 지문에 포함됩니다. 따라서 파일을 버전 디렉터리 간에 옮기거나, 대응 페이지를 추가하거나(다른 버전의 <code>version_links</code>에서 <code>exists</code>가 바뀜), 스위치를 바꾸면 <code>hwaro build --cache</code>가 바뀐 것을 다시 빌드합니다.</li>
+<li><code>hwaro serve</code>는 버전 사이트도 다른 사이트처럼 빌드하며, 버전 디렉터리 안의 편집은 증분으로 반영됩니다.</li>
+<li><code>hwaro doctor</code>는 디렉터리가 없는 <code>[[versions.list]]</code> 항목에 <code>version-path-missing</code>을 보고합니다.</li>
+</ul>
+<h2 id="포함되지-않은-것">포함되지 않은 것</h2>
+<ul>
+<li>최신 버전에만 존재하는 URL에 대한 리디렉션 규칙(이전 버전의 404는 그냥 404입니다).</li>
+<li>버전을 인식하는 시리즈.</li>
+<li><code>docs</code> 스캐폴드는 바뀌지 않았습니다. 생성된 사이트에는 위 스니펫으로 <code>[versions]</code>를 직접 추가하세요.</li>
+</ul>
+<h2 id="참고">참고</h2>
+<ul>
+<li><a href="/ko/features/multilingual/">다국어</a> — 버전과 결합되는 언어 계층</li>
+<li><a href="/ko/templates/data-model/">데이터 모델</a> — 모든 <code>page.*</code>와 전역 변수</li>
+<li><a href="/ko/features/seo/">SEO</a> — canonical, robots, 사이트맵 세부 사항</li>
+<li><a href="/ko/start/config/">설정</a> — 전체 <code>config.toml</code> 레퍼런스</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/features/image-processing/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">이미지 처리</span>
+    <span class="pn-desc">빌드 시 자동 이미지 리사이즈, LQIP 플레이스홀더, 대표 색상 추출</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/pwa/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">PWA</span>
+    <span class="pn-desc">manifest.json과 서비스 워커를 이용한 프로그레시브 웹 앱 지원</span>
+  </a>
+  
+</nav>
+
+    <footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
+      <p class="site-footer-tag">Crystal로 만든 빠르고 가벼운 정적 사이트 생성기.</p>
+    </div>
+    <div class="site-footer-col">
+      <h2>문서</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/start/">시작하기</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+        <li><a href="https://hwaro.hahwul.com/ko/deploy/">배포</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>프로젝트</h2>
+      <ul>
+        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">릴리스</a></li>
+        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">예제</a></li>
+        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">벤치마크</a></li>
+      </ul>
+    </div>
+    <div class="site-footer-col">
+      <h2>리소스</h2>
+      <ul>
+        <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+        <li><a href="https://hwaro.hahwul.com/llms.txt">llms.txt</a></li>
+        <li><a href="https://hwaro.hahwul.com/sitemap.xml">사이트맵</a></li>
+        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">MIT 라이선스</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-mark">
+    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
+      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+    </a>
+    <p class="footer-love">Built with Love</p>
+  </div>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#설정">설정</a></li><li><a href="#콘텐츠-구조">콘텐츠 구조</a><ul><li><a href="#url-매핑">URL 매핑</a></li><li><a href="#다국어">다국어</a></li></ul></li><li><a href="#템플릿-변수">템플릿 변수</a><ul><li><a href="#pageversion">page.version</a></li><li><a href="#pageversion-links">page.version_links</a></li><li><a href="#versions-전역">versions (전역)</a></li></ul></li><li><a href="#버전-전환기-예시">버전 전환기 예시</a></li><li><a href="#범위-규칙">범위 규칙</a></li><li><a href="#seo와-탐색-표면">SEO와 탐색 표면</a><ul><li><a href="#canonical과-noindex">Canonical과 noindex</a></li><li><a href="#탐색-표면">탐색 표면</a></li></ul></li><li><a href="#빌드-캐시-serve-doctor">빌드 캐시, serve, doctor</a></li><li><a href="#포함되지-않은-것">포함되지 않은 것</a></li><li><a href="#참고">참고</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=ff673853"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=ff673853"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=ff673853"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=ff673853"></script>
+</body>
+</html>
