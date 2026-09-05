@@ -16,6 +16,25 @@ module Hwaro
       TOML_FRONTMATTER_RE = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?/m
       YAML_FRONTMATTER_RE = /\A---\s*\n(.*?\n?)^---\s*$\n?/m
 
+      # The front-matter block at the top of `content` as {dialect, source}:
+      # `{:toml, body}` / `{:yaml, body}` (the text between the fences) or
+      # `{:json, object}` (the balanced `{...}` at byte 0), or nil when the
+      # file has none. Detection order TOML → YAML → JSON, the same as the
+      # build's parser, so every read-only tool agrees with the build about
+      # which dialect a file is in. Parsing (and its error policy) stays
+      # with the caller.
+      def detect(content : String) : {Symbol, String}?
+        if match = content.match(TOML_FRONTMATTER_RE)
+          {:toml, match[1]}
+        elsif match = content.match(YAML_FRONTMATTER_RE)
+          {:yaml, match[1]}
+        elsif content.starts_with?('{') && (end_idx = find_json_end(content))
+          # find_json_end returns a BYTE offset; byte_slice keeps multibyte
+          # JSON front matter intact.
+          {:json, content.byte_slice(0, end_idx)}
+        end
+      end
+
       # Strip front matter, if any. The TOML and YAML strips are mutually
       # exclusive: chaining them would let the `\A`-anchored YAML pattern
       # eat a *body* that opens with a thematic break (`---\n…\n---`) once

@@ -203,15 +203,18 @@ module Hwaro
           # degrades to reporting the link rather than crashing the run.
           private def frontmatter_flag?(path : String, key : String) : Bool
             content = Utils::TextUtils.strip_bom(File.read(path))
+            return false unless fm = Utils::FrontmatterScanner.detect(content)
+            dialect, source = fm
 
-            if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
-              return TOML.parse(match[1])[key]?.try(&.raw) == true
-            elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
-              if h = YAML.parse(match[1]).as_h?
+            case dialect
+            when :toml
+              return TOML.parse(source)[key]?.try(&.raw) == true
+            when :yaml
+              if h = YAML.parse(source).as_h?
                 return h[YAML::Any.new(key)]?.try(&.raw) == true
               end
-            elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
-              if h = JSON.parse(content.byte_slice(0, end_idx)).as_h?
+            when :json
+              if h = JSON.parse(source).as_h?
                 return h[key]?.try(&.raw) == true
               end
             end
@@ -287,20 +290,23 @@ module Hwaro
           # is what makes it produce `/page/N/` routes at all.
           private def section_pagination(index_path : String) : {String, Int32?}
             content = Utils::TextUtils.strip_bom(File.read(index_path))
+            return {"page", nil} unless fm = Utils::FrontmatterScanner.detect(content)
+            dialect, source = fm
 
-            if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
-              data = TOML.parse(match[1])
+            case dialect
+            when :toml
+              data = TOML.parse(source)
               per_page = data["paginate_by"]?.try(&.raw).as?(Int64)
               path = data["paginate_path"]?.try(&.as_s?) || "page"
               return {path, positive_page_size(per_page)}
-            elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
-              if h = YAML.parse(match[1]).as_h?
+            when :yaml
+              if h = YAML.parse(source).as_h?
                 per_page = h[YAML::Any.new("paginate_by")]?.try(&.as_i64?)
                 path = h[YAML::Any.new("paginate_path")]?.try(&.as_s?) || "page"
                 return {path, positive_page_size(per_page)}
               end
-            elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
-              if h = JSON.parse(content.byte_slice(0, end_idx)).as_h?
+            when :json
+              if h = JSON.parse(source).as_h?
                 per_page = h["paginate_by"]?.try(&.as_i64?)
                 path = h["paginate_path"]?.try(&.as_s?) || "page"
                 return {path, positive_page_size(per_page)}

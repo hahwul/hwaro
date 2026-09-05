@@ -50,9 +50,6 @@ module Hwaro
     end
 
     class ContentStats
-      TOML_FRONTMATTER_RE = Utils::FrontmatterScanner::TOML_FRONTMATTER_RE
-      YAML_FRONTMATTER_RE = Utils::FrontmatterScanner::YAML_FRONTMATTER_RE
-
       @content_dir : String
 
       def initialize(@content_dir : String = "content")
@@ -188,9 +185,13 @@ module Hwaro
       # the top-level key reported an EMPTY tag distribution for those sites
       # (`Processors::Markdown` applies the same fallback).
       private def extract_tags(content : String, path : String) : Array(String)
-        if match = content.match(TOML_FRONTMATTER_RE)
+        return [] of String unless fm = Utils::FrontmatterScanner.detect(content)
+        dialect, source = fm
+
+        case dialect
+        when :toml
           begin
-            toml_data = TOML.parse(match[1])
+            toml_data = TOML.parse(source)
             tags = toml_string_array(toml_data["tags"]?)
             return tags unless tags.empty?
             nested = toml_data["taxonomies"]?.try(&.as_h?).try(&.["tags"]?)
@@ -198,9 +199,9 @@ module Hwaro
           rescue ex : TOML::ParseException | ArgumentError
             warn_unparsed_frontmatter(path, "TOML", ex)
           end
-        elsif match = content.match(YAML_FRONTMATTER_RE)
+        when :yaml
           begin
-            yaml_data = YAML.parse(match[1])
+            yaml_data = YAML.parse(source)
             if h = yaml_data.as_h?
               tags = yaml_string_array(h[YAML::Any.new("tags")]?)
               return tags unless tags.empty?
@@ -210,11 +211,11 @@ module Hwaro
           rescue ex : YAML::ParseException | ArgumentError
             warn_unparsed_frontmatter(path, "YAML", ex)
           end
-        elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
+        when :json
           # JSON front matter is a first-class dialect for the build, so a
           # JSON-authored post used to contribute nothing to the report.
           begin
-            if h = JSON.parse(content.byte_slice(0, end_idx)).as_h?
+            if h = JSON.parse(source).as_h?
               tags = json_string_array(h["tags"]?)
               return tags unless tags.empty?
               return json_string_array(h["taxonomies"]?.try(&.as_h?).try(&.["tags"]?))

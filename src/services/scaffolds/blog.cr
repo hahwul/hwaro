@@ -85,47 +85,6 @@ module Hwaro
           files
         end
 
-        def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
-          config = String.build do |str|
-            # Site basics
-            str << base_config(config_title, config_description)
-
-            # Content & Processing
-            str << multilingual_config(multilingual_languages, skip_taxonomies)
-            str << plugins_config
-            str << content_files_config
-            str << highlight_config
-            str << og_config
-            str << search_config
-            str << pagination_config
-            str << series_config
-            str << related_config
-            str << taxonomies_config unless skip_taxonomies
-            str << menus_config(multilingual_languages)
-
-            # SEO & Feeds
-            str << sitemap_config
-            str << robots_config
-            str << llms_config
-            str << feeds_config(feed_sections)
-
-            # Optional features (commented out by default)
-            str << permalinks_config
-            str << auto_includes_config
-            str << assets_config
-            str << markdown_config
-            str << content_new_config
-            str << image_processing_config
-            str << build_hooks_config
-            str << pwa_config
-            str << amp_config
-            str << og_auto_image_config
-            str << doctor_config
-            str << deployment_config
-          end
-          config
-        end
-
         # `[[menus.main]]` entries backing blog_nav_html's
         # `get_menu(name="main")` loop — matches the three links the
         # scaffold's own content creates (posts/_index.md, archives.md,
