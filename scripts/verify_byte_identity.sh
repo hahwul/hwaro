@@ -98,6 +98,18 @@ normalize_tree() {
   # copy suffix.
   find "$dir" \( -path '*/.hwaro/*' -o -name '.hwaro_cache.json' \) -type f -print0 2>/dev/null |
     xargs -0 perl -pi -e 's/\.(base|cand)(?=\/|\b)/.X/g' 2>/dev/null || true
+  # The build cache records source mtimes (which `cp -R` rewrites per copy)
+  # and lists entries in render-completion order; canonicalise it.
+  find "$dir" -name '.hwaro_cache.json' -type f -print0 2>/dev/null |
+    xargs -0 -n 1 python3 -c '
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+for e in d.get("entries", []):
+    e["mtime"] = "T"
+d["entries"] = sorted(d.get("entries", []), key=lambda e: e.get("path", ""))
+json.dump(d, open(p, "w"), sort_keys=True, indent=1)
+' 2>/dev/null || true
 }
 
 # Normalise timings / pids / the work-dir path in captured text output.
