@@ -38,22 +38,98 @@ dev:
     @[ -f bin/hwaro ] || just build
     bin/hwaro serve -i docs
 
+# ameba 1.7 ships no executable, and a cached bin/ameba is much faster than
+# recompiling lib/ameba/src/cli.cr on every run.
+#
+# Build the ameba linter binary.
+[group('development')]
+ameba:
+    @[ -x bin/ameba ] || { [ -d lib/ameba ] || shards install; mkdir -p bin; crystal build lib/ameba/src/cli.cr -o bin/ameba --release; }
+
 # Auto-format code and fix lint issues.
 [group('development')]
-fix:
+fix: ameba
     crystal tool format
-    lib/ameba/bin/ameba.cr --fix
+    bin/ameba --fix
 
 # Check code format and lint without changes.
 [group('development')]
-check:
+check: ameba
     crystal tool format --check
-    lib/ameba/bin/ameba.cr
+    bin/ameba
 
+# Always ONE `crystal spec` process per cache dir: two concurrent runs sharing
+# ~/.cache/crystal clobber each other's spec binary (see AGENTS.md).
+#
 # Run all tests.
 [group('development')]
 test:
     crystal spec
+
+#     just test-file spec/unit/config_spec.cr
+#     just test-file spec/unit/config_spec.cr:42
+#
+# Run one spec file (or file:line) in its own compiler cache, safe alongside `just test`.
+[group('development')]
+test-file TARGET:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _warn-stale-binary
+    export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/hwaro-spec.XXXXXX")}"
+    crystal spec "{{ TARGET }}"
+
+#     just test-dir spec/unit/sass
+#
+# Run every spec under a directory (same isolation as test-file).
+[group('development')]
+test-dir DIR:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _warn-stale-binary
+    export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/hwaro-spec.XXXXXX")}"
+    crystal spec "{{ DIR }}"
+
+# Functional specs spawn bin/hwaro: a stale binary makes them test old code.
+[private]
+_warn-stale-binary:
+    #!/usr/bin/env bash
+    if [ ! -x bin/hwaro ]; then
+        echo "note: bin/hwaro is not built — functional specs that spawn it will be skipped (run: shards build)" >&2
+    elif [ -n "$(find src -newer bin/hwaro -name '*.cr' -print -quit)" ]; then
+        echo "warning: bin/hwaro is older than src/ — functional specs will run the OLD binary (run: shards build)" >&2
+    fi
+
+#     just baseline            # → ../hwaro-baseline/bin/hwaro
+#     just baseline v0.20.1    # any ref
+#
+# Build a baseline hwaro binary from a ref (default main) in ../hwaro-baseline for byte-identity checks.
+[group('development')]
+baseline REF="main":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir="$(dirname "$PWD")/hwaro-baseline"
+    if [ -d "$dir" ]; then
+        git -C "$dir" checkout --detach "{{ REF }}"
+    else
+        git worktree add --detach "$dir" "{{ REF }}"
+    fi
+    [ -e "$dir/lib" ] || ln -s "$PWD/lib" "$dir/lib"
+    (cd "$dir" && shards build)
+    echo "baseline: $dir/bin/hwaro"
+
+#     just verify
+#     just verify --serve --deploy
+#
+# Byte-identity gate: diff -r everything the baseline and current binaries produce (args → script).
+[group('development')]
+verify *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    base="${HWARO_BASELINE_BIN:-$(dirname "$PWD")/hwaro-baseline/bin/hwaro}"
+    [ -x "$base" ] || { echo "no baseline binary at $base — run: just baseline" >&2; exit 1; }
+    shards build
+    scripts/check_no_toplevel_effects.sh
+    scripts/verify_byte_identity.sh "$base" bin/hwaro {{ ARGS }}
 
 # Check version consistency across all files.
 [group('development')]
