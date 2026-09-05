@@ -1,5 +1,5 @@
 require "../spec_helper"
-require "./support/build_helper"
+require "../support/build_helper"
 
 # End-to-end specs for `[[content.generate]]`: generated pages must flow
 # through the FULL pipeline as first-class content — rendered HTML, section

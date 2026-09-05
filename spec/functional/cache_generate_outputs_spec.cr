@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # The Generate phase's outputs (search index, feeds) must be byte-identical

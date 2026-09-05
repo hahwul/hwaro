@@ -1,0 +1,656 @@
+require "../../spec_helper"
+
+describe Hwaro::Content::Search do
+  describe ".generate" do
+    it "does not generate search index when disabled" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = false
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([] of Hwaro::Models::Page, config, output_dir)
+        File.exists?(File.join(output_dir, "search.json")).should be_false
+      end
+    end
+
+    it "generates search index when enabled" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_json"
+      config.search.fields = ["title", "url"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Test content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        search_path = File.join(output_dir, "search.json")
+        File.exists?(search_path).should be_true
+
+        content = File.read(search_path)
+        content.should contain("Test Page")
+        content.should contain("/test/")
+      end
+    end
+
+    it "excludes draft pages from search index" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+
+      page1 = Hwaro::Models::Page.new("published.md")
+      page1.title = "Published"
+      page1.url = "/published/"
+      page1.draft = false
+      page1.raw_content = "Content"
+
+      page2 = Hwaro::Models::Page.new("draft.md")
+      page2.title = "Draft"
+      page2.url = "/draft/"
+      page2.draft = true
+      page2.raw_content = "Draft content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page1, page2], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("Published")
+        content.should_not contain("Draft")
+      end
+    end
+
+    # Regression: a section index with `render = false` emits no HTML, so a
+    # search hit pointing at its URL 404s. The search index must apply the
+    # same `render` filter that sitemap.cr / feeds.cr / llms.cr already do.
+    it "excludes render=false pages from search index" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+
+      rendered = Hwaro::Models::Page.new("guide/intro.md")
+      rendered.title = "Intro"
+      rendered.url = "/guide/intro/"
+      rendered.draft = false
+      rendered.raw_content = "Content"
+
+      not_rendered = Hwaro::Models::Page.new("guide/_index.md")
+      not_rendered.title = "Guide"
+      not_rendered.url = "/guide/"
+      not_rendered.draft = false
+      not_rendered.render = false
+      not_rendered.raw_content = "Section container"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([rendered, not_rendered], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/guide/intro/")
+        content.should_not contain("\"/guide/\"")
+        content.should_not contain("Guide")
+      end
+    end
+
+    # Regression: auto-generated listing pages (taxonomy index/term pages) are
+    # registered into all_pages so they reach the sitemap, but they should not
+    # pollute the search index — mirrors the `!generated` guard in llms.cr.
+    it "excludes generated pages from search index" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+
+      real = Hwaro::Models::Page.new("post.md")
+      real.title = "Real Post"
+      real.url = "/post/"
+      real.draft = false
+      real.raw_content = "Content"
+
+      tag_page = Hwaro::Models::Page.new("tags/crystal/index.md")
+      tag_page.title = "Tags: crystal"
+      tag_page.url = "/tags/crystal/"
+      tag_page.draft = false
+      tag_page.generated = true
+      tag_page.raw_content = "listing"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([real, tag_page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/post/")
+        content.should_not contain("/tags/crystal/")
+      end
+    end
+
+    it "excludes pages matching exclude patterns" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+      config.search.exclude = ["/private", "/drafts"]
+
+      page1 = Hwaro::Models::Page.new("public.md")
+      page1.title = "Public"
+      page1.url = "/public/"
+      page1.draft = false
+      page1.raw_content = "Content"
+
+      page2 = Hwaro::Models::Page.new("private.md")
+      page2.title = "Private"
+      page2.url = "/private/doc"
+      page2.draft = false
+      page2.raw_content = "Private Content"
+
+      page3 = Hwaro::Models::Page.new("drafts.md")
+      page3.title = "Drafts"
+      page3.url = "/drafts/wip"
+      page3.draft = false
+      page3.raw_content = "WIP Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page1, page2, page3], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("Public")
+        content.should_not contain("Private")
+        content.should_not contain("Drafts")
+      end
+    end
+
+    # Regression: the exclude match must respect the path-segment boundary. The
+    # `excluded + "/"` guard in search.cr means excluding "/blog" drops pages
+    # genuinely under /blog/ (and the exact "/blog") but must NOT strip a sibling
+    # like /blogroll/ that merely shares the prefix segment. Removing the
+    # trailing-slash boundary would silently drop legitimate pages.
+    it "does not exclude pages that merely share a prefix segment" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+      config.search.exclude = ["/blog"]
+
+      under = Hwaro::Models::Page.new("blog/post.md")
+      under.title = "Blog Post"
+      under.url = "/blog/post/"
+      under.draft = false
+      under.raw_content = "Content"
+
+      sibling = Hwaro::Models::Page.new("blogroll.md")
+      sibling.title = "Blogroll"
+      sibling.url = "/blogroll/"
+      sibling.draft = false
+      sibling.raw_content = "Content"
+
+      exact = Hwaro::Models::Page.new("blog.md")
+      exact.title = "Blog Index"
+      exact.url = "/blog"
+      exact.draft = false
+      exact.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([under, sibling, exact], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/blogroll/")
+        content.should_not contain("/blog/post/")
+        content.should_not contain("\"/blog\"")
+      end
+    end
+
+    it "uses custom filename" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.filename = "custom-search.json"
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+        File.exists?(File.join(output_dir, "custom-search.json")).should be_true
+      end
+    end
+
+    it "generates JavaScript format when configured" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_javascript"
+      config.search.filename = "search.js"
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.js"))
+        content.should start_with("var searchData = ")
+      end
+    end
+
+    it "generates elasticlunr_json format when configured" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "elasticlunr_json"
+      config.search.filename = "search.json"
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        search_path = File.join(output_dir, "search.json")
+        File.exists?(search_path).should be_true
+        content = File.read(search_path)
+        content.should contain("Test")
+      end
+    end
+
+    it "generates elasticlunr_javascript format when configured" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "elasticlunr_javascript"
+      config.search.filename = "search.js"
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.js"))
+        content.should start_with("var searchData = ")
+      end
+    end
+
+    it "includes all configured fields" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "content", "tags", "url", "section", "description"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/blog/test/"
+      page.section = "blog"
+      page.description = "A test description"
+      page.tags = ["crystal", "testing"]
+      page.draft = false
+      page.raw_content = "# Heading\n\nSome **markdown** content."
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("Test Page")
+        content.should contain("/blog/test/")
+        content.should contain("blog")
+        content.should contain("A test description")
+        content.should contain("crystal")
+        content.should contain("testing")
+        # Content should be plain text (HTML stripped)
+        content.should_not contain("<h1>")
+        content.should_not contain("<strong>")
+      end
+    end
+
+    it "always includes URL even if not in fields list" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/test/")
+      end
+    end
+
+    it "tags each entry with its language (defaults to default_language)" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain(%("lang":"en"))
+      end
+    end
+
+    it "excludes pages of a language whose build_search_index is false" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.default_language = "en"
+      config.languages["en"] = Hwaro::Models::LanguageConfig.new("en")
+      ko = Hwaro::Models::LanguageConfig.new("ko")
+      ko.build_search_index = false
+      config.languages["ko"] = ko
+
+      en_page = Hwaro::Models::Page.new("about.md")
+      en_page.title = "About"
+      en_page.url = "/about/"
+      en_page.draft = false
+      en_page.raw_content = "English"
+
+      ko_page = Hwaro::Models::Page.new("about.ko.md")
+      ko_page.title = "소개"
+      ko_page.url = "/ko/about/"
+      ko_page.language = "ko"
+      ko_page.draft = false
+      ko_page.raw_content = "한국어"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([en_page, ko_page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("About")
+        content.should_not contain("소개")
+      end
+    end
+
+    it "prepends base_url path to URLs for subpath deployments" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_json"
+      config.search.fields = ["title", "url"]
+      config.base_url = "https://example.github.io/mysite"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/get_started/installation/"
+      page.draft = false
+      page.raw_content = "Test content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/mysite/get_started/installation/")
+      end
+    end
+
+    it "prepends base_url path to fallback URL when url not in fields" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_json"
+      config.search.fields = ["title"]
+      config.base_url = "https://example.github.io/mysite"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/get_started/installation/"
+      page.draft = false
+      page.raw_content = "Test content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("/mysite/get_started/installation/")
+      end
+    end
+
+    it "does not modify URLs when base_url has no subpath" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.format = "fuse_json"
+      config.search.fields = ["title", "url"]
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test Page"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "Test content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        parsed = JSON.parse(content)
+        parsed[0]["url"].as_s.should eq("/test/")
+      end
+    end
+
+    it "handles empty pages array" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title"]
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([] of Hwaro::Models::Page, config, output_dir)
+        # Should not create file when no pages
+        File.exists?(File.join(output_dir, "search.json")).should be_false
+      end
+    end
+
+    it "handles description field when nil" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "description"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.description = nil
+      page.draft = false
+      page.raw_content = "Content"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        # Should have empty description, not crash
+        content.should contain("\"description\":\"\"")
+      end
+    end
+
+    it "strips HTML from content field" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["content"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "<p>Hello <strong>World</strong></p>"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should_not contain("<p>")
+        content.should_not contain("<strong>")
+        content.should_not contain("</p>")
+      end
+    end
+
+    # Regression for https://github.com/hahwul/hwaro/issues/491
+    # `strip_html` removed tags but left HTML entities (`&quot;`, `&amp;`, …)
+    # encoded, so `print("hi")` ended up as `print(&quot;hi&quot;)` in the
+    # JSON content field. Client-side fuzzy-search libraries match on the
+    # raw stored string, so a query for the literal source never hit.
+    it "decodes HTML entities to plain text in the content field" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["content"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Test"
+      page.url = "/test/"
+      page.draft = false
+      # Markdown renders fenced code with HTML-escaped quotes inside
+      # `<pre><code>` — strip_html leaves those entities encoded.
+      page.raw_content = %(```python\nprint("hi")\n```)
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain(%(print(\\"hi\\")))
+        content.should_not contain("&quot;")
+      end
+    end
+
+    # Titles are plain frontmatter text, not HTML: stripping "tags" from
+    # them destroyed legitimate angle-bracket text (`Using <canvas>`,
+    # `Vec<T>` …). The bundled search UIs escape titles at render time.
+    it "stores titles with literal angle brackets verbatim" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title"]
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.title = "Using <canvas> with Vec<T>"
+      page.url = "/test/"
+      page.draft = false
+      page.raw_content = "x"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("Using <canvas> with Vec<T>")
+      end
+    end
+
+    it "handles multiple pages" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "url"]
+
+      pages = (1..3).map do |i|
+        page = Hwaro::Models::Page.new("page#{i}.md")
+        page.title = "Page #{i}"
+        page.url = "/page#{i}/"
+        page.draft = false
+        page.raw_content = "Content #{i}"
+        page
+      end
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Search.generate(pages, config, output_dir)
+
+        content = File.read(File.join(output_dir, "search.json"))
+        content.should contain("Page 1")
+        content.should contain("Page 2")
+        content.should contain("Page 3")
+        content.should contain("/page1/")
+        content.should contain("/page2/")
+        content.should contain("/page3/")
+      end
+    end
+  end
+end
+
+describe Hwaro::Models::SearchConfig do
+  it "has default values" do
+    config = Hwaro::Models::SearchConfig.new
+    config.enabled.should be_false
+    config.format.should eq("fuse_json")
+    config.fields.should eq(["title", "content"])
+    config.filename.should eq("search.json")
+    config.tokenize_cjk.should be_false
+  end
+end
+
+describe "CJK tokenization in search" do
+  it "tokenizes CJK content when tokenize_cjk is true" do
+    config = Hwaro::Models::Config.new
+    config.search.enabled = true
+    config.search.tokenize_cjk = true
+    config.search.fields = ["title", "content", "description"]
+
+    page = Hwaro::Models::Page.new("test.md")
+    page.title = "검색엔진"
+    page.url = "/test/"
+    page.description = "搜索引擎"
+    page.draft = false
+    page.raw_content = "테스트내용"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Search.generate([page], config, output_dir)
+
+      content = File.read(File.join(output_dir, "search.json"))
+      # Title should be bigram-tokenized
+      content.should contain("검색 색엔 엔진")
+      # Description should be bigram-tokenized
+      content.should contain("搜索 索引 引擎")
+    end
+  end
+
+  it "does not tokenize CJK content when tokenize_cjk is false" do
+    config = Hwaro::Models::Config.new
+    config.search.enabled = true
+    config.search.tokenize_cjk = false
+    config.search.fields = ["title"]
+
+    page = Hwaro::Models::Page.new("test.md")
+    page.title = "검색엔진"
+    page.url = "/test/"
+    page.draft = false
+    page.raw_content = "Content"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Search.generate([page], config, output_dir)
+
+      content = File.read(File.join(output_dir, "search.json"))
+      content.should contain("검색엔진")
+      content.should_not contain("검색 색엔 엔진")
+    end
+  end
+
+  it "does not tokenize tags and url fields" do
+    config = Hwaro::Models::Config.new
+    config.search.enabled = true
+    config.search.tokenize_cjk = true
+    config.search.fields = ["title", "tags", "url"]
+
+    page = Hwaro::Models::Page.new("test.md")
+    page.title = "테스트"
+    page.url = "/검색엔진/"
+    page.tags = ["검색엔진"]
+    page.draft = false
+    page.raw_content = "Content"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Search.generate([page], config, output_dir)
+
+      content = File.read(File.join(output_dir, "search.json"))
+      # URL should not be tokenized
+      content.should contain("/검색엔진/")
+      # Tags should not be tokenized
+      content.should contain("검색엔진")
+    end
+  end
+end

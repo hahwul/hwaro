@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # Regression coverage for ext/crinja_include_depth_fix.cr.

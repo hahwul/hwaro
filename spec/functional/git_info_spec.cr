@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # `[git] enabled = true` end-to-end: a real repository is created in the temp

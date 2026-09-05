@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 describe "Asset Pipeline: End-to-end build" do
   it "processes asset bundles during build" do

@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 require "http/client"
 
 # Process-level smoke test for `hwaro serve --fast-start`.

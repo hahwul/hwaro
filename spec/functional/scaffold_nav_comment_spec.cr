@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 require "../../src/services/scaffolds/blog"
 require "../../src/services/scaffolds/simple"
 

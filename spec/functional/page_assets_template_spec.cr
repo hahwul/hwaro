@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # ---------------------------------------------------------------------------
 # Regression tests for page.assets in templates (GitHub issue #224)

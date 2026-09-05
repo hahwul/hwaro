@@ -351,7 +351,7 @@ reach for the existing pair, or `color-mix()` off one.
 >   supply **both** sides of each pair, or one scheme ships broken.
 > - **A user-facing toggle** = the `[data-theme]` pattern above plus a small JS
 >   toggle; you write the toggle, the tokens do the rest.
-> - A hygiene spec (`spec/unit/scaffold_token_hygiene_spec.cr`) enforces that
+> - A hygiene spec (`spec/unit/services/scaffolds/scaffold_token_hygiene_spec.cr`) enforces that
 >   scaffold CSS has **no hardcoded colors outside the token definitions** —
 >   when you edit scaffold source CSS, keep it green by routing every color
 >   through a token.

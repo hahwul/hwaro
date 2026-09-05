@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # ---------------------------------------------------------------------------
 # Templates are Jinja2 (Crinja): macro definitions, macro invocations,

@@ -66,8 +66,8 @@ check: ameba
 test:
     crystal spec
 
-#     just test-file spec/unit/config_spec.cr
-#     just test-file spec/unit/config_spec.cr:42
+#     just test-file spec/unit/models/config_spec.cr
+#     just test-file spec/unit/models/config_spec.cr:42
 #
 # Run one spec file (or file:line) in its own compiler cache, safe alongside `just test`.
 [group('development')]
@@ -78,7 +78,7 @@ test-file TARGET:
     export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/hwaro-spec.XXXXXX")}"
     crystal spec "{{ TARGET }}"
 
-#     just test-dir spec/unit/sass
+#     just test-dir spec/unit/assets/sass
 #
 # Run every spec under a directory (same isolation as test-file).
 [group('development')]

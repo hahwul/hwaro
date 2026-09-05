@@ -1,0 +1,1398 @@
+require "../../spec_helper"
+require "../../../src/services/deployer"
+require "../../../src/models/config"
+require "../../../src/config/options/deploy_options"
+
+describe Hwaro::Services::Deployer do
+  describe "#run" do
+    it "raises HwaroError(HWARO_E_CONFIG) if no targets configured" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: dir,
+          targets: [] of String,
+        )
+
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("No deployment targets")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) if an unknown target is specified" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "production"
+        target.url = "file:///tmp/prod"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: dir,
+          targets: ["staging"],
+        )
+
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("Unknown deploy target: staging")
+        (err.hint || "").should contain("production")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) if the source directory is missing" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "production"
+        target.url = "file://#{dir}/dest"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: "#{dir}/missing_src",
+          targets: ["production"]
+        )
+
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Source directory not found")
+      end
+    end
+
+    it "deploys to local directory" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello World")
+        File.write(File.join(src_dir, "style.css"), "body { color: red; }")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["local"]
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+
+        File.exists?(File.join(dest_dir, "index.html")).should be_true
+        File.read(File.join(dest_dir, "index.html")).should eq("Hello World")
+        File.exists?(File.join(dest_dir, "style.css")).should be_true
+      end
+    end
+
+    it "deploys via command" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello World")
+        output_file = File.join(dir, "output.txt")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "cmd"
+        # We use a simple command that writes to a file
+        target.command = "echo 'deployed' > #{output_file}"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["cmd"]
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+
+        File.exists?(output_file).should be_true
+        File.read(output_file).strip.should eq("deployed")
+      end
+    end
+
+    it "dry_run for directory deployment does not copy files" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello World")
+        File.write(File.join(src_dir, "style.css"), "body { color: red; }")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["local"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+
+        # Files should not have been copied to destination
+        File.exists?(File.join(dest_dir, "index.html")).should be_false
+        File.exists?(File.join(dest_dir, "style.css")).should be_false
+      end
+    end
+
+    it "dry_run for command deployment does not execute command" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello World")
+        sentinel_file = File.join(dir, "sentinel.txt")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "cmd"
+        target.command = "echo 'executed' > #{sentinel_file}"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["cmd"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+
+        # Sentinel file should not exist
+        File.exists?(sentinel_file).should be_false
+      end
+    end
+
+    it "strips index.html when configured" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(File.join(src_dir, "foo"))
+        File.write(File.join(src_dir, "foo", "index.html"), "Foo Content")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        target.strip_index_html = true
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["local"]
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+
+        # index.html should be stripped to just "foo"
+        # Since it is a file deployment, "foo" should become a file in dest_dir
+        dest_file = File.join(dest_dir, "foo")
+        File.exists?(dest_file).should be_true
+        File.file?(dest_file).should be_true
+        File.read(dest_file).should eq("Foo Content")
+      end
+    end
+
+    # When strip_index_html is on, `foo/index.html` strips to the file `foo`
+    # while `foo/bar/index.html` yields the path `foo/bar` — writing a file and
+    # a directory at the same `foo` corrupts the destination, so the validator
+    # must raise HWARO_E_CONFIG before any copy happens.
+    it "raises HwaroError(HWARO_E_CONFIG) when strip_index_html produces a file/dir collision" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(File.join(src_dir, "foo", "bar"))
+        File.write(File.join(src_dir, "foo", "index.html"), "Foo")
+        File.write(File.join(src_dir, "foo", "bar", "index.html"), "Bar")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        target.strip_index_html = true
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["local"]
+        )
+
+        err = expect_raises(Hwaro::HwaroError) { deployer.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("stripIndexHTML cannot be used")
+      end
+    end
+
+    it "auto-generates command for s3:// URL in dry_run" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello World")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "s3"
+        target.url = "s3://my-bucket"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["s3"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+      end
+    end
+
+    it "returns per-target DeployResult list for #deploy_structured happy path" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello")
+        File.write(File.join(src_dir, "style.css"), "body{}")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["local"]
+        )
+
+        results = deployer.deploy_structured(options, config)
+        results.size.should eq(1)
+        r = results.first
+        r.name.should eq("local")
+        r.status.should eq("ok")
+        r.created.should eq(2)
+        r.updated.should eq(0)
+        r.deleted.should eq(0)
+        r.duration_ms.should be >= 0.0
+        r.error.should be_nil
+
+        # Second run: same content should produce all-skipped (no create/update/delete)
+        results2 = deployer.deploy_structured(options, config)
+        r2 = results2.first
+        r2.status.should eq("ok")
+        r2.created.should eq(0)
+        r2.updated.should eq(0)
+        r2.deleted.should eq(0)
+      end
+    end
+
+    it "serializes DeployResult as JSON with required fields" do
+      result = Hwaro::Services::Deployer::DeployResult.new(
+        name: "production",
+        status: "ok",
+        created: 3,
+        updated: 7,
+        deleted: 0,
+        duration_ms: 2410.0,
+        error: nil,
+      )
+      json = result.to_json
+      parsed = JSON.parse(json)
+      parsed["name"].as_s.should eq("production")
+      parsed["status"].as_s.should eq("ok")
+      parsed["created"].as_i.should eq(3)
+      parsed["updated"].as_i.should eq(7)
+      parsed["deleted"].as_i.should eq(0)
+      parsed["duration_ms"].as_f.should eq(2410.0)
+    end
+
+    it "captures per-target error without aborting siblings in #deploy_structured" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hi")
+
+        config = Hwaro::Models::Config.new
+
+        # First target succeeds, second fails (missing url + command).
+        ok_target = Hwaro::Models::DeploymentTarget.new
+        ok_target.name = "ok"
+        ok_target.url = "file://#{dest_dir}"
+        config.deployment.targets << ok_target
+
+        bad_target = Hwaro::Models::DeploymentTarget.new
+        bad_target.name = "bad"
+        bad_target.url = ""
+        config.deployment.targets << bad_target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["ok", "bad"]
+        )
+
+        results = deployer.deploy_structured(options, config)
+        results.size.should eq(2)
+        results[0].name.should eq("ok")
+        results[0].status.should eq("ok")
+        results[1].name.should eq("bad")
+        results[1].status.should eq("error")
+        results[1].error.should_not be_nil
+      end
+    end
+
+    # `hwaro deploy --dry-run --json` used to print `[]` with exit 0 for the
+    # exact configs where a real deploy raises — CI read "nothing to deploy"
+    # where the deploy itself would have failed.
+    describe "#plan parity with #run" do
+      it "raises HwaroError(HWARO_E_USAGE) for an unknown target" do
+        Dir.mktmpdir do |dir|
+          File.write(File.join(dir, "index.html"), "x")
+          config = Hwaro::Models::Config.new
+          target = Hwaro::Models::DeploymentTarget.new
+          target.name = "production"
+          target.url = "file:///tmp/prod"
+          config.deployment.targets << target
+
+          options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["staging"])
+          err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.plan(options, config) }
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          (err.message || "").should contain("Unknown deploy target: staging")
+        end
+      end
+
+      it "raises HwaroError(HWARO_E_CONFIG) when the source directory is missing" do
+        Dir.mktmpdir do |dir|
+          config = Hwaro::Models::Config.new
+          target = Hwaro::Models::DeploymentTarget.new
+          target.name = "local"
+          target.url = "file://#{dir}/dest"
+          config.deployment.targets << target
+
+          options = Hwaro::Config::Options::DeployOptions.new(source_dir: "#{dir}/missing", targets: ["local"])
+          err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.plan(options, config) }
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          (err.message || "").should contain("Source directory not found")
+        end
+      end
+
+      it "raises HwaroError(HWARO_E_CONFIG) when no targets are configured" do
+        Dir.mktmpdir do |dir|
+          File.write(File.join(dir, "index.html"), "x")
+          config = Hwaro::Models::Config.new
+          options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: [] of String)
+          err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.plan(options, config) }
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          (err.message || "").should contain("No deployment targets")
+        end
+      end
+
+      it "raises HwaroError(HWARO_E_CONFIG) on an unsupported URL scheme" do
+        Dir.mktmpdir do |dir|
+          File.write(File.join(dir, "index.html"), "x")
+          config = Hwaro::Models::Config.new
+          target = Hwaro::Models::DeploymentTarget.new
+          target.name = "unknown"
+          target.url = "gopher://example.com"
+          config.deployment.targets << target
+
+          options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["unknown"])
+          err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.plan(options, config) }
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+          (err.message || "").should contain("Unsupported deploy target URL scheme")
+        end
+      end
+
+      it "lists ops in deterministic sorted order" do
+        Dir.mktmpdir do |dir|
+          src_dir = File.join(dir, "src")
+          dest_dir = File.join(dir, "dest")
+          FileUtils.mkdir_p(File.join(src_dir, "c"))
+          File.write(File.join(src_dir, "b.html"), "b")
+          File.write(File.join(src_dir, "a.html"), "a")
+          File.write(File.join(src_dir, "c", "d.html"), "d")
+
+          config = Hwaro::Models::Config.new
+          target = Hwaro::Models::DeploymentTarget.new
+          target.name = "local"
+          target.url = "file://#{dest_dir}"
+          config.deployment.targets << target
+
+          options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+          ops = Hwaro::Services::Deployer.new.plan(options, config)
+          ops.map(&.path).should eq(["a.html", "b.html", "c/d.html"])
+        end
+      end
+    end
+
+    # Removed pages whose on-disk name was stripped (`blog/post/index.html` →
+    # `blog/post`) never matched source-shaped include globs like
+    # "**/*.html", so they survived every sync at the destination.
+    it "deletes stale stripped files when include globs match source paths" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(File.join(src_dir, "blog", "post1"))
+        File.write(File.join(src_dir, "blog", "post1", "index.html"), "p1")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        target.include = "**/*.html"
+        target.strip_index_html = true
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        deployer.run(options, config).should be_true
+        File.exists?(File.join(dest_dir, "blog", "post1")).should be_true
+
+        # Remove post1 from the source; the stale stripped file must go away.
+        FileUtils.rm_rf(File.join(src_dir, "blog", "post1"))
+        FileUtils.mkdir_p(File.join(src_dir, "blog", "post2"))
+        File.write(File.join(src_dir, "blog", "post2", "index.html"), "p2")
+
+        deployer.run(options, config).should be_true
+        File.exists?(File.join(dest_dir, "blog", "post1")).should be_false
+        File.exists?(File.join(dest_dir, "blog", "post2")).should be_true
+      end
+    end
+
+    # `--max-deletes -3` used to hard-refuse every deploy ("Refusing to
+    # delete 0 files") because only exactly -1 disabled the cap.
+    it "treats any negative max_deletes as disabling the delete cap" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "keep.html"), "x")
+        FileUtils.mkdir_p(dest_dir)
+        10.times { |i| File.write(File.join(dest_dir, "extra-#{i}.html"), "y") }
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir, targets: ["local"], max_deletes: -3,
+        )
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+        Dir.children(dest_dir).count(&.starts_with?("extra-")).should eq(0)
+      end
+    end
+
+    it "survives symlink cycles in the source tree" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        File.write(File.join(src_dir, "index.html"), "hi")
+        # src/sub/loop → src: an unguarded walk crashes with ELOOP.
+        File.symlink("..", File.join(src_dir, "sub", "loop"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+        File.exists?(File.join(dest_dir, "index.html")).should be_true
+      end
+    end
+
+    it "refuses to deploy when the destination is a symlink into the source" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "x")
+        link = File.join(dir, "alias_to_src")
+        File.symlink(src_dir, link)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{link}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("overlap")
+      end
+    end
+
+    it "re-copies identical files matched by a force matcher" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "same")
+        File.write(File.join(src_dir, "style.css"), "same")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+        matcher = Hwaro::Models::DeploymentMatcher.new
+        matcher.pattern = "^.+\\.html$"
+        matcher.force = true
+        config.deployment.matchers << matcher
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        deployer.deploy_structured(options, config).first.created.should eq(2)
+
+        # Second run with identical content: the html file matches the force
+        # matcher and is re-copied (updated), the css is skipped.
+        second = deployer.deploy_structured(options, config).first
+        second.updated.should eq(1)
+        second.created.should eq(0)
+      end
+    end
+
+    it "deduplicates repeated CLI target names" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "x")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local", "local"])
+        results = Hwaro::Services::Deployer.new.deploy_structured(options, config)
+        results.size.should eq(1)
+      end
+    end
+
+    it "auto-generates command for gs:// URL in dry_run" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "index.html"), "Hello World")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "gcs"
+        target.url = "gs://my-bucket"
+        config.deployment.targets << target
+
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir,
+          targets: ["gcs"],
+          dry_run: true
+        )
+
+        result = deployer.run(options, config)
+        result.should be_true
+      end
+    end
+
+    it "replaces a destination symlink instead of writing through it" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "new")
+        File.write(File.join(outside, "victim.txt"), "untouched")
+        File.symlink(File.join(outside, "victim.txt"), File.join(dest_dir, "index.html"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        # The file behind the link is untouched and the link is now a real file.
+        File.read(File.join(outside, "victim.txt")).should eq("untouched")
+        File.symlink?(File.join(dest_dir, "index.html")).should be_false
+        File.read(File.join(dest_dir, "index.html")).should eq("new")
+      end
+    end
+
+    it "never deletes through a symlinked destination directory" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside", "sub")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "root")
+        File.write(File.join(src_dir, "sub", "index.html"), "child")
+        File.write(File.join(outside, "keepme.txt"), "keep")
+        File.symlink(outside, File.join(dest_dir, "sub"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        File.exists?(File.join(outside, "keepme.txt")).should be_true
+        File.symlink?(File.join(dest_dir, "sub")).should be_false
+        File.read(File.join(dest_dir, "sub", "index.html")).should eq("child")
+      end
+    end
+
+    it "unlinks a stale destination symlink without touching its target" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "x")
+        File.write(File.join(outside, "keepme.txt"), "keep")
+        File.symlink(File.join(outside, "keepme.txt"), File.join(dest_dir, "stale.txt"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        File.exists?(File.join(dest_dir, "stale.txt")).should be_false
+        File.read(File.join(outside, "keepme.txt")).should eq("keep")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) when the source directory is empty" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "old.html"), "old")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Source directory is empty")
+        File.exists?(File.join(dest_dir, "old.html")).should be_true
+      end
+    end
+
+    it "refuses to wipe the destination when the source selects no files" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        # Only a hidden directory: not `Dir.empty?`, but nothing is deployable.
+        FileUtils.mkdir_p(File.join(src_dir, ".git"))
+        File.write(File.join(src_dir, ".git", "HEAD"), "ref")
+        FileUtils.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "old.html"), "old")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("selected no files to deploy")
+        File.exists?(File.join(dest_dir, "old.html")).should be_true
+
+        # --force is the documented escape hatch.
+        forced = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"], force: true)
+        Hwaro::Services::Deployer.new.run(forced, config).should be_true
+        File.exists?(File.join(dest_dir, "old.html")).should be_false
+      end
+    end
+
+    it "#plan surfaces the destination conflicts a real deploy would raise" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        # A directory sits where index.html has to go.
+        FileUtils.mkdir_p(File.join(dest_dir, "index.html"))
+        File.write(File.join(src_dir, "index.html"), "x")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"], dry_run: true)
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.plan(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+        (err.message || "").should contain("Destination path is a directory")
+      end
+    end
+
+    it "copies files behind a destination symlink instead of skipping them as identical" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside", "sub")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "root")
+        # `a.html` is byte-identical to the copy behind the link, `b.html` is new.
+        File.write(File.join(src_dir, "sub", "a.html"), "same")
+        File.write(File.join(src_dir, "sub", "b.html"), "new")
+        File.write(File.join(outside, "a.html"), "same")
+        File.symlink(outside, File.join(dest_dir, "sub"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        # The link is gone and BOTH files landed in the real directory.
+        File.symlink?(File.join(dest_dir, "sub")).should be_false
+        Dir.children(File.join(dest_dir, "sub")).sort.should eq(["a.html", "b.html"])
+        File.read(File.join(dest_dir, "sub", "a.html")).should eq("same")
+      end
+    end
+
+    it "clears an escaping symlink even when everything behind it is identical" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside", "sub")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "root")
+        File.write(File.join(src_dir, "sub", "a.html"), "same")
+        File.write(File.join(outside, "a.html"), "same")
+        File.symlink(outside, File.join(dest_dir, "sub"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        File.symlink?(File.join(dest_dir, "sub")).should be_false
+        File.read(File.join(dest_dir, "sub", "a.html")).should eq("same")
+      end
+    end
+
+    it "replaces a symlinked ancestor instead of reporting an unresolvable conflict" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(File.join(src_dir, "sub"))
+        FileUtils.mkdir_p(dest_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "sub", "index.html"), "child")
+        File.write(File.join(outside, "victim.txt"), "untouched")
+        # A symlink to a *file* sits where the `sub/` directory has to go.
+        File.symlink(File.join(outside, "victim.txt"), File.join(dest_dir, "sub"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+
+        File.read(File.join(outside, "victim.txt")).should eq("untouched")
+        File.read(File.join(dest_dir, "sub", "index.html")).should eq("child")
+      end
+    end
+
+    it "does not apply the empty-source guard to commands that never read the source" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        sentinel = File.join(dir, "ran.txt")
+        FileUtils.mkdir_p(src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "cmd"
+        target.command = "echo ran > #{sentinel}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["cmd"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+        File.exists?(sentinel).should be_true
+      end
+    end
+
+    it "applies the empty-source guard to commands that interpolate {source}" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        FileUtils.mkdir_p(src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "cmd"
+        target.command = "rsync -a {source}/ host:/var/www/"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["cmd"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Source directory is empty")
+      end
+    end
+
+    it "lets --force deploy from an empty source, as the docs promise" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "old.html"), "old")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"], force: true)
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+        File.exists?(File.join(dest_dir, "old.html")).should be_false
+      end
+    end
+
+    it "expands a leading ~ in target paths and --source" do
+      deployer = Hwaro::Services::Deployer.new
+      deployer.test_expand_local_path("~/site").should eq(File.join(Path.home.to_s, "site"))
+      deployer.test_expand_local_path("~").should eq(Path.home.to_s)
+    end
+  end
+end
+
+# Reopen Deployer to expose private methods for testing
+class Hwaro::Services::Deployer
+  def test_shell_escape(value : String) : String
+    shell_escape(value)
+  end
+
+  def test_expand_placeholders(command : String, source_dir : String, target : Hwaro::Models::DeploymentTarget) : String
+    expand_placeholders(command, source_dir, target)
+  end
+
+  def test_auto_command_for_url(url : String, source_dir : String) : String?
+    auto_command_for_url(url, source_dir)
+  end
+
+  def test_local_directory_destination(url : String) : String?
+    local_directory_destination(url)
+  end
+
+  def test_included_by_target?(rel : String, target : Hwaro::Models::DeploymentTarget) : Bool
+    included_by_target?(rel, target)
+  end
+
+  def test_expand_local_path(path : String) : String
+    expand_local_path(path)
+  end
+end
+
+describe "Deployer private helpers" do
+  describe "#shell_escape" do
+    it "wraps value in single quotes" do
+      deployer = Hwaro::Services::Deployer.new
+      deployer.test_shell_escape("hello").should eq("'hello'")
+    end
+
+    it "escapes embedded single quotes" do
+      deployer = Hwaro::Services::Deployer.new
+      deployer.test_shell_escape("it's").should eq("'it'\\''s'")
+    end
+
+    it "strips null bytes" do
+      deployer = Hwaro::Services::Deployer.new
+      deployer.test_shell_escape("hel\0lo").should eq("'hello'")
+    end
+
+    it "handles empty string" do
+      deployer = Hwaro::Services::Deployer.new
+      deployer.test_shell_escape("").should eq("''")
+    end
+
+    it "escapes multiple single quotes" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_shell_escape("a'b'c")
+      result.should eq("'a'\\''b'\\''c'")
+    end
+  end
+
+  describe "#expand_placeholders" do
+    it "replaces source, url, and target placeholders" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "s3://my-bucket"
+
+      result = deployer.test_expand_placeholders("deploy {source} to {url} as {target}", "/tmp/out", target)
+      result.should contain("'/tmp/out'")
+      result.should contain("'s3://my-bucket'")
+      result.should contain("'prod'")
+    end
+
+    it "shell-escapes placeholder values" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "it's a test"
+      target.url = "file:///tmp/dest"
+
+      result = deployer.test_expand_placeholders("cmd {target}", "/tmp", target)
+      result.should contain("'\\''")
+    end
+
+    it "handles command with no placeholders" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "s3://bucket"
+
+      result = deployer.test_expand_placeholders("echo done", "/tmp", target)
+      result.should eq("echo done")
+    end
+
+    # Sequential gsub used to re-expand placeholder-like text INSIDE expanded
+    # values: a source path containing a literal `{url}` had the target URL
+    # spliced into it (breaking the shell quoting along the way).
+    it "does not re-expand placeholder tokens inside expanded values" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "s3://my-bucket"
+
+      result = deployer.test_expand_placeholders("echo {source}", "/tmp/src{url}dir", target)
+      result.should eq("echo '/tmp/src{url}dir'")
+      result.should_not contain("s3://my-bucket")
+    end
+
+    it "does not reject brace tokens that only appear inside expanded values" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "s3://bucket"
+
+      # `{bucket}` lives in the VALUE, not the template — validation must not
+      # flag it as an unknown placeholder.
+      result = deployer.test_expand_placeholders("echo {source}", "/tmp/{bucket}", target)
+      result.should eq("echo '/tmp/{bucket}'")
+    end
+  end
+
+  describe "#auto_command_for_url" do
+    it "returns aws command for s3:// URL" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_auto_command_for_url("s3://my-bucket", "/tmp")
+      result.should eq("aws s3 sync {source}/ {url} --delete")
+    end
+
+    it "returns gsutil command for gs:// URL" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_auto_command_for_url("gs://my-bucket", "/tmp")
+      result.should eq("gsutil -m rsync -r -d {source}/ {url}")
+    end
+
+    it "returns az command for az:// URL with the container name inlined" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_auto_command_for_url("az://my-container", "/tmp")
+      # The container name (uri.host) is inlined+shell-escaped; {url} would
+      # otherwise expand to the full az:// URL, which the az CLI rejects.
+      result.should eq("az storage blob sync --source {source} --container 'my-container'")
+    end
+
+    it "appends --destination for az:// URLs with a path prefix" do
+      deployer = Hwaro::Services::Deployer.new
+      # az://container/sub/dir used to drop the prefix and deploy to the
+      # container root.
+      result = deployer.test_auto_command_for_url("az://my-container/sub/dir", "/tmp")
+      result.should eq("az storage blob sync --source {source} --container 'my-container' --destination 'sub/dir'")
+    end
+
+    it "returns nil for az:// URL with an empty container" do
+      deployer = Hwaro::Services::Deployer.new
+      # An az:// URL with no container must not emit a command targeting an
+      # empty container; it falls through to the unsupported-scheme path.
+      result = deployer.test_auto_command_for_url("az://", "/tmp")
+      result.should be_nil
+    end
+
+    it "returns nil for unknown scheme" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_auto_command_for_url("https://example.com", "/tmp")
+      result.should be_nil
+    end
+
+    it "returns nil for invalid URL" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_auto_command_for_url("://broken", "/tmp")
+      result.should be_nil
+    end
+  end
+
+  describe "#local_directory_destination" do
+    it "extracts path from file:// URL" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("file:///tmp/dest")
+      result.should eq("/tmp/dest")
+    end
+
+    it "returns nil for non-file scheme" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("s3://bucket")
+      result.should be_nil
+    end
+
+    it "treats plain path as local directory" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("/tmp/output")
+      result.should eq("/tmp/output")
+    end
+
+    it "treats relative path as local directory" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("dist/public")
+      result.should eq("dist/public")
+    end
+
+    it "percent-decodes file:// destinations" do
+      deployer = Hwaro::Services::Deployer.new
+      # file:///var/www/my%20site must deploy to the real "my site" directory,
+      # not create a literal "my%20site" one.
+      result = deployer.test_local_directory_destination("file:///var/www/my%20site")
+      result.should eq("/var/www/my site")
+    end
+
+    it "returns nil for file:// with empty path" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("file://")
+      result.should be_nil
+    end
+
+    it "treats file://./out as project-relative, not filesystem root" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("file://./out")
+      result.should eq("./out")
+    end
+
+    it "preserves the leading segment of file://relative/path" do
+      deployer = Hwaro::Services::Deployer.new
+      result = deployer.test_local_directory_destination("file://relative/path")
+      result.should eq("relative/path")
+    end
+
+    it "does not treat a single-slash scheme typo as a local path" do
+      deployer = Hwaro::Services::Deployer.new
+      deployer.test_local_directory_destination("s3:/bucket").should be_nil
+      deployer.test_auto_command_for_url("s3:/bucket", "/tmp").should be_nil
+      deployer.test_auto_command_for_url("gs:/bucket", "/tmp").should be_nil
+    end
+
+    it "keeps a Windows drive letter a local path" do
+      deployer = Hwaro::Services::Deployer.new
+      deployer.test_local_directory_destination("C:\\out").should eq("C:\\out")
+    end
+  end
+
+  describe "#included_by_target?" do
+    it "returns true when no include/exclude patterns" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "file:///tmp"
+
+      deployer.test_included_by_target?("index.html", target).should be_true
+    end
+
+    it "includes files matching include pattern" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "file:///tmp"
+      target.include = "*.html"
+
+      deployer.test_included_by_target?("index.html", target).should be_true
+      deployer.test_included_by_target?("style.css", target).should be_false
+    end
+
+    it "excludes files matching exclude pattern" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "file:///tmp"
+      target.exclude = "*.map"
+
+      deployer.test_included_by_target?("app.js", target).should be_true
+      deployer.test_included_by_target?("app.js.map", target).should be_false
+    end
+
+    it "normalizes backslashes to forward slashes" do
+      deployer = Hwaro::Services::Deployer.new
+      target = Hwaro::Models::DeploymentTarget.new
+      target.name = "prod"
+      target.url = "file:///tmp"
+      target.exclude = "assets\\style.css"
+
+      # After normalization, "assets\style.css" becomes "assets/style.css"
+      # which should NOT match the exclude (exclude is also a literal pattern)
+      deployer.test_included_by_target?("assets\\style.css", target).should be_true
+    end
+  end
+
+  describe "classified error surface" do
+    it "raises HwaroError(HWARO_E_CONFIG) when target has neither url nor command" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "bare"
+        target.url = ""
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["bare"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("missing 'url'")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) on an unsupported URL scheme with no command override" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "unknown"
+        target.url = "gopher://example.com"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["unknown"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Unsupported deploy target URL scheme")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) for az:// with an empty container (no auto command)" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "az-empty"
+        target.url = "az://"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["az-empty"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Unsupported deploy target URL scheme")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) when --max-deletes limit is exceeded" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "keep.html"), "x")
+        FileUtils.mkdir_p(dest_dir)
+        # Seed the destination with more files than the limit.
+        10.times { |i| File.write(File.join(dest_dir, "extra-#{i}.html"), "y") }
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir, targets: ["local"], max_deletes: 5,
+        )
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("Refusing to delete")
+        (err.message || "").should contain("max_deletes: 5")
+        # The existing "extra-*" files must remain on disk — the safety
+        # limit aborted the plan before any deletion happened.
+        Dir.children(dest_dir).count(&.starts_with?("extra-")).should eq(10)
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_USAGE) when source and destination overlap" do
+      Dir.mktmpdir do |dir|
+        # Deploy INTO a subdirectory of the source — classic overlap that
+        # could wipe the source files during a delete pass.
+        src_dir = dir
+        dest_dir = File.join(dir, "nested")
+        File.write(File.join(src_dir, "keep.html"), "x")
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "nested"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["nested"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err.message || "").should contain("source and destination overlap")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) on unknown command placeholders" do
+      # Typos like `{srouce}` and forward-looking tokens like `{bucket}`
+      # used to reach the shell as literals and cause confusing
+      # downstream errors. The validator now rejects anything that still
+      # matches `\{name\}` after expansion.
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "typo"
+        target.url = "custom://"
+        target.command = "echo src={srouce} bucket={bucket}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["typo"])
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("Unknown placeholder(s)")
+        (err.message || "").should contain("{srouce}")
+        (err.message || "").should contain("{bucket}")
+        # Supported-placeholder list in the hint for discoverability.
+        (err.hint || "").should contain("{source}")
+        (err.hint || "").should contain("{url}")
+        (err.hint || "").should contain("{target}")
+      end
+    end
+
+    it "leaves commands with only supported placeholders alone" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "good"
+        target.url = "custom://"
+        # {target} inside a comment-style literal string should also pass
+        target.command = "true # {source} {url} {target}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["good"])
+        # Does not raise — `true` exits 0, no HwaroError surfaces.
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+      end
+    end
+
+    it "catches unknown placeholders even during --dry-run" do
+      # Dry-run still needs to expand + validate the template so typos
+      # are caught without waiting for the user to trigger a real deploy.
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "index.html"), "x")
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "typo"
+        target.url = "custom://"
+        target.command = "echo {unknown}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: dir, targets: ["typo"], dry_run: true,
+        )
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain("{unknown}")
+      end
+    end
+
+    it "propagates HwaroError from deploy_structured as per-target payload with the correct code" do
+      # Regression: a `--max-deletes` refusal used to surface in --json as
+      # HWARO_E_NETWORK with the generic "Deploy target '<name>' failed"
+      # message; now it carries the classified HWARO_E_USAGE code and the
+      # real "Refusing to delete N files" text.
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        File.write(File.join(src_dir, "keep.html"), "x")
+        FileUtils.mkdir_p(dest_dir)
+        10.times { |i| File.write(File.join(dest_dir, "extra-#{i}.html"), "y") }
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(
+          source_dir: src_dir, targets: ["local"], max_deletes: 5,
+        )
+        results = Hwaro::Services::Deployer.new.deploy_structured(options, config)
+        results.size.should eq(1)
+        result = results.first
+        result.status.should eq("error")
+        err = result.error.not_nil!
+        err["code"].should eq(Hwaro::Errors::HWARO_E_USAGE)
+        (err["message"] || "").should contain("Refusing to delete")
+      end
+    end
+  end
+end

@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # End-to-end coverage for static-file publishing. These run a full build via
 # Builder#run so they exercise the same path the GitHub Action takes — most

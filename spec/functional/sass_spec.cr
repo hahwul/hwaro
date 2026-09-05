@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 private SASS_CONFIG = <<-TOML
   title = "Sass Test"

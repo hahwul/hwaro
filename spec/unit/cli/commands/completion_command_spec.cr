@@ -1,0 +1,236 @@
+require "../../../spec_helper"
+
+# Ensure commands are registered for completion generation
+private def ensure_commands_registered
+  return if Hwaro::CLI::CommandRegistry.all_metadata.present?
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::InitCommand.metadata) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::BuildCommand.metadata) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::ServeCommand.metadata) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::NewCommand.metadata) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::DeployCommand.metadata) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::ToolCommand.metadata) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::Commands::CompletionCommand.metadata) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::CommandInfo.new(name: "version", description: "Show version")) { |_| }
+  Hwaro::CLI::CommandRegistry.register(Hwaro::CLI::CommandInfo.new(name: "help", description: "Show help")) { |_| }
+end
+
+describe Hwaro::CLI::Commands::CompletionCommand do
+  before_each { ensure_commands_registered }
+
+  describe "bash completion" do
+    it "generates a bash completion script" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_bash_for_test
+
+      output.should contain("_hwaro_completions")
+      output.should contain("complete -F _hwaro_completions hwaro")
+    end
+
+    it "includes command names in bash script" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_bash_for_test
+
+      output.should contain("build")
+      output.should contain("serve")
+      output.should contain("init")
+      output.should contain("deploy")
+      output.should contain("completion")
+    end
+
+    it "includes version and help in bash commands" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_bash_for_test
+
+      output.should contain("version")
+      output.should contain("help")
+    end
+
+    it "includes positional_choices for completion command in bash" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_bash_for_test
+
+      output.should contain("bash")
+      output.should contain("zsh")
+      output.should contain("fish")
+    end
+
+    it "uses compgen for bash completions" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_bash_for_test
+
+      output.should contain("compgen")
+      output.should contain("COMPREPLY")
+    end
+
+    it "includes new tool subcommands in bash" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_bash_for_test
+
+      output.should contain("stats")
+      output.should contain("validate")
+      output.should contain("unused-assets")
+      output.should contain("export")
+    end
+  end
+
+  describe "zsh completion" do
+    it "generates a zsh completion script with compdef header" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_zsh_for_test
+
+      output.should contain("#compdef hwaro")
+      output.should contain("_hwaro")
+    end
+
+    it "includes _hwaro function definition" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_zsh_for_test
+
+      output.should contain("_hwaro()")
+      output.should contain("_arguments")
+      output.should contain("_describe")
+    end
+
+    it "includes command descriptions in zsh" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_zsh_for_test
+
+      output.should contain("'version:Show version'")
+      output.should contain("'help:Show help'")
+    end
+
+    it "includes subcommand support in zsh" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_zsh_for_test
+
+      # completion command should have positional choices
+      output.should contain("completion)")
+    end
+
+    it "includes new tool subcommands in zsh" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_zsh_for_test
+
+      output.should contain("stats")
+      output.should contain("validate")
+      output.should contain("unused-assets")
+      output.should contain("export")
+    end
+  end
+
+  describe "fish completion" do
+    it "generates a fish completion script" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      output.should contain("complete -c hwaro -f")
+    end
+
+    it "includes main commands in fish" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      output.should contain("__fish_use_subcommand")
+      output.should contain("build")
+      output.should contain("serve")
+      output.should contain("deploy")
+      output.should contain("version")
+      output.should contain("help")
+    end
+
+    it "includes subcommand conditions with __fish_seen_subcommand_from" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      output.should contain("__fish_seen_subcommand_from")
+    end
+
+    it "includes positional choices for completion in fish" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      # The completion command's positional choices (bash, zsh, fish) should appear
+      output.should contain("bash")
+      output.should contain("zsh")
+      output.should contain("fish")
+    end
+
+    it "registers flags with descriptions in fish" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      # Should have -d for description syntax
+      output.should contain("-d")
+    end
+
+    it "includes new tool subcommands in fish" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      output.should contain("stats")
+      output.should contain("validate")
+      output.should contain("unused-assets")
+      output.should contain("export")
+    end
+  end
+
+  describe "shell-metacharacter escaping" do
+    # Register a synthetic command whose flag descriptions contain the exact
+    # metacharacters escape_zsh ([ ] ') and escape_fish (" $) handle. Real
+    # flag descriptions contain parens/colons/commas but none of these chars,
+    # so without a synthetic flag the gsub branches stay uncovered.
+    before_each do
+      ensure_commands_registered
+      Hwaro::CLI::CommandRegistry.register(
+        Hwaro::CLI::CommandInfo.new(
+          name: "synthescape",
+          description: "synthetic",
+          flags: [
+            Hwaro::CLI::FlagInfo.new(
+              short: nil,
+              long: "--meta",
+              description: %q(brackets [x] and quote ' and dollar $ and dquote "z"),
+            ),
+          ],
+        )
+      ) { |_| }
+    end
+
+    it "escapes ' [ ] in the generated zsh script so the _arguments line stays well-formed" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_zsh_for_test
+
+      # The raw description must not appear verbatim — brackets and the quote
+      # are escaped before interpolation into the '[...]' description slot.
+      output.should contain("\\[x\\]")
+      output.should contain("'\\''")
+      # No unescaped raw "[x]" leaks into the script.
+      output.should_not contain("brackets [x] and")
+    end
+
+    it "escapes \" and $ in the generated fish script" do
+      cmd = Hwaro::CLI::Commands::CompletionCommand.new
+      output = cmd.generate_fish_for_test
+
+      # $ and embedded double-quotes are escaped before going into the -d "..."
+      output.should contain("dollar \\$")
+      output.should contain("dquote \\\"z\\\"")
+      output.should_not contain("dollar $ and")
+    end
+  end
+end
+
+# Test helper to expose private generate_ methods
+class Hwaro::CLI::Commands::CompletionCommand
+  def generate_bash_for_test : String
+    generate_bash
+  end
+
+  def generate_zsh_for_test : String
+    generate_zsh
+  end
+
+  def generate_fish_for_test : String
+    generate_fish
+  end
+end

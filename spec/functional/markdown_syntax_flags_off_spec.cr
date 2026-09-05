@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # Regression anchor: markdown syntax additions (F5 fence options, F9
