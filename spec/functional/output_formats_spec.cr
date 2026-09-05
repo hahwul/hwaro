@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # Output formats functional tests (see `[outputs]`, docs/content/features/

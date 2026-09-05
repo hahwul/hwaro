@@ -80,38 +80,6 @@ module Hwaro
         # template from being emitted as dead chrome (it's also dropped
         # from `template_files`). Users who want taxonomies can copy from
         # the simple/blog scaffolds.
-        def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
-          config = String.build do |str|
-            str << base_config(config_title, config_description)
-            str << multilingual_config(multilingual_languages, skip_taxonomies)
-            str << plugins_config
-            str << content_files_config
-            str << highlight_config
-            str << og_config
-            str << search_config
-            str << pagination_config
-            str << series_config
-            str << related_config
-            str << sitemap_config
-            str << robots_config
-            str << llms_config
-            str << feeds_config(feed_sections)
-            str << permalinks_config
-            str << auto_includes_config
-            str << assets_config
-            str << markdown_config
-            str << content_new_config
-            str << image_processing_config
-            str << build_hooks_config
-            str << pwa_config
-            str << amp_config
-            str << og_auto_image_config
-            str << doctor_config
-            str << deployment_config
-          end
-          config
-        end
-
         # `book` ships no `[[taxonomies]]` block, so emit `[related]` as a
         # commented placeholder rather than the default enabled snippet
         # (which references `tags`, triggering a doctor warning out of the
@@ -1169,8 +1137,13 @@ module Hwaro
             CSS
         end
 
+        # book.js = keyboard navigation + active-chapter highlight, then the
+        # shared search overlay (`Base#search_js_body`), then fullscreen — one
+        # script, one IIFE. The search section used to be a verbatim copy.
         private def book_js_content : String
-          <<-'JS'
+          # Raw heredoc on purpose: the `\/` in the path regexes below must reach
+          # the browser byte-for-byte (an unescaped heredoc turns `\/` into `/`).
+          head = <<-'JS' # ameba:disable Style/HeredocEscape
             (function () {
               // ── Keyboard Navigation (← →) ──
               var prevLink = document.querySelector('.book-nav-arrow--prev');
@@ -1267,158 +1240,8 @@ module Hwaro
               }
 
               // ── Search ──
-              var searchData = null;
-              var activeIndex = -1;
-              var overlay = document.getElementById('searchOverlay');
-              var input = document.getElementById('searchInput');
-              var resultsEl = document.getElementById('searchResults');
-
-              function loadSearchData(cb) {
-                if (searchData) return cb(searchData);
-                var link = document.querySelector('link[rel="stylesheet"][href*="/css/"]');
-                var path = link ? new URL(link.href, document.baseURI).pathname : '/css/';
-                var searchUrl = path.substring(0, path.indexOf('/css/')) + '/search.json';
-                fetch(searchUrl)
-                  .then(function (r) { return r.json(); })
-                  .then(function (data) { searchData = data; cb(data); })
-                  .catch(function () { searchData = []; cb([]); });
-              }
-
-              window.openSearch = function () {
-                overlay.classList.add('active');
-                input.value = '';
-                resultsEl.innerHTML = '';
-                activeIndex = -1;
-                input.focus();
-                loadSearchData(function () {});
-              };
-
-              window.closeSearch = function () {
-                overlay.classList.remove('active');
-                activeIndex = -1;
-              };
-
-              document.addEventListener('keydown', function (e) {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                  e.preventDefault();
-                  if (overlay.classList.contains('active')) {
-                    closeSearch();
-                  } else {
-                    openSearch();
-                  }
-                }
-                if (e.key === 'Escape' && overlay.classList.contains('active')) {
-                  closeSearch();
-                }
-              });
-
-              function escapeHtml(s) {
-                var d = document.createElement('div');
-                d.textContent = s;
-                return d.innerHTML;
-              }
-
-              function highlightMatch(text, query) {
-                if (!query) return escapeHtml(text);
-                var escaped = query.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
-                var re = new RegExp('(' + escaped + ')', 'gi');
-                return escapeHtml(text).replace(re, '<mark>$1</mark>');
-              }
-
-              function getSnippet(content, query) {
-                var lower = content.toLowerCase();
-                var idx = lower.indexOf(query.toLowerCase());
-                var start = Math.max(0, idx - 60);
-                var end = Math.min(content.length, idx + query.length + 100);
-                var snippet = content.substring(start, end).replace(/\\s+/g, ' ').trim();
-                if (start > 0) snippet = '...' + snippet;
-                if (end < content.length) snippet = snippet + '...';
-                return snippet;
-              }
-
-              function search(query) {
-                if (!searchData || !query.trim()) {
-                  resultsEl.innerHTML = '';
-                  activeIndex = -1;
-                  return;
-                }
-                var q = query.trim().toLowerCase();
-                var pageLang = document.documentElement.lang || '';
-                var results = [];
-                for (var i = 0; i < searchData.length; i++) {
-                  var item = searchData[i];
-                  if (pageLang && item.lang && item.lang !== pageLang) continue;
-                  var titleIdx = item.title.toLowerCase().indexOf(q);
-                  var contentIdx = item.content.toLowerCase().indexOf(q);
-                  if (titleIdx !== -1 || contentIdx !== -1) {
-                    // Earlier matches rank higher; every title match outranks
-                    // every content-only match. The title bonus must stay
-                    // larger than any offset a title can reach, or a match
-                    // late in a long title scores below a content-only hit.
-                    var score = titleIdx !== -1 ? 1e9 - titleIdx : -contentIdx;
-                    results.push({ item: item, score: score });
-                  }
-                }
-                results.sort(function (a, b) { return b.score - a.score; });
-                results = results.slice(0, 10);
-
-                if (results.length === 0) {
-                  resultsEl.innerHTML = '<div class="search-no-results">No results for "' + escapeHtml(query) + '"</div>';
-                  activeIndex = -1;
-                  return;
-                }
-
-                var html = '';
-                for (var j = 0; j < results.length; j++) {
-                  var r = results[j].item;
-                  var snippet = getSnippet(r.content, query.trim());
-                  html += '<a class="search-result-item" href="' + encodeURI(r.url) + '" data-index="' + j + '">'
-                    + '<div class="search-result-title">' + highlightMatch(r.title, query.trim()) + '</div>'
-                    + '<div class="search-result-snippet">' + highlightMatch(snippet, query.trim()) + '</div>'
-                    + '</a>';
-                }
-                html += '<div class="search-hint"><span><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate</span><span><kbd>Enter</kbd> open</span><span><kbd>ESC</kbd> close</span></div>';
-                resultsEl.innerHTML = html;
-                activeIndex = -1;
-              }
-
-              function updateActive() {
-                var items = resultsEl.querySelectorAll('.search-result-item');
-                for (var i = 0; i < items.length; i++) {
-                  items[i].classList.toggle('active', i === activeIndex);
-                }
-                if (activeIndex >= 0 && items[activeIndex]) {
-                  items[activeIndex].scrollIntoView({ block: 'nearest' });
-                }
-              }
-
-              if (input) {
-                input.addEventListener('input', function () {
-                  loadSearchData(function () { search(input.value); });
-                });
-
-                input.addEventListener('keydown', function (e) {
-                  var items = resultsEl.querySelectorAll('.search-result-item');
-                  var count = items.length;
-                  if (count === 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
-                  if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    activeIndex = (activeIndex + 1) % count;
-                    updateActive();
-                  } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    activeIndex = (activeIndex - 1 + count) % count;
-                    updateActive();
-                  } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (activeIndex >= 0 && items[activeIndex]) {
-                      window.location.href = items[activeIndex].href;
-                    } else if (items.length > 0) {
-                      window.location.href = items[0].href;
-                    }
-                  }
-                });
-              }
+            JS
+          tail = <<-JS
               // ── Fullscreen ──
               window.toggleFullscreen = function () {
                 if (!document.fullscreenElement) {
@@ -1439,6 +1262,7 @@ module Hwaro
               });
             })();
             JS
+          head + "\n" + search_js_body + "\n" + tail
         end
 
         # Footer template

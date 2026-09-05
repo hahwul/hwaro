@@ -32,14 +32,14 @@ Lint/NotNil:
   Excluded:
     - spec/**/*.cr
 
-# spec/functional/support/ holds helper modules, not specs.
+# spec/support/ holds shared helper modules, not specs.
 Lint/SpecFilename:
   Excluded:
-    - spec/functional/support/**/*.cr
+    - spec/support/**/*.cr
 
 # `OutputsConfig#any?` (page/section formats configured) is a custom Bool
 # method, not `Enumerable#any?` — this rule matches any arg-less/no-block
 # `.any?` call by name alone and can't tell the two apart.
 Performance/AnyInsteadOfPresent:
   Excluded:
-    - spec/unit/outputs_config_spec.cr
+    - spec/unit/models/config/outputs_config_spec.cr

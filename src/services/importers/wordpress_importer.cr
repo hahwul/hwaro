@@ -48,34 +48,17 @@ module Hwaro
 
           doc = XML.parse(xml_content)
 
-          imported = 0
-          skipped = 0
-          errors = 0
-
-          items = find_items(doc)
-
-          items.each do |item|
-            result = process_item(item, output_dir, include_drafts, verbose, force)
-            case result
-            when :imported
-              imported += 1
-            when :skipped
-              skipped += 1
-            end
-          rescue ex
-            errors += 1
-            Logger.warn "Error processing item: #{ex.message}"
+          import_each(find_items(doc), "WordPress") do |item|
+            process_item(item, output_dir, include_drafts, verbose, force)
           end
+        end
 
-          report_collisions
+        protected def import_error_message(item : XML::Node, ex : Exception) : String
+          "Error processing item: #{ex.message}"
+        end
 
-          ImportResult.new(
-            success: imported > 0 || errors == 0,
-            message: "Imported #{imported} items, skipped #{skipped}, errors #{errors}",
-            imported_count: imported,
-            skipped_count: skipped,
-            error_count: errors
-          )
+        protected def summary_message(engine : String, imported : Int32, skipped : Int32, errors : Int32) : String
+          "Imported #{imported} items, skipped #{skipped}, errors #{errors}"
         end
 
         private def find_items(doc : XML::Node) : Array(XML::Node)

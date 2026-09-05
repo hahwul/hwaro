@@ -659,7 +659,7 @@ module Hwaro
           limit = config.feeds.truncate > 0 ? config.feeds.truncate : 300
 
           if summary_html = page.summary_html
-            text = HTML.unescape(Utils::TextUtils.strip_html(summary_html)).strip
+            text = Utils::TextUtils.html_to_plain_text(summary_html)
             return truncate_for_feed(text, limit) unless text.empty?
           end
 
@@ -674,7 +674,7 @@ module Hwaro
           # already-rendered HTML; degrade to the raw markdown only if
           # render hasn't run.
           html = page.content.empty? ? rendered_body_fallback(page, config) : page.content
-          text = HTML.unescape(Utils::TextUtils.strip_html(html)).strip
+          text = Utils::TextUtils.html_to_plain_text(html)
           truncate_for_feed(text, limit)
         end
 

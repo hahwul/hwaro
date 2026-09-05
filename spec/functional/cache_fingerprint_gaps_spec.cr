@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # Regression specs for cache fingerprint gaps (issue ledger C1/C2/C3/R7).

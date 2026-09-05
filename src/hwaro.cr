@@ -1,19 +1,21 @@
 # Hwaro - A fast and lightweight static site generator
 #
-# This is the main entry point for the Hwaro application.
-# The codebase is organized as follows:
+# This is the main entry point for the Hwaro library; src/main.cr wraps it in
+# the process entry. The require list below is ORDERED and explicit; part
+# files of a split owner (e.g. core/build/phases/render/*.cr) are required
+# from their owner, never from here. ARCHITECTURE.md is the map:
 #
-# - config/    : Configuration loading and options
-#   - options/ : Command option structs (BuildOptions, ServeOptions, etc.)
-# - core/      : Build orchestration (builder, cache, parallel, lifecycle)
-# - content/   : Content domain
-#   - processors/ : Content processors (markdown, html, etc.)
-#   - seo/     : SEO file generators (sitemap, feeds, robots, llms)
-#   - hooks/   : Lifecycle hook implementations
-# - services/  : Non-build features (init, new, serve)
-# - models/    : Data structures (config, page, site, etc.)
-# - cli/       : Command-line interface
-# - utils/     : Utility modules (logger, etc.)
+# - cli/       : Runner + CommandRegistry, commands/, commands/tool/
+# - config/    : options/ — typed option structs (BuildOptions, ServeOptions, ...)
+# - models/    : Page, Section, Site, Toc, Deployment, GitInfo, Config (+ config/ per section)
+# - content/   : processors/ (markdown, template, html, ...), hooks/, seo/, pagination/,
+#                search, taxonomies, menus, i18n, versions
+# - core/      : lifecycle/ (Manager, phases, BuildContext) and build/ (Builder + phases/)
+# - services/  : everything the CLI does that is not a build: doctor, deployer, server,
+#                scaffolds, importers/exporters, content tools, defaults
+# - assets/    : asset pipeline and the Sass compiler (sass/)
+# - utils/     : Logger, PathUtils, TextUtils, FileSafe, minifiers, ...
+# - ext/       : vendored patches for markd/crinja/toml/tartrazine, stb_image bindings
 
 require "option_parser"
 require "yaml"

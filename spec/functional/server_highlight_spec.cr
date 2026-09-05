@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # Build-time syntax highlighting ([highlight] mode = "server", the default)

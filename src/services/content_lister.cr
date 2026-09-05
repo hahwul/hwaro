@@ -44,6 +44,27 @@ module Hwaro
       # was never content. A symlink we cannot follow is named in a single
       # warning instead, matching `Phases::Initialize#static_target_info`, so
       # a file missing from a listing or a validate summary is never silent.
+      # Every Markdown file under `content_dir`, sorted. Unfollowable
+      # symlinks are dropped here (see `readable_file?`) so one bad link
+      # cannot turn a listing, a validate summary or a convert run into a
+      # wall of "Failed to read content file" warnings — or a non-zero exit —
+      # for files the build itself skips. `tool list`, `tool stats`,
+      # `tool validate` and `tool convert` all walk through here, so they
+      # stay consistent with each other.
+      def find_content_files(content_dir : String) : Array(String)
+        files = [] of String
+
+        Dir.glob(File.join(content_dir, "**", "*.md")) do |file|
+          files << file if readable_file?(file)
+        end
+
+        Dir.glob(File.join(content_dir, "**", "*.markdown")) do |file|
+          files << file if readable_file?(file)
+        end
+
+        files.sort
+      end
+
       def readable_file?(path : String) : Bool
         # lstat never follows, so a cycle is an ordinary symlink entry here
         # instead of an ELOOP failure. For the common (non-symlink) case it is
@@ -381,21 +402,7 @@ module Hwaro
       end
 
       private def find_content_files : Array(String)
-        files = [] of String
-
-        # Unfollowable symlinks are dropped here (see `ContentWalk`) so one
-        # bad link cannot turn a listing into a wall of "Failed to read
-        # content file" warnings for files the build itself skips. `tool
-        # stats` walks through this method too, so both stay consistent.
-        Dir.glob(File.join(@content_dir, "**", "*.md")) do |file|
-          files << file if ContentWalk.readable_file?(file)
-        end
-
-        Dir.glob(File.join(@content_dir, "**", "*.markdown")) do |file|
-          files << file if ContentWalk.readable_file?(file)
-        end
-
-        files.sort
+        ContentWalk.find_content_files(@content_dir)
       end
 
       private def parse_content_info(
@@ -418,53 +425,53 @@ module Hwaro
         date : Time? = nil
         expires : Time? = nil
 
-        # Try TOML Front Matter (+++)
-        if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
-          begin
-            toml_fm = TOML.parse(match[1])
-            title = toml_fm["title"]?.try(&.as_s?) || title
-            if declared = toml_fm["draft"]?
-              draft_declared = true
-              draft = declared.as_bool? || false
-            end
-            date = toml_date(toml_fm["date"]?)
-            expires = toml_date(toml_fm["expires"]?)
-          rescue ex
-            Logger.debug "TOML front matter parsing failed for #{file_path}: #{ex.message}"
-          end
-          # Try YAML Front Matter (---)
-        elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
-          begin
-            yaml_fm = YAML.parse(match[1])
-            if yaml_fm.as_h?
-              title = yaml_fm["title"]?.try(&.as_s?) || title
-              if declared = yaml_fm["draft"]?
+        # Front matter, in the build's dialect order (TOML → YAML → JSON).
+        if fm = Utils::FrontmatterScanner.detect(content)
+          dialect, source = fm
+          case dialect
+          when :toml
+            begin
+              toml_fm = TOML.parse(source)
+              title = toml_fm["title"]?.try(&.as_s?) || title
+              if declared = toml_fm["draft"]?
                 draft_declared = true
                 draft = declared.as_bool? || false
               end
-              date = yaml_date(yaml_fm["date"]?)
-              expires = yaml_date(yaml_fm["expires"]?)
+              date = toml_date(toml_fm["date"]?)
+              expires = toml_date(toml_fm["expires"]?)
+            rescue ex
+              Logger.debug "TOML front matter parsing failed for #{file_path}: #{ex.message}"
             end
-          rescue ex
-            Logger.debug "YAML front matter parsing failed for #{file_path}: #{ex.message}"
-          end
-          # Try JSON Front Matter (balanced {...} at file start)
-        elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
-          begin
-            # find_json_end returns a BYTE offset; byte_slice keeps multibyte
-            # JSON frontmatter intact so title/date aren't silently lost.
-            json_fm = JSON.parse(content.byte_slice(0, end_idx))
-            if json_fm.as_h?
-              title = json_fm["title"]?.try(&.as_s?) || title
-              if declared = json_fm["draft"]?
-                draft_declared = true
-                draft = declared.as_bool? || false
+          when :yaml
+            begin
+              yaml_fm = YAML.parse(source)
+              if yaml_fm.as_h?
+                title = yaml_fm["title"]?.try(&.as_s?) || title
+                if declared = yaml_fm["draft"]?
+                  draft_declared = true
+                  draft = declared.as_bool? || false
+                end
+                date = yaml_date(yaml_fm["date"]?)
+                expires = yaml_date(yaml_fm["expires"]?)
               end
-              date = parse_time(json_fm["date"]?.try(&.as_s?))
-              expires = parse_time(json_fm["expires"]?.try(&.as_s?))
+            rescue ex
+              Logger.debug "YAML front matter parsing failed for #{file_path}: #{ex.message}"
             end
-          rescue ex
-            Logger.debug "JSON front matter parsing failed for #{file_path}: #{ex.message}"
+          when :json
+            begin
+              json_fm = JSON.parse(source)
+              if json_fm.as_h?
+                title = json_fm["title"]?.try(&.as_s?) || title
+                if declared = json_fm["draft"]?
+                  draft_declared = true
+                  draft = declared.as_bool? || false
+                end
+                date = parse_time(json_fm["date"]?.try(&.as_s?))
+                expires = parse_time(json_fm["expires"]?.try(&.as_s?))
+              end
+            rescue ex
+              Logger.debug "JSON front matter parsing failed for #{file_path}: #{ex.message}"
+            end
           end
         end
 
@@ -533,14 +540,17 @@ module Hwaro
       # file declares no cascade (or no `draft` inside it).
       private def cascade_draft_value(file_path : String) : Bool?
         content = Utils::TextUtils.strip_bom(File.read(file_path))
+        return unless fm = Utils::FrontmatterScanner.detect(content)
+        dialect, source = fm
 
-        if match = content.match(Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)
-          TOML.parse(match[1])["cascade"]?.try(&.as_h?).try(&.["draft"]?).try(&.as_bool?)
-        elsif match = content.match(Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)
-          YAML.parse(match[1]).as_h?.try(&.[YAML::Any.new("cascade")]?).try(&.as_h?)
+        case dialect
+        when :toml
+          TOML.parse(source)["cascade"]?.try(&.as_h?).try(&.["draft"]?).try(&.as_bool?)
+        when :yaml
+          YAML.parse(source).as_h?.try(&.[YAML::Any.new("cascade")]?).try(&.as_h?)
             .try(&.[YAML::Any.new("draft")]?).try(&.as_bool?)
-        elsif content.starts_with?('{') && (end_idx = Utils::FrontmatterScanner.find_json_end(content))
-          JSON.parse(content.byte_slice(0, end_idx)).as_h?.try(&.["cascade"]?).try(&.as_h?)
+        when :json
+          JSON.parse(source).as_h?.try(&.["cascade"]?).try(&.as_h?)
             .try(&.["draft"]?).try(&.as_bool?)
         end
       rescue ex

@@ -81,8 +81,7 @@ module Hwaro
                   code: Hwaro::Errors::HWARO_E_CONTENT,
                   message: ex.message || "stats failed",
                 )
-                puts err.to_error_payload.to_json
-                exit(err.exit_code)
+                Runner.exit_with_error_payload(err)
               else
                 raise ex
               end

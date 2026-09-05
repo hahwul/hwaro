@@ -17,10 +17,6 @@ module Hwaro
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
-          imported = 0
-          skipped = 0
-          errors = 0
-          wrapped = 0
 
           unless Dir.exists?(path)
             return ImportResult.new(
@@ -40,35 +36,9 @@ module Hwaro
             )
           end
 
-          files.each do |file_info|
-            result = import_file(file_info, output_dir, options.verbose, options.force)
-            case result
-            when :imported
-              imported += 1
-            when :imported_wrapped
-              imported += 1
-              wrapped += 1
-            when :skipped
-              skipped += 1
-            end
-          rescue ex
-            errors += 1
-            Logger.warn "Error importing #{file_info[:path]}: #{ex.message}"
+          import_each(files, "Jekyll", wrapped_note: "contained unconverted Liquid constructs. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_info|
+            import_file(file_info, output_dir, options.verbose, options.force)
           end
-
-          if wrapped > 0
-            Logger.warn "#{wrapped} file(s) contained unconverted Liquid constructs. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
-          end
-
-          report_collisions
-
-          ImportResult.new(
-            success: imported > 0 || errors == 0,
-            message: "Jekyll import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",
-            imported_count: imported,
-            skipped_count: skipped,
-            error_count: errors,
-          )
         end
 
         private def collect_files(path : String, include_drafts : Bool) : Array(NamedTuple(path: String, draft: Bool))

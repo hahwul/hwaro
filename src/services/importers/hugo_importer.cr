@@ -24,40 +24,17 @@ module Hwaro
             )
           end
 
-          imported = 0
-          skipped = 0
-          errors = 0
-          wrapped = 0
-
-          scan_markdown_files(content_dir).each do |file_path|
-            result = process_file(file_path, content_dir, output_dir, include_drafts, verbose, force)
-            case result
-            when :imported
-              imported += 1
-            when :imported_wrapped
-              imported += 1
-              wrapped += 1
-            when :skipped
-              skipped += 1
-            end
-          rescue ex
-            errors += 1
-            Logger.warn "Error processing #{file_path}: #{ex.message}"
+          import_each(scan_markdown_files(content_dir), "Hugo", wrapped_note: "contained Hugo shortcodes. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_path|
+            process_file(file_path, content_dir, output_dir, include_drafts, verbose, force)
           end
+        end
 
-          if wrapped > 0
-            Logger.warn "#{wrapped} file(s) contained Hugo shortcodes. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
-          end
+        protected def import_error_message(item : String, ex : Exception) : String
+          "Error processing #{item}: #{ex.message}"
+        end
 
-          report_collisions
-
-          ImportResult.new(
-            success: imported > 0 || errors == 0,
-            message: "Imported #{imported} items, skipped #{skipped}, errors #{errors}",
-            imported_count: imported,
-            skipped_count: skipped,
-            error_count: errors
-          )
+        protected def summary_message(engine : String, imported : Int32, skipped : Int32, errors : Int32) : String
+          "Imported #{imported} items, skipped #{skipped}, errors #{errors}"
         end
 
         private def scan_markdown_files(content_dir : String) : Array(String)

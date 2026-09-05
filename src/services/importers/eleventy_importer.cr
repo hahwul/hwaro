@@ -22,10 +22,6 @@ module Hwaro
           path = options.path.rstrip('/')
           path = "/" if path.empty? && !options.path.empty?
           output_dir = options.output_dir
-          imported = 0
-          skipped = 0
-          errors = 0
-          wrapped = 0
 
           @used_paths.clear
           reset_written_paths
@@ -51,35 +47,9 @@ module Hwaro
           # Load directory data files (11ty convention)
           dir_data = load_directory_data(path)
 
-          files.each do |file_path|
-            result = import_file(file_path, path, output_dir, dir_data, options.drafts, options.verbose, options.force)
-            case result
-            when :imported
-              imported += 1
-            when :imported_wrapped
-              imported += 1
-              wrapped += 1
-            when :skipped
-              skipped += 1
-            end
-          rescue ex
-            errors += 1
-            Logger.warn "Error importing #{file_path}: #{ex.message}"
+          import_each(files, "Eleventy", wrapped_note: "contained Nunjucks/Liquid template tags. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_path|
+            import_file(file_path, path, output_dir, dir_data, options.drafts, options.verbose, options.force)
           end
-
-          if wrapped > 0
-            Logger.warn "#{wrapped} file(s) contained Nunjucks/Liquid template tags. Imports kept the raw syntax — each will render as literal text until you hand-convert them."
-          end
-
-          report_collisions
-
-          ImportResult.new(
-            success: imported > 0 || errors == 0,
-            message: "Eleventy import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",
-            imported_count: imported,
-            skipped_count: skipped,
-            error_count: errors,
-          )
         end
 
         private def collect_content_files(path : String) : Array(String)

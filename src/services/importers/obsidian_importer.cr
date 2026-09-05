@@ -20,9 +20,6 @@ module Hwaro
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
-          imported = 0
-          skipped = 0
-          errors = 0
 
           reset_written_paths
 
@@ -51,28 +48,9 @@ module Hwaro
           content_cache = {} of String => String
           link_map = build_link_map(files, path, options.drafts, content_cache)
 
-          files.each do |file_path|
-            result = import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
-            case result
-            when :imported
-              imported += 1
-            when :skipped
-              skipped += 1
-            end
-          rescue ex
-            errors += 1
-            Logger.warn "Error importing #{file_path}: #{ex.message}"
+          import_each(files, "Obsidian") do |file_path|
+            import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
           end
-
-          report_collisions
-
-          ImportResult.new(
-            success: imported > 0 || errors == 0,
-            message: "Obsidian import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",
-            imported_count: imported,
-            skipped_count: skipped,
-            error_count: errors,
-          )
         end
 
         private def collect_markdown_files(path : String) : Array(String)

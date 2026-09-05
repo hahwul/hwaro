@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # =============================================================================
 # Versioned documentation (`[versions]` + `[[versions.list]]`) functional tests

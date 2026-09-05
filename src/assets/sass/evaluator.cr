@@ -277,6 +277,15 @@ module Hwaro
           rule = Css::Rule.new(selectors, breaks)
           emit(rule)
 
+          with_rule_scope(rule, selectors, breaks) { eval_nodes(node.children) }
+        end
+
+        # Evaluate a rule body with `rule` as the current rule, `selectors` /
+        # `breaks` as the parent selector context and a fresh variable scope
+        # (each block is one), restoring all of it afterwards — also when the
+        # body raises, so a caller that recovers from an evaluation error
+        # never continues in the nested scope.
+        private def with_rule_scope(rule : Css::Rule, selectors : Array(String), breaks : Array(Bool), &) : Nil
           saved_rule = @current_rule
           saved_rule_sink = @current_rule_sink
           saved_parents = @parent_selectors
@@ -286,13 +295,16 @@ module Hwaro
           @current_rule_sink = @sink
           @parent_selectors = selectors
           @parent_breaks = breaks
-          @env = Environment.new(saved_env) # each block is a variable scope
-          eval_nodes(node.children)
-          @current_rule = saved_rule
-          @current_rule_sink = saved_rule_sink
-          @parent_selectors = saved_parents
-          @parent_breaks = saved_breaks
-          @env = saved_env
+          @env = Environment.new(saved_env)
+          begin
+            yield
+          ensure
+            @current_rule = saved_rule
+            @current_rule_sink = saved_rule_sink
+            @parent_selectors = saved_parents
+            @parent_breaks = saved_breaks
+            @env = saved_env
+          end
         end
 
         # Splits a selector list on top-level commas, remembering which
@@ -1401,25 +1413,7 @@ module Hwaro
 
           rule = Css::Rule.new(selectors, breaks)
           emit(rule)
-          saved_rule = @current_rule
-          saved_rule_sink = @current_rule_sink
-          saved_parents = @parent_selectors
-          saved_breaks = @parent_breaks
-          saved_env = @env
-          @current_rule = rule
-          @current_rule_sink = @sink
-          @parent_selectors = selectors
-          @parent_breaks = breaks
-          @env = Environment.new(saved_env)
-          begin
-            eval_nodes(node.children)
-          ensure
-            @current_rule = saved_rule
-            @current_rule_sink = saved_rule_sink
-            @parent_selectors = saved_parents
-            @parent_breaks = saved_breaks
-            @env = saved_env
-          end
+          with_rule_scope(rule, selectors, breaks) { eval_nodes(node.children) }
           # A rule lifted to the root is its own output group — dart-sass
           # separates it from what follows with a blank line.
           if @at_frames.empty? && (last = @sink.last?)

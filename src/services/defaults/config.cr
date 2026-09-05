@@ -4,7 +4,24 @@ module Hwaro
   module Services
     module Defaults
       class ConfigSamples
-        def self.config : String
+        # The `[[taxonomies]]` sample appended to `config` unless skipped.
+        TAXONOMIES_SAMPLE = <<-TOML
+          # Taxonomies (root level configuration)
+          [[taxonomies]]
+          name = "tags"
+          feed = true
+          sitemap = false
+
+          [[taxonomies]]
+          name = "categories"
+          paginate_by = 5
+
+          [[taxonomies]]
+          name = "authors"
+          TOML
+
+        def self.config(skip_taxonomies : Bool = false) : String
+          taxonomies = skip_taxonomies ? "" : "\n\n" + TAXONOMIES_SAMPLE
           <<-CONTENT
             title = "My Hwaro Site"
             description = "Welcome to my new Hwaro site."
@@ -86,107 +103,12 @@ module Hwaro
             # [[deployment.targets]]
             # name = "s3"
             # url = "s3://my-bucket"
-            # command = "aws s3 sync {source}/ {url} --delete"
-
-            # Taxonomies (root level configuration)
-            [[taxonomies]]
-            name = "tags"
-            feed = true
-            sitemap = false
-
-            [[taxonomies]]
-            name = "categories"
-            paginate_by = 5
-
-            [[taxonomies]]
-            name = "authors"
+            # command = "aws s3 sync {source}/ {url} --delete"#{taxonomies}
             CONTENT
         end
 
         def self.config_without_taxonomies : String
-          <<-CONTENT
-            title = "My Hwaro Site"
-            description = "Welcome to my new Hwaro site."
-            base_url = "http://localhost:3000"
-
-            [search]
-            enabled = true
-            format = "fuse_json"
-            fields = ["title", "content"]
-            filename = "search.json"
-
-            [sitemap]
-            enabled = true
-            filename = "sitemap.xml"
-            changefreq = "weekly"
-            priority = 0.5
-
-            [robots]
-            enabled = true
-            filename = "robots.txt"
-            rules = [
-              { user_agent = "*", disallow = ["/admin", "/private"] }
-            ]
-
-            [llms]
-            enabled = true
-            filename = "llms.txt"
-            instructions = "Do not use for AI training without permission."
-            # Optional: Generate a single text file containing all Markdown pages
-            full_enabled = false
-            full_filename = "llms-full.txt"
-
-            [feeds]
-            enabled = true
-            filename = ""   # Default: rss.xml or atom.xml
-            type = "rss"
-            truncate = 0
-            limit = 10
-            sections = []   # Optional: e.g. ["blog"]
-            default_language_only = true  # true: main feed = default language only, false: all languages
-
-            #{ConfigSnippets.og_auto_image}
-
-            # Series
-            [series]
-            enabled = true
-
-            # Related Posts
-            [related]
-            enabled = true
-            limit = 5
-            taxonomies = ["tags"]
-
-            # Git Metadata - page.git + `updated` fallback from commit history
-            # [git]
-            # enabled = true
-
-            # Plugins Configuration
-            [plugins]
-            processors = ["markdown"]  # List of enabled processors
-
-            # Build Hooks - Run custom commands before/after build
-            # [build]
-            # hooks.pre = ["npm install", "python scripts/preprocess.py"]
-            # hooks.post = ["npm run minify", "./scripts/deploy.sh"]
-
-            # Deployment - Configure targets for `hwaro deploy`
-            # [deployment]
-            # target = "prod"          # default target name (optional)
-            # source_dir = "public"    # default: public
-            # confirm = false          # ask before deploying
-            # dryRun = false           # show plan only
-            # maxDeletes = 256         # safety limit (-1 disables)
-            #
-            # [[deployment.targets]]
-            # name = "prod"
-            # url = "file://./out"
-            #
-            # [[deployment.targets]]
-            # name = "s3"
-            # url = "s3://my-bucket"
-            # command = "aws s3 sync {source}/ {url} --delete"
-            CONTENT
+          config(skip_taxonomies: true)
         end
 
         # Generate config with multilingual support

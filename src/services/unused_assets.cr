@@ -101,7 +101,7 @@ module Hwaro
       # assets came from one project, references from another, and
       # `--delete --force` removed files the other project still uses.
       private def resolve_project_root : String
-        candidate = find_project_root(@content_dir)
+        candidate = Utils::PathUtils.find_project_root(@content_dir)
         # A config.toml next to the content tree is authoritative.
         return candidate if File.exists?(File.join(candidate, "config.toml"))
         # Fall back to the CWD only when the content tree actually lives
@@ -122,19 +122,6 @@ module Hwaro
       # paths stay byte-identical.
       private def rooted(name : String) : String
         @project_root == "." ? name : File.join(@project_root, name)
-      end
-
-      private def find_project_root(content_dir : String) : String
-        if File.basename(content_dir) == "content"
-          parent = File.dirname(content_dir)
-          return parent.empty? || parent == "." ? "." : parent
-        end
-
-        if Dir.exists?(File.join(content_dir, "content")) || Dir.exists?(File.join(content_dir, "../content"))
-          return content_dir
-        end
-
-        content_dir
       end
 
       def run : UnusedAssetsResult

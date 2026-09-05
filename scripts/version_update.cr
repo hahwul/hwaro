@@ -173,6 +173,20 @@ puts
 puts "Updating to version #{new_version}..."
 puts
 
+# Fold pending changelog fragments into CHANGELOG.md so a release never
+# leaves entries stranded in changelog.d/ (see changelog.d/README.md). Runs
+# only once the version is confirmed, so cancelling at the prompt changes
+# nothing.
+if Dir.exists?("changelog.d") && !Dir.glob("changelog.d/*.md").reject { |f| File.basename(f) == "README.md" }.empty?
+  puts "Merging changelog.d/ fragments into CHANGELOG.md..."
+  status = Process.run("crystal", ["run", "scripts/changelog_assemble.cr"], output: STDOUT, error: STDERR)
+  unless status.success?
+    puts "❌ changelog.d fragments could not be merged; fix them and re-run."
+    exit 1
+  end
+  puts
+end
+
 # Update all files
 success_count = 0
 total_count = 0

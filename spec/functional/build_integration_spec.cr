@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 
 # ---------------------------------------------------------------------------
 # 1. Basic page URL generation

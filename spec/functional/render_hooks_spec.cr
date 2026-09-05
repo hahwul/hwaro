@@ -1,4 +1,4 @@
-require "./support/build_helper"
+require "../support/build_helper"
 require "../../src/content/hooks/image_hooks"
 
 # =============================================================================

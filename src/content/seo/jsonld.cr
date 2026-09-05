@@ -11,7 +11,7 @@ module Hwaro
 
         # Join `path` onto `base` as a root-relative absolute URL.
         private def abs_path(base : String, path : String) : String
-          "#{base}#{path.starts_with?("/") ? path : "/#{path}"}"
+          "#{base}#{Utils::PathUtils.root_relative(path)}"
         end
 
         # Like abs_path, but leaves a value that already carries its own origin

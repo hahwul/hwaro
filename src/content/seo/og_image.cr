@@ -655,12 +655,12 @@ module Hwaro
         # Render an SVG image for a page
         def self.render_svg(page : Models::Page, config : Models::Config, logo_data_uri : String? = nil, bg_data_uri : String? = nil) : String
           ai = config.og.auto_image
-          bg = escape_attr(ai.background)
-          text_color = escape_attr(ai.text_color)
-          accent = escape_attr(ai.accent_color)
-          secondary = escape_attr(resolve_secondary(ai))
+          bg = Utils::TextUtils.escape_xml(ai.background)
+          text_color = Utils::TextUtils.escape_xml(ai.text_color)
+          accent = Utils::TextUtils.escape_xml(ai.accent_color)
+          secondary = Utils::TextUtils.escape_xml(resolve_secondary(ai))
           style = ai.style
-          site_name = escape_xml(config.title)
+          site_name = Utils::TextUtils.escape_xml(config.title)
 
           # Style-tuned default type scale unless the user raised it explicitly.
           font_size = Math.max(ai.font_size, 1)
@@ -776,7 +776,7 @@ module Hwaro
               # Fallback: reference logo as URL (file not found or not pre-computed)
               logo_url = logo.lchop("static/")
               logo_url = logo_url.starts_with?("/") ? logo_url : "/#{logo_url}"
-              logo_svg = %(<image href="#{escape_attr(logo_url)}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
+              logo_svg = %(<image href="#{Utils::TextUtils.escape_xml(logo_url)}" x="#{logo_x}" y="#{logo_y}" width="#{LOGO_SIZE}" height="#{LOGO_SIZE}" />)
             end
           end
 
@@ -818,7 +818,7 @@ module Hwaro
                   svg << %(<text x="#{text_x - 10}" y="#{ghost_top + (ghost_size * 0.78).to_i}" )
                   svg << %(font-family="#{SVG_DISPLAY_FONT}" )
                   svg << %(font-size="#{ghost_size}" font-weight="700" letter-spacing="4" fill="#{text_color}" opacity="0.06">)
-                  svg << escape_xml(ghost.upcase)
+                  svg << Utils::TextUtils.escape_xml(ghost.upcase)
                   svg << %(</text>\n)
                 end
               end
@@ -875,7 +875,7 @@ module Hwaro
               svg << %(<text x="#{x}" y="#{y}"#{title_anchor}#{title_tracking} )
               svg << %(font-family="#{title_font}" )
               svg << %(font-size="#{font_size}" font-weight="700" fill="#{title_fill}">)
-              svg << escape_xml(line)
+              svg << Utils::TextUtils.escape_xml(line)
               # Terminal: blinking-cursor block after the last title line.
               if style == "terminal" && i == title_lines.size - 1
                 svg << %(<tspan fill="#{accent}">&#x2588;</tspan>)
@@ -912,7 +912,7 @@ module Hwaro
                 svg << %(<text x="#{desc_x}" y="#{y}"#{desc_anchor} )
                 svg << %(font-family="#{SVG_DISPLAY_FONT}" )
                 svg << %(font-size="#{desc_size}" font-weight="500" fill="#{text_color}" opacity="#{desc_opacity}">)
-                svg << escape_xml(line)
+                svg << Utils::TextUtils.escape_xml(line)
                 svg << %(</text>\n)
               end
               desc_last_y = desc_start_y + (desc_lines.size - 1) * desc_line_h
@@ -1565,14 +1565,6 @@ module Hwaro
             end
           end
           File.write(manifest_path, json)
-        end
-
-        private def self.escape_xml(text : String) : String
-          Utils::TextUtils.escape_xml(text)
-        end
-
-        private def self.escape_attr(text : String) : String
-          Utils::TextUtils.escape_xml(text)
         end
       end
     end

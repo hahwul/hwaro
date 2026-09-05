@@ -1,139 +1,138 @@
 # Hwaro - Agent Instructions
 
-## Overview
-Hwaro is a fast, lifecycle-driven static site generator written in Crystal. Features a hook-based build pipeline, pluggable processors, multi-layer caching, and parallel content processing.
+Hwaro is a fast, lifecycle-driven static site generator written in Crystal
+(>= 1.21): a hook-based build pipeline, pluggable content processors,
+multi-layer caching and fiber-parallel rendering. **`ARCHITECTURE.md` is the
+map** — directory layout, the build pipeline, every registry, and a
+"where does X go" table. This file is the rules.
 
-## Build & Run
+## Build, test, lint
+
 ```bash
-just build          # shards install && shards build → bin/hwaro
-just test           # crystal spec (unit + functional + content)
-just fix            # crystal tool format
-just dev            # Serve docs site locally (bin/hwaro serve -i docs)
-just clean          # Remove bin/, lib/, stb_impl.o
+just build              # shards install && shards build → bin/hwaro
+just test               # crystal spec — the whole suite, ONE process
+just test-file PATH     # one spec file (or file:line) in its own compiler cache
+just test-dir DIR       # every spec under a directory, same isolation
+just check              # crystal tool format --check + bin/ameba   (CI gates on both)
+just fix                # crystal tool format + bin/ameba --fix
+just baseline           # build main into ../hwaro-baseline/bin/hwaro
+just verify             # byte-identity gate: baseline vs bin/hwaro (add --serve --deploy)
+just changelog          # merge changelog.d/ fragments into CHANGELOG.md (--check to validate)
+just dev                # serve the docs site (bin/hwaro serve -i docs)
 ```
 
-Run the suite as a **single** `crystal spec` process. `crystal spec` links every run to the same fixed path (`~/.cache/crystal/crystal-run-spec.tmp`), so two concurrent invocations clobber each other's binary and produce results that look plausible and are not — a single-example run reporting another file's example count, or `Error: you've found a bug in the Crystal compiler`. If you must fan out per file, give each invocation its own `CRYSTAL_CACHE_DIR`.
+- Run the suite as a **single** `crystal spec` process per compiler cache.
+  `crystal spec` links every run to the same fixed path under
+  `~/.cache/crystal`, so two concurrent invocations clobber each other's
+  binary and produce plausible-looking nonsense. `just test-file` /
+  `just test-dir` set their own `CRYSTAL_CACHE_DIR`, so they are safe to run
+  alongside `just test`.
+- `spec/functional/**` spawns `bin/hwaro`; rebuild it (`shards build`) before
+  trusting a functional run, or the specs test the old binary (the serve
+  specs mark themselves pending when it is missing).
+- `bin/ameba` is built by `just ameba` (ameba 1.7 ships no executable).
+- Anything that changes `shard.lock` must be followed by `just nix-update`.
+  `flake.nix` reads the version and minimum Crystal from `shard.yml`.
+- Parallelism comes from Crystal's execution contexts: `src/main.cr` sizes the
+  default `Fiber::ExecutionContext::Parallel` (honours `CRYSTAL_WORKERS`).
+  **Never reintroduce `-Dpreview_mt`** — its legacy scheduler can spin forever
+  at process exit. Code that mutates shared state from worker fibers guards
+  it with a `Mutex`; directory creation goes through `Utils::FileSafe.mkdir_p`.
 
-Dependencies (shard.yml): `markd` (Markdown), `toml` (TOML parsing), `crinja` (Jinja2 templates), `emoji`.
+## Behaviour-preserving changes (refactors, splits, dedups)
 
-Anything that changes `shard.lock` must be followed by `just nix-update` — the Nix build resolves dependencies offline from `shards.nix`, so a stale one silently compiles against the wrong revisions. CI's `build-nix` job checks both. `flake.nix` reads the version and the minimum Crystal straight out of `shard.yml`, so release bumps never touch it.
+Generated output is the contract. Before opening a structural PR:
 
-Hwaro requires Crystal >= 1.21 and gets its parallelism from Crystal's **execution contexts**: `src/main.cr` resizes the default `Fiber::ExecutionContext::Parallel` to `default_workers_count` (which honours `CRYSTAL_WORKERS`, defaulting to the CPU count). Do NOT reintroduce `-Dpreview_mt` — Crystal 1.21 deprecated it, and its legacy MT scheduler can spin forever at process exit (all `CRYSTAL-MT-*` threads stuck in `Crystal::SpinLock#lock` inside the event loop), so `hwaro build` never returns. Every `spawn` lands in the default context, so the build still runs fibers across cores: new code that mutates shared state from worker fibers must guard with a `Mutex` or use the existing `@crinja_cache_mutex`; new directory creation must go through `Hwaro::Utils::FileSafe.mkdir_p` rather than `FileUtils.mkdir_p` (the latter has a check-then-create race that fires under parallelism).
+1. `just baseline` once (a `main` binary in a sibling worktree), then
+   `just verify` — it inits and builds every scaffold, builds `docs/` and a
+   generated corpus (cold and warm `--cache`), runs every importer,
+   convert/export, and diffs `--help`/`--json` surfaces. `--serve` and
+   `--deploy` add the incremental-rebuild and deploy tiers.
+2. `scripts/check_no_toplevel_effects.sh` (run by `just verify`) enforces the
+   file-split convention; `spec/unit/registration_order_spec.cr` pins the
+   hand-maintained registries (contents, and order where it matters).
+3. Move-only commits first (`git diff --color-moved=dimmed-zebra` should show
+   only moves), edits in separate commits. A regression spec added with a fix
+   must be shown failing on the pre-fix code.
 
-## Directory Structure
-```
-src/
-  cli/              # Runner, metadata (FlagInfo), commands/, commands/tool/
-  config/options/   # Typed option classes per command (BuildOptions, ServeOptions, etc.)
-  content/
-    processors/     # Base, Markdown, Template, HTML, XML, JSON, Image, SyntaxHighlighter
-    filters/        # Crinja filters: string, collection, date, html, url, i18n, math, misc
-    hooks/          # Markdown, SEO, Taxonomy, Asset, PWA, AMP, OgImage, Image hooks
-    seo/            # Feeds, Sitemap, Robots, JsonLD, Tags, LLMs, PWA, OgPngRenderer
-    pagination/     # Paginator, Renderer
-  core/
-    lifecycle/      # Manager, Hooks (HookResult/Hookable/HookDSL), Phases, BuildContext
-    build/          # Builder, CacheManager, ShortcodeProcessor, Parallel, phases/
-  models/           # Page, Section, Site, Config, Toc, Deployment
-  services/
-    scaffolds/      # Registry + 8 built-in (simple/bare/blog/docs/book + dark variants) + remote
-    importers/      # WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy
-    exporters/      # Jekyll, Hugo
-    server/         # Dev server with live reload and file watching
-    defaults/       # Default content, templates, config
-  utils/            # Logger, PathUtils, TextUtils, CrinjaUtils, Profiler, minifiers
-  ext/              # Crinja patches, stb_image bindings, fonts
-spec/
-  unit/             # Component-level tests (~150 files)
-  functional/       # End-to-end build tests (~20 files, use build_helper.cr)
-  content/seo/      # SEO output validation
-```
+### Splitting a large file
 
-## Architecture
+Parts live in a directory named after the owner (`render.cr` → `render/*.cr`)
+and **only reopen the same type**; the owner keeps its path, its ivars, its
+load-time statements (`Registry.register`, …) and an explicit, ordered
+`require "./render/x"` list. No globs, no new mixin modules, no ivar
+declarations in parts. Full rules and the current list of split owners are
+in `ARCHITECTURE.md`.
 
-### Lifecycle Pipeline
-8 sequential phases, each with `before`/`after` hook points (16 total):
-```
-Initialize → ReadContent → ParseContent → Transform → Render → Generate → Write → Finalize
-```
-- **BuildContext**: Shared state container (pages, sections, site, config, cache) passed through all phases.
-- **Hook registration**: Modules implement `Hookable` interface, register via `Manager#on(HookPoint, priority:, name:)`.
-- **HookResult**: `Continue` | `Skip` | `Abort`.
-
-### Registry Pattern
-Used for: Processors (`ContentProcessors::Base`), Commands (`CommandRegistry`), Scaffolds (`Scaffolds::Registry`), Hooks (`Manager`).
-
-### CLI
-- Commands define `NAME`, `DESCRIPTION`, `FLAGS` (array of `FlagInfo`), `POSITIONAL_ARGS`.
-- Tool subcommands: list, convert, check-links, stats, validate, unused-assets, platform, doctor, import, export, agents-md, ci.
-- Shell completion auto-generated from `CommandRegistry` metadata.
-- `doctor` is a top-level alias for `tool doctor`.
-
-### Caching (Multi-layer)
-1. **Build cache** (`.hwaro_cache.json`) - File mtime + content hash.
-2. **Template compilation cache** - Compiled Crinja AST keyed by `UInt64`.
-3. **Crinja value caches** - Per-page, per-section, per-series, per-ancestor. Cleared at phase transitions.
-4. **Site lookup indices** - `pages_by_section`, `sections_by_parent`, `sections_by_name`.
-
-### Models
-- **Page**: 50+ properties (title, date, draft, tags, content, url, word_count, reading_time, series, authors, extra, etc.).
-- **Section**: Extends Page with paginate, sort_by, reverse, transparent, subsections.
-- **Site**: Aggregator with lookup indices, taxonomy maps, data/authors hashes.
-- **Config**: Nested structures for feeds, sitemap, robots, search, SEO, image processing, multilingual.
-
-## Development Guide
-
-### Adding a New Processor
-1. Inherit `Hwaro::Content::Processors::Base`, implement `process(context : ProcessorContext) : ProcessorResult`.
-2. Register in processor `Registry`.
-
-### Adding a New Command
-1. Create class in `src/cli/commands/` with `NAME`, `DESCRIPTION`, `FLAGS` (using `FlagInfo`), and `run(args)`.
-2. Register in `src/cli/runner.cr` via `CommandRegistry.register(metadata, &handler)`.
-
-### Adding a New Hook
-1. Implement `Hwaro::Core::Lifecycle::Hookable` with `register_hooks(manager)`.
-2. Register in `src/content/hooks.cr`.
-
-### Adding a Config Option
-Update **all** of the following:
-1. `src/models/config.cr` — property, default, and loader.
-2. `src/services/config_snippets.cr` — shared TOML snippets (accepts `commented` param for scaffold vs doctor variants).
-3. `src/services/scaffolds/base.cr` — if scaffold-only section.
-4. `spec/unit/config_spec.cr` and relevant feature specs.
-
-## Coding Patterns
+## Coding patterns
 
 ### Security
-- **HTML/XML output**: `Utils::TextUtils.escape_xml(value)` or `HTML.escape(value)`.
-- **Inline JS**: Escape `</` → `<\/` in JSON data to prevent `</script>` breakout.
-- **Front matter (TOML/YAML/JSON)**: Always use safe casts (`.as_s?`, `.as_bool?`, `.as_i?`, `.as_a?`) on `TOML::Any` / `YAML::Any` / `JSON::Any` values, never unchecked `.as_s`.
-- **Crinja filter args**: Use `.to_s` instead of `.as_s`.
-- **Paths**: Always use `PathUtils.sanitize_path` for user-provided or content-derived paths.
+- HTML/XML output: `Utils::TextUtils.escape_xml(value)` or `HTML.escape(value)`.
+- Inline JS: escape `</` → `<\/` in JSON data to prevent `</script>` breakout.
+- Front matter and config values: safe casts (`.as_s?`, `.as_bool?`, `.as_i?`,
+  `.as_a?`) on `TOML::Any` / `YAML::Any` / `JSON::Any`, never unchecked `.as_s`.
+- Crinja filter args: `.to_s`, not `.as_s`.
+- Paths: `PathUtils.sanitize_path` for user-provided or content-derived paths;
+  config.toml is a trusted boundary (do not guard config path escapes).
+- Vendored shard bugs (markd, crinja, toml, tartrazine) are patched in
+  `src/ext/`, not worked around at call sites.
 
 ### Performance
-- **String building**: Prefer `String.build` with char-by-char iteration over chained `.gsub()`.
-- **Bounded substrings**: Use `html[pos, n]` instead of `html[pos..]` in loops to avoid O(n) allocations.
-- **Crinja value caching**: Cache `Crinja::Value` arrays per-section/page. Clear at all reset points.
+- Prefer `String.build` with char-by-char iteration over chained `.gsub`.
+- Bounded substrings (`html[pos, n]`) instead of `html[pos..]` in loops.
+- Cache `Crinja::Value` arrays per section/page; clear them at every reset
+  point (see `invalidate_caches_for_pages`).
+- Tartrazine is not thread-safe: syntax highlighting goes through
+  `ServerHighlighter`'s mutex.
 
 ### Logging
-- `Logger.action(label, message, color)` — file operations (right-justified label).
-- `Logger.progress(current, total)` — progress bar with percentage.
-- `Logger.timed(message, &block)` — timing wrapper.
-- Levels: `debug`, `info`, `warn`, `error`, `success`.
-- Every command honors `--quiet`/`-q` (suppresses info/action/progress/success + banner; warn/error still emit on stderr) and the `NO_COLOR` env var (auto-detect also disables ANSI when stdout is not a TTY).
+- `Logger.action(label, message, role = Role::Success)` for file operations,
+  `Logger.progress(current, total)`, `Logger.outcome`, `Logger::Receipt`,
+  `Logger.timed(message, &block)`; levels `debug`/`info`/`warn`/`error`/`success`.
+- Every command honours `--quiet`/`-q` (info/action/progress/success and the
+  banner off; warn/error still on stderr) and `NO_COLOR`. A command that
+  handles `--json` itself exits through `Runner.exit_with_error_payload`.
+- Machine-readable lines (`hwaro serve: ready url=…`, `--json` envelopes) are
+  contracts; keep their bytes.
 
-### Testing
-- **Unit tests**: Isolated components, minimal objects, helper methods (e.g., `load_config`, `render_filter`).
-- **Functional tests**: Use `build_site()` helper (creates temp dir, writes files, runs build, yields for assertions, auto-cleans).
-- Logger output suppressed via `Logger.io = IO::Memory.new` in spec_helper.
-- No fixtures directory — inline data creation with temp dirs (`Dir.mktmpdir`).
+### Registries
+Registries are explicit lists (`Hooks.all`, `register_default_commands`,
+`register_sub`, `SECTION_LOADERS`, `CHECK_GROUPS`, …) on purpose — they are
+what a reader greps for. Add one line in the right position; the
+registration-order spec tells you if a merge broke it.
 
-## Documentation Site (`docs/`)
-Build: `bin/hwaro build -i docs` → `docs/public/`. Always build after changes to verify.
+### Tests
+- `spec/unit/<mirror of src>/…_spec.cr`: the test for `src/a/b/c.cr` lives in
+  `spec/unit/a/b/` (usually `c_spec.cr`; feature-named files such as
+  `models/config/outputs_config_spec.cr` sit in the directory of the code they
+  test); cross-cutting sweeps go in `spec/unit/regressions/`.
+- `spec/support/`: shared helpers — `load_config` / `expect_config_error`
+  (config_helper), `compile` / `compile_with` (sass_helper), `build_site`
+  (build_helper: temp project, `Builder#run`, yields for assertions). Add a
+  helper there instead of redefining it per file (a second top-level `def`
+  silently wins, so duplicates are a trap).
+- Specs that need a private method reopen the class in the spec file
+  (`class Hwaro::Core::Build::Builder … def test_x`).
+- Logger output is captured (`Logger.io = IO::Memory.new` in spec_helper);
+  `with_captured_log { }` returns it. No fixtures directory — inline data in
+  `Dir.mktmpdir`.
 
-- `docs/content/` — Markdown pages (sections: start, writing, templates, features, deploy).
-- `docs/data/sidebar.yml` — Navigation (link items + nested groups).
-- `docs/templates/` — Jinja2 templates. Landing page (`index.html`) uses separate template; `index.md` content is not rendered.
-- `docs/static/assets/css/` — Numbered by load order (`01-variables` → `08-shortcodes`).
-- Front matter: the docs site uses TOML (`+++`) by convention (YAML `---` is also supported by hwaro), `weight` for ordering, `toc = true` for long pages.
+## Changelog and docs
+- Do not edit `CHANGELOG.md` in a PR; add `changelog.d/<slug>.md` with
+  `### Added|Changed|Deprecated|Removed|Fixed|Security` headings and bullets
+  (see `changelog.d/README.md`). `just changelog` merges them at release time.
+- User-facing changes update the docs site in both languages:
+  `docs/content/**.md` and the matching `.ko.md`.
+- PRs that resolve issues use `Closes #N` / `Fixes #N`.
+- Commit messages: no AI attribution lines.
+
+## Documentation site (`docs/`)
+Build: `bin/hwaro build -i docs` → `docs/public/`; preview local edits with
+`hwaro serve -i docs` (built docs use absolute production asset URLs). Never
+run a production build while serving.
+
+- `docs/content/` — Markdown pages (start, writing, templates, features, deploy), bilingual.
+- `docs/data/sidebar.yml` / `sidebar_ko.yml` — navigation.
+- `docs/templates/` — Jinja2 templates; the landing page uses its own template.
+- `docs/static/assets/css/` — numbered by load order.
+- Front matter is TOML (`+++`) by convention; `weight` orders pages, `toc = true` for long ones.

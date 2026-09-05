@@ -362,7 +362,56 @@ module Hwaro
         # `--include-multilingual`) is threaded through so the full config
         # emits a real, enabled `[languages]` block instead of the commented
         # placeholder.
-        abstract def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+        # The `--full-config` config.toml: every section, in one fixed order,
+        # with a discoverability banner per section. Scaffolds do not restate
+        # this list — they opt sections out through `ships_taxonomies?` and
+        # supply their menu entries through `menus_config` (empty by
+        # default), and `bare` overrides the whole method for its subset.
+        def config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
+          String.build do |str|
+            # Site basics
+            str << base_config(config_title, config_description)
+
+            # Content & Processing
+            str << multilingual_config(multilingual_languages, skip_taxonomies)
+            str << plugins_config
+            str << content_files_config
+            str << highlight_config
+            str << og_config
+            str << search_config
+            str << pagination_config
+            str << series_config
+            str << related_config
+            str << taxonomies_config if !skip_taxonomies && ships_taxonomies?
+            str << menus_config(multilingual_languages)
+
+            # SEO & Feeds
+            str << sitemap_config
+            str << robots_config
+            str << llms_config
+            str << feeds_config(feed_sections)
+
+            # Optional features (commented out by default)
+            str << permalinks_config
+            str << auto_includes_config
+            str << assets_config
+            str << markdown_config
+            str << content_new_config
+            str << image_processing_config
+            str << build_hooks_config
+            str << pwa_config
+            str << amp_config
+            str << og_auto_image_config
+            str << doctor_config
+            str << deployment_config
+          end
+        end
+
+        # `[[menus.*]]` section of the full config; scaffolds whose templates
+        # render a menu override this (see Simple / Blog).
+        protected def menus_config(multilingual_languages : Array(String) = [] of String) : String
+          ""
+        end
 
         # Returns the site title used in config (overridable per scaffold).
         # Public so `hwaro doctor` can source its placeholder-title advisory
@@ -1125,9 +1174,12 @@ module Hwaro
         # docs passes its heading hover-anchor block. Raw heredocs
         # (`<<-'JS'`) on purpose: the JS must not go through `#{}`
         # interpolation.
-        protected def search_js_content(extra_init : String = "") : String
-          head = <<-'JS'
-            (function () {
+        # The search overlay script (data loading, matching, result list,
+        # keyboard handling) WITHOUT its IIFE wrapper, so a scaffold that
+        # ships one combined script (book.js) can splice it between its own
+        # sections. `search_js_content` wraps it for the standalone search.js.
+        protected def search_js_body : String
+          <<-'JS'
               var searchData = null;
               var activeIndex = -1;
               var overlay = document.getElementById('searchOverlay');
@@ -1281,6 +1333,10 @@ module Hwaro
                 });
               }
             JS
+        end
+
+        protected def search_js_content(extra_init : String = "") : String
+          head = "(function () {\n" + search_js_body
           tail = "})();"
           if extra_init.empty?
             head + "\n" + tail
