@@ -16,9 +16,6 @@ module Hwaro
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
-          imported = 0
-          skipped = 0
-          errors = 0
 
           @used_slugs.clear
           reset_written_paths
@@ -39,28 +36,9 @@ module Hwaro
             )
           end
 
-          files.each do |file_path|
-            result = import_file(file_path, path, output_dir, options.verbose, options.force)
-            case result
-            when :imported
-              imported += 1
-            when :skipped
-              skipped += 1
-            end
-          rescue ex
-            errors += 1
-            Logger.warn "Error importing #{file_path}: #{ex.message}"
+          import_each(files, "Notion") do |file_path|
+            import_file(file_path, path, output_dir, options.verbose, options.force)
           end
-
-          report_collisions
-
-          ImportResult.new(
-            success: imported > 0 || errors == 0,
-            message: "Notion import complete: #{imported} imported, #{skipped} skipped, #{errors} errors",
-            imported_count: imported,
-            skipped_count: skipped,
-            error_count: errors,
-          )
         end
 
         private def collect_markdown_files(path : String) : Array(String)

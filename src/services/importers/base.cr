@@ -250,6 +250,62 @@ module Hwaro
           @file_actions.clear
         end
 
+        # The per-item import loop every importer runs: yield each item,
+        # tally the outcome it returns (:imported / :imported_wrapped /
+        # :skipped), turn a raised exception into a counted error (see
+        # `import_error_message`), then warn once about files that kept
+        # engine-specific syntax verbatim (`wrapped_note`, the sentence after
+        # "N file(s)"), report path collisions and build the ImportResult
+        # (`summary_message`). Both messages have per-engine overrides.
+        protected def import_each(items : Array(T), engine : String, wrapped_note : String? = nil, &block : T -> Symbol) : ImportResult forall T
+          imported = 0
+          skipped = 0
+          errors = 0
+          wrapped = 0
+
+          items.each do |item|
+            result = yield item
+            case result
+            when :imported
+              imported += 1
+            when :imported_wrapped
+              imported += 1
+              wrapped += 1
+            when :skipped
+              skipped += 1
+            end
+          rescue ex
+            errors += 1
+            Logger.warn import_error_message(item, ex)
+          end
+
+          if wrapped > 0 && wrapped_note
+            Logger.warn "#{wrapped} file(s) #{wrapped_note}"
+          end
+
+          report_collisions
+
+          ImportResult.new(
+            success: imported > 0 || errors == 0,
+            message: summary_message(engine, imported, skipped, errors),
+            imported_count: imported,
+            skipped_count: skipped,
+            error_count: errors,
+          )
+        end
+
+        protected def import_error_message(item : String, ex : Exception) : String
+          "Error importing #{item}: #{ex.message}"
+        end
+
+        protected def import_error_message(item : NamedTuple, ex : Exception) : String
+          "Error importing #{item[:path]}: #{ex.message}"
+        end
+
+        protected def summary_message(engine : String, imported : Int32, skipped : Int32, errors : Int32) : String
+          "#{engine} import complete: #{imported} imported, #{skipped} skipped, #{errors} errors"
+        end
+
         # Emit the single end-of-run collision summary, if any. Importers call
         # this from `run` alongside their other summary warnings.
         protected def report_collisions : Nil
