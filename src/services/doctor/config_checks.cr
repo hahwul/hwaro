@@ -6,6 +6,10 @@
 module Hwaro
   module Services
     class Doctor
+      # The config.toml group: load the file (a missing or unparseable
+      # config blocks every other config check — see CHECK_GROUPS), then run
+      # one small check per CheckSpec. Push order = report order, so a new
+      # diagnostic goes in the position its CheckSpec has in the registry.
       private def check_config(issues : Array(Issue)) : Models::Config?
         unless File.exists?(@config_path)
           # Missing config.toml blocks every build path (`Config.load`
@@ -22,6 +26,27 @@ module Hwaro
           return
         end
 
+        check_base_url(issues, config)
+        check_title(issues, config)
+        check_sitemap_changefreq(issues, config)
+        check_sitemap_priority(issues, config)
+        check_taxonomy_duplicates(issues, config)
+        check_search_format(issues, config)
+        check_language_duplicates(issues, config)
+        check_default_language(issues, config)
+        check_version_paths(issues, config)
+        check_math_engine(issues, config)
+        check_image_processing_widths(issues, config)
+        check_pwa_enums(issues, config)
+        check_deployment_target(issues, config)
+        check_related_taxonomies(issues, config)
+        check_menu_parents(issues, config)
+        check_missing_config_sections(issues)
+
+        config
+      end
+
+      private def check_base_url(issues : Array(Issue), config : Models::Config) : Nil
         # base_url check
         #
         # Scheme/host validity is enforced at `Models::Config.load` time via
@@ -38,7 +63,9 @@ module Hwaro
           issues << Issue.new(id: "base-url-trailing-slash", level: :warning, category: "config", file: @config_path,
             message: "base_url should not end with a trailing slash")
         end
+      end
 
+      private def check_title(issues : Array(Issue), config : Models::Config) : Nil
         # title check. An ABSENT `title` reaches here as the internal
         # "Hwaro Site" fallback, so reporting it as a placeholder value
         # sent the user grepping for a string their config doesn't
@@ -50,19 +77,25 @@ module Hwaro
           issues << Issue.new(id: "title-default", level: :warning, category: "config", file: @config_path,
             message: "title is still the placeholder value \"#{config.title}\"")
         end
+      end
 
+      private def check_sitemap_changefreq(issues : Array(Issue), config : Models::Config) : Nil
         # sitemap changefreq validity
         unless VALID_CHANGEFREQS.includes?(config.sitemap.changefreq)
           issues << Issue.new(id: "sitemap-changefreq-invalid", level: :warning, category: "config", file: @config_path,
             message: "sitemap.changefreq \"#{config.sitemap.changefreq}\" is not valid (expected: #{VALID_CHANGEFREQS.join(", ")})")
         end
+      end
 
+      private def check_sitemap_priority(issues : Array(Issue), config : Models::Config) : Nil
         # sitemap priority range
         unless 0.0 <= config.sitemap.priority <= 1.0
           issues << Issue.new(id: "sitemap-priority-range", level: :warning, category: "config", file: @config_path,
             message: "sitemap.priority #{config.sitemap.priority} is out of range (expected: 0.0–1.0)")
         end
+      end
 
+      private def check_taxonomy_duplicates(issues : Array(Issue), config : Models::Config) : Nil
         # taxonomy name duplicates — read from the raw TOML: the loader now
         # drops a repeated name (first declaration wins), so the parsed
         # `config.taxonomies` can no longer show the duplicate.
@@ -73,13 +106,17 @@ module Hwaro
           issues << Issue.new(id: "taxonomy-duplicate", level: :warning, category: "config", file: @config_path,
             message: "Duplicate taxonomy name: \"#{name}\"")
         end
+      end
 
+      private def check_search_format(issues : Array(Issue), config : Models::Config) : Nil
         # search format validity
         if config.search.enabled && !VALID_SEARCH_FORMATS.includes?(config.search.format)
           issues << Issue.new(id: "search-format-invalid", level: :warning, category: "config", file: @config_path,
             message: "search.format \"#{config.search.format}\" is not supported (expected: #{VALID_SEARCH_FORMATS.join(", ")})")
         end
+      end
 
+      private def check_language_duplicates(issues : Array(Issue), config : Models::Config) : Nil
         # duplicate language codes
         lang_codes = config.languages.keys
         lang_duplicates = lang_codes.tally.select { |_, count| count > 1 }.keys
@@ -87,7 +124,9 @@ module Hwaro
           issues << Issue.new(id: "language-duplicate", level: :warning, category: "config", file: @config_path,
             message: "Duplicate language code: \"#{code}\"")
         end
+      end
 
+      private def check_default_language(issues : Array(Issue), config : Models::Config) : Nil
         # default_language must resolve to a `[languages.<code>]` table.
         # Without this check a typo silently falls through to untranslated
         # content with broken hreflang tags and a feed that omits the
@@ -97,7 +136,9 @@ module Hwaro
           issues << Issue.new(id: "default-language-undefined", level: :warning, category: "config", file: @config_path,
             message: "default_language \"#{config.default_language}\" has no matching [languages.#{config.default_language}] block (defined: #{known})")
         end
+      end
 
+      private def check_version_paths(issues : Array(Issue), config : Models::Config) : Nil
         # Every `[[versions.list]]` path must be a real content directory:
         # a typo'd path silently publishes an empty version (its switcher
         # entry links to a 404 root).
@@ -107,7 +148,9 @@ module Hwaro
           issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
             message: "version \"#{version.name}\" points at content path \"#{version.path}\" which does not exist (#{dir})")
         end
+      end
 
+      private def check_math_engine(issues : Array(Issue), config : Models::Config) : Nil
         # markdown.math_engine only renders when set to a value the
         # build pipeline actually loads; other strings silently produce
         # no math. Skip when math is off — the field is a no-op there.
@@ -115,7 +158,9 @@ module Hwaro
           issues << Issue.new(id: "markdown-math-engine-invalid", level: :warning, category: "config", file: @config_path,
             message: "markdown.math_engine \"#{config.markdown.math_engine}\" is not supported (expected: #{VALID_MATH_ENGINES.join(", ")})")
         end
+      end
 
+      private def check_image_processing_widths(issues : Array(Issue), config : Models::Config) : Nil
         # An enabled [image_processing] with no widths is a silent no-op:
         # the image hook returns early on an empty widths array and the
         # renderer generates no srcset, so the user turns the feature on
@@ -125,7 +170,9 @@ module Hwaro
           issues << Issue.new(id: "image-processing-widths-empty", level: :warning, category: "config", file: @config_path,
             message: "image_processing is enabled but widths is empty — no resized variants will be generated (set e.g. widths = [320, 640, 1024])")
         end
+      end
 
+      private def check_pwa_enums(issues : Array(Issue), config : Models::Config) : Nil
         # PWA cache_strategy is enforced at runtime via VALID_STRATEGIES.
         # `Models::Config.load` silently coerces an unknown value back
         # to "cache-first" (with a `Logger.warn` the user often misses
@@ -148,7 +195,9 @@ module Hwaro
               message: "pwa.display \"#{raw_display}\" is not supported (expected: #{Models::PwaConfig::VALID_DISPLAYS.join(", ")})")
           end
         end
+      end
 
+      private def check_deployment_target(issues : Array(Issue), config : Models::Config) : Nil
         # `[deployment].target` selects which `[[deployment.targets]]`
         # block `hwaro deploy` uses. Pointing at an undefined name
         # makes `deploy` fail at runtime with a "target not found"
@@ -162,7 +211,9 @@ module Hwaro
               message: "deployment.target \"#{selected}\" has no matching [[deployment.targets]] block (#{known_hint})")
           end
         end
+      end
 
+      private def check_related_taxonomies(issues : Array(Issue), config : Models::Config) : Nil
         # `[related].taxonomies` references taxonomy names from
         # `[[taxonomies]]`. A typo silently produces zero related
         # posts on every page without any user-visible signal — the
@@ -176,7 +227,9 @@ module Hwaro
               message: "[related] taxonomies references \"#{name}\" but no [[taxonomies]] block defines it (#{known_hint})")
           end
         end
+      end
 
+      private def check_menu_parents(issues : Array(Issue), config : Models::Config) : Nil
         # `[[menus.<name>]]` entries may set `parent` to another entry's
         # `identifier` within the SAME menu (global or per-language). A typo
         # silently falls through to Content::Menus's "promoted to root"
@@ -190,11 +243,6 @@ module Hwaro
           lang_menus = config.languages[code].menus
           check_menu_parent_undefined(issues, code, lang_menus) if lang_menus
         end
-
-        # Check for missing config sections
-        check_missing_config_sections(issues)
-
-        config
       end
 
       private def check_menu_parent_undefined(issues : Array(Issue), lang_code : String, menus : Hash(String, Array(Models::MenuItemConfig)))
