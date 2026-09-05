@@ -99,19 +99,22 @@ src/core/build/phases/render.cr        owner: doc comment, constants, ordered `r
 src/core/build/phases/render/*.cr      parts: `module Hwaro::Core::Build::Phases::Render` reopened
 ```
 
-Rules (enforced by `scripts/check_no_toplevel_effects.sh`):
+Rules (rules 2 and 4 are enforced by `scripts/check_no_toplevel_effects.sh`,
+which lists every part in its `PART_GLOBS` — add a line when you split a new
+owner):
 
 1. The owner keeps its path, so nothing outside changes; it requires its
-   parts in an explicit order (no globs) right after its own requires.
+   parts in an explicit order (no globs) right after its own requires. Parts
+   contain no `require` at all.
 2. A part only **reopens** the same type (`module …::Render`,
-   `class Hwaro::Models::Config`, `class Hwaro::Services::Doctor`). No new
-   mixin modules: `private`/`protected` reach and the spec shims that reopen
-   the class must keep working.
+   `class Hwaro::Models::Config`, `class Hwaro::Services::Doctor`) and fills
+   it with definitions. No new mixin modules: `private`/`protected` reach and
+   the spec shims that reopen the class must keep working.
 3. Ivars are declared only in the owner. Parts may read and write them.
 4. Load-time statements (`Registry.register(...)`, `Scaffolds::Registry.register`,
-   `extend self`) stay in the owner, after the part requires. Constants and
-   method definitions are order-independent in Crystal; only executable
-   top-level statements are not.
+   `extend self`, class-variable initialisers, bare calls) stay in the owner,
+   after the part requires. Constants and method definitions are
+   order-independent in Crystal; only executable statements are not.
 5. Split owners today: `phases/render`, `models/config`, `services/server`
    (siblings, since the owner already lives in `server/`), `services/doctor`,
    `services/deployer`, `core/build/builder`, `processors/markdown`,
