@@ -37,8 +37,8 @@ hwaro tool convert to-yaml --json
 
 Conversion rewrites files in place and cannot preserve front-matter comments,
 so run `--dry-run` first on a tree you care about: it runs the full
-detection/conversion pipeline — including the per-file "dropping N comment
-line(s)" warnings — without writing anything back.
+detection/conversion pipeline, including the per-file "dropping N comment
+line(s)" warnings, without writing anything back.
 
 ## JSON Output
 
@@ -55,7 +55,7 @@ line(s)" warnings — without writing anything back.
 
 ## Skipped Files
 
-The human summary breaks the skip count down by reason — `already TOML`,
+The human summary breaks the skip count down by reason: `already TOML`,
 `without front matter`, and `not front matter`:
 
 ```
@@ -63,8 +63,8 @@ converted: 5 files · 2 skipped (1 already TOML, 1 not front matter)
 ```
 
 `not front matter` is the one worth reading. It means the file opens with a
-`---`/`+++` pair whose contents are prose, not a key/value mapping — a thematic
-rule, say. Rewriting it would delete the author's text, so the file is left
+`---`/`+++` pair whose contents are prose, not a key/value mapping (a thematic
+rule, say). Rewriting it would delete the author's text, so the file is left
 untouched and named on stderr.
 
 ## Example

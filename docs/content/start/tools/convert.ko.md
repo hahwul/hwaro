@@ -55,7 +55,7 @@ hwaro tool convert to-yaml --json
 
 ## 건너뛴 파일
 
-사람이 읽는 요약에는 건너뛴 이유가 함께 표시됩니다 — `already TOML`,
+사람이 읽는 요약에는 건너뛴 이유가 함께 표시됩니다. `already TOML`,
 `without front matter`, `not front matter`:
 
 ```

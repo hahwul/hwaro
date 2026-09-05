@@ -63,7 +63,7 @@ mode = "server"
 
 ## 서버 사이드 강조(기본값)
 
-`mode = "server"`(기본값)에서는 빌드 중에 코드 블록이 강조됩니다 — 브라우저로 JavaScript가 전송되지 않고, JavaScript를 꺼 놓아도 코드에 색이 입혀집니다.
+`mode = "server"`(기본값)에서는 빌드 중에 코드 블록이 강조됩니다. 브라우저로 JavaScript가 전송되지 않고, JavaScript를 꺼 놓아도 코드에 색이 입혀집니다.
 
 빌드 시점 하이라이터는 Highlight.js 호환 CSS 클래스를 출력하므로, 아래의 모든 테마가 그대로 동작합니다. `{{ highlight_css }}`는 여전히 테마 스타일시트를 주입하고, `{{ highlight_js }}`는 빈 값이 됩니다.
 
@@ -79,7 +79,7 @@ mode = "client"
 theme = "github-dark"
 ```
 
-클라이언트 모드에서는 `{{ highlight_js }}`가 Highlight.js 스크립트를 주입하고(CDN 또는 로컬 에셋에서 — 아래 참고), 코드 블록은 브라우저가 색을 입힐 수 있도록 일반 `<pre><code class="language-...">` 마크업으로 출력됩니다.
+클라이언트 모드에서는 `{{ highlight_js }}`가 Highlight.js 스크립트를 주입하고(CDN 또는 로컬 에셋에서. 아래 참고), 코드 블록은 브라우저가 색을 입힐 수 있도록 일반 `<pre><code class="language-...">` 마크업으로 출력됩니다.
 
 ## 줄 번호와 줄 강조
 
@@ -98,9 +98,9 @@ def main():
 | 옵션 | 값 | 설명 |
 |--------|-------|--------------|
 | `linenos` | `true` / `false` | 줄 번호 거터 표시. 이 블록에 한해 `[highlight] line_numbers` 기본값을 덮어씀 |
-| `hl_lines` | 예: `"2-4 7"` | 지정한 줄을 강조 — 공백/쉼표로 구분한 줄 번호나 범위. 항상 블록 자체의 **물리적** 1-기반 줄 번호이며 `linenostart`의 영향을 받지 않음 |
+| `hl_lines` | 예: `"2-4 7"` | 지정한 줄을 강조. 공백/쉼표로 구분한 줄 번호나 범위. 항상 블록 자체의 **물리적** 1-기반 줄 번호이며 `linenostart`의 영향을 받지 않음 |
 | `linenostart` | 예: `5` | 표시되는 첫 줄 번호(기본 `1`). 화면에 보이는 번호만 바꿀 뿐, `hl_lines`가 강조하는 물리적 줄은 바뀌지 않음 |
-| `hide_lines` | 예: `"1 9-12"` | 지정한 줄을 렌더링 출력에서 제외(서버 모드 전용 — 아래 참고). 문법과 물리적 줄 의미는 `hl_lines`와 동일 |
+| `hide_lines` | 예: `"1 9-12"` | 지정한 줄을 렌더링 출력에서 제외(서버 모드 전용, 아래 참고). 문법과 물리적 줄 의미는 `hl_lines`와 동일 |
 | `copy` | `true` / `false` | 이 블록에 복사 버튼 표시. `[highlight] copy` 기본값을 덮어씀. `mermaid` 펜스에서는 무시됨 |
 | `name` | 예: `"main.cr"` | 블록 위에 렌더링되는 파일명/제목 라벨(`title=`도 별칭으로 허용). `mermaid` 펜스에서는 무시됨 |
 
@@ -145,9 +145,9 @@ pre code .ln { user-select: none; -webkit-user-select: none; opacity: .45; }
 copy = true
 ```
 
-마크업 계약은 이렇습니다. 옵트인한 각 블록의 `<pre>`에 `data-copy="true"` 속성이 붙고, `{{ highlight_js }}`가 의존성 없는 작은 인라인 런타임을 주입합니다(서버·클라이언트 모드 모두 동작). `copy = true`이면 런타임이 사이트 전체에 포함되고, 전역 기본값이 꺼져 있으면 옵트인 블록이 본문에 있는 페이지에만 해당 페이지의 `{{ highlight_js }}`에 덧붙습니다 — 없는 페이지는 JavaScript가 없는 상태를 유지합니다. 런타임은 각 `pre[data-copy]`를 `<div class="code-wrapper">`로 감싸고(이름 붙은 펜스처럼 기존 `.code-block` 래퍼가 있으면 그것을 앵커로 재사용), `<button class="code-copy-btn">`을 덧붙인 뒤, 클릭 시 코드 텍스트를 복사합니다(서버 모드의 `.ln` 줄 번호 거터는 복사되는 텍스트에서 제거됩니다). 인라인 스타일은 테마 중립적(currentColor, 호버 시 표시)이며, 스캐폴드 사이트는 토큰 기반 스타일로 이를 덮어씁니다.
+마크업 계약은 이렇습니다. 옵트인한 각 블록의 `<pre>`에 `data-copy="true"` 속성이 붙고, `{{ highlight_js }}`가 의존성 없는 작은 인라인 런타임을 주입합니다(서버·클라이언트 모드 모두 동작). `copy = true`이면 런타임이 사이트 전체에 포함되고, 전역 기본값이 꺼져 있으면 옵트인 블록이 본문에 있는 페이지에만 해당 페이지의 `{{ highlight_js }}`에 덧붙습니다. 없는 페이지는 JavaScript가 없는 상태를 유지합니다. 런타임은 각 `pre[data-copy]`를 `<div class="code-wrapper">`로 감싸고(이름 붙은 펜스처럼 기존 `.code-block` 래퍼가 있으면 그것을 앵커로 재사용), `<button class="code-copy-btn">`을 덧붙인 뒤, 클릭 시 코드 텍스트를 복사합니다(서버 모드의 `.ln` 줄 번호 거터는 복사되는 텍스트에서 제거됩니다). 인라인 스타일은 테마 중립적(currentColor, 호버 시 표시)이며, 스캐폴드 사이트는 토큰 기반 스타일로 이를 덮어씁니다.
 
-`mermaid` 펜스에는 이 속성이 절대 붙지 않습니다 — 그 `<pre>` 구조는 Mermaid 파이프라인이 소유합니다.
+`mermaid` 펜스에는 이 속성이 절대 붙지 않습니다. 그 `<pre>` 구조는 Mermaid 파이프라인이 소유합니다.
 
 새로 스캐폴드한 사이트는 `copy = true`가 기본으로 켜져 있습니다.
 
@@ -183,7 +183,7 @@ Hwaro는 [Highlight.js](https://highlightjs.org/) 테마를 사용합니다. 유
 <script src="/assets/js/highlight.min.js"></script>
 ```
 
-`use_cdn = false`를 쓸 때는 로컬 파일을 직접 준비해야 합니다. 기본값인 서버 모드에서는 테마 스타일시트만 참조됩니다 — 위의 `<script>` 태그는 `mode = "client"`일 때만 나타납니다.
+`use_cdn = false`를 쓸 때는 로컬 파일을 직접 준비해야 합니다. 기본값인 서버 모드에서는 테마 스타일시트만 참조됩니다. 위의 `<script>` 태그는 `mode = "client"`일 때만 나타납니다.
 
 ## 템플릿 연동
 

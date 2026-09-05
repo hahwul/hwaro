@@ -64,7 +64,7 @@ command exits non-zero when error-level issues are found, so it can gate CI.
 
 Exit codes mirror `hwaro doctor`: error-level findings exit with the content
 error code (5), while warning-driven failures from `--strict` or
-`--max-warnings` exit with the generic code (1) — a consumer can still tell a
+`--max-warnings` exit with the generic code (1), so a consumer can still tell a
 broken file from a tightened gate. Both flags apply to `--json` runs too.
 
 ## Rule IDs

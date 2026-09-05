@@ -27,7 +27,7 @@ Hwaro computes an MD5 content hash of your local CSS/JS files and appends the fi
 
 Hwaro uses a **content-based hash** rather than a build timestamp. This means:
 
-- The hash stays the same across builds if files haven't changed — no unnecessary cache invalidation
+- The hash stays the same across builds if files haven't changed, so there is no unnecessary cache invalidation
 - The hash changes immediately when any CSS/JS file content is modified
 - Different build machines produce the same hash for identical files
 

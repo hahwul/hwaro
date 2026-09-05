@@ -24,9 +24,9 @@ templates/
 
 `shortcodes/` 디렉터리에는 마크다운에 삽입할 수 있는 재사용 컴포넌트를 둡니다. 사용법과 커스텀 숏코드 만드는 방법은 [콘텐츠 작성: 숏코드](/ko/writing/shortcodes/)를 참고합니다.
 
-HTML 외에도 페이지/섹션은 `[outputs]` 설정으로 활성화한 형제 파일 `templates/page.<fmt>.jinja` / `templates/section.<fmt>.jinja`(JSON, XML, TXT, CSV)를 추가로 렌더링할 수 있습니다 — [출력 포맷](/ko/features/output-formats/) 참고.
+HTML 외에도 페이지/섹션은 `[outputs]` 설정으로 활성화한 형제 파일 `templates/page.<fmt>.jinja` / `templates/section.<fmt>.jinja`(JSON, XML, TXT, CSV)를 추가로 렌더링할 수 있습니다. [출력 포맷](/ko/features/output-formats/)을 참고합니다.
 
-`hooks/` 디렉터리는 개별 마크다운 요소가 렌더링되는 방식을 재정의합니다 — [렌더 훅](/ko/templates/render-hooks/) 참고.
+`hooks/` 디렉터리는 개별 마크다운 요소가 렌더링되는 방식을 재정의합니다. [렌더 훅](/ko/templates/render-hooks/)을 참고합니다.
 
 ## 템플릿 선택
 

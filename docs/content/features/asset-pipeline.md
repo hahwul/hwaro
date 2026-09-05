@@ -33,7 +33,7 @@ name = "app.js"
 files = ["js/util.js", "js/app.js"]
 ```
 
-Bundle `files` may also name `.scss` sources — while `[sass]` is enabled they compile through the [built-in Sass compiler](/features/sass/) before concatenation, then minify and fingerprint like any other CSS. Name such bundles with a `.css` extension so the output serves with the right type.
+Bundle `files` may also name `.scss` sources. While `[sass]` is enabled they compile through the [built-in Sass compiler](/features/sass/) before concatenation, then minify and fingerprint like any other CSS. Name such bundles with a `.css` extension so the output serves with the right type.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|

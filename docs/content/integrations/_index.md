@@ -5,7 +5,7 @@ weight = 6
 sort_by = "weight"
 +++
 
-Hwaro is built to play well with the rest of your toolchain — especially AI
+Hwaro is built to play well with the rest of your toolchain, especially AI
 coding agents. The classified error codes, `--json` output, and `AGENTS.md`
 generation all exist so an agent can drive Hwaro reliably.
 

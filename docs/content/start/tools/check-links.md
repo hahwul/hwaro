@@ -38,12 +38,12 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 | -h, --help | Show help |
 
 `--ignore-url` matches the URL as written in the source, as a
-case-insensitive substring — `--ignore-url twitter.com` skips every link
+case-insensitive substring. `--ignore-url twitter.com` skips every link
 containing `twitter.com` (or `Twitter.com`), and `*` matches any run of
 characters (`--ignore-url 'https://example.com/*'`). The flag can be passed
 multiple times; matching links are never contacted at all, the scan line
 reports how many were ignored, and the JSON payload carries the same number
-as `ignored_count` — so a machine consumer can tell "all healthy" from "an
+as `ignored_count`, so a machine consumer can tell "all healthy" from "an
 over-broad pattern checked nothing".
 
 `--allow-status` is for hosts that answer link checkers with `403`/`429`
@@ -63,24 +63,24 @@ failing CI.
 7. Reports broken or unreachable links
 
 External links that resolve to private or internal addresses (localhost,
-RFC 1918 ranges, `.local`/`.internal` hosts) are never contacted — they are
+RFC 1918 ranges, `.local`/`.internal` hosts) are never contacted. They are
 reported as skipped instead, both in the human output and under
 `skipped_external` in the JSON payload.
 
 ### Generated routes
 
-Some URLs have no source file at all — the build writes them. Those are
+Some URLs have no source file at all, because the build writes them. Those are
 resolved from `config.toml`, so `check-links` can run **before** the first
 build (the order a lint-then-build CI pipeline uses):
 
 - `/sitemap.xml`, `/robots.txt`, `/llms.txt`, the search index, and `404.html`,
   each honouring its configured `filename`
 - Feeds (`/rss.xml`, `/atom.xml`), including the per-language copies
-  (`/ko/rss.xml`) and the per-section ones (`/posts/rss.xml`) — a section feed
+  (`/ko/rss.xml`) and the per-section ones (`/posts/rss.xml`). A section feed
   only counts when the section's `_index.md` sets `generate_feeds = true`,
   since that is what makes the build write it
 - Taxonomy listing and term pages (`/tags/`, `/categories/rust/`)
-- Paginated listings (`/posts/page/2/`) — only for a section that actually
+- Paginated listings (`/posts/page/2/`), only for a section that actually
   declares `paginate_by`, so a `/page/N/` link under a non-paginated section
   is still reported
 
@@ -155,7 +155,7 @@ command exits non-zero when dead links are found, so it can gate CI.
 ```
 
 `output_hint` is `null` unless the build output changed how the result should
-be read — see below. The human report prints the same sentence; `--json`
+be read (see below). The human report prints the same sentence; `--json`
 carries it so a CI run that never sees the terminal output still gets it.
 
 ## Build Output as Evidence
@@ -163,7 +163,7 @@ carries it so a CI run that never sees the terminal output still gets it.
 Some links point at files no source explains: a compiled stylesheet, a
 resized image variant, anything published through `[content.files]` or the
 asset pipeline. `check-links` accepts those when it finds them in the last
-build's `[build] output_dir` (`public/` by default) — the only evidence
+build's `[build] output_dir` (`public/` by default), the only evidence
 available to a command that runs outside the build.
 
 That tree has to come from `hwaro build`. Since Hwaro 0.19, `hwaro serve`

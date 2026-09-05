@@ -1,6 +1,6 @@
 +++
 title = "ci (사용 중단)"
-description = "CI/CD 워크플로 파일 생성 (사용 중단 — tool platform 사용)"
+description = "CI/CD 워크플로 파일 생성 (사용 중단, tool platform 사용)"
 weight = 6
 +++
 

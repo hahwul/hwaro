@@ -58,7 +58,7 @@ Only files with extensions in `allow_extensions` are published:
 allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
 ```
 
-Extensions are normalized — both `"jpg"` and `".jpg"` are accepted.
+Extensions are normalized, so both `"jpg"` and `".jpg"` are accepted.
 
 ### Deny List
 
@@ -125,11 +125,11 @@ For page bundles, colocated assets are also available via `page.assets`:
 | Path filtering | ✅ Yes (`disallow_paths`) | ✅ Yes (`[static]` `exclude`) |
 | Best for | Per-page assets | Site-wide assets |
 
-Use **content files** for assets that belong to specific pages (screenshots, diagrams, attachments). Use **static files** for site-wide assets (CSS, JS, logos, favicons) — see [`[static]`](/start/config/#static-files) to exclude cruft or specific paths.
+Use **content files** for assets that belong to specific pages (screenshots, diagrams, attachments). Use **static files** for site-wide assets (CSS, JS, logos, favicons). See [`[static]`](/start/config/#static-files) to exclude cruft or specific paths.
 
 ## Tips
 
-- **Page Bundles**: For the best organization, use [page bundles](/writing/pages/#asset-colocation) — place `index.md` and its assets in a directory together.
+- **Page Bundles**: For the best organization, use [page bundles](/writing/pages/#asset-colocation) and place `index.md` and its assets in a directory together.
 - **Image formats**: Include common web image formats: `["jpg", "jpeg", "png", "gif", "svg", "webp"]`.
 - **Security**: Use `disallow_paths` to prevent publishing source files or drafts.
 - **Keep it lean**: Only allow extensions you actually need. This prevents accidentally publishing large source files.

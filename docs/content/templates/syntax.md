@@ -163,7 +163,7 @@ Evaluate conditions:
 {% endif %}
 ```
 
-Tests are not filters, but they are documented on the same page — see [Filters › Tests](/templates/filters/#tests).
+Tests are not filters, but they are documented on the same page. See [Filters › Tests](/templates/filters/#tests).
 
 ## Whitespace Control
 

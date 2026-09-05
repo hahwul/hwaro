@@ -5,7 +5,7 @@ weight = 23
 toc = true
 +++
 
-Hwaro can automatically generate resized image variants during build. This is useful for responsive images, thumbnails, and performance optimization. No external tools required — image processing is built into the binary using [stb](https://github.com/nothings/stb) libraries.
+Hwaro can automatically generate resized image variants during build. This is useful for responsive images, thumbnails, and performance optimization. No external tools are required, since image processing is built into the binary using [stb](https://github.com/nothings/stb) libraries.
 
 ## Supported Formats
 
@@ -49,7 +49,7 @@ quality = 20
 | width | int | 32 | Placeholder image width in pixels (8-128) |
 | quality | int | 20 | JPEG quality for placeholder (1-100, lower = smaller) |
 
-A width of 32 and quality of 20 typically produces ~400-800 byte base64 strings per image — small enough to inline directly in HTML.
+A width of 32 and quality of 20 typically produces ~400-800 byte base64 strings per image, small enough to inline directly in HTML.
 
 ## How It Works
 
@@ -165,7 +165,7 @@ This docs site has image processing enabled with `widths = [128, 256, 512]` and 
 
 <img src="/hwaro_512w.png" alt="Hwaro logo - 512px wide">
 
-These files are generated at build time — no runtime resizing or external services needed. In your templates, use `resize_image()` to reference them:
+These files are generated at build time, so no runtime resizing or external services are needed. In your templates, use `resize_image()` to reference them:
 
 ```jinja
 {% set img = resize_image(path="/hwaro.png", width=256) %}

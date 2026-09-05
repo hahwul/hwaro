@@ -7,11 +7,11 @@ weight = 7
 Show content statistics including post counts, word count metrics, tag distribution, and monthly publishing frequency.
 
 `published` counts what a default `hwaro build` actually ships, so files it
-drops are reported under their own reason — `drafts` (own or cascaded from a
+drops are reported under their own reason: `drafts` (own or cascaded from a
 parent section), `future` (`date` in the future) and `expired` (`expires` in
 the past). Word counts, the tag distribution and the monthly chart cover the
 published set only. Tags are read from a top-level `tags` list or, when that is
-absent, from the `[taxonomies] tags` table — the same fallback the build uses.
+absent, from the `[taxonomies] tags` table, the same fallback the build uses.
 
 ```bash
 # Show statistics for content directory
@@ -60,7 +60,7 @@ counted: 42 files, 37 published, 4 drafts · 1 future
 In a color terminal the same report renders as an `hwaro stats` heading, aligned
 receipt rows, proportional bar charts, and a `✦ counted` outcome line. When
 there are more tags than the chart budget, only the top N are charted
-(`tags: top 15` by default — raise or lower it with `--top N`). The JSON
+(`tags: top 15` by default; raise or lower it with `--top N`). The JSON
 output always contains every tag regardless of `--top`.
 
 ## JSON Output

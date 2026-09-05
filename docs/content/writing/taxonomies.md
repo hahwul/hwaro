@@ -37,26 +37,26 @@ name = "authors"
 
 ## Sorting
 
-`sort_by` controls the order of pages within each term — on the written
+`sort_by` controls the order of pages within each term: on the written
 term pages, in `term.pages` from `get_taxonomy()`, and in per-term
 pagination. The semantics match section sorting exactly:
 
-- `"date"` (default) — newest first; `reverse = true` gives oldest first.
+- `"date"` (default): newest first; `reverse = true` gives oldest first.
 - `"title"` — alphabetical ascending; `reverse = true` descends.
 - `"weight"` — lowest weight first; `reverse = true` descends.
 
 An invalid `sort_by` value logs a warning and keeps the `"date"` default.
 
-`terms_sort_by` controls the order of the terms list — on the taxonomy
+`terms_sort_by` controls the order of the terms list, on the taxonomy
 index page and in `get_taxonomy().items`:
 
-- `"name"` (default) — alphabetical ascending.
+- `"name"` (default): alphabetical ascending.
 - `"count"` — page count descending, name-ascending tiebreak. On a
   multilingual site, each language's index uses that language's own page
   counts.
 
 **Term feeds are exempt.** With `feed = true`, each term's RSS feed stays
-reverse-chronological regardless of `sort_by` — RSS consumers assume
+reverse-chronological regardless of `sort_by`, because RSS consumers assume
 newest-first entries.
 
 ```toml
@@ -92,7 +92,7 @@ tech = ["crystal", "security"]
 ```
 
 In templates, a page's own terms are available as `page.taxonomies.<name>`
-(e.g. `{% for t in page.taxonomies.tech %}`) — also on the page objects
+(e.g. `{% for t in page.taxonomies.tech %}`), and also on the page objects
 inside `section.pages`, `site.pages`, and term page lists.
 
 ## Generated URLs
@@ -108,7 +108,7 @@ With `paginate_by` set, term pages paginate at `/tags/crystal/page/2/`, `/tags/c
 
 ## Templates
 
-Both templates receive a ready-made listing as `{{ content }}` — the term list in `taxonomy.html`, the page list in `taxonomy_term.html`. For custom markup, use [`get_taxonomy()`](#get-taxonomy-function) instead of `content`.
+Both templates receive a ready-made listing as `{{ content }}`: the term list in `taxonomy.html`, the page list in `taxonomy_term.html`. For custom markup, use [`get_taxonomy()`](#get-taxonomy-function) instead of `content`.
 
 ### Taxonomy Index
 
@@ -151,7 +151,7 @@ Custom term list:
 {% endblock %}
 ```
 
-Custom page list — look up the current term's pages via `get_taxonomy()`:
+Custom page list, looking up the current term's pages via `get_taxonomy()`:
 
 ```jinja
 {% set tax = get_taxonomy(kind=taxonomy_name) %}

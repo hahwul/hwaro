@@ -5,7 +5,7 @@ weight = 4
 toc = true
 +++
 
-숏코드는 마크다운 콘텐츠 안에서 쓸 수 있는 재사용 가능한 템플릿 조각입니다. 커스텀 숏코드는 `templates/shortcodes/`에 두는 Jinja2 템플릿입니다 — 템플릿 언어 레퍼런스는 [문법](/ko/templates/syntax/)을 참고합니다.
+숏코드는 마크다운 콘텐츠 안에서 쓸 수 있는 재사용 가능한 템플릿 조각입니다. 커스텀 숏코드는 `templates/shortcodes/`에 두는 Jinja2 템플릿입니다. 템플릿 언어 레퍼런스는 [문법](/ko/templates/syntax/)을 참고합니다.
 
 ## 숏코드 사용
 

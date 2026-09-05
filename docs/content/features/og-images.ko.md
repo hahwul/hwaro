@@ -5,7 +5,7 @@ weight = 3
 toc = true
 +++
 
-Hwaro는 프론트 매터에 커스텀 `image`가 없는 모든 페이지에 1200x630 Open Graph 미리보기 이미지를 자동 생성합니다. 생성된 경로가 `page.image`로 설정되므로 `og:image` 메타 태그가 자동으로 이를 사용합니다 — 템플릿을 고칠 필요가 없습니다.
+Hwaro는 프론트 매터에 커스텀 `image`가 없는 모든 페이지에 1200x630 Open Graph 미리보기 이미지를 자동 생성합니다. 생성된 경로가 `page.image`로 설정되므로 `og:image` 메타 태그가 자동으로 이를 사용하므로 템플릿을 고칠 필요가 없습니다.
 
 ![자동 OG 이미지 페이지의 자동 생성 OG 이미지](/og-images/features-og-images.png)
 *이 페이지의 자동 생성 OG 이미지 (`style = "terminal"`).*
@@ -45,7 +45,7 @@ logo = "static/logo.png"
 | accent_bars | bool | `false` | 패턴 스타일에 클래식한 얇은 상/하단 액센트 바 추가 |
 | lazy_generate | bool | `false` | `hwaro serve`에서 일괄 생성을 건너뛰고 첫 요청 때 렌더링. 대규모 사이트에 권장. `hwaro build`에는 영향 없음 |
 
-제목은 Space Grotesk, 설명은 Space Grotesk Medium, `terminal` 스타일은 JetBrains Mono로 렌더링됩니다 — 모두 바이너리에 번들되어 있어 PNG 출력이 어떤 머신에서든 동일합니다. 제목에 필요하면 CJK를 지원하는 시스템 폰트가 체인에 자동으로 추가되고, 그 밖의 모든 경우는 DejaVu Sans Bold가 받쳐 줍니다.
+제목은 Space Grotesk, 설명은 Space Grotesk Medium, `terminal` 스타일은 JetBrains Mono로 렌더링됩니다. 모두 바이너리에 번들되어 있어 PNG 출력이 어떤 머신에서든 동일합니다. 제목에 필요하면 CJK를 지원하는 시스템 폰트가 체인에 자동으로 추가되고, 그 밖의 모든 경우는 DejaVu Sans Bold가 받쳐 줍니다.
 
 ## 스타일 프리셋
 
@@ -434,15 +434,15 @@ overlay_opacity = 0.55
 
 ## 출력 포맷
 
-PNG가 기본값입니다 — stb_truetype과 stb_image_write로 자체 렌더링하므로 외부 도구가 필요 없습니다. 시스템 폰트는 자동 감지되며(macOS는 Helvetica/Arial, Linux는 DejaVu/Liberation/Noto), 최후 수단으로 번들된 DejaVu Sans Bold를 사용합니다.
+PNG가 기본값입니다. stb_truetype과 stb_image_write로 자체 렌더링하므로 외부 도구가 필요 없습니다. 시스템 폰트는 자동 감지되며(macOS는 Helvetica/Arial, Linux는 DejaVu/Liberation/Noto), 최후 수단으로 번들된 DejaVu Sans Bold를 사용합니다.
 
-CJK 문자가 들어간 제목에는 CJK를 지원하는 `font_path`(예: Noto Sans CJK)가 필요합니다 — 번들 폰트는 라틴 문자만 지원합니다.
+CJK 문자가 들어간 제목에는 CJK를 지원하는 `font_path`(예: Noto Sans CJK)가 필요합니다. 번들 폰트는 라틴 문자만 지원합니다.
 
 의존성 없는 SVG 출력이 필요하면 `format = "svg"`로 설정합니다. 다만 소셜 플랫폼은 일반적으로 SVG `og:image`를 렌더링하지 않습니다.
 
 ## 증분 생성
 
-Hwaro는 생성 이미지 옆에 `.og_manifest.json`을 저장하고 입력이 바뀌지 않은 페이지를 건너뜁니다. 빌드 간에 출력 디렉터리를 유지하면(예: `--cache` 모드) 증분 생성이 자동으로 동작합니다 — `hahwul/hwaro` GitHub Action은 이를 알아서 처리합니다.
+Hwaro는 생성 이미지 옆에 `.og_manifest.json`을 저장하고 입력이 바뀌지 않은 페이지를 건너뜁니다. 빌드 간에 출력 디렉터리를 유지하면(예: `--cache` 모드) 증분 생성이 자동으로 동작합니다. `hahwul/hwaro` GitHub Action은 이를 알아서 처리합니다.
 
 | 변경 | 재생성 대상 |
 |--------|-------------|

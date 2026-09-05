@@ -25,14 +25,13 @@ Built-in scaffolds:
 | `book` | Book with chapters, prev/next navigation, keyboard shortcuts |
 
 Every scaffold shares one design-token system built on CSS `light-dark()` pairs,
-so each site automatically follows the reader's OS color scheme — light for
-light, dark for dark, with no extra setup. The styled scaffolds also ship a
+so each site automatically follows the reader's OS color scheme, light or dark, with no extra setup. The styled scaffolds also ship a
 theme switcher in the header: it cycles auto → light → dark, persists the
 choice in `localStorage`, and applies it before first paint so there is no
 flash. To force one scheme permanently (a dark-only site), add
 `:root { color-scheme: dark; }` at the end of the generated `css/style.css`.
 
-The scaffolds also carry a quiet modern layer: a sticky glass header, native
+The scaffolds also include a few modern touches: a sticky glass header, native
 cross-document view transitions between pages, and (on blog posts and book
 pages) a CSS-only reading-progress thread. All of it degrades gracefully on
 older browsers and every animation respects `prefers-reduced-motion`.
@@ -75,7 +74,7 @@ my-site/
 
 Two rules cover most of it.
 
-**`data/` sits at the project root**, next to `config.toml` — not under `content/`. Every file in it is loaded automatically and keyed by its filename, so `data/team.json` is available in any template as `site.data.team`:
+**`data/` sits at the project root**, next to `config.toml`, not under `content/`. Every file in it is loaded automatically and keyed by its filename, so `data/team.json` is available in any template as `site.data.team`:
 
 ```jinja
 {% for member in site.data.team %}
@@ -91,9 +90,9 @@ Subdirectories nest (`data/users/alice.yml` → `site.data.users.alice`). `hwaro
 {{ figure(src="/images/photo.jpg", caption="A photo") }}
 ```
 
-Keep the leading `/` even when you deploy to a sub-path such as `example.com/my-site/` — Hwaro rewrites root-relative `src` and `href` values to include the `base_url` sub-path at build time, so the same content works in both places.
+Keep the leading `/` even when you deploy to a sub-path such as `example.com/my-site/`. Hwaro rewrites root-relative `src` and `href` values to include the `base_url` sub-path at build time, so the same content works in both places.
 
-You can also keep an asset next to the page that uses it, inside `content/`, but that is opt-in — enable [Content Files](/features/content-files/) first:
+You can also keep an asset next to the page that uses it, inside `content/`, but that is opt-in. Enable [Content Files](/features/content-files/) first:
 
 ```toml
 [content.files]
@@ -180,7 +179,7 @@ project you just created:
 
 | Skill | What it does |
 |-------|--------------|
-| `hwaro` | Runs the CLI properly — `init`, `new`, `serve`, `build`, `doctor`, and the content tools — using the `--json` output contract and `HWARO_E_*` exit codes instead of guessing from text. |
+| `hwaro` | Runs the CLI properly (`init`, `new`, `serve`, `build`, `doctor`, and the content tools) using the `--json` output contract and `HWARO_E_*` exit codes instead of guessing from text. |
 | `hwaro-design` | Designs and rethemes the site inside Hwaro's Crinja templates and `light-dark()` design tokens, under an anti-slop discipline that avoids generic AI-looking layouts. |
 
 Install both with one command:
@@ -190,7 +189,7 @@ npx skills add hahwul/hwaro
 ```
 
 Then ask the agent something like *"add a projects section to this Hwaro site"*
-or *"retheme this blog to a warm dark palette"* — it loads the matching skill on
+or *"retheme this blog to a warm dark palette"*, and it loads the matching skill on
 its own. See [Agent Skills](/integrations/skills/) for manual install paths and
 per-agent directories, and [AGENTS.md](/start/tools/agents-md/) to record
 project-specific conventions the agent should follow first.

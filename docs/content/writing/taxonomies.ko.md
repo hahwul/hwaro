@@ -37,20 +37,20 @@ name = "authors"
 
 ## 정렬
 
-`sort_by`는 각 택소노미 항목에 속한 페이지의 순서를 결정합니다 — 생성되는 항목 페이지, `get_taxonomy()`의 `term.pages`, 항목별 페이지네이션 모두에 적용됩니다. 의미는 섹션 정렬과 정확히 같습니다:
+`sort_by`는 각 택소노미 항목에 속한 페이지의 순서를 결정하며, 생성되는 항목 페이지, `get_taxonomy()`의 `term.pages`, 항목별 페이지네이션 모두에 적용됩니다. 의미는 섹션 정렬과 정확히 같습니다:
 
-- `"date"`(기본값) — 최신순. `reverse = true`면 오래된 순.
+- `"date"`(기본값): 최신순. `reverse = true`면 오래된 순.
 - `"title"` — 알파벳 오름차순. `reverse = true`면 내림차순.
 - `"weight"` — 낮은 weight 우선. `reverse = true`면 내림차순.
 
 `sort_by` 값이 잘못되면 경고를 남기고 기본값 `"date"`를 유지합니다.
 
-`terms_sort_by`는 항목 목록의 순서를 결정합니다 — 택소노미 인덱스 페이지와 `get_taxonomy().items`에 적용됩니다:
+`terms_sort_by`는 항목 목록의 순서를 결정하며, 택소노미 인덱스 페이지와 `get_taxonomy().items`에 적용됩니다:
 
-- `"name"`(기본값) — 알파벳 오름차순.
+- `"name"`(기본값): 알파벳 오름차순.
 - `"count"` — 페이지 수 내림차순, 동률이면 이름 오름차순. 다국어 사이트에서는 각 언어의 인덱스가 해당 언어 자체의 페이지 수를 사용합니다.
 
-**항목 피드는 예외입니다.** `feed = true`일 때 각 항목의 RSS 피드는 `sort_by`와 무관하게 항상 역시간순(최신 우선)을 유지합니다 — RSS 소비자는 최신 항목이 먼저 온다고 가정하기 때문입니다.
+**항목 피드는 예외입니다.** `feed = true`일 때 각 항목의 RSS 피드는 `sort_by`와 무관하게 항상 역시간순(최신 우선)을 유지합니다. RSS 소비자는 최신 항목이 먼저 온다고 가정하기 때문입니다.
 
 ```toml
 [[taxonomies]]
@@ -98,7 +98,7 @@ tech = ["crystal", "security"]
 
 ## 템플릿
 
-두 템플릿 모두 완성된 목록을 `{{ content }}`로 받습니다 — `taxonomy.html`에는 항목 목록이, `taxonomy_term.html`에는 페이지 목록이 들어갑니다. 커스텀 마크업이 필요하면 `content` 대신 [`get_taxonomy()`](#get-taxonomy-함수)를 사용합니다.
+두 템플릿 모두 완성된 목록을 `{{ content }}`로 받습니다. `taxonomy.html`에는 항목 목록이, `taxonomy_term.html`에는 페이지 목록이 들어갑니다. 커스텀 마크업이 필요하면 `content` 대신 [`get_taxonomy()`](#get-taxonomy-함수)를 사용합니다.
 
 ### 택소노미 인덱스
 
@@ -141,7 +141,7 @@ tech = ["crystal", "security"]
 {% endblock %}
 ```
 
-커스텀 페이지 목록 — 현재 항목의 페이지를 `get_taxonomy()`로 조회합니다:
+커스텀 페이지 목록으로, 현재 항목의 페이지를 `get_taxonomy()`로 조회합니다:
 
 ```jinja
 {% set tax = get_taxonomy(kind=taxonomy_name) %}

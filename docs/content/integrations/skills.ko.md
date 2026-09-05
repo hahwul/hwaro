@@ -9,7 +9,7 @@ Hwaro는 두 개의 [에이전트 스킬](https://github.com/hahwul/hwaro/tree/m
 
 | 스킬 | 가르치는 내용 |
 |-------|-----------------|
-| **`hwaro`** | CLI 운용 — 스캐폴드(`init`), 콘텐츠 작성(`new`), 미리 보기(`serve`), 프로덕션 빌드(`build`), 그리고 `doctor`/`tool`/`deploy` 하위 명령. 에이전트에 안전한 출력 계약 — `--json`, `--quiet`, `NO_COLOR`, 분류된 `HWARO_E_*` 오류/종료 코드 — 과 안전한 `config.toml`·Crinja 템플릿 수정을 강조합니다. |
+| **`hwaro`** | CLI 운용. 스캐폴드(`init`), 콘텐츠 작성(`new`), 미리 보기(`serve`), 프로덕션 빌드(`build`), 그리고 `doctor`/`tool`/`deploy` 하위 명령. 에이전트에 안전한 출력 계약(`--json`, `--quiet`, `NO_COLOR`, 분류된 `HWARO_E_*` 오류/종료 코드)과 안전한 `config.toml`·Crinja 템플릿 수정을 강조합니다. |
 | **`hwaro-design`** | 사이트 디자인과 리스타일링. **요구 사항을 읽고 한 줄짜리 Design Read를 선언한 뒤 세 가지 디자인 다이얼을 설정**하고(의도가 정말 모호할 때만 질문), Hwaro의 Crinja 템플릿과 CSS 변수 토큰 시스템 안에서 개성 있는 프로덕션 수준의 디자인을 만들어 냅니다. 뻔한 AI 미감을 걸러내는 엄격한 anti-slop 원칙과 기계적인 사전 점검을 따릅니다. |
 
 ## `npx skills`로 설치
@@ -67,8 +67,8 @@ curl -o ~/.claude/skills/hwaro-design/SKILL.md \
 ### `hwaro-design` — 사이트 디자인
 
 - **Design Read 우선:** CSS를 한 줄이라도 쓰기 전에 요구 사항을 읽고 한 줄짜리 디자인 방향과 세 가지 다이얼(`DESIGN_VARIANCE` / `MOTION_INTENSITY` / `VISUAL_DENSITY`)을 선언합니다. 의도가 정말 모호할 때만 짧고 집중된 질문을 하고, 전체 취향 인터뷰는 요청할 때만 진행하므로, 결과물은 기본값이 아니라 **사용자의** 취향을 반영합니다.
-- **Anti-slop 원칙:** AI가 만든 디자인의 전형적 신호를 강하게 금지하는 방대한 목록 — 본문 카피의 em-dash, eyebrow 라벨 남용, 반복되는 섹션 레이아웃, hero 오버플로, `<div>`로 만든 가짜 스크린샷, AI 특유의 보라색 그라디언트, 장식용 점과 로케일 스트립, "Jane Doe" 데모 콘텐츠 — 에 레이아웃·카피 밀도·이미지 규칙을 더해, 완료를 선언하기 전에 기계적인 사전 점검 체크리스트로 전부 강제합니다.
-- **Hwaro 메커니즘:** Crinja 템플릿 구조, 세 가지 CSS 전달 방식(인라인, `[auto_includes]`, `[assets]` 파이프라인), 모든 내장 스캐폴드가 테마의 기반으로 공유하는 `light-dark()` 디자인 토큰 어휘(라이트/다크는 자동 지원, 토큰 쌍만 재정의하면 리테마), `resize_image`를 이용한 반응형 이미지, CSS 스크롤 기반 애니메이션과 `IntersectionObserver`를 이용한 정적 사이트 모션 — 프레임워크가 필요 없습니다.
+- **Anti-slop 원칙:** AI가 만든 디자인의 전형적 신호를 강하게 금지하는 방대한 목록(본문 카피의 em-dash, eyebrow 라벨 남용, 반복되는 섹션 레이아웃, hero 오버플로, `<div>`로 만든 가짜 스크린샷, AI 특유의 보라색 그라디언트, 장식용 점과 로케일 스트립, "Jane Doe" 데모 콘텐츠)에 레이아웃·카피 밀도·이미지 규칙을 더해, 완료를 선언하기 전에 기계적인 사전 점검 체크리스트로 전부 강제합니다.
+- **Hwaro 메커니즘:** Crinja 템플릿 구조, 세 가지 CSS 전달 방식(인라인, `[auto_includes]`, `[assets]` 파이프라인), 모든 내장 스캐폴드가 테마의 기반으로 공유하는 `light-dark()` 디자인 토큰 어휘(라이트/다크는 자동 지원, 토큰 쌍만 재정의하면 리테마), `resize_image`를 이용한 반응형 이미지, CSS 스크롤 기반 애니메이션과 `IntersectionObserver`를 이용한 정적 사이트 모션을 다룹니다. 프레임워크가 필요 없습니다.
 
 ## 사전 요구 사항
 
@@ -80,7 +80,7 @@ curl -o ~/.claude/skills/hwaro-design/SKILL.md \
 
 두 스킬 모두 Hwaro 저장소의 [`skills/`](https://github.com/hahwul/hwaro/tree/main/skills) 아래에 있습니다. 기여할 때는 다음을 지킵니다:
 
-- CLI/템플릿 레퍼런스 전체를 복제하는 대신(그 내용은 이 문서로 링크), **에이전트의 상호작용 패턴** — 무엇을 언제 실행하고 어떻게 복구하는지 — 을 중심으로 작성합니다.
+- CLI/템플릿 레퍼런스 전체를 복제하는 대신(그 내용은 이 문서로 링크), **에이전트의 상호작용 패턴**(무엇을 언제 실행하고 어떻게 복구하는지)을 중심으로 작성합니다.
 - 프론트 매터의 `description`을 정확하게 유지합니다. 에이전트는 이 값을 읽고 스킬을 *언제* 불러올지 결정합니다.
 - [GitHub](https://github.com/hahwul/hwaro)에 풀 리퀘스트를 엽니다.
 

@@ -64,7 +64,7 @@ mode = "server"
 ## Server-Side Highlighting (Default)
 
 With `mode = "server"` (the default), code blocks are highlighted during
-the build — no JavaScript ships to the browser, and code is colored even
+the build. No JavaScript ships to the browser, and code is colored even
 with JavaScript disabled.
 
 The build-time highlighter emits Highlight.js-compatible CSS classes, so
@@ -92,8 +92,8 @@ the CDN or your local assets, see below), and code blocks ship as plain
 
 ## Line Numbers and Highlighted Lines
 
-A fenced code block's language can be followed by an options block —
-`{...}` — to add line numbers and/or highlight specific lines:
+A fenced code block's language can be followed by an options block,
+`{...}`, to add line numbers and/or highlight specific lines:
 
 ````markdown
 ```python {linenos=true, hl_lines="2-4 7", linenostart=5}
@@ -108,9 +108,9 @@ def main():
 | Option | Value | Description |
 |--------|-------|--------------|
 | `linenos` | `true` / `false` | Show a line-number gutter. Overrides the `[highlight] line_numbers` default for this block. |
-| `hl_lines` | e.g. `"2-4 7"` | Highlight these lines — space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
-| `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown — it does not change which physical lines `hl_lines` highlights. |
-| `hide_lines` | e.g. `"1 9-12"` | Omit these lines from the rendered output (server mode only — see below). Same syntax and physical-line semantics as `hl_lines`. |
+| `hl_lines` | e.g. `"2-4 7"` | Highlight these lines. Space/comma-separated line numbers and/or ranges. Always the block's own **physical** 1-based lines, never shifted by `linenostart`. |
+| `linenostart` | e.g. `5` | First displayed line number (default `1`). Only affects the numbers shown; it does not change which physical lines `hl_lines` highlights. |
+| `hide_lines` | e.g. `"1 9-12"` | Omit these lines from the rendered output (server mode only, see below). Same syntax and physical-line semantics as `hl_lines`. |
 | `copy` | `true` / `false` | Show a copy-to-clipboard button on this block. Overrides the `[highlight] copy` default. Ignored on `mermaid` fences. |
 | `name` | e.g. `"main.cr"` | Filename/title label rendered above the block (`title=` is accepted as an alias). Ignored on `mermaid` fences. |
 
@@ -132,11 +132,11 @@ left as literal text in the language token, exactly as if fence options
 didn't exist.
 
 Setting `[highlight] line_numbers = true` turns line numbers on for
-*every* fenced code block with a language — a per-block `{linenos=false}`
+*every* fenced code block with a language; a per-block `{linenos=false}`
 opts back out.
 
 Hidden lines keep consuming their physical line numbers, so with
-`linenos=true` the gutter shows a **gap** where lines were elided —
+`linenos=true` the gutter shows a **gap** where lines were elided,
 unlike Zola, which renumbers the remaining lines. This keeps the
 documented invariant that `hl_lines` and `linenostart` always target the
 block's physical lines, hidden or not (highlighting a hidden line is
@@ -144,7 +144,7 @@ simply a no-op).
 
 Only `mode = "server"` actually removes hidden lines from the HTML. In
 client mode `hide_lines` is presentational-only metadata (an inert
-`data-hide-lines` attribute) — the lines remain in the page source. Do
+`data-hide-lines` attribute), and the lines remain in the page source. Do
 **not** use `hide_lines` to redact secrets in client mode.
 
 **Server vs client mode:**
@@ -152,7 +152,7 @@ client mode `hide_lines` is presentational-only metadata (an inert
 - `mode = "server"` (default) renders the full result at build time: each
   line is wrapped in its own element, so line numbers and highlighted
   lines appear with no JavaScript.
-- `mode = "client"` does not re-render the body — instead the
+- `mode = "client"` does not re-render the body. Instead the
   `<pre>` tag gets `data-linenos="true"`, `data-linenostart="N"` (when
   greater than 1), `data-hl-lines="2-4 7"`, and/or
   `data-hide-lines="1 9-12"` attributes, so a client-side script or
@@ -187,17 +187,16 @@ The markup contract: each opted-in block's `<pre>` gets a
 inline, dependency-free runtime (works in both server and client mode).
 With `copy = true` the runtime ships site-wide; with the global default
 off, pages whose body contains an opted-in block get it appended to
-their own `{{ highlight_js }}` — pages without one stay JavaScript-free.
-The runtime
-that wraps each `pre[data-copy]` in a `<div class="code-wrapper">` —
-reusing an existing `.code-block` wrapper (named fences) as the anchor
-instead — appends a `<button class="code-copy-btn">`, and copies the
+their own `{{ highlight_js }}`; pages without one stay JavaScript-free.
+The runtime wraps each `pre[data-copy]` in a `<div class="code-wrapper">`
+(reusing an existing `.code-block` wrapper from a named fence as the anchor
+instead), appends a `<button class="code-copy-btn">`, and copies the
 code's text on click (server-mode `.ln` line-number gutters are stripped
 from the copied text). The inline styles are theme-neutral
 (currentColor, hover-reveal); scaffolded sites override them with
 token-based styles.
 
-`mermaid` fences never get the attribute — their `<pre>` shape is owned
+`mermaid` fences never get the attribute, since their `<pre>` shape is owned
 by the Mermaid pipeline.
 
 New scaffolded sites enable `copy = true` out of the box.
@@ -235,7 +234,7 @@ When `use_cdn = false`, assets are loaded from local paths:
 ```
 
 You must provide the local files yourself when using `use_cdn = false`.
-In the default server mode only the theme stylesheet is referenced — the
+In the default server mode only the theme stylesheet is referenced; the
 `<script>` tags above appear only with `mode = "client"`.
 
 ## Template Integration

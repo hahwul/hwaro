@@ -54,7 +54,7 @@ hwaro doctor --json
 - `base_url` is not set, or has a trailing slash
 - `title` is still a placeholder (`Hwaro Site`, `My Hwaro Site`)
 - `sitemap.changefreq` has an invalid value
-- `sitemap.priority` is out of range (0.0–1.0)
+- `sitemap.priority` is out of range (0.0 to 1.0)
 - Duplicate taxonomy names or language codes
 - Invalid `search.format`, `markdown.math_engine` or `pwa.cache_strategy` value
 - `default_language` with no matching `[languages.<code>]` block
@@ -63,7 +63,7 @@ hwaro doctor --json
 - Referenced files and directories that don't exist (`[og] default_image`,
   `[pwa] icons`, `[auto_includes] dirs`, `[[assets.bundles]] files`, …).
   Values that carry their own origin (`https://…`, `//cdn…`, `data:…`) are
-  left alone — doctor can't validate a remote URL.
+  left alone, since doctor can't validate a remote URL.
 - Build output that cannot back a route check (see
   [Build output as evidence](#build-output-as-evidence))
 
@@ -126,7 +126,7 @@ Tip: Use 'hwaro tool validate' for content checks
 ```
 
 A check whose scan never ran renders as `[--] … (skipped)` rather than as a
-passing check — for example `template syntax` when `templates/` is missing.
+passing check, for example `template syntax` when `templates/` is missing.
 
 In a color terminal the check lines use `✓`/`⚠`/`✗`/`ℹ` glyphs under an
 `hwaro doctor` heading, and the summary is a severity-colored `✦ checked` outcome
@@ -135,8 +135,8 @@ line. A clean run ends with `checked: no issues found — your site looks great`
 ## Build Output as Evidence
 
 `[pwa] offline_page` and `[pwa] precache_urls` are routes, not files. Doctor
-resolves them against `content/` first, and — for values that carry an
-extension, such as a compiled stylesheet or a resized image variant — against
+resolves them against `content/` first and, for values that carry an
+extension such as a compiled stylesheet or a resized image variant, against
 the last build in `[build] output_dir` (`public/` by default).
 
 That tree has to come from `hwaro build`. Since Hwaro 0.19, `hwaro serve`
@@ -173,7 +173,7 @@ Use `hwaro doctor --json` to find rule IDs in the output. Ignored issues are com
 
 > `ignore` only silences **warning** and **info** issues. Error-level rules
 > (marked ✗ below) report problems that will fail `hwaro build` anyway, so
-> listing one cannot disable the CI gate — doctor keeps reporting it and warns
+> listing one cannot disable the CI gate. Doctor keeps reporting it and warns
 > that the entry has no effect.
 
 ### Available Rule IDs

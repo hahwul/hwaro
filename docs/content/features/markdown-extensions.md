@@ -215,7 +215,7 @@ graph TD
 
 ## Inline Markup (ins, mark, sub, sup)
 
-Four opt-in inline styles, each behind its own flag — off by default, so
+Four opt-in inline styles, each behind its own flag. All are off by default, so
 turning one on never affects the others.
 
 ### Syntax
@@ -244,7 +244,7 @@ Formula: x<sub>2</sub> + y<sup>2</sup> = z<sub>n</sub></p>
 
 - **No backslash escape.** None of the four delimiters supports
   CommonMark-style `\`-escaping to suppress the transform, and results
-  from trying are inconsistent — a backslash can leave broken, escaped-tag
+  from trying are inconsistent: a backslash can leave broken, escaped-tag
   output behind instead of either the literal delimiter or the styled
   result. Use a code span (`` `++literal++` ``) whenever you need the
   syntax to show up as text.
@@ -252,7 +252,7 @@ Formula: x<sub>2</sub> + y<sup>2</sup> = z<sub>n</sub></p>
   both sides of the content to activate, so arithmetic-like text (`a ~ b`,
   `x ^ y`, `a == b` with spaces) is left alone. A single `~` and `^` are
   deliberately disjoint from strikethrough's `~~` and normal `**`/`__`
-  emphasis, so `~~del~~` and `~sub~` on the same line both work — but a
+  emphasis, so `~~del~~` and `~sub~` on the same line both work. But a
   page with lots of literal `~`/`^`/`==`/`++` (shell prompts, C/C++
   snippets, XOR-heavy code) should keep those in code spans or fenced code
   blocks either way, since sub/sup/ins/mark only ever apply outside them.
@@ -261,7 +261,7 @@ Formula: x<sub>2</sub> + y<sup>2</sup> = z<sub>n</sub></p>
 
 ## Attributes (`{#id .class key=val}`)
 
-A pandoc-style attribute block on a heading or inline image — a
+A pandoc-style attribute block on a heading or inline image, a
 generalization of the [custom heading ID](/writing/pages/#custom-heading-ids)
 shorthand that also sets classes and arbitrary attributes, and extends to
 images.
@@ -302,7 +302,7 @@ invalidates the whole block, leaving the source `{...}` untouched.
   narrower `heading_ids` mechanism even when `attributes` is also on, so
   turning `attributes` on doesn't change existing `{#id}`-only headings.
 - **Safe mode drops the block**: with `markdown.safe = true`, `{...}`
-  attribute blocks are stripped from the output (like `heading_ids`) —
+  attribute blocks are stripped from the output (like `heading_ids`), so
   no attributes are applied.
 
 ## Smart Punctuation
@@ -350,7 +350,7 @@ task item. Off by default so existing sites keep byte-identical output.
 ## Heading Anchor Links
 
 `insert_anchor_links = "left"` (or `"right"`) adds a `🔗` anchor link
-to every heading site-wide — before or after the heading text. Page
+to every heading site-wide, before or after the heading text. Page
 front matter `insert_anchor_links = true/false` overrides the site
 setting per page. Customize the markup entirely with a
 [render-heading hook](/templates/render-hooks/).
@@ -368,7 +368,7 @@ external_links_no_referrer = true  # rel="noreferrer"
 ```
 
 Links that already carry a `target=` keep it, and `rel` tokens merge
-into an existing `rel` attribute without duplicating — so a
+into an existing `rel` attribute without duplicating, so a
 render-link hook's explicit choices win. The policy applies to every
 absolute http(s) link, including ones pointing at your own domain.
 

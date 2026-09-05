@@ -6,7 +6,7 @@ toc = true
 +++
 
 Beyond the HTML page every page and section always renders, Hwaro can
-additionally render sibling non-HTML files — a JSON representation of a post,
+additionally render sibling non-HTML files: a JSON representation of a post,
 an XML feed-like listing for a section, a plain-text export, and so on. HTML
 rendering is unaffected; extra formats are strictly additive.
 
@@ -29,7 +29,7 @@ sections = []              # optional allowlist of section names; empty = all
 | section | array | [] | Formats every section index emits |
 | sections | array | [] | Section names (and their descendants) to restrict `section` output to; empty = all sections |
 
-Only four formats are supported — the format name IS the file extension:
+Only four formats are supported, and the format name is the file extension:
 
 ```
 json  txt  xml  csv
@@ -54,7 +54,7 @@ outputs = ["json"]
 +++
 ```
 
-`outputs` is not a first-class front matter field — like any other unknown
+`outputs` is not a first-class front matter field. Like any other unknown
 top-level key, it lands in `page.extra["outputs"]` and is exposed to
 templates as `page.extra.outputs`. Its *presence* in front matter always
 wins over the config default, including an explicit empty list:
@@ -84,7 +84,7 @@ outputs = ["json"]
 
 gives every descendant page `outputs = ["json"]` unless a page sets its own.
 A malformed override (not an array, or containing a name outside
-`json`/`txt`/`xml`/`csv`) is ignored with a one-time build warning — the page
+`json`/`txt`/`xml`/`csv`) is ignored with a one-time build warning, and the page
 falls back to no extra formats rather than failing the build.
 
 ## Templates
@@ -99,13 +99,13 @@ templates/page.xml.jinja
 ```
 
 Only the final, recognized template extension (`.html`, `.j2`, `.jinja2`,
-`.jinja`, `.ecr`) is stripped when Hwaro loads templates — the `.json`/`.xml`
+`.jinja`, `.ecr`) is stripped when Hwaro loads templates. The `.json`/`.xml`
 part is kept as part of the template's name, e.g. `templates/page.json.jinja`
 loads as `page.json`.
 
 A page's own body markdown/content, `toc`, and every other value normally
 available to `page.html`/`section.html` (`page`, `section`, `site`, `config`,
-…) are available in the format template too — write whatever the format
+…) are available in the format template too, so write whatever the format
 needs, for example:
 
 ```jinja
@@ -163,7 +163,7 @@ public/
 
 ## Pagination
 
-Formats apply once per page/section — **page 1 only**. A paginated section's
+Formats apply once per page/section, on **page 1 only**. A paginated section's
 `/page/2/`, `/page/3/`, … output HTML as usual but never get their own
 `index.<fmt>`; only the section's own URL does.
 
@@ -191,7 +191,7 @@ links do, so it's correct under a subpath deployment
 
 ## Determinism
 
-Format templates run through the same rendering pipeline as `page.html` —
+Format templates run through the same rendering pipeline as `page.html`, so
 avoid `now()` or other non-deterministic values in a format template if you
 want byte-identical output across builds (see
 [Incremental Builds](/features/incremental-build/)).

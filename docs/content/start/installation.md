@@ -97,7 +97,7 @@ Pre-built binaries for macOS and Linux are available on the [GitHub Releases](ht
 
 1. Download the binary for your platform from the [latest release](https://github.com/hahwul/hwaro/releases/latest).
 2. Move the binary to a directory in your PATH. **On macOS the download is a
-   tarball, not a bare binary — see [macOS](#macos) below before moving
+   tarball, not a bare binary. See [macOS](#macos) below before moving
    anything.**
 
 ```bash
@@ -110,7 +110,7 @@ sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 
 The macOS download is a tarball, not a bare binary. It extracts to `hwaro`
 plus a `lib/` directory holding the bundled OpenSSL, and the binary loads
-those through `@executable_path/lib` — so **`lib/` has to travel with it**.
+those through `@executable_path/lib`, so **`lib/` has to travel with it**.
 Move the whole extracted directory, not just the binary:
 
 ```bash
@@ -125,7 +125,7 @@ so the dylibs are still found. Homebrew installs the tarball the same way.
 
 > **v0.20.0 only.** That release's macOS tarball shipped with an invalid code
 > signature on its bundled dylibs, and Apple Silicon kills the process at
-> launch — `zsh: killed hwaro`, with no other diagnostic. Clearing quarantine
+> launch with `zsh: killed hwaro` and no other diagnostic. Clearing quarantine
 > on its own does not fix it, because the signature is stale as well; re-signing
 > on its own can also leave you stuck, because re-signing a quarantined file
 > resets its approval. Do both, in this order, from the extracted directory:
@@ -141,7 +141,7 @@ so the dylibs are still found. Homebrew installs the tarball the same way.
 
 ### Prerequisites
 
-- [Crystal](https://crystal-lang.org/install/) 1.19+
+- [Crystal](https://crystal-lang.org/install/) 1.21+
 - Git
 
 ### Build
@@ -156,14 +156,14 @@ shards build --release --no-debug
 The binary is created at `./bin/hwaro`.
 
 > Requires Crystal **1.21 or newer**. Parallel page rendering is enabled in
-> `src/main.cr`, which resizes Crystal's default execution context — no build
-> flag needed. Set `CRYSTAL_WORKERS=N` to override the worker count (it
+> `src/main.cr`, which resizes Crystal's default execution context, so no build
+> flag is needed. Set `CRYSTAL_WORKERS=N` to override the worker count (it
 > defaults to the CPU count). Do not pass the old `-Dpreview_mt` flag:
 > Crystal 1.21 deprecated it and its scheduler can hang at process exit.
 >
 > For `hwaro build` (any install method, not just source builds), Hwaro
 > tunes the Boehm GC at startup (`GC_MARKERS=1` and
-> `GC_INITIAL_HEAP_SIZE=256M`) — measured 3-5x faster builds on
+> `GC_INITIAL_HEAP_SIZE=256M`). We measured 3-5x faster builds on
 > allocation-heavy sites, at the cost of a higher peak memory floor during
 > the build. Exporting either variable overrides the built-in default, and
 > the heap presize is skipped when `--memory-limit` is used. See the

@@ -7,7 +7,7 @@ toc = true
 
 All site configuration lives in `config.toml` at the project root.
 
-Unknown top-level keys are reported instead of silently ignored — a typo'd
+Unknown top-level keys are reported instead of silently ignored. A typo'd
 `[markdonw]` or `titel = "…"` would otherwise disable a feature with no
 feedback. Hwaro warns with a suggestion when one is close to a real key:
 
@@ -78,7 +78,7 @@ hooks.post = ["npm run minify"]
 command-line flag  >  config.toml  >  built-in default
 ```
 
-So `hwaro build -o dist` overrides `output_dir` in config, and `hwaro build --drafts` still includes drafts when `drafts = false`. The reverse does not exist — there is no `--no-drafts` or `--no-cache` to turn a config value back off, so set those keys only when you want them on for every build. `--no-parallel` is the one exception, and it overrides `parallel = true`.
+So `hwaro build -o dist` overrides `output_dir` in config, and `hwaro build --drafts` still includes drafts when `drafts = false`. The reverse does not exist: there is no `--no-drafts` or `--no-cache` to turn a config value back off, so set those keys only when you want them on for every build. `--no-parallel` is the one exception, and it overrides `parallel = true`.
 
 These apply to `hwaro serve` as well, which builds into (and serves from) `output_dir`. `hwaro deploy` follows it too: when `[deployment] source_dir` is not set, it deploys `output_dir` rather than assuming `public`.
 
@@ -151,7 +151,7 @@ Rewrite content directory paths to custom URL paths. Useful for site restructuri
 |-------------------|-------------------|----------------|
 | `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
 
-Rules are evaluated in declaration order and the **first** source that matches the page's directory (exactly or as a parent prefix) wins — later rules are never consulted for that page. Declare specific prefixes before broad ones (`"posts/tech"` before `"posts"`), or the broad rule shadows the specific one. This applies to token patterns too, and especially to the `""` catch-all: put it **last**, after every other rule.
+Rules are evaluated in declaration order and the **first** source that matches the page's directory (exactly or as a parent prefix) wins. Later rules are never consulted for that page. Declare specific prefixes before broad ones (`"posts/tech"` before `"posts"`), or the broad rule shadows the specific one. This applies to token patterns too, and especially to the `""` catch-all: put it **last**, after every other rule.
 
 ### Token patterns
 
@@ -178,9 +178,9 @@ Notes:
 
 - Tokens must be whole path segments; unknown tokens fail the config load.
 - Patterns apply to leaf pages only. Section `_index` and bundle `index` pages skip pattern rules (they keep their directory URL, or a later plain remap rule).
-- A page without a `date` that matches a pattern using `:year`/`:month`/`:day` fails the build — add a date, set an explicit `path` in front matter, or drop the date tokens. Pages that never publish are exempt: drafts (without `--drafts`), expired/future-dated pages, and headless `render: false` pages don't block the build.
+- A page without a `date` that matches a pattern using `:year`/`:month`/`:day` fails the build. Add a date, set an explicit `path` in front matter, or drop the date tokens. Pages that never publish are exempt: drafts (without `--drafts`), expired/future-dated pages, and headless `render: false` pages don't block the build.
 - An explicit `path` in front matter always wins over any permalink rule.
-- An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page — declare it last, since first-match ordering means it would shadow any rule after it.
+- An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page. Declare it last, since first-match ordering means it would shadow any rule after it.
 - For non-default languages the `/lang/` prefix comes first: `/ko/2026/03/05/hello/`.
 
 ## Links
@@ -252,7 +252,7 @@ Pages/sections can also join a menu from their own front matter (`menus = ["main
 
 ## Static Files
 
-Everything under `static/` is copied verbatim into the site root, preserving its directory structure — `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.
+Everything under `static/` is copied verbatim into the site root, preserving its directory structure, so `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.
 
 ```toml
 [static]
@@ -265,11 +265,11 @@ exclude = ["*.bak", "drafts/**"]         # extra patterns to skip
 | use_default_excludes | bool | true | Filter the built-in cruft denylist (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `.git`, vim swap files, …) |
 | exclude | array | [] | Extra patterns to skip. A glob like `*.bak` matches at any depth, `drafts/**` scopes a subtree, and a literal name is anchored to an exact file or directory (`drafts` drops `drafts/…`) |
 
-The built-in denylist only removes cruft — legitimate dot-paths such as `.well-known/` and `.domains` are **never** filtered and are always published, identically for cold and `--cache`/incremental builds. Set `use_default_excludes = false` to disable the built-in filtering entirely.
+The built-in denylist only removes cruft. Legitimate dot-paths such as `.well-known/` and `.domains` are **never** filtered and are always published, identically for cold and `--cache`/incremental builds. Set `use_default_excludes = false` to disable the built-in filtering entirely.
 
 ## Development Server
 
-Options for `hwaro serve` only — they never affect `hwaro build` output.
+Options for `hwaro serve` only. They never affect `hwaro build` output.
 
 ```toml
 [serve]

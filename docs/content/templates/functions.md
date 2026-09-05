@@ -26,7 +26,7 @@ Retrieve any page by path or URL:
 |------|------|-------------|
 | path | String | Relative source path (e.g. `about.md`) or URL path (e.g. `/about/`) |
 
-**Returns:** Page? (nil if not found) — exposes the standard [Page properties](/templates/data-model/#page), minus per-render computed fields (`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`).
+**Returns:** Page? (nil if not found). Exposes the standard [Page properties](/templates/data-model/#page), minus per-render computed fields (`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`).
 
 **Examples:**
 
@@ -133,7 +133,7 @@ Access taxonomy terms and their pages:
 | items | Array<Term> |
 
 `items` is ordered by the taxonomy's
-[`terms_sort_by`](/writing/taxonomies/#sorting): `"name"` (the default —
+[`terms_sort_by`](/writing/taxonomies/#sorting): `"name"` (the default,
 alphabetical) or `"count"` (page count descending, name-ascending
 tiebreak). Counts are site-wide across every language, matching the root
 taxonomy index page.
@@ -186,7 +186,7 @@ Access a named menu's resolved entry tree ([Menus](/features/menus/)):
 |------|------|-------------|
 | name | String | Menu name (e.g., "main", "footer") |
 
-**Returns:** Array\<Entry\> — resolved against the **current page's** language, falling back to the default language when that language has no entries for `name`. An unknown/unregistered menu name returns an empty array (never nil), so a `{% for %}` loop never errors.
+**Returns:** Array\<Entry\>. Resolved against the **current page's** language, falling back to the default language when that language has no entries for `name`. An unknown/unregistered menu name returns an empty array (never nil), so a `{% for %}` loop never errors.
 
 **Entry Properties:**
 
@@ -201,7 +201,7 @@ Access a named menu's resolved entry tree ([Menus](/features/menus/)):
 | children | Array\<Entry\> | Nested entries |
 | page | Page? | The registering page's data (front-matter-registered entries only) |
 
-Prefer `site.menus.<name>` only when you specifically need the **default language's** menu regardless of the current page — `get_menu()` is almost always the right choice inside a shared nav partial.
+Prefer `site.menus.<name>` only when you specifically need the **default language's** menu regardless of the current page. `get_menu()` is almost always the right choice inside a shared nav partial.
 
 ---
 
@@ -226,7 +226,7 @@ Load external data files (JSON, TOML, YAML, CSV):
 
 **Returns:** Parsed data or nil
 
-`load_data()` reads from the local filesystem only, and paths are resolved inside the project directory — it cannot read a file outside the project, and it cannot fetch a URL. For a single HTTP(S) GET payload, use [`[[data.remote]]`](/features/remote-data/) to expose it as `site.data`; use a [pre-build hook](/features/build-hooks/) when the fetch needs multiple requests or transformation. Everything under `data/` is also exposed as `site.data` without a `load_data()` call.
+`load_data()` reads from the local filesystem only, and paths are resolved inside the project directory. It cannot read a file outside the project, and it cannot fetch a URL. For a single HTTP(S) GET payload, use [`[[data.remote]]`](/features/remote-data/) to expose it as `site.data`; use a [pre-build hook](/features/build-hooks/) when the fetch needs multiple requests or transformation. Everything under `data/` is also exposed as `site.data` without a `load_data()` call.
 
 **Supported Formats:**
 
@@ -356,7 +356,7 @@ Resolve a bundled or fingerprinted asset to its final URL. When the [asset pipel
 |------|------|-------------|
 | name | String | Bundle or asset name (e.g. `main.css`, `app.js`) |
 
-**Returns:** String — absolute URL under `base_url`. When no manifest entry is found, the name is returned as a path under `base_url` unchanged, so templates keep working before you turn the pipeline on.
+**Returns:** String. Absolute URL under `base_url`. When no manifest entry is found, the name is returned as a path under `base_url` unchanged, so templates keep working before you turn the pipeline on.
 
 ---
 

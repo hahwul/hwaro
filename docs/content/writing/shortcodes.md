@@ -5,7 +5,7 @@ weight = 4
 toc = true
 +++
 
-Shortcodes are reusable template snippets you can use in Markdown content. Custom shortcodes are Jinja2 templates placed in `templates/shortcodes/` — see [Template Syntax](/templates/syntax/) for the templating language reference.
+Shortcodes are reusable template snippets you can use in Markdown content. Custom shortcodes are Jinja2 templates placed in `templates/shortcodes/`. See [Template Syntax](/templates/syntax/) for the templating language reference.
 
 ## Using Shortcodes
 
@@ -40,7 +40,7 @@ Block shortcodes support two closer styles:
 
 ## Built-in Shortcodes
 
-Hwaro ships with built-in shortcodes that work out of the box — no template files needed.
+Hwaro ships with built-in shortcodes that work out of the box, with no template files needed.
 
 ### youtube
 
@@ -262,7 +262,7 @@ This is the **body** content of the shortcode.
 {% end %}
 ```
 
-The body is passed to the shortcode template as the `body` variable. Markdown conversion is **not** applied automatically — use the `markdownify` filter in your template if needed:
+The body is passed to the shortcode template as the `body` variable. Markdown conversion is **not** applied automatically, so use the `markdownify` filter in your template if needed:
 
 ```jinja
 <div class="note">

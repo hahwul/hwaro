@@ -234,7 +234,7 @@ input.addEventListener('focus', async () => {
 
 ## Sharded Index
 
-A single `search.json` grows with the site, and every visitor pays for the whole file before the first search. Sharding splits the index into several JSON files plus a manifest so a client can load only what it needs — the current section first, or one language at a time.
+A single `search.json` grows with the site, and every visitor pays for the whole file before the first search. Sharding splits the index into several JSON files plus a manifest so a client can load only what it needs: the current section first, or one language at a time.
 
 ```toml
 [search]
@@ -264,7 +264,7 @@ public/
     └── docs.json        # nested ids use directories: search/ko/blog.json
 ```
 
-Each shard is a plain JSON array with exactly the same entry schema as `search.json` (shards are always JSON, whatever `format` says — the `*_javascript` wrapper only serves `<script src>` loading). `search/index.json` describes the layout:
+Each shard is a plain JSON array with exactly the same entry schema as `search.json` (shards are always JSON, whatever `format` says; the `*_javascript` wrapper only serves `<script src>` loading). `search/index.json` describes the layout:
 
 ```json
 {

@@ -48,7 +48,7 @@ hwaro tool unused-assets --delete --force --json
 - All content files (`.md`, `.markdown`)
 - Template files (`.html`, `.j2`, `.jinja`, `.jinja2`, `.ecr`, plus `.css`, `.js`, `.xml`, `.json`, `.webmanifest`, `.svg`, `.txt`)
 - Static sources that can reference other static files (`.css`, `.scss`, `.sass`, `.js`, `.json`, `.webmanifest`, `.xml`, `.svg`, `.txt`, `.html`, `.htm`)
-- Data and translation files (`data/` and `i18n/` — `.yml`, `.yaml`, `.json`, `.toml`)
+- Data and translation files (`.yml`, `.yaml`, `.json`, `.toml` under `data/` and `i18n/`)
 - `config.toml` values that name files
 
 If your templates live outside `templates/`, point the scan at them with
@@ -99,4 +99,4 @@ confirmation, or `cancelled: no files deleted`.
 ## Limitations
 
 - Asset filenames referenced dynamically via template variables (e.g., `{{ page.image }}`) may not be detected, resulting in false positives.
-- The detection is based on filename matching — if two files in different directories share the same name, both may be considered referenced even if only one is actually used.
+- The detection is based on filename matching. If two files in different directories share the same name, both may be considered referenced even if only one is actually used.

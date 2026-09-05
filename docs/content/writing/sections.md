@@ -70,7 +70,7 @@ banner = "default-banner.png"
 ```
 
 Every page under the section now renders with the `post` template, carries the
-`blog` tag, and exposes `page.extra.banner` — unless it sets those fields
+`blog` tag, and exposes `page.extra.banner`, unless it sets those fields
 itself. `extra` and `taxonomies` merge per key: the page's own keys win,
 cascaded keys fill the gaps.
 
@@ -79,7 +79,7 @@ Cascadable keys: `template`, `draft`, `render`, `toc`, `insert_anchor_links`,
 URL-affecting keys (`slug`, `path`, `aliases`) cannot cascade and are ignored
 with a warning.
 
-On multilingual sites, a cascade only applies within its own language tree —
+On multilingual sites, a cascade only applies within its own language tree:
 `_index.ko.md` cascades to `.ko` pages, `_index.md` to default-language pages.
 
 ## Sort direction
@@ -118,7 +118,7 @@ paginate_path = "p"
 
 Generates: `/blog/`, `/blog/p/2/`, `/blog/p/3/`
 
-With the default `paginate_path = "page"`, the URLs are `/blog/page/2/`, `/blog/page/3/`, … — page 1 always stays at the section URL.
+With the default `paginate_path = "page"`, the URLs are `/blog/page/2/`, `/blog/page/3/`, and so on, while page 1 always stays at the section URL.
 
 ### Documentation
 

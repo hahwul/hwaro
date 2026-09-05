@@ -125,8 +125,8 @@ sudo ln -sf /usr/local/libexec/hwaro/hwaro /usr/local/bin/hwaro
 > **v0.20.0 한정.** 이 릴리스의 macOS tarball은 번들된 dylib의 코드 서명이 깨진
 > 상태로 배포되어, Apple Silicon에서는 실행 즉시 프로세스가 종료됩니다
 > (`zsh: killed hwaro`, 다른 메시지는 나오지 않습니다). quarantine 속성만 지워서는
-> 해결되지 않습니다 — 서명 자체가 깨져 있기 때문입니다. 반대로 다시 서명만 해도
-> 막힐 수 있습니다 — quarantine이 걸린 파일을 재서명하면 승인 상태가 초기화되기
+> 해결되지 않습니다. 서명 자체가 깨져 있기 때문입니다. 반대로 다시 서명만 해도
+> 막힐 수 있습니다. quarantine이 걸린 파일을 재서명하면 승인 상태가 초기화되기
 > 때문입니다. 압축을 푼 디렉터리에서 아래 순서로 둘 다 실행하세요.
 >
 > ```bash
@@ -140,7 +140,7 @@ sudo ln -sf /usr/local/libexec/hwaro/hwaro /usr/local/bin/hwaro
 
 ### 사전 요구 사항
 
-- [Crystal](https://crystal-lang.org/install/) 1.19+
+- [Crystal](https://crystal-lang.org/install/) 1.21+
 - Git
 
 ### 빌드
