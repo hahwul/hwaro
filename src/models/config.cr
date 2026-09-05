@@ -325,60 +325,74 @@ module Hwaro
         end
         config.default_language = config.raw["default_language"]?.try(&.as_s?) || config.default_language
 
-        load_sitemap(config)
-        load_robots(config)
-        load_llms(config)
-        load_feeds(config)
-        load_search(config)
-        load_plugins(config)
-        load_content_files(config)
-        load_content_new(config)
-        load_content_summary(config)
-        load_pagination(config)
-        load_highlight(config)
-        load_auto_includes(config)
-        load_og(config)
-        load_menus(config)
-        load_taxonomies(config)
-        load_languages(config)
-        load_versions(config)
-        load_build(config)
-        load_serve(config)
-        load_markdown(config)
-        load_series(config)
-        load_related(config)
-        load_git(config)
-        load_permalinks(config)
-        load_assets(config)
-        load_sass(config)
-        load_pwa(config)
-        load_amp(config)
-        load_image_processing(config)
-        load_doctor(config)
-        load_static(config)
-        load_deployment(config)
-        resolve_deployment_source_dir(config)
-        load_outputs(config)
-        load_links(config)
-        load_data_remote(config)
-        load_content_generate(config)
+        SECTION_LOADERS.each(&.load.call(config))
 
         config
       end
 
-      # Every top-level key `load` reads (scalars + `load_*` section names).
+      # One entry per section loader: the top-level config.toml key(s) it
+      # reads and the loader itself. This is the registry a new section
+      # joins (see src/models/config/*.cr) — it drives both the load order and
+      # the unknown-key warning, so a section can't be loaded without also
+      # being recognised, or vice versa.
+      #
+      # Order matters for exactly three entries: `languages` reads the menus
+      # and taxonomies already loaded (per-language overrides), `sass` reads
+      # `auto_includes`, and `resolve_deployment_source_dir` reads `build` and
+      # `deployment`. Everything else only reads `config.raw`.
+      record SectionLoader, keys : Array(String), load : Proc(Config, Nil)
+
+      SECTION_LOADERS = [
+        SectionLoader.new(%w[sitemap], ->(c : Config) { load_sitemap(c) }),
+        SectionLoader.new(%w[robots], ->(c : Config) { load_robots(c) }),
+        SectionLoader.new(%w[llms], ->(c : Config) { load_llms(c) }),
+        SectionLoader.new(%w[feeds], ->(c : Config) { load_feeds(c) }),
+        SectionLoader.new(%w[search], ->(c : Config) { load_search(c) }),
+        SectionLoader.new(%w[plugins], ->(c : Config) { load_plugins(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_files(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_new(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_summary(c) }),
+        SectionLoader.new(%w[pagination], ->(c : Config) { load_pagination(c) }),
+        SectionLoader.new(%w[highlight], ->(c : Config) { load_highlight(c) }),
+        SectionLoader.new(%w[auto_includes], ->(c : Config) { load_auto_includes(c) }),
+        SectionLoader.new(%w[og], ->(c : Config) { load_og(c) }),
+        SectionLoader.new(%w[menus], ->(c : Config) { load_menus(c) }),
+        SectionLoader.new(%w[taxonomies], ->(c : Config) { load_taxonomies(c) }),
+        SectionLoader.new(%w[languages], ->(c : Config) { load_languages(c) }),
+        SectionLoader.new(%w[versions], ->(c : Config) { load_versions(c) }),
+        SectionLoader.new(%w[build], ->(c : Config) { load_build(c) }),
+        SectionLoader.new(%w[serve], ->(c : Config) { load_serve(c) }),
+        SectionLoader.new(%w[markdown], ->(c : Config) { load_markdown(c) }),
+        SectionLoader.new(%w[series], ->(c : Config) { load_series(c) }),
+        SectionLoader.new(%w[related], ->(c : Config) { load_related(c) }),
+        SectionLoader.new(%w[git], ->(c : Config) { load_git(c) }),
+        SectionLoader.new(%w[permalinks], ->(c : Config) { load_permalinks(c) }),
+        SectionLoader.new(%w[assets], ->(c : Config) { load_assets(c) }),
+        SectionLoader.new(%w[sass], ->(c : Config) { load_sass(c) }),
+        SectionLoader.new(%w[pwa], ->(c : Config) { load_pwa(c) }),
+        SectionLoader.new(%w[amp], ->(c : Config) { load_amp(c) }),
+        SectionLoader.new(%w[image_processing], ->(c : Config) { load_image_processing(c) }),
+        SectionLoader.new(%w[doctor], ->(c : Config) { load_doctor(c) }),
+        SectionLoader.new(%w[static], ->(c : Config) { load_static(c) }),
+        SectionLoader.new(%w[deployment], ->(c : Config) { load_deployment(c) }),
+        SectionLoader.new(%w[], ->(c : Config) { resolve_deployment_source_dir(c) }),
+        SectionLoader.new(%w[outputs], ->(c : Config) { load_outputs(c) }),
+        SectionLoader.new(%w[links], ->(c : Config) { load_links(c) }),
+        SectionLoader.new(%w[data], ->(c : Config) { load_data_remote(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_generate(c) }),
+      ]
+
+      # The four scalar keys `load` reads directly, ahead of any section.
+      SCALAR_KEYS = %w[title description base_url default_language]
+
+      # Every top-level key `load` reads (scalars + registered section keys).
       # Used to warn on unrecognized keys instead of silently ignoring them —
       # a typo'd `[markdonw]` or `titel =` otherwise disables a feature with
       # zero feedback. Templates cannot read arbitrary raw config keys (the
       # site/config objects expose structured fields only), so an unknown
-      # top-level key is always dead configuration.
-      KNOWN_TOP_LEVEL_KEYS = %w[
-        title description base_url default_language
-        amp assets auto_includes build content data deployment doctor feeds
-        git highlight image_processing languages links llms markdown menus og
-        outputs pagination permalinks plugins pwa related robots sass search
-        series serve sitemap static taxonomies versions
-      ]
+      # top-level key is always dead configuration. Sorted, so "did you mean"
+      # suggestions tie-break the same way regardless of load order.
+      KNOWN_TOP_LEVEL_KEYS = SCALAR_KEYS + SECTION_LOADERS.flat_map(&.keys).uniq.sort
 
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
         raw.each_key do |key|
