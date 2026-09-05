@@ -16,15 +16,6 @@ require "../utils/logger"
 module Hwaro
   module Services
     class Deployer
-      struct Summary
-        property copied : Int32
-        property deleted : Int32
-        property skipped : Int32
-
-        def initialize(@copied : Int32 = 0, @deleted : Int32 = 0, @skipped : Int32 = 0)
-        end
-      end
-
       # A single planned deployment operation produced by `#plan`. Used by
       # `hwaro deploy --dry-run --json` so agents/CI can parse the list of
       # files that would be copied, updated, or deleted for each target.
@@ -89,7 +80,6 @@ module Hwaro
         warn_unapplied_matchers(deployment)
         warn_unapplied_workers(deployment)
         effective = EffectiveOptions.new(deployment, options)
-        force_patterns = force_matcher_patterns(deployment)
 
         targets.each do |target|
           if command = target.command
@@ -109,38 +99,20 @@ module Hwaro
           raise_missing_url!(target) if url.empty?
 
           if directory_destination = local_directory_destination(url)
-            require_non_empty_source!(source_dir, effective)
-            dest_dir = expand_local_path(directory_destination)
-            check_overlap!(source_dir, dest_dir)
-
-            desired = build_desired_map(source_dir, target)
-            existing = list_existing_files(dest_dir)
-
             # `--dry-run` is only useful if it fails the way the real deploy
-            # would. Skipping these left `--dry-run --json` reporting a clean
-            # plan for a destination that a real deploy refuses (e.g. a
-            # directory sitting where a file has to go).
-            validate_strip_index_html_for_filesystem(target, desired.keys)
-            validate_destination_paths(dest_dir, desired.keys)
+            # would, so the plan runs the exact preparation (overlap check,
+            # destination validation, delete cap) a deploy does — it only
+            # stops short of creating the destination directory.
+            sync = prepare_directory_sync(target, source_dir, directory_destination, effective, deployment, create_dest: false)
+            dest_dir = sync.dest_dir
 
-            to_delete = compute_deletes(existing, desired.keys, target)
-            check_empty_selection!(desired, to_delete, target, effective)
-            check_max_deletes!(to_delete.size, effective)
-
-            symlink_memo = {} of String => Bool
-            desired.each do |dest_rel, src_path|
+            sync.to_copy.each do |dest_rel, src_path|
               dest_path = File.join(dest_dir, dest_rel)
-              if File.exists?(dest_path)
-                next if !effective.force && !force_match?(dest_rel, force_patterns) &&
-                        !traverses_symlink?(dest_dir, dest_rel, symlink_memo) &&
-                        same_file?(src_path, dest_path)
-                ops << PlannedOp.new(target: target.name, action: "update", path: dest_rel, source: src_path, destination: dest_path)
-              else
-                ops << PlannedOp.new(target: target.name, action: "create", path: dest_rel, source: src_path, destination: dest_path)
-              end
+              action = File.exists?(dest_path) ? "update" : "create"
+              ops << PlannedOp.new(target: target.name, action: action, path: dest_rel, source: src_path, destination: dest_path)
             end
 
-            to_delete.each do |rel|
+            sync.to_delete.each do |rel|
               ops << PlannedOp.new(target: target.name, action: "delete", path: rel, source: nil, destination: File.join(dest_dir, rel))
             end
           elsif auto_command = auto_command_for_url(url, source_dir)
@@ -295,11 +267,18 @@ module Hwaro
 
       # Deploy a single target, returning both success and the collected
       # counts so `#deploy_structured` can surface file-level stats.
+      #
+      # `structured` picks the local-directory reporting style: the compact
+      # heading + created/updated/deleted outcome of `deploy --json`, or the
+      # receipt + dry-run plan listing of a plain `hwaro deploy`. Everything
+      # else — command targets, URL resolution, the sync itself — is the same
+      # code path either way.
       private def deploy_target_with_counts(
         target : Models::DeploymentTarget,
         source_dir : String,
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
+        structured : Bool = true,
       ) : {Bool, TargetCounts}
         if command = target.command
           ok = deploy_via_command(target, source_dir, command, effective)
@@ -310,7 +289,11 @@ module Hwaro
         raise_missing_url!(target) if url.empty?
 
         if directory_destination = local_directory_destination(url)
-          return deploy_to_directory_with_counts(target, source_dir, directory_destination, effective, deployment)
+          if structured
+            return deploy_to_directory_with_counts(target, source_dir, directory_destination, effective, deployment)
+          end
+          ok = deploy_to_directory(target, source_dir, directory_destination, effective, deployment)
+          return {ok, TargetCounts.new}
         end
 
         if auto_command = auto_command_for_url(url, source_dir)
@@ -365,29 +348,15 @@ module Hwaro
         end
       end
 
+      # `#run`'s per-target step: the same dispatch as the structured path,
+      # with the human reporting style and only the success flag kept.
       private def deploy_target(
         target : Models::DeploymentTarget,
         source_dir : String,
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
       ) : Bool
-        if command = target.command
-          return deploy_via_command(target, source_dir, command, effective)
-        end
-
-        url = target.url
-        raise_missing_url!(target) if url.empty?
-
-        if directory_destination = local_directory_destination(url)
-          return deploy_to_directory(target, source_dir, directory_destination, effective, deployment)
-        end
-
-        if auto_command = auto_command_for_url(url, source_dir)
-          Logger.debug "  Auto-generated command for #{url}"
-          return deploy_via_command(target, source_dir, auto_command, effective)
-        end
-
-        raise_unsupported_scheme!(target, url)
+        deploy_target_with_counts(target, source_dir, effective, deployment, structured: false)[0]
       end
 
       # Shell metacharacters that indicate potentially dangerous commands.
@@ -455,86 +424,34 @@ module Hwaro
         true
       end
 
-      # Variant of `#deploy_to_directory` that also returns per-action
-      # counts (created/updated/deleted) for JSON summary output.
-      private def deploy_to_directory_with_counts(
+      # Everything a local-directory deploy decides before it writes: the
+      # expanded destination, the desired file map, and the copy/delete lists.
+      # Shared by the dry-run plan and both deploy reporting styles, so the
+      # three can't drift in what they validate or select.
+      private record DirectorySync,
+        dest_dir : String,
+        desired : Hash(String, String),
+        to_copy : Array({String, String}),
+        to_delete : Array(String),
+        skipped : Int32
+
+      # Validate and select files for syncing `source_dir` into the local
+      # directory `dest_dir`. `create_dest: false` (the plan) leaves a missing
+      # destination uncreated — a dry run must not write anything.
+      private def prepare_directory_sync(
         target : Models::DeploymentTarget,
         source_dir : String,
         dest_dir : String,
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
-      ) : {Bool, TargetCounts}
-        Logger.heading("deploy", target.name)
-        counts = TargetCounts.new
-        require_non_empty_source!(source_dir, effective)
-        dest_dir_expanded = expand_local_path(dest_dir)
-
-        check_overlap!(source_dir, dest_dir_expanded)
-
-        Hwaro::Utils::FileSafe.mkdir_p(dest_dir_expanded)
-
-        desired = build_desired_map(source_dir, target)
-        existing = list_existing_files(dest_dir_expanded)
-
-        validate_strip_index_html_for_filesystem(target, desired.keys)
-        validate_destination_paths(dest_dir_expanded, desired.keys)
-
-        to_delete = compute_deletes(existing, desired.keys, target)
-        check_empty_selection!(desired, to_delete, target, effective)
-        check_max_deletes!(to_delete.size, effective)
-
-        to_copy, _skipped = compute_copies(desired, dest_dir_expanded, effective.force, force_matcher_patterns(deployment))
-
-        if effective.dry_run
-          return {true, counts}
-        end
-
-        if effective.confirm && !confirm?("Proceed with deploy to #{dest_dir_expanded}?")
-          Logger.warn "Cancelled."
-          return {true, counts}
-        end
-
-        to_copy.each_with_index do |(dest_rel, src_path), idx|
-          Logger.progress(idx + 1, to_copy.size, "Copying ")
-          dest_path = File.join(dest_dir_expanded, dest_rel)
-          # `existed_before` is sampled after the symlink is cleared: a link
-          # replaced by a real file is a create, not an update.
-          unlink_destination_symlinks!(dest_dir_expanded, dest_rel)
-          existed_before = File.exists?(dest_path)
-          Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-          FileUtils.cp(src_path, dest_path)
-          if existed_before
-            counts.updated += 1
-          else
-            counts.created += 1
-          end
-        end
-
-        to_delete.each_with_index do |rel, idx|
-          Logger.progress(idx + 1, to_delete.size, "Deleting ")
-          FileUtils.rm(File.join(dest_dir_expanded, rel))
-          counts.deleted += 1
-        end
-
-        remove_empty_directories(dest_dir_expanded)
-        Logger.info "" if Logger.color_enabled?
-        Logger.outcome("deployed", "#{dest_dir_expanded} · #{counts.created} created · #{counts.updated} updated · #{counts.deleted} deleted")
-        {true, counts}
-      end
-
-      private def deploy_to_directory(
-        target : Models::DeploymentTarget,
-        source_dir : String,
-        dest_dir : String,
-        effective : EffectiveOptions,
-        deployment : Models::DeploymentConfig,
-      ) : Bool
+        create_dest : Bool,
+      ) : DirectorySync
         require_non_empty_source!(source_dir, effective)
         dest_dir = expand_local_path(dest_dir)
 
         check_overlap!(source_dir, dest_dir)
 
-        Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
+        Hwaro::Utils::FileSafe.mkdir_p(dest_dir) if create_dest
 
         desired = build_desired_map(source_dir, target)
         existing = list_existing_files(dest_dir)
@@ -548,42 +465,99 @@ module Hwaro
 
         to_copy, skipped = compute_copies(desired, dest_dir, effective.force, force_matcher_patterns(deployment))
 
-        Logger::Receipt.new("deploy", target.name)
-          .row("source", source_dir)
-          .row("dest", dest_dir)
-          .row("plan", "copy #{to_copy.size} · delete #{to_delete.size} · skip #{skipped}")
-          .emit
+        DirectorySync.new(dest_dir, desired, to_copy, to_delete, skipped)
+      end
 
-        if effective.dry_run
-          log_plan(to_copy, to_delete)
-          return true
-        end
+      # Apply a prepared sync: copy, delete, prune empty directories. Returns
+      # the per-action counts (a link replaced by a real file is a create,
+      # not an update — `existed_before` is sampled after the link is cleared).
+      private def write_directory_sync(sync : DirectorySync) : TargetCounts
+        counts = TargetCounts.new
+        dest_dir = sync.dest_dir
 
-        if effective.confirm && !confirm?("Proceed with deploy to #{dest_dir}?")
-          Logger.warn "Cancelled."
-          return true
-        end
-
-        summary = Summary.new(copied: 0, deleted: 0, skipped: skipped)
-
-        to_copy.each_with_index do |(dest_rel, src_path), idx|
-          Logger.progress(idx + 1, to_copy.size, "Copying ")
+        sync.to_copy.each_with_index do |(dest_rel, src_path), idx|
+          Logger.progress(idx + 1, sync.to_copy.size, "Copying ")
           dest_path = File.join(dest_dir, dest_rel)
           unlink_destination_symlinks!(dest_dir, dest_rel)
+          existed_before = File.exists?(dest_path)
           Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
           FileUtils.cp(src_path, dest_path)
-          summary.copied += 1
+          if existed_before
+            counts.updated += 1
+          else
+            counts.created += 1
+          end
         end
 
-        to_delete.each_with_index do |rel, idx|
-          Logger.progress(idx + 1, to_delete.size, "Deleting ")
+        sync.to_delete.each_with_index do |rel, idx|
+          Logger.progress(idx + 1, sync.to_delete.size, "Deleting ")
           FileUtils.rm(File.join(dest_dir, rel))
-          summary.deleted += 1
+          counts.deleted += 1
         end
 
         remove_empty_directories(dest_dir)
+        counts
+      end
+
+      # Ask before writing when `--confirm` is on; false means the user
+      # declined (the deploy is then reported as completed, not failed).
+      private def sync_confirmed?(dest_dir : String, effective : EffectiveOptions) : Bool
+        return true unless effective.confirm
+        return true if confirm?("Proceed with deploy to #{dest_dir}?")
+        Logger.warn "Cancelled."
+        false
+      end
+
+      # Local-directory deploy with the compact reporting of `deploy --json`,
+      # returning per-action counts (created/updated/deleted) for the summary.
+      private def deploy_to_directory_with_counts(
+        target : Models::DeploymentTarget,
+        source_dir : String,
+        dest_dir : String,
+        effective : EffectiveOptions,
+        deployment : Models::DeploymentConfig,
+      ) : {Bool, TargetCounts}
+        Logger.heading("deploy", target.name)
+        sync = prepare_directory_sync(target, source_dir, dest_dir, effective, deployment, create_dest: true)
+
+        return {true, TargetCounts.new} if effective.dry_run
+        return {true, TargetCounts.new} unless sync_confirmed?(sync.dest_dir, effective)
+
+        counts = write_directory_sync(sync)
         Logger.info "" if Logger.color_enabled?
-        Logger.outcome("deployed", "#{dest_dir} · #{summary.copied} copied · #{summary.deleted} deleted · #{summary.skipped} skipped")
+        Logger.outcome("deployed", "#{sync.dest_dir} · #{counts.created} created · #{counts.updated} updated · #{counts.deleted} deleted")
+        {true, counts}
+      end
+
+      # Local-directory deploy with the human reporting of a plain
+      # `hwaro deploy`: a receipt up front, the plan listing on --dry-run, and
+      # a copied/deleted/skipped outcome.
+      private def deploy_to_directory(
+        target : Models::DeploymentTarget,
+        source_dir : String,
+        dest_dir : String,
+        effective : EffectiveOptions,
+        deployment : Models::DeploymentConfig,
+      ) : Bool
+        sync = prepare_directory_sync(target, source_dir, dest_dir, effective, deployment, create_dest: true)
+        dest_dir = sync.dest_dir
+
+        Logger::Receipt.new("deploy", target.name)
+          .row("source", source_dir)
+          .row("dest", dest_dir)
+          .row("plan", "copy #{sync.to_copy.size} · delete #{sync.to_delete.size} · skip #{sync.skipped}")
+          .emit
+
+        if effective.dry_run
+          log_plan(sync.to_copy, sync.to_delete)
+          return true
+        end
+
+        return true unless sync_confirmed?(dest_dir, effective)
+
+        counts = write_directory_sync(sync)
+        Logger.info "" if Logger.color_enabled?
+        Logger.outcome("deployed", "#{dest_dir} · #{counts.created + counts.updated} copied · #{counts.deleted} deleted · #{sync.skipped} skipped")
         true
       end
 
@@ -816,8 +790,8 @@ module Hwaro
       # the refusal (a lexical-only comparison would let a strip_index_html
       # target mutate or delete the source).
       private def check_overlap!(source_dir : String, dest_dir : String)
-        src = existing_real_path(source_dir)
-        dst = existing_real_path(dest_dir)
+        src = Hwaro::Utils::PathUtils.resolved_real_path(source_dir)
+        dst = Hwaro::Utils::PathUtils.resolved_real_path(dest_dir)
         if nested_path?(src, dst) || nested_path?(dst, src)
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_USAGE,
@@ -825,26 +799,6 @@ module Hwaro
             hint: "source: #{source_dir} / dest: #{dest_dir}",
           )
         end
-      end
-
-      # Resolve symlinks for the deepest existing ancestor and re-append the
-      # not-yet-created remainder. Resolving only the paths that fully exist
-      # would compare a resolved source against a lexical destination (e.g.
-      # /private/var vs /var on macOS) and miss real overlaps.
-      private def existing_real_path(path : String) : String
-        suffix = [] of String
-        current = path
-        until File.exists?(current)
-          parent = File.dirname(current)
-          return path if parent == current
-          suffix << File.basename(current)
-          current = parent
-        end
-        real = File.realpath(current)
-        suffix.reverse_each { |part| real = File.join(real, part) }
-        real
-      rescue File::Error | IO::Error
-        path
       end
 
       # Enforce the delete safety cap. Any negative value disables the cap —
@@ -1235,7 +1189,7 @@ module Hwaro
 
       private def each_project_file(root : String, follow_symlinks : Bool = true, &block : String ->)
         visited = Set(String).new
-        visited << existing_real_path(root)
+        visited << Hwaro::Utils::PathUtils.resolved_real_path(root)
         walk_project_files(root, visited, follow_symlinks, &block)
       end
 

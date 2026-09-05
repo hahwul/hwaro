@@ -649,13 +649,17 @@ EOF
   ( cd "$WORK/deploy.base" && "$BASE_BIN" build -q -o public >/dev/null 2>&1 ) || true
   ( cd "$WORK/deploy.cand" && "$CAND_BIN" build -q -o public >/dev/null 2>&1 ) || true
   run_both dry "$WORK/deploy.base" "$WORK/deploy.cand" -- deploy local --dry-run
+  run_both dryjson "$WORK/deploy.base" "$WORK/deploy.cand" -- deploy local --dry-run --json
   run_both dep "$WORK/deploy.base" "$WORK/deploy.cand" -- deploy local
+  run_both depjson "$WORK/deploy.base" "$WORK/deploy.cand" -- deploy local --json
   # Second deploy with a removed file exercises the delete path.
   rm -f "$WORK/deploy.base/public/index.html" "$WORK/deploy.cand/public/index.html"
   run_both dep2 "$WORK/deploy.base" "$WORK/deploy.cand" -- deploy local
   perl -pi -e 's/deploy-target\.(base|cand)/deploy-target.X/g' "$WORK"/deploy.*.out
   compare "deploy:target" "$WORK/deploy-target.base" "$WORK/deploy-target.cand"
   compare "deploy:dry-run stdout" "$WORK/deploy.base.dry.out" "$WORK/deploy.cand.dry.out"
+  compare "deploy:dry-run json" "$WORK/deploy.base.dryjson.out" "$WORK/deploy.cand.dryjson.out"
+  compare "deploy:json" "$WORK/deploy.base.depjson.out" "$WORK/deploy.cand.depjson.out"
   compare "deploy:stdout" "$WORK/deploy.base.dep.out" "$WORK/deploy.cand.dep.out"
   compare "deploy:second stdout" "$WORK/deploy.base.dep2.out" "$WORK/deploy.cand.dep2.out"
 fi
