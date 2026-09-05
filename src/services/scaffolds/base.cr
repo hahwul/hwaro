@@ -1125,9 +1125,12 @@ module Hwaro
         # docs passes its heading hover-anchor block. Raw heredocs
         # (`<<-'JS'`) on purpose: the JS must not go through `#{}`
         # interpolation.
-        protected def search_js_content(extra_init : String = "") : String
-          head = <<-'JS'
-            (function () {
+        # The search overlay script (data loading, matching, result list,
+        # keyboard handling) WITHOUT its IIFE wrapper, so a scaffold that
+        # ships one combined script (book.js) can splice it between its own
+        # sections. `search_js_content` wraps it for the standalone search.js.
+        protected def search_js_body : String
+          <<-'JS'
               var searchData = null;
               var activeIndex = -1;
               var overlay = document.getElementById('searchOverlay');
@@ -1281,6 +1284,10 @@ module Hwaro
                 });
               }
             JS
+        end
+
+        protected def search_js_content(extra_init : String = "") : String
+          head = "(function () {\n" + search_js_body
           tail = "})();"
           if extra_init.empty?
             head + "\n" + tail
