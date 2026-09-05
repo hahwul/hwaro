@@ -82,26 +82,19 @@ module Hwaro
               Logger.item("comments in front matter are not preserved by conversion", glyph: :info) unless json_output
             end
 
-            case fmt
-            when "to-yaml"
-              result = converter.convert_to_yaml
-              puts result.to_json if json_output
-              fail_conversion(result, json_output) unless result.success
-            when "to-toml"
-              result = converter.convert_to_toml
-              puts result.to_json if json_output
-              fail_conversion(result, json_output) unless result.success
-            when "to-json"
-              result = converter.convert_to_json
-              puts result.to_json if json_output
-              fail_conversion(result, json_output) unless result.success
-            else
-              raise Hwaro::HwaroError.new(
-                code: Hwaro::Errors::HWARO_E_USAGE,
-                message: "unknown format: #{format}",
-                hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
-              )
-            end
+            result = case fmt
+                     when "to-yaml" then converter.convert_to_yaml
+                     when "to-toml" then converter.convert_to_toml
+                     when "to-json" then converter.convert_to_json
+                     else
+                       raise Hwaro::HwaroError.new(
+                         code: Hwaro::Errors::HWARO_E_USAGE,
+                         message: "unknown format: #{format}",
+                         hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
+                       )
+                     end
+            puts result.to_json if json_output
+            fail_conversion(result, json_output) unless result.success
           end
 
           # Surface the converter's own message instead of exiting 1 in

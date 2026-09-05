@@ -552,7 +552,7 @@ module Hwaro
           # Strip tags, then decode entities so escaped chars from rendered
           # HTML (e.g. `&gt;` inside code blocks) become real characters —
           # the meta-tag layer re-escapes them, avoiding `&amp;gt;` artifacts.
-          stripped = HTML.unescape(Hwaro::Utils::TextUtils.strip_html(source)).strip
+          stripped = Hwaro::Utils::TextUtils.html_to_plain_text(source)
           text = stripped.empty? ? nil : stripped
           @plain_summary_text = text
           @plain_summary_for = source

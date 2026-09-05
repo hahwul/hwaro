@@ -188,7 +188,7 @@ module Hwaro
         img = image || @default_image
         return unless img
         return img if Content::Processors::InternalLinkResolver.has_own_origin?(img)
-        "#{base_url}#{img.starts_with?("/") ? img : "/#{img}"}"
+        "#{base_url}#{Utils::PathUtils.root_relative(img)}"
       end
 
       # Generate both OG and Twitter tags

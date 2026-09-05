@@ -613,6 +613,12 @@ module Hwaro
       # tag stripper below.
       RAW_TEXT_ELEMENT = /<(script|style)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
 
+      # Rendered HTML as plain text: tags stripped, entities decoded, edges
+      # trimmed. The one spelling for excerpts and feed descriptions.
+      def html_to_plain_text(html : String) : String
+        HTML.unescape(strip_html(html)).strip
+      end
+
       # Strip HTML tags from text (single-pass)
       #
       # Example:

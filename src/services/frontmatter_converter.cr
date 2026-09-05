@@ -270,21 +270,7 @@ module Hwaro
       end
 
       private def find_content_files : Array(String)
-        files = [] of String
-
-        # Unfollowable symlinks are dropped here (see `ContentWalk`). There is
-        # no frontmatter to rewrite in a link that resolves to nothing, and
-        # counting one as a conversion *error* made `hwaro tool convert` report
-        # failure — and exit non-zero — on a tree `hwaro build` publishes fine.
-        Dir.glob(File.join(@content_dir, "**", "*.md")) do |file|
-          files << file if ContentWalk.readable_file?(file)
-        end
-
-        Dir.glob(File.join(@content_dir, "**", "*.markdown")) do |file|
-          files << file if ContentWalk.readable_file?(file)
-        end
-
-        files.sort
+        ContentWalk.find_content_files(@content_dir)
       end
 
       # Why the last `convert_content` returned nil. The per-format converters

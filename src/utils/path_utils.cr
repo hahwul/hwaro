@@ -239,6 +239,31 @@ module Hwaro
         real_path == real_root || real_path.starts_with?(real_root + File::SEPARATOR)
       end
 
+      # `path` with exactly one leading slash, for joining onto a base URL
+      # that has none (`base_url_stripped`). The idiom used to be spelled
+      # inline at every URL-building site.
+      def root_relative(path : String) : String
+        path.starts_with?("/") ? path : "/#{path}"
+      end
+
+      # The project root for a content directory argument: `content` or
+      # `<root>/content` → its parent, a directory that itself holds a
+      # `content/` (or sits beside one) → itself, anything else → itself.
+      # Lets `tool check-links` / `tool unused-assets` run with `-c content`,
+      # `-c .` or from inside a subdirectory and still find config.toml.
+      def find_project_root(content_dir : String) : String
+        if File.basename(content_dir) == "content"
+          parent = File.dirname(content_dir)
+          return parent.empty? || parent == "." ? "." : parent
+        end
+
+        if Dir.exists?(File.join(content_dir, "content")) || Dir.exists?(File.join(content_dir, "../content"))
+          return content_dir
+        end
+
+        content_dir
+      end
+
       # `path` with every symlink resolved, including when it does not exist
       # yet: resolve the deepest existing ancestor and re-append the missing
       # tail. A not-yet-created destination is the normal case (`-o export` on

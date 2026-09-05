@@ -27,9 +27,9 @@ module Hwaro
           # non-ASCII path (e.g. a Unicode taxonomy term) canonicalizes to
           # the exact same RFC 3986 URL those XML surfaces advertise.
           raw = if u = url_override
-                  "#{config.base_url_stripped}#{u.starts_with?("/") ? u : "/#{u}"}"
+                  "#{config.base_url_stripped}#{Utils::PathUtils.root_relative(u)}"
                 else
-                  page.permalink || "#{config.base_url_stripped}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+                  page.permalink || "#{config.base_url_stripped}#{Utils::PathUtils.root_relative(page.url)}"
                 end
           Utils::TextUtils.encode_url_path(raw)
         end
@@ -50,7 +50,7 @@ module Hwaro
           String.build(page.translations.size * 80) do |str|
             # Add current page. URLs are percent-encoded to match the
             # sitemap's xhtml:link alternates for the same pages.
-            current_url = page.permalink || "#{base}#{page.url.starts_with?("/") ? page.url : "/#{page.url}"}"
+            current_url = page.permalink || "#{base}#{Utils::PathUtils.root_relative(page.url)}"
             current_url = Utils::TextUtils.encode_url_path(current_url)
             lang_code = page.language || config.default_language
             str << %(<link rel="alternate" hreflang="#{HTML.escape(lang_code)}" href="#{HTML.escape(current_url)}">)
@@ -61,7 +61,7 @@ module Hwaro
               abs_url = if Processors::InternalLinkResolver.has_own_origin?(t.url)
                           t.url
                         else
-                          "#{base}#{t.url.starts_with?("/") ? t.url : "/#{t.url}"}"
+                          "#{base}#{Utils::PathUtils.root_relative(t.url)}"
                         end
               abs_url = Utils::TextUtils.encode_url_path(abs_url)
               str << '\n'

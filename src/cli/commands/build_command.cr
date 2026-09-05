@@ -76,10 +76,7 @@ module Hwaro
                 code: Hwaro::Errors::HWARO_E_IO,
                 message: "Input directory does not exist: #{dir}",
               )
-              if json_output
-                puts err.to_error_payload.to_json
-                exit(err.exit_code)
-              end
+              Runner.exit_with_error_payload(err) if json_output
               Logger.error "Error [#{err.code}]: #{err.message}"
               exit(err.exit_code)
             end
@@ -122,8 +119,7 @@ module Hwaro
             # Classified errors (config, template, content, …) are raised at
             # their source sites now, so we just forward the payload / rethrow.
             if json_output
-              puts ex.to_error_payload.to_json
-              exit(ex.exit_code)
+              Runner.exit_with_error_payload(ex)
             else
               raise ex
             end

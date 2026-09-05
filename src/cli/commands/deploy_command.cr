@@ -60,8 +60,7 @@ module Hwaro
             config = begin
               Models::Config.load(env: options.env)
             rescue ex : Hwaro::HwaroError
-              STDOUT.puts ex.to_error_payload.to_json
-              exit(ex.exit_code)
+              Runner.exit_with_error_payload(ex)
             end
 
             # Effective dry-run (the --dry-run flag OR deployment.dryRun in
@@ -77,8 +76,7 @@ module Hwaro
                 ops = Services::Deployer.new.plan(options, config)
                 STDOUT.puts ops.to_json
               rescue ex : Hwaro::HwaroError
-                STDOUT.puts ex.to_error_payload.to_json
-                exit(ex.exit_code)
+                Runner.exit_with_error_payload(ex)
               rescue ex
                 STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy plan failed"}}.to_json)
                 exit(1)
@@ -94,8 +92,7 @@ module Hwaro
             results = begin
               Services::Deployer.new.deploy_structured(options, config)
             rescue ex : Hwaro::HwaroError
-              STDOUT.puts ex.to_error_payload.to_json
-              exit(ex.exit_code)
+              Runner.exit_with_error_payload(ex)
             rescue ex
               STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy failed"}}.to_json)
               exit(1)
@@ -210,11 +207,8 @@ module Hwaro
           config = begin
             Models::Config.load(env: env)
           rescue ex : Hwaro::HwaroError
-            if json
-              STDOUT.puts ex.to_error_payload.to_json
-            else
-              Logger.error "Error [#{ex.code}]: #{ex.message}"
-            end
+            Runner.exit_with_error_payload(ex) if json
+            Logger.error "Error [#{ex.code}]: #{ex.message}"
             exit(ex.exit_code)
           end
 

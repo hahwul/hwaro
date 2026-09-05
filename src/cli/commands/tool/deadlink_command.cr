@@ -170,10 +170,7 @@ module Hwaro
                 code: Hwaro::Errors::HWARO_E_IO,
                 message: "Directory not found: #{target_dir}",
               )
-              if json_output
-                puts err.to_error_payload.to_json
-                exit(err.exit_code)
-              end
+              Runner.exit_with_error_payload(err) if json_output
               Logger.error "Error [#{err.code}]: #{err.message}"
               exit(err.exit_code)
             end
@@ -227,7 +224,7 @@ module Hwaro
             # URLs like `/tags/` or `/categories/foo/` that Hwaro generates
             # at build time aren't reported as dead (the source-only check
             # has no way to discover these otherwise).
-            project_root = find_project_root(target_dir)
+            project_root = Utils::PathUtils.find_project_root(target_dir)
             config = load_config(project_root)
             taxonomy_names = config ? config.taxonomies.map(&.name) : [] of String
             base_path = config ? config.base_path : ""

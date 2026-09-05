@@ -151,6 +151,15 @@ module Hwaro
         @@json_mode = true
       end
 
+      # `--json` failure exit: print the classified error payload on stdout
+      # and exit with the error's own code. Every command that handles
+      # `--json` itself funnels its HwaroError rescues through here so the
+      # envelope cannot drift between commands.
+      def self.exit_with_error_payload(err : Hwaro::HwaroError) : NoReturn
+        STDOUT.puts err.to_error_payload.to_json
+        exit(err.exit_code)
+      end
+
       # Emit a classified error in either the quiet/JSON machine shape or the
       # human-friendly `Error [CODE]: message` form. JSON mode is detected
       # from `Runner.json_mode?` (set by commands that saw `--json`) or from

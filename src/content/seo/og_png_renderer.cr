@@ -487,16 +487,7 @@ module Hwaro
           base = Bytes.new(WIDTH * HEIGHT * CHANNELS)
           pixels = base.to_unsafe
 
-          fill_rect(pixels, 0, 0, WIDTH, HEIGHT, bg_color)
-
-          if bg_image_path
-            if cbg = cached_bg
-              blit_cached_image(pixels, cbg, 0, 0)
-            else
-              composite_image(pixels, bg_image_path, 0, 0, WIDTH, HEIGHT)
-            end
-            fill_rect_alpha(pixels, 0, 0, WIDTH, HEIGHT, bg_color, ai.overlay_opacity)
-          end
+          paint_background(pixels, bg_color, bg_image_path, cached_bg, ai.overlay_opacity)
 
           render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
 
@@ -554,19 +545,8 @@ module Hwaro
               # already baked into `base`; memcpy them in.
               base.to_unsafe.copy_to(pixels, base.size)
             else
-              # 1. Fill background
-              fill_rect(pixels, 0, 0, WIDTH, HEIGHT, bg_color)
-
-              # 2. Background image (if configured)
-              if bg_image_path
-                if cbg = cached_bg
-                  blit_cached_image(pixels, cbg, 0, 0)
-                else
-                  composite_image(pixels, bg_image_path, 0, 0, WIDTH, HEIGHT)
-                end
-                # Overlay
-                fill_rect_alpha(pixels, 0, 0, WIDTH, HEIGHT, bg_color, ai.overlay_opacity)
-              end
+              # 1-2. Background colour, then the background image + overlay
+              paint_background(pixels, bg_color, bg_image_path, cached_bg, ai.overlay_opacity)
 
               # 3. Style pattern
               render_pattern(pixels, ai.style, accent_color, ai.pattern_opacity, ai.pattern_scale)
@@ -1145,6 +1125,23 @@ module Hwaro
               pixels[idx + 1] = (dg + (panel_g.to_f - dg) * side_alpha).to_u8
               pixels[idx + 2] = (db + (panel_b.to_f - db) * side_alpha).to_u8
             end
+          end
+        end
+
+        # Fill the canvas with `bg_color`, then — when a background image is
+        # configured — blit the cached decode (or decode+composite it) and dim
+        # it with the colour at `overlay_opacity`. Shared by the cached-base
+        # and the per-image render paths so the two cannot drift.
+        private def self.paint_background(pixels : UInt8*, bg_color : UInt32, bg_image_path : String?, cached_bg : CachedImage?, overlay_opacity : Float64)
+          fill_rect(pixels, 0, 0, WIDTH, HEIGHT, bg_color)
+
+          if bg_image_path
+            if cbg = cached_bg
+              blit_cached_image(pixels, cbg, 0, 0)
+            else
+              composite_image(pixels, bg_image_path, 0, 0, WIDTH, HEIGHT)
+            end
+            fill_rect_alpha(pixels, 0, 0, WIDTH, HEIGHT, bg_color, overlay_opacity)
           end
         end
 

@@ -65,10 +65,7 @@ module Hwaro
       # fine. The skip is announced by `ContentWalk`, so the summary's counts
       # are never quietly short of a file the caller can see on disk.
       private def find_content_files : Array(String)
-        files = [] of String
-        Dir.glob(File.join(@content_dir, "**", "*.md")) { |f| files << f if ContentWalk.readable_file?(f) }
-        Dir.glob(File.join(@content_dir, "**", "*.markdown")) { |f| files << f if ContentWalk.readable_file?(f) }
-        files.sort
+        ContentWalk.find_content_files(@content_dir)
       end
 
       private def validate_file(file_path : String, issues : Array(Issue))

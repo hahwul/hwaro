@@ -20,7 +20,7 @@ module Hwaro
 
           private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, oracle : Utils::BuildOutput::Oracle = Utils::BuildOutput.oracle("public", tool: "check-links")) : Array(Result)
             results = [] of Result
-            project_root = find_project_root(content_dir)
+            project_root = Utils::PathUtils.find_project_root(content_dir)
 
             links.each do |link|
               decoded_url = URI.decode(link.url)
@@ -315,24 +315,6 @@ module Hwaro
           private def positive_page_size(value : Int64?) : Int32?
             return unless value && value > 0
             value.clamp(1_i64, Int32::MAX.to_i64).to_i32
-          end
-
-          # Resolve the project root from the given content directory.
-          # Supports running with -i content, -i ., or from inside a subdirectory.
-          private def find_project_root(content_dir : String) : String
-            # Common case: target_dir is "content" or ends with /content
-            if File.basename(content_dir) == "content"
-              parent = File.dirname(content_dir)
-              return parent.empty? || parent == "." ? "." : parent
-            end
-
-            # If there's a "content" sibling, use the current directory as root
-            if Dir.exists?(File.join(content_dir, "content")) || Dir.exists?(File.join(content_dir, "../content"))
-              # content_dir might already be the project root
-              return content_dir
-            end
-
-            content_dir
           end
 
           # Taxonomy listing and term pages (`/tags/`, `/categories/foo/`) are

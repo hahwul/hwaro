@@ -44,6 +44,27 @@ module Hwaro
       # was never content. A symlink we cannot follow is named in a single
       # warning instead, matching `Phases::Initialize#static_target_info`, so
       # a file missing from a listing or a validate summary is never silent.
+      # Every Markdown file under `content_dir`, sorted. Unfollowable
+      # symlinks are dropped here (see `readable_file?`) so one bad link
+      # cannot turn a listing, a validate summary or a convert run into a
+      # wall of "Failed to read content file" warnings — or a non-zero exit —
+      # for files the build itself skips. `tool list`, `tool stats`,
+      # `tool validate` and `tool convert` all walk through here, so they
+      # stay consistent with each other.
+      def find_content_files(content_dir : String) : Array(String)
+        files = [] of String
+
+        Dir.glob(File.join(content_dir, "**", "*.md")) do |file|
+          files << file if readable_file?(file)
+        end
+
+        Dir.glob(File.join(content_dir, "**", "*.markdown")) do |file|
+          files << file if readable_file?(file)
+        end
+
+        files.sort
+      end
+
       def readable_file?(path : String) : Bool
         # lstat never follows, so a cycle is an ordinary symlink entry here
         # instead of an ELOOP failure. For the common (non-symlink) case it is
@@ -381,21 +402,7 @@ module Hwaro
       end
 
       private def find_content_files : Array(String)
-        files = [] of String
-
-        # Unfollowable symlinks are dropped here (see `ContentWalk`) so one
-        # bad link cannot turn a listing into a wall of "Failed to read
-        # content file" warnings for files the build itself skips. `tool
-        # stats` walks through this method too, so both stay consistent.
-        Dir.glob(File.join(@content_dir, "**", "*.md")) do |file|
-          files << file if ContentWalk.readable_file?(file)
-        end
-
-        Dir.glob(File.join(@content_dir, "**", "*.markdown")) do |file|
-          files << file if ContentWalk.readable_file?(file)
-        end
-
-        files.sort
+        ContentWalk.find_content_files(@content_dir)
       end
 
       private def parse_content_info(
