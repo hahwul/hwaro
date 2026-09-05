@@ -53,7 +53,7 @@ Validation (all of these fail the build with `HWARO_E_CONFIG`):
 
 ## Content Structure
 
-Each version is a normal content tree under its own directory. Files with the same path relative to the version root are treated as the same page in different versions — that is how the switcher finds counterparts.
+Each version is a normal content tree under its own directory. Files with the same path relative to the version root are treated as the same page in different versions. That is how the switcher finds counterparts.
 
 ```
 content/
@@ -79,7 +79,7 @@ The version directory is swapped for the directory the version *publishes* under
 | `content/docs/v1/_index.md` | `/docs/v1/` |
 | `content/docs/v1/install.md` | `/docs/v1/install/` |
 
-With `latest_at_root = false` every version keeps its segment (`/docs/v2/install/`, `/docs/v1/install/`) and `/docs/` becomes a redirect stub to the latest version's root — unless you author your own `content/docs/_index.md`, which then keeps that URL.
+With `latest_at_root = false` every version keeps its segment (`/docs/v2/install/`, `/docs/v1/install/`) and `/docs/` becomes a redirect stub to the latest version's root, unless you author your own `content/docs/_index.md`, which then keeps that URL.
 
 The URL segment is the version **name**, not the directory basename: `name = "2.x"` with `path = "docs/v2"` publishes at `/docs/2.x/…` when it is not at root. Version directories may also sit at the top level (`content/v2/…`), in which case the latest version *is* the site root.
 
@@ -87,7 +87,7 @@ Notes:
 
 - With `latest_at_root = true` do not also author `content/docs/_index.md`: it claims the same `/docs/` URL as the latest version's root and the build reports a duplicate output path (the authored file wins, the version root is not written).
 - `[permalinks]` rules and `slug` apply to the published path (`docs/install.md`), not the source path.
-- An explicit `path = "…"` in front matter wins outright, exactly as it does for languages — a custom path is not prefixed, so keep them distinct across versions.
+- An explicit `path = "…"` in front matter wins outright, exactly as it does for languages. A custom path is not prefixed, so keep them distinct across versions.
 - Everything under a version directory is versioned: page bundles, assets, `_index.md` cascades and `[[content.generate]]` output whose target path falls inside it.
 
 ### Multilingual
@@ -109,7 +109,7 @@ Languages and versions combine: the language prefix comes first, the version aft
 
 ### page.version_links
 
-One entry per configured version, in config order — the switcher rows. Empty for unversioned pages.
+One entry per configured version, in config order. These are the switcher rows. Empty for unversioned pages.
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -132,7 +132,7 @@ Available on every page of a versioned site. It is a list (`{% for v in versions
 | `versions.all` | The same list as a plain array |
 | `versions.size` | Number of versions |
 
-Like `page.url`, every URL above is site-relative — prefix it with `{{ base_url }}` (or `{{ base_path }}`) in links so [subpath deployments](/start/config/#base-url) work.
+Like `page.url`, every URL above is site-relative, so prefix it with `{{ base_url }}` (or `{{ base_path }}`) in links so [subpath deployments](/start/config/#base-url) work.
 
 ## Version Switcher Example
 
@@ -204,7 +204,7 @@ Pages of an older version emit a canonical link to their **latest counterpart** 
 <meta name="robots" content="noindex">
 ```
 
-Latest-version pages self-canonicalize as usual. Paginated listings keep self-canonicalizing (`page/2/` of an old section is not `page/2/` of the new one). `hreflang_tags` are unaffected — they link translations of the same version.
+Latest-version pages self-canonicalize as usual. Paginated listings keep self-canonicalizing (`page/2/` of an old section is not `page/2/` of the new one). `hreflang_tags` are unaffected, since they link translations of the same version.
 
 ### Discovery surfaces
 

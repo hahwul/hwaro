@@ -4,7 +4,7 @@ description = "Expose each page's commit history as page.git and derive lastmod 
 weight = 12
 +++
 
-Read each content file's commit history once per build and expose it to templates and SEO outputs — like Hugo's `enableGitInfo`. With `[git]` enabled, a page that has no `updated` in its front matter gets one from its latest commit, so sitemap `<lastmod>`, feed `<updated>`, and JSON-LD `dateModified` reflect when the file really changed.
+Read each content file's commit history once per build and expose it to templates and SEO outputs, like Hugo's `enableGitInfo`. With `[git]` enabled, a page that has no `updated` in its front matter gets one from its latest commit, so sitemap `<lastmod>`, feed `<updated>`, and JSON-LD `dateModified` reflect when the file really changed.
 
 ## Configuration
 
@@ -29,7 +29,7 @@ Front matter always wins: a fallback only fills a field the file left unset.
 
 1. The build runs **one** `git log` over `content/` (never one process per page) and maps every path to its commits. On a 5,200-page test repository the whole collection step took about 50 ms.
 2. Each page whose source file has at least one non-merge commit gets a `page.git` object.
-3. `use_lastmod` / `use_date` fill the missing `updated` / `date` fields, after which everything downstream — sitemap, feeds, JSON-LD, OpenGraph, `sort_by = "date"` — sees the git-derived value with no template changes.
+3. `use_lastmod` / `use_date` fill the missing `updated` / `date` fields, after which everything downstream (sitemap, feeds, JSON-LD, OpenGraph, `sort_by = "date"`) sees the git-derived value with no template changes.
 
 `hwaro serve` collects history once per full rebuild, not on every file save. `hwaro build --cache` folds each page's commit id and timestamps into its cache key, so a warm rebuild after a new commit re-renders exactly the pages that commit touched (and the listings that show them).
 
@@ -57,7 +57,7 @@ Front matter always wins: a fallback only fills a field the file left unset.
 {% endif %}
 ```
 
-`page.git` is `nil` — and no fallback applies — for:
+`page.git` is `nil`, and no fallback applies, for:
 
 - files that are not committed yet (new or untracked),
 - pages materialized from `[[content.generate]]`,

@@ -53,7 +53,7 @@ hwaro tool platform vercel --stdout
 각 설정에는 다음이 포함됩니다.
 
 - **빌드 명령**: `hwaro build`
-- **출력 디렉터리**: 설정한 `[build] output_dir` (기본값 `public/`) — 값을
+- **출력 디렉터리**: 설정한 `[build] output_dir` (기본값 `public/`). 값을
   바꾸면 생성되는 모든 설정 파일에 그대로 반영되므로, 호스팅 서비스가
   `hwaro build`가 실제로 쓰는 디렉터리를 배포합니다. `gitlab-ci`는 기본값이
   아닐 때 `pages` 잡에 `publish:`도 함께 추가합니다.

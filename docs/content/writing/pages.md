@@ -5,7 +5,7 @@ weight = 1
 toc = true
 +++
 
-Pages are Markdown files that become HTML pages on your site. This page covers **how to write content** — front matter fields, Markdown syntax, and file organization. For how these fields are accessed in templates, see the [Data Model](/templates/data-model/#page).
+Pages are Markdown files that become HTML pages on your site. This page covers **how to write content**: front matter fields, Markdown syntax, and file organization. For how these fields are accessed in templates, see the [Data Model](/templates/data-model/#page).
 
 ## Basic Structure
 
@@ -38,7 +38,7 @@ Your content in **Markdown**.
 Your content in **Markdown**.
 ```
 
-For JSON, the first balanced `{...}` at the very start of the file is the front matter — no fence is needed. The file must begin with `{` (no leading whitespace).
+For JSON, the first balanced `{...}` at the very start of the file is the front matter, and no fence is needed. The file must begin with `{` (no leading whitespace).
 
 ## Front Matter
 
@@ -153,7 +153,7 @@ series_weight = 1
 First part of the series.
 ```
 
-With `[series]` enabled in `config.toml`, `page.series_index` (1-based position) and `page.series_pages` (all pages in the series) are computed at build time — they are template-only values, not front matter fields. See [Data Model](/templates/data-model/#computed-properties).
+With `[series]` enabled in `config.toml`, `page.series_index` (1-based position) and `page.series_pages` (all pages in the series) are computed at build time. They are template-only values, not front matter fields. See [Data Model](/templates/data-model/#computed-properties).
 
 ### Custom Template
 
@@ -195,7 +195,7 @@ aliases = ["/old-url/", "/another-old-url/"]
 Redirects from old URLs to this page.
 ```
 
-Each alias is a path **on this site** — the build writes a redirect stub at it.
+Each alias is a path **on this site**, and the build writes a redirect stub at it.
 An absolute (`https://example.com/old/`) or protocol-relative (`//example.com/old/`)
 value is not something this build can publish, so it is skipped with a warning.
 
@@ -273,7 +273,7 @@ The full article continues here...
 
 ### Automatic summaries
 
-A page with neither a marker nor a `description` gets an automatic summary: the first 70 words of its rendered body, wrapped in a single `<p>` and followed by an ellipsis (`…`) when text was cut. The excerpt is built from the rendered HTML, so shortcodes are expanded and code blocks, headings, images and figures are skipped — it reads as prose.
+A page with neither a marker nor a `description` gets an automatic summary: the first 70 words of its rendered body, wrapped in a single `<p>` and followed by an ellipsis (`…`) when text was cut. The excerpt is built from the rendered HTML, so shortcodes are expanded and code blocks, headings, images and figures are skipped, so it reads as prose.
 
 For CJK-dominant text (Chinese, Japanese, Korean), where words are not space-delimited, the limit counts characters at twice the configured number: `summary_length = 70` yields up to 140 characters. Cuts land on word boundaries (character boundaries for CJK) and never split an entity or a multibyte character.
 
@@ -285,7 +285,7 @@ summary_length = 70      # words (CJK: characters ×2); 0 disables the automatic
 summary_ellipsis = "…"   # appended only when text was actually cut
 ```
 
-`page.summary_truncated` is `true` only when the automatic excerpt was cut, so a template can show a "Read more" link only where it makes sense. Automatic summaries never replace a marker or a `description` — pages that have one keep their existing output.
+`page.summary_truncated` is `true` only when the automatic excerpt was cut, so a template can show a "Read more" link only where it makes sense. Automatic summaries never replace a marker or a `description`; pages that have one keep their existing output.
 
 ## Markdown Syntax
 
@@ -347,7 +347,7 @@ Use `@/` to link to other content pages by their source path. Hwaro resolves the
 [With anchor](@/blog/my-post.md#introduction)
 ```
 
-This is useful because you don't need to know the final URL — Hwaro calculates it from the content path. If the target page doesn't exist, the link is left unchanged and a warning is logged during build.
+This is useful because you don't need to know the final URL, because Hwaro calculates it from the content path. If the target page doesn't exist, the link is left unchanged and a warning is logged during build.
 
 | Syntax | Resolved URL |
 |--------|-------------|
@@ -390,13 +390,13 @@ GitHub-style alert blocks render as styled callouts. Recognised types: `NOTE`, `
 > Text after the marker on the same line becomes the title (Obsidian / Hugo syntax).
 ```
 
-The output is a `<div class="admonition admonition-{type}">` with a title paragraph (`<p class="admonition-title">`) followed by the body. Without a custom title the type name is used (`Note`, `Tip`, …). Style it from your CSS — Hwaro emits semantic markup only.
+The output is a `<div class="admonition admonition-{type}">` with a title paragraph (`<p class="admonition-title">`) followed by the body. Without a custom title the type name is used (`Note`, `Tip`, …). Style it from your CSS, since Hwaro emits semantic markup only.
 
 Tables work inside admonitions and plain blockquotes: prefix every row with `>` as usual (`> | a | b |`, `> |---|---|`).
 
 Disable by setting `admonitions = false` under `[markdown]` in `config.toml`.
 
-Limitations: matching is type-case-sensitive (`[!NOTE]` only, not `[!note]`), and a nested blockquote inside an admonition body closes the outer admonition early. There is no inline escape — backslash-escaping (`\[!NOTE\]`) renders the same characters and still triggers the admonition, so disable the feature if you need to render the literal token.
+Limitations: matching is type-case-sensitive (`[!NOTE]` only, not `[!note]`), and a nested blockquote inside an admonition body closes the outer admonition early. There is no inline escape. Backslash-escaping (`\[!NOTE\]`) renders the same characters and still triggers the admonition, so disable the feature if you need to render the literal token.
 
 ### Custom Heading IDs
 
@@ -412,9 +412,9 @@ Allowed id characters: letters, digits, `_`, `-`, `:`. The id must start with a 
 
 Disable by setting `heading_ids = false` under `[markdown]` in `config.toml`.
 
-Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no id is applied — use raw HTML headings if you need both safe mode and explicit ids. Writing the same `{#id}` twice in one page produces duplicate id attributes; the first anchor wins.
+Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no id is applied, so use raw HTML headings if you need both safe mode and explicit ids. Writing the same `{#id}` twice in one page produces duplicate id attributes; the first anchor wins.
 
-This `{#id}` shorthand is a special case of the more general `{#id .class key=val}` attribute block (`[markdown] attributes = true`), which also applies to inline images — see [Markdown Extensions](/features/markdown-extensions/).
+This `{#id}` shorthand is a special case of the more general `{#id .class key=val}` attribute block (`[markdown] attributes = true`), which also applies to inline images. See [Markdown Extensions](/features/markdown-extensions/).
 
 ### Definition Lists
 

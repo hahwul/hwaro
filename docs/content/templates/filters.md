@@ -7,7 +7,7 @@ toc = true
 
 Filters transform values in templates. Apply with the pipe `|` operator.
 
-Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins — `upper`, `lower`, `join`, `map`, `select`, `batch`, and friends — so both kinds work anywhere below.
+Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins (`upper`, `lower`, `join`, `map`, `select`, `batch`, and friends), so both kinds work anywhere below.
 
 ## Syntax
 

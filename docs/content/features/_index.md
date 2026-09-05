@@ -5,7 +5,7 @@ weight = 4
 sort_by = "weight"
 +++
 
-Hwaro ships with a comprehensive set of built-in features — no plugins required. All features are configured through `config.toml` and work out of the box once enabled.
+Hwaro ships with a broad set of built-in features, and no plugins are required. All features are configured through `config.toml` and work out of the box once enabled.
 
 ## At a Glance
 

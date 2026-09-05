@@ -1,6 +1,6 @@
 +++
 title = "ci (deprecated)"
-description = "Generate CI/CD workflow files (deprecated — use tool platform)"
+description = "Generate CI/CD workflow files (deprecated, use tool platform)"
 weight = 6
 +++
 

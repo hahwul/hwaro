@@ -7,7 +7,7 @@ toc = true
 
 필터는 템플릿에서 값을 변환합니다. 파이프 `|` 연산자로 적용합니다.
 
-Hwaro는 표준 Crinja(Jinja2) 내장 필터 — `upper`, `lower`, `join`, `map`, `select`, `batch` 등 — 위에 자체 필터를 얹어 제공하므로, 아래 어디서든 두 종류 모두 사용할 수 있습니다.
+Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `select`, `batch` 등) 위에 자체 필터를 얹어 제공하므로, 아래 어디서든 두 종류 모두 사용할 수 있습니다.
 
 ## 문법
 

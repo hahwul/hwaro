@@ -78,9 +78,9 @@ hooks.post = ["npm run minify"]
 명령줄 플래그  >  config.toml  >  기본값
 ```
 
-즉 `hwaro build -o dist`는 config의 `output_dir`를 덮어쓰고, `drafts = false`여도 `hwaro build --drafts`를 쓰면 초안이 포함됩니다. 반대 방향은 없습니다 — config 값을 다시 끄는 `--no-drafts`나 `--no-cache`는 존재하지 않으므로, 모든 빌드에 항상 적용할 때만 이 키들을 켜세요. `--no-parallel`만 예외로, `parallel = true`를 덮어씁니다.
+즉 `hwaro build -o dist`는 config의 `output_dir`를 덮어쓰고, `drafts = false`여도 `hwaro build --drafts`를 쓰면 초안이 포함됩니다. 반대 방향은 없습니다. config 값을 다시 끄는 `--no-drafts`나 `--no-cache`는 존재하지 않으므로, 모든 빌드에 항상 적용할 때만 이 키들을 켜세요. `--no-parallel`만 예외로, `parallel = true`를 덮어씁니다.
 
-이 설정들은 `hwaro serve`에도 적용됩니다. serve는 `output_dir`로 빌드하고 그 디렉터리를 서빙합니다. `hwaro deploy`도 이를 따릅니다 — `[deployment] source_dir`가 설정되지 않았다면 `public`을 가정하지 않고 `output_dir`를 배포합니다.
+이 설정들은 `hwaro serve`에도 적용됩니다. serve는 `output_dir`로 빌드하고 그 디렉터리를 서빙합니다. `hwaro deploy`도 이를 따릅니다. `[deployment] source_dir`가 설정되지 않았다면 `public`을 가정하지 않고 `output_dir`를 배포합니다.
 
 `output_dir`에는 프로젝트 상대 경로와 절대 경로를 모두 쓸 수 있습니다. 프로젝트 밖으로 벗어나는 경로(`../out`)는 거부됩니다. 개발 서버가 프로젝트 밖에서는 서빙하지 않기 때문에, 그대로 두면 빌드는 serve가 읽지 않는 곳에 결과를 쓰게 됩니다.
 
@@ -151,7 +151,7 @@ summary_ellipsis = "…"
 |-------------------|-------------------|----------------|
 | `content/old/posts/a.md` | `posts/` | `/old/posts/a/` -> `/posts/a/` |
 
-규칙은 선언 순서대로 평가되고, 페이지의 디렉터리와 (정확히 또는 상위 접두사로) **처음** 일치하는 원본이 선택됩니다 — 그 페이지에 대해 이후 규칙은 아예 확인하지 않습니다. 구체적인 접두사를 넓은 접두사보다 먼저 선언합니다(`"posts/tech"`를 `"posts"`보다 앞에). 그러지 않으면 넓은 규칙이 구체적인 규칙을 가립니다. 토큰 패턴에도 똑같이 적용되며, 특히 `""` catch-all 규칙은 다른 모든 규칙 **뒤에**, 맨 마지막에 둡니다.
+규칙은 선언 순서대로 평가되고, 페이지의 디렉터리와 (정확히 또는 상위 접두사로) **처음** 일치하는 원본이 선택됩니다. 그 페이지에 대해 이후 규칙은 아예 확인하지 않습니다. 구체적인 접두사를 넓은 접두사보다 먼저 선언합니다(`"posts/tech"`를 `"posts"`보다 앞에). 그러지 않으면 넓은 규칙이 구체적인 규칙을 가립니다. 토큰 패턴에도 똑같이 적용되며, 특히 `""` catch-all 규칙은 다른 모든 규칙 **뒤에**, 맨 마지막에 둡니다.
 
 ### 토큰 패턴
 
@@ -178,9 +178,9 @@ summary_ellipsis = "…"
 
 - 토큰은 경로 세그먼트 전체여야 하며, 알 수 없는 토큰은 설정 로드를 실패시킵니다.
 - 패턴은 리프 페이지에만 적용됩니다. 섹션 `_index`와 번들 `index` 페이지는 패턴 규칙을 건너뜁니다(디렉터리 URL을 유지하거나, 뒤에 오는 일반 재매핑 규칙을 따릅니다).
-- `date`가 없는 페이지가 `:year`/`:month`/`:day`를 쓰는 패턴에 걸리면 빌드가 실패합니다 — 날짜를 넣거나, 프론트 매터에 명시적 `path`를 설정하거나, 날짜 토큰을 뺍니다. 게시되지 않는 페이지는 예외입니다: 초안(`--drafts` 없이), 만료/미래 날짜 페이지, 헤드리스 `render: false` 페이지는 빌드를 막지 않습니다.
+- `date`가 없는 페이지가 `:year`/`:month`/`:day`를 쓰는 패턴에 걸리면 빌드가 실패합니다. 날짜를 넣거나, 프론트 매터에 명시적 `path`를 설정하거나, 날짜 토큰을 뺍니다. 게시되지 않는 페이지는 예외입니다: 초안(`--drafts` 없이), 만료/미래 날짜 페이지, 헤드리스 `render: false` 페이지는 빌드를 막지 않습니다.
 - 프론트 매터의 명시적 `path`는 어떤 퍼머링크 규칙보다 항상 우선합니다.
-- 원본 키가 비어 있으면(`""` 또는 `"/"`) 패턴 규칙이 모든 페이지의 catch-all이 됩니다 — 처음 일치하는 규칙이 이기는 순서 규칙상 뒤의 규칙을 전부 가리므로 반드시 마지막에 선언합니다.
+- 원본 키가 비어 있으면(`""` 또는 `"/"`) 패턴 규칙이 모든 페이지의 catch-all이 됩니다. 처음 일치하는 규칙이 이기므로 뒤의 규칙을 전부 가리게 되니 반드시 마지막에 선언합니다.
 - 기본 언어가 아닌 언어에서는 `/lang/` 접두사가 먼저 옵니다: `/ko/2026/03/05/hello/`.
 
 ## 링크
@@ -252,7 +252,7 @@ weight = 2
 
 ## 정적 파일
 
-`static/` 아래의 모든 것은 디렉터리 구조를 유지한 채 사이트 루트로 그대로 복사됩니다 — `static/css/app.css`는 `/css/app.css`로 서빙됩니다. 숨김 항목도 포함되므로 `static/.well-known/security.txt`는 `/.well-known/security.txt`로 게시됩니다. 기본적으로 Hwaro는 흔한 OS·에디터·VCS 잔여 파일을 걸러내 프로덕션에 실려 가지 않게 합니다.
+`static/` 아래의 모든 것은 디렉터리 구조를 유지한 채 사이트 루트로 그대로 복사되므로 `static/css/app.css`는 `/css/app.css`로 서빙됩니다. 숨김 항목도 포함되므로 `static/.well-known/security.txt`는 `/.well-known/security.txt`로 게시됩니다. 기본적으로 Hwaro는 흔한 OS·에디터·VCS 잔여 파일을 걸러내 프로덕션에 실려 가지 않게 합니다.
 
 ```toml
 [static]
@@ -265,11 +265,11 @@ exclude = ["*.bak", "drafts/**"]         # 추가로 건너뛸 패턴
 | use_default_excludes | bool | true | 내장 잔여 파일 차단 목록 필터링 (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `.git`, vim 스왑 파일, …) |
 | exclude | array | [] | 추가로 건너뛸 패턴. `*.bak` 같은 글롭은 모든 깊이에서 매칭, `drafts/**`는 하위 트리로 한정, 리터럴 이름은 정확한 파일이나 디렉터리에 고정 (`drafts`는 `drafts/…`를 제외) |
 
-내장 차단 목록은 잔여 파일만 제거합니다 — `.well-known/`, `.domains` 같은 정상적인 점(dot) 경로는 **절대** 걸러지지 않고 항상 게시되며, 콜드 빌드와 `--cache`/증분 빌드에서 동일하게 동작합니다. 내장 필터링을 완전히 끄려면 `use_default_excludes = false`로 설정합니다.
+내장 차단 목록은 잔여 파일만 제거합니다. `.well-known/`, `.domains` 같은 정상적인 점(dot) 경로는 **절대** 걸러지지 않고 항상 게시되며, 콜드 빌드와 `--cache`/증분 빌드에서 동일하게 동작합니다. 내장 필터링을 완전히 끄려면 `use_default_excludes = false`로 설정합니다.
 
 ## 개발 서버
 
-`hwaro serve`에만 적용되는 옵션입니다 — `hwaro build` 출력에는 영향을 주지 않습니다.
+`hwaro serve`에만 적용되는 옵션입니다. `hwaro build` 출력에는 영향을 주지 않습니다.
 
 ```toml
 [serve]
@@ -304,7 +304,7 @@ Cache-Control = "no-store"
 | `[auto_includes]` | [자동 인클루드](/ko/features/auto-includes/) | CSS/JS 파일 자동 인클루드 |
 | `[assets]` | [에셋 파이프라인](/ko/features/asset-pipeline/) | CSS/JS 압축(minify) & 핑거프린팅 |
 | `[sass]` | [Sass/SCSS](/ko/features/sass/) | 내장 SCSS 컴파일 (순수 Crystal) |
-| `[image_processing]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | 이미지 리사이즈 & LQIP |
+| `[image_processing]` | [이미지 처리](/ko/features/image-processing/) | 이미지 리사이즈 & LQIP |
 | `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | Base64 블러업 플레이스홀더 |
 | `[content.files]` | [콘텐츠 파일](/ko/features/content-files/) | 마크다운이 아닌 파일 게시 |
 | `[[content.generate]]` | [콘텐츠 생성](/ko/features/content-generation/) | `site.data` 레코드를 페이지로 구체화 |

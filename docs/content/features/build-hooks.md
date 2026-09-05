@@ -29,7 +29,7 @@ hooks.post = ["npm run minify", "npx pagefind --site public"]
 Pre-build hooks run **before** any content processing begins. They are ideal for:
 
 - Installing dependencies
-- Compiling assets (TypeScript, Tailwind/PostCSS, etc. — SCSS has a [built-in compiler](/features/sass/))
+- Compiling assets (TypeScript, Tailwind/PostCSS, and so on; SCSS has a [built-in compiler](/features/sass/))
 - Running data fetching scripts
 - Preprocessing content
 
@@ -90,19 +90,19 @@ Step 3
 Build hooks also run during `hwaro serve`, but only on **full** rebuilds:
 
 - Hooks execute on the **initial build** when the server starts
-- Hooks **re-execute on full rebuilds** — a `config.toml` change, a file added or removed, or a change to any file under `data/`
-- Hooks are **skipped on partial rebuilds** — editing an existing content or template file re-renders only the affected pages and does not re-run your commands
-- Config changes are picked up automatically — if you modify `hooks.pre` or `hooks.post` in `config.toml`, the new commands take effect on the next rebuild
+- Hooks **re-execute on full rebuilds**: a `config.toml` change, a file added or removed, or a change to any file under `data/`
+- Hooks are **skipped on partial rebuilds**: editing an existing content or template file re-renders only the affected pages and does not re-run your commands
+- Config changes are picked up automatically. If you modify `hooks.pre` or `hooks.post` in `config.toml`, the new commands take effect on the next rebuild
 
 This keeps save-to-reload fast. If a hook produces something you need refreshed while the server is running, touch `config.toml` or restart `hwaro serve` to force a full rebuild.
 
 ### Rebuild loops
 
-A hook that writes into a watched directory (`content/`, `templates/`, `static/`, `data/`, `i18n/`) — or into `config.toml` itself — feeds the watcher its own output. The harmless case is handled for you: when a run lands the **same bytes** the build already read (`curl -o data/team.json` fetching an unchanged payload, a bundler re-emitting an identical file, a hook that only touches `config.toml`), the session settles instead of rebuilding forever. Depending on where the file lives, the rewrite is either ignored outright or absorbed by a partial rebuild that does not re-run your commands.
+A hook that writes into a watched directory (`content/`, `templates/`, `static/`, `data/`, `i18n/`), or into `config.toml` itself, feeds the watcher its own output. The harmless case is handled for you: when a run lands the **same bytes** the build already read (`curl -o data/team.json` fetching an unchanged payload, a bundler re-emitting an identical file, a hook that only touches `config.toml`), the session settles instead of rebuilding forever. Depending on where the file lives, the rewrite is either ignored outright or absorbed by a partial rebuild that does not re-run your commands.
 
 Two patterns still rebuild on every run, because to the watcher they are genuine changes:
 
-- writing **different** bytes each time — an embedded timestamp, a build counter, a non-deterministic bundle hash
+- writing **different** bytes each time: an embedded timestamp, a build counter, a non-deterministic bundle hash
 - **creating and deleting** a file under a watched directory on every run
 
 Make the output deterministic, or write it somewhere the watcher does not look (`.hwaro/` is ignored, as is anything outside the directories listed above).
@@ -127,7 +127,7 @@ hooks.pre = [
 
 ### Fetching Data from an API
 
-For the common case — a GET request whose payload should land in `site.data` — you don't need a hook at all: declare a [`[[data.remote]]` source](/features/remote-data/) in `config.toml` and Hwaro fetches it once per build, with disk caching and explicit error handling built in.
+For the common case, a GET request whose payload should land in `site.data`, you don't need a hook at all. Declare a [`[[data.remote]]` source](/features/remote-data/) in `config.toml` and Hwaro fetches it once per build, with disk caching and explicit error handling built in.
 
 A pre-build hook remains the right tool when the fetch is more than a single request. `load_data()` reads from disk only, so remote data is baked in by fetching it into `data/` before the build. Every file under `data/` is then exposed as `site.data`:
 
@@ -142,7 +142,7 @@ hooks.pre = ["curl -sfL https://api.example.com/team -o data/team.json"]
 {% endfor %}
 ```
 
-`curl -f` exits non-zero on an HTTP error, which aborts the build rather than publishing a site with missing data. For anything beyond a single request — pagination, auth headers, reshaping the response — write a script and call that instead:
+`curl -f` exits non-zero on an HTTP error, which aborts the build rather than publishing a site with missing data. For anything beyond a single request (pagination, auth headers, reshaping the response), write a script and call that instead:
 
 ```toml
 [build]

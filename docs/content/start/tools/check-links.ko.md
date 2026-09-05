@@ -38,7 +38,7 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 | -h, --help | 도움말 표시 |
 
 `--ignore-url`은 소스에 적힌 URL을 대소문자 구분 없는 부분 문자열로
-매칭합니다 — `--ignore-url twitter.com`은 `twitter.com`(또는 `Twitter.com`)이
+매칭합니다. `--ignore-url twitter.com`은 `twitter.com`(또는 `Twitter.com`)이
 포함된 모든 링크를 건너뛰고, `*`는 임의 문자열과 매칭됩니다
 (`--ignore-url 'https://example.com/*'`). 여러 번 전달할 수 있으며, 매칭된
 링크에는 요청 자체를 보내지 않습니다. 무시된 개수는 스캔 라인과 JSON의
@@ -70,14 +70,14 @@ JSON의 `skipped_external` 항목 모두에 "건너뜀"으로 보고됩니다.
 유도하므로, 첫 빌드 **이전**에도 `check-links`를 돌릴 수 있습니다(린트 후 빌드
 순서로 도는 CI가 이 경우입니다).
 
-- `/sitemap.xml`, `/robots.txt`, `/llms.txt`, 검색 인덱스, `404.html` — 각각
+- `/sitemap.xml`, `/robots.txt`, `/llms.txt`, 검색 인덱스, `404.html`. 각각
   설정된 `filename`을 따릅니다
-- 피드(`/rss.xml`, `/atom.xml`) — 언어별 사본(`/ko/rss.xml`)과 섹션별
+- 피드(`/rss.xml`, `/atom.xml`). 언어별 사본(`/ko/rss.xml`)과 섹션별
   사본(`/posts/rss.xml`) 포함. 섹션 피드는 해당 섹션의 `_index.md`가
   `generate_feeds = true`를 선언했을 때만 인정합니다. 빌드가 그때만 파일을
   쓰기 때문입니다
 - 분류 목록·용어 페이지(`/tags/`, `/categories/rust/`)
-- 페이지네이션 경로(`/posts/page/2/`) — `paginate_by`를 실제로 선언한 섹션에만
+- 페이지네이션 경로(`/posts/page/2/`). `paginate_by`를 실제로 선언한 섹션에만
   해당하므로, 페이지네이션이 없는 섹션의 `/page/N/` 링크는 여전히 보고됩니다
 
 ## 링크 유형

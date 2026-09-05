@@ -67,11 +67,11 @@ banner = "default-banner.png"
 +++
 ```
 
-이제 이 섹션 아래 모든 페이지는 `post` 템플릿으로 렌더링되고, `blog` 태그를 가지며, `page.extra.banner`를 노출합니다 — 페이지가 해당 필드를 직접 지정하지 않았을 때에 한합니다. `extra`와 `taxonomies`는 키 단위로 병합됩니다: 페이지 자신의 키가 우선하고, 캐스케이드된 키가 빈자리를 채웁니다.
+이제 이 섹션 아래 모든 페이지는 `post` 템플릿으로 렌더링되고, `blog` 태그를 가지며, `page.extra.banner`를 노출합니다. 페이지가 해당 필드를 직접 지정하지 않았을 때에 한합니다. `extra`와 `taxonomies`는 키 단위로 병합됩니다: 페이지 자신의 키가 우선하고, 캐스케이드된 키가 빈자리를 채웁니다.
 
 캐스케이드 가능한 키: `template`, `draft`, `render`, `toc`, `insert_anchor_links`, `in_sitemap`, `in_search_index`, `tags`, `taxonomies`, `authors`, `extra`. URL에 영향을 주는 키(`slug`, `path`, `aliases`)는 캐스케이드할 수 없으며 경고와 함께 무시됩니다.
 
-다국어 사이트에서 캐스케이드는 자기 언어 트리 안에서만 적용됩니다 — `_index.ko.md`는 `.ko` 페이지에, `_index.md`는 기본 언어 페이지에 캐스케이드됩니다.
+다국어 사이트에서 캐스케이드는 자기 언어 트리 안에서만 적용됩니다. `_index.ko.md`는 `.ko` 페이지에, `_index.md`는 기본 언어 페이지에 캐스케이드됩니다.
 
 ## 정렬 방향
 
@@ -109,7 +109,7 @@ paginate_path = "p"
 
 생성 결과: `/blog/`, `/blog/p/2/`, `/blog/p/3/`
 
-기본값 `paginate_path = "page"`를 쓰면 URL은 `/blog/page/2/`, `/blog/page/3/`, … 형태가 됩니다 — 1페이지는 항상 섹션 URL에 그대로 있습니다.
+기본값 `paginate_path = "page"`를 쓰면 URL은 `/blog/page/2/`, `/blog/page/3/`, … 형태가 되고, 1페이지는 항상 섹션 URL에 그대로 있습니다.
 
 ### 문서
 

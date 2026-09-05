@@ -48,7 +48,7 @@ hwaro tool unused-assets --delete --force --json
 - 모든 콘텐츠 파일 (`.md`, `.markdown`)
 - 템플릿 파일 (`.html`, `.j2`, `.jinja`, `.jinja2`, `.ecr`, 그리고 `.css`, `.js`, `.xml`, `.json`, `.webmanifest`, `.svg`, `.txt`)
 - 다른 정적 파일을 참조할 수 있는 정적 소스 (`.css`, `.scss`, `.sass`, `.js`, `.json`, `.webmanifest`, `.xml`, `.svg`, `.txt`, `.html`, `.htm`)
-- 데이터·번역 파일 (`data/`, `i18n/` — `.yml`, `.yaml`, `.json`, `.toml`)
+- 데이터·번역 파일 (`data/`, `i18n/`의 `.yml`, `.yaml`, `.json`, `.toml`)
 - 파일을 지정하는 `config.toml` 값
 
 템플릿이 `templates/` 밖에 있다면 `--templates-dir`로 스캔 위치를 알려주세요.
@@ -99,4 +99,4 @@ found: 4 unused assets
 ## 제한 사항
 
 - 템플릿 변수 등으로 동적으로 참조되는 에셋 파일명(예: `{{ page.image }}`)은 감지되지 않아 오탐(false positive)이 생길 수 있습니다.
-- 감지는 파일명 매칭 기반입니다 — 서로 다른 디렉터리의 두 파일이 이름이 같으면, 실제로는 하나만 쓰이더라도 둘 다 참조된 것으로 간주될 수 있습니다.
+- 감지는 파일명 매칭 기반입니다. 서로 다른 디렉터리의 두 파일이 이름이 같으면, 실제로는 하나만 쓰이더라도 둘 다 참조된 것으로 간주될 수 있습니다.

@@ -5,7 +5,7 @@ weight = 3
 toc = true
 +++
 
-Hwaro auto-generates 1200x630 Open Graph preview images for every page that has no custom `image` in front matter. The generated path is set as `page.image`, so `og:image` meta tags pick it up automatically — no template changes needed.
+Hwaro auto-generates 1200x630 Open Graph preview images for every page that has no custom `image` in front matter. The generated path is set as `page.image`, so `og:image` meta tags pick it up automatically, with no template changes needed.
 
 ![Auto-generated OG image for the Auto OG Images page](/og-images/features-og-images.png)
 *The auto-generated OG image for this page (`style = "terminal"`).*
@@ -45,7 +45,7 @@ logo = "static/logo.png"
 | accent_bars | bool | `false` | Classic thin top/bottom accent bars on the pattern styles |
 | lazy_generate | bool | `false` | Skip bulk generation during `hwaro serve`; images render on first request. Recommended for large sites. No effect on `hwaro build` |
 
-Titles render in Space Grotesk, descriptions in Space Grotesk Medium, and the `terminal` style in JetBrains Mono — all bundled into the binary, so PNG output looks the same on every machine. A CJK-capable system font is appended to the chain automatically when your titles need it, and DejaVu Sans Bold backstops everything else.
+Titles render in Space Grotesk, descriptions in Space Grotesk Medium, and the `terminal` style in JetBrains Mono, all bundled into the binary, so PNG output looks the same on every machine. A CJK-capable system font is appended to the chain automatically when your titles need it, and DejaVu Sans Bold backstops everything else.
 
 ## Style Presets
 
@@ -434,15 +434,15 @@ The examples below differ only in `overlay_opacity` (same photo, `style = "edito
 
 ## Output Format
 
-PNG is the default — rendering is built-in via stb_truetype and stb_image_write, no external tools required. System fonts are auto-detected (Helvetica/Arial on macOS, DejaVu/Liberation/Noto on Linux), with a bundled DejaVu Sans Bold as the last resort.
+PNG is the default. Rendering is built in via stb_truetype and stb_image_write, so no external tools are required. System fonts are auto-detected (Helvetica/Arial on macOS, DejaVu/Liberation/Noto on Linux), with a bundled DejaVu Sans Bold as the last resort.
 
-Titles with CJK characters need a CJK-capable `font_path` (e.g. Noto Sans CJK) — the bundled fonts cover Latin scripts only.
+Titles with CJK characters need a CJK-capable `font_path` (e.g. Noto Sans CJK), since the bundled fonts cover Latin scripts only.
 
 Set `format = "svg"` for dependency-free SVG output instead. Note that social platforms generally don't render SVG `og:image`.
 
 ## Incremental Generation
 
-Hwaro stores a `.og_manifest.json` next to the generated images and skips pages whose inputs haven't changed. Keep the output directory between builds (e.g. `--cache` mode) and incremental generation works automatically — the `hahwul/hwaro` GitHub Action handles this for you.
+Hwaro stores a `.og_manifest.json` next to the generated images and skips pages whose inputs haven't changed. Keep the output directory between builds (e.g. `--cache` mode) and incremental generation works automatically. The `hahwul/hwaro` GitHub Action handles this for you.
 
 | Change | Regenerates |
 |--------|-------------|

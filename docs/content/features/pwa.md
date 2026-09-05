@@ -49,7 +49,7 @@ cache_strategy = "cache-first"
 
 ## Icon Sizing
 
-The `sizes` field of each icon is measured from the file itself — the real
+The `sizes` field of each icon is measured from the file itself: the real
 pixel dimensions read out of the PNG, JPEG, or BMP header. Browsers pick the
 install icon by this value, so a measured size is always preferred over a
 guess.
@@ -65,14 +65,14 @@ guess.
 
 The filename heuristic is only a fallback: it applies to formats whose header
 Hwaro cannot read (WebP, ICO), to remote `http(s)://` icons, and to files whose
-bytes turn out to be unreadable — a build warning names the icon when that
+bytes turn out to be unreadable. A build warning names the icon when that
 happens.
 
 Place icon files in your `static/` directory so they are copied to the build output.
 
 ## Template Integration
 
-The easiest wiring is the `{{ pwa_tags }}` template variable — it expands to
+The easiest wiring is the `{{ pwa_tags }}` template variable. It expands to
 the manifest link, a theme-color meta, and the service worker registration
 (already base-path-prefixed), and renders as an empty string while `[pwa]` is
 disabled. The scaffold header templates include it out of the box:

@@ -26,7 +26,7 @@ toc = true
 |------|------|-------------|
 | path | String | 소스 상대 경로(예: `about.md`) 또는 URL 경로(예: `/about/`) |
 
-**반환값:** Page? (못 찾으면 nil) — 표준 [Page 속성](/ko/templates/data-model/#page)을 노출하되, 렌더링 시점에 계산되는 필드(`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`)는 제외됩니다.
+**반환값:** Page? (못 찾으면 nil). 표준 [Page 속성](/ko/templates/data-model/#page)을 노출하되, 렌더링 시점에 계산되는 필드(`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`)는 제외됩니다.
 
 **예시:**
 
@@ -186,7 +186,7 @@ toc = true
 |------|------|-------------|
 | name | String | 메뉴 이름(예: "main", "footer") |
 
-**반환값:** Array\<Entry\> — **현재 페이지**의 언어를 기준으로 해석하고, 그 언어에 `name` 메뉴 엔트리가 없으면 기본 언어로 폴백합니다. 알 수 없거나 등록되지 않은 메뉴 이름은 빈 배열을 반환하므로(nil이 아님) `{% for %}` 루프에서 오류가 나지 않습니다.
+**반환값:** Array\<Entry\>. **현재 페이지**의 언어를 기준으로 해석하고, 그 언어에 `name` 메뉴 엔트리가 없으면 기본 언어로 폴백합니다. 알 수 없거나 등록되지 않은 메뉴 이름은 빈 배열을 반환하므로(nil이 아님) `{% for %}` 루프에서 오류가 나지 않습니다.
 
 **엔트리 속성:**
 
@@ -201,7 +201,7 @@ toc = true
 | children | Array\<Entry\> | 중첩 엔트리 |
 | page | Page? | 등록한 페이지의 데이터(프론트 매터로 등록된 엔트리만) |
 
-현재 페이지와 무관하게 **기본 언어**의 메뉴가 꼭 필요할 때만 `site.menus.<name>`을 사용합니다 — 공용 내비게이션 파셜 안에서는 거의 언제나 `get_menu()`가 맞는 선택입니다.
+현재 페이지와 무관하게 **기본 언어**의 메뉴가 꼭 필요할 때만 `site.menus.<name>`을 사용합니다. 공용 내비게이션 파셜 안에서는 거의 언제나 `get_menu()`가 맞는 선택입니다.
 
 ---
 
@@ -356,7 +356,7 @@ base_url이 포함된 URL을 생성합니다.
 |------|------|-------------|
 | name | String | 번들 또는 에셋 이름(예: `main.css`, `app.js`) |
 
-**반환값:** String — `base_url` 아래의 절대 URL. 매니페스트에 항목이 없으면 이름을 그대로 `base_url` 아래 경로로 반환하므로, 파이프라인을 켜기 전에도 템플릿이 그대로 동작합니다.
+**반환값:** String. `base_url` 아래의 절대 URL. 매니페스트에 항목이 없으면 이름을 그대로 `base_url` 아래 경로로 반환하므로, 파이프라인을 켜기 전에도 템플릿이 그대로 동작합니다.
 
 ---
 

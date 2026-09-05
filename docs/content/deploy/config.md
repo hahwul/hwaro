@@ -33,12 +33,12 @@ external tool's own flags, which hwaro cannot count in advance.
 
 A deploy also refuses outright when the source directory is empty, or when
 `include`/`exclude` selected no files while the destination still holds
-some — that combination is almost always "the site was never built" and
+some. That combination is almost always "the site was never built" and
 would otherwise wipe the destination. Pass `--force` to clear a destination
 on purpose. A `command` target that never interpolates `{source}` is exempt.
 
-A source directory containing a `.hwaro-dev` marker is refused as well —
-that marker means the directory is `hwaro serve` output, with the dev
+A source directory containing a `.hwaro-dev` marker is refused as well.
+That marker means the directory is `hwaro serve` output, with the dev
 server's `base_url` (e.g. `http://127.0.0.1:3000`) baked into every link.
 Run `hwaro build` and deploy its output instead; there is no override flag
 (deleting the marker file by hand is the deliberate escape hatch).
@@ -91,12 +91,12 @@ source tree.
 **Local directory sync and symlinks.** The built-in sync keeps every write
 inside the destination. A symlink standing where a file or directory belongs
 is replaced with the real thing, and a symlink with no counterpart in the
-source is unlinked — neither case reads or deletes through the link, so
+source is unlinked. Neither case reads or deletes through the link, so
 content living outside the destination is never touched.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| name | string | — | Target identifier (must be unique — duplicates are warned about and only the first is used) |
+| name | string | — | Target identifier (must be unique; duplicates are warned about and only the first is used) |
 | url | string | — | Destination URL (`file://`, `s3://`, `gs://`, `az://`) |
 | path | string | — | Alias for `url` when deploying to a local directory (`path = "~/public"`; `~` is expanded) |
 | include | string | — | Glob pattern for files to include |
@@ -132,7 +132,7 @@ force = true
 
 The built-in sync copies files and runs external CLIs; it does not talk to
 an object-store API, so it can only honor `force`. Setting `cache_control`,
-`content_type`, or `gzip` prints a warning — configure headers and
+`content_type`, or `gzip` prints a warning. Configure headers and
 compression at your host or CDN instead.
 
 ## See Also

@@ -42,7 +42,7 @@ hwaro tool export hugo --verbose
 | -j, --json | Output a per-file manifest as JSON |
 | -h, --help | Show help |
 
-Re-exporting into the same directory **replaces** the previous output — that
+Re-exporting into the same directory **replaces** the previous output. That
 is the normal refresh workflow. When a run replaces pre-existing files, the
 summary warns with the count, and the JSON manifest marks those rows
 `overwritten` (fresh destinations are `exported`). Use `--dry-run` to see the
@@ -64,7 +64,7 @@ full manifest before writing.
 }
 ```
 
-`files` lists every destination written — page-bundle assets included —
+`files` lists every destination written, page-bundle assets included,
 while the counts cover content documents only.
 
 ## Field Mappings

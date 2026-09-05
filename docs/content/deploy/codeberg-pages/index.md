@@ -4,7 +4,7 @@ description = "Deploy your Hwaro site to Codeberg Pages"
 weight = 7
 +++
 
-Deploy your Hwaro site to [Codeberg Pages](https://codeberg.page/) — free static hosting backed by Codeberg's Forgejo instance.
+Deploy your Hwaro site to [Codeberg Pages](https://codeberg.page/), free static hosting backed by Codeberg's Forgejo instance.
 
 ## How Codeberg Pages Works
 
@@ -23,7 +23,7 @@ This distinction matters: a project site pushes to a `pages` *branch*, while a u
 
 ## Method 1: Forgejo Actions (Recommended)
 
-Codeberg supports [Forgejo Actions](https://forgejo.org/docs/latest/user/actions/), which is GitHub Actions–compatible. Forgejo Actions is opt-in per repository — enable it under **Settings → Actions** before the workflow will run.
+Codeberg supports [Forgejo Actions](https://forgejo.org/docs/latest/user/actions/), which is GitHub Actions-compatible. Forgejo Actions is opt-in per repository, so enable it under **Settings → Actions** before the workflow will run.
 
 > Forgejo also accepts workflows under `.gitea/workflows/` for backwards compatibility, but `.forgejo/workflows/` is the upstream-blessed path and the one Hwaro generates.
 
@@ -157,7 +157,7 @@ hwaro deploy codeberg-pages --dry-run
 PAGES_BRANCH=main hwaro deploy codeberg-pages
 ```
 
-As with Method 1, the script force-pushes a fresh init — branch history is not preserved.
+As with Method 1, the script force-pushes a fresh init, so branch history is not preserved.
 
 ## Method 3: Manual Branch Deploy
 
@@ -195,7 +195,7 @@ static/
 └── .domains
 ```
 
-Hwaro copies hidden dot-paths from `static/` verbatim into `public/` on every build — cold or `--cache`/incremental — so `static/.domains` always reaches the served branch. See [Static Files](/start/config/#static-files) for details.
+Hwaro copies hidden dot-paths from `static/` verbatim into `public/` on every build (cold or `--cache`/incremental), so `static/.domains` always reaches the served branch. See [Static Files](/start/config/#static-files) for details.
 
 ### 2. Configure DNS
 
@@ -226,7 +226,7 @@ CNAME delegates *the whole hostname*, so you cannot run email (MX) on the same n
 | AAAA | @    | `2a0a:4580:103f:c0de::2`             |
 | TXT  | @    | `REPO.USERNAME.codeberg.page` (or `USERNAME.codeberg.page` for a user site) |
 
-> Verify the latest IPs on the [Codeberg Pages docs](https://docs.codeberg.org/codeberg-pages/using-custom-domain/) before relying on them — Codeberg occasionally rotates them.
+> Verify the latest IPs on the [Codeberg Pages docs](https://docs.codeberg.org/codeberg-pages/using-custom-domain/) before relying on them. Codeberg occasionally rotates them.
 
 If your zone uses CAA records, add an entry that allows Let's Encrypt so Codeberg can issue a TLS certificate:
 
@@ -250,7 +250,7 @@ base_url = "https://www.example.org"
 ### Push Fails with 401 / 403
 
 - Re-check the `CODEBERG_TOKEN` secret value and that the token still has `write:repository` scope
-- Tokens are tied to your account — make sure the actor has push access to the target repo
+- Tokens are tied to your account, so make sure the actor has push access to the target repo
 
 ### 404 on the Deployed Site
 

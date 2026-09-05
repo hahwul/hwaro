@@ -25,14 +25,13 @@ cd my-site
 | `book` | 챕터, 이전/다음 이동, 키보드 단축키가 있는 책 |
 
 모든 스캐폴드는 CSS `light-dark()` 쌍 위에 만든 하나의 디자인 토큰 시스템을
-공유하므로, 별도 설정 없이 읽는 사람의 OS 색상 모드를 그대로 따라갑니다 —
-라이트면 라이트, 다크면 다크. 스타일이 있는 스캐폴드에는 헤더에 테마 전환
+공유하므로, 별도 설정 없이 읽는 사람의 OS 색상 모드(라이트/다크)를 그대로 따라갑니다. 스타일이 있는 스캐폴드에는 헤더에 테마 전환
 버튼도 들어 있습니다. auto → light → dark 순으로 순환하고, 선택을
 `localStorage`에 저장하며, 첫 페인트 전에 적용하기 때문에 화면이 번쩍이지
 않습니다. 한 가지 모드로 고정하려면(다크 전용 사이트 등) 생성된
 `css/style.css` 끝에 `:root { color-scheme: dark; }`를 추가합니다.
 
-스캐폴드에는 절제된 모던 레이어도 들어 있습니다. 반투명 고정 헤더, 페이지
+스캐폴드에는 몇 가지 모던한 요소도 들어 있습니다. 반투명 고정 헤더, 페이지
 사이의 네이티브 크로스 문서 뷰 전환, 그리고 (블로그 글과 책 페이지의) CSS
 전용 읽기 진행 표시선입니다. 모두 구형 브라우저에서는 자연스럽게 꺼지고,
 모든 애니메이션은 `prefers-reduced-motion`을 존중합니다.
@@ -83,7 +82,7 @@ my-site/
 {% endfor %}
 ```
 
-하위 디렉터리는 중첩됩니다(`data/users/alice.yml` → `site.data.users.alice`). `hwaro init`은 이 디렉터리를 만들지 않으니 필요할 때 직접 추가하세요. 자세한 규칙은 [데이터 모델](/templates/data-model/)을 참고하세요.
+하위 디렉터리는 중첩됩니다(`data/users/alice.yml` → `site.data.users.alice`). `hwaro init`은 이 디렉터리를 만들지 않으니 필요할 때 직접 추가하세요. 자세한 규칙은 [데이터 모델](/ko/templates/data-model/)을 참고하세요.
 
 **이미지 같은 정적 파일은 `static/`에 둡니다.** `static/images/photo.jpg`는 출력물에서 `/images/photo.jpg`로 복사되므로, 앞에 슬래시를 붙여 참조합니다.
 
@@ -93,7 +92,7 @@ my-site/
 
 `example.com/my-site/`처럼 하위 경로에 배포할 때도 앞의 `/`를 그대로 두세요. Hwaro가 빌드 시점에 루트 상대 `src`와 `href`에 `base_url`의 하위 경로를 붙여 주기 때문에, 같은 콘텐츠가 양쪽에서 모두 동작합니다.
 
-에셋을 그 파일을 쓰는 페이지 옆, 즉 `content/` 안에 두는 것도 가능하지만 이는 선택 기능입니다. 먼저 [콘텐츠 파일](/features/content-files/)을 활성화하세요.
+에셋을 그 파일을 쓰는 페이지 옆, 즉 `content/` 안에 두는 것도 가능하지만 이는 선택 기능입니다. 먼저 [콘텐츠 파일](/ko/features/content-files/)을 활성화하세요.
 
 ```toml
 [content.files]
@@ -180,8 +179,8 @@ Claude Code, Cursor, Codex 같은 스킬 지원 에이전트를 쓴다면, Hwaro
 
 | 스킬 | 하는 일 |
 |-------|--------------|
-| `hwaro` | CLI를 제대로 실행 — 텍스트 출력을 추측하는 대신 `--json` 출력 규약과 `HWARO_E_*` 종료 코드를 사용해 `init`, `new`, `serve`, `build`, `doctor`와 콘텐츠 도구를 다룸 |
-| `hwaro-design` | Hwaro의 Crinja 템플릿과 `light-dark()` 디자인 토큰 안에서 사이트를 디자인하고 리테마 — 전형적인 AI 느낌의 레이아웃을 피하는 안티슬롭 원칙 적용 |
+| `hwaro` | `init`, `new`, `serve`, `build`, `doctor`와 콘텐츠 도구를 제대로 실행합니다. 텍스트 출력을 추측하는 대신 `--json` 출력 규약과 `HWARO_E_*` 종료 코드를 사용합니다. |
+| `hwaro-design` | Hwaro의 Crinja 템플릿과 `light-dark()` 디자인 토큰 안에서 사이트를 디자인하고 리테마합니다. 전형적인 AI 느낌의 레이아웃을 피하는 안티슬롭 원칙을 따릅니다. |
 
 명령 하나로 둘 다 설치합니다:
 

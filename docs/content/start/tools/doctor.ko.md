@@ -54,7 +54,7 @@ hwaro doctor --json
 - `base_url`이 설정되지 않았거나 끝 슬래시가 있음
 - `title`이 아직 자리표시자(`Hwaro Site`, `My Hwaro Site`)임
 - `sitemap.changefreq` 값이 유효하지 않음
-- `sitemap.priority`가 범위(0.0–1.0)를 벗어남
+- `sitemap.priority`가 범위(0.0~1.0)를 벗어남
 - 택소노미 이름 또는 언어 코드 중복
 - `search.format`, `markdown.math_engine`, `pwa.cache_strategy` 값이 유효하지 않음
 - `default_language`에 대응하는 `[languages.<code>]` 블록이 없음
@@ -169,7 +169,7 @@ ignore = [
 
 > `ignore`는 **warning**과 **info** 수준의 문제만 숨깁니다. 아래 표에서 ✗로
 > 표시된 error 수준 규칙은 어차피 `hwaro build`를 실패시키는 문제라서 목록에
-> 넣어도 CI 게이트를 끌 수 없습니다 — doctor는 계속 보고하고, 해당 항목이
+> 넣어도 CI 게이트를 끌 수 없습니다. doctor는 계속 보고하고, 해당 항목이
 > 효과가 없다는 경고를 출력합니다.
 
 ### 사용 가능한 규칙 ID

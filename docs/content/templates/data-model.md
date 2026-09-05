@@ -5,7 +5,7 @@ weight = 2
 toc = true
 +++
 
-Hwaro's template system centers on three core types: **Site**, **Section**, and **Page**. This page is a **template-side reference** — all properties and variables you can use when building templates. For how to write content and set front matter fields, see [Writing](/writing/).
+Hwaro's template system centers on three core types: **Site**, **Section**, and **Page**. This page is a **template-side reference** for all properties and variables you can use when building templates. For how to write content and set front matter fields, see [Writing](/writing/).
 
 ## Hierarchy
 
@@ -117,7 +117,7 @@ Directories nest arbitrarily: `data/users/admins/root.yml` → `site.data.users.
 
 ### Remote Data Sources
 
-`site.data` can also be fed from HTTP(S) endpoints, declared in `config.toml`. Each source is fetched **once per build, before anything renders** — templates never trigger network requests, and every endpoint the build talks to is visible in one place.
+`site.data` can also be fed from HTTP(S) endpoints, declared in `config.toml`. Each source is fetched **once per build, before anything renders**. Templates never trigger network requests, and every endpoint the build talks to is visible in one place.
 
 For the standalone configuration guide, including cache behavior, offline error
 policies, timeouts, and security boundaries, see [Remote Data Sources](/features/remote-data/).
@@ -132,28 +132,28 @@ cache = "1h"                # skip the request while the cached copy is younger 
 on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 ```
 
-Templates consume the result exactly like a local data file — `site.data.team` — so a key can move between `data/team.json` and a remote source without touching any template. To turn the records themselves into pages instead of feeding templates, see [Content Generation](/features/content-generation/).
+Templates consume the result exactly like a local data file (`site.data.team`), so a key can move between `data/team.json` and a remote source without touching any template. To turn the records themselves into pages instead of feeding templates, see [Content Generation](/features/content-generation/).
 
 | Field | Required | Meaning |
 |-------|----------|---------|
-| `key` | yes | Name under `site.data`. Letters, digits, `_`, `-` only; each key may be declared once. Keys are compared case-insensitively — `Team` and `team` would share one cache file on macOS and Windows, so they are rejected as duplicates. |
+| `key` | yes | Name under `site.data`. Letters, digits, `_`, `-` only; each key may be declared once. Keys are compared case-insensitively, because `Team` and `team` would share one cache file on macOS and Windows, so they are rejected as duplicates. |
 | `url` | yes | Absolute `http://` or `https://` URL. Other schemes are rejected at config load. |
 | `format` | no | `json`, `toml`, `yaml`, or `csv`. When omitted, inferred from the response `Content-Type`, then from the file extension of the URL the request finally landed on (after any redirects). If neither identifies a format, the fetch fails with a hint to set `format` explicitly. |
 | `headers` | no | Extra request headers. Treated as credentials: never logged, and dropped when a redirect leaves the original origin. |
-| `cache` | no | Disk-cache TTL such as `"90s"`, `"30m"`, `"1h"`, `"7d"` (units combine: `"1h30m"`). While the cached copy is fresh, the build skips the request entirely. Without `cache`, every build refetches — but the last payload is still saved for `warn-and-use-cache`. |
+| `cache` | no | Disk-cache TTL such as `"90s"`, `"30m"`, `"1h"`, `"7d"` (units combine: `"1h30m"`). While the cached copy is fresh, the build skips the request entirely. Without `cache`, every build refetches, but the last payload is still saved for `warn-and-use-cache`. |
 | `on_error` | no | What to do when the fetch or parse fails. `fail` (default) aborts the build; `warn-and-use-cache` warns and builds from the last successfully fetched payload (any age); `warn-and-skip` warns and leaves `site.data.<key>` unset for this build. |
 
-CSV payloads parse to an array of rows, each an array of stripped string cells — the same shape `load_data()` produces for `.csv` files.
+CSV payloads parse to an array of rows, each an array of stripped string cells, the same shape `load_data()` produces for `.csv` files.
 
-**Environment variables.** `${VAR}` in `url` and `headers` values is replaced from the environment. A referenced variable that is not set fails the build with an error naming the variable (elsewhere in `config.toml` this is only a warning); write `${VAR:-default}` to provide a fallback instead. The error is raised when the source is actually fetched, so commands that never fetch — `hwaro deploy`, `hwaro new`, `hwaro tool ...` — keep working without the variable exported.
+**Environment variables.** `${VAR}` in `url` and `headers` values is replaced from the environment. A referenced variable that is not set fails the build with an error naming the variable (elsewhere in `config.toml` this is only a warning); write `${VAR:-default}` to provide a fallback instead. The error is raised when the source is actually fetched, so commands that never fetch (`hwaro deploy`, `hwaro new`, `hwaro tool ...`) keep working without the variable exported.
 
-**Caching.** Payloads are cached under `.hwaro/remote_data/` — outside `data/` and every other directory `hwaro serve` watches, so serve rebuilds within the TTL reuse the cache instead of re-hitting the API, and cache writes never trigger a rebuild. The cache also survives `hwaro build --full` (only the page cache is cleared), and it is what lets an offline build succeed with `on_error = "warn-and-use-cache"`. `.hwaro/` is self-ignoring (hwaro writes `.hwaro/.gitignore` when creating it), so the cache never appears in `git status`. During a long `hwaro serve` session each source is fetched once and then reused in memory: an entry with a `cache` TTL is re-fetched on the first full rebuild after that TTL expires, and an entry without one is fetched once for the whole session rather than on every save. If a re-fetch fails while the session already holds a payload, serve warns and keeps using it — whatever `on_error` says — so an editor keeps working offline. `hwaro build` is unaffected: it is one process per build and always follows `cache`/`on_error` exactly. A changed payload invalidates cached pages the same way an edited `data/` file does.
+**Caching.** Payloads are cached under `.hwaro/remote_data/`, outside `data/` and every other directory `hwaro serve` watches, so serve rebuilds within the TTL reuse the cache instead of re-hitting the API, and cache writes never trigger a rebuild. The cache also survives `hwaro build --full` (only the page cache is cleared), and it is what lets an offline build succeed with `on_error = "warn-and-use-cache"`. `.hwaro/` is self-ignoring (hwaro writes `.hwaro/.gitignore` when creating it), so the cache never appears in `git status`. During a long `hwaro serve` session each source is fetched once and then reused in memory: an entry with a `cache` TTL is re-fetched on the first full rebuild after that TTL expires, and an entry without one is fetched once for the whole session rather than on every save. If a re-fetch fails while the session already holds a payload, serve warns and keeps using it, whatever `on_error` says, so an editor keeps working offline. `hwaro build` is unaffected: it is one process per build and always follows `cache`/`on_error` exactly. A changed payload invalidates cached pages the same way an edited `data/` file does.
 
-**Timeouts.** Each source gets 10s to connect, 30s per read, and 120s overall — the last one spans every redirect hop and the whole body, so a source that trickles bytes just inside the read timeout can't stall the build. Exceeding any of them is a fetch failure, handled by `on_error` like any other.
+**Timeouts.** Each source gets 10s to connect, 30s per read, and 120s overall. The last one spans every redirect hop and the whole body, so a source that trickles bytes just inside the read timeout can't stall the build. Exceeding any of them is a fetch failure, handled by `on_error` like any other.
 
-**Collisions.** A remote `key` that also exists on disk (`data/team.json` next to `key = "team"`) is a config error naming both sources — a key must have exactly one source, so `site.data.team` never silently depends on which one wins.
+**Collisions.** A remote `key` that also exists on disk (`data/team.json` next to `key = "team"`) is a config error naming both sources, since a key must have exactly one source, so `site.data.team` never silently depends on which one wins.
 
-Remote sources are deliberately config-only: `load_data()` and shortcodes cannot take a URL. If you need more than a GET request per source — pagination, POST bodies, reshaping — fetch with a [pre-build hook](/features/build-hooks/#fetching-data-from-an-api) into `data/` instead.
+Remote sources are deliberately config-only: `load_data()` and shortcodes cannot take a URL. If you need more than a GET request per source (pagination, POST bodies, reshaping), fetch with a [pre-build hook](/features/build-hooks/#fetching-data-from-an-api) into `data/` instead.
 
 ### Site Authors
 
@@ -527,7 +527,7 @@ pros = ["Fast", "Reliable"]
 ```
 
 A top-level `outputs = ["json"]` in front matter is likewise an ordinary
-unknown key that lands in `page.extra.outputs` — it overrides the
+unknown key that lands in `page.extra.outputs`, and it overrides the
 `[outputs]` config default for that one page/section. See
 [Output Formats](/features/output-formats/).
 
@@ -727,13 +727,13 @@ Available in taxonomy templates:
 | taxonomy_term | String | Current term name (empty on the index page) |
 | content | String | Pre-rendered listing HTML (terms or pages) |
 
-For custom listings, use `get_taxonomy()` — see [Taxonomies](/writing/taxonomies/).
+For custom listings, use `get_taxonomy()`. See [Taxonomies](/writing/taxonomies/).
 
 ---
 
 ## Menus
 
-`site.menus` exposes the **default language's** named menus (config `[[menus.*]]` + front-matter `menus`/`menu` registrations). Inside a template, prefer `get_menu(name="...")` over `site.menus.<name>` — it resolves against the **current page's** language instead, falling back to the default language:
+`site.menus` exposes the **default language's** named menus (config `[[menus.*]]` + front-matter `menus`/`menu` registrations). Inside a template, prefer `get_menu(name="...")` over `site.menus.<name>`, since it resolves against the **current page's** language instead, falling back to the default language:
 
 ```jinja
 {% for item in get_menu(name="main") %}

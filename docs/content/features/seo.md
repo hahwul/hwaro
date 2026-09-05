@@ -145,7 +145,7 @@ To take full control of the feed markup, create a template named after the feed 
 | RSS | `templates/rss.xml.jinja` | `rss.xml` |
 | Atom | `templates/atom.xml.jinja` | `atom.xml` |
 
-Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`) — only the final extension is stripped, so `rss.xml.jinja` loads under the key `rss.xml`. Whatever the extension, the file is always rendered as **Jinja** (an `.ecr` file is picked up too, but ECR `<%= %>` tags pass through as literal text — use Jinja syntax). The template file itself is the opt-in: when it's absent, Hwaro emits its built-in feed exactly as before, and deleting the template falls back to the built-in output. The override applies to **all four feed kinds** — the main feed, per-section feeds, per-language feeds, and per-taxonomy-term feeds — and a custom `[feeds] filename` still controls the output path.
+Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`). Only the final extension is stripped, so `rss.xml.jinja` loads under the key `rss.xml`. Whatever the extension, the file is always rendered as **Jinja** (an `.ecr` file is picked up too, but ECR `<%= %>` tags pass through as literal text, so use Jinja syntax). The template file itself is the opt-in: when it's absent, Hwaro emits its built-in feed exactly as before, and deleting the template falls back to the built-in output. The override applies to **all four feed kinds** (the main feed, per-section feeds, per-language feeds, and per-taxonomy-term feeds), and a custom `[feeds] filename` still controls the output path.
 
 `{% include %}` works inside feed templates, and a broken template fails the build with a template error naming the file.
 
@@ -191,7 +191,7 @@ Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`) — only the 
 
 #### Example
 
-Values are **not** pre-escaped — applying `xml_escape` (or emitting CDATA) is the template author's job:
+Values are **not** pre-escaped. Applying `xml_escape` (or emitting CDATA) is the template author's job:
 
 ```jinja
 <?xml version="1.0" encoding="UTF-8"?>

@@ -30,7 +30,7 @@ hwaro tool agents-md --write --force
 | `--local` (기본값) | 전체 내장 레퍼런스(약 260줄). 콘텐츠 형식, 템플릿 변수, 설정 레퍼런스, AI 에이전트 참고 사항 포함. 오프라인이나 로컬 LLM 환경에 적합 |
 | `--remote` | 경량 버전(약 50줄). 프로젝트 구조, 핵심 명령, 그리고 [온라인 문서](https://hwaro.hahwul.com)와 [LLM 레퍼런스](https://hwaro.hahwul.com/llms-full.txt) 링크가 담긴 AI 에이전트 참고 사항 포함 |
 
-두 모드 모두 프로젝트 고유의 규칙과 컨벤션을 적을 수 있는 **Site-Specific Instructions** 섹션을 포함합니다. `--write`로 다시 생성해도 이 섹션은 기존 파일에서 그대로 이어집니다 — 생성된 부분(모드 전환 포함)만 갱신되고 `## Site-Specific Instructions` 아래에 적은 내용은 변경 없이 보존됩니다. 보존은 정확히 이 헤딩을 기준으로 동작하므로, `## Site-Specific Instructions` 헤딩이 없는 기존 파일은 전체가 교체됩니다(실행 전에 프롬프트가, `--force`에서는 경고가 이를 알려줍니다).
+두 모드 모두 프로젝트 고유의 규칙과 컨벤션을 적을 수 있는 **Site-Specific Instructions** 섹션을 포함합니다. `--write`로 다시 생성해도 이 섹션은 기존 파일에서 그대로 이어집니다. 생성된 부분(모드 전환 포함)만 갱신되고 `## Site-Specific Instructions` 아래에 적은 내용은 변경 없이 보존됩니다. 보존은 정확히 이 헤딩을 기준으로 동작하므로, `## Site-Specific Instructions` 헤딩이 없는 기존 파일은 전체가 교체됩니다(실행 전에 프롬프트가, `--force`에서는 경고가 이를 알려줍니다).
 
 ## 옵션
 

@@ -46,7 +46,7 @@ Error [HWARO_E_USAGE]: missing <path> argument
 ```
 
 Under `--json` the classified error is emitted as a structured payload
-on stdout instead. (`--quiet` only silences info output — errors keep
+on stdout instead. (`--quiet` only silences info output. Errors keep
 the human `Error [CODE]: …` form on stderr, so pair it with `--json`
 when you want machine-readable failures.)
 
@@ -101,7 +101,7 @@ summary and asks to confirm before writing anything. When a path argument is
 given (`hwaro init my-site --wizard`), the wizard skips the directory prompt
 and uses that path directly.
 
-Without `--wizard`, `hwaro init` initializes immediately with defaults — the
+Without `--wizard`, `hwaro init` initializes immediately with defaults, the
 same behaviour scripts and CI already relied on.
 
 Every scaffold follows the reader's OS color scheme automatically (the shared
@@ -166,8 +166,8 @@ before writing. Any flags you already passed pre-fill the matching prompt, so
 `hwaro new -t "My Post"` only asks for the rest. Press `Ctrl-D` or answer `n` at the final
 prompt to cancel without creating anything.
 
-The wizard never runs in non-interactive contexts — pipes, CI, agents, `--json`, or
-`--quiet` — which instead print the classified `HWARO_E_USAGE` error, so scripted callers
+The wizard never runs in non-interactive contexts (pipes, CI, agents, `--json`, or
+`--quiet`), which instead print the classified `HWARO_E_USAGE` error, so scripted callers
 stay predictable. Pass a `<path>` (and any flags) to skip the prompts entirely.
 
 **Options:**
@@ -253,7 +253,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | --debug | Print debug information after build |
 
 **About the output directory:** a full build starts from an empty output
-directory, but hwaro only clears a directory it can vouch for — the
+directory, but hwaro only clears a directory it can vouch for: the
 conventional `public/` next to the project, `hwaro serve`'s own `.hwaro/serve`,
 and any directory hwaro created (or found empty) on an earlier build. Pointing
 `-o` at a directory that already holds other files (`-o ~/Documents/site`, a
@@ -280,7 +280,7 @@ For sites with thousands of pages, loading all rendered HTML into memory at once
 | yes | 512M | - | Streaming, batch≈5000 |
 | - | 2G | 1G | CLI wins (2G) |
 
-The build output is identical — streaming only affects memory usage during the build.
+The build output is identical. Streaming only affects memory usage during the build.
 
 **About `--minify`:**
 
@@ -290,13 +290,13 @@ The minify flag shrinks generated files while keeping them visually identical to
 - **JSON**: Removes whitespace and newlines for compact output.
 - **XML**: Removes whitespace between tags for smaller file sizes.
 
-Whitespace-sensitive elements — `<pre>`, `<code>`, `<textarea>`, `<script>`, `<style>`, `<svg>`, `<math>`, `<noscript>` — are extracted before any whitespace pass and restored verbatim, so their contents are never touched.
+Whitespace-sensitive elements (`<pre>`, `<code>`, `<textarea>`, `<script>`, `<style>`, `<svg>`, `<math>`, `<noscript>`) are extracted before any whitespace pass and restored verbatim, so their contents are never touched.
 
 For more aggressive output shrinking (attribute quoting, entity collapsing, etc.) post-process `public/` with a dedicated tool such as `html-minifier-terser` or `minify-html`.
 
 **About `--cache` (Incremental Build):**
 
-When enabled, Hwaro tracks file modification times and content checksums in a `.hwaro_cache.json` file at the project root. On subsequent builds, only files that have changed since the last build are re-rendered. The cache also tracks template and config checksums — if templates or `config.toml` change, all entries are automatically invalidated and every page is rebuilt.
+When enabled, Hwaro tracks file modification times and content checksums in a `.hwaro_cache.json` file at the project root. On subsequent builds, only files that have changed since the last build are re-rendered. The cache also tracks template and config checksums. If templates or `config.toml` change, all entries are automatically invalidated and every page is rebuilt.
 
 Use `--full` together with `--cache` to force a clean rebuild while still saving the cache for the next run:
 
@@ -308,7 +308,7 @@ See [Incremental Build](/features/incremental-build/) for details.
 
 **About `--jobs` (render concurrency):**
 
-By default Hwaro picks the number of concurrent render workers from your site's **listing fan-out** — how many page objects a single page render materializes from a site-wide collection. `--jobs N` overrides that. It never changes the generated output, only how many pages render at once.
+By default Hwaro picks the number of concurrent render workers from your site's **listing fan-out**, the number of page objects a single page render materializes from a site-wide collection. `--jobs N` overrides that. It never changes the generated output, only how many pages render at once.
 
 Fan-out is what caps useful parallelism, not the core count. Every `{% for p in site.pages %}` or `{% for p in section.pages %}` iteration allocates one object per item, and past a small worker count the garbage collector's global allocation lock serializes that work while extra workers add only contention. So the automatic count is:
 
@@ -318,7 +318,7 @@ Fan-out is what caps useful parallelism, not the core count. Every `{% for p in 
 | 100–499 | 2 |
 | Under 100 (most sites) | up to 4 |
 
-A homepage that lists every page does not count against this — the estimate is the mean across rendered pages, so one expensive listing page among thousands of cheap ones leaves the site on the fast path.
+A homepage that lists every page does not count against this. The estimate is the mean across rendered pages, so one expensive listing page among thousands of cheap ones leaves the site on the fast path.
 
 ```bash
 hwaro build --jobs 4   # override the automatic count
@@ -331,9 +331,9 @@ Leave it unset unless you are benchmarking; the automatic count is within a few 
 When specified, Hwaro changes its working directory to the given path before building. This lets you build a site located in another directory without `cd`-ing into it first.
 
 - All site sources (`config.toml`, `content/`, `templates/`, `static/`) are read from the input directory.
-- **Without `-o`:** The default output directory `public/` is created inside the input directory (i.e., the site's own `public/` folder). This is the natural behavior — `hwaro build -i ../my-site` produces `../my-site/public/`.
+- **Without `-o`:** The default output directory `public/` is created inside the input directory (i.e., the site's own `public/` folder). This is the natural behavior: `hwaro build -i ../my-site` produces `../my-site/public/`.
 - **With `-o`:** The output path is resolved relative to **your current directory** (not the input directory), so `hwaro build -i ../my-site -o ./dist` writes output to `./dist` in your shell's CWD.
-- If `-i` is omitted, behavior is unchanged — the current directory is used.
+- If `-i` is omitted, behavior is unchanged and the current directory is used.
 
 ### serve
 
@@ -349,7 +349,7 @@ hwaro serve -i /path/to/my-site
 hwaro serve -i /path/to/my-site -p 8080
 ```
 
-> **Serve output is a dev artifact — never deploy it.** `hwaro serve` builds into its own directory, `.hwaro/serve/`, and leaves the configured `output_dir` (`public/` by default) completely untouched, so a serve session can never overwrite a deployable build. The pages under `.hwaro/serve/` carry the dev server's `base_url` (e.g. `http://127.0.0.1:3000`) in every link, and the directory is stamped with a `.hwaro-dev` marker that `hwaro deploy` refuses. Run `hwaro build` to produce a deployable site. `.hwaro/` keeps itself out of version control — hwaro writes a self-ignoring `.hwaro/.gitignore` when it creates the directory, and `hwaro init` also scaffolds a project `.gitignore` covering the output dir, `.hwaro/`, and `.hwaro_cache.json`.
+> **Serve output is a dev artifact. Never deploy it.** `hwaro serve` builds into its own directory, `.hwaro/serve/`, and leaves the configured `output_dir` (`public/` by default) completely untouched, so a serve session can never overwrite a deployable build. The pages under `.hwaro/serve/` carry the dev server's `base_url` (e.g. `http://127.0.0.1:3000`) in every link, and the directory is stamped with a `.hwaro-dev` marker that `hwaro deploy` refuses. Run `hwaro build` to produce a deployable site. `.hwaro/` keeps itself out of version control: hwaro writes a self-ignoring `.hwaro/.gitignore` when it creates the directory, and `hwaro init` also scaffolds a project `.gitignore` covering the output dir, `.hwaro/`, and `.hwaro_cache.json`.
 
 **Options:**
 
@@ -368,7 +368,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --include-future | Include future-dated content |
 | -v, --verbose | Show detailed output |
 | --debug | Print debug information after each rebuild |
-| --access-log | Show HTTP access log (e.g. GET requests). Each line reports the path the browser requested — `/`, not the `/index.html` the dev server resolves it to |
+| --access-log | Show HTTP access log (e.g. GET requests). Each line reports the path the browser requested (`/`, not the `/index.html` the dev server resolves it to) |
 | --no-error-overlay | Disable in-browser error overlay (default: enabled) |
 | --live-reload | Enable browser live reload on file changes (default: enabled; kept for backwards compatibility) |
 | --no-live-reload | Disable browser live reload on file changes |
@@ -397,11 +397,11 @@ The server watches for file changes and rebuilds automatically. It uses **smart 
 
 **About live reload:**
 
-Live reload is **enabled by default**. The server injects a small WebSocket client script into every HTML response, and after each successful rebuild, connected browsers automatically refresh the page — no manual reload needed. The client uses exponential backoff (1s–30s) for reconnection, so restarting the server won't break the connection permanently.
+Live reload is **enabled by default**. The server injects a small WebSocket client script into every HTML response, and after each successful rebuild, connected browsers automatically refresh the page, so no manual reload is needed. The client uses exponential backoff (1s to 30s) for reconnection, so restarting the server won't break the connection permanently.
 
 Pass `--no-live-reload` to disable this behaviour (useful for testing production-like delivery locally). The `--live-reload` flag is kept as a no-op alias for backwards compatibility with existing invocations.
 
-When `-i` is specified, the server operates as if you had `cd`-ed into the given directory — watching and serving from that project root.
+When `-i` is specified, the server operates as if you had `cd`-ed into the given directory, watching and serving from that project root.
 
 **Subpath preview (`--base-url` with a path):**
 
@@ -409,7 +409,7 @@ When `-i` is specified, the server operates as if you had `cd`-ed into the given
 hwaro serve --base-url http://localhost:3000/myblog/
 ```
 
-The site is built with `/myblog/`-prefixed links and served under that same prefix, so a project-page deployment (GitHub Pages, GitLab Pages) can be previewed exactly as it will be published — instead of a homepage whose every link 404s locally.
+The site is built with `/myblog/`-prefixed links and served under that same prefix, so a project-page deployment (GitHub Pages, GitLab Pages) can be previewed exactly as it will be published, instead of a homepage whose every link 404s locally.
 
 - `/` redirects to `/myblog/`.
 - Unprefixed requests still resolve, so hand-typed asset paths keep working.
@@ -419,7 +419,7 @@ The site is built with `/myblog/`-prefixed links and served under that same pref
 
 - The server answers `GET`, `HEAD`, and `OPTIONS`. Any other method returns `405 Method Not Allowed` with an `Allow: GET, HEAD, OPTIONS` header, rather than the 404 page.
 - Malformed request paths (for example a percent-encoded NUL byte) return `400 Bad Request`.
-- `HEAD` returns exactly the same headers as the matching `GET` — including the `Content-Length` of the live-reload-injected HTML — with no body.
+- `HEAD` returns exactly the same headers as the matching `GET`, including the `Content-Length` of the live-reload-injected HTML, with no body.
 - Text responses (`.txt`, `.json`, `.xml`, `.js`, `.css`, `.svg`, …) always carry `; charset=utf-8`, regardless of file size.
 - Directory redirects emit a percent-encoded `Location` (`/my%20page/`, `/%ED%95%9C%EA%B8%80/`). Paths containing a backslash or an encoded separator (`%2F`, `%5C`) are not served, matching static-host behaviour.
 
@@ -472,12 +472,12 @@ hwaro deploy --dry-run
 cannot reconcile:
 
 - An empty source directory (or one where `include`/`exclude` selected
-  nothing) aborts instead of deleting the destination — run `hwaro build`
+  nothing) aborts instead of deleting the destination. Run `hwaro build`
   first, or pass `--force` to clear it deliberately. A `command` target that
   never interpolates `{source}` is exempt, since it does not read the
   source at all.
 - `--max-deletes` caps the delete pass (256 by default; any negative value
-  disables it). It applies to the built-in `file://` sync only — a command
+  disables it). It applies to the built-in `file://` sync only; a command
   target's own `--delete` flag is not bounded by it.
 - Symlinks at the destination are never written or deleted *through*. A link
   standing where a file or directory belongs is replaced; a stale one is
