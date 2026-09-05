@@ -21,6 +21,10 @@ module Hwaro
       # Validate and select files for syncing `source_dir` into the local
       # directory `dest_dir`. `create_dest: false` (the plan) leaves a missing
       # destination uncreated — a dry run must not write anything.
+      #
+      # `force_patterns` lets the plan compile (and warn about) the matcher
+      # patterns once for the whole run; the deploy paths compile them per
+      # target, as they always did.
       private def prepare_directory_sync(
         target : Models::DeploymentTarget,
         source_dir : String,
@@ -28,6 +32,7 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
         create_dest : Bool,
+        force_patterns : Array(Regex)? = nil,
       ) : DirectorySync
         require_non_empty_source!(source_dir, effective)
         dest_dir = expand_local_path(dest_dir)
@@ -46,7 +51,7 @@ module Hwaro
         check_empty_selection!(desired, to_delete, target, effective)
         check_max_deletes!(to_delete.size, effective)
 
-        to_copy, skipped = compute_copies(desired, dest_dir, effective.force, force_matcher_patterns(deployment))
+        to_copy, skipped = compute_copies(desired, dest_dir, effective.force, force_patterns || force_matcher_patterns(deployment))
 
         DirectorySync.new(dest_dir, desired, to_copy, to_delete, skipped)
       end

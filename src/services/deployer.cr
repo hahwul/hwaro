@@ -85,6 +85,7 @@ module Hwaro
         warn_unapplied_matchers(deployment)
         warn_unapplied_workers(deployment)
         effective = EffectiveOptions.new(deployment, options)
+        force_patterns = force_matcher_patterns(deployment)
 
         targets.each do |target|
           if command = target.command
@@ -108,7 +109,7 @@ module Hwaro
             # would, so the plan runs the exact preparation (overlap check,
             # destination validation, delete cap) a deploy does — it only
             # stops short of creating the destination directory.
-            sync = prepare_directory_sync(target, source_dir, directory_destination, effective, deployment, create_dest: false)
+            sync = prepare_directory_sync(target, source_dir, directory_destination, effective, deployment, create_dest: false, force_patterns: force_patterns)
             dest_dir = sync.dest_dir
 
             sync.to_copy.each do |dest_rel, src_path|
