@@ -392,7 +392,7 @@ module Hwaro
       # site/config objects expose structured fields only), so an unknown
       # top-level key is always dead configuration. Sorted, so "did you mean"
       # suggestions tie-break the same way regardless of load order.
-      KNOWN_TOP_LEVEL_KEYS = SCALAR_KEYS + SECTION_LOADERS.flat_map(&.keys).uniq.sort
+      KNOWN_TOP_LEVEL_KEYS = SCALAR_KEYS + SECTION_LOADERS.flat_map(&.keys).uniq!.sort!
 
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
         raw.each_key do |key|

@@ -257,7 +257,7 @@ module Hwaro
         # engine-specific syntax verbatim (`wrapped_note`, the sentence after
         # "N file(s)"), report path collisions and build the ImportResult
         # (`summary_message`). Both messages have per-engine overrides.
-        protected def import_each(items : Array(T), engine : String, wrapped_note : String? = nil, &block : T -> Symbol) : ImportResult forall T
+        protected def import_each(items : Array(T), engine : String, wrapped_note : String? = nil, & : T -> Symbol) : ImportResult forall T
           imported = 0
           skipped = 0
           errors = 0
