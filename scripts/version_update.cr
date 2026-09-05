@@ -120,6 +120,18 @@ puts "Hwaro Version Update Tool"
 puts "=" * 50
 puts
 
+# Fold pending changelog fragments into CHANGELOG.md first so a release never
+# leaves entries stranded in changelog.d/ (see changelog.d/README.md).
+if Dir.exists?("changelog.d") && !Dir.glob("changelog.d/*.md").reject { |f| File.basename(f) == "README.md" }.empty?
+  puts "Merging changelog.d/ fragments into CHANGELOG.md..."
+  status = Process.run("crystal", ["run", "scripts/changelog_assemble.cr"], output: STDOUT, error: STDERR)
+  unless status.success?
+    puts "❌ changelog.d fragments could not be merged; fix them and re-run."
+    exit 1
+  end
+  puts
+end
+
 # Show current versions
 shard_v = get_shard_version
 hwaro_v = get_hwaro_version

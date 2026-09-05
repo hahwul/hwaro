@@ -141,6 +141,12 @@ version-check:
 version-update:
     crystal run scripts/version_update.cr
 
+# Merge changelog.d/*.md fragments into CHANGELOG.md's Unreleased section
+# (pass --check to validate without merging).
+[group('development')]
+changelog *ARGS:
+    crystal run scripts/changelog_assemble.cr -- {{ ARGS }}
+
 # Test known external hwaro-powered sites ("friends") to prevent regressions.
 # This ensures that changes to hwaro don't accidentally break real user sites.
 #
