@@ -17,6 +17,8 @@
 #   --count N      benchmark corpus size (default 300)
 #   --keep         keep the work directory on success (always kept on failure)
 #   --work DIR     use DIR as the work directory instead of mktemp
+#   --tiers LIST   run only these tiers (comma-separated subset of
+#                  scaffolds,docs,bench,import,convert,text,serve,deploy)
 #
 # Typical:
 #   just baseline                      # builds ../hwaro-baseline/bin/hwaro from main
@@ -36,6 +38,7 @@ QUICK=0
 COUNT=300
 KEEP=0
 WORK=""
+TIERS="scaffolds,docs,bench,import,convert,text"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -45,6 +48,7 @@ while [ $# -gt 0 ]; do
     --count) COUNT="$2"; shift ;;
     --keep) KEEP=1 ;;
     --work) WORK="$2"; shift ;;
+    --tiers) TIERS="$2"; shift ;;
     -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     -*) echo "unknown option: $1" >&2; exit 2 ;;
     *)
@@ -66,12 +70,19 @@ CAND_BIN="$(cd "$(dirname "$CAND_BIN")" && pwd)/$(basename "$CAND_BIN")"
 [ -x "$BASE_BIN" ] || { echo "not executable: $BASE_BIN" >&2; exit 2; }
 [ -x "$CAND_BIN" ] || { echo "not executable: $CAND_BIN" >&2; exit 2; }
 
+[ "$RUN_SERVE" = 1 ] && TIERS="$TIERS,serve"
+[ "$RUN_DEPLOY" = 1 ] && TIERS="$TIERS,deploy"
+tier_on() { case ",$TIERS," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
+
 if [ -z "$WORK" ]; then
   WORK="$(mktemp -d "${TMPDIR:-/tmp}/hwaro-identity.XXXXXX")"
 else
   mkdir -p "$WORK"
-  WORK="$(cd "$WORK" && pwd)"
 fi
+# Canonical (symlink-resolved, no doubled slashes) so paths hwaro prints —
+# which may be realpath'd, e.g. /private/var vs /var on macOS — match.
+WORK="$(cd "$WORK" && pwd -P)"
+WORK_LOGICAL="$(cd "$WORK" && pwd -L)"
 
 export NO_COLOR=1
 export HWARO_NO_UPDATE_CHECK=1
@@ -112,15 +123,19 @@ json.dump(d, open(p, "w"), sort_keys=True, indent=1)
 ' 2>/dev/null || true
 }
 
-# Normalise timings / pids / the work-dir path in captured text output.
+# Normalise timings / pids / clock stamps / the work-dir path (and our own
+# .base/.cand copy suffix) in captured text output.
 normalize_text() {
-  NORM_WORK="$WORK" NORM_BASE="$BASE_BIN" NORM_CAND="$CAND_BIN" perl -pe '
+  NORM_WORK="$WORK" NORM_WORK2="$WORK_LOGICAL" NORM_BASE="$BASE_BIN" NORM_CAND="$CAND_BIN" perl -pe '
     s/\b\d+(\.\d+)?\s?(ms|s|sec|seconds)\b/T/g;
+    s/\b\d{2}:\d{2}:\d{2}\b/HH:MM:SS/g;
     s/"(duration|elapsed|time|took|build_time|duration_ms|elapsed_ms|pid)"\s*:\s*[0-9.]+/"$1": T/g;
     s/pid=\d+/pid=P/g;
     s/\Q$ENV{NORM_WORK}\E/WORK/g;
+    s/\Q$ENV{NORM_WORK2}\E/WORK/g;
     s/\Q$ENV{NORM_BASE}\E/BIN/g;
     s/\Q$ENV{NORM_CAND}\E/BIN/g;
+    s/\.(base|cand)(?=\/|\b)/.X/g;
   '
 }
 
@@ -184,8 +199,9 @@ log "base:     $BASE_BIN"
 log "cand:     $CAND_BIN"
 
 # ---------------------------------------------------------------- scaffolds
-step "scaffold init + build"
 SCAFFOLDS="simple bare blog docs book"
+if tier_on scaffolds; then
+step "scaffold init + build"
 if [ "$QUICK" = 1 ]; then
   CONFIG_MODES="default"
   LANG_MODES="mono"
@@ -216,13 +232,23 @@ for s in $SCAFFOLDS; do
     done
   done
 done
+fi
+# Later tiers reuse the default-mode inits; make sure they exist even when
+# the scaffold tier was skipped.
+for s in $SCAFFOLDS; do
+  d="$WORK/init/$s-default-mono.base"
+  [ -d "$d" ] || { mkdir -p "$d"; ( cd "$WORK/init" && "$BASE_BIN" init -q --scaffold "$s" --agents local --force "$s-default-mono.base" >/dev/null 2>&1 ) || true; }
+done
 
 # --------------------------------------------------------------------- docs
+if tier_on docs; then
 step "docs site"
 build_compare "docs" "$REPO/docs" --
 build_compare "docs-minify" "$REPO/docs" -- --minify
+fi
 
 # ------------------------------------------------------------ bench corpus
+if tier_on bench; then
 step "benchmark corpus (count=$COUNT)"
 if ( cd "$REPO" && crystal run scripts/benchmark_run.cr -- --generate-only --force --count "$COUNT" --dir "$WORK/bench" > "$WORK/bench.gen.log" 2>&1 ); then
   build_compare "bench" "$WORK/bench" --
@@ -240,8 +266,10 @@ else
   log "  ! benchmark corpus generation failed (see $WORK/bench.gen.log) — tier skipped"
   FAILURES=$((FAILURES + 1))
 fi
+fi
 
 # ---------------------------------------------------------------- importers
+if tier_on import; then
 step "importers"
 IMP="$WORK/import/src"
 mkdir -p "$IMP"
@@ -482,8 +510,10 @@ for fmt in wordpress jekyll hugo notion obsidian hexo astro eleventy; do
   compare "import:$fmt" "$b" "$c"
   compare "import:$fmt (stdout)" "$b.out" "$c.out"
 done
+fi
 
 # ------------------------------------------------------- convert / export
+if tier_on convert; then
 step "convert + export (blog scaffold content)"
 BLOG="$WORK/init/blog-default-mono.base"
 if [ ! -d "$BLOG" ]; then BLOG="$WORK/init/blog-default-mono.base"; fi
@@ -501,8 +531,10 @@ for target in hugo jekyll; do
   compare "export:$target" "$b" "$c"
   compare "export:$target (stdout)" "$b.export.out" "$c.export.out"
 done
+fi
 
 # ------------------------------------------------------------ text surfaces
+if tier_on text; then
 step "text surfaces (--help, --json reports, doctor, validate, new)"
 run_both_here "help:root" "$WORK" -- --help
 run_both_here "help:version" "$WORK" -- version
@@ -558,9 +590,10 @@ for s in blog docs; do
   run_both agents "$b" "$c" -- tool agents-md --write --force
   compare "generators:$s" "$b" "$c"
 done
+fi
 
 # ---------------------------------------------------------------- serve
-if [ "$RUN_SERVE" = 1 ]; then
+if tier_on serve; then
   step "serve (incremental rebuild snapshots)"
   SERVE_SRC="$WORK/init/blog-default-mono.base"
   PORT=$((20000 + RANDOM % 20000))
@@ -632,7 +665,7 @@ if [ "$RUN_SERVE" = 1 ]; then
 fi
 
 # --------------------------------------------------------------- deploy
-if [ "$RUN_DEPLOY" = 1 ]; then
+if tier_on deploy; then
   step "deploy (file:// target)"
   SRC="$WORK/init/blog-default-mono.base"
   for side in base cand; do
@@ -655,7 +688,6 @@ EOF
   # Second deploy with a removed file exercises the delete path.
   rm -f "$WORK/deploy.base/public/index.html" "$WORK/deploy.cand/public/index.html"
   run_both dep2 "$WORK/deploy.base" "$WORK/deploy.cand" -- deploy local
-  perl -pi -e 's/deploy-target\.(base|cand)/deploy-target.X/g' "$WORK"/deploy.*.out
   compare "deploy:target" "$WORK/deploy-target.base" "$WORK/deploy-target.cand"
   compare "deploy:dry-run stdout" "$WORK/deploy.base.dry.out" "$WORK/deploy.cand.dry.out"
   compare "deploy:dry-run json" "$WORK/deploy.base.dryjson.out" "$WORK/deploy.cand.dryjson.out"
