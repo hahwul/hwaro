@@ -85,7 +85,6 @@ WORK="$(cd "$WORK" && pwd -P)"
 WORK_LOGICAL="$(cd "$WORK" && pwd -L)"
 
 export NO_COLOR=1
-export HWARO_NO_UPDATE_CHECK=1
 
 FAILURES=0
 PASSED=0
@@ -103,16 +102,16 @@ normalize_tree() {
   # Feed build timestamps: RSS <lastBuildDate>, Atom feed-level <updated> on
   # the line right after <feed ...> / <title> header, JSON Feed has none.
   find "$dir" -type f \( -name '*.xml' -o -name '*.atom' -o -name '*.rss' \) -print0 2>/dev/null |
-    xargs -0 perl -pi -e 's{<lastBuildDate>[^<]*</lastBuildDate>}{<lastBuildDate>T</lastBuildDate>}g' 2>/dev/null || true
+    xargs -0 -r perl -pi -e 's{<lastBuildDate>[^<]*</lastBuildDate>}{<lastBuildDate>T</lastBuildDate>}g' 2>/dev/null || true
   # Build bookkeeping written into the input tree (.hwaro/owned_outputs, the
   # build cache) records absolute paths, which differ only by our .base/.cand
   # copy suffix.
   find "$dir" \( -path '*/.hwaro/*' -o -name '.hwaro_cache.json' \) -type f -print0 2>/dev/null |
-    xargs -0 perl -pi -e 's/\.(base|cand)(?=\/|\b)/.X/g' 2>/dev/null || true
+    xargs -0 -r perl -pi -e 's/\.(base|cand)(?=\/|\b)/.X/g' 2>/dev/null || true
   # The build cache records source mtimes (which `cp -R` rewrites per copy)
   # and lists entries in render-completion order; canonicalise it.
   find "$dir" -name '.hwaro_cache.json' -type f -print0 2>/dev/null |
-    xargs -0 -n 1 python3 -c '
+    xargs -0 -r -n 1 python3 -c '
 import json, sys
 p = sys.argv[1]
 d = json.load(open(p))
@@ -123,19 +122,24 @@ json.dump(d, open(p, "w"), sort_keys=True, indent=1)
 ' 2>/dev/null || true
 }
 
-# Normalise timings / pids / clock stamps / the work-dir path (and our own
-# .base/.cand copy suffix) in captured text output.
+# Normalise the few things that legitimately differ between two runs of the
+# SAME binary in captured text output: duration tokens (`1.2s`, `340ms`,
+# `3 seconds` — not version strings or dates: the token must not follow a
+# word/dot character), the serve log's leading wall-clock stamp, pids, the
+# work-dir path, and our own .base/.cand copy suffix INSIDE work-dir paths.
+# Everything else, including dates printed by `tool list`, is compared.
 normalize_text() {
   NORM_WORK="$WORK" NORM_WORK2="$WORK_LOGICAL" NORM_BASE="$BASE_BIN" NORM_CAND="$CAND_BIN" perl -pe '
-    s/\b\d+(\.\d+)?\s?(ms|s|sec|seconds)\b/T/g;
-    s/\b\d{2}:\d{2}:\d{2}\b/HH:MM:SS/g;
+    s/(?<![\w.])\d+(\.\d+)?(ms|s)\b/T/g;
+    s/(?<![\w.])\d+(\.\d+)? (ms|seconds)\b/T/g;
+    s/^(\S{1,3} )\d{2}:\d{2}:\d{2}(?= )/$1HH:MM:SS/;
     s/"(duration|elapsed|time|took|build_time|duration_ms|elapsed_ms|pid)"\s*:\s*[0-9.]+/"$1": T/g;
     s/pid=\d+/pid=P/g;
     s/\Q$ENV{NORM_WORK}\E/WORK/g;
     s/\Q$ENV{NORM_WORK2}\E/WORK/g;
     s/\Q$ENV{NORM_BASE}\E/BIN/g;
     s/\Q$ENV{NORM_CAND}\E/BIN/g;
-    s/\.(base|cand)(?=\/|\b)/.X/g;
+    s/(WORK\/[^\s"]*?)\.(base|cand)(?=\/|\b)/$1.X/g;
   '
 }
 
@@ -516,7 +520,6 @@ fi
 if tier_on convert; then
 step "convert + export (blog scaffold content)"
 BLOG="$WORK/init/blog-default-mono.base"
-if [ ! -d "$BLOG" ]; then BLOG="$WORK/init/blog-default-mono.base"; fi
 for target in to-yaml to-json to-toml; do
   b="$WORK/build/convert-$target.base"; c="$WORK/build/convert-$target.cand"
   copy_tree "$BLOG" "$b"; copy_tree "$BLOG" "$c"
@@ -563,7 +566,11 @@ for s in $SCAFFOLDS; do
   run_both_here "validate:$s" "$d" -- tool validate
   run_both_here "validate-json:$s" "$d" -- tool validate --json
   run_both_here "unused-assets:$s" "$d" -- tool unused-assets
-  run_both_here "check-links:$s" "$d" -- tool check-links --internal-only
+  run_both_here "check-links:$s (no build output)" "$d" -- tool check-links --internal-only
+  built="$WORK/build/checklinks-$s"
+  copy_tree "$d" "$built"
+  ( cd "$built" && "$BASE_BIN" build -q >/dev/null 2>&1 ) || true
+  run_both_here "check-links:$s (built)" "$built" -- tool check-links --internal-only
   run_both_here "deploy-list:$s" "$d" -- deploy --list-targets
 done
 
@@ -589,6 +596,9 @@ for s in blog docs; do
   run_both ci "$b" "$c" -- tool ci github-actions
   run_both agents "$b" "$c" -- tool agents-md --write --force
   compare "generators:$s" "$b" "$c"
+  compare "generators:$s (platform stdout)" "$b.platform.out" "$c.platform.out"
+  compare "generators:$s (ci stdout)" "$b.ci.out" "$c.ci.out"
+  compare "generators:$s (agents-md stdout)" "$b.agents.out" "$c.agents.out"
 done
 fi
 
@@ -620,46 +630,59 @@ if tier_on serve; then
     local page_tmpl
     page_tmpl="$(cd "$dir" && ls templates/*.html | head -n 1)"
 
-    wait_for() { # wait_for PATTERN FILE_GLOB_DIR
+    # A rebuild that never lands is a FAILURE of the tier, not a skipped
+    # snapshot: otherwise both binaries could miss the same marker and the
+    # snapshot comparison would pass on two identical gaps.
+    local missed=0
+    wait_for() { # wait_for PATTERN
       local pat="$1" d=$((SECONDS + 30))
       until grep -rq -- "$pat" "$out" 2>/dev/null; do
-        sleep 0.2; [ $SECONDS -gt $d ] && { echo "timeout waiting for $pat" >&2; return 1; }
+        sleep 0.2
+        if [ $SECONDS -gt $d ]; then echo "  ✗ serve: timed out waiting for $pat in $out" >&2; missed=$((missed + 1)); return 1; fi
       done
       sleep 0.5
     }
     wait_gone() { # wait_gone FILE
       local f="$1" d=$((SECONDS + 30))
       while [ -e "$f" ]; do
-        sleep 0.2; [ $SECONDS -gt $d ] && { echo "timeout waiting for $f to disappear" >&2; return 1; }
+        sleep 0.2
+        if [ $SECONDS -gt $d ]; then echo "  ✗ serve: timed out waiting for $f to disappear" >&2; missed=$((missed + 1)); return 1; fi
       done
       sleep 0.5
     }
 
     cp -R "$out" "$snaps/0-initial"
     printf '\n\nIDENTITY-MARKER-CONTENT\n' >> "$dir/$first_post"
-    wait_for 'IDENTITY-MARKER-CONTENT' && cp -R "$out" "$snaps/1-content"
+    wait_for 'IDENTITY-MARKER-CONTENT' || true
+    cp -R "$out" "$snaps/1-content"
     printf '\n<!-- IDENTITY-MARKER-TEMPLATE -->\n' >> "$dir/$page_tmpl"
-    wait_for 'IDENTITY-MARKER-TEMPLATE' && cp -R "$out" "$snaps/2-template"
+    wait_for 'IDENTITY-MARKER-TEMPLATE' || true
+    cp -R "$out" "$snaps/2-template"
     mkdir -p "$dir/static" && printf 'static marker\n' > "$dir/static/identity-marker.txt"
-    wait_for 'static marker' && cp -R "$out" "$snaps/3-static"
+    wait_for 'static marker' || true
+    cp -R "$out" "$snaps/3-static"
+    # The removed post's own page (…/index.html, not a listing or feed that
+    # merely mentions the marker) must disappear.
     local removed_html
-    removed_html="$(grep -rl 'IDENTITY-MARKER-CONTENT' "$out" | head -n 1 || true)"
+    removed_html="$(grep -rl 'IDENTITY-MARKER-CONTENT' "$out" | grep '/index\.html$' | grep -v "^$out/index\.html$" | head -n 1 || true)"
     rm -f "$dir/$first_post"
-    if [ -n "$removed_html" ]; then wait_gone "$removed_html"; else sleep 2; fi
+    if [ -n "$removed_html" ]; then wait_gone "$removed_html" || true; else echo "  ✗ serve: could not locate the rendered page of $first_post" >&2; missed=$((missed + 1)); fi
     cp -R "$out" "$snaps/4-removed"
     kill $pid 2>/dev/null || true
     wait $pid 2>/dev/null || true
     normalize_text < "$log" > "$snaps/serve.norm.log"
     rm -f "$log"
+    [ "$missed" = 0 ]
   }
 
   copy_tree "$SERVE_SRC" "$WORK/serve.base"
   copy_tree "$SERVE_SRC" "$WORK/serve.cand"
-  if serve_sequence "$BASE_BIN" "$WORK/serve.base" "$WORK/serve-snaps.base" &&
-     serve_sequence "$CAND_BIN" "$WORK/serve.cand" "$WORK/serve-snaps.cand"; then
-    compare "serve:snapshots" "$WORK/serve-snaps.base" "$WORK/serve-snaps.cand"
-  else
-    log "  ✗ serve sequence failed"
+  serve_ok=1
+  serve_sequence "$BASE_BIN" "$WORK/serve.base" "$WORK/serve-snaps.base" || serve_ok=0
+  serve_sequence "$CAND_BIN" "$WORK/serve.cand" "$WORK/serve-snaps.cand" || serve_ok=0
+  compare "serve:snapshots" "$WORK/serve-snaps.base" "$WORK/serve-snaps.cand"
+  if [ "$serve_ok" = 0 ]; then
+    log "  ✗ serve: at least one rebuild never landed (see messages above)"
     FAILURES=$((FAILURES + 1))
   fi
 fi

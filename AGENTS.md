@@ -28,8 +28,8 @@ just dev                # serve the docs site (bin/hwaro serve -i docs)
   `just test-dir` set their own `CRYSTAL_CACHE_DIR`, so they are safe to run
   alongside `just test`.
 - `spec/functional/**` spawns `bin/hwaro`; rebuild it (`shards build`) before
-  trusting a functional run, or the specs test the old binary (some skip
-  silently when it is missing).
+  trusting a functional run, or the specs test the old binary (the serve
+  specs mark themselves pending when it is missing).
 - `bin/ameba` is built by `just ameba` (ameba 1.7 ships no executable).
 - Anything that changes `shard.lock` must be followed by `just nix-update`.
   `flake.nix` reads the version and minimum Crystal from `shard.yml`.
@@ -49,8 +49,8 @@ Generated output is the contract. Before opening a structural PR:
    convert/export, and diffs `--help`/`--json` surfaces. `--serve` and
    `--deploy` add the incremental-rebuild and deploy tiers.
 2. `scripts/check_no_toplevel_effects.sh` (run by `just verify`) enforces the
-   file-split convention; `spec/unit/registration_order_spec.cr` pins every
-   hand-maintained registry.
+   file-split convention; `spec/unit/registration_order_spec.cr` pins the
+   hand-maintained registries (contents, and order where it matters).
 3. Move-only commits first (`git diff --color-moved=dimmed-zebra` should show
    only moves), edits in separate commits. A regression spec added with a fix
    must be shown failing on the pre-fix code.
@@ -86,12 +86,12 @@ in `ARCHITECTURE.md`.
   `ServerHighlighter`'s mutex.
 
 ### Logging
-- `Logger.action(label, message, color)` for file operations,
+- `Logger.action(label, message, role = Role::Success)` for file operations,
   `Logger.progress(current, total)`, `Logger.outcome`, `Logger::Receipt`,
   `Logger.timed(message, &block)`; levels `debug`/`info`/`warn`/`error`/`success`.
 - Every command honours `--quiet`/`-q` (info/action/progress/success and the
-  banner off; warn/error still on stderr) and `NO_COLOR`. `--json` commands
-  route failures through `Runner.exit_with_error_payload`.
+  banner off; warn/error still on stderr) and `NO_COLOR`. A command that
+  handles `--json` itself exits through `Runner.exit_with_error_payload`.
 - Machine-readable lines (`hwaro serve: ready url=…`, `--json` envelopes) are
   contracts; keep their bytes.
 
@@ -103,7 +103,9 @@ registration-order spec tells you if a merge broke it.
 
 ### Tests
 - `spec/unit/<mirror of src>/…_spec.cr`: the test for `src/a/b/c.cr` lives in
-  `spec/unit/a/b/c_spec.cr`; cross-cutting sweeps go in `spec/unit/regressions/`.
+  `spec/unit/a/b/` (usually `c_spec.cr`; feature-named files such as
+  `models/config/outputs_config_spec.cr` sit in the directory of the code they
+  test); cross-cutting sweeps go in `spec/unit/regressions/`.
 - `spec/support/`: shared helpers — `load_config` / `expect_config_error`
   (config_helper), `compile` / `compile_with` (sass_helper), `build_site`
   (build_helper: temp project, `Builder#run`, yields for assertions). Add a

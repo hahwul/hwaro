@@ -79,7 +79,7 @@ describe "registration order" do
 
   it "keeps the Crinja filter, test and function sets" do
     env = Hwaro::Content::Processors::TemplateEngine.new.env
-    env.filters.keys.sort.should eq(%w[
+    env.filters.keys.sort!.should eq(%w[
       abs absolute_url active_path append attr batch capitalize ceil center
       compact date default dictsort escape filesizeformat first flatten float
       floor forceescape format group_by groupby indent inspect int join
@@ -89,15 +89,36 @@ describe "registration order" do
       sum t title tojson trim truncate truncate_words unique upper urlencode
       urlize where wordcount wordwrap xml_escape xmlattr
     ])
-    env.tests.keys.sort.should eq(%w[
+    env.tests.keys.sort!.should eq(%w[
       callable containing defined divisibleby empty endswith equalto escaped
       even greaterthan in iterable lessthan lower mapping matching nil none
       number odd present sameas sequence startswith string undefined upper
     ])
-    env.functions.keys.sort.should eq(%w[
+    env.functions.keys.sort!.should eq(%w[
       asset asset_url cycler debug dict env get_menu get_page get_section
       get_taxonomy get_taxonomy_url get_url joiner load_data now range
       resize_image super url_for
+    ])
+  end
+
+  it "keeps the config section loader order" do
+    # The keys each loader reads, in load order. Three entries are order
+    # sensitive (languages after menus/taxonomies, sass after auto_includes,
+    # the deployment source-dir resolver after build + deployment); pinning
+    # the whole sequence is simpler than pinning the constraints.
+    Hwaro::Models::Config::SECTION_LOADERS.map(&.keys.join(",")).should eq(%w[
+      sitemap robots llms feeds search plugins content content content
+      pagination highlight auto_includes og menus taxonomies languages
+      versions build serve markdown series related git permalinks assets
+      sass pwa amp image_processing doctor static deployment
+    ] + [""] + %w[outputs links data content])
+  end
+
+  it "keeps the config snippet registry" do
+    Hwaro::Services::ConfigSnippets::SECTION_REGISTRY.keys.should eq(%w[
+      plugins highlight og search serve pagination series related git markdown
+      sitemap robots llms feeds build links permalinks auto_includes assets sass
+      deployment image_processing pwa amp menus
     ])
   end
 

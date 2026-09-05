@@ -39,16 +39,17 @@ src/
     scaffolds/            `hwaro init` scaffolds (Base + simple/bare/blog/docs/book + remote)
     importers/ exporters/ WordPress/Jekyll/Hugo/Notion/Obsidian/Hexo/Astro/Eleventy; Jekyll/Hugo
     defaults/             sample config/content/templates/AGENTS.md for init
-    content_lister/stats/validator, creator (`hwaro new`), frontmatter_converter, …
+    content_lister / content_stats / content_validator, creator (`hwaro new`), frontmatter_converter, …
   assets/                 asset pipeline (bundling/fingerprinting) and the Sass compiler
     sass/                 scanner → parser → AST → evaluator (+ functions, color, extend, importer)
   utils/                  Logger, PathUtils, TextUtils, FileSafe, FrontmatterScanner/Writer,
                           OutputGuard, DevMarker, Profiler, minifiers, …
   ext/                    vendored patches for markd/crinja/toml/tartrazine + stb_image bindings
 spec/
-  spec_helper.cr          requires src/hwaro and spec/support/*
-  support/                shared helpers: config_helper, sass_helper, build_helper (build_site)
-  unit/<mirror of src>/   e.g. spec/unit/core/build/phases/render_spec.cr tests
+  spec_helper.cr          requires src/hwaro, support/config_helper and support/sass_helper
+  support/                shared helpers: config_helper, sass_helper, build_helper (build_site;
+                          required per functional spec)
+  unit/<mirror of src>/   e.g. spec/unit/core/build/phases/phases_render_spec.cr tests
                           src/core/build/phases/render.cr; regressions/ holds cross-cutting sweeps
   functional/             end-to-end builds through Builder#run and the bin/hwaro binary
 docs/                     the documentation site (built with hwaro itself; en + ko)
@@ -60,7 +61,8 @@ changelog.d/              one changelog fragment per PR (see its README)
 ## Build pipeline
 
 `hwaro build` constructs a `Core::Build::Builder`, registers `Content::Hooks.all`
-on its `Lifecycle::Manager`, and runs nine phase modules in order; every
+on its `Lifecycle::Manager`, and runs the eight lifecycle phases in order
+(`OutputFormats` is a ninth included module that runs inside Render); every
 phase has a `before`/`after` hook point:
 
 ```
@@ -79,9 +81,10 @@ Initialize → ReadContent → ParseContent → Transform → Render (+ OutputFo
 - `phases/render.cr` keeps the tuning constants and the ordered require list
   of `phases/render/*.cr`: orchestration, fingerprints, output_paths, fanout,
   page_pipeline, pagination, html_transforms, template_masking, crinja_values,
-  global_vars, asset_tags, template_variables, seo_vars. `apply_template` is
-  the module's one public entry; `build_template_variables` (per page) and
-  `build_global_vars` (per site) assemble what templates see.
+  global_vars, asset_tags, template_variables, seo_vars. The public entries
+  are `apply_template` and the global-vars accessors in `global_vars.cr`;
+  `build_template_variables` (per page) and `build_global_vars` (per site)
+  assemble what templates see.
 - `BuildContext` (`core/lifecycle/context.cr`) is the shared state container
   passed to hooks; hooks reach the builder through `ctx.builder`.
 
@@ -110,7 +113,9 @@ owner):
    `class Hwaro::Models::Config`, `class Hwaro::Services::Doctor`) and fills
    it with definitions. No new mixin modules: `private`/`protected` reach and
    the spec shims that reopen the class must keep working.
-3. Ivars are declared only in the owner. Parts may read and write them.
+3. Ivars of the reopened type are declared only in the owner; parts may read
+   and write them. (A part that defines a new type of its own, like the
+   handler classes in `server/handlers.cr`, declares that type's ivars.)
 4. Load-time statements (`Registry.register(...)`, `Scaffolds::Registry.register`,
    `extend self`, class-variable initialisers, bare calls) stay in the owner,
    after the part requires. Constants and method definitions are
@@ -122,20 +127,21 @@ owner):
 
 ## Registries (explicit on purpose)
 
-Hand-written lists are what an agent greps for, so they stay explicit; each
-one is pinned by `spec/unit/registration_order_spec.cr`, which fails when a
-merge drops or reorders an entry.
+Hand-written lists are what an agent greps for, so they stay explicit.
+`spec/unit/registration_order_spec.cr` pins their contents (and, where order
+is meaningful, their order) so a merge that drops or reorders an entry
+fails a test.
 
 | Registry | Where | Populated by |
 |---|---|---|
-| Content processors | `content/processors/base.cr` `Registry` | `Registry.register(X.new)` at the bottom of each processor file |
-| Lifecycle hooks | `content/hooks.cr` `Hooks.all` | literal array (order = hook order) |
+| Content processors | `content/processors/base.cr` `Registry` | `Registry.register(X.new)` after each processor class (in the owner file) |
+| Lifecycle hooks | `content/hooks.cr` `Hooks.all` | literal array (run order is by hook priority; the array is the tie-break) |
 | CLI commands | `cli/runner.cr` `register_default_commands` | one `CommandRegistry.register` per command |
-| Tool subcommands | `cli/commands/tool_command.cr` | `register_sub` calls (order = `tool --help` order) |
+| Tool subcommands | `cli/commands/tool_command.cr` | `register_sub` calls; `tool --help` groups them by `CATEGORIES` (`HIDDEN` hides deprecated ones) |
 | Crinja filters/tests/functions | `content/processors/template.cr` | `Filters::X.register(@env)` chain, inline `@env.tests[...]`/`@env.functions[...]` |
 | Scaffolds | `services/scaffolds/registry.cr` | `Registry.register(X.new)` at file bottom + `ScaffoldType` enum |
-| Config sections | `models/config.cr` `SECTION_LOADERS` | one row per loader (order = load order) |
-| Config snippets | `services/config_snippets.cr` `SECTION_REGISTRY` | hash literal |
+| Config sections | `models/config.cr` `SECTION_LOADERS` | one row per loader (order = load order, pinned) |
+| Config snippets | `services/config_snippets.cr` `SECTION_REGISTRY` | hash literal (key order pinned) |
 | Doctor checks | `services/doctor/registry.cr` `CHECK_GROUPS` | `CheckSpec` rows (order = report order) |
 
 ## Where does X go?
@@ -145,16 +151,16 @@ Touch the files in the order listed; the last column says where the test lives.
 | Adding… | Files (in order) | Test |
 |---|---|---|
 | a config.toml section `[foo]` | `models/config/foo.cr` (class + `load_foo`, copy an existing file) → `models/config.cr`: `property foo`, `@foo = FooConfig.new` in `initialize`, a `SectionLoader` row in `SECTION_LOADERS` → `services/config_snippets.cr` (`def self.foo` + `SECTION_REGISTRY` row) → `services/scaffolds/base.cr` if scaffolds should emit it → `docs/content/start/config.md` + `.ko.md` | `spec/unit/models/config/foo_spec.cr` |
-| a top-level command | `cli/commands/foo_command.cr` (NAME/DESCRIPTION/FLAGS/`self.metadata`/`run`) → `cli/runner.cr` `register_default_commands` → `docs/content/start/cli.md` | `spec/unit/cli/commands/foo_command_spec.cr`, `spec/functional/cli_*` |
-| a `tool` subcommand | `cli/commands/tool/foo_command.cr` → `cli/commands/tool_command.cr` (require + `register_sub` + the doc comment list) | `spec/unit/cli/commands/tool/foo_command_spec.cr` |
+| a top-level command | `cli/commands/foo_command.cr` (NAME/DESCRIPTION/FLAGS/`self.metadata`/`run`) → `cli/runner.cr` `register_default_commands` → `docs/content/start/cli.md` (+ `.ko.md`) | `spec/unit/cli/commands/foo_command_spec.cr`, `spec/functional/cli_*` |
+| a `tool` subcommand | `cli/commands/tool/foo_command.cr` → `cli/commands/tool_command.cr` (require + `register_sub` + `CATEGORIES` + the doc comment list) → `docs/content/start/tools/foo.md` (+ `.ko.md`) | `spec/unit/cli/commands/tool/foo_command_spec.cr` |
 | a lifecycle hook | `content/hooks/foo_hooks.cr` (`include Lifecycle::Hookable`, `register_hooks`) → `content/hooks.cr` (require + `Hooks.all`) | `spec/unit/content/hooks/` |
 | a Crinja filter | `content/processors/filters/foo_filter.cr` (`module Filters::FooFilters` with `self.register(env)`) → `template.cr` `register_custom_filters` chain | `spec/unit/content/processors/filters/filters_spec.cr` |
 | a Crinja function / test | `content/processors/template.cr` (`register_custom_functions` / `register_custom_tests`) | `spec/unit/content/processors/template_spec.cr` |
-| a template variable | per page: `phases/render/template_variables.cr` (`build_template_variables`); site-wide: `phases/render/global_vars.cr`; SEO/JSON-LD: `phases/render/seo_vars.cr`; gate expensive ones on `TemplateVarFeatures` (scanned in `phases/initialize.cr`) | `spec/unit/core/build/phases/render_spec.cr`, `spec/functional/render_vars_regression_spec.cr` |
+| a template variable | per page: `phases/render/template_variables.cr` (`build_template_variables`); site-wide: `phases/render/global_vars.cr`; SEO/JSON-LD: `phases/render/seo_vars.cr`; gate expensive ones on `TemplateVarFeatures` (scanned in `phases/initialize.cr`) | `spec/unit/core/build/phases/phases_render_spec.cr`, `spec/functional/render_vars_regression_spec.cr` |
 | a Markdown pass | `content/processors/markdown_extensions/foo.cr` (reopen `MarkdownExtensions`) → the pass order in `markdown_extensions.cr` `preprocess`/`postprocess` → a `[markdown]` switch in `models/config/markdown.cr` if opt-in | `spec/unit/content/processors/markdown_extensions_spec.cr` |
 | a front-matter field | `content/processors/markdown/frontmatter.cr` (`KNOWN_FRONT_MATTER_KEYS`, `build_front_matter_result`) → `models/page.cr` | `spec/unit/content/processors/frontmatter_parsing_spec.cr` |
-| a doctor diagnostic | `services/doctor/registry.cr` (`CheckSpec` row; the position is the report position) → a `check_*` method in the matching `services/doctor/<family>_checks.cr` → `docs/content/features/doctor.md` | `spec/unit/services/doctor_spec.cr` |
-| a scaffold | `services/scaffolds/foo.cr` (subclass `Base`, override what differs; `config_content` is assembled by Base) → `services/scaffolds/registry.cr` → `config/options/init_options.cr` `ScaffoldType` (+ `from_string`, `to_s`) → `docs/content/start/scaffolds.md` | `spec/unit/services/scaffolds/scaffolds_foo_spec.cr` |
+| a doctor diagnostic | `services/doctor/registry.cr` (`CheckSpec` row; the position is the report position) → a `check_*` method in the matching `services/doctor/<family>_checks.cr` → `docs/content/start/tools/doctor.md` (+ `.ko.md`) | `spec/unit/services/doctor_spec.cr` |
+| a scaffold | `services/scaffolds/foo.cr` (subclass `Base`, override what differs; `config_content` is assembled by Base) → `services/scaffolds/registry.cr` → `config/options/init_options.cr` `ScaffoldType` (+ `from_string`, `to_s`) → `docs/content/start/first-site.md` / `cli.md` where scaffolds are listed | `spec/unit/services/scaffolds/scaffolds_foo_spec.cr` |
 | an importer | `services/importers/foo_importer.cr` (subclass `Importers::Base`, drive the loop with `import_each`) → `cli/commands/tool/import_command.cr` (require, `POSITIONAL_CHOICES`, dispatch) | `spec/unit/services/importers/foo_importer_spec.cr` |
 | a SEO output file | `content/seo/foo.cr` → the hook that writes it (`content/hooks/seo_hooks.cr`) → serve regeneration in `builder/seo_surfaces.cr` if it must refresh on partial rebuilds | `spec/unit/content/seo/foo_spec.cr` |
 | a serve-mode change strategy | `services/server/change_set.cr` (classification) → `services/server/rebuild.cr` (`apply_changeset`) → `builder/incremental.cr` | `spec/unit/services/server/server_spec.cr`, `spec/functional/serve_*` |
@@ -183,19 +189,20 @@ docs (`.md` + `.ko.md`) when user-facing.
 
 ## Known debts (deliberately not fixed in the structure refactor)
 
-- Process-global caches without reset or mutex: `SyntaxHighlighter` result
-  cache, `Processor::Markdown` body cache, `OgPngRenderer` cached font/base
-  layer, `RenderHooks` fallback env. Specs only pass as one serial process.
+- Process-global caches that are never reset between builds or examples:
+  `SyntaxHighlighter` result cache, `Processor::Markdown` body cache and
+  `RenderHooks` fallback env (mutex-guarded), `OgPngRenderer` cached font /
+  base layer (no mutex). Specs only pass as one serial process.
 - Layering inversions: `models/config.cr` and `models/page.cr` require
   `content/processors/*`; `utils/{debug_printer,sort_utils,redirect_html}`
   require models/content; `content/taxonomies.cr` constructs a `Builder`.
-- `ServeOptions` restates 21 `BuildOptions` fields; `to_build_options` copies them.
+- `ServeOptions` restates most `BuildOptions` fields; `to_build_options` copies them.
 - Six `X::Any → Y::Any` walkers (`frontmatter_writer`, `frontmatter_converter`,
   hugo/eleventy importers) share a shape but differ in nil/Time/Int32 handling.
 - `exporters/base.cr` has no JSON front-matter branch (a JSON-authored page
   exports its front matter as body text) — a bug, left as-is because fixing it
   changes output.
-- The five scaffold stylesheets share byte-identical rule runs interleaved
+- The blog/docs/book scaffold stylesheets share byte-identical rule runs interleaved
   with formatting differences; deduplicating them needs a CSS normalisation
   pass and therefore changes emitted bytes.
 - Four truncation policies (feeds, page summary, search, excerpt) and two
