@@ -208,6 +208,13 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, (p.updated.try(&.to_unix) || 0_i64).to_s)
       fp_value(digest, p.weight.to_s)
       fp_value(digest, p.draft ? "1" : "0")
+      # `render` decides whether the page writes a file at all, and a page
+      # turning `render = false` renders NOTHING — so `pages_rendered` stays 0
+      # and `generate_outputs_unchanged?` skipped the SEO pass, leaving the
+      # page in sitemap.xml / rss.xml / search.json / llms.txt until an
+      # unrelated edit. It belongs to the set's identity for the same reason
+      # `draft` does.
+      fp_value(digest, p.render ? "1" : "0")
       fp_value(digest, p.toc ? "1" : "0")
       fp_value(digest, p.section)
       fp_value(digest, p.image || "")

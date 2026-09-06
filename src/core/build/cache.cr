@@ -191,6 +191,14 @@ module Hwaro
         # @mutex wherever entries or metadata actually change.
         @dirty : Bool = false
 
+        # Output files an entry recorded on the LAST build and no longer
+        # records after this one — a page whose `slug`/`path`/permalink moved
+        # keeps its source file (so it keeps its entry) but writes somewhere
+        # else, leaving the old file behind on a `--cache` build that never
+        # wipes the output directory. Collected under @mutex by #update and
+        # drained once by the Finalize phase.
+        @orphaned_outputs = [] of String
+
         def initialize(@enabled : Bool = true, @cache_path : String = CACHE_FILE)
           @entries = {} of String => CacheEntry
           @metadata = CacheMetadata.new
@@ -360,6 +368,48 @@ module Hwaro
           @mutex.synchronize { @entries[file_path]?.try(&.output_paths) || [] of String }
         end
 
+        # Output files recorded by an entry this build then replaced — see
+        # `@orphaned_outputs`. Drained: a second call returns nothing.
+        def take_orphaned_outputs : Array(String)
+          @mutex.synchronize do
+            taken = @orphaned_outputs
+            @orphaned_outputs = [] of String
+            taken
+          end
+        end
+
+        # Drop every entry whose source path is NOT in `live_paths` and return
+        # the output files those entries recorded.
+        #
+        # A `--cache` build keeps the output directory between runs (a cold
+        # build wipes it), and nothing else notices that a page went away: the
+        # render phase only walks pages that still exist. So `rm
+        # content/posts/old.md && hwaro build --cache` left /posts/old/ in
+        # `public/` — still served, still deployed — and the same held for a
+        # renamed source, a post flipped to `draft`, one that passed its
+        # `expires` date, and `render = false`. Each entry knows the primary
+        # file it wrote plus its `[outputs]` siblings, so the entries no live
+        # page claims name exactly the files to remove.
+        #
+        # Callers filter the result against the outputs the CURRENT site
+        # claims before deleting: a source renamed onto the same output URL
+        # (foo.md -> foo/index.md) leaves an orphan entry pointing at a file
+        # this very build rewrote.
+        def prune_entries_not_in(live_paths : Set(String)) : Array(String)
+          stale = [] of String
+          return stale unless @enabled
+          @mutex.synchronize do
+            @entries.reject! do |path, entry|
+              next false if live_paths.includes?(path)
+              stale << entry.output_path unless entry.output_path.empty?
+              stale.concat(entry.output_paths)
+              @dirty = true
+              true
+            end
+          end
+          stale
+        end
+
         # Update cache entry for a file.
         # `template_hash` is the page's template closure fingerprint; nil
         # stores the global templates checksum (non-page entries).
@@ -406,6 +456,15 @@ module Hwaro
               # Re-check under lock: another fiber may have written a newer entry
               current = @entries[file_path]?
               if current.nil? || current.mtime <= mtime
+                if previous = current
+                  fresh = output_paths.dup << output_path
+                  previous.output_paths.each do |old_path|
+                    @orphaned_outputs << old_path unless old_path.empty? || fresh.includes?(old_path)
+                  end
+                  unless previous.output_path.empty? || fresh.includes?(previous.output_path)
+                    @orphaned_outputs << previous.output_path
+                  end
+                end
                 @entries[file_path] = entry
                 @dirty = true
               end
