@@ -1,5 +1,6 @@
 require "../../../spec_helper"
 require "../../../../src/content/hooks/image_hooks"
+require "../../../../src/content/processors/template"
 
 # =============================================================================
 # Unit specs for ImageHooks. Covers:
@@ -149,6 +150,67 @@ describe Hwaro::Content::Hooks::ImageHooks do
         )
         Hwaro::Content::Hooks::ImageHooks.find_closest("/empty.png", 320)
           .should be_nil
+      end
+    end
+  end
+
+  # Variants are never upscaled, so the file a request resolves to can be
+  # narrower than what was asked for. `resize_image()` reported the REQUESTED
+  # width, which templates write into `<img width=…>` — telling the browser to
+  # lay out the image at a size it isn't.
+  describe ".find_closest_variant" do
+    it "reports the actual width of the chosen variant" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
+          {"/p.png" => {320 => "/p-320.png", 640 => "/p-640.png"}}
+        )
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/p.png", 640)
+          .should eq({640, "/p-640.png"})
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/p.png", 500)
+          .should eq({640, "/p-640.png"})
+        # Nothing is large enough — the widest variant, at its real width.
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/p.png", 9999)
+          .should eq({640, "/p-640.png"})
+      end
+    end
+
+    it "returns nil for an unknown URL" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map({} of String => Hash(Int32, String))
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/missing.png", 320).should be_nil
+      end
+    end
+  end
+
+  describe "resize_image()" do
+    it "reports the variant's width, not the requested one" do
+      with_image_hook_state do
+        # A 10px-wide source: no variant is upscaled, so 640 resolves to 10.
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map({"/img/tiny.png" => {10 => "/img/tiny_10w.png"}})
+        page = Hwaro::Models::Page.new("test.md")
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+        out = Hwaro::Content::Processors::Template.process(
+          %({{ resize_image(path="/img/tiny.png", width=640).width }}|{{ resize_image(path="/img/tiny.png", width=640).url }}),
+          context
+        ).strip
+        out.should eq("10|https://example.com/img/tiny_10w.png")
+      end
+    end
+
+    it "falls back to the requested width when no variant exists" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map({} of String => Hash(Int32, String))
+        page = Hwaro::Models::Page.new("test.md")
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
+
+        Hwaro::Content::Processors::Template.process(
+          %({{ resize_image(path="/img/a.png", width=800).width }}), context
+        ).strip.should eq("800")
       end
     end
   end

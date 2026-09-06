@@ -77,10 +77,23 @@ module Hwaro
         end
 
         def self.find_closest(url : String, width : Int32) : String?
+          find_closest_variant(url, width).try(&.[1])
+        end
+
+        # The chosen variant as `{actual_width, url}`.
+        #
+        # The width matters to the caller, not just the URL: no variant is
+        # ever upscaled, so a 900px source asked for 1024 resolves to the
+        # 900px file. `resize_image()` reported the REQUESTED width, which is
+        # what a template writes into `<img width=…>` — a number the browser
+        # then uses to lay out an image that is a different size.
+        def self.find_closest_variant(url : String, width : Int32) : {Int32, String}?
           @@resize_map_mutex.synchronize do
             widths_map = @@resize_map[url]?
             return unless widths_map
-            return widths_map[width] if widths_map.has_key?(width)
+            if exact = widths_map[width]?
+              return {width, exact}
+            end
 
             # Find the smallest width that is >= requested
             best_key = nil
@@ -93,7 +106,7 @@ module Hwaro
             end
             # If nothing bigger, pick the largest available
             best_key ||= widths_map.keys.max?
-            best_key ? widths_map[best_key] : nil
+            best_key ? {best_key, widths_map[best_key]} : nil
           end
         end
 
