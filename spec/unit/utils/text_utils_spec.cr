@@ -346,6 +346,35 @@ describe Hwaro::Utils::TextUtils do
     it "handles tags with attributes" do
       Hwaro::Utils::TextUtils.strip_html("<a href=\"url\">link</a>").should eq("link")
     end
+
+    # `aria-hidden="true"` marks decoration a screen reader skips, and every
+    # plain-text projection (search index, feed summaries, excerpts) must skip
+    # it too. Both emitters live in rendered page content: the heading anchor
+    # link that `insert_anchor_links` adds, and the line-number gutter from
+    # `[highlight] line_numbers`.
+    it "drops the heading anchor link that insert_anchor_links adds" do
+      html = %(<h2 id="x">Title <a class="anchor" href="#x" aria-hidden="true">🔗</a></h2>)
+      Hwaro::Utils::TextUtils.strip_html(html).should eq("Title")
+    end
+
+    it "drops the code-block line-number gutter" do
+      html = %(<span class="line"><span class="ln" aria-hidden="true">1 </span>a = 1</span>) +
+             %(<span class="line"><span class="ln" aria-hidden="true">2 </span>b = 2</span>)
+      Hwaro::Utils::TextUtils.strip_html(html).should eq("a = 1 b = 2")
+    end
+
+    it "accepts single-quoted and extra attributes on the marked element" do
+      Hwaro::Utils::TextUtils.strip_html(%(a<i class='x' aria-hidden='true' role="img">★</i>b)).should eq("a b")
+    end
+
+    it "keeps an element whose aria-hidden is false" do
+      Hwaro::Utils::TextUtils.strip_html(%(<span aria-hidden="false">kept</span>)).should eq("kept")
+    end
+
+    it "keeps text that merely mentions aria-hidden" do
+      Hwaro::Utils::TextUtils.strip_html("<p>set aria-hidden=\"true\" on it</p>")
+        .should eq("set aria-hidden=\"true\" on it")
+    end
   end
 
   describe ".strip_html (extended)" do

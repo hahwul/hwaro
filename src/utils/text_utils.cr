@@ -613,6 +613,18 @@ module Hwaro
       # tag stripper below.
       RAW_TEXT_ELEMENT = /<(script|style)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
 
+      # Elements the author marked `aria-hidden="true"` are decoration, not
+      # text: a screen reader skips them and so must every plain-text
+      # projection of the page. Two live in rendered content and both leaked
+      # into the search index and feed summaries — the heading anchor link
+      # (`insert_anchor_links`, a 🔗 after every heading) and the code-block
+      # line-number gutter (`[highlight] line_numbers`, which indexed
+      # `1 2 3 4 …` alongside the code). Same lazy `[\s\S]*?` shape as
+      # RAW_TEXT_ELEMENT: an unterminated or same-tag-nested element just
+      # falls through to the tag stripper, which is harmless here because the
+      # result is text either way.
+      ARIA_HIDDEN_ELEMENT = /<([a-zA-Z][a-zA-Z0-9]*)\s[^>]*aria-hidden=["']true["'][^>]*>[\s\S]*?<\/\1\s*>/
+
       # Rendered HTML as plain text: tags stripped, entities decoded, edges
       # trimmed. The one spelling for excerpts and feed descriptions.
       def html_to_plain_text(html : String) : String
@@ -628,6 +640,9 @@ module Hwaro
         # Remove raw-text element bodies (<style>/<script>) before stripping
         # tags so their CSS/JS contents don't leak through as "text".
         text = text.gsub(RAW_TEXT_ELEMENT, " ")
+        # Then the decorative ones. Guarded by a substring probe so a page
+        # with no aria-hidden markup never pays for the scan.
+        text = text.gsub(ARIA_HIDDEN_ELEMENT, " ") if text.includes?("aria-hidden")
         String.build(text.bytesize) do |io|
           in_tag = false
           last_was_space = true # suppress leading space
