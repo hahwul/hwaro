@@ -63,6 +63,17 @@ module Hwaro
         @[JSON::Field(key: "output_paths", emit_null: false)]
         property output_paths : Array(String)
 
+        # Files this page produced that are NOT its own output: its `aliases`
+        # redirect stubs and, for a section, its `/page/N/` pagination pages.
+        # Kept apart from `output_paths` on purpose — that list also feeds
+        # `changed?` ("a manually deleted sibling forces a rebuild"), and the
+        # page count a section paginates into is only known AFTER rendering,
+        # so it cannot take part in the decision to render. These paths exist
+        # solely so a page that goes away, or stops producing one of them,
+        # takes the file with it. Empty for entries written before this field.
+        @[JSON::Field(key: "derived_paths", emit_null: false)]
+        property derived_paths : Array(String)
+
         def initialize(
           @path : String,
           @mtime : Int64,
@@ -74,6 +85,7 @@ module Hwaro
           @output_paths : Array(String) = [] of String,
           @assets_hash : String = "",
           @git_hash : String = "",
+          @derived_paths : Array(String) = [] of String,
         )
         end
 
@@ -89,6 +101,7 @@ module Hwaro
           assets_hash = ""
           git_hash = ""
           output_paths = [] of String
+          derived_paths = [] of String
 
           pull.read_object do |key|
             case key
@@ -104,13 +117,17 @@ module Hwaro
             when "output_paths"
               output_paths = [] of String
               pull.read_array { output_paths << pull.read_string }
+            when "derived_paths"
+              derived_paths = [] of String
+              pull.read_array { derived_paths << pull.read_string }
             else pull.skip
             end
           end
 
           new(path: path, mtime: mtime, hash: hash, output_path: output_path,
             template_hash: template_hash, config_hash: config_hash, cascade_hash: cascade_hash,
-            output_paths: output_paths, assets_hash: assets_hash, git_hash: git_hash)
+            output_paths: output_paths, assets_hash: assets_hash, git_hash: git_hash,
+            derived_paths: derived_paths)
         end
       end
 
@@ -153,6 +170,18 @@ module Hwaro
         # workspace must NOT — hence relative, not absolute.
         @[JSON::Field(key: "output_dir", emit_null: false)]
         property output_dir : String = ""
+
+        # Output files the last build produced that no cache ENTRY covers: the
+        # taxonomy index/term pages, their pagination pages and their feeds.
+        # Those have no content file, so nothing else remembers them, and a
+        # `--cache` build (which keeps the output directory) left the term page
+        # of a tag whose last post was deleted published forever. Stored
+        # relative to the output directory so moving the workspace, or
+        # switching between an absolute and a relative `-o`, does not strand
+        # them. Empty for caches written before this field existed: the first
+        # build after an upgrade records the set and prunes from the next one.
+        @[JSON::Field(key: "generated_outputs", emit_null: false)]
+        property generated_outputs : Array(String) = [] of String
 
         def initialize(@template_hash : String = "", @config_hash : String = "",
                        @page_set_hash : String = "", @section_set_hash : String = "")
@@ -237,17 +266,21 @@ module Hwaro
           end
 
           if invalidated
-            @mutex.synchronize { @entries.clear }
+            @mutex.synchronize { discard_entries_recording_outputs }
           end
 
           if invalidated || @metadata.template_hash != template_hash || @metadata.config_hash != config_hash
             @dirty = true
           end
-          # Preserve the page/section-set fingerprints loaded from the prior
-          # build so the render phase can compare against them before recording
-          # the current ones.
-          @metadata = CacheMetadata.new(template_hash: template_hash, config_hash: config_hash,
-            page_set_hash: @metadata.page_set_hash, section_set_hash: @metadata.section_set_hash)
+          # Update the two hashes IN PLACE rather than rebuilding the struct.
+          # A rebuild resets every field the constructor doesn't take, so each
+          # new piece of metadata had to be hand-carried across this line (the
+          # page/section-set fingerprints the render phase compares against,
+          # the output dir, and now the generated-output list the Finalize
+          # phase prunes from) — and the next one added would silently be
+          # dropped instead.
+          @metadata.template_hash = template_hash
+          @metadata.config_hash = config_hash
           @metadata.output_dir = output_key unless output_key.empty?
         end
 
@@ -269,10 +302,8 @@ module Hwaro
           if @metadata.page_set_hash != page_set || @metadata.section_set_hash != section_set
             @dirty = true
           end
-          previous_output_dir = @metadata.output_dir
-          @metadata = CacheMetadata.new(template_hash: @metadata.template_hash, config_hash: @metadata.config_hash,
-            page_set_hash: page_set, section_set_hash: section_set)
-          @metadata.output_dir = previous_output_dir
+          @metadata.page_set_hash = page_set
+          @metadata.section_set_hash = section_set
         end
 
         # Check if a file has changed since last build.
@@ -368,6 +399,22 @@ module Hwaro
           @mutex.synchronize { @entries[file_path]?.try(&.output_paths) || [] of String }
         end
 
+        # The source-less generated outputs the LAST build recorded, and the
+        # setter the current build's Finalize phase persists through. Paths are
+        # stored relative to the output directory; callers rejoin them.
+        def previous_generated_outputs : Array(String)
+          @mutex.synchronize { @metadata.generated_outputs.dup }
+        end
+
+        def record_generated_outputs(paths : Array(String)) : Nil
+          return unless @enabled
+          @mutex.synchronize do
+            next if @metadata.generated_outputs == paths
+            @metadata.generated_outputs = paths
+            @dirty = true
+          end
+        end
+
         # Output files recorded by an entry this build then replaced — see
         # `@orphaned_outputs`. Drained: a second call returns nothing.
         def take_orphaned_outputs : Array(String)
@@ -403,6 +450,7 @@ module Hwaro
               next false if live_paths.includes?(path)
               stale << entry.output_path unless entry.output_path.empty?
               stale.concat(entry.output_paths)
+              stale.concat(entry.derived_paths)
               @dirty = true
               true
             end
@@ -416,7 +464,7 @@ module Hwaro
         # `output_paths` are the secondary sibling output files this page
         # emitted (see `[outputs]`); empty when the feature isn't in use.
         # Thread-safe: protected by mutex for concurrent parallel builds.
-        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "")
+        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "", derived_paths : Array(String) = [] of String)
           return unless @enabled
           return unless File.exists?(file_path)
 
@@ -431,7 +479,7 @@ module Hwaro
               if existing && existing.mtime == mtime && existing.output_path == output_path &&
                  existing.cascade_hash == cascade_hash && existing.template_hash == effective_template_hash &&
                  existing.output_paths == output_paths && existing.assets_hash == assets_hash &&
-                 existing.git_hash == git_hash
+                 existing.git_hash == git_hash && existing.derived_paths == derived_paths
                 return
               end
             end
@@ -450,6 +498,7 @@ module Hwaro
               output_paths: output_paths,
               assets_hash: assets_hash,
               git_hash: git_hash,
+              derived_paths: derived_paths,
             )
 
             @mutex.synchronize do
@@ -457,8 +506,8 @@ module Hwaro
               current = @entries[file_path]?
               if current.nil? || current.mtime <= mtime
                 if previous = current
-                  fresh = output_paths.dup << output_path
-                  previous.output_paths.each do |old_path|
+                  fresh = output_paths.dup.concat(derived_paths) << output_path
+                  (previous.output_paths + previous.derived_paths).each do |old_path|
                     @orphaned_outputs << old_path unless old_path.empty? || fresh.includes?(old_path)
                   end
                   unless previous.output_path.empty? || fresh.includes?(previous.output_path)
@@ -484,11 +533,51 @@ module Hwaro
         # Clear all cache entries
         def clear
           @mutex.synchronize do
-            @entries.clear
+            produced = @metadata.generated_outputs
+            discard_entries_recording_outputs
             @metadata = CacheMetadata.new
+            # Not part of the cache's VALIDITY — a record of what is sitting in
+            # the output directory, which `--full` does not empty when
+            # `--cache` keeps it. Dropping it here would let a `--full --cache`
+            # build lose track of the taxonomy pages the last build wrote.
+            @metadata.generated_outputs = produced
             @dirty = true
           end
           File.delete(@cache_path) if File.exists?(@cache_path)
+        end
+
+        # Drop every entry, remembering the files they recorded so the Finalize
+        # phase can still tell what the last build produced.
+        #
+        # A config/template/output-dir change (and `--full`) invalidates the
+        # whole cache, and with the entries went the only record of what was
+        # written last time: after `per_page = 2` became `3`, the `/page/N/`
+        # file the section no longer fills stayed published. The build re-adds
+        # an entry for everything it still produces, and Finalize filters this
+        # list against those, so only the genuinely-gone files are deleted.
+        # Caller holds @mutex.
+        private def discard_entries_recording_outputs : Nil
+          @entries.each_value do |entry|
+            @orphaned_outputs << entry.output_path unless entry.output_path.empty?
+            @orphaned_outputs.concat(entry.output_paths)
+            @orphaned_outputs.concat(entry.derived_paths)
+          end
+          @entries.clear
+        end
+
+        # Every output file the entries that SURVIVED this build record. The
+        # Finalize phase subtracts it from the stale list: a path harvested
+        # from a discarded entry and then written again is not stale at all.
+        def current_output_files : Set(String)
+          files = Set(String).new
+          @mutex.synchronize do
+            @entries.each_value do |entry|
+              files << entry.output_path unless entry.output_path.empty?
+              entry.output_paths.each { |path| files << path }
+              entry.derived_paths.each { |path| files << path }
+            end
+          end
+          files
         end
 
         # Save cache to disk using atomic write (temp file + rename)

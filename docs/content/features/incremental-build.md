@@ -108,11 +108,14 @@ That covers a page that was deleted, renamed, moved to a new URL (`slug`,
 `path`, a permalink rule), turned into a draft, passed its `expires` date, or
 set `render = false`.
 
-Output that no cache entry names is still left behind: generated listings
-(a taxonomy term page for a term nobody uses any more, pagination pages past
-the new last one), AMP mirrors, auto-generated OG images, and `aliases`
-redirect stubs. Run `hwaro build --full` (or a build without `--cache`) to
-clear those.
+Everything a removed page brought with it goes too: its `aliases` redirect
+stubs, its AMP mirror, its auto-generated OG image, the taxonomy term page of
+a tag nobody uses any more (with that term's feed), and the pagination page a
+section no longer fills. Turning a whole feature off — `[amp] enabled = false`
+— removes what it used to publish on the next build for the same reason.
+
+A `--cache` build's output is therefore byte-identical to a clean build's, and
+`hwaro build --full` is not needed to clear anything.
 
 ## Cache File
 

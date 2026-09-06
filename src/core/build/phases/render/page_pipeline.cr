@@ -256,6 +256,10 @@ module Hwaro::Core::Build::Phases::Render
 
     # Clear warnings from previous renders (important for incremental rebuilds)
     page.build_warnings.clear
+    # Same for the alias stubs / pagination pages this render is about to
+    # record: a serve rebuild must replace the previous pass's list, not
+    # append to it.
+    clear_page_derived_outputs(page.path)
 
     # Handle redirect_to for pages AND sections
     if page.has_redirect?

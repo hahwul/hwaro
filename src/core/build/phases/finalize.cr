@@ -41,10 +41,11 @@ module Hwaro::Core::Build::Phases::Finalize
   #     an entry left over from a build with a different `-o` is skipped
   #     rather than followed.
   #
-  # Output no cache entry names is still left behind: generated listings
-  # (taxonomy term pages, pagination pages past the new last one), AMP mirrors,
-  # auto-generated OG images and `aliases` redirect stubs. `--full` (or a build
-  # without `--cache`) clears those.
+  # Beyond the entries themselves, the source-less generated files this build
+  # claimed (`Builder#claim_generated_output` — the taxonomy index/term pages,
+  # their pagination pages and their feeds, and every AMP mirror) are diffed
+  # against what the previous build claimed. Auto-generated OG images prune
+  # themselves against their own manifest, in the generator that writes them.
   private def prune_orphaned_cached_outputs(ctx : Lifecycle::BuildContext, build_cache : Cache) : Nil
     return unless build_cache.enabled?
     output_dir = ctx.options.output_dir
@@ -70,9 +71,39 @@ module Hwaro::Core::Build::Phases::Finalize
     # their previous file behind too; #update collected those as it went.
     stale = build_cache.prune_entries_not_in(live)
     stale.concat(build_cache.take_orphaned_outputs)
+    # Everything this build still claims survives: the pages' own outputs, and
+    # every file the surviving cache entries record. That second set is what
+    # keeps a whole-cache invalidation — a config edit, `--full` — from
+    # deleting files it only discarded the bookkeeping for, so it has to be
+    # applied BEFORE the source-less lists are added.
+    still_written = build_cache.current_output_files
+    stale.reject! { |path| owned.includes?(path) || still_written.includes?(path) }
+    stale.concat(stale_generated_outputs(build_cache, output_dir))
+    stale.uniq!
     return if stale.empty?
 
-    stale.reject! { |path| owned.includes?(path) }
-    delete_orphaned_outputs(stale, output_dir) unless stale.empty?
+    delete_orphaned_outputs(stale, output_dir)
+  end
+
+  # The source-less generated outputs the previous build produced and this one
+  # no longer claims — a taxonomy term whose last post was deleted, and its
+  # feed and pagination pages. Records this build's claims on the way out, so
+  # the next build can do the same.
+  #
+  # Only a path a previous build actually claimed can appear here: a generator
+  # that reports nothing keeps today's behaviour (its output lingers) instead
+  # of having files deleted out from under it. Paths are stored relative to
+  # the output directory, so a workspace that moved — or an `-o` spelled
+  # absolutely one day and relatively the next — still matches.
+  private def stale_generated_outputs(build_cache : Cache, output_dir : String) : Array(String)
+    claimed = generated_output_claims.compact_map do |path|
+      Path[path].relative_to(output_dir).to_s rescue nil
+    end.sort!
+    previous = build_cache.previous_generated_outputs
+    build_cache.record_generated_outputs(claimed)
+
+    return [] of String if previous.empty?
+    current = claimed.to_set
+    previous.reject(&.in?(current)).map { |relative| File.join(output_dir, relative) }
   end
 end

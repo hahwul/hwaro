@@ -297,6 +297,9 @@ module Hwaro::Core::Build::Phases::Render
       target = page.url.starts_with?('/') ? page.url : "/#{page.url}"
       redirect_url = site.config.with_base_path(target)
       Hwaro::Utils::FileSafe.atomic_write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
+      # The page's front matter is the only record that this stub exists, so a
+      # page that is deleted (or drops the alias) has to take it along.
+      record_page_derived_output(page.path, dest_path)
       Logger.action :create, dest_path, Logger::Role::Warn if verbose
     end
   end

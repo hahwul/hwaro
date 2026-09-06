@@ -528,6 +528,7 @@ module Hwaro
             generated = results.count(&.success)
           end
 
+          prune_orphaned_images(img_dir, output_dir, old_entries, new_entries, verbose) unless partial
           save_manifest(manifest_path, config_hash, new_entries)
 
           if generated > 0 || skipped > 0
@@ -1530,6 +1531,42 @@ module Hwaro
         # Compute a hash of page content that affects OG image rendering.
         def self.compute_page_hash(page : Models::Page) : String
           Digest::SHA256.hexdigest("#{page.title}|#{page.description}|#{page.url}")
+        end
+
+        # Delete the images of slugs the manifest recorded and this build no
+        # longer claims — a page that was deleted, renamed, turned into a
+        # draft, or given a custom `image` in its front matter.
+        #
+        # `hwaro build` without `--cache` wipes the output directory, so this
+        # only shows on a warm `--cache` build (and on `serve`, which preserves
+        # its output): the PNG for a removed page stayed in `og-images/`
+        # forever, which is the orphaning the manifest's own comment describes.
+        # Pass 1 records EVERY eligible page in `new_entries` before the
+        # cache-hit short-circuit, so an unchanged page's image is never
+        # mistaken for an orphan.
+        #
+        # Never in partial mode: those calls deliberately carry the previous
+        # manifest forward because they only saw a slice of the pages.
+        private def self.prune_orphaned_images(img_dir : String, output_dir : String, old_entries : Hash(String, String), new_entries : Hash(String, String), verbose : Bool) : Nil
+          removed = 0
+          old_entries.each_key do |slug|
+            next if new_entries.has_key?(slug)
+            {"#{slug}.png", "#{slug}.svg"}.each do |filename|
+              path = File.join(img_dir, filename)
+              next unless File.file?(path)
+              next unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+              begin
+                File.delete(path)
+                removed += 1
+                Logger.debug "  OG image: removed stale #{path}" if verbose
+              rescue ex : File::Error
+                # Bookkeeping: a stale image left behind must never fail a
+                # build whose pages all generated correctly.
+                Logger.debug "  OG image: could not remove stale #{path}: #{ex.message}"
+              end
+            end
+          end
+          Logger.info "  Removed #{removed} stale OG image(s)" if removed > 0
         end
 
         # Load the OG manifest file. Returns {config_hash, entries}.

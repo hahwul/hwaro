@@ -29,32 +29,13 @@ module Hwaro
           config : Models::Config,
           output_dir : String,
           verbose : Bool = false,
+          builder : Core::Build::Builder? = nil,
         )
           return unless config.amp.enabled
 
           amp_config = config.amp
-          prefix = amp_config.path_prefix.strip('/')
-          # A "."/".." prefix is not empty, so the emptiness guard below never
-          # fires for it, yet File.join resolves it straight back to the
-          # canonical path: the AMP variant would overwrite the very page it was
-          # converted from, with a rel="amphtml" pointing at itself. Refuse
-          # outright — the way every other emitter refuses a traversing output
-          # path — rather than reinterpreting the author's intent. The prefix
-          # itself is left verbatim (it is also a URL segment, so a literal
-          # percent-encoded directory name must survive unchanged); only the
-          # decision to proceed is taken on the traversal-safe reading of it.
-          _prefix_segments, prefix_refused = Utils::PathUtils.split_safe_segments(prefix)
-          if prefix_refused
-            Logger.warn "AMP path_prefix '#{amp_config.path_prefix}' resolves onto the canonical output path; skipping AMP generation to avoid overwriting canonical pages."
-            return
-          end
-          # A blank/slash-only prefix would make amp_output_path collapse to the
-          # canonical path (File.join drops empty components), overwriting every
-          # canonical page with its AMP variant. Refuse rather than destroy output.
-          if prefix.empty?
-            Logger.warn "AMP path_prefix resolves to empty; skipping AMP generation to avoid overwriting canonical pages."
-            return
-          end
+          prefix = effective_prefix(config, warn: true)
+          return unless prefix
           generated = 0
 
           pages.each do |page|
@@ -88,6 +69,13 @@ module Hwaro
             dir = File.dirname(amp_output)
             Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
             Hwaro::Utils::FileSafe.atomic_write(amp_output, amp_html)
+            # A mirror has no content file of its own, so nothing else records
+            # that this build still wants it. Claiming it lets the Finalize
+            # phase drop the mirrors of pages that are gone — and, because this
+            # generator walks every page on every build and claims nothing at
+            # all when `[amp]` is off or its prefix is refused, the whole tree
+            # when AMP stops publishing.
+            builder.try(&.claim_generated_output(amp_output))
 
             # Inject <link rel="amphtml"> into the canonical page
             inject_amphtml_link(canonical_path, page, config, prefix)
@@ -385,14 +373,67 @@ module Hwaro
           end
         end
 
+        # The `path_prefix` AMP will actually publish under, or nil when it
+        # must not publish at all. Both refusals below would otherwise let an
+        # AMP variant overwrite the very page it was converted from:
+        #
+        #   * a "."/".." prefix is not empty, so the emptiness guard never
+        #     fires for it, yet File.join resolves it straight back to the
+        #     canonical path — with a rel="amphtml" pointing at itself. Refuse
+        #     outright, the way every other emitter refuses a traversing
+        #     output path, rather than reinterpreting the author's intent. The
+        #     prefix itself is left verbatim (it is also a URL segment, so a
+        #     literal percent-encoded directory name must survive unchanged);
+        #     only the decision to proceed is taken on the traversal-safe
+        #     reading of it;
+        #   * a blank/slash-only prefix makes mirror_path collapse onto the
+        #     canonical path (File.join drops empty components).
+        #
+        # Public because the stale-output prune has to resolve the same prefix
+        # to find the mirror of a page that no longer exists; `warn:` keeps the
+        # log lines on the generating call only.
+        def self.effective_prefix(config : Models::Config, warn : Bool = false) : String?
+          return unless config.amp.enabled
+          prefix = config.amp.path_prefix.strip('/')
+          _prefix_segments, refused = Utils::PathUtils.split_safe_segments(prefix)
+          if refused
+            Logger.warn "AMP path_prefix '#{config.amp.path_prefix}' resolves onto the canonical output path; skipping AMP generation to avoid overwriting canonical pages." if warn
+            return
+          end
+          if prefix.empty?
+            Logger.warn "AMP path_prefix resolves to empty; skipping AMP generation to avoid overwriting canonical pages." if warn
+            return
+          end
+          prefix
+        end
+
+        # The AMP mirror of a canonical output file: the same path with
+        # `prefix` inserted directly after the output directory. The one
+        # spelling of the AMP layout — `generate` mirrors each page through it,
+        # and the Finalize phase's stale-output prune mirrors the recorded
+        # output path of a page that is gone, so the two cannot disagree about
+        # where a mirror lives.
+        # Both sides are expanded first: a page's recorded output path is
+        # absolute (OutputGuard resolves it) while `output_dir` is whatever the
+        # caller passed, usually the relative "public" — and `relative_to`
+        # across those two spellings raises instead of matching, which silently
+        # left every AMP mirror behind. The result is rejoined onto the
+        # caller's own spelling so it stays comparable with the paths around it.
+        def self.mirror_path(canonical_output : String, output_dir : String, prefix : String) : String
+          root = File.expand_path(output_dir)
+          relative = Path[File.expand_path(canonical_output)].relative_to(root).to_s
+          File.join(output_dir, prefix, relative)
+        rescue ArgumentError
+          canonical_output
+        end
+
         private def self.output_path_for(page : Models::Page, output_dir : String) : String
           url_path = page.url.lchop("/")
           File.join(output_dir, url_path, "index.html")
         end
 
         private def self.amp_output_path(page : Models::Page, output_dir : String, prefix : String) : String
-          url_path = page.url.lchop("/")
-          File.join(output_dir, prefix, url_path, "index.html")
+          mirror_path(output_path_for(page, output_dir), output_dir, prefix)
         end
       end
     end

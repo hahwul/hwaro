@@ -307,10 +307,66 @@ module Hwaro
         # into one classified error by raise_on_broken_internal_links!.
         @broken_internal_links : Array(String) = [] of String
         @broken_links_mutex : Mutex = Mutex.new
+        # Output files this build claims that no content source backs — the
+        # taxonomy index/term pages, their pagination pages and their feeds.
+        # A page's own output is recorded in its cache entry; these have no
+        # entry to record them, so the Finalize phase persists this set and
+        # deletes what the PREVIOUS build claimed and this one no longer does
+        # (a term whose last post was deleted). Only a claim recorded here can
+        # ever be deleted, so a generator that reports nothing simply keeps
+        # today's behaviour instead of losing files. Reset by the Initialize
+        # phase; guarded because taxonomy rendering fans out.
+        @generated_output_claims : Set(String) = Set(String).new
+        @generated_claims_mutex : Mutex = Mutex.new
+        # Files a page wrote BESIDES its own output: its `aliases` redirect
+        # stubs and, for a section, its `/page/N/` pagination pages. Both are
+        # produced by the render pass, so a warm `--cache` build that skips a
+        # page never re-derives them — they go into the page's cache entry
+        # (`derived_paths`) instead, which is what lets a removed page take its
+        # stubs with it and a section that lost a page drop the pagination page
+        # it no longer fills. Keyed by page.path, filled during render_page and
+        # drained by record_page_cache_entry a few lines later in the same
+        # worker fiber.
+        @page_derived_outputs : Hash(String, Array(String)) = {} of String => Array(String)
+        @page_derived_mutex : Mutex = Mutex.new
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
           setup_cache_manager
+        end
+
+        # Record an output file this build produced that no cache entry
+        # covers. Public: the taxonomy generator is a module that reaches the
+        # builder through its `builder:` argument.
+        def claim_generated_output(path : String) : Nil
+          @generated_claims_mutex.synchronize { @generated_output_claims << path }
+        end
+
+        # Everything claimed since the last reset.
+        def generated_output_claims : Set(String)
+          @generated_claims_mutex.synchronize { @generated_output_claims.dup }
+        end
+
+        def reset_generated_output_claims : Nil
+          @generated_claims_mutex.synchronize { @generated_output_claims.clear }
+        end
+
+        # Record an alias stub / pagination page `page` just wrote.
+        def record_page_derived_output(page_path : String, output_path : String) : Nil
+          @page_derived_mutex.synchronize do
+            (@page_derived_outputs[page_path] ||= [] of String) << output_path
+          end
+        end
+
+        # Start this page's list over — called at the top of every render so a
+        # `serve` session's repeated rebuilds don't accumulate.
+        def clear_page_derived_outputs(page_path : String) : Nil
+          @page_derived_mutex.synchronize { @page_derived_outputs.delete(page_path) }
+        end
+
+        # Take (and forget) what this page derived.
+        def take_page_derived_outputs(page_path : String) : Array(String)
+          @page_derived_mutex.synchronize { @page_derived_outputs.delete(page_path) } || [] of String
         end
 
         # Access cache manager for external inspection

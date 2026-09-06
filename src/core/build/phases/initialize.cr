@@ -22,6 +22,9 @@ module Hwaro::Core::Build::Phases::Initialize
       build_cache = Cache.new(enabled: cache_enabled)
       @cache = build_cache
       ctx.cache = build_cache
+      # Source-less generated outputs are re-claimed from scratch every build;
+      # the Finalize phase diffs this build's claims against the last one's.
+      reset_generated_output_claims
 
       if cache_enabled
         if ctx.options.full
