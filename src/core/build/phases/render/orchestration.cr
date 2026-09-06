@@ -111,7 +111,7 @@ module Hwaro::Core::Build::Phases::Render
       end
       begin
         count = if ctx.options.streaming?
-                  render_streaming(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay, parallel, ctx.options.batch_size)
+                  render_streaming(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay, parallel, ctx.options.batch_size, !generated_outputs_read_content?(site))
                 elsif parallel && pages_to_build.size > 1
                   process_files_parallel(pages_to_build, site, templates, output_dir, minify, build_cache, use_highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                 else
@@ -229,6 +229,7 @@ module Hwaro::Core::Build::Phases::Render
     error_overlay : Bool,
     parallel : Bool,
     batch_size : Int32,
+    release_content : Bool,
   ) : Int32
     total_count = 0
     batch_num = 0
@@ -257,9 +258,14 @@ module Hwaro::Core::Build::Phases::Render
               end
       total_count += count
 
-      # Always release the rendered HTML strings for this batch immediately.
-      # This is cheap and the primary mechanism for keeping peak memory low.
-      batch.each(&.content=(""))
+      # Release the rendered HTML strings for this batch immediately — the
+      # primary mechanism for keeping peak memory low. Only safe when no
+      # Generate-phase output reads `page.content` back
+      # (`generated_outputs_read_content?`): the fallback those generators
+      # use is a markdown-only re-render of `raw_content`, so releasing
+      # under them shipped raw `{% shortcode %}` markup, unresolved `@/`
+      # links and un-prefixed subpath URLs into search.json and every feed.
+      batch.each(&.content=("")) if release_content
 
       # Only do the heavier cache invalidation + full GC on every Nth batch.
       # This significantly reduces overhead compared to doing it on every batch,

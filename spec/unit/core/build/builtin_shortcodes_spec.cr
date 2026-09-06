@@ -101,4 +101,38 @@ describe Hwaro::Core::Build::BuiltinShortcodes do
       Hwaro::Core::Build::BuiltinShortcodes.positional_params("shortcodes/custom-thing").should be_nil
     end
   end
+
+  # Backs the dispatcher's missing-argument warning: these are the slots a
+  # built-in interpolates straight into a URL or an `src`, so omitting one
+  # renders a well-formed embed pointing nowhere.
+  describe ".required_params" do
+    it "names the URL slots of every embed built-in" do
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/youtube").should eq(["id"])
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/vimeo").should eq(["id"])
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/gist").should eq(["user", "id"])
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/tweet").should eq(["user", "id"])
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/codepen").should eq(["user", "id"])
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/figure").should eq(["src"])
+    end
+
+    it "returns nil where every slot has a default" do
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/alert").should be_nil
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/callout").should be_nil
+    end
+
+    it "returns nil for user shortcodes, which define their own contract" do
+      Hwaro::Core::Build::BuiltinShortcodes.required_params("shortcodes/custom-thing").should be_nil
+    end
+
+    it "only names parameters the template interpolates without a default" do
+      templates = Hwaro::Core::Build::BuiltinShortcodes.templates
+      Hwaro::Core::Build::BuiltinShortcodes::REQUIRED_PARAMS.each do |key, params|
+        body = templates[key]
+        params.each do |param|
+          body.should contain("{{ #{param} | e }}")
+          body.should_not contain("{{ #{param} | default(")
+        end
+      end
+    end
+  end
 end

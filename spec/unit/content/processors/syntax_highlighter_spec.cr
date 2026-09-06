@@ -706,5 +706,46 @@ describe Hwaro::Content::Processors::ServerHighlighter do
       # sanitization and proves the invalid-byte path was exercised.
       html.not_nil!.should contain("�")
     end
+
+    # A lexer splits one visual atom into several same-type tokens (Crystal's
+    # `puts "hi"` arrives as `"`, `hi`, `"` and an empty LiteralString), and a
+    # span each produced four elements — one of them empty — where one
+    # belongs. The extra tag boundaries also made `strip_html` insert a space
+    # before the next word, so the search index read `puts " hi"`.
+    it "emits one span per run of same-class tokens" do
+      html = Hwaro::Content::Processors::ServerHighlighter.highlight(%q(puts "hi"), "crystal").not_nil!
+      html.should eq(%(puts <span class="hljs-string">&quot;hi&quot;</span>))
+    end
+
+    it "never emits an empty span" do
+      %w[crystal python json yaml].each do |lang|
+        html = Hwaro::Content::Processors::ServerHighlighter.highlight(%q(x = "hi"), lang)
+        html.try(&.should_not(match(/<span class="[^"]*"><\/span>/)))
+      end
+    end
+
+    it "keeps the plain text intact when spans are stripped" do
+      code = %(def f(x)\n  "value"\nend)
+      html = Hwaro::Content::Processors::ServerHighlighter.highlight(code, "crystal").not_nil!
+      html.gsub(/<\/?span[^>]*>/, "").should eq(HTML.escape(code))
+    end
+
+    it "still breaks the run where the class changes" do
+      html = Hwaro::Content::Processors::ServerHighlighter.highlight(%q(x = 1), "python").not_nil!
+      html.should contain(%(<span class="hljs-number">1</span>))
+      html.should_not contain(%(<span class="hljs-number">x))
+    end
+
+    # LineWrapper re-opens a span carried across a newline, so a run that now
+    # spans two lines must still leave every line balanced.
+    it "produces balanced spans per line after merging across a newline" do
+      code = %(a = "multi\nline")
+      html = Hwaro::Content::Processors::ServerHighlighter.highlight(code, "crystal").not_nil!
+      lines = Hwaro::Content::Processors::LineWrapper.split_lines(html)
+      lines.size.should eq(2)
+      lines.each do |line|
+        line.scan(/<span /).size.should eq(line.scan(/<\/span>/).size)
+      end
+    end
   end
 end

@@ -96,12 +96,34 @@ The development server (`hwaro serve`) uses a more targeted incremental strategy
 | Config file | Full rebuild |
 | Static files only | Copy only changed files |
 
+### Removed pages
+
+A cold build starts from an empty output directory, so a page you delete is
+gone from `public/` on the next build. `--cache` keeps the directory — that is
+the point — so removals are handled from the cache instead: every entry records
+the file the page wrote, and on each build the entries no live page claims have
+their output deleted.
+
+That covers a page that was deleted, renamed, moved to a new URL (`slug`,
+`path`, a permalink rule), turned into a draft, passed its `expires` date, or
+set `render = false`.
+
+Everything a removed page brought with it goes too: its `aliases` redirect
+stubs, its AMP mirror, its auto-generated OG image, the taxonomy term page of
+a tag nobody uses any more (with that term's feed), and the pagination page a
+section no longer fills. Turning a whole feature off — `[amp] enabled = false`
+— removes what it used to publish on the next build for the same reason.
+
+A `--cache` build's output is therefore byte-identical to a clean build's, and
+`hwaro build --full` is not needed to clear anything.
+
 ## Cache File
 
 The cache is stored in `.hwaro_cache.json` at the project root. This file contains:
 
 - **Metadata** — template and config checksums from the last build
 - **Entries** — per-file records with path, mtime, content hash, and output path
+  (the output path is also what identifies a removed page's stale file)
 
 Add `.hwaro_cache.json` to your `.gitignore` (the one `hwaro init` scaffolds already lists it):
 

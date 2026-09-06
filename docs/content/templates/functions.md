@@ -426,12 +426,19 @@ Returns a resized image variant. When [image processing](/features/image-process
 | Property | Type | Description |
 |----------|------|-------------|
 | url | String | URL to the resized variant (or original if unavailable) |
-| width | Int | Requested width |
-| height | Int | Requested height |
+| width | Int | The variant's actual width — falls back to the requested width when no variant exists |
+| height | Int | Requested height (0 when not passed) |
 | lqip | String | Base64 data URI of a tiny JPEG placeholder (empty if LQIP disabled) |
 | dominant_color | String | Hex color string of the image's dominant color, e.g. `#a3b2c1` (empty if LQIP disabled) |
 
 The function selects the closest available width from the configured `widths`. If you request `width=500` and the configured widths are `[320, 640, 1024]`, it returns the 640px variant (smallest width >= requested). If nothing is large enough, it falls back to the largest available.
+
+Variants are never upscaled, so a 900px source asked for `width=1024` resolves
+to a 900px file — and `img.width` reports `900`, so
+`<img width="{{ img.width }}">` matches the file the browser loads. `height`
+is only ever the value you passed (`0` when you passed none): the variant map
+is rebuilt from filenames on incremental builds, so a real height is not
+available without decoding every image.
 
 The `lqip` and `dominant_color` properties require `[image_processing.lqip]` to be enabled. When disabled, they return empty strings.
 

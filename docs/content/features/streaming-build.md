@@ -76,15 +76,37 @@ hwaro build --stream --memory-limit 512M
 
 1. During the Render phase, pages are split into batches
 2. Each batch is rendered using the same parallel/sequential logic as a normal build
-3. After each batch is written to disk, `page.content` is cleared to free memory
+3. After each batch is written to disk, `page.content` is cleared to free memory —
+   but only when nothing downstream reads it back (see below)
 4. The garbage collector is invoked to reclaim the released memory
 5. After the Generate phase (feeds, sitemap, search index), `page.raw_content` is also cleared
 
-The Generate phase (feeds, search, sitemap, llms.txt) still works correctly because these generators already fall back to re-rendering from `raw_content` when `page.content` is empty.
+### When `page.content` is kept
+
+The search index and every feed surface read each page's rendered body back
+during the Generate phase. Releasing it under them would leave those generators
+with a markdown-only re-render of `raw_content` — no shortcode expansion, no
+`@/` link resolution, no anchor links, no `base_path` prefix — so `search.json`
+and `rss.xml` would carry raw `{% shortcode %}` markup and broken links.
+
+So step 3 is skipped whenever any of these is on:
+
+- `[search] enabled`
+- `[feeds] enabled`
+- any `[[taxonomies]]` with `feed = true`
+- any section with `generate_feeds` in its `_index.md`
+
+With all of them off, batches are released as before. Either way the render
+itself still runs in batches, so the per-batch peak (worker template output,
+Crinja value caches) stays bounded.
 
 ## Output
 
 The build output is **identical** whether streaming is enabled or not. Streaming only affects memory usage during the build process.
+
+> This did not hold on releases up to v0.20.1: on a site with a search index
+> or feeds, `--stream` shipped unexpanded shortcodes and unresolved `@/` links
+> into `search.json` and every feed. Rebuild such a site once after upgrading.
 
 Use `--verbose` to see batch progress:
 

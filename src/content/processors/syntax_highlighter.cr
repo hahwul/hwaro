@@ -163,17 +163,35 @@ module Hwaro
           @@tokenize_gate.send(nil)
           result = begin
             String.build do |io|
+              # One span per RUN of same-class tokens, not per token. A lexer
+              # routinely splits one visual atom into several tokens of the
+              # same type — Crystal's `puts "hi"` arrives as four
+              # LiteralString tokens (`"`, `hi`, `"`, and an empty one) — and
+              # emitting a span each produced four elements where one belongs,
+              # including `<span class="hljs-string"></span>` with no content
+              # at all. The extra boundaries are not only bytes: `strip_html`
+              # inserts a space at a tag boundary before a word character, so
+              # the search index and feed descriptions read `puts " hi"`
+              # instead of `puts "hi"`. Runs also survive `LineWrapper`, which
+              # already re-opens a span carried across a newline.
+              open_class : String? = nil
               lexer.tokenizer(code).each do |token|
                 value = token[:value]
+                # An empty token contributes nothing but a tag pair, and
+                # dropping it lets the runs on either side join.
+                next if value.empty?
                 # Most tokens (keywords, identifiers, whitespace) need no
                 # escaping — skip HTML.escape's char-by-char rebuild for them.
                 value = HTML.escape(value) if needs_html_escape?(value)
-                if css_class = class_for(token[:type])
-                  io << %(<span class=") << css_class << %(">) << value << "</span>"
-                else
-                  io << value
+                css_class = class_for(token[:type])
+                if css_class != open_class
+                  io << "</span>" if open_class
+                  io << %(<span class=") << css_class << %(">) if css_class
+                  open_class = css_class
                 end
+                io << value
               end
+              io << "</span>" if open_class
             end
           rescue ex
             # A lexer bug must never take down the build — degrade to plain.

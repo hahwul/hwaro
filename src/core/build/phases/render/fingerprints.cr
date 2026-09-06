@@ -208,6 +208,13 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, (p.updated.try(&.to_unix) || 0_i64).to_s)
       fp_value(digest, p.weight.to_s)
       fp_value(digest, p.draft ? "1" : "0")
+      # `render` decides whether the page writes a file at all, and a page
+      # turning `render = false` renders NOTHING — so `pages_rendered` stays 0
+      # and `generate_outputs_unchanged?` skipped the SEO pass, leaving the
+      # page in sitemap.xml / rss.xml / search.json / llms.txt until an
+      # unrelated edit. It belongs to the set's identity for the same reason
+      # `draft` does.
+      fp_value(digest, p.render ? "1" : "0")
       fp_value(digest, p.toc ? "1" : "0")
       fp_value(digest, p.section)
       fp_value(digest, p.image || "")
@@ -376,7 +383,11 @@ module Hwaro::Core::Build::Phases::Render
     # up-to-date would let filter_changed_pages skip it forever.
     return unless output_path
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page))
+    # Alias stubs and `/page/N/` pagination files the render just wrote (see
+    # `@page_derived_outputs`): recorded here, sorted so a re-render in a
+    # different fiber order can't make the entry look changed.
+    derived = take_page_derived_outputs(page.path).sort!
+    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), derived_paths: derived)
   end
 
   # Fingerprint of the page's `[git]` metadata (see CacheEntry#git_hash):

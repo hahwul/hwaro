@@ -19,6 +19,7 @@ def build_site(
   highlight : Bool = false,
   cache : Bool = false,
   parallel : Bool = false,
+  stream : Bool = false,
   &
 )
   Dir.mktmpdir do |dir|
@@ -70,6 +71,7 @@ def build_site(
         highlight: highlight,
         verbose: false,
         profile: false,
+        stream: stream,
       )
 
       yield dir

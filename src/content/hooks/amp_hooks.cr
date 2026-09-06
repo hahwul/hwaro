@@ -25,6 +25,7 @@ module Hwaro
             site.config,
             ctx.output_dir,
             ctx.options.verbose,
+            builder: ctx.builder,
           )
         end
       end

@@ -719,7 +719,8 @@ module Hwaro
           warnings : Array(String)? = nil,
         ) : String
           template_key = "shortcodes/#{name}"
-          template = templates[template_key]? || BuiltinShortcodes.templates[template_key]?
+          user_template = templates[template_key]?
+          template = user_template || BuiltinShortcodes.templates[template_key]?
 
           unless template
             # Direct-call syntax (`{{ name(args) }}`) doubles as Crinja's
@@ -763,6 +764,8 @@ module Hwaro
               pos_idx += 1
             end
           end
+
+          warn_missing_shortcode_args(name, template_key, args, warnings) unless user_template
 
           html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, shortcode_name: name, warnings: warnings)
 
@@ -1021,6 +1024,33 @@ module Hwaro
           end
           return unless should_warn
           Logger.warn "Shortcode template '#{template_key}' not found."
+        end
+
+        # A built-in shortcode call that leaves out a required parameter
+        # renders successfully into markup nobody can use — an iframe at
+        # `https://codepen.io//embed/abc`, a gist script at
+        # `https://gist.github.com//abc.js`, an `<img src="">`. Crinja
+        # resolves the missing name to the empty string and the build exits 0,
+        # so without this the only symptom is a dead embed on the published
+        # page. Only reported for the built-in templates: a user template in
+        # `templates/shortcodes/` decides its own contract, so the caller
+        # skips this whenever the lookup found one — including a file that
+        # overrides a built-in by name.
+        private def warn_missing_shortcode_args(name : String, template_key : String, args : Hash(String, String), warnings : Array(String)?) : Nil
+          return unless templates_required = BuiltinShortcodes.required_params(template_key)
+          missing = templates_required.reject { |param| args[param]?.try { |v| !v.strip.empty? } }
+          return if missing.empty?
+
+          list = missing.join("`, `")
+          message = "Shortcode `#{name}` is missing required argument#{"s" if missing.size > 1} `#{list}` — it renders a broken embed. Usage: `{{ #{name}(#{templates_required.map { |p| %(#{p}="…") }.join(", ")}) }}`."
+          # Page-scoped so the serve error overlay can show it next to the
+          # page that has the bad call; deduped globally for the build log.
+          warnings.try(&.<<(message))
+          should_warn = @crinja_cache_mutex.synchronize do
+            seen = (@shortcode_warnings_seen ||= Set(String).new)
+            seen.add?("args:#{template_key}:#{missing.join(",")}")
+          end
+          Logger.warn message if should_warn
         end
 
         # Same once-per-build dedupe for a block opener that never finds its

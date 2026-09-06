@@ -84,6 +84,9 @@ module Hwaro::Core::Build::Phases::Render
 
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+    # A section that loses posts paginates into fewer pages; the file for the
+    # page number it no longer fills is only ever named here.
+    record_page_derived_output(page.path, output_path)
     Logger.action :create, output_path if verbose
   end
 end

@@ -325,7 +325,7 @@ module Hwaro
         html_content = build_term_list(terms, page.url, site.config.base_url, slug_map)
 
         final_html = apply_template(template_content, html_content, page, site, templates, builder: builder, global_vars: global_vars, template_name: template_name)
-        write_output(page, output_dir, final_html, verbose)
+        write_output(page, output_dir, final_html, verbose, builder)
       end
 
       private def self.render_taxonomy_term(
@@ -375,9 +375,9 @@ module Hwaro
           final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name, pagination_seo_links: seo_links)
 
           if paginated_page.page_number == 1
-            write_output(index_page, output_dir, final_html, verbose)
+            write_output(index_page, output_dir, final_html, verbose, builder)
           else
-            write_paginated_output(index_page, paginated_page.page_number, output_dir, final_html, verbose, index_page.paginate_path)
+            write_paginated_output(index_page, paginated_page.page_number, output_dir, final_html, verbose, index_page.paginate_path, builder)
           end
         end
 
@@ -523,6 +523,12 @@ module Hwaro
         feed_output_dir = Content::Seo::Feeds.feed_output_dir_for(output_dir, base_url)
         return unless feed_output_dir
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"
+        # Same reason as the term page: nothing else records that this feed is
+        # still wanted, so a removed term left `tags/<slug>/rss.xml` behind.
+        # `process_feed` derives the name the same way.
+        builder.try(&.claim_generated_output(
+          File.join(feed_output_dir, Content::Seo::Feeds.safe_feed_filename(site.config.feeds.filename, site.config.feeds.type))
+        ))
 
         # No caller-side sort/limit: process_feed itself sorts date-desc
         # (SortUtils.compare_by_date) and applies feeds.limit. Dedupe by URL
@@ -587,11 +593,18 @@ module Hwaro
 
       # Guard against escaping the output dir, then mkdir + write + log a
       # taxonomy output file. Shared by the single-page and paginated writers.
-      private def self.write_to(output_path : String, output_dir : String, content : String, verbose : Bool)
+      private def self.write_to(output_path : String, output_dir : String, content : String, verbose : Bool, builder : Core::Build::Builder? = nil)
         unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
           Logger.warn "Skipping taxonomy output outside output directory: #{output_path}"
           return
         end
+
+        # No content file backs a taxonomy page, so nothing else records that
+        # this build still wants it. Claiming it lets the Finalize phase
+        # delete the term pages a previous `--cache` build left behind when
+        # its last post was deleted (the output directory survives a warm
+        # build, and this generator only ever writes the terms that exist).
+        builder.try(&.claim_generated_output(output_path))
 
         begin
           Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
@@ -620,21 +633,21 @@ module Hwaro
       # page onto the shortened path instead of skipping it. Reachable only if
       # a term ever escapes `safe_slugify`, but every writer family must answer
       # this question the same way.
-      private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false)
+      private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false, builder : Core::Build::Builder? = nil)
         segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
         if refused
           Logger.warn "Skipping taxonomy page #{page.url.inspect}: a path segment would escape the output directory."
           return
         end
         output_path = File.join(output_dir, segments.join("/"), "index.html")
-        write_to(output_path, output_dir, content, verbose)
+        write_to(output_path, output_dir, content, verbose, builder)
       end
 
-      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false, paginate_path : String = "page")
+      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false, paginate_path : String = "page", builder : Core::Build::Builder? = nil)
         segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
         return if refused
         output_path = File.join(output_dir, segments.join("/"), paginate_path, page_number.to_s, "index.html")
-        write_to(output_path, output_dir, content, verbose)
+        write_to(output_path, output_dir, content, verbose, builder)
       end
     end
   end

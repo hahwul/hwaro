@@ -553,9 +553,16 @@ module Hwaro
           # Usage: {{ resize_image(path="/images/photo.jpg", width=800).url }}
           # Returns object with:
           #   - url: URL to the resized variant (or original if not available)
-          #   - width: requested width (0 if not specified)
+          #   - width: the variant's actual width, falling back to the
+          #     requested one when no variant exists (0 if not specified)
           #   - height: requested height (0 if not specified)
-          # Note: actual output dimensions depend on aspect ratio preservation.
+          # `width` is the variant's, not the request's: variants are never
+          # upscaled, so `width=1024` against a 900px source resolves to the
+          # 900px file — and the documented `<img width="{{ img.width }}">`
+          # then told the browser 1024, laying out the image at the wrong
+          # size. `height` stays the requested value: the resize map is
+          # rebuilt from variant FILENAMES on warm builds (`_320w.png`), so a
+          # real height is not recoverable without decoding every image.
           @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0}) do
             path = arguments["path"].to_s
             # Lenient coercion: shortcode arguments are always Strings, so a
@@ -573,15 +580,16 @@ module Hwaro
             normalized = URI.decode(path.starts_with?("/") ? path : "/#{path}")
 
             # Try to find a resized variant from the image hooks map
-            resized_url = if width > 0
-                            Content::Hooks::ImageHooks.find_closest(normalized, width)
-                          end
+            variant = if width > 0
+                        Content::Hooks::ImageHooks.find_closest_variant(normalized, width)
+                      end
 
-            final_url = if resized = resized_url
-                          base_url.rstrip("/") + URI.encode_path(resized)
+            final_url = if resized = variant
+                          base_url.rstrip("/") + URI.encode_path(resized[1])
                         else
                           base_url.rstrip("/") + URI.encode_path(normalized)
                         end
+            actual_width = variant.try(&.[0]) || width
 
             # Look up LQIP data
             lqip_data = Content::Hooks::ImageHooks.find_lqip(normalized)
@@ -590,7 +598,7 @@ module Hwaro
 
             Crinja::Value.new({
               "url"            => Crinja::Value.new(final_url),
-              "width"          => Crinja::Value.new(width),
+              "width"          => Crinja::Value.new(actual_width),
               "height"         => Crinja::Value.new(height),
               "lqip"           => Crinja::Value.new(lqip_value),
               "dominant_color" => Crinja::Value.new(dominant_color_value),
