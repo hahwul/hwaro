@@ -1,2 +1,0 @@
-### Fixed
-- `resize_image().width` reports the chosen variant's actual width instead of the requested one. Variants are never upscaled, so `resize_image(path="/hero.jpg", width=1024)` against a 900px source returns the 900px file — while `width` still said `1024`, and the documented `<img width="{{ img.width }}">` then told the browser to lay the image out at a size it isn't. `height` is unchanged (the requested value, `0` when not passed): the variant map is rebuilt from filenames on incremental builds, so a real height is not recoverable without decoding every image
