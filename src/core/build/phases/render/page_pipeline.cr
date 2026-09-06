@@ -29,6 +29,30 @@ module Hwaro::Core::Build::Phases::Render
     site.config.taxonomies.any?(&.feed)
   end
 
+  # Does any Generate-phase output read `page.content` back?
+  #
+  # `--stream` releases each batch's rendered body to keep peak memory flat.
+  # That is only sound when nothing downstream reads it: the search index and
+  # every feed surface do, and their fallback is a markdown-only re-render of
+  # `raw_content` — no shortcode expansion, no `@/` link resolution, no anchor
+  # links, no base_path prefix, no responsive images. Releasing under those
+  # consumers put raw `{% alert() %}` markup and `…/posts/x/@/posts/y.md`
+  # links into search.json and rss.xml (the corruption #775 fixed for warm
+  # `--cache` builds, on the one mode still doing it) while ALSO paying a
+  # second full markdown pass per page for the fallback — slower AND wrong.
+  #
+  # Section feeds are driven by a section's own `generate_feeds`, outside
+  # `[feeds] enabled`, and taxonomy feeds by `[[taxonomies]] feed`, so each
+  # feed surface is checked separately. Language feeds ride on
+  # `[feeds] enabled` and need no extra test.
+  private def generated_outputs_read_content?(site : Models::Site) : Bool
+    config = site.config
+    return true if config.search.enabled
+    return true if config.feeds.enabled
+    return true if config.taxonomies.any?(&.feed)
+    site.sections.any?(&.generate_feeds)
+  end
+
   # Populate `page.content` for cache-hit pages on a warm `--cache` build.
   #
   # The render phase only runs `render_page` for pages whose cache entry is
