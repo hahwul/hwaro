@@ -290,7 +290,9 @@ attributes = true
 Tokens are whitespace-separated (commas are not separators): `#id` sets
 the id, `.class` adds a class (repeatable), and `key=value` / `key="quoted
 value"` sets any other attribute. `id=value` and `class=value` are
-accepted as aliases for `#value` / `.value`. Any single invalid token
+accepted as aliases for `#value` / `.value`. An id may start with a digit
+(`{#1-intro}`), the same charset the [custom heading ID](/writing/pages/#custom-heading-ids)
+shorthand accepts; a class name may not. Any single invalid token
 invalidates the whole block, leaving the source `{...}` untouched.
 
 ### Limitations

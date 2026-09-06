@@ -270,7 +270,7 @@ attributes = true
 <img src="diagram.png" alt="A diagram" class="responsive" width="800" />
 ```
 
-토큰은 공백으로 구분합니다(쉼표는 구분자가 아님). `#id`는 id를 설정하고, `.class`는 클래스를 추가하며(반복 가능), `key=value` / `key="quoted value"`는 그 밖의 속성을 설정합니다. `id=value`와 `class=value`는 `#value` / `.value`의 별칭으로 허용됩니다. 유효하지 않은 토큰이 하나라도 있으면 블록 전체가 무효가 되어 원본 `{...}`이 그대로 남습니다.
+토큰은 공백으로 구분합니다(쉼표는 구분자가 아님). `#id`는 id를 설정하고, `.class`는 클래스를 추가하며(반복 가능), `key=value` / `key="quoted value"`는 그 밖의 속성을 설정합니다. `id=value`와 `class=value`는 `#value` / `.value`의 별칭으로 허용됩니다. id는 숫자로 시작해도 됩니다(`{#1-intro}`) — [커스텀 헤딩 ID](/ko/writing/pages/#커스텀-헤딩-id) 축약 문법과 같은 문자 집합입니다. 클래스 이름은 그렇지 않습니다. 유효하지 않은 토큰이 하나라도 있으면 블록 전체가 무효가 되어 원본 `{...}`이 그대로 남습니다.
 
 ### 제한 사항
 
