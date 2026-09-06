@@ -152,7 +152,16 @@ CodePen을 삽입합니다.
 | `height` | `300` | 삽입 높이 |
 | `title` | `CodePen Embed` | 접근성용 제목 |
 
-> 내장 숏코드를 덮어쓰려면 `templates/shortcodes/`에 같은 이름의 파일을 만들면 됩니다(예: `templates/shortcodes/youtube.html`). 사용자 템플릿이 항상 우선합니다.
+위에서 **(필수)** 로 표시된 매개변수는 모두 URL이나 `src`에 그대로 들어갑니다.
+빠뜨려도 렌더링은 성공하지만 아무 데도 가리키지 않는 임베드
+(`https://codepen.io//embed/gfdDu`)가 나오므로, 배포된 페이지에서 깨진 임베드를
+직접 찾는 대신 빌드가 경고합니다.
+
+```
+[WARN] Shortcode `codepen` is missing required argument `user` — it renders a broken embed. Usage: `{{ codepen(user="…", id="…") }}`.
+```
+
+> 내장 숏코드를 덮어쓰려면 `templates/shortcodes/`에 같은 이름의 파일을 만들면 됩니다(예: `templates/shortcodes/youtube.html`). 사용자 템플릿이 항상 우선하며, 자기 계약을 스스로 정의하므로 위 경고는 적용되지 않습니다.
 
 ## 커스텀 숏코드 작성
 

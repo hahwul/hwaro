@@ -152,7 +152,16 @@ Embed a CodePen.
 | `height` | `300` | Embed height |
 | `title` | `CodePen Embed` | Accessible title |
 
-> To override any built-in shortcode, create a file with the same name in `templates/shortcodes/` (e.g., `templates/shortcodes/youtube.html`). User templates always take priority.
+Every parameter marked **(required)** above lands directly in a URL or an
+`src`. Omitting one still renders — into an embed that points nowhere
+(`https://codepen.io//embed/gfdDu`) — so the build warns instead of leaving you
+to find the dead embed on the published page:
+
+```
+[WARN] Shortcode `codepen` is missing required argument `user` — it renders a broken embed. Usage: `{{ codepen(user="…", id="…") }}`.
+```
+
+> To override any built-in shortcode, create a file with the same name in `templates/shortcodes/` (e.g., `templates/shortcodes/youtube.html`). User templates always take priority — and define their own contract, so the warning above does not apply to them.
 
 ## Creating Custom Shortcodes
 

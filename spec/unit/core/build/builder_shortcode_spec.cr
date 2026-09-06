@@ -13,8 +13,8 @@ module Hwaro::Core::Build
       process_shortcodes_jinja(content, templates, context, shortcode_results, crinja_env_override: crinja_env_override)
     end
 
-    def test_render_shortcode_result(name, args_str, templates, context, shortcode_results, fallback, warn_missing = true, extra_args = nil, crinja_env_override = nil)
-      render_shortcode_result(name, args_str, templates, context, shortcode_results, fallback, warn_missing: warn_missing, extra_args: extra_args, crinja_env_override: crinja_env_override)
+    def test_render_shortcode_result(name, args_str, templates, context, shortcode_results, fallback, warn_missing = true, extra_args = nil, crinja_env_override = nil, warnings = nil)
+      render_shortcode_result(name, args_str, templates, context, shortcode_results, fallback, warn_missing: warn_missing, extra_args: extra_args, crinja_env_override: crinja_env_override, warnings: warnings)
     end
 
     def test_replace_shortcode_placeholders(html, shortcode_results)
@@ -420,6 +420,73 @@ describe Hwaro::Core::Build::Builder do
         "wrap", nil, templates, context, nil, "fallback", extra_args: extra, crinja_env_override: env
       )
       result.should eq("<div>inner content</div>")
+    end
+  end
+
+  # A built-in call that omits a required slot still renders — into markup
+  # nobody can use (`https://codepen.io//embed/abc`, `<img src="">`) — and the
+  # build exits 0, so the only symptom used to be a dead embed on the page.
+  describe "#render_shortcode_result missing built-in arguments" do
+    it "warns and names the required argument" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      context = {} of String => Crinja::Value
+      warnings = [] of String
+
+      log = with_captured_log do
+        builder.test_render_shortcode_result(
+          "codepen", "id=\"abc\"", {} of String => String, context, nil, "fallback",
+          crinja_env_override: env, warnings: warnings
+        )
+      end
+
+      log.to_s.should contain("missing required argument `user`")
+      warnings.size.should eq(1)
+      warnings.first.should contain("codepen")
+    end
+
+    it "treats a blank value as missing" do
+      builder = Hwaro::Core::Build::Builder.new
+      warnings = [] of String
+      builder.test_render_shortcode_result(
+        "youtube", "id=\"   \"", {} of String => String, {} of String => Crinja::Value, nil,
+        "fallback", crinja_env_override: Crinja.new, warnings: warnings
+      )
+      warnings.size.should eq(1)
+    end
+
+    it "stays quiet when every required argument is present" do
+      builder = Hwaro::Core::Build::Builder.new
+      warnings = [] of String
+      builder.test_render_shortcode_result(
+        "gist", "user=\"octo\", id=\"abc\"", {} of String => String, {} of String => Crinja::Value,
+        nil, "fallback", crinja_env_override: Crinja.new, warnings: warnings
+      )
+      warnings.should be_empty
+    end
+
+    it "stays quiet for the positional form, which fills the same slots" do
+      builder = Hwaro::Core::Build::Builder.new
+      warnings = [] of String
+      builder.test_render_shortcode_result(
+        "gist", "\"octo\", \"abc\"", {} of String => String, {} of String => Crinja::Value,
+        nil, "fallback", crinja_env_override: Crinja.new, warnings: warnings
+      )
+      warnings.should be_empty
+    end
+
+    # A file in templates/shortcodes/ defines its own contract, even when it
+    # shadows a built-in name.
+    it "stays quiet when a user template overrides the built-in" do
+      builder = Hwaro::Core::Build::Builder.new
+      warnings = [] of String
+      templates = {"shortcodes/youtube" => "<div class=\"mine\">{{ id }}</div>"}
+      result = builder.test_render_shortcode_result(
+        "youtube", "", templates, {} of String => Crinja::Value, nil, "fallback",
+        crinja_env_override: Crinja.new, warnings: warnings
+      )
+      result.should contain("class=\"mine\"")
+      warnings.should be_empty
     end
   end
 
