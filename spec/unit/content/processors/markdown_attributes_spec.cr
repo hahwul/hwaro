@@ -9,8 +9,13 @@ describe Hwaro::Content::Processors::MarkdownAttributes do
       parsed.attrs.should eq([{"k", "v"}, {"k2", "v 2"}])
     end
 
-    it "returns nil for an invalid id token (#1x)" do
-      Hwaro::Content::Processors::MarkdownAttributes.parse("#1x").should be_nil
+    it "accepts a digit-leading id token (#1x), matching the HTML5 id rule" do
+      parsed = Hwaro::Content::Processors::MarkdownAttributes.parse("#1x").not_nil!
+      parsed.id.should eq("1x")
+    end
+
+    it "returns nil for an id token that is only a `#`" do
+      Hwaro::Content::Processors::MarkdownAttributes.parse("#").should be_nil
     end
 
     it "returns nil for an invalid class token (.9)" do

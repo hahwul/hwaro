@@ -12,19 +12,23 @@ module Hwaro
         # `## My Heading {#custom-id}` → `## My Heading <!--HID:custom-id-->`
         # The marker survives Markd rendering and is converted to an `id="..."`
         # attribute in `postprocess_heading_ids`.
-        # Restricting the id charset to `[A-Za-z][\w:-]*` keeps it valid as an
-        # HTML id without further escaping.
+        # Restricting the id charset to `[\w][\w:-]*` keeps it valid as an
+        # HTML id without further escaping (no quote, `<` or `&` can occur
+        # in it). A leading digit is deliberately allowed: that's the HTML5
+        # rule, and hwaro's own auto-slugs already produce digit-leading ids
+        # like `1-create-a-project` for `## 1. Create a project`, so a
+        # translated heading has to be able to pin that same anchor (#792).
         # CommonMark allows up to 3 leading spaces before an ATX heading, which
         # we capture and preserve so Markd still recognises the line as a heading.
         # `\r?` before `$`: CRLF content otherwise never matches and the id is
         # silently dropped.
-        HEADING_ID_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([A-Za-z][\w:-]*)\}[ \t]*\r?$/
+        HEADING_ID_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([\w][\w:-]*)\}[ \t]*\r?$/
 
         # --- Custom Attributes (F9) ---
         # Generalized `{#id .class key=val}` attribute blocks — headings and
         # inline images. See `markdown_attributes.cr` for the token grammar.
         # Deliberately broader than HEADING_ID_RE's brace group
-        # (`[^{}]+` vs `\#[A-Za-z][\w:-]*`): this is what makes the two
+        # (`[^{}]+` vs `\#[\w][\w:-]*`): this is what makes the two
         # regexes disjoint on `## H {#id}` (HEADING_ID_RE wins) while still
         # catching `## H {#id .class}` (falls through to this one, since
         # HEADING_ID_RE requires the braces to contain ONLY `#id`).
@@ -100,7 +104,7 @@ module Hwaro
         # tag); the id checks guard with `(?<![\w-])` so `data-id=` never
         # counts as the element's id.
         HEADING_TAG_FOR_HID_RE = /<(h[1-6])((?:[^>"']|"[^"]*"|'[^']*')*)>(.*?)<\/\1>/m
-        HID_MARKER_RE          = /<!--HID:([A-Za-z][\w:-]*)-->/
+        HID_MARKER_RE          = /<!--HID:([\w][\w:-]*)-->/
         EXISTING_ID_RE         = /(?<![\w-])id\s*=\s*"[^"]*"/i
         ANY_ID_ATTR_PRESENT_RE = /(?<![\w-])id\s*=/i
 

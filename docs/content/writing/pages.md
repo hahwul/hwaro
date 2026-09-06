@@ -408,7 +408,7 @@ Append `{#custom-id}` to a heading line to override the auto-generated slug. Use
 
 Renders as `<h2 id="install">Installation Guide</h2>`. The TOC and any `[link](#install)` will use the custom id.
 
-Allowed id characters: letters, digits, `_`, `-`, `:`. The id must start with a letter. CommonMark allows up to 3 leading spaces before an ATX heading; deeper indentation makes the line a code block, in which case `{#id}` is not applied.
+Allowed id characters: letters (any script), digits, `_`, `-`, `:`. The id may start with a digit — `{#1-create-a-project}` is valid, which matters for translated numbered headings that need to keep the original anchor — but not with `-` or `:`. CommonMark allows up to 3 leading spaces before an ATX heading; deeper indentation makes the line a code block, in which case `{#id}` is not applied.
 
 Disable by setting `heading_ids = false` under `[markdown]` in `config.toml`.
 

@@ -740,6 +740,36 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should eq("## My Heading <!--HID:custom-id-->")
     end
 
+    it "extracts a digit-leading id (#792)" do
+      content = "## 1. Fuzzer로 요청 보내기 {#1-send-a-request-to-the-fuzzer}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should end_with("<!--HID:1-send-a-request-to-the-fuzzer-->")
+      result.should_not contain("{#")
+    end
+
+    it "renders a digit-leading custom id end-to-end (#792)" do
+      cfg = make_config(heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "## 1. Create a project {#1-create-a-project}\n\nBody.\n",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<h2 id="1-create-a-project">))
+      html.should_not contain("{#")
+      html.should_not contain("HID:")
+    end
+
+    it "accepts an underscore-leading custom id" do
+      content = "## Heading {#_private}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should eq("## Heading <!--HID:_private-->")
+    end
+
+    it "leaves a `{#}` with no id characters literal" do
+      content = "## Heading {#}"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result.should eq(content)
+    end
+
     it "preserves headings without an id marker" do
       content = "## Plain heading"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
@@ -1823,6 +1853,22 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html_on, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg_on)
       html_off, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg_off)
       html_on.should eq(html_off)
+    end
+
+    it "renders a digit-leading pure {#id} block byte-equal to attributes-off (#792)" do
+      cfg_on = make_config(attributes: true, heading_ids: true)
+      cfg_off = make_config(heading_ids: true)
+      content = "## 1. Create a project {#1-create-a-project}\n\nBody.\n"
+      html_on, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg_on)
+      html_off, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg_off)
+      html_on.should eq(html_off)
+      html_on.should contain(%(<h2 id="1-create-a-project">))
+    end
+
+    it "applies a digit-leading id alongside other tokens (#792)" do
+      cfg = make_config(attributes: true, heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render("## H {#1-intro .c}", markdown_config: cfg)
+      html.should contain(%(<h2 id="1-intro" class="c">H</h2>))
     end
 
     it "leaves {#id .class key=val} literal when the attributes flag is off" do

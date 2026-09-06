@@ -41,7 +41,13 @@ module Hwaro
         # Capture groups: 1 = `#id` token (with `#`), 2 = `.class` token
         # (with `.`), 3 = kv key, 4 = kv value (quotes included if quoted),
         # 5 = kv value's inner text when quoted (nil when bare).
-        TOKEN_RE = /\G\s*(?:(\#[A-Za-z][\w:-]*)|(\.[A-Za-z_][\w-]*)|([A-Za-z_][\w-]*)=("([^"{}]*)"|[^\s"'`=<>{}]+))/
+        # The `#id` charset matches `HEADING_ID_RE`'s exactly (`[\w][\w:-]*`)
+        # so `{#1-intro}` means the same thing whichever of the two
+        # mechanisms consumes it. A leading digit is fine for an HTML5 id;
+        # `.class` and `key=` keep their letter/underscore start, where a
+        # leading digit would need CSS escaping / isn't a valid attribute
+        # name.
+        TOKEN_RE = /\G\s*(?:(\#[\w][\w:-]*)|(\.[A-Za-z_][\w-]*)|([A-Za-z_][\w-]*)=("([^"{}]*)"|[^\s"'`=<>{}]+))/
 
         # Parses the inside of a `{...}` block (braces already stripped).
         # Returns `nil` when the block is empty, contains a token matching
