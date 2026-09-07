@@ -1,7 +1,7 @@
 # Render-path performance patches for the vendored Crinja runtime — kept
 # here so we don't fork the library, mirroring ext/crinja_resolve_fix.cr.
 #
-# All three patches are byte-compat: they change how the rendered string is
+# Every patch here is byte-compat: they change how the rendered string is
 # assembled, never which bytes come out. Verified by diff -r of full output
 # trees on the harsh-5000 and public-5000 benchmark corpora.
 #
@@ -78,13 +78,11 @@ class Crinja::Renderer
   # (it raises on unresolved placeholders), which `else` covers.
   class OutputList < Output
     def value(io : IO)
-      nodes.each do |node|
-        if node.is_a?(OutputList)
-          node.value(io)
-        else
-          io << node.value
-        end
-      end
+      # Every Output subclass defines `value(io)`, so dispatching to it
+      # streams uniformly: OutputList recurses, RenderedOutput writes its
+      # string, and BlockOutput either streams its resolved subtree (patch 7)
+      # or raises through `value` exactly as upstream does when unresolved.
+      nodes.each(&.value(io))
     end
 
     # === 4. Block-free subtree pruning ==================================
@@ -339,5 +337,118 @@ class Crinja::Tag::For
         end
       end
     end
+  end
+end
+
+# === 7. Block placeholders hold their subtree, not a materialized String ===
+# `resolve_block_stubs` rendered each `{% block %}` and immediately flattened
+# it with `output.value` — a String.build of the ENTIRE block. For a page
+# whose body is one `{% block body %}` (what `{% extends %}` layouts always
+# produce) that is a full copy of the page, allocated and thrown away purely
+# so the parent list could copy it again into the final page string. On the
+# harsh-5000 corpus, where each page is ~400 KB, that was ~2 GB of pointless
+# allocation and memcpy per build.
+#
+# Keeping the rendered `Output` and streaming it at join time removes the
+# intermediate entirely. Deferring is safe because the block's output is inert
+# by then: `resolve_block_stubs` recurses into it first, so its own nested
+# placeholders are already resolved, and nothing in `value(io)` reads the
+# render scope the block was produced under.
+class Crinja::Renderer
+  class BlockOutput < Output
+    @resolved_output : Output?
+
+    # Overload of the upstream `resolve(String)`; `resolve("")` still lands
+    # on that one.
+    def resolve(output : Output)
+      @resolved_output = output
+    end
+
+    def resolved?
+      !@output.nil? || !@resolved_output.nil?
+    end
+
+    def value : String
+      if resolved = @resolved_output
+        return resolved.value
+      end
+      raise "block placeholder not resolved #{name}" unless resolved?
+
+      @output.not_nil! # ameba:disable Lint/NotNil -- mirrors the upstream accessor
+    end
+
+    def value(io)
+      if resolved = @resolved_output
+        resolved.value(io)
+      else
+        io << value
+      end
+    end
+  end
+
+  # Upstream body, with `placeholder.resolve(output.value)` replaced by the
+  # streaming `placeholder.resolve(output)`. Everything else — including the
+  # deliberate rebinding of `output` inside the loop — is verbatim.
+  private def resolve_block_stubs(output, block_names = Array(String).new)
+    output.each_block do |placeholder|
+      name = placeholder.name
+      unless block_names.includes?(name)
+        block_chain = @blocks[name]
+
+        if block_chain.size > 0
+          block = block_chain.first
+
+          scope = env.context
+          unless (original_scope = placeholder.scope).nil?
+            scope = original_scope
+          end
+
+          env.with_scope(scope) do
+            env.context.block_context = {name: name, index: 0}
+
+            output = render(block)
+
+            block_names << name
+            resolve_block_stubs(output, block_names)
+
+            block_names.pop
+
+            env.context.block_context = nil
+          end
+
+          placeholder.resolve(output)
+        end
+      end
+
+      placeholder.resolve("") unless placeholder.resolved?
+    end
+  end
+end
+
+# === 8. Presized page buffer ==========================================
+# `Template#render(bindings)` builds its result with a default `String.build`,
+# which starts at 64 bytes and doubles. A 400 KB page therefore reallocates
+# about thirteen times and memcpys roughly twice its own size before it is
+# finished — per page, on every page.
+#
+# Consecutive renders of the SAME template produce similarly sized output (a
+# listing page is a listing page), so the previous render's size is a good
+# capacity hint. It is only a hint: too small and `String::Builder` grows
+# exactly as it does today, too large and the final `String.build` trims the
+# excess. No byte of output depends on it.
+#
+# `@render_size_hint` is an aligned Int32 shared between render workers, so a
+# concurrent write cannot tear — the worst case is a worker reading a size
+# from a different page, which is the same class of estimate the value is.
+class Crinja::Template
+  @render_size_hint : Int32 = 0
+
+  def render(bindings = nil)
+    hint = @render_size_hint
+    result = String.build(hint > 0 ? hint : 64) do |io|
+      render(io, bindings)
+    end
+    @render_size_hint = result.bytesize
+    result
   end
 end

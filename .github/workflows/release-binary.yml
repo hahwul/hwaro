@@ -49,7 +49,7 @@ jobs:
           # src/main.cr — the old `-Dpreview_mt` flag is deprecated and its
           # legacy MT scheduler can spin forever at process exit.
           docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.21.0-alpine sh -c "
-            apk add --no-cache yaml-dev git curl &&
+            apk add --no-cache yaml-dev zlib-dev zlib-static git curl &&
             shards install --release --no-debug --production &&
             mkdir -p build &&
             crystal build src/main.cr -o build/hwaro-${GITHUB_REF_SLUG}-linux-${ARCH} --release --no-debug --static

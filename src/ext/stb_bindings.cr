@@ -8,6 +8,12 @@
 #
 # The ldflags backtick command auto-compiles stb_impl.o when missing or stale.
 # It checks all source files (.c and .h) so header updates trigger a rebuild.
+#
+# stb's PNG writer deflates through zlib (the STBIW_ZLIB_COMPRESS block in
+# stb_impl.c), so this object needs libz at link time. `lib_z` carries the
+# `@[Link("z")]` that supplies it; requiring it here states the dependency
+# without emitting a second `-lz` (the linker warns about duplicates).
+require "lib_z"
 
 @[Link(ldflags: "`sh -c 'D=#{__DIR__}; OBJ=$D/stb_impl.o; STALE=0; if [ ! -f \"$OBJ\" ]; then STALE=1; else for f in $D/stb_impl.c $D/stb_image.h $D/stb_image_write.h $D/stb_image_resize2.h $D/stb_truetype.h; do [ \"$f\" -nt \"$OBJ\" ] && STALE=1; done; fi; [ $STALE -eq 1 ] && ${CC:-cc} -c -O2 -o \"$OBJ\" \"$D/stb_impl.c\"; echo \"$OBJ\"'`")]
 lib LibStb

@@ -35,6 +35,7 @@ require "./ext/toml_nesting_limit_fix"
 require "emoji"
 
 # Load utilities
+require "./utils/byte_scan"
 require "./utils/errors"
 require "./utils/nesting"
 require "./utils/logger"

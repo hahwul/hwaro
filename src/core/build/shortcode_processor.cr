@@ -67,7 +67,8 @@ module Hwaro
         # the very common case of documentation pages that only show literal
         # shortcode examples inside code regions.
         def content_may_contain_shortcodes?(content : String) : Bool
-          return false unless content.includes?("{{") || content.includes?("{%")
+          # Whole-document probes: memchr-anchored, not the stdlib's Rabin-Karp.
+          return false unless Utils::ByteScan.includes?(content, "{{") || Utils::ByteScan.includes?(content, "{%")
 
           # FenceTracker (shared with the table/definition/math walkers and,
           # critically, process_shortcodes_jinja below) so the skip decision
@@ -177,7 +178,7 @@ module Hwaro
         # not a closer. (The old loop honored that only at depth 0, which is
         # exactly how a fenced example came to close a real opener.)
         private def block_body_lines(content : String) : Array(Bool)
-          return [] of Bool unless content.includes?("{%")
+          return [] of Bool unless Utils::ByteScan.includes?(content, "{%")
 
           tracker = Content::Processors::FenceTracker.new
           open_lines = [] of Int32
@@ -404,7 +405,7 @@ module Hwaro
         # named-closer normalization, an explicit/direct `{{ name(...) }}`
         # call, or a non-control `{% name %}` block opener.
         def shortcode_scan_needed?(text : String) : Bool
-          return false unless text.includes?("{{") || text.includes?("{%")
+          return false unless Utils::ByteScan.includes?(text, "{{") || Utils::ByteScan.includes?(text, "{%")
           return true if named_closer?(text)
           return true if SHORTCODE_CALL_SCAN_RE.matches?(text)
 

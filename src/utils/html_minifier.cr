@@ -90,9 +90,9 @@ module Hwaro
         # Cheap presence probe: most pages carry no <textarea>, <math>,
         # <noscript>, …, and the heavy `.*?` extraction pattern below has
         # no fast no-match path (every '<' in the document is a candidate
-        # start). The lowercase literal decides via memchr for the
-        # markdown-rendered common case; the case-insensitive probe covers
-        # author-written uppercase tags.
+        # start). The lowercase literal decides via `ByteScan`'s memchr scan
+        # for the markdown-rendered common case; the case-insensitive probe
+        # covers author-written uppercase tags.
          "<#{tag}",
          Regex.new("<#{tag}", Regex::Options::IGNORE_CASE),
          Regex.new(
@@ -174,7 +174,9 @@ module Hwaro
       # to U+FFFD; NUL never appears inside a multi-byte sequence, so this is
       # safe.
       def scrub_nul(html : String) : String
-        return html unless html.byte_index(0)
+        # memchr, not `String#byte_index`, whose byte-at-a-time loop is ~15x
+        # slower — this probe runs over every rendered page.
+        return html unless ByteScan.byte?(html, 0_u8)
         String.build(html.bytesize) do |io|
           html.each_byte { |b| io.write_byte(b) unless b == 0 }
         end
@@ -205,7 +207,7 @@ module Hwaro
       private def protect_sensitive_blocks(html : String, preserves : Array(String)) : String
         result = html
         PROTECTED_PATTERNS.each do |(tag, open_literal, probe, pattern)|
-          next unless result.includes?(open_literal) || result.matches?(probe)
+          next unless ByteScan.includes?(result, open_literal) || result.matches?(probe)
           prefix = PROTECTED_INLINE.includes?(tag) ? PRESERVE_PREFIX_INLINE : PRESERVE_PREFIX_BLOCK
           result = result.gsub(pattern) do |match|
             idx = preserves.size

@@ -31,13 +31,35 @@ module Hwaro
       # is false because we never reached the leaf — so the EEXIST bubbles
       # out and a render fails ("Unable to create directory: '…': File
       # exists"). Tolerating EEXIST per component avoids the cascade.
+      #
+      # The parent walk runs deepest-first and stops at the first component
+      # that already exists, then creates downward from there. Walking from
+      # the root instead (what `each_parent` yields, and what this used to do)
+      # cost one `Dir.exists?` stat per ancestor on every call — and every
+      # page of a large site creates a fresh leaf directory under an
+      # already-existing tree, so a six-deep output path paid six stats to
+      # create one directory. Only the components actually missing are
+      # touched now, which for that shape is a single stat plus one mkdir.
+      #
+      # EEXIST is still absorbed per component, so the concurrency argument
+      # above is unchanged: another fiber may materialize any of these
+      # directories between our stat and our mkdir.
       def self.mkdir_p(path : String | Path, mode : Int32 = 0o777) : Nil
         path = Path.new(path)
         return if Dir.exists?(path)
 
-        path.each_parent do |parent|
-          mkdir_tolerant(parent, mode)
+        missing = [] of Path
+        current = path
+        while parent = current.parent
+          # `Path#parent` is a fixed point at the root ("/" and "." both
+          # return themselves), which would spin forever without this.
+          break if parent == current
+          break if Dir.exists?(parent)
+          missing << parent
+          current = parent
         end
+
+        missing.reverse_each { |dir| mkdir_tolerant(dir, mode) }
         mkdir_tolerant(path, mode)
       end
 
