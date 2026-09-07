@@ -193,124 +193,64 @@ ul.page-list li {
    Site footer
    ============================================================================= */
 
+/* One centered tier. Inside .docs-main the prose rules (.docs-main p,
+   .docs-main p a) match at the same weight, so every override here carries
+   the extra .footer-meta class rather than relying on file order. */
 .site-footer {
     margin-top: var(--space-8);
-    padding-top: var(--space-6);
+    padding: var(--space-5) 0;
     border-top: 1px solid var(--border-subtle);
-}
-
-.site-footer-grid {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr 1fr;
-    gap: var(--space-6);
-}
-
-.site-footer-logo {
-    height: 26px;
-    width: auto;
-}
-
-.site-footer .site-footer-tag {
-    margin: var(--space-3) 0 0;
-    font-size: 0.82rem;
-    line-height: 1.6;
-    color: var(--text-muted);
-    max-width: 26ch;
-}
-
-/* Beat the content h2/link rules from 04-content.css (.docs-main h2 etc.)
-   when the footer renders inside the docs column. */
-.site-footer .site-footer-col h2 {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--text-muted);
-    margin: 0 0 var(--space-3);
-    padding-bottom: 0;
-    border-bottom: none;
-}
-
-.site-footer-col ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.site-footer-col li {
-    margin-bottom: var(--space-2);
-}
-
-.site-footer .site-footer-col a {
-    font-size: 0.84rem;
-    color: var(--text-secondary);
-    text-decoration: none;
-}
-
-.site-footer .site-footer-col a:hover {
-    color: var(--primary);
-}
-
-.site-footer-bottom {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    margin-top: var(--space-6);
-    padding: var(--space-4) 0 var(--space-5);
-    border-top: 1px solid var(--border-subtle);
-    font-size: 0.78rem;
-    color: var(--text-muted);
-}
-
-.site-footer-bottom a {
-    color: var(--text-muted);
-}
-
-.site-footer-bottom a:hover {
-    color: var(--primary);
-}
-
-/* hahwul mark — Built with Love (matches dalfox docs footer) */
-.footer-mark {
     text-align: center;
-    margin-top: var(--space-5);
 }
 
-.footer-mark a {
-    display: inline-block;
-    line-height: 0;
+.site-footer .footer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem 0.6rem;
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
 }
 
-.footer-mark .hahwul-img {
-    display: inline-block;
-    width: 80px;
-    height: 80px;
+.site-footer .footer-meta a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition);
+}
+
+.site-footer .footer-meta a:hover {
+    color: var(--primary);
+}
+
+/* hahwul mark — Built with Love (matches the dalfox docs footer), folded
+   into the meta line so the signature costs a glyph, not its own block. */
+.footer-sig {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.footer-sig .hahwul-img {
+    width: 22px;
+    height: 22px;
     /* Recolor the logo to the footer text tone by using its alpha as a mask
        and filling with the muted token (the raster itself is white). */
     background-color: var(--text-muted);
     -webkit-mask: url("../../images/hahwul.webp") center / contain no-repeat;
     mask: url("../../images/hahwul.webp") center / contain no-repeat;
-    transition: background-color 0.3s ease;
+    transition: background-color var(--transition);
 }
 
-.footer-mark .hahwul-img:hover {
+.site-footer .footer-meta a:hover .hahwul-img {
     background-color: var(--text);
 }
 
 .footer-love {
-    margin-top: 0.85rem;
-    color: var(--text-muted);
     font-family: "Bradley Hand", "Snell Roundhand", "Apple Chancery", cursive;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     letter-spacing: 0.02em;
-}
-
-@media (max-width: 900px) {
-    .site-footer-grid {
-        grid-template-columns: 1fr 1fr;
-    }
 }
 
 @media (max-width: 768px) {
@@ -326,13 +266,6 @@ ul.page-list li {
     .pn-next {
         grid-column: auto;
         text-align: left;
-    }
-}
-
-@media (max-width: 560px) {
-    .site-footer-grid {
-        grid-template-columns: 1fr;
-        gap: var(--space-5);
     }
 }
 

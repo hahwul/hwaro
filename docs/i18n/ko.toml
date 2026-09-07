@@ -30,17 +30,6 @@ in_this_section = "이 섹션의 문서"
 [toc]
 on_this_page = "목차"
 
-[footer]
-tagline = "Crystal로 만든 빠르고 가벼운 정적 사이트 생성기."
-docs = "문서"
-project = "프로젝트"
-resources = "리소스"
-releases = "릴리스"
-benchmark = "벤치마크"
-sitemap = "사이트맵"
-license = "MIT 라이선스"
-skills = "에이전트 스킬"
-
 [error]
 not_found = "찾으시는 페이지가 없거나 이동되었습니다."
 back_home = "홈으로 돌아가기"
