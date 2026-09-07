@@ -1,5 +1,6 @@
 require "file_utils"
 require "yaml"
+require "json"
 require "toml"
 require "../file_action"
 require "../../config/options/export_options"
@@ -255,9 +256,35 @@ module Hwaro
               # rule, not frontmatter — keep the whole document as body.
               return {fields, content}
             end
+          elsif content.matches?(/\A\{\s*["}]/)
+            # Match the build's JSON-intent rule so shortcodes, Jinja tags,
+            # and Markdown attribute lists remain body text. The scanner's
+            # offset is in bytes, including for Unicode frontmatter.
+            end_idx = Utils::FrontmatterScanner.find_json_end(content)
+            raise ArgumentError.new("Invalid JSON frontmatter: unbalanced braces") unless end_idx
+            if json_fields = JSON.parse(content.byte_slice(0, end_idx)).as_h?
+              json_fields.each do |key, value|
+                fields[key] = json_to_yaml_any(value)
+              end
+            end
+            return {fields, content.byte_slice(end_idx).lstrip('\n')}
           end
 
           {fields, content}
+        end
+
+        private def json_to_yaml_any(value : JSON::Any, depth : Int32 = 0) : YAML::Any
+          Utils::Nesting.check!(depth)
+          case raw = value.raw
+          when Array
+            YAML::Any.new(raw.map { |item| json_to_yaml_any(item, depth + 1) })
+          when Hash
+            hash = {} of YAML::Any => YAML::Any
+            raw.each { |key, item| hash[YAML::Any.new(key)] = json_to_yaml_any(item, depth + 1) }
+            YAML::Any.new(hash)
+          else
+            YAML::Any.new(raw)
+          end
         end
 
         # Hoist a `[taxonomies]` table's entries to top-level front-matter

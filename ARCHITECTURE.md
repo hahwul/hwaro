@@ -197,11 +197,8 @@ docs (`.md` + `.ko.md`) when user-facing.
   `content/processors/*`; `utils/{debug_printer,sort_utils,redirect_html}`
   require models/content; `content/taxonomies.cr` constructs a `Builder`.
 - `ServeOptions` restates most `BuildOptions` fields; `to_build_options` copies them.
-- Six `X::Any → Y::Any` walkers (`frontmatter_writer`, `frontmatter_converter`,
-  hugo/eleventy importers) share a shape but differ in nil/Time/Int32 handling.
-- `exporters/base.cr` has no JSON front-matter branch (a JSON-authored page
-  exports its front matter as body text) — a bug, left as-is because fixing it
-  changes output.
+- `X::Any → Y::Any` walkers (`frontmatter_writer`, `frontmatter_converter`,
+  exporters, hugo/eleventy importers) share a shape but differ in nil/Time/Int32 handling.
 - The blog/docs/book scaffold stylesheets share byte-identical rule runs interleaved
   with formatting differences; deduplicating them needs a CSS normalisation
   pass and therefore changes emitted bytes.

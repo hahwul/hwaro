@@ -561,6 +561,11 @@ hwaro tool import jekyll /path --dry-run
 hwaro tool export hugo --dry-run
 ```
 
+`list`와 `convert` 명령은 사용법에 표시된 위치 인자만 받습니다.
+`check-links`, `stats`, `validate`, `unused-assets`는 위치 인자를 받지 않습니다.
+`--` 뒤의 인자를 포함한 추가 위치 인자는 사용법 오류로 거부되므로, 경로나
+다른 옵션에는 문서에 나온 플래그를 사용하세요.
+
 **서브커맨드:**
 
 | 분류 | 서브커맨드 | 설명 |

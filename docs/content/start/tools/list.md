@@ -30,6 +30,10 @@ hwaro tool list all --sort path --reverse
 hwaro tool list all --json
 ```
 
+The command accepts one filter argument (`all`, `drafts`, or `published`).
+Extra positional arguments are rejected; use flags such as `--content-dir` for
+additional options.
+
 ## Options
 
 | Flag | Description |

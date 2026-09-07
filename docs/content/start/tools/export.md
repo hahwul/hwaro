@@ -6,6 +6,10 @@ weight = 10
 
 Export hwaro content to other static site generator formats. This is the reverse of `hwaro tool import`.
 
+Source files can use TOML (`+++`), YAML (`---`), or JSON (`{...}`) front matter.
+All three formats use the same field mappings and draft filtering. Invalid JSON
+front matter is reported as an export error instead of being copied into the body.
+
 ```bash
 # Export to Hugo
 hwaro tool export hugo
@@ -108,7 +112,7 @@ Output conventions:
 - Regular posts go to `_posts/` with `YYYY-MM-DD-slug.md` filename
 - Draft posts go to `_drafts/` without date prefix
 - Section index files (`_index.md`) become `index.md` pages
-- Frontmatter is converted from TOML (`+++`) to YAML (`---`)
+- Frontmatter is converted from TOML, YAML, or JSON to YAML (`---`)
 - A `[taxonomies]` table is hoisted to top-level keys, since neither Hugo nor
   Jekyll reads taxonomy membership from a nested table. An explicit top-level
   key of the same name wins, matching how the build resolves the two

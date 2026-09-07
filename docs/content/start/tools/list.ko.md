@@ -30,6 +30,10 @@ hwaro tool list all --sort path --reverse
 hwaro tool list all --json
 ```
 
+이 명령은 필터 인자(`all`, `drafts`, `published`) 하나만 받습니다.
+추가 위치 인자는 오류로 거부되므로 다른 옵션은 `--content-dir` 같은 플래그를
+사용하세요.
+
 ## 옵션
 
 | 플래그 | 설명 |

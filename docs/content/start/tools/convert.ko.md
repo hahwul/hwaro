@@ -26,6 +26,10 @@ hwaro tool convert to-yaml --dry-run
 hwaro tool convert to-yaml --json
 ```
 
+이 명령은 형식 인자(`to-yaml`, `to-toml`, `to-json`) 하나만 받습니다.
+추가 위치 인자는 오류로 거부되므로 다른 옵션은 `--content-dir` 같은 플래그를
+사용하세요.
+
 ## 옵션
 
 | 플래그 | 설명 |
