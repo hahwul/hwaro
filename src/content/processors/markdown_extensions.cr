@@ -64,17 +64,24 @@ module Hwaro
           do_sub = config.sub
           do_sup = config.sup
 
-          # Whole-content marker pre-check (memchr-fast): with none of the
-          # enabled extensions' markers present, the line pass is the
-          # identity transform and only rebuilds the string — skip it. The
-          # per-line includes? guards below are unchanged, so any page that
-          # passes this check transforms exactly as before.
-          markers_present = (do_task_lists && (result.includes?("[ ]") || result.includes?("[x]") || result.includes?("[X]"))) ||
-                            (do_strikethrough && result.includes?("~~")) ||
-                            (do_heading_ids && (result.includes?("{#") || result.includes?("<!--HID:"))) ||
-                            (do_ins && result.includes?("++")) || (do_mark && result.includes?("==")) ||
+          # Whole-content marker pre-check: with none of the enabled
+          # extensions' markers present, the line pass is the identity
+          # transform and only rebuilds the string — skip it. The per-line
+          # includes? guards below are unchanged, so any page that passes this
+          # check transforms exactly as before.
+          #
+          # `ByteScan`, not `String#includes?`: this is up to ten
+          # whole-document probes per page, and the stdlib's Rabin-Karp walks
+          # every byte in Crystal (~75x slower than an anchored memchr scan on
+          # a miss, which is the common case). Character probes already reach
+          # memchr through `String#index(Char)`.
+          scan = Utils::ByteScan
+          markers_present = (do_task_lists && (scan.includes?(result, "[ ]") || scan.includes?(result, "[x]") || scan.includes?(result, "[X]"))) ||
+                            (do_strikethrough && scan.includes?(result, "~~")) ||
+                            (do_heading_ids && (scan.includes?(result, "{#") || scan.includes?(result, "<!--HID:"))) ||
+                            (do_ins && scan.includes?(result, "++")) || (do_mark && scan.includes?(result, "==")) ||
                             (do_sub && result.includes?('~')) || (do_sup && result.includes?('^')) ||
-                            (config.attributes && (result.includes?('{') || result.includes?("<!--HATTR:")))
+                            (config.attributes && (result.includes?('{') || scan.includes?(result, "<!--HATTR:")))
 
           if markers_present
             result = process_lines_fence_aware(result) do |line, _in_fence|

@@ -68,7 +68,7 @@ module Hwaro
           base_url : String = "",
           misses : Array({String, String})? = nil,
         ) : String
-          return html unless html.includes?("@/")
+          return html unless Utils::ByteScan.includes?(html, "@/")
 
           # Only treat base_url as a subpath prefix when it is a real absolute
           # URL (has a scheme). A host-only or malformed value like
@@ -145,7 +145,7 @@ module Hwaro
         # the same value by construction).
         def prefix_root_relative_links(html : String, base_url : String, base_path : String? = nil) : String
           return html if base_url.empty?
-          return html unless html.includes?("=\"/")
+          return html unless Utils::ByteScan.includes?(html, "=\"/")
 
           base_path ||= URI.parse(base_url).path.rstrip("/")
           return html if base_path.empty?
@@ -180,7 +180,7 @@ module Hwaro
         # to resolve against — e.g. an empty base_url deploy).
         def absolutize_links(html : String, page_url : String) : String
           return html if page_url.empty?
-          return html unless html.includes?("href=\"") || html.includes?("src=\"")
+          return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"")
 
           base = URI.parse(page_url)
           return html if base.host.nil?

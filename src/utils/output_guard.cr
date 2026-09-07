@@ -19,8 +19,17 @@ module Hwaro
         # Canonicalize once — the previous within_output_dir? + canonical
         # sequence expanded output_path twice (a getcwd syscall and several
         # Path allocations each), and this runs for every written file.
-        canonical_output = canonical?(output_path)
-        canonical_dir = canonical?(output_dir)
+        #
+        # One `Dir.current` for both expansions. `File.expand_path` with no
+        # base resolves the working directory itself, and that is a `getcwd`
+        # syscall — on macOS an `open` plus `stat`, not a cheap read. This
+        # method runs for every file a build writes, so paying it twice per
+        # page was pure waste. Resolving it here (rather than memoizing it
+        # process-wide) keeps the guard correct for callers that run under a
+        # different working directory later in the same process.
+        cwd = Dir.current
+        canonical_output = canonical?(output_path, cwd)
+        canonical_dir = canonical?(output_dir, cwd)
         if canonical_output && canonical_dir && contains?(canonical_dir, canonical_output)
           canonical_output
         else
@@ -32,8 +41,9 @@ module Hwaro
       # Check if a path is within the output directory.
       #
       def within_output_dir?(output_path : String, output_dir : String) : Bool
-        dir = canonical?(output_dir)
-        target = canonical?(output_path)
+        cwd = Dir.current
+        dir = canonical?(output_dir, cwd)
+        target = canonical?(output_path, cwd)
         return false unless dir && target
         contains?(dir, target)
       end
@@ -55,8 +65,8 @@ module Hwaro
       # "String contains null byte" instead of answering "not safe", which is
       # exactly the outcome a guard exists to produce. Nil means "no canonical
       # form"; `contains?` treats that as outside.
-      private def canonical?(path : String) : String?
-        canonical(path)
+      private def canonical?(path : String, base : String? = nil) : String?
+        canonical(path, base)
       rescue ArgumentError
         nil
       end
@@ -70,8 +80,8 @@ module Hwaro
       # every page — a `-o public/` build (what shell directory completion
       # types for you) silently published nothing. Dropping trailing
       # separators makes `public/` and `public` the same directory again.
-      private def canonical(path : String) : String
-        expanded = File.expand_path(path)
+      private def canonical(path : String, base : String? = nil) : String
+        expanded = File.expand_path(path, base)
         return expanded if expanded == File::SEPARATOR_STRING
         expanded.rstrip(File::SEPARATOR)
       end

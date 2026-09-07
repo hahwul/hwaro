@@ -145,4 +145,108 @@ describe "ext/crinja_render_perf" do
       env.__for_fragment_cache.size.should eq(0)
     end
   end
+
+  # Patch 7 keeps the rendered `Output` on a BlockOutput and streams it at
+  # join time instead of flattening it into a String immediately. These pin
+  # the behaviour that deferral must not disturb: nesting, inheritance
+  # chains, `{{ super() }}`, repeated and empty blocks, and blocks whose
+  # content is produced under a scope that is gone by the time the page is
+  # assembled.
+  describe "block placeholder streaming" do
+    it "renders a single overridden block" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "<h>{% block body %}base{% endblock %}</h>",
+        "child.html" => "{% extends \"base.html\" %}{% block body %}child{% endblock %}",
+      })
+
+      env.get_template("child.html").render.should eq("<h>child</h>")
+    end
+
+    it "renders a block that was never overridden" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "<h>{% block body %}fallback{% endblock %}</h>",
+        "child.html" => "{% extends \"base.html\" %}",
+      })
+
+      env.get_template("child.html").render.should eq("<h>fallback</h>")
+    end
+
+    it "renders an empty block as empty" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "[{% block body %}{% endblock %}]",
+        "child.html" => "{% extends \"base.html\" %}{% block body %}{% endblock %}",
+      })
+
+      env.get_template("child.html").render.should eq("[]")
+    end
+
+    it "renders blocks nested inside other blocks" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "{% block outer %}O({% block inner %}i{% endblock %}){% endblock %}",
+        "child.html" => "{% extends \"base.html\" %}{% block inner %}I{% endblock %}",
+      })
+
+      env.get_template("child.html").render.should eq("O(I)")
+    end
+
+    it "renders a three-level inheritance chain" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"   => "<{% block body %}base{% endblock %}>",
+        "middle.html" => "{% extends \"base.html\" %}{% block body %}m[{% block inner %}m-in{% endblock %}]{% endblock %}",
+        "leaf.html"   => "{% extends \"middle.html\" %}{% block inner %}leaf{% endblock %}",
+      })
+
+      env.get_template("leaf.html").render.should eq("<m[leaf]>")
+    end
+
+    it "renders super() from an overriding block" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "{% block body %}base{% endblock %}",
+        "child.html" => "{% extends \"base.html\" %}{% block body %}[{{ super() }}]{% endblock %}",
+      })
+
+      env.get_template("child.html").render.should eq("[base]")
+    end
+
+    it "renders a block used twice in the parent" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "{% block body %}b{% endblock %}|{% block body %}b{% endblock %}",
+        "child.html" => "{% extends \"base.html\" %}{% block body %}X{% endblock %}",
+      })
+
+      env.get_template("child.html").render.should eq("X|X")
+    end
+
+    it "renders a block whose body loops over template variables" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "<{% block body %}{% endblock %}>",
+        "child.html" => "{% extends \"base.html\" %}{% block body %}{% for x in items %}{{ x }};{% endfor %}{% endblock %}",
+      })
+
+      env.get_template("child.html").render({"items" => Crinja::Value.new([
+        Crinja::Value.new("a"), Crinja::Value.new("b"),
+      ] of Crinja::Value)}).should eq("<a;b;>")
+    end
+
+    it "renders the same template repeatedly without carrying state over" do
+      env = Crinja.new
+      env.loader = Crinja::Loader::HashLoader.new({
+        "base.html"  => "<{% block body %}{% endblock %}>",
+        "child.html" => "{% extends \"base.html\" %}{% block body %}{{ name }}{% endblock %}",
+      })
+      template = env.get_template("child.html")
+
+      template.render({"name" => Crinja::Value.new("one")}).should eq("<one>")
+      template.render({"name" => Crinja::Value.new("two")}).should eq("<two>")
+      template.render({"name" => Crinja::Value.new("three")}).should eq("<three>")
+    end
+  end
 end

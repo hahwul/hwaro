@@ -95,8 +95,9 @@ module Hwaro
             html = MarkdownExtensions.postprocess(html, md_cfg)
           end
 
-          has_headers = html.includes?("<h")
-          has_images = lazy_loading && html.includes?("<img")
+          # ByteScan, not String#includes? — two whole-document probes per page.
+          has_headers = Utils::ByteScan.includes?(html, "<h")
+          has_images = lazy_loading && Utils::ByteScan.includes?(html, "<img")
 
           # Optimization: If no headers and no images (or lazy loading disabled), don't parse XML
           unless has_headers || has_images

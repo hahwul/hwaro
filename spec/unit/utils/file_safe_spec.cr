@@ -20,6 +20,44 @@ describe Hwaro::Utils::FileSafe do
       end
     end
 
+    # The parent walk stops at the deepest ancestor that already exists
+    # instead of visiting every component from the root, so these pin the
+    # shapes where "where do I start creating?" is decided.
+    it "creates only the missing tail below an existing ancestor" do
+      Dir.mktmpdir do |root|
+        Dir.mkdir_p(File.join(root, "a", "b"))
+        target = File.join(root, "a", "b", "c", "d")
+        Hwaro::Utils::FileSafe.mkdir_p(target)
+        Dir.exists?(target).should be_true
+        Dir.exists?(File.join(root, "a", "b", "c")).should be_true
+      end
+    end
+
+    it "tolerates a trailing separator" do
+      Dir.mktmpdir do |root|
+        target = File.join(root, "a", "b")
+        Hwaro::Utils::FileSafe.mkdir_p(target + File::SEPARATOR)
+        Dir.exists?(target).should be_true
+      end
+    end
+
+    it "creates a relative nested path" do
+      Dir.mktmpdir do |root|
+        Dir.cd(root) do
+          Hwaro::Utils::FileSafe.mkdir_p(Path["public", "posts", "hello"])
+          Dir.exists?(File.join(root, "public", "posts", "hello")).should be_true
+        end
+      end
+    end
+
+    it "resolves .. segments the same way the caller wrote them" do
+      Dir.mktmpdir do |root|
+        target = File.join(root, "a", "..", "b", "c")
+        Hwaro::Utils::FileSafe.mkdir_p(target)
+        Dir.exists?(File.join(root, "b", "c")).should be_true
+      end
+    end
+
     # Regression: an output_dir that is a dangling symlink (`public ->
     # nowhere`) made `Dir.exists?` false — it resolves the link — while
     # `Dir.mkdir` still hit EEXIST on the link itself, so the wrapper re-raised

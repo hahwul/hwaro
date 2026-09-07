@@ -12,6 +12,56 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+/* PNG deflate through zlib instead of stb's built-in compressor.
+ *
+ * stb_image_write ships a small hash-chain deflate that is both slower and
+ * markedly weaker than zlib's. Measured on a 1200x630 RGBA OG image
+ * (-O2, Apple M-series), encoding the whole PNG:
+ *
+ *   stb's compressor (level 8)   15.3 ms   203,152 bytes
+ *   zlib level 3                  6.6 ms   174,733 bytes
+ *   zlib level 4                  9.4 ms   144,187 bytes
+ *   zlib level 6                 14.6 ms   128,976 bytes
+ *
+ * Level 4 is faster AND smaller than what stb produced, which is why it is
+ * the default here: OG image generation dominates a real site's build (567 ms
+ * of a 943 ms docs build), and the images it emits also ship to every social
+ * crawler that fetches them.
+ *
+ * libz is already a hard dependency of every hwaro build — Crystal's
+ * `compress/deflate`, required by src/core/build/remote_data.cr, links it —
+ * so this adds no new library. The encoded pixels are unchanged: PNG is
+ * lossless and only the IDAT deflate stream differs, so cached OG images
+ * stay valid and RENDER_REVISION deliberately does NOT move.
+ */
+#include <stdlib.h>
+#include <zlib.h>
+
+#define HWARO_PNG_ZLIB_LEVEL 4
+
+/* stb passes `stbi_write_png_compression_level` (its own default, 8) as
+ * `quality`. That number indexes stb's compressor, not zlib's — the two
+ * scales are unrelated, and zlib's 8 costs 40 ms for 5 KB less than level 4 —
+ * so it is deliberately ignored. hwaro never sets that global.
+ *
+ * Returns a buffer stb frees with STBIW_FREE (plain free), or NULL, which
+ * stb propagates as a failed write. */
+static unsigned char *hwaro_png_zlib_compress(unsigned char *data, int data_len,
+                                              int *out_len, int quality) {
+    (void)quality;
+    if (data_len < 0) return NULL;
+    uLongf bound = compressBound((uLong)data_len);
+    unsigned char *out = (unsigned char *)malloc(bound ? bound : 1);
+    if (!out) return NULL;
+    if (compress2(out, &bound, data, (uLong)data_len, HWARO_PNG_ZLIB_LEVEL) != Z_OK) {
+        free(out);
+        return NULL;
+    }
+    *out_len = (int)bound;
+    return out;
+}
+
+#define STBIW_ZLIB_COMPRESS hwaro_png_zlib_compress
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
