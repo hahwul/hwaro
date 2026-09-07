@@ -67,6 +67,14 @@ module Hwaro
               end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              parser.unknown_args do |before_dash, after_dash|
+                unknown = before_dash + after_dash
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "unexpected extra argument(s): '#{unknown.join("', '")}'",
+                  hint: "hwaro tool validate accepts options only.",
+                ) unless unknown.empty?
+              end
             end
 
             Runner.enable_json_mode! if json_output

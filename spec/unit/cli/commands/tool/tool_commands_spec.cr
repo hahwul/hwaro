@@ -127,6 +127,32 @@ describe Hwaro::CLI::Commands::Tool::ConvertCommand do
       flag.not_nil!.value_hint.should eq("DIR")
     end
   end
+
+  describe "#run argument validation" do
+    it "rejects extra positional arguments" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content"))
+        source = File.join(dir, "content", "post.md")
+        original = "+++\ntitle = \"Keep me\"\n+++\n\nBody.\n"
+        File.write(source, original)
+        cmd = Hwaro::CLI::Commands::Tool::ConvertCommand.new
+        ex = expect_raises(Hwaro::HwaroError) do
+          cmd.run(["to-yaml", "-c", File.join(dir, "content"), "--", "extra"])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+        File.read(source).should eq(original)
+
+        cmd = Hwaro::CLI::Commands::Tool::ConvertCommand.new
+        ex = expect_raises(Hwaro::HwaroError) do
+          cmd.run(["to-yaml", "extra", "-c", File.join(dir, "content")])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+        File.read(source).should eq(original)
+      end
+    end
+  end
 end
 
 describe Hwaro::CLI::Commands::Tool::ListCommand do
@@ -172,6 +198,101 @@ describe Hwaro::CLI::Commands::Tool::ListCommand do
       flag.should_not be_nil
       flag.not_nil!.takes_value.should be_true
       flag.not_nil!.value_hint.should eq("DIR")
+    end
+  end
+
+  describe "#run argument validation" do
+    it "rejects extra positional arguments" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content"))
+        cmd = Hwaro::CLI::Commands::Tool::ListCommand.new
+        ex = expect_raises(Hwaro::HwaroError) do
+          cmd.run(["all", "-c", File.join(dir, "content"), "--", "extra"])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+
+        cmd = Hwaro::CLI::Commands::Tool::ListCommand.new
+        ex = expect_raises(Hwaro::HwaroError) do
+          cmd.run(["all", "extra", "-c", File.join(dir, "content")])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+      end
+    end
+  end
+end
+
+describe "tool commands positional argument validation" do
+  it "rejects positionals for check-links" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      FileUtils.mkdir_p(content_dir)
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["-c", content_dir, "--", "extra"]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["extra", "-c", content_dir]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+    end
+  end
+
+  it "rejects positionals for stats" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      FileUtils.mkdir_p(content_dir)
+      cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["-c", content_dir, "--", "extra"]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+      cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["extra", "-c", content_dir]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+    end
+  end
+
+  it "rejects positionals for validate" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      FileUtils.mkdir_p(content_dir)
+      cmd = Hwaro::CLI::Commands::Tool::ValidateCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["-c", content_dir, "--", "extra"]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+      cmd = Hwaro::CLI::Commands::Tool::ValidateCommand.new
+      ex = expect_raises(Hwaro::HwaroError) { cmd.run(["extra", "-c", content_dir]) }
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+    end
+  end
+
+  it "rejects positionals for unused-assets before scanning or deleting" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      static_dir = File.join(dir, "static")
+      templates_dir = File.join(dir, "templates")
+      FileUtils.mkdir_p(content_dir)
+      FileUtils.mkdir_p(static_dir)
+      FileUtils.mkdir_p(templates_dir)
+      asset = File.join(static_dir, "unused.png")
+      File.write(asset, "fixture")
+      cmd = Hwaro::CLI::Commands::Tool::UnusedAssetsCommand.new
+      ex = expect_raises(Hwaro::HwaroError) do
+        cmd.run(["-c", content_dir, "-s", static_dir, "-t", templates_dir, "--delete", "--force", "--", "extra"])
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+      File.exists?(asset).should be_true
+      cmd = Hwaro::CLI::Commands::Tool::UnusedAssetsCommand.new
+      ex = expect_raises(Hwaro::HwaroError) do
+        cmd.run(["extra", "-c", content_dir, "-s", static_dir, "-t", templates_dir, "--delete", "--force"])
+      end
+      ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      ex.message.to_s.should contain("unexpected extra argument(s): 'extra'")
+      File.exists?(asset).should be_true
     end
   end
 end

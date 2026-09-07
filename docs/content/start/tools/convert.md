@@ -26,6 +26,10 @@ hwaro tool convert to-yaml --dry-run
 hwaro tool convert to-yaml --json
 ```
 
+The command accepts one format argument (`to-yaml`, `to-toml`, or `to-json`).
+Extra positional arguments are rejected; use flags such as `--content-dir` for
+additional options.
+
 ## Options
 
 | Flag | Description |

@@ -6,6 +6,10 @@ weight = 10
 
 hwaro 콘텐츠를 다른 정적 사이트 생성기 형식으로 내보냅니다. `hwaro tool import`의 반대 방향 작업입니다.
 
+원본 파일의 프론트 매터는 TOML(`+++`), YAML(`---`), JSON(`{...}`)을 지원합니다.
+세 형식 모두 동일한 필드 매핑과 초안 제외 규칙을 적용합니다. 잘못된 JSON 프론트
+매터는 본문에 복사하지 않고 내보내기 오류로 보고합니다.
+
 ```bash
 # Hugo로 내보내기
 hwaro tool export hugo
@@ -108,7 +112,7 @@ hwaro tool export hugo --verbose
 - 일반 글은 `_posts/`에 `YYYY-MM-DD-slug.md` 파일명으로 저장
 - 초안 글은 날짜 접두사 없이 `_drafts/`에 저장
 - 섹션 인덱스 파일(`_index.md`)은 `index.md` 페이지로 변환
-- 프론트 매터는 TOML(`+++`)에서 YAML(`---`)로 변환
+- 프론트 매터는 TOML, YAML, JSON에서 YAML(`---`)로 변환
 - `[taxonomies]` 테이블은 최상위 키로 승격됩니다. Hugo도 Jekyll도 중첩 테이블에서
   분류 소속을 읽지 않기 때문입니다. 같은 이름의 최상위 키가 이미 있으면 그쪽이
   우선하며, 이는 빌드가 둘을 해석하는 순서와 같습니다

@@ -559,6 +559,12 @@ hwaro tool import jekyll /path --dry-run
 hwaro tool export hugo --dry-run
 ```
 
+The `list` and `convert` commands accept only the positional arguments shown in
+their usage. `check-links`, `stats`, `validate`, and `unused-assets` accept no
+positional arguments. Extra positional arguments, including arguments after
+`--`, are rejected with a usage error; use the documented flags for additional
+paths and options.
+
 **Subcommands:**
 
 | Category | Subcommand | Description |
