@@ -30,17 +30,6 @@ in_this_section = "In this section"
 [toc]
 on_this_page = "On this page"
 
-[footer]
-tagline = "Fast, lightweight static site generator built with Crystal."
-docs = "Docs"
-project = "Project"
-resources = "Resources"
-releases = "Releases"
-benchmark = "Benchmark"
-sitemap = "Sitemap"
-license = "MIT License"
-skills = "Agent Skills"
-
 [error]
 not_found = "The page you are looking for doesn't exist or has been moved."
 back_home = "Back to home"

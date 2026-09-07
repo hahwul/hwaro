@@ -1,42 +1,16 @@
+{# One centered tier: a single meta line carrying the hahwul signature, the
+   license, and the copyright. The old brand + three-column link grid only
+   restated the sidebar and the header nav, so the strip now reads as frame
+   rather than a second index. Deliberately untranslated — it is chrome, not
+   content, and the handwriting stack under "Built with Love" carries no
+   Hangul anyway. #}
 <footer class="site-footer">
-  <div class="site-footer-grid">
-    <div class="site-footer-brand">
-      <img src="/hwaro-wide.webp" alt="Hwaro" class="site-footer-logo">
-      <p class="site-footer-tag">{{ "footer.tagline" | t }}</p>
-    </div>
-    <div class="site-footer-col">
-      <h2>{{ "footer.docs" | t }}</h2>
-      <ul>
-        <li><a href="{{ base_url }}{{ lang_prefix }}/start/">{{ "nav.start" | t }}</a></li>
-        <li><a href="{{ base_url }}{{ lang_prefix }}/writing/">{{ "nav.writing" | t }}</a></li>
-        <li><a href="{{ base_url }}{{ lang_prefix }}/templates/">{{ "nav.templates" | t }}</a></li>
-        <li><a href="{{ base_url }}{{ lang_prefix }}/features/">{{ "nav.features" | t }}</a></li>
-        <li><a href="{{ base_url }}{{ lang_prefix }}/deploy/">{{ "nav.deploy" | t }}</a></li>
-      </ul>
-    </div>
-    <div class="site-footer-col">
-      <h2>{{ "footer.project" | t }}</h2>
-      <ul>
-        <li><a href="https://github.com/hahwul/hwaro" target="_blank" rel="noopener">GitHub</a></li>
-        <li><a href="https://github.com/hahwul/hwaro/releases" target="_blank" rel="noopener">{{ "footer.releases" | t }}</a></li>
-        <li><a href="https://examples.hwaro.hahwul.com" target="_blank" rel="noopener">{{ "nav.examples" | t }}</a></li>
-        <li><a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">{{ "footer.benchmark" | t }}</a></li>
-      </ul>
-    </div>
-    <div class="site-footer-col">
-      <h2>{{ "footer.resources" | t }}</h2>
-      <ul>
-        <li><a href="{{ base_url }}{{ lang_prefix }}/integrations/skills/">{{ "footer.skills" | t }}</a></li>
-        <li><a href="{{ base_url }}/llms.txt">llms.txt</a></li>
-        <li><a href="{{ base_url }}/sitemap.xml">{{ "footer.sitemap" | t }}</a></li>
-        <li><a href="https://github.com/hahwul/hwaro/blob/main/LICENSE" target="_blank" rel="noopener">{{ "footer.license" | t }}</a></li>
-      </ul>
-    </div>
-  </div>
-  <div class="footer-mark">
-    <a href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul">
-      <span class="hahwul-img" role="img" aria-label="hahwul"></span>
+  <p class="footer-meta">
+    <a class="footer-sig" href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul, Built with Love">
+      <span class="hahwul-img" aria-hidden="true"></span>
+      <span class="footer-love">Built with Love</span>
     </a>
-    <p class="footer-love">Built with Love</p>
-  </div>
+    <span aria-hidden="true">·</span>
+    <span>MIT · © HAHWUL</span>
+  </p>
 </footer>
