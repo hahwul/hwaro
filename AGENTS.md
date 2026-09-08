@@ -37,12 +37,13 @@ just dev                # serve the docs site (bin/hwaro serve -i docs)
 - Anything that changes `shard.lock` must be followed by `just nix-update`.
   `flake.nix` reads the version and minimum Crystal from `shard.yml`.
 - CI (`.github/workflows/ci.yml`) sizes its two expensive matrices in the
-  `plan` job: an ordinary source PR builds one nix system and one Docker arch,
-  while every push to main — and any PR touching `flake.*`, `shards.nix`,
-  `shard.lock`, `shard.yml` or the workflow — builds all of them. Widen that
-  file list rather than the matrices when a new input can break packaging.
-  `tests` and `package-macos` restore `~/.cache/crystal`; only pushes to main
-  write it back.
+  `plan` job. An ordinary source PR builds one nix system and one Docker arch;
+  every push to main builds both matrices in full, and so does a PR touching
+  the inputs a matrix exists to protect — `flake.*`/`shards.nix` for nix,
+  `docker/`/`action.yml` for the image, `shard.lock`/`shard.yml`/the workflow
+  for both. Widen those file lists rather than the matrices when a new input
+  can break packaging. `tests` and `package-macos` restore
+  `~/.cache/crystal`; only pushes to main write it back.
 - Parallelism comes from Crystal's execution contexts: `src/main.cr` sizes the
   default `Fiber::ExecutionContext::Parallel` (honours `CRYSTAL_WORKERS`).
   **Never reintroduce `-Dpreview_mt`** — its legacy scheduler can spin forever

@@ -80,18 +80,21 @@ jobs:
           docker="$docker_all"
 
           if [ "$EVENT" = pull_request ]; then
-            docker="$docker_one"
             nix="$nix_one"
-            # The three-system nix matrix exists to catch a bad release-tarball
-            # hash or a platform-specific link failure, and both of those come
-            # from the files below -- so a PR that edits one gets all three
-            # back. A `gh` failure widens too: losing coverage must never be
-            # the quiet outcome of an API hiccup.
+            docker="$docker_one"
+            # Both matrices are multi-platform to catch platform-specific
+            # breakage -- a bad release-tarball hash or a link failure for nix,
+            # an arch-specific stage package for the image -- and that risk
+            # arrives through the files each one is built from. A PR that edits
+            # any of them gets its full matrix back. A `gh` failure widens both:
+            # losing coverage must never be the quiet outcome of an API hiccup.
             if files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename'); then
               grep -qE '^(flake\.nix|flake\.lock|shards\.nix|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && nix="$nix_all"
+              grep -qE '^(docker/Dockerfile|docker/entrypoint\.sh|action\.yml|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && docker="$docker_all"
             else
-              echo "::warning::could not list the PR's files; building the full nix matrix"
+              echo "::warning::could not list the PR's files; building the full matrices"
               nix="$nix_all"
+              docker="$docker_all"
             fi
           fi
 
