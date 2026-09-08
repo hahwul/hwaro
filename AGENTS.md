@@ -25,14 +25,25 @@ just dev                # serve the docs site (bin/hwaro serve -i docs)
   `crystal spec` links every run to the same fixed path under
   `~/.cache/crystal`, so two concurrent invocations clobber each other's
   binary and produce plausible-looking nonsense. `just test-file` /
-  `just test-dir` set their own `CRYSTAL_CACHE_DIR`, so they are safe to run
-  alongside `just test`.
+  `just test-dir` point `CRYSTAL_CACHE_DIR` at a **per-target** directory under
+  `$TMPDIR/hwaro-spec-cache/`, so they are safe alongside `just test` and
+  alongside each other, and a re-run of the same target reuses the last
+  compile (~2× faster). `just clean` removes them; export
+  `CRYSTAL_CACHE_DIR` yourself to override.
 - `spec/functional/**` spawns `bin/hwaro`; rebuild it (`shards build`) before
   trusting a functional run, or the specs test the old binary (the serve
   specs mark themselves pending when it is missing).
 - `bin/ameba` is built by `just ameba` (ameba 1.7 ships no executable).
 - Anything that changes `shard.lock` must be followed by `just nix-update`.
   `flake.nix` reads the version and minimum Crystal from `shard.yml`.
+- CI (`.github/workflows/ci.yml`) sizes its two expensive matrices in the
+  `plan` job. An ordinary source PR builds one nix system and one Docker arch;
+  every push to main builds both matrices in full, and so does a PR touching
+  the inputs a matrix exists to protect — `flake.*`/`shards.nix` for nix,
+  `docker/`/`action.yml` for the image, `shard.lock`/`shard.yml`/the workflow
+  for both. Widen those file lists rather than the matrices when a new input
+  can break packaging. `tests` and `package-macos` restore
+  `~/.cache/crystal`; only pushes to main write it back.
 - Parallelism comes from Crystal's execution contexts: `src/main.cr` sizes the
   default `Fiber::ExecutionContext::Parallel` (honours `CRYSTAL_WORKERS`).
   **Never reintroduce `-Dpreview_mt`** — its legacy scheduler can spin forever

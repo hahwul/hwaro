@@ -98,9 +98,9 @@ describe Hwaro::Content::Processors::InlineMarkdown do
     # minutes here, the linear form about a millisecond.
     it "renders a long unclosed backtick run in linear time" do
       input = "`" * 100_000
-      started = Time.monotonic
+      started = Time.instant
       out = Hwaro::Content::Processors::InlineMarkdown.render(input)
-      (Time.monotonic - started).should be < 5.seconds
+      (Time.instant - started).should be < 5.seconds
       out.should eq(input)
     end
 
@@ -109,9 +109,9 @@ describe Hwaro::Content::Processors::InlineMarkdown do
     # 20k spans took ~10 s. One pass per token kind now.
     it "restores many code spans in linear time" do
       input = Array.new(20_000) { |i| "`c#{i}`" }.join(" ")
-      started = Time.monotonic
+      started = Time.instant
       out = Hwaro::Content::Processors::InlineMarkdown.render(input)
-      (Time.monotonic - started).should be < 3.seconds
+      (Time.instant - started).should be < 3.seconds
       out.should start_with("<code>c0</code> <code>c1</code>")
       out.should end_with("<code>c19999</code>")
       out.should_not contain("\x00")

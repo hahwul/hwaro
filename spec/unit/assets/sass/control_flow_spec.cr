@@ -279,9 +279,14 @@ describe "Sass loop budget" do
     end
   end
 
+  # The body is a bare declaration rather than a rule on purpose. The budget is
+  # ticked once per iteration *before* the body runs, so what this asserts is
+  # unchanged -- but emitting a million rule nodes to reach the cap cost 2.9s,
+  # and the spec above already covers the budget tripping on the shape that
+  # actually allocates.
   it "errors on nested loops whose product exceeds the budget" do
     expect_raises(Hwaro::Assets::Sass::SyntaxError, /total @for\/@each\/@while iterations/) do
-      compile("@for $i from 1 through 3000 { @for $j from 1 through 3000 { .c { top: 0; } } }")
+      compile("@for $i from 1 through 3000 { @for $j from 1 through 3000 { $unused: $j; } }")
     end
   end
 
