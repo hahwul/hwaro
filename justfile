@@ -31,6 +31,7 @@ clean:
     rm -f src/ext/stb_impl.o
     rm -rf bin/
     rm -rf lib/
+    rm -rf "${TMPDIR:-/tmp}/hwaro-spec-cache"
 
 # Serve docs site with the built binary.
 [group('documents')]
@@ -66,6 +67,21 @@ check: ameba
 test:
     crystal spec
 
+# Per-target compiler caches for the two recipes below.
+#
+# They used to `mktemp -d` a fresh directory per invocation, which bought
+# isolation at the price of a fully cold compile every time: nothing was reused,
+# including the two `macro run` sub-compilations (baked_file_system's loader via
+# tartrazine, ecr's processor via HTTP::StaticFileHandler) that alone cost ~8s.
+# Keying the directory on the target instead keeps every bit of that isolation --
+# `crystal spec` names its binary after the spec ROOT, not the file passed to it,
+# so two targets sharing one cache dir would still clobber each other's binary --
+# while letting a re-run of the same target reuse the last one (measured: 10.9s
+# -> 5.5s on a single spec file). `just clean` removes them.
+#
+# The `:line` suffix is stripped because it selects examples at run time and
+# compiles the identical program; it must not fork a second cache.
+
 #     just test-file spec/unit/models/config_spec.cr
 #     just test-file spec/unit/models/config_spec.cr:42
 #
@@ -75,8 +91,10 @@ test-file TARGET:
     #!/usr/bin/env bash
     set -euo pipefail
     just _warn-stale-binary
-    export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/hwaro-spec.XXXXXX")}"
-    crystal spec "{{ TARGET }}"
+    target="{{ TARGET }}"
+    export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-${TMPDIR:-/tmp}/hwaro-spec-cache/$(printf '%s' "${target%%:*}" | tr -c 'A-Za-z0-9' '-')}"
+    mkdir -p "$CRYSTAL_CACHE_DIR"
+    crystal spec "$target"
 
 #     just test-dir spec/unit/assets/sass
 #
@@ -86,8 +104,10 @@ test-dir DIR:
     #!/usr/bin/env bash
     set -euo pipefail
     just _warn-stale-binary
-    export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/hwaro-spec.XXXXXX")}"
-    crystal spec "{{ DIR }}"
+    dir="{{ DIR }}"
+    export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-${TMPDIR:-/tmp}/hwaro-spec-cache/$(printf '%s' "$dir" | tr -c 'A-Za-z0-9' '-')}"
+    mkdir -p "$CRYSTAL_CACHE_DIR"
+    crystal spec "$dir"
 
 # Functional specs spawn bin/hwaro: a stale binary makes them test old code.
 [private]

@@ -38,30 +38,70 @@ on:
         description: manual run
         required: false
         default: ""
+# A PR is superseded by its own next push far more often than a full matrix run
+# is worth. Pushes to main are never cancelled: they are the full-fidelity gate
+# and the only writer of the compiler cache the other jobs read.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  build-crystal:
+  # Which slice of the two heavy matrices this event needs. build-nix costs
+  # ~5 minutes per system and build-docker ~4 per arch, and running all five on
+  # every PR made packaging -- not compiling or testing -- the critical path. A
+  # PR runs one of each, which still proves the packaging compiles, links and
+  # runs; the full matrices run on every push to main, before anything can be
+  # released from it, and on the PRs that edit the packaging inputs themselves.
+  plan:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        crystal-version: [1.21.0]
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      nix: ${{ steps.matrices.outputs.nix }}
+      docker: ${{ steps.matrices.outputs.docker }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: crystal-lang/install-crystal@v1
-        with:
-          crystal: ${{ matrix.crystal-version }}
-      - name: Install dependencies
-        run: shards install
-      - name: Build
-        run: shards build
+      - id: matrices
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          nix_all='{"include":[{"system":"x86_64-linux","runner":"ubuntu-latest"},{"system":"aarch64-linux","runner":"ubuntu-24.04-arm"},{"system":"aarch64-darwin","runner":"macos-latest"}]}'
+          nix_one='{"include":[{"system":"x86_64-linux","runner":"ubuntu-latest"}]}'
+          docker_all='{"include":[{"arch":"linux/amd64","runner":"ubuntu-latest"},{"arch":"linux/arm64","runner":"ubuntu-24.04-arm"}]}'
+          docker_one='{"include":[{"arch":"linux/amd64","runner":"ubuntu-latest"}]}'
+
+          # Anything that is not a PR -- a push to main, a manual dispatch --
+          # gets everything.
+          nix="$nix_all"
+          docker="$docker_all"
+
+          if [ "$EVENT" = pull_request ]; then
+            docker="$docker_one"
+            nix="$nix_one"
+            # The three-system nix matrix exists to catch a bad release-tarball
+            # hash or a platform-specific link failure, and both of those come
+            # from the files below -- so a PR that edits one gets all three
+            # back. A `gh` failure widens too: losing coverage must never be
+            # the quiet outcome of an API hiccup.
+            if files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename'); then
+              grep -qE '^(flake\.nix|flake\.lock|shards\.nix|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && nix="$nix_all"
+            else
+              echo "::warning::could not list the PR's files; building the full nix matrix"
+              nix="$nix_all"
+            fi
+          fi
+
+          echo "nix=$nix" >> "$GITHUB_OUTPUT"
+          echo "docker=$docker" >> "$GITHUB_OUTPUT"
   build-docker:
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - arch: linux/amd64
-            runner: ubuntu-latest
-          - arch: linux/arm64
-            runner: ubuntu-24.04-arm
+      matrix: ${{ fromJSON(needs.plan.outputs.docker) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
@@ -135,6 +175,10 @@ jobs:
       - name: Run Ameba linter
         uses: crystal-ameba/github-action@master
   tests:
+    # Also the compile gate. `shards build` here is exactly what a separate
+    # build-only job used to run twice over, and spec/functional spawns the
+    # binary it produces, so a compile break already fails this job before a
+    # single example runs.
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -144,26 +188,64 @@ jobs:
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: ${{ matrix.crystal-version }}
+      # Crystal keys its cache by absolute source path and the runner workspace
+      # path is stable, so a restored ~/.cache/crystal gives this job both
+      # halves of a warm compile. The expensive half is the two `macro run`
+      # programs -- baked_file_system's loader (via tartrazine) and ecr's
+      # processor (via HTTP::StaticFileHandler) -- which cost ~8s of every cold
+      # compile and are cached per macro program, so `shards build` and
+      # `crystal spec` share one copy. The per-module .o/.bc files then let
+      # codegen skip everything the commit did not touch (measured: >99% reuse
+      # after a one-file edit). Only pushes to main write the cache; PRs read
+      # it, so no PR can poison what the next one restores.
+      - name: Restore Crystal cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/crystal
+            lib
+          key: crystal-${{ runner.os }}-${{ matrix.crystal-version }}-${{ hashFiles('shard.lock') }}-${{ github.sha }}
+          restore-keys: |
+            crystal-${{ runner.os }}-${{ matrix.crystal-version }}-${{ hashFiles('shard.lock') }}-
+      # ameba is a development dependency and the lint job brings its own; not
+      # cloning it here also keeps the cached lib/ to what this job compiles.
       - name: Install dependencies
-        run: shards install
+        run: shards install --without-development
       - name: Build binary
         run: shards build
       - name: Run tests
         run: crystal spec
+      # Cached object files are named after a content hash, so a changed module
+      # adds a file rather than replacing one and the directory only grows.
+      # Dropping the ones a week of pushes has not regenerated bounds it without
+      # throwing away the entries that make the next restore worth downloading.
+      - name: Trim the Crystal cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          find ~/.cache/crystal -type f -mtime +7 -delete
+          find ~/.cache/crystal -type d -empty -delete
+          du -sh ~/.cache/crystal
+      - name: Save Crystal cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/crystal
+            lib
+          key: crystal-${{ runner.os }}-${{ matrix.crystal-version }}-${{ hashFiles('shard.lock') }}-${{ github.sha }}
   build-nix:
     # One runner per system flake.nix declares: a bad tarball hash or a
     # platform-specific link failure must not reach a user's `nix profile
-    # install` just because CI only ever built x86_64-linux.
+    # install` just because CI only ever built x86_64-linux. `plan` decides how
+    # many of them this event needs -- all three whenever one could regress
+    # (any push to main, and PRs touching the flake or the lock files), one on
+    # an ordinary source PR, where the release-mode compile and the link are
+    # what is actually at risk and x86_64-linux proves both.
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - system: x86_64-linux
-            runner: ubuntu-latest
-          - system: aarch64-linux
-            runner: ubuntu-24.04-arm
-          - system: aarch64-darwin
-            runner: macos-latest
+      matrix: ${{ fromJSON(needs.plan.outputs.nix) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
@@ -204,8 +286,20 @@ jobs:
           crystal: 1.21.0
       - name: Install build dependencies
         run: brew install openssl@3 pkg-config
+      # Same warm-compile cache as the tests job, on its own key -- macOS
+      # runners are the slowest in the matrix and this job compiles the whole
+      # program just to look at what it links.
+      - name: Restore Crystal cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/crystal
+            lib
+          key: crystal-${{ runner.os }}-1.21.0-${{ hashFiles('shard.lock') }}-${{ github.sha }}
+          restore-keys: |
+            crystal-${{ runner.os }}-1.21.0-${{ hashFiles('shard.lock') }}-
       - name: Install shards
-        run: shards install
+        run: shards install --without-development
       # Not --release: this job is about linkage and signatures, which are
       # identical either way, and a release build would triple the runtime.
       - name: Build binary
@@ -214,6 +308,21 @@ jobs:
           export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig"
           mkdir -p build
           crystal build src/main.cr -o build/hwaro --no-debug
+      - name: Trim the Crystal cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          find ~/.cache/crystal -type f -mtime +7 -delete
+          find ~/.cache/crystal -type d -empty -delete
+          du -sh ~/.cache/crystal
+      - name: Save Crystal cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/crystal
+            lib
+          key: crystal-${{ runner.os }}-1.21.0-${{ hashFiles('shard.lock') }}-${{ github.sha }}
       # The runtime half of this job only means anything on arm64: x86_64
       # happily executes a stale signature. `macos-latest` is arm64 today but
       # it is an alias GitHub has re-pointed before, and a silent move would
