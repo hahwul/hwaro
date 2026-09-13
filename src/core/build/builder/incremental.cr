@@ -66,12 +66,10 @@ module Hwaro
           verbose = options.verbose
 
           # --- 1. Identify changed pages and snapshot their state before re-parse ---
-          # Fingerprint the global page/section sets BEFORE the re-parse, so
-          # the fan-out below can tell whether this edit changed anything the
-          # site's listing pages actually print. See listing_fanout_pages.
-          listing_fields = listing_page_fields(templates)
-          before_page_fp = compute_page_set_fingerprint(site.pages, listing_fields)
-          before_section_fp = compute_section_set_fingerprint(site.sections)
+          # Digest every page-set projection the templates read, BEFORE the
+          # re-parse, so the fan-out below can tell which of them this edit
+          # actually moved. See listing_fanout_pages.
+          listing_sets = snapshot_listing_sets(site, templates)
 
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -239,10 +237,8 @@ module Hwaro
           # reach them, and their on-disk HTML kept showing the pre-edit title
           # (or kept listing a page just flipped to draft) until something
           # unrelated happened to re-render them.
-          listing_fanout_pages(site, templates, all_pages,
-            page_set_changed: compute_page_set_fingerprint(site.pages, listing_fields) != before_page_fp,
-            section_set_changed: compute_section_set_fingerprint(site.sections) != before_section_fp,
-          ).each { |p| pages_to_render << p }
+          listing_fanout_pages(site, templates, all_pages, listing_sets)
+            .each { |p| pages_to_render << p }
 
           render_list = pages_to_render.to_a
 
@@ -305,16 +301,14 @@ module Hwaro
           output_dir = options.output_dir
           pages_map = @pages_by_path || build_pages_by_path(site)
 
-          # Set fingerprints taken before the re-parse, exactly as in
+          # Projection digests taken before the re-parse, exactly as in
           # run_incremental — the re-render below is selective too, so a
           # listing page the template edit doesn't touch needs the same
-          # fan-out. Folded against the CURRENT templates: run_rerender
-          # reloads them, but `listing_page_fields` only decides which page
-          # fields enter the digest, and both sides of the comparison use the
-          # same answer.
-          listing_fields = listing_page_fields(@templates || {} of String => String)
-          before_page_fp = compute_page_set_fingerprint(site.pages, listing_fields)
-          before_section_fp = compute_section_set_fingerprint(site.sections)
+          # fan-out. Snapshotted against the CURRENT templates: run_rerender
+          # reloads them, but both sides of the comparison then use the same
+          # `needs_*` answer, and a template edit that changes which
+          # projections exist re-renders on its own account anyway.
+          listing_sets = snapshot_listing_sets(site, @templates)
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
@@ -358,47 +352,107 @@ module Hwaro
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
           run_rerender(options, force_pages: changed_pages, membership_changed: !excluded_pages.empty?,
-            page_set_changed: compute_page_set_fingerprint(site.pages, listing_fields) != before_page_fp,
-            section_set_changed: compute_section_set_fingerprint(site.sections) != before_section_fp)
+            listing_sets: listing_sets)
         end
 
-        # Pages whose template closure renders a global page/section listing,
-        # returned only when this rebuild actually moved the corresponding set
-        # fingerprint.
+        # Digests of every page-set projection the site's templates read,
+        # taken before a re-parse so the fan-out can diff them afterwards.
+        # `needs_*` records which ones any template actually reads; the rest
+        # are left empty and never computed — the page-set digest is O(pages)
+        # and must not be paid by a site with no listing at all.
+        private record ListingSetSnapshot,
+          needs_page : Bool,
+          needs_section : Bool,
+          needs_menu : Bool,
+          needs_taxonomy : Bool,
+          page : String,
+          section : String,
+          menu : String,
+          taxonomy : String do
+          def self.inert : ListingSetSnapshot
+            new(false, false, false, false, "", "", "", "")
+          end
+        end
+
+        # Snapshot the projections before a re-parse. `templates` is nil only
+        # before the first build, where there is nothing to fan out to —
+        # returning `inert` also keeps a throwaway Hash out of
+        # `listing_source_union`, which memoizes on the hash's object_id.
+        private def snapshot_listing_sets(site : Models::Site, templates : Hash(String, String)?) : ListingSetSnapshot
+          return ListingSetSnapshot.inert unless templates
+
+          blob = templates.values.join("\n")
+          needs_page = Phases::Render::LISTING_PAGE_MARKERS.any? do |marker|
+            marker == "get_taxonomy" ? Phases::Render::GET_TAXONOMY_RE.matches?(blob) : blob.includes?(marker)
+          end
+          # A section index renders its own page list with no marker to scan
+          # for (`{{ section.list }}`), so any site with sections can need the
+          # page digest.
+          needs_page ||= !site.sections.empty?
+          needs_section = Phases::Render::LISTING_SECTION_MARKERS.any? { |marker| blob.includes?(marker) }
+          needs_menu = Phases::Render::MENU_SET_MARKERS.any? { |marker| blob.includes?(marker) }
+          needs_taxonomy = blob.includes?(Phases::Render::TAXONOMY_URL_MARKER)
+
+          ListingSetSnapshot.new(
+            needs_page: needs_page,
+            needs_section: needs_section,
+            needs_menu: needs_menu,
+            needs_taxonomy: needs_taxonomy,
+            page: needs_page ? compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) : "",
+            section: needs_section ? compute_section_set_fingerprint(site.sections) : "",
+            menu: needs_menu ? compute_menu_set_fingerprint(site.pages, site.sections) : "",
+            taxonomy: needs_taxonomy ? compute_taxonomy_slug_fingerprint(site) : "",
+          )
+        end
+
+        # Pages that render a projection of the global page/section set which
+        # THIS rebuild actually moved.
         #
-        # This is the incremental counterpart of what `hwaro build --cache`
-        # already does in `filter_changed_pages`: same marker scan
-        # (`listing_template_deps`), same fingerprints
-        # (`compute_page_set_fingerprint` / `compute_section_set_fingerprint`),
-        # so the two paths agree on which pages a set change reaches. Without
-        # it, `hwaro serve` had a standing gap the full build did not — a
-        # retitled post left the homepage showing the old title for the rest of
-        # the session.
+        # `hwaro build --cache` solves the same problem in
+        # `filter_changed_pages` and serve had no equivalent, so a retitled
+        # post left the homepage showing the old title for the rest of the
+        # session. The difference is granularity, and it is not cosmetic: the
+        # cached build gates every marker on one broad page-set digest, which
+        # for a site whose base layout carries a nav (`get_menu`) and whose
+        # posts carry tag pills (`get_taxonomy_url`) selects EVERY page on any
+        # metadata edit. A full build re-renders the union anyway; a dev server
+        # turning each keystroke-save into a whole-site render does not.
         #
-        # The fingerprint gate is what keeps this cheap. An edit that moves
-        # nothing a listing reads — a body-only change on a site whose
-        # listings print no excerpts — selects nothing, so the common
-        # save-and-refresh loop is unchanged. The two digests are the whole
-        # added cost, and they are the same ones a cached build pays per build.
+        # So each marker class is gated on a digest of what it actually reads
+        # (see the marker constants in phases/render/fingerprints.cr). A nav
+        # re-renders when a menu entry moves, a tag pill when the term set
+        # does, and a `site.pages` listing when the page set does — which is
+        # also the edit where re-rendering it is the whole point.
         private def listing_fanout_pages(
           site : Models::Site,
           templates : Hash(String, String),
           all_pages : Array(Models::Page),
-          page_set_changed : Bool,
-          section_set_changed : Bool,
+          before : ListingSetSnapshot,
         ) : Array(Models::Page)
-          return [] of Models::Page unless page_set_changed || section_set_changed
+          page_changed = before.needs_page &&
+                         compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) != before.page
+          section_changed = before.needs_section &&
+                            compute_section_set_fingerprint(site.sections) != before.section
+          menu_changed = before.needs_menu &&
+                         compute_menu_set_fingerprint(site.pages, site.sections) != before.menu
+          taxonomy_changed = before.needs_taxonomy &&
+                             compute_taxonomy_slug_fingerprint(site) != before.taxonomy
 
-          listing_memo = {} of String => Tuple(Bool, Bool)
+          return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed
+
+          deps_memo = {} of String => Phases::Render::ListingSetDeps
           all_pages.select do |page|
             next false unless page.render
             entry = determine_template(page, templates, site)
-            page_dep, section_dep = (listing_memo[entry]? || (listing_memo[entry] = listing_template_deps(entry, templates)))
+            deps = (deps_memo[entry]? || (deps_memo[entry] = listing_set_deps(entry, templates)))
             # Mirrors filter_changed_pages: a section index renders its
             # section's page list even via `{{ section.list }}`, which leaves
             # no marker in the template source to scan for.
-            page_dep ||= page.is_a?(Models::Section)
-            (page_dep && page_set_changed) || (section_dep && section_set_changed)
+            page_dep = deps.page || page.is_a?(Models::Section)
+            (page_dep && page_changed) ||
+              (deps.section && section_changed) ||
+              (deps.menu && menu_changed) ||
+              (deps.taxonomy_slug && taxonomy_changed)
           end
         end
 
@@ -579,17 +633,16 @@ module Hwaro
         # pages must refresh even when no template content changed, and the
         # identical-templates early return must not skip that work.
         #
-        # `page_set_changed` / `section_set_changed` report that the caller's
-        # content re-parse moved the global set fingerprints, so the selective
-        # render set must also take in the listing pages that print those sets
-        # (see listing_fanout_pages). Both default to false: a pure template
-        # edit changes no page metadata.
+        # `listing_sets` is the caller's pre-re-parse snapshot of the page-set
+        # projections (see snapshot_listing_sets): the selective render set
+        # must also take in the listing pages that print a projection the
+        # content re-parse moved. Nil for a pure template edit, which changes
+        # no page metadata.
         def run_rerender(
           options : Config::Options::BuildOptions,
           force_pages : Array(Models::Page)? = nil,
           membership_changed : Bool = false,
-          page_set_changed : Bool = false,
-          section_set_changed : Bool = false,
+          listing_sets : ListingSetSnapshot? = nil,
         ) : Bool
           @render_workers = options.workers
           config = @config
@@ -689,10 +742,10 @@ module Hwaro
                                   selected << page if page.render && seen.add?(page.path)
                                 end
                               end
-                              listing_fanout_pages(site, templates, all_pages,
-                                page_set_changed: page_set_changed,
-                                section_set_changed: section_set_changed,
-                              ).each { |page| selected << page if seen.add?(page.path) }
+                              if sets = listing_sets
+                                listing_fanout_pages(site, templates, all_pages, sets)
+                                  .each { |page| selected << page if seen.add?(page.path) }
+                              end
                               selected
                             else
                               renderable_pages

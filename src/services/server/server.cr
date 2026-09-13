@@ -82,6 +82,9 @@ module Hwaro
       # produced no event at all and the fingerprinted bundle kept serving its
       # pre-edit bytes for the whole session.
       @extra_watch_roots : Array(String) = [] of String
+      # The config `serve_build_options` loaded, kept so the watcher's root
+      # resolution doesn't pay (and re-warn through) another load.
+      @startup_config : Models::Config? = nil
       # The stamps our own most recent hook-running build left on the watched
       # config files it rewrote WITHOUT changing a byte. Empty for the
       # overwhelmingly common build that touches no config at all. See
@@ -201,10 +204,12 @@ module Hwaro
       protected def serve_build_options(options : Config::Options::ServeOptions) : Config::Options::BuildOptions
         build_options = options.to_build_options
         build_options.serve_mode = true
-        begin
-          build_options.apply_build_config!(Hwaro::Models::Config.load(env: build_options.env).build)
-        rescue Hwaro::HwaroError
-        end
+        # Kept for the watcher (see @startup_config): loading config.toml
+        # emits its env-substitution warnings every time, so a third load at
+        # startup would print each `${VAR} is not set` line three times.
+        config = load_config_or_nil(build_options.env)
+        @startup_config = config
+        config.try { |cfg| build_options.apply_build_config!(cfg.build) }
         build_options
       end
 
@@ -217,8 +222,12 @@ module Hwaro
         # Resolved BEFORE capture_watch_baseline: a root added to the scan
         # after the baseline was taken reports every file under it as new on
         # the first poll, which is a spurious full rebuild seconds after
-        # startup.
-        @extra_watch_roots = resolve_extra_watch_roots(load_config_or_nil(build_options.env))
+        # startup. Reuses the config serve_build_options already loaded; the
+        # fallback is for callers that reach run_with_options directly.
+        @extra_watch_roots = resolve_extra_watch_roots(
+          @startup_config || load_config_or_nil(build_options.env),
+          sanitize_output_dir(build_options.output_dir),
+        )
         # Must happen before any handler is built so StaticFileHandler picks
         # the charset-bearing types up.
         Server.register_utf8_mime_types

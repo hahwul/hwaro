@@ -236,7 +236,9 @@ module Hwaro
           # where the bundle sources now live. (Files under a newly added root
           # read as additions on the next poll, which costs one more full
           # rebuild — the honest price of the root having changed.)
-          @builder.config.try { |cfg| @extra_watch_roots = resolve_extra_watch_roots(cfg) }
+          @builder.config.try do |cfg|
+            @extra_watch_roots = resolve_extra_watch_roots(cfg, sanitize_output_dir(build_options.output_dir))
+          end
         end
       end
     end

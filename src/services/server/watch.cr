@@ -306,15 +306,23 @@ module Hwaro
       # - an absolute path: `source_dir = "/"` (or any typo that normalizes
       #   to one) would put a full-filesystem glob on the poll loop;
       # - a path escaping the project, for the same reason;
+      # - the build output directory, in either direction: the watcher would
+      #   re-stat the whole generated tree every poll and re-classify the
+      #   build's own writes as source changes;
       # - anything a fixed root already covers, which would stamp the same
       #   files twice per scan.
-      private def resolve_extra_watch_roots(config : Models::Config?) : Array(String)
+      private def resolve_extra_watch_roots(config : Models::Config?, output_dir : String) : Array(String)
         roots = [] of String
         return roots unless config && config.assets.enabled
 
         source_dir = Path[config.assets.source_dir].normalize.to_s
         return roots if source_dir.empty? || source_dir == "." || source_dir.starts_with?("..")
         return roots if Path[source_dir].absolute?
+
+        output = Path[output_dir].normalize.to_s
+        return roots if source_dir == output ||
+                        source_dir.starts_with?("#{output}/") ||
+                        output.starts_with?("#{source_dir}/")
         return roots if Server::WATCH_ROOTS.any? { |r| source_dir == r || source_dir.starts_with?("#{r}/") }
 
         roots << source_dir

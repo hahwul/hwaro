@@ -34,8 +34,8 @@ module Hwaro
         scan_mtimes
       end
 
-      def staleness_resolve_extra_roots(env : String? = nil) : Array(String)
-        @extra_watch_roots = resolve_extra_watch_roots(load_config_or_nil(env))
+      def staleness_resolve_extra_roots(env : String? = nil, output_dir : String = "public") : Array(String)
+        @extra_watch_roots = resolve_extra_watch_roots(load_config_or_nil(env), output_dir)
       end
     end
   end
@@ -284,6 +284,28 @@ describe "serve incremental staleness" do
     end
   end
 
+  # Watching the build output would re-stat the whole generated tree every
+  # poll and read the build's own writes back as source changes.
+  it "refuses an [assets] source_dir that overlaps the output directory (L3)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_listing_site
+        {"public", "public/js", "."}.each do |source_dir|
+          File.write("config.toml", <<-TOML
+            title = "Listing Site"
+            base_url = "https://example.com"
+
+            [assets]
+            enabled = true
+            source_dir = "#{source_dir}"
+            TOML
+          )
+          Hwaro::Services::Server.new.staleness_resolve_extra_roots(output_dir: "public").should be_empty
+        end
+      end
+    end
+  end
+
   # A disabled pipeline reads nothing from source_dir, so watching it would
   # only cost stat calls on every poll.
   it "adds no extra root while the asset pipeline is disabled (L3)" do
@@ -301,6 +323,109 @@ describe "serve incremental staleness" do
         )
 
         Hwaro::Services::Server.new.staleness_resolve_extra_roots.should be_empty
+      end
+    end
+  end
+end
+
+# The fan-out is only usable on a dev server if it stays proportional. A
+# nav partial in the shared base layout puts `get_menu` in EVERY page's
+# template closure, and tag pills put `get_taxonomy_url` in every post's —
+# gating those on the broad page-set digest (what `--cache` does) selects the
+# whole site for any metadata edit. Each marker class is paired with a digest
+# of what it actually reads instead.
+private def write_chrome_site
+  File.write("config.toml", <<-TOML
+    title = "Chrome Site"
+    base_url = "https://example.com"
+
+    [[taxonomies]]
+    name = "tags"
+    TOML
+  )
+  FileUtils.mkdir_p("content/posts")
+  FileUtils.mkdir_p("templates")
+  File.write("templates/base.html", <<-HTML
+    <html><body><nav>{% for item in get_menu(name="main") %}<a href="{{ item.href }}">{{ item.name }}</a>{% endfor %}</nav>{% block main %}{% endblock %}</body></html>
+    HTML
+  )
+  File.write("templates/page.html", <<-HTML
+    {% extends "base.html" %}{% block main %}<h1>{{ page.title }}</h1>{% for t in page.tags %}<a href="{{ get_taxonomy_url(kind='tags', term=t) }}">{{ t }}</a>{% endfor %}{{ content }}{% endblock %}
+    HTML
+  )
+  File.write("templates/index.html", <<-HTML
+    {% extends "base.html" %}{% block main %}{% for p in site.pages %}<a href="{{ p.url }}">{{ p.title }}</a>{% endfor %}{% endblock %}
+    HTML
+  )
+  File.write("content/index.md", "---\ntitle: Home\ntemplate: index.html\nmenus: [main]\n---\nhome")
+  8.times do |i|
+    File.write("content/posts/p#{i}.md", "---\ntitle: Post #{i}\nweight: #{10 + i}\ntags: [t#{i % 3}]\n---\nbody #{i}")
+  end
+end
+
+# Count the output files a rebuild rewrote, by mtime.
+private def rewritten_since(marker : Time) : Int32
+  Dir.glob("public/**/*.html").count { |f| File.info(f).modification_time > marker }
+end
+
+describe "serve listing fan-out proportionality" do
+  it "does not re-render the whole site when only the shared nav carries a marker" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_chrome_site
+
+        server = Hwaro::Services::Server.new
+        options = staleness_options
+        server.staleness_builder.run(options).should be_true
+        total = Dir.glob("public/**/*.html").size
+        total.should be > 5
+
+        marker = Time.local
+        sleep 1.1.seconds
+        File.write("content/posts/p3.md", "---\ntitle: Post 3 RETITLED\nweight: 13\ntags: [t0]\n---\nbody 3")
+        server.staleness_builder.run_incremental(["content/posts/p3.md"], options).should be_true
+
+        # The edited post, its reading-order neighbours and the one page that
+        # really prints `site.pages` — not the nav on all nine.
+        rewritten_since(marker).should be < total
+        File.read("public/index.html").should contain("Post 3 RETITLED")
+      end
+    end
+  end
+
+  # The menu projection is not merely ignored: an edit that DOES move a menu
+  # entry has to reach every page that renders the nav.
+  it "re-renders every page when a menu entry's title changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_chrome_site
+
+        server = Hwaro::Services::Server.new
+        options = staleness_options
+        server.staleness_builder.run(options).should be_true
+
+        File.write("content/index.md", "---\ntitle: Renamed Home\ntemplate: index.html\nmenus: [main]\n---\nhome")
+        server.staleness_builder.run_incremental(["content/index.md"], options).should be_true
+
+        File.read("public/posts/p5/index.html").should contain("Renamed Home")
+      end
+    end
+  end
+
+  # Same for the taxonomy-slug projection behind `get_taxonomy_url`.
+  it "re-renders tag-pill pages when the term set changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_chrome_site
+
+        server = Hwaro::Services::Server.new
+        options = staleness_options
+        server.staleness_builder.run(options).should be_true
+
+        File.write("content/posts/p2.md", "---\ntitle: Post 2\nweight: 12\ntags: [t2, brandnew]\n---\nbody 2")
+        server.staleness_builder.run_incremental(["content/posts/p2.md"], options).should be_true
+
+        File.read("public/posts/p2/index.html").should contain("tags/brandnew")
       end
     end
   end
