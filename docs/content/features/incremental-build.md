@@ -91,10 +91,24 @@ The development server (`hwaro serve`) uses a more targeted incremental strategy
 
 | Change Type | Strategy |
 |-------------|----------|
-| Content files only | Re-parse and re-render only affected pages + neighbors |
+| Content files only | Re-parse and re-render only affected pages + neighbors, plus any listing page the edit changed (see below) |
 | Template files only | Re-render only pages whose template closure includes an edited template (all pages when tracking is off, the graph has dynamic references, or the edited file is under `templates/hooks/`) |
 | Config file | Full rebuild |
 | Static files only | Copy only changed files |
+
+A **listing page** is one whose template closure renders a global set — the
+homepage's "latest posts" loop over `site.pages`, an archive, a paginated
+index, a nav built from `site.menus` or `get_section()`. It owns none of the
+page you edited, so the selections above never reach it. Serve therefore
+fingerprints the page and section sets either side of the rebuild and, when
+one moved, re-renders the listing pages that read it — the same test
+`--cache` applies on a full build. An edit that moves nothing a listing
+prints (a body-only change on a site whose listings show no excerpts) still
+re-renders just the edited page.
+
+Serve also watches an `[assets] source_dir` that lives outside `static/`, so
+bundle sources kept in their own directory rebuild on save like any other
+asset.
 
 ### Removed pages
 

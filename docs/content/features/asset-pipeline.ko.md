@@ -40,7 +40,7 @@ files = ["js/util.js", "js/app.js"]
 | `enabled` | bool | `false` | 에셋 파이프라인 활성화 |
 | `minify` | bool | `true` | CSS/JS 출력 압축 |
 | `fingerprint` | bool | `true` | 파일명에 콘텐츠 해시 추가 |
-| `source_dir` | string | `"static"` | 소스 파일이 있는 디렉터리 |
+| `source_dir` | string | `"static"` | 소스 파일이 있는 디렉터리 (프로젝트 안에 있는 한 어디를 가리켜도 `hwaro serve`가 감시합니다) |
 | `output_dir` | string | `"assets"` | 빌드 출력 내 출력 하위 디렉터리 |
 
 ### 번들 정의
