@@ -49,7 +49,7 @@ module Hwaro
         # rendered as body text under the default "Note" heading. Obsidian's
         # optional fold marker (`[!NOTE]+` / `[!NOTE]-`) is accepted and
         # dropped; folding itself is not modeled.
-        ADMONITION_BLOCKQUOTE_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][+-]?([^\n]*?)(?:\n|(?=<\/p>))\s*(.*?)<\/blockquote>/m
+        ADMONITION_BLOCKQUOTE_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][+-]?([^\n]*?)(?:\n|(?=<\/p>))\s*(.*?)<\/blockquote>/im
 
         # Post-processing: rewrite GitHub `> [!TYPE]` blockquotes as admonition divs.
         # Note: the lazy match against `</blockquote>` means a nested blockquote
@@ -80,7 +80,7 @@ module Hwaro
             type_lower = type.downcase
             # The custom title is already inline-rendered (and escaped) by
             # markd — it was part of the paragraph — so it is emitted as-is.
-            type_title = custom_title.empty? ? type[0].to_s + type[1..].downcase : custom_title
+            type_title = custom_title.empty? ? type.capitalize : custom_title
 
             body = if rest.lstrip.starts_with?("</p>")
                      # Marker was alone on its paragraph; remaining content

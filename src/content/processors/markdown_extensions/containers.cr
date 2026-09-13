@@ -25,7 +25,7 @@ module Hwaro
         # EOF (markdown-it behavior). Fence-aware: ::: lines inside code
         # fences stay verbatim. The type token is class-safe by
         # construction; the title is HTML-escaped plain text.
-        CONTAINER_OPEN_RE  = /\A {0,3}:{3,}([A-Za-z][\w-]*)[ \t]*(.*)\z/
+        CONTAINER_OPEN_RE  = /\A {0,3}:{3,}[ \t]*([A-Za-z][\w-]*)[ \t]*(.*)\z/
         CONTAINER_CLOSE_RE = /\A {0,3}:{3,}\z/
 
         def preprocess_containers(content : String) : String

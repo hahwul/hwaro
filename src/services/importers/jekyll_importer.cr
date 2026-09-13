@@ -27,7 +27,7 @@ module Hwaro
 
           @used_slugs.clear
           reset_written_paths
-          files = collect_files(path, options.drafts)
+          files = collect_files(path, options.drafts, output_dir)
 
           if files.empty?
             return ImportResult.new(
@@ -41,8 +41,8 @@ module Hwaro
           end
         end
 
-        private def collect_files(path : String, include_drafts : Bool) : Array(NamedTuple(path: String, draft: Bool))
-          files = [] of NamedTuple(path: String, draft: Bool)
+        private def collect_files(path : String, include_drafts : Bool, output_dir : String? = nil) : Array(NamedTuple(path: String, draft: Bool, section: String))
+          files = [] of NamedTuple(path: String, draft: Bool, section: String)
 
           # Recursive: Jekyll supports organizing posts in subfolders
           # (`_posts/tech/2024-01-02-post.md` is a common category layout);
@@ -50,7 +50,7 @@ module Hwaro
           posts_dir = File.join(path, "_posts")
           if Dir.exists?(posts_dir)
             walk_files(posts_dir).sort.each do |file|
-              files << {path: file, draft: false}
+              files << {path: file, draft: false, section: "posts"}
             end
           end
 
@@ -58,16 +58,34 @@ module Hwaro
             drafts_dir = File.join(path, "_drafts")
             if Dir.exists?(drafts_dir)
               walk_files(drafts_dir).sort.each do |file|
-                files << {path: file, draft: true}
+                files << {path: file, draft: true, section: "posts"}
               end
             end
+          end
+
+          out_dir_clean = output_dir ? File.expand_path(output_dir) : nil
+
+          # Standalone pages outside _posts and _drafts (e.g. about.md, contact.md, docs/page.md)
+          page_files = walk_files(path, skip_dir: ->(entry : String) {
+            return true if entry.starts_with?(".") || entry.starts_with?("_")
+            return true if {"node_modules", "vendor", "assets"}.includes?(entry)
+            if out_dir = out_dir_clean
+              entry_full = File.expand_path(File.join(path, entry))
+              return true if entry_full == out_dir || out_dir.starts_with?(entry_full + "/")
+            end
+            false
+          })
+
+          page_files.sort.each do |file|
+            sec, _ = section_from_path(file, path, "")
+            files << {path: file, draft: false, section: sec}
           end
 
           files
         end
 
         private def import_file(
-          file_info : NamedTuple(path: String, draft: Bool),
+          file_info : NamedTuple(path: String, draft: Bool, section: String),
           output_dir : String,
           verbose : Bool,
           force : Bool,
@@ -199,11 +217,14 @@ module Hwaro
           # Stripping the unique `YYYY-MM-DD-` prefix can collide two posts
           # (`2023-01-01-recap.md` + `2024-01-01-recap.md` → `recap.md`);
           # re-attach the date to the later one instead of losing it.
-          unless @used_slugs.add?(slug)
+          scoped_slug = file_info[:section].empty? ? slug : "#{file_info[:section]}/#{slug}"
+          unless @used_slugs.add?(scoped_slug)
             candidate = filename_date ? "#{slug}-#{filename_date.to_s("%Y-%m-%d")}" : slug
+            scoped_candidate = file_info[:section].empty? ? candidate : "#{file_info[:section]}/#{candidate}"
             n = 1
-            until @used_slugs.add?(candidate)
+            until @used_slugs.add?(scoped_candidate)
               candidate = "#{slug}-#{n}"
+              scoped_candidate = file_info[:section].empty? ? candidate : "#{file_info[:section]}/#{candidate}"
               n += 1
             end
             Logger.warn "Slug collision after date-prefix strip: writing #{candidate} for #{file_info[:path]}"
@@ -212,7 +233,7 @@ module Hwaro
 
           frontmatter = generate_frontmatter(fields)
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
-          written = write_content_file(output_dir, "posts", slug, frontmatter, body, verbose, force)
+          written = write_content_file(output_dir, file_info[:section], slug, frontmatter, body, verbose, force)
 
           return :skipped unless written
           has_liquid ? :imported_wrapped : :imported

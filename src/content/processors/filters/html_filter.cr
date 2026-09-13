@@ -1,6 +1,6 @@
 require "crinja"
 require "markd"
-require "../../../../src/utils/text_utils"
+require "../../../utils/text_utils"
 
 module Hwaro
   module Content
