@@ -98,13 +98,19 @@ The development server (`hwaro serve`) uses a more targeted incremental strategy
 
 A **listing page** is one whose template closure renders a global set — the
 homepage's "latest posts" loop over `site.pages`, an archive, a paginated
-index, a nav built from `site.menus` or `get_section()`. It owns none of the
-page you edited, so the selections above never reach it. Serve therefore
-fingerprints the page and section sets either side of the rebuild and, when
-one moved, re-renders the listing pages that read it — the same test
-`--cache` applies on a full build. An edit that moves nothing a listing
-prints (a body-only change on a site whose listings show no excerpts) still
-re-renders just the edited page.
+index, a nav built from `site.menus`, a tag pill resolved through
+`get_taxonomy_url()`. It owns none of the page you edited, so the selections
+above never reach it. Serve therefore fingerprints those sets either side of
+the rebuild and re-renders the listing pages whose set moved.
+
+Each kind of listing is gated on a fingerprint of its own inputs, not on one
+site-wide digest. That matters because a nav partial in the shared base
+layout is in *every* page's template closure: a coarser gate would answer
+"re-render the whole site" for any metadata edit. A menu refreshes when a
+menu entry's title or URL moves, a tag pill when the term set changes, a
+`site.pages` loop when the page set changes — and an edit that moves nothing
+a listing prints (a body-only change on a site whose listings show no
+excerpts) still re-renders just the edited page.
 
 Serve also watches an `[assets] source_dir` that lives outside `static/`, so
 bundle sources kept in their own directory rebuild on save like any other
