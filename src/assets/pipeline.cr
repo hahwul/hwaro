@@ -20,12 +20,20 @@ module Hwaro
       # e.g. "main.css" => "/assets/main.a1b2c3d4.css"
       getter manifest : Hash(String, String)
 
+      # Output files this run actually wrote, as filesystem paths under the
+      # build output directory. The caller (AssetHooks) claims them so a
+      # `--cache` build — which never wipes the output directory — can drop
+      # the previous fingerprinted bundle instead of accumulating one file
+      # per edit in `public/assets/` forever.
+      getter written_paths : Array(String)
+
       # `sass_enabled` mirrors `[sass].enabled`: `.scss` bundle entries
       # compile through the built-in compiler only when the feature is on;
       # otherwise they concatenate verbatim (pre-Sass behavior, and the
       # escape hatch for sources outside the supported subset).
       def initialize(@config : Models::AssetsConfig, @base_url : String, @sass_enabled : Bool = false)
         @manifest = {} of String => String
+        @written_paths = [] of String
       end
 
       def process(output_dir : String)
@@ -42,8 +50,11 @@ module Hwaro
           Logger.warn "Asset pipeline: output_dir '#{@config.output_dir}' escapes the output directory; skipping asset processing."
           return
         end
-        Hwaro::Utils::FileSafe.mkdir_p(assets_output)
-
+        # The directory is created by `process_bundle` when a bundle actually
+        # has bytes to write. Creating it up front left an empty `assets/`
+        # in the output of every build that produced no bundle (all sources
+        # missing, or `bundles` empty) — a stray directory a cold build ships
+        # and a `--cache` build, which prunes emptied directories, does not.
         @config.bundles.each do |bundle|
           process_bundle(bundle, assets_output)
         end
@@ -124,6 +135,7 @@ module Hwaro
         end
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
         File.write(output_path, contents)
+        @written_paths << output_path
 
         # Record in manifest
         manifest_path = "/" + File.join(@config.output_dir, output_name)

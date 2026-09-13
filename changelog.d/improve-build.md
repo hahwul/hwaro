@@ -1,0 +1,14 @@
+### Fixed
+- `hwaro build` rejects unexpected positional arguments (`hwaro build mysite`) instead of silently ignoring them and building the current directory.
+- `--cache` builds no longer keep publishing files whose source is gone: a deleted `static/` file, a deleted `[content.files]`/raw file, and a page-bundle asset removed from its bundle are now dropped from the output directory, and fingerprinted asset bundles no longer accumulate one stale `main.<hash>.css` per edit.
+- `--cache`: a `static/` file that publishes to a page's URL (`static/about/index.html` beside `content/about.md`) no longer replaces that page's rendered HTML on a warm build — the page is re-rendered, exactly as on a cold build where the render runs after the static copy.
+- `--cache`: the stale-output prune never deletes a file the build itself wrote, so a `static/robots.txt` or `static/404.html` that shadows a generated file can be removed without taking the generated output with it.
+- `--cache`: a `static/` file that lands on an `aliases` redirect stub or a section's `/page/N/` pagination page no longer replaces it on warm builds — those files are written only by a render, so the owning page is re-rendered too.
+- `hwaro serve`: a static save that lands on a file a page renders escalates to a full rebuild instead of leaving the static bytes on that URL for the rest of the session.
+- `--stream --cache`: warm builds re-render cache-hit page content again, so `search.json`, `rss.xml` and taxonomy feeds no longer ship raw `{% shortcode %}` markup, unresolved `@/` links or un-prefixed subpath URLs.
+- A page whose `aliases` entry escapes the output directory is no longer counted in the build receipt's "not published" row or in `--json`'s `pages_not_published`; the page itself published fine. An alias refused for resolving outside the output directory now warns instead of vanishing silently.
+- A page bundle whose URL traverses out of the output directory no longer creates a stray directory beside it, and a bundle whose assets are all skipped no longer leaves an empty destination directory.
+- A failing `[build] hooks.pre` command now exits with `HWARO_E_CONFIG` (exit 3) and names the hook, instead of the `HWARO_E_INTERNAL` / exit 70 reserved for hwaro's own faults.
+- `--full` without `--cache` warns that it has no effect instead of silently doing nothing.
+- The asset pipeline no longer leaves an empty `assets/` directory in the output when no bundle is produced.
+- The listing-template source memo is keyed by the template snapshot itself rather than its `object_id`, so a reloaded snapshot at a recycled address can no longer serve the previous snapshot's cache-invalidation decisions.

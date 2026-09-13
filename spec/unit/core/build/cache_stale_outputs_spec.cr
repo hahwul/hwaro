@@ -218,6 +218,210 @@ describe "warm --cache builds" do
     end
   end
 
+  # Files with a SOURCE but no cache entry: `static/` copies,
+  # `[content.files]`/raw copies, page-bundle assets and the fingerprinted
+  # asset bundles. A cold build starts from an empty directory, so all of
+  # them vanish with their source; a warm `--cache` build kept publishing
+  # (and deploying) them forever.
+  describe "source-backed outputs with no cache entry" do
+    it "removes the copy of a deleted static file" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", "body{color:red}")
+        cached_build
+        File.exists?("public/css/site.css").should be_true
+
+        File.delete("static/css/site.css")
+        cached_build
+
+        File.exists?("public/css/site.css").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
+    it "keeps an unchanged static file that the warm build skipped copying" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", "body{color:red}")
+        cached_build
+        # Second warm build copies nothing (mtime+size match) — the claim must
+        # still be recorded, or the THIRD build would delete a live file.
+        cached_build
+        cached_build
+
+        File.exists?("public/css/site.css").should be_true
+        File.read("public/css/site.css").should eq("body{color:red}")
+      end
+    end
+
+    it "removes the copy of a deleted content file" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") +
+                                  "\n[content.files]\nallow_extensions = [\"txt\"]\n")
+        File.write("content/posts/notes.txt", "hello")
+        cached_build
+        File.exists?("public/posts/notes.txt").should be_true
+
+        File.delete("content/posts/notes.txt")
+        cached_build
+
+        File.exists?("public/posts/notes.txt").should be_false
+      end
+    end
+
+    it "removes a page bundle asset deleted from the bundle" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") +
+                                  "\n[content.files]\nallow_extensions = []\n")
+        FileUtils.mkdir_p("content/posts/bundle")
+        File.write("content/posts/bundle/index.md", "+++\ntitle = \"Bundle\"\n+++\nbody")
+        File.write("content/posts/bundle/pic.svg", "<svg/>")
+        cached_build
+        File.exists?("public/posts/bundle/pic.svg").should be_true
+
+        File.delete("content/posts/bundle/pic.svg")
+        cached_build
+
+        File.exists?("public/posts/bundle/pic.svg").should be_false
+        File.exists?("public/posts/bundle/index.html").should be_true
+      end
+    end
+
+    # A static file and a page can publish the SAME output path (the page
+    # render overwrites the copy). Dropping the static claim must not delete
+    # the file the page still writes — which is why the owned/still-written
+    # filter runs after the source-less list is folded in, not before.
+    it "keeps a path a page still writes when the static copy claiming it is deleted" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/posts/keep")
+        File.write("static/posts/keep/index.html", "<p>from static</p>")
+        cached_build
+        File.read("public/posts/keep/index.html").should contain("keep body")
+
+        File.delete("static/posts/keep/index.html")
+        cached_build
+
+        File.exists?("public/posts/keep/index.html").should be_true
+        File.read("public/posts/keep/index.html").should contain("keep body")
+      end
+    end
+
+    # `static/` is copied in the Initialize phase and the render runs after it,
+    # so a cold build lets the page win a shared output path. On a warm build
+    # the page is a cache hit and never re-renders, so the static copy's bytes
+    # replaced it — `public/posts/keep/index.html` served the static file.
+    it "re-renders a page whose output the static copy overwrote" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/posts/keep")
+        File.write("static/posts/keep/index.html", "<p>from static</p>")
+        cached_build
+        File.read("public/posts/keep/index.html").should contain("keep body")
+
+        File.write("static/posts/keep/index.html", "<p>from static v2</p>")
+        # The copy is skipped on size+mtime equality; make the change
+        # unambiguous rather than depend on filesystem timestamp granularity.
+        File.utime(Time.utc, Time.utc + 1.hour, "static/posts/keep/index.html")
+        cached_build
+
+        File.read("public/posts/keep/index.html").should contain("keep body")
+        File.read("public/posts/keep/index.html").should_not contain("from static")
+      end
+    end
+
+    # A static file and a GENERATED file can be the same file:
+    # `static/robots.txt` publishes exactly where the robots generator
+    # writes, and only the static side is claimed. Deleting the source must
+    # not take the generated output with it.
+    it "keeps a generated file that a deleted static file shadowed" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        File.write("static/robots.txt", "User-agent: custom\n")
+        File.write("templates/404.html", "<p>not found</p>")
+        File.write("static/404.html", "<p>static 404</p>")
+        cached_build
+        File.exists?("public/robots.txt").should be_true
+
+        File.delete("static/robots.txt")
+        File.delete("static/404.html")
+        cached_build
+
+        File.exists?("public/robots.txt").should be_true
+        File.read("public/robots.txt").should_not contain("custom")
+        File.exists?("public/404.html").should be_true
+        File.read("public/404.html").should contain("not found")
+      end
+    end
+
+    # An `aliases` redirect stub and a section's `/page/N/` pagination pages
+    # are written ONLY by a render, and the cache entry is the only record of
+    # them — so a `static/` file publishing to one of those paths replaced it
+    # outright on every warm build, the owning page being a cache hit.
+    it "re-renders a page whose alias stub the static copy overwrote" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/legacy")
+        File.write("static/legacy/index.html", "<p>STATIC LEGACY</p>")
+        cached_build
+        File.read("public/legacy/index.html").should contain("0; url=")
+
+        File.write("static/legacy/index.html", "<p>STATIC LEGACY v2</p>")
+        File.utime(Time.utc, Time.utc + 1.hour, "static/legacy/index.html")
+        cached_build
+
+        File.read("public/legacy/index.html").should contain("0; url=")
+        File.read("public/legacy/index.html").should_not contain("STATIC LEGACY")
+      end
+    end
+
+    it "re-renders a section whose pagination page the static copy overwrote" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") +
+                                  "\n[pagination]\nenabled = true\nper_page = 1\n")
+        FileUtils.mkdir_p("static/posts/page/2")
+        File.write("static/posts/page/2/index.html", "<p>STATIC P2</p>")
+        cached_build
+        File.read("public/posts/page/2/index.html").should contain("Posts")
+
+        File.write("static/posts/page/2/index.html", "<p>STATIC P2 v2</p>")
+        File.utime(Time.utc, Time.utc + 1.hour, "static/posts/page/2/index.html")
+        cached_build
+
+        File.read("public/posts/page/2/index.html").should contain("Posts")
+        File.read("public/posts/page/2/index.html").should_not contain("STATIC P2")
+      end
+    end
+
+    it "does not accumulate one fingerprinted asset bundle per edit" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", ".a{color:red}")
+        File.write("config.toml", File.read("config.toml") + <<-TOML)
+
+          [assets]
+          enabled = true
+          minify = false
+          fingerprint = true
+          source_dir = "static"
+          output_dir = "assets"
+
+          [[assets.bundles]]
+          name = "main.css"
+          files = ["css/site.css"]
+          TOML
+        cached_build
+        Dir.glob("public/assets/main.*.css").size.should eq(1)
+
+        File.write("static/css/site.css", ".b{color:blue}")
+        cached_build
+        File.write("static/css/site.css", ".c{color:green}")
+        cached_build
+
+        remaining = Dir.glob("public/assets/main.*.css")
+        remaining.size.should eq(1)
+        File.read(remaining.first).should contain(".c{color:green}")
+      end
+    end
+  end
+
   it "leaves an untouched page's output alone" do
     with_cached_site do
       cached_build

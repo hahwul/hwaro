@@ -44,6 +44,15 @@ module Hwaro
 
           AssetHooks.replace_manifest(pipeline.manifest)
 
+          # Fingerprinted bundle names change with their contents, and a
+          # `--cache` build keeps the output directory — so every CSS/JS edit
+          # used to leave the previous `main.<hash>.css` behind, published and
+          # deployed forever. Claiming what this build wrote lets the Finalize
+          # phase delete the ones it no longer writes.
+          if builder = ctx.builder
+            pipeline.written_paths.each { |path| builder.claim_generated_output(path) }
+          end
+
           if pipeline.manifest.size > 0
             Logger.info "  Assets: #{pipeline.manifest.size} bundle(s) processed."
           end

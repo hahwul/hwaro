@@ -14,6 +14,9 @@ module Hwaro::Core::Build::Phases::Render
     page_set_changed = cache.page_set_changed?(page_set_fp)
     section_set_changed = cache.section_set_changed?(section_set_fp)
     listing_memo = {} of String => Tuple(Bool, Bool)
+    # Resolved once for the static-collision gate below; nil (the common warm
+    # build, where no static file changed) skips the gate entirely.
+    static_cwd = static_copies_recorded? ? Dir.current : nil
     pages.select do |page|
       # A synthesized page has no source file to fingerprint and records no
       # cache entry (see record_page_cache_entry) — it is always dirty, so
@@ -21,6 +24,21 @@ module Hwaro::Core::Build::Phases::Render
       next true if page.synthesized?
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
+      # The static copy in the Initialize phase wrote a file this page owns (a
+      # `static/` path that collides with the page's URL). A cold build lets
+      # the render overwrite it; skipping the page here left the static bytes
+      # published in its place.
+      #
+      # `derived_paths` matters as much as the page's own output: an `aliases`
+      # redirect stub and a section's `/page/N/` pagination pages are written
+      # ONLY by a render, so `static/legacy/index.html` beside
+      # `aliases = ["/legacy/"]` replaced the stub outright on every warm
+      # build. The cache entry is the only record of those paths.
+      if cwd = static_cwd
+        next true if output_path && static_copied_output?(output_path, cwd)
+        next true if fmt_paths.any? { |path| static_copied_output?(path, cwd) }
+        next true if cache.derived_paths_for(source_path).any? { |path| static_copied_output?(path, cwd) }
+      end
       next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page))
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
@@ -86,11 +104,19 @@ module Hwaro::Core::Build::Phases::Render
   # Memoized per template set: this walks every template's closure and the
   # render phase asks for it on every build, cached or not.
   private def listing_source_union(templates : Hash(String, String)) : String
-    if (memo = @listing_source_union_memo) && @listing_source_union_memo_key == templates.object_id
+    if (memo = @listing_source_union_memo) && @listing_source_union_memo_key.same?(templates)
       return memo
     end
     result = compute_listing_source_union(templates)
-    @listing_source_union_memo_key = templates.object_id
+    # The KEY holds the hash itself, not its `object_id`. An id is only an
+    # address: the previous snapshot is unreachable the moment
+    # `load_templates` swaps in a new one, and a collected snapshot's address
+    # can be handed straight back to the replacement — at which point a
+    # serve-session template reload would read the PREVIOUS set's union and
+    # decide cache invalidation from templates that no longer exist. Keeping
+    # a reference makes the identity unforgeable (and pins exactly one dead
+    # snapshot, which the next reload releases).
+    @listing_source_union_memo_key = templates
     @listing_source_union_memo = result
     result
   end

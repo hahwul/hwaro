@@ -146,7 +146,11 @@ module Hwaro
       # moved and the page re-render below reported failure); true otherwise.
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
-        @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        # True when a copy landed on a file a page renders: the static-only
+        # strategy re-renders nothing, so the page's URL would serve the
+        # static bytes for the rest of the session. Escalated below, with the
+        # bundle-fingerprint case, to a full rebuild.
+        static_shadowed_page = @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
         # A user's own `static/.hwaro-dev` publishes like any hidden static
         # file, so the copy above can land on top of serve's stamp. Only the
         # full-build path re-stamps, so without this the dev dir would sit
@@ -186,6 +190,10 @@ module Hwaro
         # rebuild reuses the same options the watcher's :full strategy runs.
         if bundles_changed
           Logger.info "  Asset bundle fingerprints changed — rebuilding pages to update references."
+          return run_full_build(build_options)
+        end
+        if static_shadowed_page
+          Logger.info "  A static file publishes where a page renders — rebuilding so the page wins that path."
           return run_full_build(build_options)
         end
         true

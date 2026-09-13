@@ -228,6 +228,20 @@ module Hwaro
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
             CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+            # `hwaro build` takes no positional arguments. Without this the
+            # parser dropped them silently, so `hwaro build mysite` (the shape
+            # other generators accept) and `hwaro build content/post.md` both
+            # built the current directory and exited 0 — the user's argument
+            # having no effect and no diagnostic. Mirrors the `hwaro tool *`
+            # subcommands.
+            parser.unknown_args do |before_dash, after_dash|
+              unknown = before_dash + after_dash
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "unexpected extra argument(s): '#{unknown.join("', '")}'",
+                hint: "hwaro build accepts options only; use -i/--input DIR to build another directory.",
+              ) unless unknown.empty?
+            end
           end
 
           # `--no-parallel` renders on a single fiber, so a worker count has

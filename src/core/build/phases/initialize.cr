@@ -25,6 +25,10 @@ module Hwaro::Core::Build::Phases::Initialize
       # Source-less generated outputs are re-claimed from scratch every build;
       # the Finalize phase diffs this build's claims against the last one's.
       reset_generated_output_claims
+      reset_static_copied_outputs
+      # Before ANY write into the output directory (the static copy below is
+      # the first), so the Finalize prune can tell what this build produced.
+      mark_build_output_epoch
 
       if cache_enabled
         if ctx.options.full
@@ -34,6 +38,13 @@ module Hwaro::Core::Build::Phases::Initialize
           stats = build_cache.stats
           Logger.info "  Cache enabled (#{stats[:valid]} valid entries)"
         end
+      elsif ctx.options.full
+        # `--full` only means anything to the cache, and without `--cache`
+        # there is none to force past — a plain build already rebuilds
+        # everything. Silently accepting it let people believe they had
+        # cleared a `.hwaro_cache.json` that a later `--cache` build still
+        # reads.
+        Logger.warn "--full has no effect without --cache (a plain build already rebuilds everything); pass --cache --full to discard the existing cache."
       end
 
       # `preserve_output` keeps existing output files between rebuilds (used
@@ -418,6 +429,13 @@ module Hwaro::Core::Build::Phases::Initialize
       next if @config.try(&.sass_source?(relative))
 
       dest_path = File.join(output_dir, relative)
+      # Claimed BEFORE the unchanged-skip below: the claim list records what
+      # this build PUBLISHES, not what it copied. A `--cache` build never
+      # wipes the output directory and no cache entry covers a static file,
+      # so without the claim a file deleted from `static/` kept being served
+      # (and deployed) forever; with it, Finalize deletes exactly the copies
+      # whose source is gone (see Phases::Finalize#stale_generated_outputs).
+      claim_generated_output(dest_path)
       # `info` from above already carries the source mtime — re-statting
       # src_path here tripled the stat count over static/ on watch rebuilds.
       #
@@ -486,6 +504,11 @@ module Hwaro::Core::Build::Phases::Initialize
   private def copy_static_pairs(files_to_copy : Array({String, String, Time}))
     files_to_copy.each { |_, dest, _| Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest)) }
 
+    # One `getcwd` for the whole copy rather than one per file: the canonical
+    # form recorded below is only needed so filter_changed_pages can compare
+    # against `get_output_path` without expanding per page.
+    cwd = Dir.current
+
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(files_to_copy.size)
 
@@ -501,6 +524,12 @@ module Hwaro::Core::Build::Phases::Initialize
           src, dest, src_mtime = pair
           begin
             FileUtils.cp(src, dest)
+            # A page can render to this very path; the render runs after this
+            # copy and must win, which it only does if it is not skipped as a
+            # cache hit (see Builder#note_static_copy). Canonical form, so the
+            # comparison against `get_output_path` in filter_changed_pages
+            # needs no per-page expansion.
+            note_static_copy(File.expand_path(dest, cwd))
             # Stamp the source mtime onto the copy so the incremental skip in
             # collect_static_files can compare timestamps at all — that is what
             # makes a source whose mtime moved BACKWARDS (git checkout, stash

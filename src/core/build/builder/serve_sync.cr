@@ -44,11 +44,21 @@ module Hwaro
 
         # Copy only the specified static files to the output directory.
         # Used by serve mode when only static files have changed.
-        def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false)
+        #
+        # Returns true when one of the copies landed on a file a PAGE owns
+        # (`static/about/index.html` beside a page whose url is `/about/`).
+        # The static-only rebuild strategy re-renders nothing, so the static
+        # bytes would sit on that URL for the rest of the session; the caller
+        # escalates to a full rebuild, where the render runs after the copy
+        # and the page wins — exactly the cold-build outcome.
+        def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false) : Bool
           static_config = static_publish_config
           config = @config
           sass_on = config.try(&.sass.enabled) || false
           copied = 0
+          cwd = Dir.current
+          page_outputs = owned_output_paths(output_dir).map { |path| File.expand_path(path, cwd) }.to_set
+          shadowed = false
           changed_files.each do |src_path|
             # Same eligibility rule as the full build's collect_static_files
             # (phases/initialize.cr): a symlinked file whose target escapes
@@ -84,9 +94,16 @@ module Hwaro
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
             atomic_copy(src_path, dest_path)
+            # Recorded for the same reason the full build records its copies
+            # (see Builder#note_static_copy): a later `--cache`-filtered
+            # render must not skip the page whose output this just replaced.
+            canonical_dest = File.expand_path(dest_path, cwd)
+            note_static_copy(canonical_dest)
+            shadowed ||= page_outputs.includes?(canonical_dest)
             copied += 1
           end
           Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
+          shadowed
         end
 
         # Recompile all SCSS entries into the output directory. Used by

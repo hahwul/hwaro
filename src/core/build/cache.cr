@@ -250,9 +250,11 @@ module Hwaro
           invalidated = false
           output_key = Cache.output_dir_key(output_dir)
 
+          output_dir_changed = false
           if !@metadata.output_dir.empty? && !output_key.empty? && @metadata.output_dir != output_key
             Logger.info "  Cache: output directory changed — invalidating all entries."
             invalidated = true
+            output_dir_changed = true
           end
 
           if invalidate_on_template_change && !@metadata.template_hash.empty? && @metadata.template_hash != template_hash
@@ -267,6 +269,16 @@ module Hwaro
 
           if invalidated
             @mutex.synchronize { discard_entries_recording_outputs }
+          end
+
+          # The generated-output claims are paths RELATIVE to the output
+          # directory, so they are meaningless once that directory changes:
+          # rejoined against the new one they name files a different tree
+          # holds. Alternating `-o dist` and `-o preview` would otherwise let
+          # the first build in each tree delete whatever the other tree
+          # happened to have at the same relative path.
+          if output_dir_changed
+            @mutex.synchronize { @metadata.generated_outputs = [] of String }
           end
 
           if invalidated || @metadata.template_hash != template_hash || @metadata.config_hash != config_hash
@@ -397,6 +409,15 @@ module Hwaro
         # (see `Builder#stale_outputs_for_removed`).
         def output_paths_for(file_path : String) : Array(String)
           @mutex.synchronize { @entries[file_path]?.try(&.output_paths) || [] of String }
+        end
+
+        # Files this page wrote BESIDES its own output on the last build — its
+        # `aliases` redirect stubs and a section's `/page/N/` pagination pages
+        # (see `CacheEntry#derived_paths`). They are produced only by a render,
+        # so a caller that needs to know whether something else has since
+        # overwritten one has to ask for them by name.
+        def derived_paths_for(file_path : String) : Array(String)
+          @mutex.synchronize { @entries[file_path]?.try(&.derived_paths) || [] of String }
         end
 
         # The source-less generated outputs the LAST build recorded, and the

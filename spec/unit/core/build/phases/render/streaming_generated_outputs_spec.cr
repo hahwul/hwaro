@@ -79,6 +79,48 @@ describe "streaming build generated outputs" do
     end
   end
 
+  # Warm `--stream --cache`. The hydration pass that re-produces `page.content`
+  # for cache-hit pages was gated on `!streaming?`, so this combination shipped
+  # raw `{% alert %}` markup and unresolved `@/` links into search.json and
+  # every feed — the same corruption the specs above cover for the cold
+  # streamed build, on the one mode still doing it.
+  it "expands shortcodes for cache-hit pages on a warm --stream --cache build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", STREAM_CONFIG)
+        STREAM_CONTENT.each do |path, body|
+          full = File.join("content", path)
+          FileUtils.mkdir_p(File.dirname(full))
+          File.write(full, body)
+        end
+
+        run = -> do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new(
+            output_dir: "public", parallel: false, highlight: false,
+            cache: true, stream: true,
+          )).should be_true
+        end
+
+        run.call
+        # Touch ONE page so the second build still regenerates the feed and
+        # the index while every other page is a cache hit.
+        File.write("content/posts/two.md", File.read("content/posts/two.md") + "\n\nMore.")
+        run.call
+
+        rss = File.read(File.join("public", "rss.xml"))
+        rss.should_not contain("{% alert")
+        rss.should contain(%(<div class="sc-alert sc-alert--tip"))
+        rss.should_not contain("@/posts/two.md")
+
+        index = File.read(File.join("public", "search.json"))
+        index.should_not contain("{% alert")
+        index.should contain("Body text.")
+      end
+    end
+  end
+
   # The release is still made where it is sound: with no search index and no
   # feed of any kind, nothing reads `page.content` after the Render phase.
   it "still releases page content when no generator reads it" do

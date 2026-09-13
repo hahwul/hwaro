@@ -114,8 +114,17 @@ a tag nobody uses any more (with that term's feed), and the pagination page a
 section no longer fills. Turning a whole feature off — `[amp] enabled = false`
 — removes what it used to publish on the next build for the same reason.
 
+Files that have a source but no cache entry are covered the same way, by
+recording what each build publishes and deleting what the next one no longer
+does: `static/` copies, `[content.files]` and raw (`.json`/`.xml`) copies,
+page-bundle assets, and the fingerprinted asset bundles — so editing a
+stylesheet replaces `main.<hash>.css` instead of leaving every past revision
+in `public/assets/`.
+
 A `--cache` build's output is therefore byte-identical to a clean build's, and
-`hwaro build --full` is not needed to clear anything.
+`hwaro build --full` is not needed to clear anything. (`--full` only clears the
+cache, so it does nothing at all without `--cache`; a plain `hwaro build`
+already rebuilds everything.)
 
 ## Cache File
 

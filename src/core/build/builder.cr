@@ -266,9 +266,11 @@ module Hwaro
         # receipt cannot claim a page that never reached disk. Atomic because
         # the render fan-out increments it from worker fibers.
         # Memo for the listing-template source union (see Phases::Render).
-        # Keyed by the templates Hash identity so a template reload recomputes.
+        # Keyed by the templates Hash ITSELF (compared with `same?`) so a
+        # template reload recomputes — an `object_id` would let a recycled
+        # address serve the previous snapshot's union.
         @listing_source_union_memo : String? = nil
-        @listing_source_union_memo_key : UInt64 = 0_u64
+        @listing_source_union_memo_key : Hash(String, String)? = nil
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve
@@ -318,6 +320,33 @@ module Hwaro
         # phase; guarded because taxonomy rendering fans out.
         @generated_output_claims : Set(String) = Set(String).new
         @generated_claims_mutex : Mutex = Mutex.new
+        # Output files the static copy actually (re)wrote this build, in the
+        # canonical absolute form `get_output_path` produces. `static/` is
+        # copied in the Initialize phase and the render phase runs after it,
+        # so on a cold build a page always wins a shared path
+        # (`static/about/index.html` vs `content/about.md`). On a warm
+        # `--cache` build the page is a cache hit and never re-renders, so the
+        # static copy's bytes REPLACED the page — `public/about/index.html`
+        # served the static file until an unrelated edit. Pages whose output
+        # this set names are forced back through the render (see
+        # filter_changed_pages), which restores the cold build's outcome.
+        @static_copied_outputs : Set(String) = Set(String).new
+        @static_copied_mutex : Mutex = Mutex.new
+        # Wall clock at the moment this build started writing into the output
+        # directory. The Finalize prune refuses to delete anything modified
+        # at or after it: whatever this build WROTE is live by definition,
+        # whether or not any bookkeeping claims it. That is what keeps a
+        # shadowed generator output safe — `static/robots.txt` and the
+        # generated `robots.txt` are the same file, so dropping the static
+        # claim when the source is deleted would otherwise take the generated
+        # one with it.
+        #
+        # nil until `mark_build_output_epoch` stamps it, which the Initialize
+        # phase does before the first write. Unstamped means "no build has
+        # written here", and the guard then protects nothing — a caller that
+        # drives the Finalize phase without a build (unit specs) gets exactly
+        # the pruning contract it asks for.
+        @build_output_epoch : Time? = nil
         # Files a page wrote BESIDES its own output: its `aliases` redirect
         # stubs and, for a section, its `/page/N/` pagination pages. Both are
         # produced by the render pass, so a warm `--cache` build that skips a
@@ -349,6 +378,81 @@ module Hwaro
 
         def reset_generated_output_claims : Nil
           @generated_claims_mutex.synchronize { @generated_output_claims.clear }
+        end
+
+        # Record an output file the static copy just wrote over (see
+        # `@static_copied_outputs`). Public because the serve watcher's
+        # static-only lane (`copy_changed_static`) copies through the builder
+        # too and must record what it wrote for the same reason. `path` must
+        # already be canonical — see `static_copied_output?`.
+        def note_static_copy(path : String) : Nil
+          @static_copied_mutex.synchronize { @static_copied_outputs << path }
+        end
+
+        # Did the static copy write anything at all this build? The gate in
+        # filter_changed_pages resolves paths against the working directory,
+        # and this lets it skip that work entirely on the common warm build
+        # where no static file changed.
+        def static_copies_recorded? : Bool
+          @static_copied_mutex.synchronize { !@static_copied_outputs.empty? }
+        end
+
+        # `path` may arrive in any spelling — `get_output_path` hands back the
+        # canonical absolute form while alias/pagination paths are built by
+        # joining the output directory — so it is resolved against `cwd` (the
+        # caller's, resolved once) before the lookup.
+        def static_copied_output?(path : String, cwd : String) : Bool
+          @static_copied_mutex.synchronize do
+            return false if @static_copied_outputs.empty?
+            @static_copied_outputs.includes?(File.expand_path(path, cwd))
+          end
+        end
+
+        def reset_static_copied_outputs : Nil
+          @static_copied_mutex.synchronize { @static_copied_outputs.clear }
+        end
+
+        # Stamp the start of this build's output writing (see
+        # `@build_output_epoch`).
+        def mark_build_output_epoch : Nil
+          @build_output_epoch = Time.utc
+        end
+
+        # True when `path` was (re)written by this build.
+        #
+        # Exact on every filesystem with sub-second mtimes (APFS, ext4, btrfs,
+        # NTFS, xfs): a previous build's file is stamped strictly before this
+        # build's epoch, and everything this build writes strictly after. The
+        # comparison carries NO slack on purpose — a slack wide enough to
+        # cover a coarse filesystem is also wide enough to protect the
+        # previous build's output, which would disable pruning outright for
+        # any two builds run seconds apart.
+        #
+        # On a filesystem that truncates mtimes to whole seconds a shadowed
+        # generator file written in the epoch's own second can read as older
+        # and be pruned. That is self-healing: the path leaves the claim list
+        # with it, and the next build's generator finds the file missing and
+        # writes it again.
+        #
+        # Widening the comparison (a slack, or truncating the epoch to its own
+        # second) trades that for a PERMANENT failure instead. A path the
+        # prune skips is not re-claimed by the build that skipped it, so it
+        # never appears in a later build's stale list either — the leftover
+        # stays published forever. Two builds run seconds apart are ordinary,
+        # so the widened form also protects the PREVIOUS build's output as a
+        # matter of course: both widenings were measured against
+        # cache_stale_outputs_spec and disable pruning outright (12+ of its 22
+        # examples). Erring toward pruning is the recoverable direction.
+        #
+        # The stamped copies (static files, bundle assets — `File.utime` with
+        # the SOURCE mtime) deliberately read as old, and they are exactly the
+        # ones a live claim already protects.
+        def written_this_build?(path : String) : Bool
+          epoch = @build_output_epoch
+          return false unless epoch
+          info = File.info?(path)
+          return false unless info
+          info.modification_time >= epoch
         end
 
         # Record an alias stub / pagination page `page` just wrote.
@@ -533,8 +637,18 @@ module Hwaro
           # Run pre-build hooks
           unless pre_hooks.empty?
             unless Utils::CommandRunner.run_pre_hooks(pre_hooks)
-              Logger.error "Build aborted due to pre-build hook failure."
-              return false
+              # Classified, not `return false`. Returning false made the CLI
+              # synthesize HWARO_E_INTERNAL / exit 70 — the code reserved for
+              # hwaro's own bugs — for a user command listed in config.toml
+              # exiting non-zero, so CI that alerts on internal faults fired
+              # on `npm run build` failing. `hwaro serve` treats a raise and a
+              # false the same way (see Server#apply_changeset), so the dev
+              # loop is unaffected.
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONFIG,
+                message: "Build aborted: a [build] hooks.pre command failed (see the command output above).",
+                hint: "Fix the failing command, or remove it from hooks.pre in config.toml.",
+              )
             end
           end
 
