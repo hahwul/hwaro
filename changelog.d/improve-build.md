@@ -1,6 +1,7 @@
 ### Fixed
 - `hwaro build` rejects unexpected positional arguments (`hwaro build mysite`) instead of silently ignoring them and building the current directory.
 - `--cache` builds no longer keep publishing files whose source is gone: a deleted `static/` file, a deleted `[content.files]`/raw file, and a page-bundle asset removed from its bundle are now dropped from the output directory, and fingerprinted asset bundles no longer accumulate one stale `main.<hash>.css` per edit.
+- `--cache`: a `static/` file that publishes to a page's URL (`static/about/index.html` beside `content/about.md`) no longer replaces that page's rendered HTML on a warm build — the page is re-rendered, exactly as on a cold build where the render runs after the static copy.
 - `--stream --cache`: warm builds re-render cache-hit page content again, so `search.json`, `rss.xml` and taxonomy feeds no longer ship raw `{% shortcode %}` markup, unresolved `@/` links or un-prefixed subpath URLs.
 - A page whose `aliases` entry escapes the output directory is no longer counted in the build receipt's "not published" row or in `--json`'s `pages_not_published`; the page itself published fine. An alias refused for resolving outside the output directory now warns instead of vanishing silently.
 - A page bundle whose URL traverses out of the output directory no longer creates a stray directory beside it, and a bundle whose assets are all skipped no longer leaves an empty destination directory.

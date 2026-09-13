@@ -25,6 +25,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # Source-less generated outputs are re-claimed from scratch every build;
       # the Finalize phase diffs this build's claims against the last one's.
       reset_generated_output_claims
+      reset_static_copied_outputs
 
       if cache_enabled
         if ctx.options.full
@@ -515,6 +516,12 @@ module Hwaro::Core::Build::Phases::Initialize
           src, dest, src_mtime = pair
           begin
             FileUtils.cp(src, dest)
+            # A page can render to this very path; the render runs after this
+            # copy and must win, which it only does if it is not skipped as a
+            # cache hit (see Builder#note_static_copy). Canonical form, so the
+            # comparison against `get_output_path` in filter_changed_pages
+            # needs no per-page expansion.
+            note_static_copy(File.expand_path(dest))
             # Stamp the source mtime onto the copy so the incremental skip in
             # collect_static_files can compare timestamps at all — that is what
             # makes a source whose mtime moved BACKWARDS (git checkout, stash

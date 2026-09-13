@@ -21,6 +21,12 @@ module Hwaro::Core::Build::Phases::Render
       next true if page.synthesized?
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
+      # The static copy in the Initialize phase wrote this page's output file
+      # (a `static/` path that collides with the page's URL). A cold build
+      # lets the render overwrite it; skipping the page here left the static
+      # bytes published in its place.
+      next true if output_path && static_copied_output?(output_path)
+      next true if fmt_paths.any? { |path| static_copied_output?(path) }
       next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page))
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.

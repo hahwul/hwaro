@@ -287,6 +287,47 @@ describe "warm --cache builds" do
       end
     end
 
+    # A static file and a page can publish the SAME output path (the page
+    # render overwrites the copy). Dropping the static claim must not delete
+    # the file the page still writes — which is why the owned/still-written
+    # filter runs after the source-less list is folded in, not before.
+    it "keeps a path a page still writes when the static copy claiming it is deleted" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/posts/keep")
+        File.write("static/posts/keep/index.html", "<p>from static</p>")
+        cached_build
+        File.read("public/posts/keep/index.html").should contain("keep body")
+
+        File.delete("static/posts/keep/index.html")
+        cached_build
+
+        File.exists?("public/posts/keep/index.html").should be_true
+        File.read("public/posts/keep/index.html").should contain("keep body")
+      end
+    end
+
+    # `static/` is copied in the Initialize phase and the render runs after it,
+    # so a cold build lets the page win a shared output path. On a warm build
+    # the page is a cache hit and never re-renders, so the static copy's bytes
+    # replaced it — `public/posts/keep/index.html` served the static file.
+    it "re-renders a page whose output the static copy overwrote" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/posts/keep")
+        File.write("static/posts/keep/index.html", "<p>from static</p>")
+        cached_build
+        File.read("public/posts/keep/index.html").should contain("keep body")
+
+        File.write("static/posts/keep/index.html", "<p>from static v2</p>")
+        # The copy is skipped on size+mtime equality; make the change
+        # unambiguous rather than depend on filesystem timestamp granularity.
+        File.utime(Time.utc, Time.utc + 1.hour, "static/posts/keep/index.html")
+        cached_build
+
+        File.read("public/posts/keep/index.html").should contain("keep body")
+        File.read("public/posts/keep/index.html").should_not contain("from static")
+      end
+    end
+
     it "does not accumulate one fingerprinted asset bundle per edit" do
       with_cached_site do
         FileUtils.mkdir_p("static/css")

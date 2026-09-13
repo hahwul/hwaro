@@ -320,6 +320,18 @@ module Hwaro
         # phase; guarded because taxonomy rendering fans out.
         @generated_output_claims : Set(String) = Set(String).new
         @generated_claims_mutex : Mutex = Mutex.new
+        # Output files the static copy actually (re)wrote this build, in the
+        # canonical absolute form `get_output_path` produces. `static/` is
+        # copied in the Initialize phase and the render phase runs after it,
+        # so on a cold build a page always wins a shared path
+        # (`static/about/index.html` vs `content/about.md`). On a warm
+        # `--cache` build the page is a cache hit and never re-renders, so the
+        # static copy's bytes REPLACED the page — `public/about/index.html`
+        # served the static file until an unrelated edit. Pages whose output
+        # this set names are forced back through the render (see
+        # filter_changed_pages), which restores the cold build's outcome.
+        @static_copied_outputs : Set(String) = Set(String).new
+        @static_copied_mutex : Mutex = Mutex.new
         # Files a page wrote BESIDES its own output: its `aliases` redirect
         # stubs and, for a section, its `/page/N/` pagination pages. Both are
         # produced by the render pass, so a warm `--cache` build that skips a
@@ -351,6 +363,25 @@ module Hwaro
 
         def reset_generated_output_claims : Nil
           @generated_claims_mutex.synchronize { @generated_output_claims.clear }
+        end
+
+        # Record an output file the static copy just wrote over (see
+        # `@static_copied_outputs`). Public for the same reason
+        # `claim_generated_output` is: the serve watcher's static-only lane
+        # copies through the builder too.
+        def note_static_copy(path : String) : Nil
+          @static_copied_mutex.synchronize { @static_copied_outputs << path }
+        end
+
+        def static_copied_output?(path : String) : Bool
+          @static_copied_mutex.synchronize do
+            return false if @static_copied_outputs.empty?
+            @static_copied_outputs.includes?(path)
+          end
+        end
+
+        def reset_static_copied_outputs : Nil
+          @static_copied_mutex.synchronize { @static_copied_outputs.clear }
         end
 
         # Record an alias stub / pagination page `page` just wrote.

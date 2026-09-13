@@ -69,7 +69,7 @@ module Hwaro::Core::Build::Phases::Finalize
       source, output = cache_paths_for(page, output_dir)
       next unless output
       live << source
-      collect_page_output_paths(page, output_dir).each { |path| owned << path }
+      collect_page_output_paths(page, output_dir).each { |path| owned << protected_output_key(path) }
     end
 
     # Entries that survived but moved (a `slug`/`path`/permalink edit) leave
@@ -79,20 +79,39 @@ module Hwaro::Core::Build::Phases::Finalize
     # Everything this build still claims survives: the pages' own outputs, and
     # every file the surviving cache entries record. That second set is what
     # keeps a whole-cache invalidation — a config edit, `--full` — from
-    # deleting files it only discarded the bookkeeping for, so it has to be
-    # applied BEFORE the source-less lists are added.
-    still_written = build_cache.current_output_files
+    # deleting files it only discarded the bookkeeping for.
+    still_written = build_cache.current_output_files.map { |path| protected_output_key(path) }.to_set
     stale.concat(stale_generated_outputs(build_cache, output_dir))
-    # Filtered AFTER the source-less list is added, not before. A claimed
-    # path and a page output can name the same file (a `static/` file the
-    # site later publishes as a page, an asset bundle moved under a page's
-    # URL), and a file this build WROTE must never be deleted because some
-    # other bookkeeping stopped claiming it.
-    stale.reject! { |path| owned.includes?(path) || still_written.includes?(path) }
+    # Filtered AFTER the source-less list is added, not before. A claimed path
+    # and a page output can name the same file — `static/posts/x/index.html`
+    # publishes exactly where the page `posts/x.md` renders — and a file this
+    # build WROTE must never be deleted because some other bookkeeping stopped
+    # claiming it.
+    stale.reject! do |path|
+      key = protected_output_key(path)
+      owned.includes?(key) || still_written.includes?(key)
+    end
     stale.uniq!
     return if stale.empty?
 
     delete_orphaned_outputs(stale, output_dir)
+  end
+
+  # Comparison key for "is this file still written by this build?".
+  #
+  # The two sides reach this filter in different spellings: cache entries and
+  # `get_output_path` store the ABSOLUTE path `OutputGuard.safe_output_path`
+  # canonicalizes to, while the generated-output claims are rebuilt from paths
+  # stored relative to the output directory. Comparing them verbatim silently
+  # matched nothing, so a static copy and the page that publishes the same URL
+  # could not protect each other. A path with no canonical form (an embedded
+  # NUL — `expand_path` raises) falls back to itself: it matches nothing,
+  # which leaves it in the stale list where `delete_orphaned_outputs`'s own
+  # containment guard is the decider.
+  private def protected_output_key(path : String) : String
+    File.expand_path(path)
+  rescue ArgumentError
+    path
   end
 
   # The source-less generated outputs the previous build produced and this one
