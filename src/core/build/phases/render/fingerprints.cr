@@ -10,6 +10,61 @@ module Hwaro::Core::Build::Phases::Render
   PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__", "version_links", "versions"]
   SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__"]
 
+  # The same markers split into the PROJECTIONS of the page set they actually
+  # read. `filter_changed_pages` already distinguishes two (pages vs
+  # sections); the serve watch path needs it finer.
+  #
+  # Why only there: a nav partial in the shared base layout puts `get_menu` in
+  # EVERY page's closure, and `{{ get_taxonomy_url(...) }}` tag pills put
+  # `get_taxonomy` in every post's. Gating those on the BROAD page-set digest
+  # answers "re-render the whole site" for any metadata edit — fine for a
+  # cached full build, which re-renders the union anyway, and fatal for a dev
+  # server's save→reload loop. Each class below is paired with a digest of
+  # exactly what it reads (see compute_menu_set_fingerprint /
+  # compute_taxonomy_slug_fingerprint), so a nav only re-renders when a menu
+  # entry moves and a tag pill only when the term set does.
+  MENU_SET_MARKERS = ["site.menus", "get_menu", "__menus__"]
+  # `get_taxonomy_url(kind:, term:)` resolves one term→slug from the
+  # disambiguated map; it never touches a term's pages. `get_taxonomy` does,
+  # which is why the lookahead keeps them apart — plain `includes?` cannot,
+  # since one name is a prefix of the other.
+  TAXONOMY_URL_MARKER = "get_taxonomy_url"
+  GET_TAXONOMY_RE     = /get_taxonomy(?!_url)/
+
+  LISTING_PAGE_MARKERS    = PAGE_SET_MARKERS - MENU_SET_MARKERS
+  LISTING_SECTION_MARKERS = SECTION_SET_MARKERS - MENU_SET_MARKERS
+
+  # Which page-set projections one entry template's closure reads.
+  record ListingSetDeps,
+    page : Bool,
+    section : Bool,
+    menu : Bool,
+    taxonomy_slug : Bool
+
+  # Per-entry-template projection scan for the serve fan-out. Same closure
+  # (and same tracking-off fallback) as `listing_template_deps`, split by
+  # projection — see the marker constants above.
+  private def listing_set_deps(entry_template : String, templates : Hash(String, String)) : ListingSetDeps
+    blob = listing_closure_blob(entry_template, templates)
+    ListingSetDeps.new(
+      page: LISTING_PAGE_MARKERS.any? do |marker|
+        marker == "get_taxonomy" ? GET_TAXONOMY_RE.matches?(blob) : blob.includes?(marker)
+      end,
+      section: LISTING_SECTION_MARKERS.any? { |marker| blob.includes?(marker) },
+      menu: MENU_SET_MARKERS.any? { |marker| blob.includes?(marker) },
+      taxonomy_slug: blob.includes?(TAXONOMY_URL_MARKER),
+    )
+  end
+
+  private def listing_closure_blob(entry_template : String, templates : Hash(String, String)) : String
+    sources = if deps = @template_deps
+                deps.closure(entry_template).compact_map { |n| templates[n]? }
+              else
+                templates.values
+              end
+    sources.join("\n")
+  end
+
   private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site, page_set_fp : String = "", section_set_fp : String = "") : Array(Models::Page)
     page_set_changed = cache.page_set_changed?(page_set_fp)
     section_set_changed = cache.section_set_changed?(section_set_fp)
@@ -56,12 +111,7 @@ module Hwaro::Core::Build::Phases::Render
   # Returns {depends_on_page_set, depends_on_section_set}. With dependency
   # tracking off, conservatively scans all templates.
   private def listing_template_deps(entry_template : String, templates : Hash(String, String)) : Tuple(Bool, Bool)
-    sources = if deps = @template_deps
-                deps.closure(entry_template).compact_map { |n| templates[n]? }
-              else
-                templates.values
-              end
-    blob = sources.join("\n")
+    blob = listing_closure_blob(entry_template, templates)
     {PAGE_SET_MARKERS.any? { |m| blob.includes?(m) }, SECTION_SET_MARKERS.any? { |m| blob.includes?(m) }}
   end
 
@@ -302,6 +352,58 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, s.paginate.try(&.to_s) || "-")
       fp_list(digest, s.assets.sort)
       fp_menus(digest, s.menus)
+    end
+    digest.final.hexstring
+  end
+
+  # Fingerprint the MENU projection of the page set: everything
+  # `Content::Menus.build` reads off content when it assembles
+  # `site.menus` / `get_menu`.
+  #
+  # Far narrower than the page set — only pages that carry a `[menu]`
+  # registration contribute, and only through the fields an entry is built
+  # from (`reg.name || p.title`, `p.url`, plus the gates `Menus.build`
+  # applies: `render`, language, version). A page gaining or losing a
+  # registration changes the number of folded entries, so membership moves
+  # too. Config `[[menus.*]]` entries are not folded: a config edit forces a
+  # full rebuild before this is ever consulted.
+  private def compute_menu_set_fingerprint(pages : Array(Models::Page), sections : Array(Models::Section)) : String
+    digest = Digest::MD5.new
+    (pages + sections).each do |p|
+      next if p.menus.empty?
+      fp_value(digest, p.path)
+      fp_value(digest, p.url)
+      fp_value(digest, p.title)
+      fp_value(digest, p.render ? "1" : "0")
+      fp_value(digest, p.language || "")
+      fp_value(digest, p.version.try(&.name) || "")
+      fp_menus(digest, p.menus)
+    end
+    digest.final.hexstring
+  end
+
+  # Fingerprint the TAXONOMY-SLUG projection: the term→slug map
+  # `get_taxonomy_url` resolves against (`__taxonomy_slugs__` /
+  # `__taxonomy_lang_slugs__` in build_global_vars).
+  #
+  # Those maps are disambiguated over the terms that actually get a page
+  # written, so the inputs are the term names per taxonomy plus, per term,
+  # which languages have a non-draft, non-generated page carrying it. A post's
+  # title or body can move neither, which is the point: tag pills sit in every
+  # post's template and must not drag the whole site into a re-render.
+  private def compute_taxonomy_slug_fingerprint(site : Models::Site) : String
+    digest = Digest::MD5.new
+    site.taxonomies.keys.sort!.each do |name|
+      fp_value(digest, name)
+      terms = site.taxonomies[name]
+      term_names = terms.keys.sort!
+      fp_list(digest, term_names)
+      term_names.each do |term|
+        languages = terms[term].compact_map do |p|
+          p.draft || p.generated ? nil : (p.language || "")
+        end
+        fp_list(digest, languages.uniq!.sort!)
+      end
     end
     digest.final.hexstring
   end

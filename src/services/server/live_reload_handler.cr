@@ -401,20 +401,15 @@ module Hwaro
         context.response.print(injected)
       end
 
-      # Mirrors HTTP::StaticFileHandler's own canonicalisation test (decode
-      # once, `Path.posix(...).expand("/")`, compare as Path) — the same
-      # shape as BasePathHandler#noncanonical_target — so this defers when
-      # and only when stdlib would redirect. Unservable paths are refused
-      # upstream (and `Path.posix` raises on NUL), so they are excluded
-      # before anything here can raise.
+      # Mirrors HTTP::StaticFileHandler's own canonicalisation test — see
+      # `DevPath.canonical_target`, the single definition the redirect
+      # pre-empts in IndexRewriteHandler and BasePathHandler share — so this
+      # defers when and only when stdlib would redirect. Both of those run
+      # above this handler in the chain, so in the assembled server a
+      # non-canonical path never reaches here; the guard stays because the
+      # injector is also constructed standalone (NotFoundHandler's 404 body).
       private def noncanonical_request?(path : String) : Bool
-        return false if DevPath.unservable?(path)
-
-        decoded = URI.decode(path)
-        return false unless decoded.valid_encoding?
-
-        request_path = Path.posix(decoded)
-        request_path != request_path.expand("/")
+        !DevPath.canonical_target(path).nil?
       end
 
       def inject_script(html : String) : String

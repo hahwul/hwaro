@@ -146,11 +146,17 @@ module Hwaro
       # moved and the page re-render below reported failure); true otherwise.
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
+        # Only `static/` publishes verbatim. The bucket can also carry files
+        # from a config-resolved `[assets] source_dir` (see
+        # Server#extra_watch_root?), which reach the output only by way of the
+        # bundle pipeline below — handing them to copy_changed_static would
+        # compute a `../`-relative destination and log a warning for every save.
+        static_sources = changeset.modified_static.select(&.starts_with?("static/"))
         # True when a copy landed on a file a page renders: the static-only
         # strategy re-renders nothing, so the page's URL would serve the
         # static bytes for the rest of the session. Escalated below, with the
         # bundle-fingerprint case, to a full rebuild.
-        static_shadowed_page = @builder.copy_changed_static(changeset.modified_static, output_dir, build_options.verbose)
+        static_shadowed_page = @builder.copy_changed_static(static_sources, output_dir, build_options.verbose)
         # A user's own `static/.hwaro-dev` publishes like any hidden static
         # file, so the copy above can land on top of serve's stamp. Only the
         # full-build path re-stamps, so without this the dev dir would sit
@@ -162,7 +168,7 @@ module Hwaro
         # alone left variants stale for the whole serve session (A12).
         unless build_options.skip_image_processing
           if config = @builder.config
-            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changeset.modified_static, config, output_dir)
+            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(static_sources, config, output_dir)
           end
         end
         # SCSS sources never publish verbatim — when one changed, recompile
@@ -225,6 +231,14 @@ module Hwaro
           @builder.run(build_options)
         ensure
           note_config_rewrites(before)
+          # A config edit can move `[assets] source_dir`; the build just
+          # reloaded the config, so this is the moment the watcher learns
+          # where the bundle sources now live. (Files under a newly added root
+          # read as additions on the next poll, which costs one more full
+          # rebuild — the honest price of the root having changed.)
+          @builder.config.try do |cfg|
+            @extra_watch_roots = resolve_extra_watch_roots(cfg, sanitize_output_dir(build_options.output_dir))
+          end
         end
       end
     end

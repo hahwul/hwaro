@@ -288,7 +288,7 @@ describe Hwaro::Services::IndexRewriteHandler do
     end
   end
 
-  it "does not redirect traversal attempts" do
+  it "collapses a traversal attempt to a root-relative target" do
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "legit"))
 
@@ -303,8 +303,13 @@ describe Hwaro::Services::IndexRewriteHandler do
 
       handler.call(context)
 
-      # Should not issue a redirect for traversal paths
-      dummy.called.should be_true
+      # The canonicalising pre-empt answers this (it is what
+      # HTTP::StaticFileHandler would otherwise emit further down the chain),
+      # and the target it names is inside the document root: `..` segments are
+      # collapsed, never honored. Nothing ever redirects out of the root.
+      response.status_code.should eq(302)
+      response.headers["Location"].should eq("/etc")
+      dummy.called.should be_false
     end
   end
 
@@ -323,6 +328,62 @@ describe Hwaro::Services::IndexRewriteHandler do
 
       request.path.should eq("/some/file.html")
       dummy.called.should be_true
+    end
+  end
+
+  # A non-canonical DIRECTORY url used to reach HTTP::StaticFileHandler with
+  # the `/` → `/index.html` rewrite already applied, so its canonicalising
+  # redirect named `/posts/index.html` — a URL the site never links to and no
+  # static host produces. The pre-empt has to win before the rewrite.
+  it "canonicalises a non-canonical directory url without leaking index.html" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "index.html"), "<html></html>")
+
+      {"//posts/", "/posts//", "/./posts/", "/a/../posts/"}.each do |path|
+        handler = Hwaro::Services::IndexRewriteHandler.new(dir)
+        dummy = DummyHandler.new
+        handler.next = dummy
+
+        request = HTTP::Request.new("GET", path)
+        response = HTTP::Server::Response.new(IO::Memory.new)
+        handler.call(HTTP::Server::Context.new(request, response))
+
+        response.status_code.should eq(302)
+        response.headers["Location"].should eq("/posts/")
+        dummy.called.should be_false
+      end
+    end
+  end
+
+  it "keeps the query string on a canonicalising redirect" do
+    Dir.mktmpdir do |dir|
+      handler = Hwaro::Services::IndexRewriteHandler.new(dir)
+      handler.next = DummyHandler.new
+
+      request = HTTP::Request.new("GET", "//search/?q=term")
+      response = HTTP::Server::Response.new(IO::Memory.new)
+      handler.call(HTTP::Server::Context.new(request, response))
+
+      response.status_code.should eq(302)
+      response.headers["Location"].should eq("/search/?q=term")
+    end
+  end
+
+  # Declined here so UnservablePathHandler's 404 stands: canonicalising an
+  # undecodable path is how the U+FFFD `Location` was produced.
+  it "declines to canonicalise an unservable path" do
+    Dir.mktmpdir do |dir|
+      handler = Hwaro::Services::IndexRewriteHandler.new(dir)
+      dummy = DummyHandler.new
+      handler.next = dummy
+
+      request = HTTP::Request.new("GET", "//%c0%ae%c0%ae/")
+      response = HTTP::Server::Response.new(IO::Memory.new)
+      handler.call(HTTP::Server::Context.new(request, response))
+
+      dummy.called.should be_true
+      response.headers["Location"]?.should be_nil
     end
   end
 end

@@ -1,0 +1,8 @@
+### Fixed
+- `hwaro serve` re-renders pages that print a global listing — the homepage's "latest posts", an archive, a nav built from `site.menus`, a tag pill resolved through `get_taxonomy_url` — when an edit moves what that listing reads. Retitling a post used to leave every such page showing the pre-edit title until an unrelated save happened to re-render it. Each kind of listing is gated on a fingerprint of its own inputs, so a post edit refreshes the homepage without dragging every page that merely renders the shared nav into the rebuild.
+- `hwaro serve` rebuilds `.markdown` pages on save. They were classified as content assets, whose republish path drops page extensions, so editing one rebuilt nothing at all and the served HTML stayed stale for the whole session.
+- `hwaro serve` watches a configured `[assets] source_dir` that lives outside `static/`. Bundle sources there produced no watch event, so a fingerprinted CSS/JS bundle kept serving its pre-edit bytes for the whole session.
+- `hwaro serve` answers a non-canonical directory URL (`//posts/`, `/posts//`, `/./posts/`) with a redirect to `/posts/` instead of `/posts/index.html`. The `index.html` rewrite used to leak into the canonicalising redirect, producing a URL the site never links to and no static host emits.
+- `hwaro serve` returns 404 for a request path whose percent-escapes decode to invalid UTF-8 (`/%c0%ae%c0%ae/`), matching what a static host does. It previously answered a 302 whose `Location` had every undecodable byte replaced with U+FFFD.
+- The serve watch timeline names the config file that actually changed, so an edit to a `config.<env>.toml` overlay is no longer reported as `config.toml`.
+- Serve rebuild receipts read "1 page" rather than "1 pages".

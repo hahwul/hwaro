@@ -40,7 +40,7 @@ Bundle `files` may also name `.scss` sources. While `[sass]` is enabled they com
 | `enabled` | bool | `false` | Enable the asset pipeline |
 | `minify` | bool | `true` | Minify CSS/JS output |
 | `fingerprint` | bool | `true` | Add content hash to filenames |
-| `source_dir` | string | `"static"` | Directory containing source files |
+| `source_dir` | string | `"static"` | Directory containing source files (watched by `hwaro serve` wherever it points, as long as it stays inside the project) |
 | `output_dir` | string | `"assets"` | Output subdirectory in the build output |
 
 ### Bundle definition
