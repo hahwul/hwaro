@@ -298,16 +298,23 @@ module Hwaro
       # `[assets] source_dir` when a project keeps its bundle sources outside
       # `static/` (see @extra_watch_roots).
       #
-      # Deliberately narrow. The project root (`.`, ""), anything escaping it,
-      # and anything already under a fixed root are all rejected: scanning the
-      # root would sweep the build output and `.git` on every poll, and a
-      # duplicate root would stamp the same files twice.
+      # Deliberately narrow — every rejection below leaves the pre-fix
+      # behaviour (that directory simply isn't watched), never something
+      # worse:
+      # - the project root (`.`, ""): scanning it would sweep the build
+      #   output, `.git` and every dependency directory every 500ms;
+      # - an absolute path: `source_dir = "/"` (or any typo that normalizes
+      #   to one) would put a full-filesystem glob on the poll loop;
+      # - a path escaping the project, for the same reason;
+      # - anything a fixed root already covers, which would stamp the same
+      #   files twice per scan.
       private def resolve_extra_watch_roots(config : Models::Config?) : Array(String)
         roots = [] of String
         return roots unless config && config.assets.enabled
 
         source_dir = Path[config.assets.source_dir].normalize.to_s
         return roots if source_dir.empty? || source_dir == "." || source_dir.starts_with?("..")
+        return roots if Path[source_dir].absolute?
         return roots if Server::WATCH_ROOTS.any? { |r| source_dir == r || source_dir.starts_with?("#{r}/") }
 
         roots << source_dir

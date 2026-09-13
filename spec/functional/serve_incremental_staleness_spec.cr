@@ -259,13 +259,16 @@ describe "serve incremental staleness" do
     end
   end
 
-  # Scanning the project root would sweep the build output, `.git` and every
-  # dependency directory on every poll; an escaping path is refused outright.
-  it "refuses a project-root or escaping [assets] source_dir (L3)" do
+  # Every rejection here leaves the directory simply unwatched, which is
+  # never worse than before the fix. Scanning the project root would sweep
+  # the build output and `.git` every 500ms, and an absolute root — `"/"`, or
+  # any typo that normalizes to one — would put a full-filesystem glob on the
+  # poll loop.
+  it "refuses a project-root, absolute or escaping [assets] source_dir (L3)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         write_listing_site
-        {".", "", "../elsewhere"}.each do |source_dir|
+        {".", "", "../elsewhere", "/", "/srv/assets"}.each do |source_dir|
           File.write("config.toml", <<-TOML
             title = "Listing Site"
             base_url = "https://example.com"
