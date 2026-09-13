@@ -273,6 +273,33 @@ describe "serve watch-lane regressions" do
     end
   end
 
+  # The static-only strategy re-renders nothing, so a `static/` file that
+  # publishes where a page renders replaced that page on its own URL for the
+  # rest of the session (incremental rebuilds only touch changed content).
+  # The copy now reports the collision and the watcher escalates to a full
+  # rebuild, where the render runs after the copy and the page wins.
+  it "rebuilds when a static save lands on a page's own output" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_minimal_site
+        File.write("content/about.md", "---\ntitle: About\n---\nPAGE BODY")
+        FileUtils.mkdir_p("static/about")
+        File.write("static/about/index.html", "<p>STATIC ABOUT</p>")
+
+        server = Hwaro::Services::Server.new
+        options = watch_options
+        server.watch_fixes_builder.run(options).should be_true
+        File.read("public/about/index.html").should contain("PAGE BODY")
+
+        File.write("static/about/index.html", "<p>STATIC ABOUT v2</p>")
+        server.watch_fixes_apply_changeset(watch_changeset(modified_static: ["static/about/index.html"]), options)
+
+        File.read("public/about/index.html").should contain("PAGE BODY")
+        File.read("public/about/index.html").should_not contain("STATIC ABOUT")
+      end
+    end
+  end
+
   # A13: on the content+template path, a page flipped to draft alongside a
   # bare template touch (identical template bytes) must vanish from the
   # sitemap — the SEO refresh used to be gated on template semantics only,

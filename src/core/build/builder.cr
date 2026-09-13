@@ -381,17 +381,30 @@ module Hwaro
         end
 
         # Record an output file the static copy just wrote over (see
-        # `@static_copied_outputs`). Public for the same reason
-        # `claim_generated_output` is: the serve watcher's static-only lane
-        # copies through the builder too.
+        # `@static_copied_outputs`). Public because the serve watcher's
+        # static-only lane (`copy_changed_static`) copies through the builder
+        # too and must record what it wrote for the same reason. `path` must
+        # already be canonical — see `static_copied_output?`.
         def note_static_copy(path : String) : Nil
           @static_copied_mutex.synchronize { @static_copied_outputs << path }
         end
 
-        def static_copied_output?(path : String) : Bool
+        # Did the static copy write anything at all this build? The gate in
+        # filter_changed_pages resolves paths against the working directory,
+        # and this lets it skip that work entirely on the common warm build
+        # where no static file changed.
+        def static_copies_recorded? : Bool
+          @static_copied_mutex.synchronize { !@static_copied_outputs.empty? }
+        end
+
+        # `path` may arrive in any spelling — `get_output_path` hands back the
+        # canonical absolute form while alias/pagination paths are built by
+        # joining the output directory — so it is resolved against `cwd` (the
+        # caller's, resolved once) before the lookup.
+        def static_copied_output?(path : String, cwd : String) : Bool
           @static_copied_mutex.synchronize do
             return false if @static_copied_outputs.empty?
-            @static_copied_outputs.includes?(path)
+            @static_copied_outputs.includes?(File.expand_path(path, cwd))
           end
         end
 
@@ -420,6 +433,16 @@ module Hwaro
         # and be pruned. That is self-healing: the path leaves the claim list
         # with it, and the next build's generator finds the file missing and
         # writes it again.
+        #
+        # Widening the comparison (a slack, or truncating the epoch to its own
+        # second) trades that for a PERMANENT failure instead. A path the
+        # prune skips is not re-claimed by the build that skipped it, so it
+        # never appears in a later build's stale list either — the leftover
+        # stays published forever. Two builds run seconds apart are ordinary,
+        # so the widened form also protects the PREVIOUS build's output as a
+        # matter of course: both widenings were measured against
+        # cache_stale_outputs_spec and disable pruning outright (12+ of its 22
+        # examples). Erring toward pruning is the recoverable direction.
         #
         # The stamped copies (static files, bundle assets — `File.utime` with
         # the SOURCE mtime) deliberately read as old, and they are exactly the

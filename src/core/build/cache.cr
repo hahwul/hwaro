@@ -411,6 +411,15 @@ module Hwaro
           @mutex.synchronize { @entries[file_path]?.try(&.output_paths) || [] of String }
         end
 
+        # Files this page wrote BESIDES its own output on the last build — its
+        # `aliases` redirect stubs and a section's `/page/N/` pagination pages
+        # (see `CacheEntry#derived_paths`). They are produced only by a render,
+        # so a caller that needs to know whether something else has since
+        # overwritten one has to ask for them by name.
+        def derived_paths_for(file_path : String) : Array(String)
+          @mutex.synchronize { @entries[file_path]?.try(&.derived_paths) || [] of String }
+        end
+
         # The source-less generated outputs the LAST build recorded, and the
         # setter the current build's Finalize phase persists through. Paths are
         # stored relative to the output directory; callers rejoin them.

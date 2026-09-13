@@ -352,6 +352,44 @@ describe "warm --cache builds" do
       end
     end
 
+    # An `aliases` redirect stub and a section's `/page/N/` pagination pages
+    # are written ONLY by a render, and the cache entry is the only record of
+    # them — so a `static/` file publishing to one of those paths replaced it
+    # outright on every warm build, the owning page being a cache hit.
+    it "re-renders a page whose alias stub the static copy overwrote" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/legacy")
+        File.write("static/legacy/index.html", "<p>STATIC LEGACY</p>")
+        cached_build
+        File.read("public/legacy/index.html").should contain("0; url=")
+
+        File.write("static/legacy/index.html", "<p>STATIC LEGACY v2</p>")
+        File.utime(Time.utc, Time.utc + 1.hour, "static/legacy/index.html")
+        cached_build
+
+        File.read("public/legacy/index.html").should contain("0; url=")
+        File.read("public/legacy/index.html").should_not contain("STATIC LEGACY")
+      end
+    end
+
+    it "re-renders a section whose pagination page the static copy overwrote" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") +
+                                  "\n[pagination]\nenabled = true\nper_page = 1\n")
+        FileUtils.mkdir_p("static/posts/page/2")
+        File.write("static/posts/page/2/index.html", "<p>STATIC P2</p>")
+        cached_build
+        File.read("public/posts/page/2/index.html").should contain("Posts")
+
+        File.write("static/posts/page/2/index.html", "<p>STATIC P2 v2</p>")
+        File.utime(Time.utc, Time.utc + 1.hour, "static/posts/page/2/index.html")
+        cached_build
+
+        File.read("public/posts/page/2/index.html").should contain("Posts")
+        File.read("public/posts/page/2/index.html").should_not contain("STATIC P2")
+      end
+    end
+
     it "does not accumulate one fingerprinted asset bundle per edit" do
       with_cached_site do
         FileUtils.mkdir_p("static/css")
