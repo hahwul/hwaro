@@ -49,6 +49,7 @@ YouTube 동영상을 삽입합니다.
 ```markdown
 {{ youtube(id="dQw4w9WgXcQ") }}
 {{ youtube(id="dQw4w9WgXcQ", width="800", height="450") }}
+{{ youtube(id="dQw4w9WgXcQ", start="30") }}
 ```
 
 | 파라미터 | 기본값 | 설명 |
@@ -57,6 +58,7 @@ YouTube 동영상을 삽입합니다.
 | `width` | `560` | 플레이어 너비 |
 | `height` | `315` | 플레이어 높이 |
 | `title` | `YouTube Video` | 접근성용 제목 |
+| `start` | | 특정 타임스탬프(초 단위)부터 재생 |
 
 ### vimeo
 
