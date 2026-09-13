@@ -332,6 +332,21 @@ module Hwaro
         # filter_changed_pages), which restores the cold build's outcome.
         @static_copied_outputs : Set(String) = Set(String).new
         @static_copied_mutex : Mutex = Mutex.new
+        # Wall clock at the moment this build started writing into the output
+        # directory. The Finalize prune refuses to delete anything modified
+        # at or after it: whatever this build WROTE is live by definition,
+        # whether or not any bookkeeping claims it. That is what keeps a
+        # shadowed generator output safe — `static/robots.txt` and the
+        # generated `robots.txt` are the same file, so dropping the static
+        # claim when the source is deleted would otherwise take the generated
+        # one with it.
+        #
+        # nil until `mark_build_output_epoch` stamps it, which the Initialize
+        # phase does before the first write. Unstamped means "no build has
+        # written here", and the guard then protects nothing — a caller that
+        # drives the Finalize phase without a build (unit specs) gets exactly
+        # the pruning contract it asks for.
+        @build_output_epoch : Time? = nil
         # Files a page wrote BESIDES its own output: its `aliases` redirect
         # stubs and, for a section, its `/page/N/` pagination pages. Both are
         # produced by the render pass, so a warm `--cache` build that skips a
@@ -382,6 +397,39 @@ module Hwaro
 
         def reset_static_copied_outputs : Nil
           @static_copied_mutex.synchronize { @static_copied_outputs.clear }
+        end
+
+        # Stamp the start of this build's output writing (see
+        # `@build_output_epoch`).
+        def mark_build_output_epoch : Nil
+          @build_output_epoch = Time.utc
+        end
+
+        # True when `path` was (re)written by this build.
+        #
+        # Exact on every filesystem with sub-second mtimes (APFS, ext4, btrfs,
+        # NTFS, xfs): a previous build's file is stamped strictly before this
+        # build's epoch, and everything this build writes strictly after. The
+        # comparison carries NO slack on purpose — a slack wide enough to
+        # cover a coarse filesystem is also wide enough to protect the
+        # previous build's output, which would disable pruning outright for
+        # any two builds run seconds apart.
+        #
+        # On a filesystem that truncates mtimes to whole seconds a shadowed
+        # generator file written in the epoch's own second can read as older
+        # and be pruned. That is self-healing: the path leaves the claim list
+        # with it, and the next build's generator finds the file missing and
+        # writes it again.
+        #
+        # The stamped copies (static files, bundle assets — `File.utime` with
+        # the SOURCE mtime) deliberately read as old, and they are exactly the
+        # ones a live claim already protects.
+        def written_this_build?(path : String) : Bool
+          epoch = @build_output_epoch
+          return false unless epoch
+          info = File.info?(path)
+          return false unless info
+          info.modification_time >= epoch
         end
 
         # Record an alias stub / pagination page `page` just wrote.

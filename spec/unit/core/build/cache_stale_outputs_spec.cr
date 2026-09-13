@@ -328,6 +328,30 @@ describe "warm --cache builds" do
       end
     end
 
+    # A static file and a GENERATED file can be the same file:
+    # `static/robots.txt` publishes exactly where the robots generator
+    # writes, and only the static side is claimed. Deleting the source must
+    # not take the generated output with it.
+    it "keeps a generated file that a deleted static file shadowed" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        File.write("static/robots.txt", "User-agent: custom\n")
+        File.write("templates/404.html", "<p>not found</p>")
+        File.write("static/404.html", "<p>static 404</p>")
+        cached_build
+        File.exists?("public/robots.txt").should be_true
+
+        File.delete("static/robots.txt")
+        File.delete("static/404.html")
+        cached_build
+
+        File.exists?("public/robots.txt").should be_true
+        File.read("public/robots.txt").should_not contain("custom")
+        File.exists?("public/404.html").should be_true
+        File.read("public/404.html").should contain("not found")
+      end
+    end
+
     it "does not accumulate one fingerprinted asset bundle per edit" do
       with_cached_site do
         FileUtils.mkdir_p("static/css")

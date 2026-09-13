@@ -26,6 +26,9 @@ module Hwaro::Core::Build::Phases::Initialize
       # the Finalize phase diffs this build's claims against the last one's.
       reset_generated_output_claims
       reset_static_copied_outputs
+      # Before ANY write into the output directory (the static copy below is
+      # the first), so the Finalize prune can tell what this build produced.
+      mark_build_output_epoch
 
       if cache_enabled
         if ctx.options.full
@@ -501,6 +504,11 @@ module Hwaro::Core::Build::Phases::Initialize
   private def copy_static_pairs(files_to_copy : Array({String, String, Time}))
     files_to_copy.each { |_, dest, _| Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest)) }
 
+    # One `getcwd` for the whole copy rather than one per file: the canonical
+    # form recorded below is only needed so filter_changed_pages can compare
+    # against `get_output_path` without expanding per page.
+    cwd = Dir.current
+
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(files_to_copy.size)
 
@@ -521,7 +529,7 @@ module Hwaro::Core::Build::Phases::Initialize
             # cache hit (see Builder#note_static_copy). Canonical form, so the
             # comparison against `get_output_path` in filter_changed_pages
             # needs no per-page expansion.
-            note_static_copy(File.expand_path(dest))
+            note_static_copy(File.expand_path(dest, cwd))
             # Stamp the source mtime onto the copy so the incremental skip in
             # collect_static_files can compare timestamps at all — that is what
             # makes a source whose mtime moved BACKWARDS (git checkout, stash

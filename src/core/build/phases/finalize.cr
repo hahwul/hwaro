@@ -58,6 +58,9 @@ module Hwaro::Core::Build::Phases::Finalize
     # One pass, two sets built from the SAME predicate so they cannot drift:
     # a page still writing output this build keeps its entry (`live`) and
     # protects the file it wrote (`owned`).
+    # One `getcwd` for every canonicalization below (see
+    # `protected_output_key`), rather than one per page.
+    cwd = Dir.current
     live = Set(String).new
     owned = Set(String).new
     ctx.all_pages.each do |page|
@@ -69,7 +72,7 @@ module Hwaro::Core::Build::Phases::Finalize
       source, output = cache_paths_for(page, output_dir)
       next unless output
       live << source
-      collect_page_output_paths(page, output_dir).each { |path| owned << protected_output_key(path) }
+      collect_page_output_paths(page, output_dir).each { |path| owned << protected_output_key(path, cwd) }
     end
 
     # Entries that survived but moved (a `slug`/`path`/permalink edit) leave
@@ -80,7 +83,7 @@ module Hwaro::Core::Build::Phases::Finalize
     # every file the surviving cache entries record. That second set is what
     # keeps a whole-cache invalidation — a config edit, `--full` — from
     # deleting files it only discarded the bookkeeping for.
-    still_written = build_cache.current_output_files.map { |path| protected_output_key(path) }.to_set
+    still_written = build_cache.current_output_files.map { |path| protected_output_key(path, cwd) }.to_set
     stale.concat(stale_generated_outputs(build_cache, output_dir))
     # Filtered AFTER the source-less list is added, not before. A claimed path
     # and a page output can name the same file — `static/posts/x/index.html`
@@ -88,8 +91,21 @@ module Hwaro::Core::Build::Phases::Finalize
     # build WROTE must never be deleted because some other bookkeeping stopped
     # claiming it.
     stale.reject! do |path|
-      key = protected_output_key(path)
-      owned.includes?(key) || still_written.includes?(key)
+      key = protected_output_key(path, cwd)
+      next true if owned.includes?(key) || still_written.includes?(key)
+      # Last line of defence: a file THIS build wrote is live, whatever the
+      # bookkeeping says. `static/robots.txt` and the generated `robots.txt`
+      # are one file, and only the static side is claimed — so deleting the
+      # source would have taken the generated output with it. Same for
+      # `static/404.html`, `static/manifest.json` and every other shadowed
+      # generator surface.
+      #
+      # A generator that SKIPPED writing on this warm build (sitemap, llms and
+      # the search index skip when the file is already there) leaves the
+      # shadowing copy looking unwritten, so it is pruned — and the same
+      # generator, now finding the file missing, writes it again on the next
+      # build. One build without it, never a permanent loss.
+      written_this_build?(path)
     end
     stale.uniq!
     return if stale.empty?
@@ -108,8 +124,8 @@ module Hwaro::Core::Build::Phases::Finalize
   # NUL — `expand_path` raises) falls back to itself: it matches nothing,
   # which leaves it in the stale list where `delete_orphaned_outputs`'s own
   # containment guard is the decider.
-  private def protected_output_key(path : String) : String
-    File.expand_path(path)
+  private def protected_output_key(path : String, cwd : String) : String
+    File.expand_path(path, cwd)
   rescue ArgumentError
     path
   end
