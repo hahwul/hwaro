@@ -115,6 +115,11 @@ module Hwaro::Core::Build::Phases::Write
       end
 
       written << File.expand_path(output_path)
+      # A raw/content file has no cache entry, so nothing else remembers that
+      # this build published it — and a `--cache` build never wipes the
+      # output directory. Claiming it lets Finalize delete the copy when its
+      # source is removed (see Phases::Finalize#stale_generated_outputs).
+      claim_generated_output(output_path)
       Logger.action :create, output_path if verbose
       count += 1
     end
@@ -132,10 +137,21 @@ module Hwaro::Core::Build::Phases::Write
 
       # Destination directory matches the page's URL structure
       # page.url typically starts with / and ends with /, e.g., /blog/post/
-      url_path = page.url.lchop("/")
-      dest_dir = File.join(output_dir, url_path)
-
-      Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
+      #
+      # The URL goes through the same refusal contract as every other sink
+      # (`url_output_path`): a traversing segment is unpublishable. The old
+      # code `mkdir_p`'d the RAW `output_dir/<url>` before any guard ran, so
+      # a bundle page with `path = "../outside"` created a directory NEXT TO
+      # the output directory — outside it — on every build, even though the
+      # per-file guard below then correctly refused every asset in it.
+      # Nothing creates the directory now until an asset is actually copied.
+      safe_url_path = url_output_path(page.url.lchop("/"))
+      unless safe_url_path
+        Logger.warn "Skipping bundle assets for #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory."
+        next
+      end
+      dest_dir = File.join(output_dir, safe_url_path)
+      next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
 
       page.assets.each do |asset_path|
         # asset_path is relative to content/ (e.g. "blog/post/image.jpg")
@@ -162,6 +178,11 @@ module Hwaro::Core::Build::Phases::Write
         # Already emitted by process_raw_files (possibly minified) — a plain
         # copy here would overwrite the processed output with the source.
         next if already_written.includes?(File.expand_path(dest_path))
+
+        # Claimed even when the copy below is skipped as unchanged: the claim
+        # list is "what this build publishes", and a file missing from it is
+        # deleted by the next `--cache` build (see Phases::Finalize).
+        claim_generated_output(dest_path)
 
         # Skip unchanged assets. The Write phase runs on every build with a
         # surviving output dir (serve rebuilds, --preserve-output), so

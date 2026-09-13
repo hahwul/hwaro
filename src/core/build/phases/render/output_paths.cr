@@ -271,8 +271,12 @@ module Hwaro::Core::Build::Phases::Render
 
       alias_clean = url_output_path(alias_path.lchop("/"))
       unless alias_clean
+        # NOT counted as an unpublished page: the page itself published
+        # fine, only one of its redirect stubs was refused. Counting it
+        # here made the receipt claim "N not published" for pages that are
+        # on disk, and inflated `pages_not_published` in `--json` by one
+        # per bad alias.
         Logger.warn "Skipping alias #{alias_path.inspect} on #{page.path}: a path segment would escape the output directory."
-        note_unpublished_page
         next
       end
       # An alias that already names an HTML file (`/legacy.html`,
@@ -285,7 +289,13 @@ module Hwaro::Core::Build::Phases::Render
                   else
                     File.join(output_dir, alias_clean, "index.html")
                   end
-      next unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
+      # Same refusal, reported the same way: a silent `next` here left an
+      # alias the user declared simply absent from the output with no trace
+      # in the log.
+      unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
+        Logger.warn "Skipping alias #{alias_path.inspect} on #{page.path}: it resolves outside the output directory."
+        next
+      end
 
       ensure_dir(File.dirname(dest_path))
 

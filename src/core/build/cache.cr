@@ -250,9 +250,11 @@ module Hwaro
           invalidated = false
           output_key = Cache.output_dir_key(output_dir)
 
+          output_dir_changed = false
           if !@metadata.output_dir.empty? && !output_key.empty? && @metadata.output_dir != output_key
             Logger.info "  Cache: output directory changed — invalidating all entries."
             invalidated = true
+            output_dir_changed = true
           end
 
           if invalidate_on_template_change && !@metadata.template_hash.empty? && @metadata.template_hash != template_hash
@@ -267,6 +269,16 @@ module Hwaro
 
           if invalidated
             @mutex.synchronize { discard_entries_recording_outputs }
+          end
+
+          # The generated-output claims are paths RELATIVE to the output
+          # directory, so they are meaningless once that directory changes:
+          # rejoined against the new one they name files a different tree
+          # holds. Alternating `-o dist` and `-o preview` would otherwise let
+          # the first build in each tree delete whatever the other tree
+          # happened to have at the same relative path.
+          if output_dir_changed
+            @mutex.synchronize { @metadata.generated_outputs = [] of String }
           end
 
           if invalidated || @metadata.template_hash != template_hash || @metadata.config_hash != config_hash

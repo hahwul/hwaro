@@ -129,7 +129,20 @@ module Hwaro::Core::Build::Phases::Render
         # (see `cached_content_needed?`), in which case the work is wasted.
         # Fast-start's deferred pages are excluded: they render for real in
         # the background pass.
-        if cache_enabled && !ctx.options.streaming? && pages_to_build.size < all_pages.size &&
+        #
+        # Streaming is NOT excluded. `--stream --cache` skipped this
+        # entirely, so a warm streamed build shipped raw `{% shortcode %}`
+        # markup, unresolved `@/` links and un-prefixed subpath URLs into
+        # search.json and every feed — exactly the corruption this pass
+        # exists to prevent, on the one mode still doing it. The memory
+        # argument for skipping doesn't hold either: streaming only releases
+        # rendered bodies when NOTHING downstream reads them back
+        # (`generated_outputs_read_content?`, see render_streaming's
+        # `release_content`), and that is precisely the case where hydration
+        # would be pointless — so gate on the same predicate instead of on
+        # the mode.
+        if cache_enabled && pages_to_build.size < all_pages.size &&
+           (!ctx.options.streaming? || generated_outputs_read_content?(site)) &&
            cached_content_needed?(ctx, site)
           skipped = all_pages - pages_to_build
           if deferred = @deferred_pages

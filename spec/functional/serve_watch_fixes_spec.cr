@@ -92,11 +92,15 @@ private def write_minimal_site
 end
 
 describe "serve watch-lane regressions" do
-  # S1: a Bool-failure build (pre-hook failure — Builder#run returns false
-  # without raising) must leave @rebuild_failed set. The watch loop used to
-  # clobber it back to false in the same iteration because apply_changeset
-  # returned normally.
-  it "keeps the failure flag set after a build that fails without raising (S1)" do
+  # S1: a failed rebuild must never clear @rebuild_failed — the reset lives at
+  # the one point in apply_changeset where success is actually known. A
+  # failing `[build] hooks.pre` command now raises a classified
+  # HWARO_E_CONFIG (a user command in config.toml exiting non-zero is a
+  # configuration failure, not an hwaro bug, and exit 70 is reserved for
+  # those); the watch loop's own rescue turns that into the flag plus the
+  # browser overlay, so what apply_changeset owes here is simply never
+  # reaching the success reset.
+  it "keeps the failure flag set when the rebuild fails (S1)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         write_minimal_site
@@ -111,9 +115,13 @@ describe "serve watch-lane regressions" do
         )
 
         server = Hwaro::Services::Server.new
-        server.watch_fixes_set_rebuild_failed(false)
-        server.watch_fixes_apply_changeset(watch_changeset(modified_content: ["content/foo.md"]), watch_options)
+        server.watch_fixes_set_rebuild_failed(true)
+        err = expect_raises(Hwaro::HwaroError) do
+          server.watch_fixes_apply_changeset(watch_changeset(modified_content: ["content/foo.md"]), watch_options)
+        end
 
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        err.message.to_s.should contain("hooks.pre")
         server.watch_fixes_rebuild_failed?.should be_true
       end
     end

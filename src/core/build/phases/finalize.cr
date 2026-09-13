@@ -41,11 +41,16 @@ module Hwaro::Core::Build::Phases::Finalize
   #     an entry left over from a build with a different `-o` is skipped
   #     rather than followed.
   #
-  # Beyond the entries themselves, the source-less generated files this build
-  # claimed (`Builder#claim_generated_output` — the taxonomy index/term pages,
-  # their pagination pages and their feeds, and every AMP mirror) are diffed
-  # against what the previous build claimed. Auto-generated OG images prune
-  # themselves against their own manifest, in the generator that writes them.
+  # Beyond the entries themselves, the files this build claimed
+  # (`Builder#claim_generated_output`) are diffed against what the previous
+  # build claimed. Those are every output no cache ENTRY covers: the taxonomy
+  # index/term pages, their pagination pages and their feeds, every AMP
+  # mirror, the `static/` copies, the `[content.files]`/raw copies, page
+  # bundle assets, and the fingerprinted asset bundles — none of which any
+  # page's entry records, so before this a deleted `static/` file and every
+  # historical `main.<hash>.css` stayed published forever on a `--cache`
+  # build. Auto-generated OG images prune themselves against their own
+  # manifest, in the generator that writes them.
   private def prune_orphaned_cached_outputs(ctx : Lifecycle::BuildContext, build_cache : Cache) : Nil
     return unless build_cache.enabled?
     output_dir = ctx.options.output_dir
@@ -77,8 +82,13 @@ module Hwaro::Core::Build::Phases::Finalize
     # deleting files it only discarded the bookkeeping for, so it has to be
     # applied BEFORE the source-less lists are added.
     still_written = build_cache.current_output_files
-    stale.reject! { |path| owned.includes?(path) || still_written.includes?(path) }
     stale.concat(stale_generated_outputs(build_cache, output_dir))
+    # Filtered AFTER the source-less list is added, not before. A claimed
+    # path and a page output can name the same file (a `static/` file the
+    # site later publishes as a page, an asset bundle moved under a page's
+    # URL), and a file this build WROTE must never be deleted because some
+    # other bookkeeping stopped claiming it.
+    stale.reject! { |path| owned.includes?(path) || still_written.includes?(path) }
     stale.uniq!
     return if stale.empty?
 

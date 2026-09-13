@@ -266,9 +266,11 @@ module Hwaro
         # receipt cannot claim a page that never reached disk. Atomic because
         # the render fan-out increments it from worker fibers.
         # Memo for the listing-template source union (see Phases::Render).
-        # Keyed by the templates Hash identity so a template reload recomputes.
+        # Keyed by the templates Hash ITSELF (compared with `same?`) so a
+        # template reload recomputes — an `object_id` would let a recycled
+        # address serve the previous snapshot's union.
         @listing_source_union_memo : String? = nil
-        @listing_source_union_memo_key : UInt64 = 0_u64
+        @listing_source_union_memo_key : Hash(String, String)? = nil
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve
@@ -533,8 +535,18 @@ module Hwaro
           # Run pre-build hooks
           unless pre_hooks.empty?
             unless Utils::CommandRunner.run_pre_hooks(pre_hooks)
-              Logger.error "Build aborted due to pre-build hook failure."
-              return false
+              # Classified, not `return false`. Returning false made the CLI
+              # synthesize HWARO_E_INTERNAL / exit 70 — the code reserved for
+              # hwaro's own bugs — for a user command listed in config.toml
+              # exiting non-zero, so CI that alerts on internal faults fired
+              # on `npm run build` failing. `hwaro serve` treats a raise and a
+              # false the same way (see Server#apply_changeset), so the dev
+              # loop is unaffected.
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONFIG,
+                message: "Build aborted: a [build] hooks.pre command failed (see the command output above).",
+                hint: "Fix the failing command, or remove it from hooks.pre in config.toml.",
+              )
             end
           end
 

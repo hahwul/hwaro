@@ -218,6 +218,107 @@ describe "warm --cache builds" do
     end
   end
 
+  # Files with a SOURCE but no cache entry: `static/` copies,
+  # `[content.files]`/raw copies, page-bundle assets and the fingerprinted
+  # asset bundles. A cold build starts from an empty directory, so all of
+  # them vanish with their source; a warm `--cache` build kept publishing
+  # (and deploying) them forever.
+  describe "source-backed outputs with no cache entry" do
+    it "removes the copy of a deleted static file" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", "body{color:red}")
+        cached_build
+        File.exists?("public/css/site.css").should be_true
+
+        File.delete("static/css/site.css")
+        cached_build
+
+        File.exists?("public/css/site.css").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
+    it "keeps an unchanged static file that the warm build skipped copying" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", "body{color:red}")
+        cached_build
+        # Second warm build copies nothing (mtime+size match) — the claim must
+        # still be recorded, or the THIRD build would delete a live file.
+        cached_build
+        cached_build
+
+        File.exists?("public/css/site.css").should be_true
+        File.read("public/css/site.css").should eq("body{color:red}")
+      end
+    end
+
+    it "removes the copy of a deleted content file" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") +
+                                  "\n[content.files]\nallow_extensions = [\"txt\"]\n")
+        File.write("content/posts/notes.txt", "hello")
+        cached_build
+        File.exists?("public/posts/notes.txt").should be_true
+
+        File.delete("content/posts/notes.txt")
+        cached_build
+
+        File.exists?("public/posts/notes.txt").should be_false
+      end
+    end
+
+    it "removes a page bundle asset deleted from the bundle" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") +
+                                  "\n[content.files]\nallow_extensions = []\n")
+        FileUtils.mkdir_p("content/posts/bundle")
+        File.write("content/posts/bundle/index.md", "+++\ntitle = \"Bundle\"\n+++\nbody")
+        File.write("content/posts/bundle/pic.svg", "<svg/>")
+        cached_build
+        File.exists?("public/posts/bundle/pic.svg").should be_true
+
+        File.delete("content/posts/bundle/pic.svg")
+        cached_build
+
+        File.exists?("public/posts/bundle/pic.svg").should be_false
+        File.exists?("public/posts/bundle/index.html").should be_true
+      end
+    end
+
+    it "does not accumulate one fingerprinted asset bundle per edit" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", ".a{color:red}")
+        File.write("config.toml", File.read("config.toml") + <<-TOML)
+
+          [assets]
+          enabled = true
+          minify = false
+          fingerprint = true
+          source_dir = "static"
+          output_dir = "assets"
+
+          [[assets.bundles]]
+          name = "main.css"
+          files = ["css/site.css"]
+          TOML
+        cached_build
+        Dir.glob("public/assets/main.*.css").size.should eq(1)
+
+        File.write("static/css/site.css", ".b{color:blue}")
+        cached_build
+        File.write("static/css/site.css", ".c{color:green}")
+        cached_build
+
+        remaining = Dir.glob("public/assets/main.*.css")
+        remaining.size.should eq(1)
+        File.read(remaining.first).should contain(".c{color:green}")
+      end
+    end
+  end
+
   it "leaves an untouched page's output alone" do
     with_cached_site do
       cached_build

@@ -86,11 +86,19 @@ module Hwaro::Core::Build::Phases::Render
   # Memoized per template set: this walks every template's closure and the
   # render phase asks for it on every build, cached or not.
   private def listing_source_union(templates : Hash(String, String)) : String
-    if (memo = @listing_source_union_memo) && @listing_source_union_memo_key == templates.object_id
+    if (memo = @listing_source_union_memo) && @listing_source_union_memo_key.same?(templates)
       return memo
     end
     result = compute_listing_source_union(templates)
-    @listing_source_union_memo_key = templates.object_id
+    # The KEY holds the hash itself, not its `object_id`. An id is only an
+    # address: the previous snapshot is unreachable the moment
+    # `load_templates` swaps in a new one, and a collected snapshot's address
+    # can be handed straight back to the replacement — at which point a
+    # serve-session template reload would read the PREVIOUS set's union and
+    # decide cache invalidation from templates that no longer exist. Keeping
+    # a reference makes the identity unforgeable (and pins exactly one dead
+    # snapshot, which the next reload releases).
+    @listing_source_union_memo_key = templates
     @listing_source_union_memo = result
     result
   end

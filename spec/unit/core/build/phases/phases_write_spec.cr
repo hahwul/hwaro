@@ -229,6 +229,52 @@ describe Hwaro::Core::Build::Phases::Write do
   end
 
   describe "#process_assets" do
+    # The page's own sink refuses a traversing URL (see get_output_path); the
+    # asset copy used to `mkdir_p` the raw `output_dir/<url>` FIRST, so the
+    # build created a directory NEXT TO the output directory — outside it —
+    # before the per-file guard refused every asset in it.
+    it "creates no directory outside the output directory for a traversing url" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/bund")
+          File.write("content/bund/index.md", "---\ntitle: B\n---\n")
+          File.write("content/bund/pic.png", "image-bytes")
+          FileUtils.mkdir_p("public")
+
+          page = Hwaro::Models::Page.new("bund/index.md")
+          page.url = "/../outside/"
+          page.assets = ["bund/pic.png"]
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_process_assets([page], "public", false)
+
+          Dir.exists?(File.join(dir, "outside")).should be_false
+          Dir.exists?("public/outside").should be_false
+        end
+      end
+    end
+
+    # Nothing is created until an asset is actually copied, so a page whose
+    # every asset is skipped leaves no empty directory behind either.
+    it "creates no destination directory when the source asset is missing" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/blog/post")
+          File.write("content/blog/post/index.md", "---\ntitle: Post\n---\n")
+          FileUtils.mkdir_p("public")
+
+          page = Hwaro::Models::Page.new("blog/post/index.md")
+          page.url = "/blog/post/"
+          page.assets = ["blog/post/missing.png"]
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_process_assets([page], "public", false)
+
+          Dir.exists?("public/blog/post").should be_false
+        end
+      end
+    end
+
     it "copies a page's collected assets next to the page output" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

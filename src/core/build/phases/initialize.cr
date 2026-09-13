@@ -34,6 +34,13 @@ module Hwaro::Core::Build::Phases::Initialize
           stats = build_cache.stats
           Logger.info "  Cache enabled (#{stats[:valid]} valid entries)"
         end
+      elsif ctx.options.full
+        # `--full` only means anything to the cache, and without `--cache`
+        # there is none to force past — a plain build already rebuilds
+        # everything. Silently accepting it let people believe they had
+        # cleared a `.hwaro_cache.json` that a later `--cache` build still
+        # reads.
+        Logger.warn "--full has no effect without --cache (a plain build already rebuilds everything); pass --cache --full to discard the existing cache."
       end
 
       # `preserve_output` keeps existing output files between rebuilds (used
@@ -418,6 +425,13 @@ module Hwaro::Core::Build::Phases::Initialize
       next if @config.try(&.sass_source?(relative))
 
       dest_path = File.join(output_dir, relative)
+      # Claimed BEFORE the unchanged-skip below: the claim list records what
+      # this build PUBLISHES, not what it copied. A `--cache` build never
+      # wipes the output directory and no cache entry covers a static file,
+      # so without the claim a file deleted from `static/` kept being served
+      # (and deployed) forever; with it, Finalize deletes exactly the copies
+      # whose source is gone (see Phases::Finalize#stale_generated_outputs).
+      claim_generated_output(dest_path)
       # `info` from above already carries the source mtime — re-statting
       # src_path here tripled the stat count over static/ on watch rebuilds.
       #

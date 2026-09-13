@@ -243,6 +243,35 @@ describe Hwaro::CLI::Commands::BuildCommand do
       json_output.should be_true
     end
 
+    it "rejects stray positional arguments with HWARO_E_USAGE" do
+      # `hwaro build mysite` (the shape other generators accept) used to build
+      # the current directory and exit 0, the argument having no effect and no
+      # diagnostic.
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.parse_options(["mysite"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      err.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.message.to_s.should contain("unexpected extra argument(s): 'mysite'")
+    end
+
+    it "names every stray positional argument, flags included" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.parse_options(["--minify", "one", "two"])
+      end
+      err.message.to_s.should contain("'one', 'two'")
+    end
+
+    it "still accepts a flag-only argument list" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      options, input_dir = cmd.parse_options(["--minify", "-o", "dist"])
+      options.minify.should be_true
+      options.output_dir.should eq("dist")
+      input_dir.should be_nil
+    end
+
     it "CLI --memory-limit overrides HWARO_MEMORYLIMIT env var" do
       ENV["HWARO_MEMORYLIMIT"] = "1G"
       begin
