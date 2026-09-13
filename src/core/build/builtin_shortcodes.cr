@@ -74,10 +74,11 @@ module Hwaro
           # ── YouTube ──────────────────────────────────────────────
           # Usage: {{ youtube(id="dQw4w9WgXcQ") }}
           #        {{ youtube(id="dQw4w9WgXcQ", width="560", height="315") }}
+          #        {{ youtube(id="dQw4w9WgXcQ", start="30") }}
           t["shortcodes/youtube"] = <<-HTML
             <div class="sc-video sc-video--youtube">
               <iframe
-                src="https://www.youtube.com/embed/{{ id | e }}"
+                src="https://www.youtube.com/embed/{{ id | e }}{% if start %}?start={{ start | e }}{% endif %}"
                 width="{{ width | default(value='560') | e }}"
                 height="{{ height | default(value='315') | e }}"
                 frameborder="0"

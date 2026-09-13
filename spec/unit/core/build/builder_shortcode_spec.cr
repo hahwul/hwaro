@@ -882,7 +882,19 @@ describe Hwaro::Core::Build::Builder do
       content = %({{ youtube(id="dQw4w9WgXcQ") }})
       result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
       result.should contain("youtube.com/embed/dQw4w9WgXcQ")
+      result.should_not contain("?start=")
       result.should contain("iframe")
+    end
+
+    it "renders youtube shortcode with start parameter" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {} of String => String
+      context = {} of String => Crinja::Value
+
+      content = %({{ youtube(id="dQw4w9WgXcQ", start="30") }})
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("youtube.com/embed/dQw4w9WgXcQ?start=30")
     end
 
     it "renders vimeo shortcode without user template" do

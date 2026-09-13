@@ -78,6 +78,11 @@ describe Hwaro::Core::Build::BuiltinShortcodes do
       templates["shortcodes/youtube"].should contain("loading=\"lazy\"")
     end
 
+    it "youtube template supports optional start parameter" do
+      templates = Hwaro::Core::Build::BuiltinShortcodes.templates
+      templates["shortcodes/youtube"].should contain("?start={{ start | e }}")
+    end
+
     it "returns the same instance on repeated calls (cached)" do
       t1 = Hwaro::Core::Build::BuiltinShortcodes.templates
       t2 = Hwaro::Core::Build::BuiltinShortcodes.templates

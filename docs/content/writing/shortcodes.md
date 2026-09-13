@@ -49,6 +49,7 @@ Embed a YouTube video.
 ```markdown
 {{ youtube(id="dQw4w9WgXcQ") }}
 {{ youtube(id="dQw4w9WgXcQ", width="800", height="450") }}
+{{ youtube(id="dQw4w9WgXcQ", start="30") }}
 ```
 
 | Param | Default | Description |
@@ -57,6 +58,7 @@ Embed a YouTube video.
 | `width` | `560` | Player width |
 | `height` | `315` | Player height |
 | `title` | `YouTube Video` | Accessible title |
+| `start` | | Start playback at a given timestamp in seconds |
 
 ### vimeo
 
