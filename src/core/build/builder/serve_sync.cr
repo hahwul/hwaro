@@ -227,7 +227,10 @@ module Hwaro
               dest = File.join(output_dir, relative)
               outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
             elsif path.starts_with?("content/")
-              if path.downcase.ends_with?(".md") || path.downcase.ends_with?(".markdown")
+              # Same definition of "page source" the ReadContent phase and the
+              # serve watcher's classify_modified use, so the three cannot
+              # drift over which extensions are pages.
+              if Phases::ReadContent::PAGE_EXTENSIONS.includes?(Path[path].extension.downcase)
                 next unless site
                 rel = path.lchop("content/")
                 # Section _index pages live in site.sections, not site.pages —

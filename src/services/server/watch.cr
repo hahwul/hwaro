@@ -114,6 +114,7 @@ module Hwaro
         added_files = [] of String
         removed_files = [] of String
         config_changed = false
+        config_files = [] of String
 
         # --- Files that exist in both snapshots but with different stamps ---
         new_mtimes.each do |path, new_stamp|
@@ -131,6 +132,7 @@ module Hwaro
               # rebuilds.
               next if built_config_rewrite?(path, new_stamp)
               config_changed = true
+              config_files << path
             elsif identical_rewrite?(path, old_stamp, new_stamp)
               # A data/i18n stamp that moved without a byte changing — the
               # #755 hook loop: reporting it would force a full rebuild,
@@ -162,6 +164,7 @@ module Hwaro
           added_files: added_files,
           removed_files: removed_files,
           config_changed: config_changed,
+          config_files: config_files,
         )
       end
 
@@ -171,6 +174,19 @@ module Hwaro
       # `[content.files] allow_extensions`) used to land in `content` and then
       # get silently dropped by `run_incremental` because they have no `Page`
       # entry. They now go into their own bucket and are republished verbatim.
+      #
+      # "Markdown" is decided by `Phases::ReadContent::PAGE_EXTENSIONS` — the
+      # build's own definition of a page source — rather than a local `.md`
+      # test. A `.markdown` page used to fail that test and land in the
+      # content-asset bucket, whose republish path then dropped it (a page
+      # extension is never in `[content.files] allow_extensions`), so editing
+      # one during serve rebuilt nothing at all: the watcher printed "changed
+      # content/post.markdown" and the served HTML stayed at the pre-edit
+      # bytes for the rest of the session.
+      private def markdown_source?(path : String) : Bool
+        Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.includes?(Path[path].extension.downcase)
+      end
+
       private def classify_modified(
         path : String,
         content : Array(String),
@@ -180,7 +196,7 @@ module Hwaro
         data : Array(String),
       )
         if path.starts_with?("content/")
-          if path.downcase.ends_with?(".md")
+          if markdown_source?(path)
             content << path
           else
             content_files << path
@@ -191,6 +207,13 @@ module Hwaro
           static << path
         elsif path.starts_with?("data/") || path.starts_with?("i18n/")
           data << path
+        elsif extra_watch_root?(path)
+          # An `[assets] source_dir` outside static/. The static bucket is the
+          # right home: its strategy is the one that reruns the Sass and
+          # asset-bundle pipelines, which is the only way these files reach the
+          # output. `copy_static` keeps the verbatim copy scoped to `static/`,
+          # so nothing here is published 1:1.
+          static << path
         end
       end
 
@@ -261,6 +284,41 @@ module Hwaro
         WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
       end
 
+      # The config as the initial build will read it, or nil when it cannot be
+      # loaded. Serve deliberately starts on a broken site, so every caller
+      # here treats "no config" as "nothing extra to watch" rather than an
+      # error — the Builder reports the real failure on the initial build.
+      private def load_config_or_nil(env : String?) : Models::Config?
+        Hwaro::Models::Config.load(env: env)
+      rescue Hwaro::HwaroError
+        nil
+      end
+
+      # Watch roots the fixed WATCH_ROOTS don't already cover. Today that is
+      # `[assets] source_dir` when a project keeps its bundle sources outside
+      # `static/` (see @extra_watch_roots).
+      #
+      # Deliberately narrow. The project root (`.`, ""), anything escaping it,
+      # and anything already under a fixed root are all rejected: scanning the
+      # root would sweep the build output and `.git` on every poll, and a
+      # duplicate root would stamp the same files twice.
+      private def resolve_extra_watch_roots(config : Models::Config?) : Array(String)
+        roots = [] of String
+        return roots unless config && config.assets.enabled
+
+        source_dir = Path[config.assets.source_dir].normalize.to_s
+        return roots if source_dir.empty? || source_dir == "." || source_dir.starts_with?("..")
+        return roots if Server::WATCH_ROOTS.any? { |r| source_dir == r || source_dir.starts_with?("#{r}/") }
+
+        roots << source_dir
+        roots
+      end
+
+      # Is `path` under one of the config-resolved extra roots?
+      private def extra_watch_root?(path : String) : Bool
+        @extra_watch_roots.any? { |root| path.starts_with?("#{root}/") }
+      end
+
       # Is this watch root a directory we can actually walk?
       #
       # `Dir.exists?` answers `false` only for ENOENT/ENOTDIR — every other
@@ -282,7 +340,7 @@ module Hwaro
       # previous snapshot — computes them fresh.
       private def scan_mtimes(prev : Hash(String, FileStamp)? = nil) : Hash(String, FileStamp)
         mtimes = {} of String => FileStamp
-        dirs_to_watch = ["content", "templates", "static", "data", "i18n"]
+        dirs_to_watch = Server::WATCH_ROOTS + @extra_watch_roots
 
         dirs_to_watch.each do |dir|
           next unless watchable_root?(dir)

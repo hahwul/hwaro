@@ -14,6 +14,20 @@ module Hwaro
       def call(context)
         path = context.request.path
 
+        # Canonicalise BEFORE the `/` → `/index.html` rewrite below.
+        # `HTTP::StaticFileHandler` answers a non-canonical path (`//posts/`,
+        # `/posts//`, `/./posts/`) with its own canonicalising redirect, but by
+        # then the rewrite is part of `request.path` — so `//posts/` was
+        # answered with `Location: /posts/index.html`, a URL the site never
+        # links to and that a static host does not produce. (`//` is a routine
+        # artifact of `{{ base_url }}/…` concatenation, so this is reachable in
+        # ordinary browsing.) `BasePathHandler` already pre-empts the same
+        # redirect for mounted requests; this closes the unmounted chain.
+        if target = DevPath.canonical_target(path)
+          redirect(context, target)
+          return
+        end
+
         if path.ends_with?("/")
           context.request.path = path + "index.html"
           begin
@@ -66,27 +80,31 @@ module Hwaro
                      end
                    end
         if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
-          # 302, not 301: browsers cache permanent redirects per URL, so a
-          # 301 would keep redirecting to a section long after a rebuild
-          # removed or renamed it (or after a different project reuses the
-          # port) until the user clears their browser cache.
-          context.response.status_code = 302
           # Build the Location from the already-resolved path to prevent
           # CRLF injection and path traversal in the redirect target, then
           # re-encode it: resolution decodes, so `/my page` would otherwise
           # emit a raw space (and `/한글` raw UTF-8) into the header, which
-          # is not a valid URI reference. Keep the query string — /search?q=term
-          # must land on /search/?q=term, not an empty-query page. (A
-          # request-line query can't contain CR/LF.)
-          location = "/" + DevPath.encode_relative(sanitized) + "/"
-          if (query = context.request.query) && !query.empty?
-            location += "?#{query}"
-          end
-          context.response.headers["Location"] = location
+          # is not a valid URI reference.
+          redirect(context, "/" + DevPath.encode_relative(sanitized) + "/")
           return
         end
 
         call_next(context)
+      end
+
+      # 302, not 301: browsers cache permanent redirects per URL, so a 301
+      # would keep redirecting to a section long after a rebuild removed or
+      # renamed it (or after a different project reuses the port) until the
+      # user clears their browser cache.
+      #
+      # Keep the query string — /search?q=term must land on /search/?q=term,
+      # not an empty-query page. (A request-line query can't contain CR/LF.)
+      private def redirect(context, location : String)
+        context.response.status_code = 302
+        if (query = context.request.query) && !query.empty?
+          location = "#{location}?#{query}"
+        end
+        context.response.headers["Location"] = location
       end
     end
 
@@ -428,24 +446,11 @@ module Hwaro
       end
 
       # The path `HTTP::StaticFileHandler` would redirect to, or nil when it
-      # would not redirect at all. Mirrors its own logic exactly — decode once,
-      # `Path.posix(...).expand("/")`, compare as `Path` — so this fires when
-      # and only when stdlib would have.
+      # would not redirect at all. See `DevPath.canonical_target` — shared with
+      # `IndexRewriteHandler`, which pre-empts the same redirect for unmounted
+      # requests, so the two can never disagree about what is canonical.
       private def noncanonical_target(path : String) : String?
-        # Never canonicalise a path the server refuses to serve. Independently
-        # of handler order this keeps two promises: an unservable path is
-        # 404'd by UnservablePathHandler rather than redirected, and nothing
-        # here raises — `Path.posix` throws on a NUL and the decode below can
-        # yield invalid UTF-8, either of which would escape as a 500.
-        return if DevPath.unservable?(path)
-
-        decoded = URI.decode(path)
-        return unless decoded.valid_encoding?
-
-        request_path = Path.posix(decoded)
-        expanded = request_path.expand("/")
-        return if request_path == expanded
-        URI.encode_path(expanded.to_s)
+        DevPath.canonical_target(path)
       end
 
       private def redirect(context, location : String)

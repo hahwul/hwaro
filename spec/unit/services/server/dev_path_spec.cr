@@ -168,6 +168,57 @@ describe Hwaro::Services::DevPath do
     end
   end
 
+  # A path whose percent-escapes decode to invalid UTF-8 is valid ASCII on
+  # the wire, so the raw-byte tests above cannot see it. Nothing can serve
+  # such a path, but HTTP::StaticFileHandler used to decode it, canonicalise
+  # it and re-encode the result — turning every undecodable byte into U+FFFD
+  # and answering `/%c0%ae%c0%ae/` with a 302 to a replacement-character URL.
+  describe ".unservable? with undecodable escapes" do
+    it "refuses percent-encoded invalid UTF-8" do
+      ["/%c0%ae%c0%ae/", "/%ff", "/a/%fe%fe.html", "/%C0%AE"].each do |path|
+        Hwaro::Services::DevPath.unservable?(path).should be_true
+      end
+    end
+
+    it "still accepts valid escapes, including ones that decode to a percent" do
+      ["/%ED%95%9C/", "/a%20b.html", "/100%25.html", "/a%2Bb.html"].each do |path|
+        Hwaro::Services::DevPath.unservable?(path).should be_false
+      end
+    end
+  end
+
+  describe ".canonical_target" do
+    it "returns nil for a path that is already canonical" do
+      ["/", "/posts/", "/posts/index.html", "/%ED%95%9C%EA%B8%80/"].each do |path|
+        Hwaro::Services::DevPath.canonical_target(path).should be_nil
+      end
+    end
+
+    # `//` is a routine artifact of `{{ base_url }}/…` concatenation.
+    it "collapses duplicate and dot segments while keeping the trailing slash" do
+      Hwaro::Services::DevPath.canonical_target("//posts/").should eq("/posts/")
+      Hwaro::Services::DevPath.canonical_target("/posts//").should eq("/posts/")
+      Hwaro::Services::DevPath.canonical_target("/./posts/").should eq("/posts/")
+      Hwaro::Services::DevPath.canonical_target("/a/../posts/").should eq("/posts/")
+    end
+
+    it "keeps a file target a file target" do
+      Hwaro::Services::DevPath.canonical_target("//index.html").should eq("/index.html")
+    end
+
+    it "re-encodes the target it hands back" do
+      Hwaro::Services::DevPath.canonical_target("//%ED%95%9C%EA%B8%80/").should eq("/%ED%95%9C%EA%B8%80/")
+    end
+
+    # An unservable path must be 404'd, never redirected — and `Path.posix`
+    # raises on a NUL, so this is also what keeps the caller from 500ing.
+    it "refuses to canonicalise a path the server will not serve" do
+      ["//guide%2Fx/", "//a\\b/", "//x%00/", "//%c0%ae/"].each do |path|
+        Hwaro::Services::DevPath.canonical_target(path).should be_nil
+      end
+    end
+  end
+
   describe ".encode_relative" do
     it "leaves an empty path alone" do
       Hwaro::Services::DevPath.encode_relative("").should eq("")

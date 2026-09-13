@@ -75,6 +75,13 @@ module Hwaro
       # during that window was absorbed into the baseline and never rebuilt.
       # Consumed once by the watch loop; nil afterwards.
       @watch_baseline : Hash(String, FileStamp)? = nil
+      # Watch roots beyond WATCH_ROOTS, resolved from config at startup: the
+      # `[assets] source_dir` when it points outside `static/`. The asset
+      # pipeline reads bundle sources from there on every build, but the
+      # watcher scanned only the fixed roots — so editing one during serve
+      # produced no event at all and the fingerprinted bundle kept serving its
+      # pre-edit bytes for the whole session.
+      @extra_watch_roots : Array(String) = [] of String
       # The stamps our own most recent hook-running build left on the watched
       # config files it rewrote WITHOUT changing a byte. Empty for the
       # overwhelmingly common build that touches no config at all. See
@@ -146,6 +153,11 @@ module Hwaro
       # Polling interval for the file watcher.
       POLL_INTERVAL = 500.milliseconds
 
+      # The project directories the watcher always scans, in the order the
+      # serve receipt lists them. `[assets] source_dir` can add one more —
+      # see @extra_watch_roots.
+      WATCH_ROOTS = ["content", "templates", "static", "data", "i18n"]
+
       # Cap on the build-failure text that reaches the terminal and the browser
       # overlay. Crinja quotes the offending source lines in its message, so a
       # single very long line near a syntax error (a minified vendor bundle
@@ -202,6 +214,11 @@ module Hwaro
         # — scan_mtimes stats it alongside config.toml.
         @env_config_file = build_options.env.try { |e| "config.#{e}.toml" }
         @error_overlay = build_options.error_overlay
+        # Resolved BEFORE capture_watch_baseline: a root added to the scan
+        # after the baseline was taken reports every file under it as new on
+        # the first poll, which is a spurious full rebuild seconds after
+        # startup.
+        @extra_watch_roots = resolve_extra_watch_roots(load_config_or_nil(build_options.env))
         # Must happen before any handler is built so StaticFileHandler picks
         # the charset-bearing types up.
         Server.register_utf8_mime_types
@@ -306,7 +323,8 @@ module Hwaro
         serve_receipt = Logger::Receipt.new("serve")
         serve_receipt.row("url", url, Logger::Role::Accent)
         serve_receipt.row("reload", live_reload ? "enabled" : "disabled")
-        serve_receipt.row("watch", "content · templates · static · data · i18n · config")
+        watched = WATCH_ROOTS + @extra_watch_roots + ["config"]
+        serve_receipt.row("watch", watched.join(" · "))
         serve_receipt.outcome("ready", "Ctrl+C to stop")
         # Blank line separates the serve block from the initial build's
         # receipt above it (TTY rhythm only; plain output stays byte-stable).

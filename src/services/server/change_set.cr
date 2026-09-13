@@ -31,6 +31,11 @@ module Hwaro
       getter removed_files : Array(String)
       # Whether config.toml itself changed
       getter config_changed : Bool
+      # Which watched config files changed — `config.toml`, the
+      # `config.<env>.toml` overlay, or both. Reporting only, so the watch
+      # timeline can name the file the developer actually saved instead of
+      # always printing "config.toml"; every decision reads `config_changed`.
+      getter config_files : Array(String)
 
       def initialize(
         @modified_content : Array(String),
@@ -41,6 +46,7 @@ module Hwaro
         @config_changed : Bool,
         @modified_content_files : Array(String) = [] of String,
         @modified_data : Array(String) = [] of String,
+        @config_files : Array(String) = [] of String,
       )
       end
 
@@ -152,6 +158,7 @@ module Hwaro
           added_files: net_added,
           removed_files: net_removed,
           config_changed: @config_changed || other.config_changed,
+          config_files: (@config_files + other.config_files).uniq,
         )
       end
 
@@ -228,7 +235,14 @@ module Hwaro
       # changed (the common save-one-file loop), the category summary above
       # otherwise.
       def display : String
-        return "config.toml" if @config_changed && all_changed_files.empty?
+        if @config_changed && all_changed_files.empty?
+          # Name the file actually saved: a `config.<env>.toml` edit under
+          # --env / HWARO_ENV used to be reported as "config.toml", pointing
+          # the developer at a file they had not touched. The fallback covers
+          # a changeset built without the list (specs, older call sites).
+          return "config.toml" if @config_files.empty?
+          return @config_files.join(", ")
+        end
         files = all_changed_files
         files.size == 1 && !@config_changed ? files.first : description
       end

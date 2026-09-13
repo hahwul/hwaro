@@ -66,6 +66,13 @@ module Hwaro
           verbose = options.verbose
 
           # --- 1. Identify changed pages and snapshot their state before re-parse ---
+          # Fingerprint the global page/section sets BEFORE the re-parse, so
+          # the fan-out below can tell whether this edit changed anything the
+          # site's listing pages actually print. See listing_fanout_pages.
+          listing_fields = listing_page_fields(templates)
+          before_page_fp = compute_page_set_fingerprint(site.pages, listing_fields)
+          before_section_fp = compute_section_set_fingerprint(site.sections)
+
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
 
@@ -225,13 +232,17 @@ module Hwaro
             end
           end
 
-          # KNOWN LIMITATION (serve preview only): a page that renders ANOTHER
-          # section's listing via `get_section(X).pages` or a global `site.pages`
-          # widget (e.g. a sidebar "recent posts") is NOT re-rendered when a page
-          # in X changes, so its on-disk HTML can show a stale list until that
-          # page is itself touched. Bounding this would require tracking which
-          # pages reference which section lists; a full `hwaro build` is always
-          # correct, so this is left as a documented preview-mode gap.
+          # Pages that render a listing derived from the GLOBAL page/section
+          # set — the homepage's "latest posts", a paginated archive, a nav
+          # built from `site.menus`, a sidebar reading `get_section(X).pages`.
+          # None of them own the edited page, so none of the selections above
+          # reach them, and their on-disk HTML kept showing the pre-edit title
+          # (or kept listing a page just flipped to draft) until something
+          # unrelated happened to re-render them.
+          listing_fanout_pages(site, templates, all_pages,
+            page_set_changed: compute_page_set_fingerprint(site.pages, listing_fields) != before_page_fp,
+            section_set_changed: compute_section_set_fingerprint(site.sections) != before_section_fp,
+          ).each { |p| pages_to_render << p }
 
           render_list = pages_to_render.to_a
 
@@ -294,6 +305,17 @@ module Hwaro
           output_dir = options.output_dir
           pages_map = @pages_by_path || build_pages_by_path(site)
 
+          # Set fingerprints taken before the re-parse, exactly as in
+          # run_incremental — the re-render below is selective too, so a
+          # listing page the template edit doesn't touch needs the same
+          # fan-out. Folded against the CURRENT templates: run_rerender
+          # reloads them, but `listing_page_fields` only decides which page
+          # fields enter the digest, and both sides of the comparison use the
+          # same answer.
+          listing_fields = listing_page_fields(@templates || {} of String => String)
+          before_page_fp = compute_page_set_fingerprint(site.pages, listing_fields)
+          before_section_fp = compute_section_set_fingerprint(site.sections)
+
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
           changed_pages = reparsed.changed_pages
@@ -335,7 +357,49 @@ module Hwaro
           # bare mtime touch). Flips INTO the set escalate to a full rebuild
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
-          run_rerender(options, force_pages: changed_pages, membership_changed: !excluded_pages.empty?)
+          run_rerender(options, force_pages: changed_pages, membership_changed: !excluded_pages.empty?,
+            page_set_changed: compute_page_set_fingerprint(site.pages, listing_fields) != before_page_fp,
+            section_set_changed: compute_section_set_fingerprint(site.sections) != before_section_fp)
+        end
+
+        # Pages whose template closure renders a global page/section listing,
+        # returned only when this rebuild actually moved the corresponding set
+        # fingerprint.
+        #
+        # This is the incremental counterpart of what `hwaro build --cache`
+        # already does in `filter_changed_pages`: same marker scan
+        # (`listing_template_deps`), same fingerprints
+        # (`compute_page_set_fingerprint` / `compute_section_set_fingerprint`),
+        # so the two paths agree on which pages a set change reaches. Without
+        # it, `hwaro serve` had a standing gap the full build did not — a
+        # retitled post left the homepage showing the old title for the rest of
+        # the session.
+        #
+        # The fingerprint gate is what keeps this cheap. An edit that moves
+        # nothing a listing reads — a body-only change on a site whose
+        # listings print no excerpts — selects nothing, so the common
+        # save-and-refresh loop is unchanged. The two digests are the whole
+        # added cost, and they are the same ones a cached build pays per build.
+        private def listing_fanout_pages(
+          site : Models::Site,
+          templates : Hash(String, String),
+          all_pages : Array(Models::Page),
+          page_set_changed : Bool,
+          section_set_changed : Bool,
+        ) : Array(Models::Page)
+          return [] of Models::Page unless page_set_changed || section_set_changed
+
+          listing_memo = {} of String => Tuple(Bool, Bool)
+          all_pages.select do |page|
+            next false unless page.render
+            entry = determine_template(page, templates, site)
+            page_dep, section_dep = (listing_memo[entry]? || (listing_memo[entry] = listing_template_deps(entry, templates)))
+            # Mirrors filter_changed_pages: a section index renders its
+            # section's page list even via `{{ section.list }}`, which leaves
+            # no marker in the template source to scan for.
+            page_dep ||= page.is_a?(Models::Section)
+            (page_dep && page_set_changed) || (section_dep && section_set_changed)
+          end
         end
 
         # Everything the incremental strategies need to know about the pages a
@@ -514,7 +578,19 @@ module Hwaro
         # pass (a draft/expired/future flip): the SEO surfaces and taxonomy
         # pages must refresh even when no template content changed, and the
         # identical-templates early return must not skip that work.
-        def run_rerender(options : Config::Options::BuildOptions, force_pages : Array(Models::Page)? = nil, membership_changed : Bool = false) : Bool
+        #
+        # `page_set_changed` / `section_set_changed` report that the caller's
+        # content re-parse moved the global set fingerprints, so the selective
+        # render set must also take in the listing pages that print those sets
+        # (see listing_fanout_pages). Both default to false: a pure template
+        # edit changes no page metadata.
+        def run_rerender(
+          options : Config::Options::BuildOptions,
+          force_pages : Array(Models::Page)? = nil,
+          membership_changed : Bool = false,
+          page_set_changed : Bool = false,
+          section_set_changed : Bool = false,
+        ) : Bool
           @render_workers = options.workers
           config = @config
           site = @site
@@ -607,12 +683,16 @@ module Hwaro
                                   deps.shortcodes_used_in(page.raw_content).any? { |sc| affected_templates.includes?(sc) } ||
                                   format_templates_affected?(page, templates, site, affected_templates)
                               end
+                              seen = selected.map(&.path).to_set
                               if forced = force_pages
-                                seen = selected.map(&.path).to_set
                                 forced.each do |page|
-                                  selected << page if page.render && !seen.includes?(page.path)
+                                  selected << page if page.render && seen.add?(page.path)
                                 end
                               end
+                              listing_fanout_pages(site, templates, all_pages,
+                                page_set_changed: page_set_changed,
+                                section_set_changed: section_set_changed,
+                              ).each { |page| selected << page if seen.add?(page.path) }
                               selected
                             else
                               renderable_pages
@@ -738,7 +818,7 @@ module Hwaro
           cache.save if options.cache
 
           elapsed = Time.instant - start_time
-          Logger.outcome("rebuilt", "#{count} pages · re-render", :result, elapsed.total_milliseconds)
+          Logger.outcome("rebuilt", "#{count} #{count == 1 ? "page" : "pages"} · re-render", :result, elapsed.total_milliseconds)
           report_cache_stats(verbose)
           true
         end
@@ -859,7 +939,7 @@ module Hwaro
           @deferred_pages = nil
 
           elapsed = Time.instant - start_time
-          Logger.outcome("rendered", "#{count} deferred pages", :result, elapsed.total_milliseconds)
+          Logger.outcome("rendered", "#{count} deferred #{count == 1 ? "page" : "pages"}", :result, elapsed.total_milliseconds)
           count
         end
       end

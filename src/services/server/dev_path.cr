@@ -62,10 +62,23 @@ module Hwaro
         # a 404. Invalid bytes are unservable by definition.
         return true unless path.valid_encoding?
 
-        path.includes?('\\') ||
-          path.includes?(Char::ZERO) ||
-          ENCODED_SEPARATOR.matches?(path) ||
-          ENCODED_NULL.matches?(path)
+        return true if path.includes?('\\') ||
+                       path.includes?(Char::ZERO) ||
+                       ENCODED_SEPARATOR.matches?(path) ||
+                       ENCODED_NULL.matches?(path)
+
+        # Percent-encoded invalid UTF-8 (`/%c0%ae%c0%ae/`, `/%ff`) is valid
+        # ASCII on the wire and only becomes invalid after decoding, so the
+        # check above cannot see it. Nothing downstream can serve such a path
+        # — `safe_relative` refuses it — but `HTTP::StaticFileHandler` decodes
+        # it, canonicalises it, and re-encodes the result, which turns every
+        # undecodable byte into U+FFFD: `/%c0%ae%c0%ae/` was answered with a
+        # 302 to `/%EF%BF%BD%EF%BF%BD%EF%BF%BD%EF%BF%BD/index.html`. A static
+        # host 404s the request; so do we. Guarded on `%` so the ordinary path
+        # pays no decode.
+        return true if path.includes?('%') && !URI.decode(path).valid_encoding?
+
+        false
       end
 
       def safe_relative(path : String) : String?
@@ -82,6 +95,36 @@ module Hwaro
         return if segments.any? { |segment| dots_only?(segment) }
 
         segments.join("/")
+      end
+
+      # The canonical form of `path` when it is not already canonical, or nil
+      # when nothing should be redirected.
+      #
+      # Mirrors `HTTP::StaticFileHandler`'s own test exactly — decode once,
+      # `Path.posix(...).expand("/")`, compare as `Path` — so a pre-empt built
+      # on this fires when and only when stdlib would have redirected, and
+      # lands on the same target (`Path#expand` keeps a trailing slash, so a
+      # directory URL stays a directory URL). The result is re-encoded because
+      # the comparison runs on decoded bytes.
+      #
+      # Handlers pre-empt stdlib rather than letting it answer because a
+      # redirect it emits reflects whatever the chain did to `request.path`
+      # along the way — `IndexRewriteHandler`'s `/` → `/index.html` rewrite
+      # leaked into it — and because `Response#redirect` closes the response,
+      # so no handler above can correct the `Location` afterwards.
+      def canonical_target(path : String) : String?
+        # Never canonicalise a path the server refuses to serve: an
+        # unservable path must be 404'd, not redirected, and `Path.posix`
+        # raises on a NUL.
+        return if unservable?(path)
+
+        decoded = URI.decode(path)
+        return unless decoded.valid_encoding?
+
+        request_path = Path.posix(decoded)
+        expanded = request_path.expand("/")
+        return if request_path == expanded
+        URI.encode_path(expanded.to_s)
       end
 
       # Percent-encode a resolved relative path back into a URI reference.
