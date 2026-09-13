@@ -664,5 +664,66 @@ describe Hwaro::Services::Importers::JekyllImporter do
         content.should contain("Just plain content.")
       end
     end
+
+    it "imports standalone root pages and subfolder pages" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        docs_dir = File.join(dir, "docs")
+        FileUtils.mkdir_p(posts_dir)
+        FileUtils.mkdir_p(docs_dir)
+
+        File.write(File.join(posts_dir, "2024-01-01-post.md"), <<-JEKYLL
+          ---
+          title: "My Post"
+          ---
+          Post content.
+          JEKYLL
+        )
+
+        File.write(File.join(dir, "about.md"), <<-JEKYLL
+          ---
+          title: "About Me"
+          layout: page
+          ---
+          About page content.
+          JEKYLL
+        )
+
+        File.write(File.join(docs_dir, "guide.md"), <<-JEKYLL
+          ---
+          title: "Guide"
+          ---
+          Guide content.
+          JEKYLL
+        )
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "jekyll",
+          path: dir,
+          output_dir: output_dir,
+        )
+
+        importer = Hwaro::Services::Importers::JekyllImporter.new
+        result = importer.run(options)
+
+        result.imported_count.should eq(3)
+        result.error_count.should eq(0)
+
+        # Post is in posts/
+        File.exists?(File.join(output_dir, "posts", "post.md")).should be_true
+        # Root page is in root output
+        File.exists?(File.join(output_dir, "about.md")).should be_true
+        about_content = File.read(File.join(output_dir, "about.md"))
+        about_content.should contain("title = \"About Me\"")
+        about_content.should contain("template = \"page\"")
+        about_content.should contain("About page content.")
+        # Subfolder page is in docs/
+        File.exists?(File.join(output_dir, "docs", "guide.md")).should be_true
+        guide_content = File.read(File.join(output_dir, "docs", "guide.md"))
+        guide_content.should contain("title = \"Guide\"")
+        guide_content.should contain("Guide content.")
+      end
+    end
   end
 end

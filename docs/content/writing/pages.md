@@ -396,7 +396,7 @@ Tables work inside admonitions and plain blockquotes: prefix every row with `>` 
 
 Disable by setting `admonitions = false` under `[markdown]` in `config.toml`.
 
-Limitations: matching is type-case-sensitive (`[!NOTE]` only, not `[!note]`), and a nested blockquote inside an admonition body closes the outer admonition early. There is no inline escape. Backslash-escaping (`\[!NOTE\]`) renders the same characters and still triggers the admonition, so disable the feature if you need to render the literal token.
+Limitations: a nested blockquote inside an admonition body closes the outer admonition early. There is no inline escape. Backslash-escaping (`\[!NOTE\]`) renders the same characters and still triggers the admonition, so disable the feature if you need to render the literal token.
 
 ### Custom Heading IDs
 

@@ -655,10 +655,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should eq(html)
     end
 
-    it "is case-sensitive on the type token" do
-      html = "<blockquote>\n<p>[!note]\nbody</p>\n</blockquote>"
-      result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
-      result.should eq(html)
+    it "accepts case-insensitive type tokens" do
+      %w[note Note NOTE tip Tip TIP warning Warning WARNING caution Caution CAUTION important Important IMPORTANT].each do |type|
+        html = "<blockquote>\n<p>[!#{type}]\nbody</p>\n</blockquote>"
+        result = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+        result.should contain("admonition-#{type.downcase}")
+        result.should contain("<p class=\"admonition-title\">#{type.capitalize}</p>")
+      end
     end
 
     # Regression: text after the marker on the same line (`> [!NOTE] Custom
@@ -1106,6 +1109,19 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain(%(<div class="admonition admonition-note">))
       html.should contain(%(<p class="admonition-title">My Title</p>))
       html.should contain("<strong>bold</strong>")
+      html.should contain("</div>")
+    end
+
+    it "accepts whitespace between colons and container type" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        "::: note Space Title\nBody text\n:::",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<div class="admonition admonition-note">))
+      html.should contain(%(<p class="admonition-title">Space Title</p>))
+      html.should contain("Body text")
       html.should contain("</div>")
     end
 
