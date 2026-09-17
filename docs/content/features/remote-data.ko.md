@@ -91,6 +91,7 @@ CSV에서 `load_data()`가 만드는 모양과 같습니다.
 
 ## 함께 보기
 
-- [데이터 모델](/ko/templates/data-model/#데이터-파일) — 로컬 `data/` 파일과 템플릿 접근
+- [데이터 모델](/ko/templates/data-model/#데이터-디렉터리) — 로컬 `data/` 파일과 템플릿 접근
 - [콘텐츠 생성](/ko/features/content-generation/) — 데이터 레코드를 페이지로 만들기
 - [빌드 훅](/ko/features/build-hooks/) — 여러 단계 또는 GET 이외의 연동
+- [날짜별 리포트 페이지](/ko/features/dated-report-pages/) — API로 `/reports/2026/09/` 페이지를 만드는 실전 예제

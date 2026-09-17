@@ -96,6 +96,7 @@ authored content.
 
 ## See Also
 
-- [Data Model](/templates/data-model/#data-files) — local `data/` files and template access
+- [Data Model](/templates/data-model/#data-directory) — local `data/` files and template access
 - [Content Generation](/features/content-generation/) — materialize data records as pages
 - [Build Hooks](/features/build-hooks/) — multi-step or non-GET integrations
+- [Dated Report Pages](/features/dated-report-pages/) — a worked example: an API to `/reports/2026/09/` pages

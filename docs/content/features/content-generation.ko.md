@@ -92,3 +92,11 @@ Error [HWARO_E_CONTENT]: [[content.generate]] "products.items": record #37: miss
 ```
 
 `source`가 없거나 배열이 아닌 규칙도 빌드를 실패시킵니다. 오타가 조용히 0개의 페이지를 생성하는 일은 없어야 합니다.
+
+## 함께 보기
+
+- [원격 데이터 소스](/ko/features/remote-data/) — HTTP(S) API로 규칙에 데이터 공급하기
+- [날짜별 리포트 페이지](/ko/features/dated-report-pages/) — API로 `/reports/2026/09/` 페이지를 만드는 실전 예제
+- [데이터 모델](/ko/templates/data-model/#데이터-디렉터리) — 로컬 `data/` 파일과 템플릿 접근
+- [설정 › 퍼머링크](/ko/start/config/#퍼머링크) — 생성 URL을 위한 토큰 패턴
+- [섹션](/ko/writing/sections/) — `sort_by`, `page_template`, 섹션 목록
