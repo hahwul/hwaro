@@ -92,3 +92,11 @@ Error [HWARO_E_CONTENT]: [[content.generate]] "products.items": record #37: miss
 ```
 
 A rule whose `source` is missing or not an array fails the build too. A typo must never silently generate zero pages.
+
+## See Also
+
+- [Remote Data Sources](/features/remote-data/) — feeding a rule from an HTTP(S) API
+- [Dated Report Pages](/features/dated-report-pages/) — a worked example: an API to `/reports/2026/09/` pages
+- [Data Model](/templates/data-model/#data-directory) — local `data/` files and template access
+- [Configuration › Permalinks](/start/config/#permalinks) — token patterns for generated URLs
+- [Sections](/writing/sections/) — `sort_by`, `page_template` and section listings

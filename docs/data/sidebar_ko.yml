@@ -107,6 +107,8 @@
           url: /ko/features/remote-data/
         - title: 콘텐츠 생성
           url: /ko/features/content-generation/
+        - title: 날짜별 리포트 페이지
+          url: /ko/features/dated-report-pages/
     - title: 플랫폼
       items:
         - title: 다국어

@@ -109,6 +109,8 @@
           url: /features/remote-data/
         - title: Content Generation
           url: /features/content-generation/
+        - title: Dated Report Pages
+          url: /features/dated-report-pages/
     - title: Platform
       items:
         - title: Multilingual
