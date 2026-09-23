@@ -82,9 +82,10 @@ describe Hwaro::Services::Exporters::Base do
       end
     end
 
-    it "skips markdown symlinks that resolve outside the content tree" do
+    it "skips markdown symlinks that resolve outside the project root" do
       Dir.mktmpdir do |dir|
-        content = File.join(dir, "content")
+        project = File.join(dir, "project")
+        content = File.join(project, "content")
         outside = File.join(dir, "outside")
         FileUtils.mkdir_p(content)
         FileUtils.mkdir_p(outside)
@@ -94,6 +95,22 @@ describe Hwaro::Services::Exporters::Base do
 
         files = TestExporter.new.test_scan_content_files(content)
         files.map { |path| File.basename(path) }.should eq(["local.md"])
+      end
+    end
+
+    it "keeps markdown symlinks that resolve elsewhere inside the project" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        content = File.join(project, "content")
+        shared = File.join(project, "shared")
+        FileUtils.mkdir_p(content)
+        FileUtils.mkdir_p(shared)
+        File.write(File.join(content, "local.md"), "local")
+        File.write(File.join(shared, "docs.md"), "shared")
+        File.symlink("../shared/docs.md", File.join(content, "docs.md"))
+
+        files = TestExporter.new.test_scan_content_files(content)
+        files.map { |path| File.basename(path) }.should eq(["docs.md", "local.md"])
       end
     end
   end
