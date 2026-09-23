@@ -56,32 +56,13 @@ private class FailingMarkdown < Hwaro::Content::Processors::Markdown
   end
 end
 
-# Capture and restore the registry around each test so we don't pollute other
-# specs that depend on the default-registered processors (markdown, html, ...).
-#
-# NOTE: The snapshot stores references to processor instances, not clones.
-# Tests inside the block must NOT mutate any processor's internal state, or
-# the restore will put a mutated instance back into the global registry.
-private def with_registry_snapshot(&)
-  snapshot = {} of String => Hwaro::Content::Processors::Base
-  Hwaro::Content::Processors::Registry.names.each do |n|
-    if p = Hwaro::Content::Processors::Registry.get(n)
-      snapshot[n] = p
-    end
-  end
-
-  begin
-    yield
-  ensure
-    Hwaro::Content::Processors::Registry.clear
-    snapshot.each_value { |p| Hwaro::Content::Processors::Registry.register(p) }
-  end
-end
-
+# Registry mutations run inside `with_isolated_registries`
+# (spec/support/registry_helper.cr) so the default-registered processors
+# (markdown, html, ...) are back in place for every later spec.
 describe Hwaro::Content::Processors::Registry do
   describe ".clear" do
     it "removes every registered processor" do
-      with_registry_snapshot do
+      with_isolated_registries do
         Hwaro::Content::Processors::Registry.register(GapTestProcessor.new)
         Hwaro::Content::Processors::Registry.has?("gap-test-processor").should be_true
 
@@ -93,7 +74,7 @@ describe Hwaro::Content::Processors::Registry do
     end
 
     it "is safe to call when the registry is already empty" do
-      with_registry_snapshot do
+      with_isolated_registries do
         Hwaro::Content::Processors::Registry.clear
         Hwaro::Content::Processors::Registry.clear
         Hwaro::Content::Processors::Registry.all.should be_empty
@@ -103,7 +84,7 @@ describe Hwaro::Content::Processors::Registry do
 
   describe "sort cache invalidation on register" do
     it "rebuilds the priority-sorted list when a new processor is registered" do
-      with_registry_snapshot do
+      with_isolated_registries do
         Hwaro::Content::Processors::Registry.clear
         Hwaro::Content::Processors::Registry.register(GapTestProcessor.new)
         # Warm the cache: priority-0 processor is the only entry
@@ -118,7 +99,7 @@ describe Hwaro::Content::Processors::Registry do
 
   describe ".for_file" do
     it "returns truly empty when no registered processor matches the extension" do
-      with_registry_snapshot do
+      with_isolated_registries do
         Hwaro::Content::Processors::Registry.clear
         Hwaro::Content::Processors::Registry.register(GapTestProcessor.new)
         Hwaro::Content::Processors::Registry.for_file("image.png").should be_empty
