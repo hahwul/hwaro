@@ -265,6 +265,7 @@ module Hwaro
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
           raise_on_broken_internal_links!
+          regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
           sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
@@ -827,6 +828,7 @@ module Hwaro
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
           raise_on_broken_internal_links!
+          regenerate_amp_mirrors(pages_to_render, site, output_dir, verbose)
 
           # Re-generate the 404 page with the new template — and whenever
           # content moved: it renders the same site-wide listings (a docs
@@ -978,6 +980,7 @@ module Hwaro
           # rescues this and routes it into the error overlay via
           # notify_build_error; the server keeps running.
           raise_on_broken_internal_links!
+          regenerate_amp_mirrors(renderable, site, output_dir, verbose)
 
           # Refresh feeds / sitemap / search now that every page has rendered
           # content. Without this, feed descriptions and the search index

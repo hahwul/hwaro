@@ -251,6 +251,10 @@ module Hwaro
                   elsif cfg = @config
                     outputs.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
                   end
+                  # Its `[amp]` mirror goes with it.
+                  if (cfg = @config) && (mirror = Content::Seo::Amp.mirror_output_for(page, cfg, output_dir))
+                    outputs << mirror
+                  end
                 end
               else
                 dest = File.join(output_dir, path.lchop("content/"))
@@ -285,6 +289,9 @@ module Hwaro
           paths = [get_output_path(page, output_dir)].compact
           if cfg = @config
             paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
+            if mirror = Content::Seo::Amp.mirror_output_for(page, cfg, output_dir)
+              paths << mirror
+            end
           end
           paths
         end
@@ -397,6 +404,17 @@ module Hwaro
           owned_output_paths(output_dir).each { |path| keep << File.expand_path(path, cwd) }
           stale = stale.uniq.reject { |path| keep.includes?(File.expand_path(path, cwd)) }
           delete_orphaned_outputs(stale, output_dir) unless stale.empty?
+        end
+
+        # Rewrite the `[amp]` mirrors of pages an incremental strategy just
+        # re-rendered. The mirror is converted from the canonical HTML, and
+        # the conversion also injects `<link rel="amphtml">` into that HTML —
+        # only the full build's AfterRender hook ran it, so every incremental
+        # re-render dropped the link from the canonical page and left the
+        # mirror serving the pre-edit content.
+        private def regenerate_amp_mirrors(pages : Enumerable(Models::Page), site : Models::Site, output_dir : String, verbose : Bool) : Nil
+          return unless site.config.amp.enabled
+          Content::Seo::Amp.generate(pages.to_a, site.config, output_dir, verbose, builder: self)
         end
 
         # Resolve `path` relative to `root`, falling back to a plain prefix

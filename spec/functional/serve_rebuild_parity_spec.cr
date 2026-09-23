@@ -65,4 +65,78 @@ describe "serve rebuild parity" do
       end
     end
   end
+
+  # `[amp]` mirrors were only written by the full build's AfterRender hook.
+  # An incremental re-render rewrote the canonical page without its
+  # `<link rel="amphtml">` and left the mirror on the pre-edit content; a
+  # deleted page kept its mirror.
+  it "keeps AMP mirrors in step with incremental rebuilds" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_amp_site
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.read("public/amp/posts/one/index.html").should contain("Old One")
+
+        File.write("content/posts/one.md", "---\ntitle: New One\n---\nbody")
+        builder.run_incremental(["content/posts/one.md"], options).should be_true
+
+        File.read("public/amp/posts/one/index.html").should contain("New One")
+        File.read("public/posts/one/index.html").should contain(%(rel="amphtml"))
+      end
+    end
+  end
+
+  it "maps a deleted page to its AMP mirror" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_amp_site
+        File.write("content/posts/two.md", "---\ntitle: Two\n---\nbody")
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.exists?("public/amp/posts/one/index.html").should be_true
+        File.exists?("public/amp/posts/two/index.html").should be_true
+
+        stale = builder.stale_outputs_for_removed(["content/posts/one.md"], "public")
+        stale.should contain(File.join("public", "amp", "posts", "one", "index.html"))
+      end
+    end
+  end
+
+  it "removes the AMP mirror of a page an incremental edit drafted" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_amp_site
+        File.write("content/posts/two.md", "---\ntitle: Two\n---\nbody")
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.exists?("public/amp/posts/two/index.html").should be_true
+
+        File.write("content/posts/two.md", "---\ntitle: Two\ndraft: true\n---\nbody")
+        builder.run_incremental(["content/posts/two.md"], options).should be_true
+        File.exists?("public/amp/posts/two/index.html").should be_false
+      end
+    end
+  end
+end
+
+private def write_amp_site
+  File.write("config.toml", <<-TOML
+    title = "Amp"
+    base_url = "https://example.com"
+
+    [amp]
+    enabled = true
+    sections = ["posts"]
+    TOML
+  )
+  FileUtils.mkdir_p("content/posts")
+  FileUtils.mkdir_p("templates")
+  File.write("templates/page.html", "<html><head><title>{{ page.title }}</title></head><body>{{ page.title }}</body></html>")
+  File.write("templates/section.html", "<html><head><title>{{ section.title }}</title></head><body>list</body></html>")
+  File.write("content/posts/_index.md", "---\ntitle: Posts\n---\n")
+  File.write("content/posts/one.md", "---\ntitle: Old One\n---\nbody")
 end
