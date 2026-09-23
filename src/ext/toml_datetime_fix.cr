@@ -118,6 +118,11 @@ class TOML::Lexer
       hour_offset = consume_datetime_component 2, "expected hour offset digit"
       raise "expected ':'" unless next_char == ':'
       minute_offset = consume_datetime_component 2, "expected minute offset digit"
+      # `Time::Location.fixed` raises its own Time::Error past ±24h, which
+      # no caller treats as a parse failure (a remote TOML source with
+      # `on_error` = warn-and-skip aborted the build), and `+23:99`
+      # silently meant `+24:39`. Reject both as TOML errors here.
+      raise "invalid UTC offset" if hour_offset > 23 || minute_offset > 59
       next_char
     else
       local_time = true

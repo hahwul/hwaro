@@ -35,6 +35,16 @@ describe "TOML offset date-times (ext/toml_datetime_fix)" do
 
     TOML.parse("a = 2024-03-05T08:20:30Z")["a"].raw.as(Time).utc?.should be_true
   end
+
+  # An out-of-range offset reached Time::Location.fixed, whose
+  # InvalidTimezoneOffsetError no caller rescues as a parse failure, and
+  # `+23:99` was accepted as `+24:39`.
+  it "rejects an out-of-range offset as a TOML parse error" do
+    {"+25:00", "+99:00", "-24:00", "+23:99", "+05:60"}.each do |off|
+      expect_raises(TOML::ParseException) { TOML.parse("a = 2024-03-05T08:20:30#{off}") }
+    end
+    TOML.parse("a = 2024-03-05T08:20:30+23:59")["a"].raw.as(Time).offset.should eq(23 * 3600 + 59 * 60)
+  end
 end
 
 describe "TOML local times (ext/toml_datetime_fix)" do
