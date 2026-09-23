@@ -1429,6 +1429,36 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain(%(rel="noopener"))
     end
 
+    it "honors case-insensitive href attribute names in raw HTML" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(<a HREF="https://example.com">x</a>),
+        markdown_config: cfg,
+      )
+      html.should contain(%(HREF="https://example.com" target="_blank" rel="noopener"))
+    end
+
+    it "honors single-quoted href attributes in raw HTML" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(<a href='https://example.com'>x</a>),
+        markdown_config: cfg,
+      )
+      html.should contain(%(href='https://example.com' target="_blank" rel="noopener"))
+    end
+
+    it "merges rel tokens into a single-quoted rel attribute" do
+      cfg = make_config
+      cfg.external_links_no_follow = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://example.com" rel='me'>x</a>), cfg
+      )
+      html.should contain(%(rel='me nofollow'))
+      html.scan("rel=").size.should eq(1)
+    end
+
     it "leaves links inside code blocks and mailto links alone" do
       cfg = make_config
       cfg.external_links_target_blank = true
