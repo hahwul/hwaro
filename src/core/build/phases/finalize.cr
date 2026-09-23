@@ -15,6 +15,8 @@ module Hwaro::Core::Build::Phases::Finalize
       if ctx.options.cache
         prune_orphaned_cached_outputs(ctx, build_cache)
         build_cache.save
+      else
+        prune_unclaimed_generated_outputs(ctx)
       end
     end
     profiler.end_phase
@@ -114,6 +116,33 @@ module Hwaro::Core::Build::Phases::Finalize
     return if stale.empty?
 
     delete_orphaned_outputs(stale, output_dir)
+  end
+
+  # The cacheless counterpart of the `stale_generated_outputs` half of the
+  # prune above, for a builder that runs more than one build into the same
+  # output directory — the `hwaro serve` session, whose rebuilds keep the
+  # directory. Diffs this build's claims against the ones the builder held
+  # when this build started (`@previous_generated_claims`), with the same
+  # protections: nothing a live page renders to, nothing claimed now, nothing
+  # written by this build. A one-shot cold build has no previous claims and
+  # prunes nothing.
+  private def prune_unclaimed_generated_outputs(ctx : Lifecycle::BuildContext) : Nil
+    previous = @generated_claims_mutex.synchronize { @previous_generated_claims }
+    return if previous.empty?
+    output_dir = ctx.options.output_dir
+    cwd = Dir.current
+
+    keep = Set(String).new
+    generated_output_claims.each { |path| keep << protected_output_key(path, cwd) }
+    ctx.all_pages.each do |page|
+      next unless page.render
+      collect_page_output_paths(page, output_dir).each { |path| keep << protected_output_key(path, cwd) }
+    end
+
+    stale = previous.reject do |path|
+      keep.includes?(protected_output_key(path, cwd)) || written_this_build?(path)
+    end
+    delete_orphaned_outputs(stale.sort!, output_dir) unless stale.empty?
   end
 
   # Comparison key for "is this file still written by this build?".

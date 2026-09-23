@@ -177,4 +177,53 @@ describe "serve orphaned outputs" do
       end
     end
   end
+
+  # Without `--cache` the claims diff that prunes source-less generated
+  # outputs had nothing to diff against, so every CSS save in a serve session
+  # left the previous fingerprinted bundle behind.
+  it "drops a superseded fingerprinted bundle on a full rebuild" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        File.open("config.toml", "a") do |io|
+          io << "\n[assets]\nenabled = true\nfingerprint = true\n\n"
+          io << "[[assets.bundles]]\nname = \"main.css\"\nfiles = [\"css/a.css\"]\n"
+        end
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/a.css", "body{color:red}")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        first = Dir.glob("public/assets/main.*.css")
+        first.size.should eq(1)
+
+        File.write("static/css/a.css", "body{color:blue}")
+        server.orphan_builder.run(options).should be_true
+
+        bundles = Dir.glob("public/assets/main.*.css")
+        bundles.size.should eq(1)
+        bundles.should_not eq(first)
+      end
+    end
+  end
+
+  it "drops the AMP tree once [amp] is switched off" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        base = File.read("config.toml")
+        File.write("config.toml", base + "\n[amp]\nenabled = true\nsections = [\"posts\"]\n")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/amp/posts/keep/index.html").should be_true
+
+        File.write("config.toml", base)
+        server.orphan_builder.run(options).should be_true
+
+        Dir.exists?("public/amp").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+  end
 end

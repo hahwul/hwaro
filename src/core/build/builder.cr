@@ -319,6 +319,14 @@ module Hwaro
         # today's behaviour instead of losing files. Reset by the Initialize
         # phase; guarded because taxonomy rendering fans out.
         @generated_output_claims : Set(String) = Set(String).new
+        # What the builder had claimed when the current build reset the set:
+        # the previous build's claims plus everything a serve session's
+        # incremental passes claimed since. Without `--cache` there is no
+        # persisted list to diff against, and this in-memory one is what lets
+        # a `hwaro serve` full rebuild drop the outputs it no longer
+        # publishes (a superseded `main.<hash>.css`, the `amp/` tree after
+        # `[amp]` is switched off). Empty on a process's first build.
+        @previous_generated_claims : Set(String) = Set(String).new
         @generated_claims_mutex : Mutex = Mutex.new
         # Output files the static copy actually (re)wrote this build, in the
         # canonical absolute form `get_output_path` produces. `static/` is
@@ -401,7 +409,10 @@ module Hwaro
         end
 
         def reset_generated_output_claims : Nil
-          @generated_claims_mutex.synchronize { @generated_output_claims.clear }
+          @generated_claims_mutex.synchronize do
+            @previous_generated_claims = @generated_output_claims
+            @generated_output_claims = Set(String).new
+          end
         end
 
         # Record an output file the static copy just wrote over (see
