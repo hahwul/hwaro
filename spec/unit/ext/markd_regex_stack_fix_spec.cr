@@ -1,7 +1,8 @@
 require "../../spec_helper"
 
 # ext/markd_regex_stack_fix.cr — markd regexes that repeat a group over a
-# whole line raised `JIT stack limit reached` on long input.
+# whole line raised `JIT stack limit reached` on long input, and
+# `Inline#match` copied the rest of the paragraph on every call.
 
 private alias Fix = Hwaro::MarkdRegexStackFix
 
@@ -49,7 +50,7 @@ describe Hwaro::MarkdRegexStackFix do
       tag_alphabet = ["<", ">", "/", "a", "b", "=", "\"", "'", " ", "-", "!", "--", "x=", "=\"v\"", "='v'", "=v", "\n", "`"]
       random_strings(11, tag_alphabet).each do |body|
         ["<a#{body}", "<!--#{body}", "</a#{body}", "<#{body}"].each do |text|
-          ours = upstream_length(Fix::HTML_TAG, text)
+          ours = Fix::HTML_TAG.match_at_byte_index(text, 0).try(&.[0].bytesize)
           ours.should eq(upstream_length(Markd::Rule::HTML_TAG, text)), "tag #{text.inspect}"
         end
       end
@@ -69,7 +70,7 @@ describe Hwaro::MarkdRegexStackFix do
       dest_alphabet = ["<", ">", "\\", "\\>", "\\<", "\\a", "a", " ", "\t", "\n", "\u0000"]
       random_strings(17, dest_alphabet).each do |body|
         text = "<#{body}"
-        ours = upstream_length(Fix::LINK_DESTINATION_BRACES, text)
+        ours = Fix::LINK_DESTINATION_BRACES.match_at_byte_index(text, 0).try(&.[0].bytesize)
         ours.should eq(upstream_length(Markd::Rule::LINK_DESTINATION_BRACES, text)), "dest #{text.inspect}"
       end
     end
@@ -101,6 +102,10 @@ describe Hwaro::MarkdRegexStackFix do
       render_within("x <!-- #{"ab " * 60000} --> y\n", 10.0).should contain("<!--")
       render_within("[#{"ab " * 60000}]\n", 10.0).should start_with("<p>")
       render_within("[a](<#{"b" * 200000}>)\n", 10.0).should contain("href=")
+    end
+
+    it "renders a long run of unclosed links in linear-ish time" do
+      render_within("[a](" * 16000 + "\n", 10.0).should start_with("<p>")
     end
   end
 end

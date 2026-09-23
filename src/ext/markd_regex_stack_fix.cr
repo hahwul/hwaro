@@ -32,6 +32,13 @@
 #   bracket counts as escaped. `MarkdRegexStackFix.bracketed_length` computes
 #   the regex's exact result, backtracking included, in one backward pass.
 #
+# `[a](` x 16_000 on one line took over 100 seconds: every failed inline link
+# entity-decoded and URI-normalized the whole rest of the line as its
+# destination before noticing there was no `)`, and `Inline#match` copied the
+# rest of the paragraph (`byte_slice`) on every call. A doomed destination is
+# no longer decoded, and matching happens in place at `@pos` with anchored
+# copies of the `^`-rules.
+#
 # Remove when: upstream markd stops repeating groups over unbounded input.
 
 require "markd"
@@ -40,7 +47,7 @@ require "markd"
 # shard bump that changes them would be silently reverted. Fail the build
 # loudly instead; re-verify against the new source, then bump the pin.
 {% if Markd::VERSION != "0.5.0" %}
-  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#html_tag/#link_title/#link_label/#link_destination and Markd::Rule::HTMLBlock#match verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
+  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#match/#html_tag/#link_title/#link_label/#link_destination and Markd::Rule::HTMLBlock#match verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
 {% end %}
 
 module Hwaro
@@ -53,14 +60,31 @@ module Hwaro
     HTML_TAG_STRING = "(?:#{OPEN_TAG_STRING}|#{Markd::Rule::CLOSE_TAG_STRING}|#{COMMENT_STRING}|" \
                       "#{Markd::Rule::PROCESSING_INSTRUCTION_STRING}|#{Markd::Rule::DECLARATION_STRING}|" \
                       "#{Markd::Rule::CDATA_STRING})"
-    HTML_TAG = Regex.new("^" + HTML_TAG_STRING, Regex::Options::IGNORE_CASE)
+    # Compile-time ANCHORED: matches only at the start offset handed to
+    # `match_at_byte_index`, so the parser never has to copy the rest of the
+    # paragraph to anchor a `^` pattern.
+    HTML_TAG = Regex.new(HTML_TAG_STRING, Regex::Options::IGNORE_CASE | Regex::Options::ANCHORED)
 
     LINK_DESTINATION_BRACES = Regex.new(
-      "^(?:[<](?:[^<>\\t\\n\\\\\\x00]|" + Markd::Rule::ESCAPED_CHAR_STRING + ")*+[>])")
+      "(?:[<](?:[^<>\\t\\n\\\\\\x00]|" + Markd::Rule::ESCAPED_CHAR_STRING + ")*+[>])",
+      Regex::Options::ANCHORED)
 
     HTML_BLOCK_OPEN = Markd::Rule::HTML_BLOCK_OPEN[0...-1] + [
       Regex.new("^(?:" + OPEN_TAG + "|" + Markd::Rule::CLOSE_TAG + ")\\s*$", Regex::Options::IGNORE_CASE),
     ]
+
+    # Anchored copies of the other `^`-rules `Inline#match` is called with.
+    ANCHORED = {
+      Markd::Rule::ESCAPABLE           => anchored(Markd::Rule::ESCAPABLE),
+      Markd::Rule::EMAIL_AUTO_LINK     => anchored(Markd::Rule::EMAIL_AUTO_LINK),
+      Markd::Rule::AUTO_LINK           => anchored(Markd::Rule::AUTO_LINK),
+      Markd::Rule::NUMERIC_HTML_ENTITY => anchored(Markd::Rule::NUMERIC_HTML_ENTITY),
+    }
+
+    def self.anchored(regex : Regex) : Regex
+      raise ArgumentError.new("expected a ^-anchored rule: #{regex.source}") unless regex.source.starts_with?('^')
+      Regex.new(regex.source.lchop('^'), regex.options | Regex::Options::ANCHORED)
+    end
 
     # CommonMark's escapable ASCII punctuation (Rule::ESCAPABLE_STRING).
     ESCAPABLE_BYTES = Set(UInt8).new(%q(!"#$%&'()*+,./:;<=>?@[\]^_`{|}~-).bytes)
@@ -118,6 +142,28 @@ end
 
 module Markd::Parser
   class Inline
+    # Upstream: `text = @text.byte_slice(@pos)` then `text.match(regex)` — an
+    # O(rest-of-paragraph) copy per call. Matches in place instead; a `^`-rule
+    # goes through its anchored copy (PCRE2's `^` means start of SUBJECT, not
+    # start offset), the unanchored `TICKS` searches forward exactly as it
+    # did in the copied remainder.
+    private def match(regex : Regex) : String?
+      regex = Hwaro::MarkdRegexStackFix::ANCHORED.fetch(regex, regex)
+      if regex.source.starts_with?('^')
+        # A `^`-rule without an anchored copy: keep upstream's semantics.
+        text = @text.byte_slice(@pos)
+        if match = text.match(regex)
+          @pos += match.byte_end(0)
+          return match[0]
+        end
+        return
+      end
+      if match = regex.match_at_byte_index(@text, @pos)
+        @pos = match.byte_end(0)
+        match[0]
+      end
+    end
+
     private def html_tag(node : Node)
       if text = match(Hwaro::MarkdRegexStackFix::HTML_TAG)
         child = Node.new(Node::Type::HTMLInline)
@@ -185,10 +231,29 @@ module Markd::Parser
                  end
                end
 
+               # A scan that ran to the END of the text cannot be followed by
+               # the `)` an inline link needs, so `close_bracket` is about to
+               # discard this destination (a failed inline link never reads
+               # it). Decoding it anyway made `[a](` x 16_000 quadratic in the
+               # entity decoder. A reference definition CAN end at the end of
+               # the text, so it still gets the real value.
+               return "" if char_at?(@pos).nil? && !@hwaro_in_reference
+
                @text.byte_slice(save_pos, @pos - save_pos)
              end
 
       normalize_uri(Utils.decode_entities_string(dest)) if dest
+    end
+
+    # True while `reference` parses a link reference definition (see
+    # `link_destination`).
+    @hwaro_in_reference = false
+
+    def reference(text : String, refmap)
+      @hwaro_in_reference = true
+      previous_def
+    ensure
+      @hwaro_in_reference = false
     end
   end
 end
