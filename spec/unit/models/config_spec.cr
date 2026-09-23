@@ -2994,6 +2994,23 @@ describe "Hwaro::Models::Config" do
   # feedback at all: `sitemap = true` never enabled the sitemap,
   # `highlight = false` never disabled highlighting, and
   # `taxonomies = ["tags"]` built a site with no taxonomies.
+  describe "environment substitution inside TOML strings" do
+    it "loads a value holding quotes and backslashes verbatim" do
+      ENV["HWARO_SPEC_CFG_TITLE"] = %(He said "hi" at C:\\new\\temp)
+      config = load_config(%(title = "${HWARO_SPEC_CFG_TITLE}"))
+      config.title.should eq(%(He said "hi" at C:\\new\\temp))
+    ensure
+      ENV.delete("HWARO_SPEC_CFG_TITLE")
+    end
+
+    it "does not substitute or warn about $VAR in a comment" do
+      log = with_captured_log do
+        load_config(%(title = "t"\n# export $HWARO_SPEC_CFG_UNSET_IN_COMMENT before deploying))
+      end
+      log.should_not contain("HWARO_SPEC_CFG_UNSET_IN_COMMENT")
+    end
+  end
+
   describe "mistyped section warnings" do
     it "warns when a table section is given a scalar" do
       log = with_captured_log { load_config("sitemap = true\nhighlight = false") }
