@@ -221,7 +221,9 @@ module Hwaro
         config.og.twitter_card = s["twitter_card"]?.try(&.as_s?) || config.og.twitter_card
         config.og.twitter_site = s["twitter_site"]?.try(&.as_s?)
         config.og.twitter_creator = s["twitter_creator"]?.try(&.as_s?)
-        config.og.fb_app_id = s["fb_app_id"]?.try(&.as_s?)
+        # Facebook app ids are numeric; an unquoted id (or unquoted
+        # `${FB_APP_ID}`) is an integer and used to be dropped silently.
+        config.og.fb_app_id = s["fb_app_id"]?.try { |v| v.as_s? || v.as_i64?.try(&.to_s) }
         config.og.og_type = s["type"]?.try(&.as_s?) || config.og.og_type
 
         if ai = s["auto_image"]?.try(&.as_h?)

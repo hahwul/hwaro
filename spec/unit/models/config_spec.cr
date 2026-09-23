@@ -3132,6 +3132,16 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  # Facebook app ids are numeric, so `fb_app_id = 1234567890` (or an
+  # unquoted `${FB_APP_ID}`) is the natural spelling — and it was dropped,
+  # silently emitting no `fb:app_id` meta tag.
+  describe "[og] fb_app_id" do
+    it "accepts a bare integer" do
+      load_config("[og]\nfb_app_id = 1234567890").og.fb_app_id.should eq("1234567890")
+      load_config(%([og]\nfb_app_id = "42")).og.fb_app_id.should eq("42")
+    end
+  end
+
   describe "mistyped section warnings" do
     it "warns when a table section is given a scalar" do
       log = with_captured_log { load_config("sitemap = true\nhighlight = false") }
