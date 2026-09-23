@@ -86,13 +86,13 @@ describe Hwaro::Services::PlatformConfig do
     end
 
     describe "cloudflare" do
-      it "generates valid wrangler.toml with site bucket" do
+      it "generates a Cloudflare Pages Wrangler output directory" do
         config = Hwaro::Models::Config.new
         generator = Hwaro::Services::PlatformConfig.new(config)
         result = generator.generate("cloudflare")
 
-        result.should contain("[site]")
-        result.should contain("bucket = \"./public\"")
+        result.should contain("pages_build_output_dir = \"./public\"")
+        result.should_not contain("[site]")
         result.should contain("compatibility_date")
       end
 

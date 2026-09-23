@@ -224,13 +224,11 @@ module Hwaro
         lines = [] of String
         lines << "name = \"#{project_name}\""
         lines << "compatibility_date = \"#{Time.utc.to_s("%Y-%m-%d")}\""
+        lines << "pages_build_output_dir = \"./#{toml_escape(output_dir)}\""
         lines << ""
-        lines << "[site]"
-        lines << "  bucket = \"./#{toml_escape(output_dir)}\""
-        lines << ""
-        lines << "# Build configuration (for Cloudflare Pages dashboard)"
+        lines << "# Build configuration for Cloudflare Pages"
         lines << "# Build command: #{build_command}"
-        lines << "# Build output directory: /#{output_dir}"
+        lines << "# Build output directory: ./#{output_dir}"
 
         # Redirects via _redirects file note
         redirects = collect_aliases
