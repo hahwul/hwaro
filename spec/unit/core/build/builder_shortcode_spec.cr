@@ -271,6 +271,27 @@ describe Hwaro::Core::Build::Builder do
       result.should_not contain("<iframe")
     end
 
+    # Raw tags are case-sensitive, as in Crinja: `{% RAW %}` is not a raw
+    # block, so the fence around a shortcode inside it must still protect
+    # that shortcode instead of pulling it into an unmasked raw chunk.
+    it "treats an uppercase {% RAW %} around a fence as ordinary text" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      content = "{% RAW %}\n```text\n{{ youtube(id=\"x\") }}\n```\n{% ENDRAW %}"
+      results = {} of String => String
+
+      result = builder.test_process_shortcodes_jinja(
+        content,
+        {} of String => String,
+        {} of String => Crinja::Value,
+        results,
+        crinja_env_override: env,
+      )
+
+      result.should eq(content)
+      results.should be_empty
+    end
+
     it "processes explicit shortcode calls" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new

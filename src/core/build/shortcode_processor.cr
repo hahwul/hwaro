@@ -258,7 +258,7 @@ module Hwaro
             next if in_fence && open_line.nil?
 
             scan_line.scan(RAW_TAG_RE) do |match|
-              tag = match[1].downcase
+              tag = match[1]
               if tag == "raw"
                 open_line ||= line_no
               elsif opened = open_line
@@ -342,7 +342,10 @@ module Hwaro
         # in a template and in a markdown body has to survive identically, so
         # the two must never disagree about where a raw block starts and ends.
         RAW_BLOCK_RE = /\{\%-?\s*raw\s*-?\%\}.*?\{\%-?\s*end\s*raw\s*-?\%\}/m
-        RAW_TAG_RE   = /\{\%-?\s*(raw|end\s*raw)\s*-?\%\}/i
+        # The single tags of RAW_BLOCK_RE, for `raw_block_lines`. Must stay
+        # case-sensitive like it: a region this marks but `mask_raw_blocks`
+        # does not mask loses its fence protection.
+        RAW_TAG_RE = /\{\%-?\s*(raw|end\s*raw)\s*-?\%\}/
 
         # Hide `{% raw %}` regions from the shortcode passes.
         #
