@@ -33,6 +33,7 @@ module Hwaro
             return ImportResult.new(
               success: true,
               message: "No Jekyll posts found in #{path}",
+              skipped_count: outside_source_skips,
             )
           end
 
@@ -49,7 +50,7 @@ module Hwaro
           # a flat glob silently ignored every nested post.
           posts_dir = File.join(path, "_posts")
           if Dir.exists?(posts_dir)
-            walk_files(posts_dir).sort.each do |file|
+            walk_files(posts_dir, source_root: path).sort.each do |file|
               files << {path: file, draft: false, section: "posts"}
             end
           end
@@ -57,7 +58,7 @@ module Hwaro
           if include_drafts
             drafts_dir = File.join(path, "_drafts")
             if Dir.exists?(drafts_dir)
-              walk_files(drafts_dir).sort.each do |file|
+              walk_files(drafts_dir, source_root: path).sort.each do |file|
                 files << {path: file, draft: true, section: "posts"}
               end
             end
@@ -74,7 +75,7 @@ module Hwaro
               return true if entry_full == out_dir || out_dir.starts_with?(entry_full + "/")
             end
             false
-          })
+          }, source_root: path)
 
           page_files.sort.each do |file|
             sec, _ = section_from_path(file, path, "")

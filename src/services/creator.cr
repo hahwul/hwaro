@@ -7,6 +7,7 @@ require "../utils/date_utils"
 require "../utils/errors"
 require "../utils/file_safe"
 require "../utils/logger"
+require "../utils/path_utils"
 require "../utils/text_utils"
 
 module Hwaro
@@ -523,6 +524,17 @@ module Hwaro
 
         # Last step before the write, so a rejected create never leaves a
         # directory behind (see the note where the path is resolved).
+        content_root = Utils::PathUtils.resolved_real_path(CONTENT_DIR)
+        resolved_path = Utils::PathUtils.resolved_real_path(full_path)
+        within_content = resolved_path == content_root || resolved_path.starts_with?(content_root + File::SEPARATOR)
+        if File.symlink?(full_path) || !within_content
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Cannot create #{full_path}: destination cannot be safely resolved within #{CONTENT_DIR}/.",
+            hint: "Remove the symlink or choose a path that resolves within #{CONTENT_DIR}/.",
+          )
+        end
+
         ensure_dir!(base_dir)
 
         begin

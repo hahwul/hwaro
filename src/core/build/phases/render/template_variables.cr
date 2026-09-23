@@ -439,8 +439,8 @@ module Hwaro::Core::Build::Phases::Render
       # requiring every author to write a description in frontmatter.
       effective_og_desc = page.description.presence || page.plain_summary || config.description
 
-      og_tags = config.og.og_tags(effective_og_title, effective_og_desc, effective_url, page.image, config.base_url, og_type_override)
-      twitter_tags = config.og.twitter_tags(effective_og_title, effective_og_desc, page.image, config.base_url)
+      og_tags = config.og.og_tags(effective_og_title, effective_og_desc, effective_url, page.social_image, config.base_url, og_type_override)
+      twitter_tags = config.og.twitter_tags(effective_og_title, effective_og_desc, page.social_image, config.base_url)
       # Mirror the 2-space indent used inside og_tags/twitter_tags so the
       # joined block stays vertically aligned in the rendered HTML.
       og_all_tags = if og_tags.empty?
@@ -483,7 +483,7 @@ module Hwaro::Core::Build::Phases::Render
 
       # Structured SEO object for custom meta tag markup
       canonical_url = Content::Seo::Tags.canonical_url(page, config, canonical_override)
-      seo_image = config.og.resolve_image_url(page.image, config.base_url) || ""
+      seo_image = config.og.resolve_image_url(page.social_image, config.base_url) || ""
       seo_obj = {
         "canonical_url"   => Crinja::Value.new(canonical_url),
         "og_type"         => Crinja::Value.new(og_type_override || config.og.og_type),

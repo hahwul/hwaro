@@ -303,6 +303,23 @@ module Hwaro
         @parse_failed = false
       end
 
+      # `image` as the social / structured-data surfaces must resolve it. A
+      # relative value naming one of this page's own bundle assets
+      # (`image = "cover.png"` beside `index.md`) is published under the
+      # page's URL, like a relative `![](cover.png)` in its body — resolving
+      # it against the site root (`/cover.png`) advertised a 404 og:image.
+      # Anything else is returned as written (root-relative, external, or a
+      # relative path meant from the site root, e.g. a `static/` file).
+      def social_image : String?
+        img = @image
+        return img unless img
+        return img if img.starts_with?('/') || img.matches?(/\A[a-zA-Z][a-zA-Z0-9+.\-]*:/)
+        own = Path.posix(Path.posix(@path).dirname, img).normalize.to_s
+        return img unless @assets.includes?(own)
+        base = @url.ends_with?('/') ? @url : "#{@url}/"
+        "#{base}#{img}"
+      end
+
       # Check if page has redirect
       def has_redirect? : Bool
         !@redirect_to.nil? && !@redirect_to.try(&.empty?)

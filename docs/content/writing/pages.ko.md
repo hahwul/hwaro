@@ -57,7 +57,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | draft | bool | false | 프로덕션 빌드에서 제외 |
 | template | string | "page" | 사용할 템플릿 |
 | weight | int | 0 | 정렬 순서(낮을수록 앞) |
-| image | string | — | 소셜 공유용 대표 이미지 |
+| image | string | — | 소셜 공유용 대표 이미지. 페이지 번들 안의 파일을 가리키는 상대 경로(`index.md` 옆의 `image = "cover.png"`)는 그 파일로 해석됨 |
 | tags | array | [] | 태그 택소노미 항목 |
 | categories | array | [] | 카테고리 택소노미 항목 |
 

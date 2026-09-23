@@ -35,6 +35,22 @@ module Hwaro
           Content::Seo::Feeds::FEED_TEMPLATE_KEYS.values.any? { |key| templates.has_key?(key) }
         end
 
+        # Remember what this feed generation published and, on a serve pass
+        # (`prune`), delete the feeds the previous generation published and
+        # this one did not — a section whose `generate_feeds` was just turned
+        # off. Full builds leave that to the Finalize claims diff.
+        def track_feed_outputs(written : Array(String), output_dir : String, prune : Bool = false) : Nil
+          current = written.to_set
+          previous = @generated_claims_mutex.synchronize do
+            last = @last_feed_outputs
+            @last_feed_outputs = current
+            last
+          end
+          return unless prune && previous
+          stale = previous - current
+          prune_unclaimed_outputs(stale, output_dir) unless stale.empty?
+        end
+
         # Regenerate the lightweight SEO/search surfaces (sitemap, feeds, llms,
         # search index, optionally robots) for the given page set. Each
         # generator writes a distinct output file with no shared in-process
@@ -49,7 +65,11 @@ module Hwaro
         private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false, options : Config::Options::BuildOptions? = nil)
           seo_tasks = [
             -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
-            -> { Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose, templates: @templates, renderer: feed_template_renderer); nil },
+            -> {
+              written = Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose, templates: @templates, renderer: feed_template_renderer)
+              track_feed_outputs(written, output_dir, prune: true)
+              nil
+            },
           ] of Proc(Nil)
           # Robots slots in right after Feeds — its original position in the
           # incremental path — so sequential (--no-parallel) output ordering is

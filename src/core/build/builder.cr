@@ -401,6 +401,12 @@ module Hwaro
         # previous pass is right here in memory. Guarded by
         # @generated_claims_mutex (taxonomy rendering fans out).
         @last_taxonomy_outputs : Set(String)? = nil
+        # Feed files the last feed generation published (full build or serve
+        # pass). A section's `generate_feeds` lives in front matter, so an
+        # incremental serve edit can stop a section feed — and incremental
+        # passes run no claims diff. See `track_feed_outputs`. Guarded by
+        # @generated_claims_mutex.
+        @last_feed_outputs : Set(String)? = nil
         @taxonomy_pass_outputs : Set(String)? = nil
 
         def initialize

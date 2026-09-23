@@ -159,25 +159,7 @@ module Hwaro
               # operators, punctuation, or keywords like return/typeof/in/etc.
               if regex_context?(chars, i)
                 # Regex literal — pass through unchanged
-                io << c
-                i += 1
-                while i < len
-                  rc = chars[i]
-                  io << rc
-                  if rc == '\\' && i + 1 < len
-                    i += 1
-                    io << chars[i]
-                  elsif rc == '/'
-                    # Consume regex flags (g, i, m, s, u, y)
-                    i += 1
-                    while i < len && chars[i].ascii_letter?
-                      io << chars[i]
-                      i += 1
-                    end
-                    break
-                  end
-                  i += 1
-                end
+                i = scan_regex(chars, i, len, io)
                 next
               end
             end
@@ -194,10 +176,16 @@ module Hwaro
       # expression (identifier char, digit, `)`, `]`), it's division;
       # otherwise (operator, `(`, `[`, `{`, `,`, `;`, `!`, line start) it's regex.
       #
-      # Known limitation: keywords that end with an alphanumeric char and precede
-      # a regex literal (e.g. `return /foo/`, `typeof /re/`, `void /re/`,
-      # `case /re/`, `throw /re/`) are misclassified as division because
-      # full keyword-aware tokenization is not performed.
+      # A word ending right before the slash is normally an identifier (so
+      # division), except for the keywords after which an expression — and so
+      # a regex literal — starts: `return /\/*$/.test(u)` must not read the
+      # regex body's `/*` as a comment opener, which dropped everything after
+      # it (the rest of the file and every later bundle entry). A keyword used
+      # as a property name (`obj.return / 2`) is still division.
+      #
+      # Known limitation: a regex right after a statement's closing paren
+      # (`if (x) /re/.test(y)`) is still read as division — telling that `)`
+      # apart from a call's needs paren matching.
       private def regex_context?(chars, pos : Int32) : Bool
         j = pos - 1
         while j >= 0 && (chars[j] == ' ' || chars[j] == '\t')
@@ -206,11 +194,39 @@ module Hwaro
         return true if j < 0 # start of input
 
         prev = chars[j]
-        # These characters can end an expression value — `/` after them is division
-        return false if prev.alphanumeric? || prev == '_' || prev == '$' ||
-                        prev == ')' || prev == ']'
-        # Everything else (operators, punctuation, keywords ending with these) → regex
+        return false if prev == ')' || prev == ']'
+        if prev.alphanumeric? || prev == '_' || prev == '$'
+          return regex_keyword_before?(chars, j)
+        end
+        # Everything else (operators, punctuation) → regex
         true
+      end
+
+      # Reserved words only: `of`, `yield` and `await` are valid identifiers
+      # outside their special contexts, so `of / 2` must stay a division.
+      REGEX_PRECEDING_KEYWORDS = Set{
+        "return", "typeof", "instanceof", "in", "new", "delete", "void",
+        "throw", "case", "do", "else",
+      }
+
+      # True when the identifier-like word ending at chars[last] is one of
+      # REGEX_PRECEDING_KEYWORDS and not a member name (`a.return`) or a
+      # private class member (`this.#in`, `#new`).
+      private def regex_keyword_before?(chars, last : Int32) : Bool
+        start = last
+        while start > 0 && (chars[start - 1].alphanumeric? || chars[start - 1] == '_' || chars[start - 1] == '$')
+          start -= 1
+        end
+        return false if start > 0 && chars[start - 1] == '#'
+        size = last - start + 1
+        return false if size > 10 # longer than any keyword above
+        word = String.build(size) { |w| (start..last).each { |k| w << chars[k] } }
+        return false unless REGEX_PRECEDING_KEYWORDS.includes?(word)
+        k = start - 1
+        while k >= 0 && chars[k].whitespace?
+          k -= 1
+        end
+        !(k >= 0 && chars[k] == '.')
       end
 
       # Scan a template literal beginning at chars[i] == '`'. Appends the whole
@@ -321,20 +337,31 @@ module Hwaro
       end
 
       # Scan a regex literal beginning at chars[i] == '/'. Appends it (and its
-      # flags) verbatim and returns the index just past the literal. Mirrors the
-      # main loop's regex handling, including its limitation of not modelling
-      # `[...]` character classes (an unescaped `/` inside a class still ends the
-      # literal) — kept identical so behaviour matches the top-level scanner.
+      # flags) verbatim and returns the index just past the literal. Used by
+      # the main loop and inside `${...}` interpolations alike.
+      #
+      # An unescaped `/` inside a `[...]` character class does not end the
+      # literal (`/[^\\/]*\//`): ending it there left the class's tail to the
+      # main loop, where the literal's closing `\//` read as a `//` comment and
+      # swallowed the rest of the line. A line break always ends the scan — a
+      # regex literal cannot contain one — so a misclassified division can
+      # never run on past its own line.
       private def scan_regex(chars, i : Int32, len : Int32, lb : String::Builder) : Int32
         lb << chars[i] # opening /
         i += 1
+        in_class = false
         while i < len
           c = chars[i]
+          break if c == '\n' || c == '\r'
           lb << c
           if c == '\\' && i + 1 < len
             i += 1
             lb << chars[i]
-          elsif c == '/'
+          elsif c == '['
+            in_class = true
+          elsif c == ']'
+            in_class = false
+          elsif c == '/' && !in_class
             i += 1
             while i < len && chars[i].ascii_letter?
               lb << chars[i]

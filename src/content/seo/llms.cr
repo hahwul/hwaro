@@ -17,11 +17,22 @@ module Hwaro
           generate(config, [] of Models::Page, output_dir, verbose)
         end
 
+        # The files the current config publishes — `llms.txt` and, when
+        # enabled, `llms-full.txt` — claimed by the builder whether written or
+        # skipped as unchanged (see Sitemap.published_outputs).
+        def self.published_outputs(config : Models::Config, output_dir : String) : Array(String)
+          outputs = [] of String
+          return outputs unless config.llms.enabled
+          outputs << File.join(output_dir, index_output_filename(config))
+          outputs << File.join(output_dir, full_output_filename(config)) if config.llms.full_enabled
+          outputs
+        end
+
         def self.generate(config : Models::Config, pages : Array(Models::Page), output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
           return unless config.llms.enabled
 
           if skip_if_unchanged
-            filename = File.basename(config.llms.filename.empty? ? "llms.txt" : config.llms.filename)
+            filename = index_output_filename(config)
             # The probe must cover every file this generator writes: when
             # full output is enabled, a present llms.txt with a missing
             # llms-full.txt must NOT skip, or the full document is never
@@ -34,7 +45,7 @@ module Hwaro
             end
           end
 
-          filename = File.basename(config.llms.filename.empty? ? "llms.txt" : config.llms.filename)
+          filename = index_output_filename(config)
           file_path = File.join(output_dir, filename)
           Hwaro::Utils::FileSafe.atomic_write(file_path, build_index(config, pages))
           Logger.action :create, file_path if verbose
@@ -144,6 +155,12 @@ module Hwaro
               str << "\n"
             end
           end
+        end
+
+        # Resolved output basename for llms.txt — shared by the writer, the
+        # warm-build skip probe and `published_outputs`.
+        private def self.index_output_filename(config : Models::Config) : String
+          File.basename(config.llms.filename.empty? ? "llms.txt" : config.llms.filename)
         end
 
         # Resolved output basename for llms-full.txt — shared by the writer

@@ -29,7 +29,38 @@ module Hwaro
         # (template keys strip only the final template extension).
         FEED_TEMPLATE_KEYS = {"rss" => "rss.xml", "atom" => "atom.xml"}
 
-        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false, templates : Hash(String, String)? = nil, renderer : Renderer? = nil)
+        # One feed this generator writes: the pages it lists, where it goes,
+        # and the channel metadata `process_feed` needs.
+        record FeedSpec,
+          pages : Array(Models::Page),
+          dir : String,
+          custom_filename : String,
+          title : String,
+          base_path : String,
+          language : String?,
+          kind : String,
+          section_url : String?
+
+        # Every main, section and per-language feed file the current config
+        # and page set publish. The builder claims these whether `generate`
+        # wrote them or skipped as unchanged, so a warm `--cache` build (or a
+        # serve rebuild) removes a feed an earlier config published: `[feeds]`
+        # disabled, `generate_feeds` turned off on a section, a language's
+        # `generate_feed` dropped, a renamed feed file. Planned by the same
+        # `each_feed` the writer walks, so the two cannot drift. Taxonomy
+        # feeds are claimed by the taxonomy generator.
+        def self.published_outputs(pages : Array(Models::Page), config : Models::Config, output_dir : String) : Array(String)
+          outputs = [] of String
+          each_feed(pages, config, output_dir) do |feed|
+            outputs << File.join(feed.dir, safe_feed_filename(feed.custom_filename, config.feeds.type))
+          end
+          outputs
+        end
+
+        # Returns every feed file this build publishes: the ones written, or,
+        # when skipped as unchanged, the ones already on disk
+        # (`published_outputs`).
+        def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false, templates : Hash(String, String)? = nil, renderer : Renderer? = nil) : Array(String)
           if skip_if_unchanged && config.feeds.enabled
             # Basename only: process_feed refuses nested filename components
             # (path-traversal defense), so the skip probe must match the
@@ -37,10 +68,20 @@ module Hwaro
             feed_file = safe_feed_filename(config.feeds.filename, config.feeds.type)
             if File.exists?(File.join(output_dir, feed_file))
               Logger.debug "  Feeds unchanged (cache hit), skipping."
-              return
+              return published_outputs(pages, config, output_dir)
             end
           end
 
+          written = [] of String
+          each_feed(pages, config, output_dir) do |feed|
+            written << process_feed(feed.pages, config, feed.dir, feed.custom_filename, feed.title, feed.base_path, verbose, feed.language,
+              templates: templates, renderer: renderer, kind: feed.kind, section_url: feed.section_url)
+          end
+          written
+        end
+
+        # Walk every feed the config and page set call for, in write order.
+        private def self.each_feed(pages : Array(Models::Page), config : Models::Config, output_dir : String, & : FeedSpec ->) : Nil
           # `[versions] feeds = "latest"` (default): older versions publish
           # no feed entries and no section feeds; "all" restores every
           # version. Applied to the whole input so the main, section and
@@ -73,8 +114,7 @@ module Hwaro
               }
             end
 
-            process_feed(site_pages, config, output_dir, config.feeds.filename, config.title, "", verbose,
-              templates: templates, renderer: renderer, kind: "main")
+            yield FeedSpec.new(site_pages, output_dir, config.feeds.filename, config.title, "", nil, "main", nil)
           end
 
           # 2. Generate Section Feeds — pre-group pages by section for O(1) lookup
@@ -128,8 +168,7 @@ module Hwaro
 
               feed_title = "#{config.title} - #{page.title}"
 
-              process_feed(section_pages, config, section_output_dir, "", feed_title, page.url, verbose,
-                templates: templates, renderer: renderer, kind: "section", section_url: page.url)
+              yield FeedSpec.new(section_pages, section_output_dir, "", feed_title, page.url, nil, "section", page.url)
             end
           end
 
@@ -137,7 +176,7 @@ module Hwaro
           # Global `[feeds] enabled = false` disables these too — per-language
           # `generate_feed` only opts OUT within a globally-enabled config.
           if config.feeds.enabled && config.multilingual?
-            generate_language_feeds(pages, config, output_dir, verbose, templates, renderer)
+            each_language_feed(pages, config, output_dir) { |feed| yield feed }
           end
         end
 
@@ -168,7 +207,7 @@ module Hwaro
 
         # Generate per-language feeds for non-default languages.
         # Each language with generate_feed=true gets its own feed at /{lang}/rss.xml (or atom.xml).
-        private def self.generate_language_feeds(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, templates : Hash(String, String)? = nil, renderer : Renderer? = nil)
+        private def self.each_language_feed(pages : Array(Models::Page), config : Models::Config, output_dir : String, & : FeedSpec ->) : Nil
           default_lang = config.default_language
 
           config.languages.each do |lang_code, lang_config|
@@ -207,8 +246,7 @@ module Hwaro
             # e.g., "/ko/" so the self-referencing link becomes base_url/ko/rss.xml
             base_path = "/#{lang_code}/"
 
-            process_feed(lang_pages, config, lang_output_dir, "", feed_title, base_path, verbose, lang_code,
-              templates: templates, renderer: renderer, kind: "language")
+            yield FeedSpec.new(lang_pages, lang_output_dir, "", feed_title, base_path, lang_code, "language", nil)
           end
         end
 
@@ -227,7 +265,7 @@ module Hwaro
           section_url : String? = nil,
           taxonomy : String? = nil,
           term : String? = nil,
-        )
+        ) : String
           # Determine feed type and filename
           feed_type = config.feeds.type.downcase
           unless ["rss", "atom"].includes?(feed_type)
@@ -278,6 +316,7 @@ module Hwaro
           feed_path = File.join(output_dir, filename)
           Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
           Logger.action :create, feed_path if verbose
+          feed_path
         end
 
         # Keep the page the build actually wrote when two pages collide on

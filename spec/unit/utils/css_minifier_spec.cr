@@ -790,5 +790,33 @@ describe Hwaro::Utils::CssMinifier do
       result = Hwaro::Utils::CssMinifier.minify("a{content:\"\u{0}PRESERVE_999\u{0}\"}")
       result.should contain("PRESERVE_999") # bogus token survives verbatim
     end
+
+    # Regression: a comment is a token separator, so dropping it between two
+    # identifier/number characters fused the tokens — `1px2px` is one
+    # dimension with unit `px2px`, and `12pxArial` voided the `font`
+    # declaration. A comment next to punctuation still leaves no space, so
+    # the compound selector `.a/**/.b` stays `.a.b`.
+    it "keeps tokens separated by a dropped comment apart" do
+      Hwaro::Utils::CssMinifier.minify("a{margin:1px/* v */2px}").should eq("a{margin:1px 2px}")
+      Hwaro::Utils::CssMinifier.minify("a{font:12px/**/Arial}").should eq("a{font:12px Arial}")
+      Hwaro::Utils::CssMinifier.minify(".a/**/.b{color:red}").should eq(".a.b{color:red}")
+      Hwaro::Utils::CssMinifier.minify("a{color:red;/* x */}").should eq("a{color:red}")
+    end
+
+    # Regression: the space that keeps value tokens apart was also emitted in
+    # selectors and at-rule preludes, where a comment is NOT whitespace:
+    # `div/**/p` is two adjacent type selectors, an invalid rule browsers
+    # drop, while `div p` is a descendant combinator that styles elements the
+    # author never targeted. Only declaration values get the space.
+    it "does not turn a dropped comment inside a selector into a combinator" do
+      Hwaro::Utils::CssMinifier.minify("div/**/p{color:red}").should eq("divp{color:red}")
+      Hwaro::Utils::CssMinifier.minify("@media screen{div/**/p{color:red}}").should eq("@media screen{divp{color:red}}")
+      Hwaro::Utils::CssMinifier.minify("a{color:red}a:hover/**/b{color:blue}").should eq("a{color:red}a:hoverb{color:blue}")
+      Hwaro::Utils::CssMinifier.minify("div{color:red;a/**/p{color:blue}}").should eq("div{color:red;ap{color:blue}}")
+      Hwaro::Utils::CssMinifier.minify("@media screen/**/and (min-width:1px){a{b:c}}").should eq("@media screenand (min-width:1px){a{b:c}}")
+      # Declaration values still keep their tokens apart.
+      Hwaro::Utils::CssMinifier.minify("a{margin:1px/**/2px}b{font:12px/**/Arial;c:d}").should eq("a{margin:1px 2px}b{font:12px Arial;c:d}")
+      Hwaro::Utils::CssMinifier.minify("a{font:12px/**/Arial,\"x{y\"}").should eq("a{font:12px Arial,\"x{y\"}")
+    end
   end
 end

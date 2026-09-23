@@ -550,3 +550,21 @@ describe "Hugo import: slug naming an existing bundle" do
     end
   end
 end
+
+describe "Hwaro::Services::Importers::HugoImporter symlink boundary" do
+  it "imports content linked from elsewhere inside the Hugo site" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = setup_hugo_site(tmpdir)
+      shared_dir = File.join(hugo_dir, "shared")
+      FileUtils.mkdir_p(shared_dir)
+      FileUtils.mkdir_p(File.join(hugo_dir, "content", "posts"))
+      File.write(File.join(shared_dir, "h.md"), "+++\ntitle = \"Shared\"\n+++\nBody.\n")
+      File.symlink("../../shared/h.md", File.join(hugo_dir, "content", "posts", "h.md"))
+
+      output_dir = File.join(tmpdir, "out")
+      result = Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir))
+      result.imported_count.should eq(1)
+      result.skipped_count.should eq(0)
+    end
+  end
+end

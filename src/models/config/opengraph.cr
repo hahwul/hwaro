@@ -188,7 +188,10 @@ module Hwaro
         img = image || @default_image
         return unless img
         return img if Content::Processors::InternalLinkResolver.has_own_origin?(img)
-        "#{base_url}#{Utils::PathUtils.root_relative(img)}"
+        # Percent-encoded like og:url: `my photo.png` or a Unicode filename
+        # is not a valid URL raw, and scrapers reject or truncate it. Only
+        # the path is: a `?v=2` cache-buster or `#fragment` stays as written.
+        "#{base_url}#{Utils::TextUtils.encode_url_path_keep_query(Utils::PathUtils.root_relative(img))}"
       end
 
       # Generate both OG and Twitter tags

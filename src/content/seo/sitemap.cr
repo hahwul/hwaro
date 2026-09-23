@@ -8,6 +8,15 @@ module Hwaro
   module Content
     module Seo
       class Sitemap
+        # The file the current config publishes (none when disabled) — what
+        # the builder claims whether `generate` wrote it or skipped it as
+        # unchanged, so a warm `--cache` build or a serve rebuild removes a
+        # sitemap an earlier config published (disabled, or renamed).
+        def self.published_outputs(config : Models::Config, output_dir : String) : Array(String)
+          return [] of String unless config.sitemap.enabled
+          [Path[output_dir, File.basename(config.sitemap.filename)].to_s]
+        end
+
         def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
           # Check if sitemap is enabled
           return unless site.config.sitemap.enabled

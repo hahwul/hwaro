@@ -551,6 +551,17 @@ module Hwaro
         end
       end
 
+      # `encode_url_path` for a URL that may carry a `?query` or `#fragment`
+      # (an author-written image path such as `/img/사진.png?v=2`): only the
+      # part before the first `?`/`#` is encoded, the rest is kept as
+      # written. `encode_url_path` alone escaped the delimiters themselves
+      # (`…png%3Fv%3D2`, a 404).
+      def encode_url_path_keep_query(url : String) : String
+        cut = url.index(/[?#]/)
+        return encode_url_path(url) unless cut
+        encode_url_path(url[0, cut]) + url[cut..]
+      end
+
       # `URI.encode_path`, except that a `%XX` escape already in the input is
       # copied through instead of having its `%` escaped again.
       #

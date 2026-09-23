@@ -143,6 +143,12 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | -q, --quiet | Suppress info output and the banner (errors still go to stderr) |
 | -j, --json | Emit machine-readable JSON output: the scaffold list with `--list-scaffolds`, otherwise a `{"status","path","scaffold","files_created"}` result |
 
+`init` refuses to create scaffold files or directories that would resolve outside the target
+directory through a symlink, and checks every destination before writing, so a refused run
+leaves the target untouched. Existing entries are kept as they are, so `init --force` still
+works when, for example, `templates/` links to a shared theme elsewhere and nothing new would
+be written through it.
+
 ### new
 
 Create a new content file:
@@ -184,6 +190,8 @@ stay predictable. Pass a `<path>` (and any flags) to skip the prompts entirely.
 | --no-bundle | Force a single file (`foo.md`); overrides `[content.new].bundle = true` |
 | --list-archetypes | List archetypes in the current project and exit |
 | --json | Emit machine-readable JSON output (archetypes listing and classified errors) |
+
+`hwaro new` rejects destinations that cannot be resolved within `content/`, including paths through symlinks outside it.
 
 **Archetypes:**
 
@@ -482,6 +490,9 @@ cannot reconcile:
 - Symlinks at the destination are never written or deleted *through*. A link
   standing where a file or directory belongs is replaced; a stale one is
   unlinked without touching what it points at.
+- Source symlinks are followed when their targets resolve within the project
+  or the resolved source directory; links escaping both are skipped. This also
+  supports a `public/` symlink to an external deploy directory.
 - `--json` is non-interactive: combining it with `--confirm` fails instead of
   writing a prompt into the JSON document.
 
@@ -590,6 +601,13 @@ paths and options.
 | -h, --help | Show help |
 
 See [Tools & Completion](/start/tools/) for detailed usage.
+
+`import` follows file symlinks within the site directory you pass it and skips
+(and counts as skipped) those resolving outside it.
+`export` and `convert` follow links within the project and skip links outside
+it. `agents-md --write` writes through an `AGENTS.md`
+symlink that resolves inside the project (such as `AGENTS.md -> CLAUDE.md`) and
+refuses one that resolves outside it.
 
 ### completion
 

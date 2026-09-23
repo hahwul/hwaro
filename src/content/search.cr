@@ -33,6 +33,33 @@ module Hwaro
         File.join(output_dir, SHARDS_DIR, MANIFEST_FILENAME)
       end
 
+      # Every file the current config publishes, as it stands on disk after
+      # `generate` ran (or skipped as unchanged): the classic index when a
+      # single file is emitted, plus the manifest and each shard it lists.
+      # The builder claims these, so a warm `--cache` build (or a serve
+      # rebuild) removes what an earlier config published and this one does
+      # not — `search.json` after `single_file = false` or a `filename`
+      # change, the `search/` tree after `shards = "none"`, everything once
+      # search is disabled.
+      def self.published_outputs(config : Models::Config, output_dir : String) : Array(String)
+        outputs = [] of String
+        return outputs unless config.search.enabled
+        sharded = config.search.sharded?
+        if !sharded || config.search.single_file
+          outputs << File.join(output_dir, File.basename(config.search.filename))
+        end
+        if sharded
+          manifest_file = manifest_path(output_dir)
+          outputs << manifest_file
+          shards_dir = File.join(output_dir, SHARDS_DIR)
+          previous_shard_ids(manifest_file).each do |id|
+            path = File.join(shards_dir, "#{id}.json")
+            outputs << path if Utils::OutputGuard.within_output_dir?(path, output_dir)
+          end
+        end
+        outputs
+      end
+
       def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
         return unless config.search.enabled
 

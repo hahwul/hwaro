@@ -238,6 +238,16 @@ describe Hwaro::Utils::TextUtils do
     end
   end
 
+  describe ".encode_url_path_keep_query" do
+    it "encodes the path and keeps the query and fragment as written" do
+      Hwaro::Utils::TextUtils.encode_url_path_keep_query("/img/사진.png?v=2&s=1#top")
+        .should eq("/img/%EC%82%AC%EC%A7%84.png?v=2&s=1#top")
+      Hwaro::Utils::TextUtils.encode_url_path_keep_query("/a b.png#x y").should eq("/a%20b.png#x y")
+      Hwaro::Utils::TextUtils.encode_url_path_keep_query("/a b.png").should eq("/a%20b.png")
+      Hwaro::Utils::TextUtils.encode_url_path_keep_query("/plain.png?v=1").should eq("/plain.png?v=1")
+    end
+  end
+
   describe ".encode_url_path" do
     it "leaves plain ASCII URLs unchanged" do
       Hwaro::Utils::TextUtils.encode_url_path("https://example.com/posts/hello/").should eq("https://example.com/posts/hello/")

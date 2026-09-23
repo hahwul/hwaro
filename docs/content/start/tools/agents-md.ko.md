@@ -44,6 +44,8 @@ hwaro tool agents-md --write --force
 
 기본적으로 stdout에 출력하므로 저장하기 전에 내용을 살펴볼 수 있습니다. 파일로 저장하려면 `--write`를 사용합니다. `AGENTS.md`가 이미 있으면 `--force`를 쓰지 않는 한 확인을 요청합니다. 어느 쪽이든 **Site-Specific Instructions** 섹션은 다시 쓰기 과정에서 보존됩니다.
 
+`AGENTS.md`가 심볼릭 링크이면 `--write`는 링크 대상이 프로젝트 안에 있을 때(예: `AGENTS.md -> CLAUDE.md`) 그 파일을 갱신하고, 프로젝트 밖을 가리키는 링크는 거부합니다.
+
 ## `hwaro init`와의 관계
 
 새 프로젝트를 만들 때는 `hwaro init`도 AGENTS.md 파일을 생성합니다. 콘텐츠 모드는 `--agents` 플래그로 지정합니다:

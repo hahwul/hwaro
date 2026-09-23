@@ -85,33 +85,99 @@ module Hwaro
         n = bytes.size
         String.build(css.bytesize) do |io|
           i = 0
+          # Last byte written verbatim (0 after a placeholder or at start).
+          last = 0_u8
+          # True until the current statement's first byte is seen; the
+          # statement is an at-rule prelude when that byte is `@`.
+          stmt_start = true
+          at_rule = false
+          # Memo for statement_end_byte: the `{`/`;`/`}` (or 0 at EOF) ending
+          # the statement that reaches up to `term_pos`.
+          term_pos = -1
+          term = 0_u8
           while i < n
             b = bytes[i]
             case b
             when '/'.ord
               if i + 1 < n && bytes[i + 1] == '*'.ord
                 # Comment — dropped. An unterminated comment runs to EOF,
-                # which is how browsers parse it too.
+                # which is how browsers parse it too. A comment separates
+                # tokens, so dropping it between two identifier/number
+                # characters of a declaration value must leave a space:
+                # `1px/**/2px` is two dimensions, `1px2px` one dimension
+                # with the unit `px2px` (and `font:12px/**/Arial` would lose
+                # its family). Not in a selector or an at-rule prelude,
+                # where a comment is not whitespace: `div/**/p` is an
+                # invalid rule, and `div p` a descendant combinator.
                 i = skip_comment(bytes, i, n)
+                if last != 0_u8 && ident_byte?(last) && i < n && ident_byte?(bytes[i]) && !at_rule
+                  if i > term_pos
+                    term_pos, term = statement_end(bytes, i, n)
+                  end
+                  if term != '{'.ord
+                    io.write_byte(' '.ord.to_u8)
+                    last = ' '.ord.to_u8
+                  end
+                end
                 next
               end
             when '"'.ord, '\''.ord
               if (stop = scan_string_end(bytes, i, n)) >= 0
                 stash(io, preserves, String.new(bytes[i, stop - i]))
+                last = 0_u8
+                stmt_start = false
                 i = stop
                 next
               end
               # Unterminated literal: emit verbatim, like the old regex pass.
             when 'u'.ord, 'U'.ord
               if stop = scan_url(bytes, i, n, preserves, io)
+                last = 0_u8
+                stmt_start = false
                 i = stop
                 next
               end
             end
             io.write_byte(b)
+            last = b
+            if b == '{'.ord || b == '}'.ord || b == ';'.ord
+              stmt_start = true
+              at_rule = false
+            elsif stmt_start && !space_byte?(b)
+              stmt_start = false
+              at_rule = b == '@'.ord
+            end
             i += 1
           end
         end
+      end
+
+      # The index of the `{`, `;` or `}` that ends the statement containing
+      # `start`, and that byte — `{n, 0}` when none does. Strings and
+      # comments are skipped, so a brace inside either does not count. A `{`
+      # means the statement is a selector (or an at-rule prelude); `;`/`}`
+      # a declaration.
+      private def statement_end(bytes : Bytes, start : Int32, n : Int32) : {Int32, UInt8}
+        i = start
+        while i < n
+          b = bytes[i]
+          case b
+          when '{'.ord, ';'.ord, '}'.ord
+            return {i, b}
+          when '/'.ord
+            if i + 1 < n && bytes[i + 1] == '*'.ord
+              i = skip_comment(bytes, i, n)
+              next
+            end
+          when '"'.ord, '\''.ord
+            stop = scan_string_end(bytes, i, n)
+            return {n, 0_u8} if stop < 0
+            i = stop
+            next
+          end
+          i += 1
+        end
+        {n, 0_u8}
       end
 
       # Append `text` to `preserves` and write its placeholder to `io`.
