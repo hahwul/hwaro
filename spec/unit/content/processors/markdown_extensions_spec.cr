@@ -1548,6 +1548,15 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       end
     end
 
+    it "matches reference definitions on very long lines without exhausting the regex stack" do
+      cfg = make_config
+      ["> " * 100_000 + "[a]: b ~~x~~", "[a]: u \"" + "x" * 300_000 + "\" ~~x~~", "[a]: <" + "u" * 300_000 + "> ~~x~~"].each do |line|
+        Hwaro::Content::Processors::MarkdownExtensions.preprocess(line, cfg).should be_a(String)
+      end
+      html_line = "<a" + %( b="c") * 50_000 + " ~~x~~>"
+      Hwaro::Content::Processors::MarkdownExtensions.preprocess(html_line, cfg).should contain("<del>x</del>")
+    end
+
     it "rewrites delimiters after text that is not an inline link" do
       html, _ = Hwaro::Processor::Markdown.render("[a](b ~~c~~)", markdown_config: make_config)
       html.should contain("<del>c</del>")

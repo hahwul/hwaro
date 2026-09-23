@@ -27,7 +27,7 @@ module Hwaro
         # (`<…>` or a non-space run), an optional title after whitespace, and
         # nothing else. Group 1 ends where the destination starts. A line
         # with trailing text is a paragraph to Markd, not a definition.
-        LINK_DEFINITION_RE = /\A((?: {0,3}>[ \t]?)* {0,3}\[[^\]]+\]:[ \t]*)(?:<[^<>\n\\]*+(?:\\.[^<>\n\\]*+)*+>|[^<\s]\S*+)(?:[ \t]++(?:"[^"\\]*+(?:\\.[^"\\]*+)*+"|'[^'\\]*+(?:\\.[^'\\]*+)*+'|\([^()\\]*+(?:\\.[^()\\]*+)*+\)))?[ \t]*\r?\n?\z/
+        LINK_DEFINITION_RE = /\A((?: {0,3}>[ \t]?)*+ {0,3}\[[^\]]++\]:[ \t]*+)(?:<[^<>\n\\]*+(?:\\.[^<>\n\\]*+)*+>|[^<\s]\S*+)(?:[ \t]++(?:"[^"\\]*+(?:\\.[^"\\]*+)*+"|'[^'\\]*+(?:\\.[^'\\]*+)*+'|\([^()\\]*+(?:\\.[^()\\]*+)*+\)))?[ \t]*\r?\n?\z/
 
         # Raw inline HTML tags as Markd recognizes them (Markd::Rule::OPEN_TAG
         # and CLOSE_TAG: tag name, attributes with optional unquoted/quoted
