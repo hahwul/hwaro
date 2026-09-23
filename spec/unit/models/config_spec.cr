@@ -3091,6 +3091,32 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  # An unrecognised math_engine matched no branch of `math_tags`, so no math
+  # renderer loaded and every formula shipped as raw TeX, with no warning;
+  # `"MathJax"` (the library's own casing) did the same. An unknown feed type
+  # was quietly published as RSS.
+  describe "math_engine and feeds.type values" do
+    it "accepts any casing" do
+      config = load_config("[markdown]\nmath = true\nmath_engine = \"MathJax\"\n[feeds]\ntype = \"Atom\"")
+      config.markdown.math_engine.should eq("mathjax")
+      config.markdown.math_tags.should contain("mathjax")
+      config.feeds.type.should eq("atom")
+    end
+
+    it "warns about an unknown value and keeps the default" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("[markdown]\nmath = true\nmath_engine = \"mathjx\"\n[feeds]\ntype = \"json\"")
+      end
+      config.not_nil!.markdown.math_engine.should eq("katex")
+      config.not_nil!.markdown.math_tags.should contain("katex")
+      config.not_nil!.feeds.type.should eq("rss")
+      log.should contain("math_engine")
+      log.should contain("mathjx")
+      log.should contain("json")
+    end
+  end
+
   describe "mistyped section warnings" do
     it "warns when a table section is given a scalar" do
       log = with_captured_log { load_config("sitemap = true\nhighlight = false") }

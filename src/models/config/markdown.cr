@@ -152,7 +152,15 @@ module Hwaro
         config.markdown.mermaid = bool_value(s["mermaid"]?, config.markdown.mermaid)
         config.markdown.math = bool_value(s["math"]?, config.markdown.math)
         if engine = s["math_engine"]?.try(&.as_s?)
-          config.markdown.math_engine = engine
+          # `math_tags` loads a renderer only for a known engine, so an
+          # unrecognised value (or `"MathJax"` in the library's own casing)
+          # used to ship every formula as raw TeX with no feedback.
+          normalized = engine.strip.downcase
+          if {"katex", "mathjax"}.includes?(normalized)
+            config.markdown.math_engine = normalized
+          else
+            Logger.warn "Unknown [markdown] math_engine '#{engine}' — expected \"katex\" or \"mathjax\". Using \"#{config.markdown.math_engine}\"."
+          end
         end
         config.markdown.admonitions = bool_value(s["admonitions"]?, config.markdown.admonitions)
         config.markdown.heading_ids = bool_value(s["heading_ids"]?, config.markdown.heading_ids)

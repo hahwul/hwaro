@@ -165,7 +165,16 @@ module Hwaro
         # Empty is the shipped default (safe_feed_filename derives rss.xml /
         # atom.xml from `type`), so only non-file values are rejected.
         validate_output_filename!("feeds", "filename", config.feeds.filename, "rss.xml", allow_empty: true)
-        config.feeds.type = s["type"]?.try(&.as_s?) || config.feeds.type
+        if feed_type = s["type"]?.try(&.as_s?)
+          # The writer only knows RSS and Atom and published anything else as
+          # RSS without a word.
+          normalized = feed_type.strip.downcase
+          if {"rss", "atom"}.includes?(normalized)
+            config.feeds.type = normalized
+          else
+            Logger.warn "Unknown [feeds] type '#{feed_type}' — expected \"rss\" or \"atom\". Using \"#{config.feeds.type}\"."
+          end
+        end
         config.feeds.truncate = int_value(s["truncate"]?, config.feeds.truncate)
         config.feeds.limit = int_value(s["limit"]?, config.feeds.limit)
         if sections = s["sections"]?
