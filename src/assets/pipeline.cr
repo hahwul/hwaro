@@ -168,22 +168,70 @@ module Hwaro
       # beside the source, so a URL the author already wrote relative to the
       # bundle output keeps working. Relative results keep subpath
       # (`base_path`) deploys working.
+      #
+      # Only real `url(...)` tokens are rewritten: the text of a CSS string
+      # (`content:"url(sp.png)"`) or a comment is copied through untouched.
       private def rebase_css_urls(css : String, file : String, bundle_dir : String) : String
         source_dir = File.dirname(file)
         return css if source_dir == bundle_dir
-        css.gsub(CSS_URL_RE) do |whole|
-          quote = $1
-          url = $2.strip
-          next whole if url.empty? || url.starts_with?('/') || url.starts_with?('#') ||
-                        url.includes?("://") || url.starts_with?("//") || url.matches?(/\A[a-z][a-z0-9+.-]*:/i)
-          path_part = url.split(/[?#]/, 2).first
-          suffix = url[path_part.size..]
-          target = Path.posix(source_dir, path_part).normalize
-          next whole if target.to_s.starts_with?("..")
-          next whole unless File.file?(File.join(@config.source_dir, target.to_s))
-          rebased = target.relative_to(Path.posix(bundle_dir)).to_s
-          "url(#{quote}#{rebased}#{suffix}#{quote})"
+        bytes = css.to_slice
+        n = bytes.size
+        String.build(css.bytesize) do |io|
+          i = 0
+          copied = 0 # bytes[copied...i] are pending verbatim output
+          while i < n
+            b = bytes[i]
+            if b == '"'.ord || b == '\''.ord
+              i = css_string_end(bytes, i, n)
+            elsif b == '/'.ord && i + 1 < n && bytes[i + 1] == '*'.ord
+              close = css.byte_index("*/", i + 2)
+              i = close ? close + 2 : n
+            elsif (b == 'u'.ord || b == 'U'.ord) && (i == 0 || !css_ident_byte?(bytes[i - 1])) &&
+                  (m = CSS_URL_RE.match_at_byte_index(css, i, Regex::MatchOptions::ANCHORED))
+              stop = i + m[0].bytesize
+              io.write(bytes[copied, i - copied])
+              io << rebase_css_url(m[0], m[1], m[2], source_dir, bundle_dir)
+              copied = i = stop
+            else
+              i += 1
+            end
+          end
+          io.write(bytes[copied, n - copied])
         end
+      end
+
+      # One matched `url(...)` token, rebased when it names a file beside the
+      # source stylesheet (see rebase_css_urls), else returned as written.
+      private def rebase_css_url(whole : String, quote : String, raw_url : String, source_dir : String, bundle_dir : String) : String
+        url = raw_url.strip
+        return whole if url.empty? || url.starts_with?('/') || url.starts_with?('#') ||
+                        url.includes?("://") || url.starts_with?("//") || url.matches?(/\A[a-z][a-z0-9+.-]*:/i)
+        path_part = url.split(/[?#]/, 2).first
+        suffix = url[path_part.size..]
+        target = Path.posix(source_dir, path_part).normalize
+        return whole if target.to_s.starts_with?("..")
+        return whole unless File.file?(File.join(@config.source_dir, target.to_s))
+        rebased = target.relative_to(Path.posix(bundle_dir)).to_s
+        "url(#{quote}#{rebased}#{suffix}#{quote})"
+      end
+
+      # Index just past the CSS string starting at `start` (backslash
+      # escapes honoured). An unterminated string ends at the line break, as
+      # CSS tokenizes it, or at the end of the input.
+      private def css_string_end(bytes : Bytes, start : Int32, n : Int32) : Int32
+        quote = bytes[start]
+        i = start + 1
+        while i < n
+          c = bytes[i]
+          return i + 1 if c == quote
+          return i if c == '\n'.ord
+          i += c == '\\'.ord ? 2 : 1
+        end
+        n
+      end
+
+      private def css_ident_byte?(b : UInt8) : Bool
+        b >= 0x80 || b.unsafe_chr.ascii_alphanumeric? || b == '-'.ord || b == '_'.ord
       end
 
       # Separator placed between concatenated bundle sources.

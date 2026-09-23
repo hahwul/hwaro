@@ -1116,6 +1116,32 @@ describe Hwaro::Assets::Pipeline do
       end
     end
 
+    it "does not rewrite url( text inside a CSS string or comment" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css")
+          File.write("static/css/sp.png", "png")
+          File.write("static/css/a.css",
+            ".a:after{content:\"url(sp.png)\"}\n" \
+            ".b:after{content:'it\\'s url(sp.png)'}\n" \
+            "/* don't url(sp.png) */\n" \
+            ".c{background:url(sp.png)}\n" \
+            ".d{background:URL( \"sp.png\" )}")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
+          Hwaro::Assets::Pipeline.new(config, "").process("public")
+
+          css = File.read("public/assets/main.css")
+          css.should contain(%(content:"url(sp.png)"))
+          css.should contain(%(content:'it\\'s url(sp.png)'))
+          css.should contain("/* don't url(sp.png) */")
+          css.should contain(".c{background:url(../css/sp.png)}")
+          css.should contain(%(.d{background:url("../css/sp.png")}))
+        end
+      end
+    end
+
     it "leaves url()s alone when the source dir is not the published static/ tree" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
