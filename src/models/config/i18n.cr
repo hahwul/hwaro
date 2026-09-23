@@ -127,12 +127,15 @@ module Hwaro
         # `hwaro doctor` already flags the duplicate; the build has to refuse
         # it too. First declaration wins, like a table-array key.
         seen = Set(String).new
-        config.taxonomies = taxonomies_section.compact_map do |taxonomy_any|
+        config.taxonomies = taxonomies_section.each_with_index.to_a.compact_map do |(taxonomy_any, index)|
+          # A nameless or non-table entry was dropped with no feedback, so a
+          # typo'd `nme = "tags"` silently built a site without the taxonomy.
           taxonomy_hash = taxonomy_any.as_h?
-          next unless taxonomy_hash
-
-          name = taxonomy_hash["name"]?.try(&.as_s?)
-          next unless name
+          name = taxonomy_hash.try(&.["name"]?).try(&.as_s?)
+          if taxonomy_hash.nil? || name.nil? || name.strip.empty?
+            Logger.warn "Ignoring [[taxonomies]] entry ##{index + 1}: it needs a non-empty string name (e.g. name = \"tags\")."
+            next
+          end
           unless seen.add?(name)
             Logger.warn "Duplicate [[taxonomies]] name #{name.inspect} in config.toml — the first declaration wins; remove the later one."
             next
@@ -179,8 +182,8 @@ module Hwaro
           lang_config.generate_feed = bool_value(lang_hash["generate_feed"]?, lang_config.generate_feed)
           lang_config.build_search_index = bool_value(lang_hash["build_search_index"]?, lang_config.build_search_index)
 
-          if taxonomies = lang_hash["taxonomies"]?.try(&.as_a?)
-            lang_config.taxonomies = taxonomies.compact_map(&.as_s?)
+          if taxonomies = string_list?(lang_hash["taxonomies"]?, "[languages.#{lang_code}] taxonomies")
+            lang_config.taxonomies = taxonomies
           else
             # No per-language `taxonomies` key → inherit the global
             # `[[taxonomies]]` set rather than the hardcoded `["tags",

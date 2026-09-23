@@ -168,4 +168,54 @@ describe Hwaro::Utils::EnvSubstitutor do
       end
     end
   end
+
+  # Config substitution runs on the raw TOML text, so a value used to be
+  # spliced in as TOML syntax: a `"` broke the load, a `\` was re-read as an
+  # escape (`C:\new` became a newline), and `$VAR` in a comment warned.
+  describe ".substitute_toml" do
+    it "escapes a value placed inside a basic string" do
+      ENV["HWARO_SPEC_TOML_V"] = %(He said "hi" at C:\new\temp)
+      toml_out, missing = Hwaro::Utils::EnvSubstitutor.substitute_toml(%(title = "${HWARO_SPEC_TOML_V}"\n))
+      missing.should be_empty
+      TOML.parse(toml_out)["title"].as_s.should eq(%(He said "hi" at C:\new\temp))
+    ensure
+      ENV.delete("HWARO_SPEC_TOML_V")
+    end
+
+    it "escapes inside a multi-line basic string, but not an authored default" do
+      ENV["HWARO_SPEC_TOML_V"] = %(a\\b "q")
+      toml = %(d = """x ${HWARO_SPEC_TOML_V} y"""\ne = "${HWARO_SPEC_TOML_UNSET_X:-C:\\\\tmp}"\n)
+      toml_out, _ = Hwaro::Utils::EnvSubstitutor.substitute_toml(toml)
+      doc = TOML.parse(toml_out)
+      doc["d"].as_s.should eq(%(x a\\b "q" y))
+      # The default is TOML source the author already escaped.
+      doc["e"].as_s.should eq("C:\\tmp")
+    ensure
+      ENV.delete("HWARO_SPEC_TOML_V")
+    end
+
+    it "inserts a bare value raw so numbers and booleans still work" do
+      ENV["HWARO_SPEC_TOML_N"] = "7"
+      toml_out, _ = Hwaro::Utils::EnvSubstitutor.substitute_toml("paginate = ${HWARO_SPEC_TOML_N}\n")
+      TOML.parse(toml_out)["paginate"].as_i.should eq(7)
+    ensure
+      ENV.delete("HWARO_SPEC_TOML_N")
+    end
+
+    it "leaves comments alone" do
+      toml_out, missing = Hwaro::Utils::EnvSubstitutor.substitute_toml("# deploy with $HWARO_SPEC_TOML_UNSET_Y\ntitle = \"x\" # $HWARO_SPEC_TOML_UNSET_Z\n")
+      missing.should be_empty
+      toml_out.should contain("$HWARO_SPEC_TOML_UNSET_Y")
+    end
+
+    it "does not treat a # inside a string as a comment" do
+      ENV["HWARO_SPEC_TOML_V"] = "v"
+      toml_out, _ = Hwaro::Utils::EnvSubstitutor.substitute_toml(%(a = "#${HWARO_SPEC_TOML_V}"\nb = '#${HWARO_SPEC_TOML_V}'\n))
+      doc = TOML.parse(toml_out)
+      doc["a"].as_s.should eq("#v")
+      doc["b"].as_s.should eq("#v")
+    ensure
+      ENV.delete("HWARO_SPEC_TOML_V")
+    end
+  end
 end

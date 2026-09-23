@@ -37,7 +37,7 @@ weight = 3
 | weight | int | 0 | 정렬 순서(낮을수록 앞) |
 | generate_feed | bool | true | 해당 언어의 RSS/Atom 피드 생성 여부 |
 | build_search_index | bool | true | 검색 인덱스 포함 여부 |
-| taxonomies | array | [] | 해당 언어의 택소노미 |
+| taxonomies | array | 모든 `[[taxonomies]]` 이름 | 해당 언어의 택소노미. 생략하면 전역 설정을 상속하고, `[]`이면 사용하지 않음 |
 
 ## 콘텐츠 구조
 

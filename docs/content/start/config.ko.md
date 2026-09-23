@@ -7,6 +7,8 @@ toc = true
 
 모든 사이트 설정은 프로젝트 루트의 `config.toml`에 있습니다.
 
+문자열 목록으로 문서화된 옵션에는 문자열 하나를 써도 되며, 항목이 하나인 목록으로 읽습니다. `sections = "posts"`는 `sections = ["posts"]`와 같습니다. 변수가 없을 때의 `exclude = "${SITEMAP_EXCLUDE:-}"`처럼 빈 문자열은 설정하지 않은 것으로 보고 기본값을 유지합니다. 문자열도 목록도 아닌 값(`fields = true`)은 경고와 함께 무시합니다.
+
 최상위 키에 오타가 있으면 조용히 무시하지 않고 경고합니다. `[markdonw]`나
 `titel = "…"` 같은 오타는 아무 안내 없이 기능을 꺼버리기 때문입니다. 실제
 키와 비슷하면 다음처럼 후보를 함께 알려줍니다.
@@ -15,8 +17,11 @@ toc = true
 Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean 'markdown'?
 ```
 
-이 검사는 최상위 키만 대상으로 하며, 섹션 안에 중첩된 키는 각 섹션의
-로더가 검증합니다.
+이 검사는 최상위 키만 대상으로 합니다. 섹션 안에 중첩된 키의 오타
+(`[markdown] emoij = true`)는 보고되지 않으므로 아래 표와 대조해 확인하세요. `[highlight]` 테이블 대신 `highlight = false`를 쓰거나
+`[[taxonomies]]` 항목 대신 `taxonomies = ["tags"]`를 쓰는 것처럼 알려진
+섹션의 형태가 틀린 경우에도 경고와 함께 무시합니다. 예외적으로
+`sitemap = true`는 `[sitemap] enabled = true`와 같은 뜻으로 계속 받아들입니다.
 
 ## 사이트 설정
 

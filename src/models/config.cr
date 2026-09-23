@@ -286,6 +286,11 @@ module Hwaro
         raw_content = File.read(config_path)
         substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, config_path)
         config.raw = parse_toml(substituted_content, config_path)
+        # Checked per file, before the merge, so a typo in the environment
+        # override is reported against that file rather than config.toml.
+        reject_null_bytes!(config.raw, config_path)
+        warn_unknown_top_level_keys(config.raw, config_path)
+        warn_mistyped_sections(config.raw, config_path)
 
         # Merge environment-specific override (e.g. config.production.toml).
         # A missing override is recoverable (we just use the base config), but
@@ -299,15 +304,15 @@ module Hwaro
             env_content = File.read(env_path)
             env_substituted = Utils::EnvSubstitutor.substitute_with_warnings(env_content, env_path)
             env_raw = parse_toml(env_substituted, env_path)
+            reject_null_bytes!(env_raw, env_path)
+            warn_unknown_top_level_keys(env_raw, env_path)
+            warn_mistyped_sections(env_raw, env_path)
             config.raw = deep_merge(config.raw, env_raw)
             Logger.info "Loaded environment config: #{env_path}"
           else
             Logger.warn "--env #{env_name}: override file '#{env_path}' not found; continuing with base #{config_path} only. If you intended to ship environment-specific settings (e.g. a production base_url), create #{env_path} or check for a typo in --env."
           end
         end
-
-        warn_unknown_top_level_keys(config.raw, config_path)
-        reject_null_bytes!(config.raw, config_path)
 
         config.title = string_or_default(config.raw, "title", config.title)
         config.description = string_or_default(config.raw, "description", config.description)
@@ -393,6 +398,39 @@ module Hwaro
       # top-level key is always dead configuration. Sorted, so "did you mean"
       # suggestions tie-break the same way regardless of load order.
       KNOWN_TOP_LEVEL_KEYS = SCALAR_KEYS + SECTION_LOADERS.flat_map(&.keys).uniq!.sort!
+
+      # Section keys read as an array of tables (`[[taxonomies]]`). Every
+      # other registered section key is a table, except the two below.
+      ARRAY_SECTION_KEYS = %w[taxonomies]
+
+      # Sections whose loader also accepts a boolean: `sitemap = true` is the
+      # pre-table form `load_sitemap` still honours for backward compatibility.
+      BOOLEAN_SECTION_KEYS = %w[sitemap]
+
+      # Sections whose loader validates the shape itself: `[versions]` takes a
+      # table or a bare `[[versions]]` array and raises a config error for
+      # anything else, so "Ignoring" would be wrong.
+      SELF_VALIDATING_SECTION_KEYS = %w[versions]
+
+      # A known section in the wrong TOML shape is skipped by its loader
+      # (`as_h?`/`as_a?` → nil), so `highlight = false` never disabled
+      # highlighting and `taxonomies = ["tags"]` built no taxonomies — all
+      # with no feedback. Say so, like the unknown-key warning above, but only
+      # where the loader really ignores the value.
+      private def self.warn_mistyped_sections(raw : Hash(String, TOML::Any), config_path : String)
+        raw.each do |key, value|
+          next if SCALAR_KEYS.includes?(key) || !KNOWN_TOP_LEVEL_KEYS.includes?(key)
+          next if SELF_VALIDATING_SECTION_KEYS.includes?(key)
+          next if BOOLEAN_SECTION_KEYS.includes?(key) && !value.as_bool?.nil?
+          if ARRAY_SECTION_KEYS.includes?(key)
+            next if value.as_a?
+            Logger.warn "Ignoring '#{key}' in #{config_path}: it must be an array of tables — write each entry as [[#{key}]] with its own keys (e.g. name = \"tags\")."
+          else
+            next if value.as_h?
+            Logger.warn "Ignoring '#{key}' in #{config_path}: it must be a table — write it as a [#{key}] section with its keys underneath."
+          end
+        end
+      end
 
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
         raw.each_key do |key|

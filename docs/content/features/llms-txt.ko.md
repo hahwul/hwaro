@@ -22,7 +22,7 @@ full_filename = "llms-full.txt"
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
-| enabled | bool | false | `llms.txt` 생성 여부 |
+| enabled | bool | true | `llms.txt` 생성 여부 (끄려면 `false`) |
 | filename | string | "llms.txt" | 출력 파일 이름 |
 | instructions | string | "" | LLM 크롤러에게 전달할 안내 텍스트 |
 | full_enabled | bool | false | 전체 콘텐츠 버전 생성 여부 |

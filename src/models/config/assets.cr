@@ -213,8 +213,8 @@ module Hwaro
         return unless s = config.raw["auto_includes"]?.try(&.as_h?)
 
         config.auto_includes.enabled = bool_value(s["enabled"]?, config.auto_includes.enabled)
-        if dirs = s["dirs"]?.try(&.as_a?)
-          config.auto_includes.dirs = dirs.compact_map(&.as_s?)
+        if dirs = string_list?(s["dirs"]?, "[auto_includes] dirs")
+          config.auto_includes.dirs = dirs
         end
       end
 
@@ -233,11 +233,7 @@ module Hwaro
             name = b["name"]?.try(&.as_s?) || ""
             next if name.empty?
 
-            files = if f = b["files"]?.try(&.as_a?)
-                      f.compact_map(&.as_s?)
-                    else
-                      [] of String
-                    end
+            files = string_list?(b["files"]?, "[[assets.bundles]] files") || [] of String
 
             config.assets.bundles << AssetBundleConfig.new(name: name, files: files)
           end
@@ -259,8 +255,8 @@ module Hwaro
 
         config.amp.enabled = bool_value(s["enabled"]?, config.amp.enabled)
         config.amp.path_prefix = s["path_prefix"]?.try(&.as_s?) || config.amp.path_prefix
-        if sections = s["sections"]?.try(&.as_a?)
-          config.amp.sections = sections.compact_map(&.as_s?)
+        if sections = string_list?(s["sections"]?, "[amp] sections")
+          config.amp.sections = sections
         end
       end
 
@@ -281,11 +277,11 @@ module Hwaro
         end
         config.pwa.start_url = s["start_url"]?.try(&.as_s?) || config.pwa.start_url
         config.pwa.offline_page = s["offline_page"]?.try(&.as_s?)
-        if icons = s["icons"]?.try(&.as_a?)
-          config.pwa.icons = icons.compact_map(&.as_s?)
+        if icons = string_list?(s["icons"]?, "[pwa] icons")
+          config.pwa.icons = icons
         end
-        if precache = s["precache_urls"]?.try(&.as_a?)
-          config.pwa.precache_urls = precache.compact_map(&.as_s?)
+        if precache = string_list?(s["precache_urls"]?, "[pwa] precache_urls")
+          config.pwa.precache_urls = precache
         end
         if strategy = s["cache_strategy"]?.try(&.as_s?)
           if PwaConfig::VALID_STRATEGIES.includes?(strategy)

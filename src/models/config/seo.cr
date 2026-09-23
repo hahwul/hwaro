@@ -91,8 +91,11 @@ module Hwaro
   module Models
     class Config
       private def self.load_sitemap(config : Config)
-        # Handle backward compatibility where sitemap was just a boolean
-        if sitemap_bool = config.raw["sitemap"]?.try(&.as_bool?)
+        # Backward compatibility: `sitemap = true|false` predates the
+        # `[sitemap]` table. `warn_mistyped_sections` exempts this form
+        # (BOOLEAN_SECTION_KEYS), so both values must really be applied.
+        sitemap_bool = config.raw["sitemap"]?.try(&.as_bool?)
+        if !sitemap_bool.nil?
           config.sitemap.enabled = sitemap_bool
         elsif s = config.raw["sitemap"]?.try(&.as_h?)
           config.sitemap.enabled = bool_value(s["enabled"]?, config.sitemap.enabled)
@@ -108,8 +111,8 @@ module Hwaro
           # so non-finite values fall back to the default here.
           pr = float_value(s["priority"]?, config.sitemap.priority)
           config.sitemap.priority = pr.finite? ? pr : config.sitemap.priority
-          if exclude_arr = s["exclude"]?.try(&.as_a?)
-            config.sitemap.exclude = exclude_arr.compact_map(&.as_s?)
+          if exclude = string_list?(s["exclude"]?, "[sitemap] exclude")
+            config.sitemap.exclude = exclude
           end
         end
       end
@@ -165,11 +168,20 @@ module Hwaro
         # Empty is the shipped default (safe_feed_filename derives rss.xml /
         # atom.xml from `type`), so only non-file values are rejected.
         validate_output_filename!("feeds", "filename", config.feeds.filename, "rss.xml", allow_empty: true)
-        config.feeds.type = s["type"]?.try(&.as_s?) || config.feeds.type
+        if feed_type = s["type"]?.try(&.as_s?)
+          # The writer only knows RSS and Atom and published anything else as
+          # RSS without a word.
+          normalized = feed_type.strip.downcase
+          if {"rss", "atom"}.includes?(normalized)
+            config.feeds.type = normalized
+          else
+            Logger.warn "Unknown [feeds] type '#{feed_type}' — expected \"rss\" or \"atom\". Using \"#{config.feeds.type}\"."
+          end
+        end
         config.feeds.truncate = int_value(s["truncate"]?, config.feeds.truncate)
         config.feeds.limit = int_value(s["limit"]?, config.feeds.limit)
-        if sections = s["sections"]?.try(&.as_a?)
-          config.feeds.sections = sections.compact_map(&.as_s?)
+        if sections = string_list?(s["sections"]?, "[feeds] sections")
+          config.feeds.sections = sections
         end
         config.feeds.default_language_only = bool_value(s["default_language_only"]?, config.feeds.default_language_only)
         config.feeds.full_content = bool_value(s["full_content"]?, config.feeds.full_content)

@@ -11,6 +11,8 @@ Hwaro supports environment variable substitution in both `config.toml` and templ
 
 Environment variables in `config.toml` are resolved before TOML parsing.
 
+A value placed inside a double-quoted string is inserted as exactly the characters the variable holds: quotes, backslashes and newlines are escaped for you, so `SITE_TITLE='Say "hi"'` or a Windows path loads verbatim. A placeholder outside any string (`paginate = ${PER_PAGE}`) is inserted as TOML, so numbers and booleans work, and a `${VAR:-default}` default is used exactly as written in the file. Placeholders inside `#` comments are left alone.
+
 ### Syntax
 
 | Pattern | Description |

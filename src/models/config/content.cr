@@ -254,8 +254,8 @@ module Hwaro
           end
         end
 
-        if fields = fields_any.try(&.as_a?)
-          config.content_new.default_fields = fields.compact_map(&.as_s?)
+        if fields = string_list?(fields_any, "[content.new] default_fields")
+          config.content_new.default_fields = fields
         end
 
         if bundle = bundle_any.try(&.as_bool?)
@@ -309,8 +309,8 @@ module Hwaro
         # crashing `serve` watch rebuilds (the full build guards `limit <= 0`,
         # the incremental path did not — clamping fixes both uniformly).
         config.related.limit = int_value(s["limit"]?, config.related.limit).clamp(0, Int32::MAX)
-        if taxonomies = s["taxonomies"]?.try(&.as_a?)
-          config.related.taxonomies = taxonomies.compact_map(&.as_s?)
+        if taxonomies = string_list?(s["taxonomies"]?, "[related] taxonomies")
+          config.related.taxonomies = taxonomies
         end
       end
 
@@ -357,6 +357,10 @@ module Hwaro
             # silently never match (source) or produce double-slash URLs
             # like `http://host//blog//p/` (target).
             config.permalinks[k.strip("/")] = target.strip("/")
+          else
+            # A number, or a dotted key (`blog.news = …`) that TOML parsed as
+            # a nested table, used to be dropped with no feedback.
+            Logger.warn "Ignoring [permalinks] rule #{k.inspect}: its target must be a string (quote a source directory that contains a dot, e.g. \"blog.news\" = \"news\")."
           end
         end
       end

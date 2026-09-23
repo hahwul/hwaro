@@ -2990,6 +2990,296 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  describe "environment substitution inside TOML strings" do
+    it "loads a value holding quotes and backslashes verbatim" do
+      ENV["HWARO_SPEC_CFG_TITLE"] = %(He said "hi" at C:\\new\\temp)
+      config = load_config(%(title = "${HWARO_SPEC_CFG_TITLE}"))
+      config.title.should eq(%(He said "hi" at C:\\new\\temp))
+    ensure
+      ENV.delete("HWARO_SPEC_CFG_TITLE")
+    end
+
+    it "does not substitute or warn about $VAR in a comment" do
+      log = with_captured_log do
+        load_config(%(title = "t"\n# export $HWARO_SPEC_CFG_UNSET_IN_COMMENT before deploying))
+      end
+      log.should_not contain("HWARO_SPEC_CFG_UNSET_IN_COMMENT")
+    end
+  end
+
+  # Several string-list keys read `as_a?` only and silently dropped a single
+  # string, in the worst direction: an exclude list became empty (private
+  # pages published) and a sections allowlist became "all sections".
+  describe "single-string list values" do
+    it "treats a single string as a one-element list for every string-list key" do
+      config = load_config(<<-TOML)
+        [build]
+        hooks.pre = "npm ci"
+        hooks.post = "echo done"
+        [sitemap]
+        exclude = "/private/"
+        [search]
+        fields = "title"
+        exclude = "/private"
+        [feeds]
+        sections = "posts"
+        [amp]
+        sections = "posts"
+        [pwa]
+        icons = "static/icon.png"
+        precache_urls = "/"
+        [related]
+        taxonomies = "categories"
+        [outputs]
+        sections = "posts"
+        [auto_includes]
+        dirs = "assets"
+        [plugins]
+        processors = "markdown"
+        [doctor]
+        ignore = "menu-undeclared"
+        [content.new]
+        default_fields = "summary"
+        [languages.ko]
+        taxonomies = "tags"
+        [[assets.bundles]]
+        name = "main.css"
+        files = "css/a.css"
+        TOML
+      config.build.hooks.pre.should eq(["npm ci"])
+      config.build.hooks.post.should eq(["echo done"])
+      config.sitemap.exclude.should eq(["/private/"])
+      config.search.fields.should eq(["title"])
+      config.search.exclude.should eq(["/private"])
+      config.feeds.sections.should eq(["posts"])
+      config.amp.sections.should eq(["posts"])
+      config.pwa.icons.should eq(["static/icon.png"])
+      config.pwa.precache_urls.should eq(["/"])
+      config.related.taxonomies.should eq(["categories"])
+      config.outputs.sections.should eq(["posts"])
+      config.auto_includes.dirs.should eq(["assets"])
+      config.plugins.processors.should eq(["markdown"])
+      config.doctor.ignore.should eq(["menu-undeclared"])
+      config.content_new.default_fields.should eq(["summary"])
+      config.languages["ko"].taxonomies.should eq(["tags"])
+      config.assets.bundles.first.files.should eq(["css/a.css"])
+    end
+
+    # `exclude = "${SITEMAP_EXCLUDE:-}"` with the variable unset is a single
+    # "" — read as [""], it excluded every page from the sitemap ("" matches
+    # like "/"), an empty `[search] exclude` suppressed search.json and an
+    # empty `[feeds] sections` dropped the feed's sections. Before single
+    # strings were accepted it was ignored, so it has to mean "not set".
+    it "treats a blank single string as not set" do
+      ENV.delete("HWARO_SPEC_CFG_UNSET_LIST")
+      config = load_config(<<-TOML)
+        [[taxonomies]]
+        name = "tags"
+        [[taxonomies]]
+        name = "authors"
+        [sitemap]
+        exclude = "${HWARO_SPEC_CFG_UNSET_LIST:-}"
+        [search]
+        fields = ""
+        exclude = ""
+        [feeds]
+        sections = "${HWARO_SPEC_CFG_UNSET_LIST:-}"
+        [build]
+        hooks.pre = "  "
+        [related]
+        taxonomies = ""
+        [languages.ko]
+        taxonomies = ""
+        TOML
+      defaults = Hwaro::Models::Config.new
+      config.sitemap.exclude.should eq(defaults.sitemap.exclude)
+      config.search.fields.should eq(defaults.search.fields)
+      config.search.exclude.should eq(defaults.search.exclude)
+      config.feeds.sections.should eq(defaults.feeds.sections)
+      config.build.hooks.pre.should eq(defaults.build.hooks.pre)
+      config.related.taxonomies.should eq(defaults.related.taxonomies)
+      config.languages["ko"].taxonomies.should eq(["tags", "authors"])
+    end
+
+    it "keeps an array's entries as written" do
+      config = load_config(%([sitemap]\nexclude = ["", "/private/"]\n[search]\nfields = []))
+      config.sitemap.exclude.should eq(["", "/private/"])
+      config.search.fields.should eq([] of String)
+    end
+
+    # The value used to be read only when it was an array, so a bool, a
+    # number or a table kept the default. Reading "anything present" instead
+    # turned it into [] — `[search] fields = true` dropped title and content
+    # from search.json, `[languages.ko] taxonomies = false` built no
+    # taxonomies for that language instead of inheriting them.
+    it "keeps the default and warns when a list option is neither a string nor an array" do
+      defaults = Hwaro::Models::Config.new
+      {
+        {"[search]\nfields = true", "[search] fields", ->(c : Hwaro::Models::Config) { c.search.fields }},
+        {"[build]\nhooks.pre = 1", "[build] hooks.pre", ->(c : Hwaro::Models::Config) { c.build.hooks.pre }},
+        {"[build]\nhooks.post = 1", "[build] hooks.post", ->(c : Hwaro::Models::Config) { c.build.hooks.post }},
+        {"[sitemap]\nexclude = true", "[sitemap] exclude", ->(c : Hwaro::Models::Config) { c.sitemap.exclude }},
+        {"[search]\nexclude = 1", "[search] exclude", ->(c : Hwaro::Models::Config) { c.search.exclude }},
+        {"[feeds]\nsections = false", "[feeds] sections", ->(c : Hwaro::Models::Config) { c.feeds.sections }},
+        {"[amp]\nsections = 1", "[amp] sections", ->(c : Hwaro::Models::Config) { c.amp.sections }},
+        {"[pwa]\nicons = 1", "[pwa] icons", ->(c : Hwaro::Models::Config) { c.pwa.icons }},
+        {"[pwa]\nprecache_urls = 1", "[pwa] precache_urls", ->(c : Hwaro::Models::Config) { c.pwa.precache_urls }},
+        {"[related]\ntaxonomies = true", "[related] taxonomies", ->(c : Hwaro::Models::Config) { c.related.taxonomies }},
+        {"[outputs]\nsections = 1", "[outputs] sections", ->(c : Hwaro::Models::Config) { c.outputs.sections }},
+        {"[auto_includes]\ndirs = true", "[auto_includes] dirs", ->(c : Hwaro::Models::Config) { c.auto_includes.dirs }},
+        {"[plugins]\nprocessors = 1", "[plugins] processors", ->(c : Hwaro::Models::Config) { c.plugins.processors }},
+        {"[doctor]\nignore = 1", "[doctor] ignore", ->(c : Hwaro::Models::Config) { c.doctor.ignore }},
+        {"[content.new]\ndefault_fields = {a = 1}", "[content.new] default_fields", ->(c : Hwaro::Models::Config) { c.content_new.default_fields }},
+      }.each do |toml, label, getter|
+        config = nil
+        log = with_captured_log { config = load_config(toml) }
+        getter.call(config.not_nil!).should eq(getter.call(defaults))
+        log.should contain("Ignoring #{label}")
+      end
+
+      config = nil
+      log = with_captured_log do
+        config = load_config("[[taxonomies]]\nname = \"tags\"\n[[taxonomies]]\nname = \"authors\"\n[languages.ko]\ntaxonomies = false\n[[assets.bundles]]\nname = \"a.css\"\nfiles = 1")
+      end
+      config.not_nil!.languages["ko"].taxonomies.should eq(["tags", "authors"])
+      config.not_nil!.assets.bundles.first.files.should eq([] of String)
+      log.should contain("Ignoring [languages.ko] taxonomies")
+      log.should contain("Ignoring [[assets.bundles]] files")
+    end
+  end
+
+  # Checks ran on the merged document with config.toml as the label, so a
+  # mistake inside config.<env>.toml was blamed on the base file.
+  describe "environment override diagnostics" do
+    it "names the override file for a typo, a mistyped section and a NUL there" do
+      Dir.mktmpdir do |dir|
+        base = File.join(dir, "config.toml")
+        env_path = File.join(dir, "config.production.toml")
+        File.write(base, %(title = "Base"\n))
+        File.write(env_path, "highlight = false\n[sitemp]\nenabled = true\n")
+        log = with_captured_log { Hwaro::Models::Config.load(base, env: "production") }
+        log.should contain("Unknown key 'sitemp' in #{env_path}")
+        log.should contain("Ignoring 'highlight' in #{env_path}")
+        log.should_not contain("in #{base}")
+
+        # Loader warnings run on the merged document and cannot tell which
+        # file an entry came from, so they must not blame config.toml.
+        File.write(env_path, "[[taxonomies]]\nnme = \"tags\"\n[permalinks]\nposts = 5\n")
+        log = with_captured_log { Hwaro::Models::Config.load(base, env: "production") }
+        log.should contain("[[taxonomies]] entry #1")
+        log.should contain("[permalinks] rule \"posts\"")
+        log.should_not contain("config.toml")
+
+        File.write(env_path, %(title = "a\\u0000b"\n))
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Models::Config.load(base, env: "production") }
+        (err.message || "").should contain(env_path)
+      end
+    end
+  end
+
+  # An unrecognised math_engine matched no branch of `math_tags`, so no math
+  # renderer loaded and every formula shipped as raw TeX, with no warning;
+  # `"MathJax"` (the library's own casing) did the same. An unknown feed type
+  # was quietly published as RSS.
+  describe "math_engine and feeds.type values" do
+    it "accepts any casing" do
+      config = load_config("[markdown]\nmath = true\nmath_engine = \"MathJax\"\n[feeds]\ntype = \"Atom\"")
+      config.markdown.math_engine.should eq("mathjax")
+      config.markdown.math_tags.should contain("mathjax")
+      config.feeds.type.should eq("atom")
+    end
+
+    it "warns about an unknown value and keeps the default" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("[markdown]\nmath = true\nmath_engine = \"mathjx\"\n[feeds]\ntype = \"json\"")
+      end
+      config.not_nil!.markdown.math_engine.should eq("katex")
+      config.not_nil!.markdown.math_tags.should contain("katex")
+      config.not_nil!.feeds.type.should eq("rss")
+      log.should contain("math_engine")
+      log.should contain("mathjx")
+      log.should contain("json")
+    end
+  end
+
+  # A non-string rule target (a number, or a dotted key TOML turned into a
+  # nested table) was dropped with no feedback, so the section kept its
+  # original URLs.
+  describe "[permalinks] non-string targets" do
+    it "warns and skips a rule whose target is not a string" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("[permalinks]\nposts = 5\nblog.news = \"news\"\ndocs = \"guide\"")
+      end
+      config.not_nil!.permalinks.should eq({"docs" => "guide"})
+      log.should contain("[permalinks] rule \"posts\"")
+      log.should contain("[permalinks] rule \"blog\"")
+    end
+  end
+
+  # Facebook app ids are numeric, so `fb_app_id = 1234567890` (or an
+  # unquoted `${FB_APP_ID}`) is the natural spelling — and it was dropped,
+  # silently emitting no `fb:app_id` meta tag.
+  describe "[og] fb_app_id" do
+    it "accepts a bare integer" do
+      load_config("[og]\nfb_app_id = 1234567890").og.fb_app_id.should eq("1234567890")
+      load_config(%([og]\nfb_app_id = "42")).og.fb_app_id.should eq("42")
+    end
+  end
+
+  # A known section with the wrong TOML shape used to be ignored with no
+  # feedback at all: `highlight = false` never disabled highlighting, and
+  # `taxonomies = ["tags"]` built a site with no taxonomies.
+  describe "mistyped section warnings" do
+    it "warns when a table section is given a scalar" do
+      log = with_captured_log { load_config("search = true\nhighlight = false") }
+      log.should contain("'search' in")
+      log.should contain("[search]")
+      log.should contain("'highlight' in")
+    end
+
+    # `sitemap = true` is the pre-table form load_sitemap still honours, so
+    # warning "Ignoring 'sitemap'" while building the sitemap was false.
+    it "accepts the boolean sitemap form silently" do
+      config = nil
+      log = with_captured_log { config = load_config("sitemap = true") }
+      config.not_nil!.sitemap.enabled.should be_true
+      log.should_not contain("'sitemap'")
+      log = with_captured_log { load_config("sitemap = false") }
+      log.should_not contain("'sitemap'")
+      log = with_captured_log { load_config(%(sitemap = "yes")) }
+      log.should contain("Ignoring 'sitemap'")
+    end
+
+    # load_versions raises its own error for any other shape; "Ignoring"
+    # right before a failed load is wrong.
+    it "leaves a mis-shaped versions value to its own error" do
+      log = with_captured_log { expect_config_error(%(versions = "v1")) }
+      log.should_not contain("Ignoring 'versions'")
+    end
+
+    it "warns when taxonomies is not an array of tables" do
+      log = with_captured_log { load_config(%(taxonomies = ["tags"])) }
+      log.should contain("[[taxonomies]]")
+      log = with_captured_log { load_config("[taxonomies]\ntag = \"tags\"") }
+      log.should contain("[[taxonomies]]")
+    end
+
+    it "warns for a [[taxonomies]] entry without a name" do
+      log = with_captured_log { load_config("[[taxonomies]]\nfeed = true\n\n[[taxonomies]]\nname = \"\"") }
+      log.scan("[[taxonomies]] entry").size.should eq(2)
+    end
+
+    it "accepts both documented [versions] shapes and correct sections silently" do
+      log = with_captured_log do
+        load_config("[sitemap]\nenabled = true\n\n[[taxonomies]]\nname = \"tags\"\n\n[[versions]]\nname = \"v1\"\npath = \"docs/v1\"")
+      end
+      log.should_not contain("must be")
+      log.should_not contain("[[taxonomies]] entry")
+    end
+  end
+
   describe "unknown top-level key warnings" do
     it "warns with a did-you-mean suggestion for a typo'd section" do
       log = with_captured_log do

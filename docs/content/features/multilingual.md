@@ -37,7 +37,7 @@ weight = 3
 | weight | int | 0 | Sort order (lower = first) |
 | generate_feed | bool | true | Generate RSS/Atom feed for this language |
 | build_search_index | bool | true | Include in search index |
-| taxonomies | array | [] | Taxonomies for this language |
+| taxonomies | array | every `[[taxonomies]]` name | Taxonomies for this language; omit to inherit the global set, `[]` for none |
 
 ## Content Structure
 
