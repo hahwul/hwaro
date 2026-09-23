@@ -173,6 +173,10 @@ CodePen을 삽입합니다.
 
 숏코드 템플릿은 `templates/shortcodes/`에 둡니다.
 
+숏코드 템플릿에 구문 또는 렌더링 오류가 있으면 Hwaro가 템플릿 경로와
+소스 위치를 알리고, 호출 위치에 HTML 주석을 표시한 뒤 페이지 렌더링을
+계속합니다.
+
 ### 예시: 알림 상자
 
 `templates/shortcodes/alert.html`을 만듭니다:

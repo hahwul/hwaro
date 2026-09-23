@@ -957,7 +957,7 @@ module Hwaro
                                 end
                               end
             crinja_template.render(context)
-          rescue ex : Crinja::TemplateError
+          rescue ex : Crinja::Error
             label = shortcode_name ? "shortcode '#{shortcode_name}'" : "shortcode"
             Logger.warn "Template error in #{label}: #{ex.message}"
             # Record the failure on the page (drives the serve error overlay —

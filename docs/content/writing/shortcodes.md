@@ -173,6 +173,10 @@ to find the dead embed on the published page:
 
 Shortcode templates live in `templates/shortcodes/`.
 
+If a shortcode template has a syntax or render error, Hwaro reports the
+template path and source location, places a visible HTML comment at the call,
+and continues rendering the page.
+
 ### Example: Alert Box
 
 Create `templates/shortcodes/alert.html`:
