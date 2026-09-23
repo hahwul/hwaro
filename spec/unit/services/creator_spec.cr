@@ -101,6 +101,24 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    it "refuses to create content through a symlink outside content" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          outside = File.join(dir, "outside")
+          FileUtils.mkdir_p(outside)
+          File.symlink(outside, "content/linked")
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "linked/post.md")
+          expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Creator.new.run(options)
+          end
+
+          File.exists?(File.join(outside, "post.md")).should be_false
+        end
+      end
+    end
+
     it "treats a bare path without .md as the page stem (title only populates front matter, not the filename on disk)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
