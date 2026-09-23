@@ -118,6 +118,14 @@ module Hwaro
               assign_date_field(fields, "date", date_val)
             end
 
+            # A literal per-document `permalink` is the page's published
+            # address; dropping it moved the page (`/about-us.html` →
+            # `/about/`). Pattern permalinks (`/:year/:title/`) describe the
+            # site-wide scheme and are left to hwaro's own URLs.
+            if permalink = yaml["permalink"]?
+              apply_source_url(fields, permalink.as_s?)
+            end
+
             # Layout -> template
             if layout = yaml["layout"]?
               fields["template"] = yaml_string(layout)

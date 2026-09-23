@@ -727,3 +727,30 @@ describe Hwaro::Services::Importers::JekyllImporter do
     end
   end
 end
+
+private def import_jekyll(dir : String) : String
+  output_dir = File.join(dir, "output")
+  options = Hwaro::Config::Options::ImportOptions.new(source_type: "jekyll", path: dir, output_dir: output_dir)
+  Hwaro::Services::Importers::JekyllImporter.new.run(options).success.should be_true
+  output_dir
+end
+
+describe "Jekyll import: published addresses" do
+  # Regression: a literal per-document `permalink` is the page's address,
+  # but it was dropped, so the imported page moved.
+  it "maps a literal permalink to path and keeps a .html address as an alias" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"), "---\ntitle: Hello\npermalink: /blog/hello/\n---\nbody\n")
+      File.write(File.join(dir, "about.md"), "---\ntitle: About\npermalink: /about-us.html\n---\nabout\n")
+      File.write(File.join(dir, "pattern.md"), "---\ntitle: P\npermalink: /:categories/:title/\n---\np\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(path = "blog/hello"))
+      about = File.read(File.join(out_dir, "about.md"))
+      about.should contain(%(path = "about-us"))
+      about.should contain(%(aliases = ["/about-us.html"]))
+      File.read(File.join(out_dir, "pattern.md")).should_not contain("path =")
+    end
+  end
+end
