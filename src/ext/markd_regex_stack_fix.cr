@@ -60,7 +60,7 @@ require "markd"
 # shard bump that changes them would be silently reverted. Fail the build
 # loudly instead; re-verify against the new source, then bump the pin.
 {% if Markd::VERSION != "0.5.0" %}
-  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#match/#html_tag/#link_title/#link_label/#link_destination/#reference and Markd::Rule::HTMLBlock#match/Paragraph#token verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
+  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#match/#html_tag/#link_title/#link_label/#link_destination/#reference, Markd::Parser::Block#add_line, Markd::Node#text and Markd::Rule::HTMLBlock#match/Paragraph#token verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
 {% end %}
 
 module Hwaro
@@ -480,6 +480,57 @@ module Markd::Parser
       @pos - startpos
     ensure
       @hwaro_in_reference = false
+    end
+  end
+end
+
+module Markd
+  class Node
+    # `Block#add_line` grew a paragraph with `tip.text += line`, copying the
+    # whole paragraph for every line — O(lines²) for any long paragraph (a
+    # paragraph of thousands of reference definitions made it obvious).
+    # Lines now go into a buffer that becomes `text` when something reads
+    # it. Block-time readers are rare (a setext underline, finalisation), so
+    # a paragraph is normally materialised once; a reader on every line would
+    # cost what upstream always did.
+    @hwaro_buffer : IO::Memory? = nil
+    @hwaro_buffer_dirty = false
+
+    def text : String
+      if (buffer = @hwaro_buffer) && @hwaro_buffer_dirty
+        @text = buffer.to_s
+        @hwaro_buffer_dirty = false
+      end
+      @text
+    end
+
+    def text=(value : String)
+      @hwaro_buffer = nil
+      @hwaro_buffer_dirty = false
+      @text = value
+    end
+
+    # Append to `text` without copying it (see above).
+    def hwaro_append(piece : String) : Nil
+      buffer = @hwaro_buffer ||= IO::Memory.new.tap { |io| io << @text }
+      buffer << piece
+      @hwaro_buffer_dirty = true
+    end
+  end
+
+  class Parser::Block
+    private def add_line
+      if @partially_consumed_tab
+        @offset += 1 # skip over tab
+        # add space characters
+        chars_to_tab = Rule::CODE_INDENT - (@column % 4)
+        tip.hwaro_append(" " * chars_to_tab)
+      end
+
+      tip.hwaro_append(@line[@offset..-1])
+      tip.hwaro_append("\n")
+
+      nil
     end
   end
 end

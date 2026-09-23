@@ -172,6 +172,19 @@ describe Hwaro::MarkdRegexStackFix do
       end
     end
 
+    # A paragraph of consecutive reference definitions: upstream re-sliced
+    # the rest of the paragraph after each one (quadratic), and the patched
+    # lexer rebuilt its per-paragraph caches for every slice.
+    it "reads a paragraph of consecutive reference definitions in linear time" do
+      defs = ->(count : Int32) { String.build { |io| count.times { |i| io << "[l" << i << "]: /u" << i << " \"t\"\n" } } }
+      best = ->(markdown : String) { Array.new(3) { started = Time.instant; Markd.to_html(markdown); Time.instant - started }.min }
+      Markd.to_html(defs.call(300)) # warm up
+      small = best.call(defs.call(2000))
+      large = best.call(defs.call(8000))
+      ratio = large / {small, 1.millisecond}.max
+      ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+    end
+
     it "renders a very long email-like autolink without a JIT stack error" do
       render_within("<a@" + "b." * 100000 + "c>\n", 10.0).should start_with("<p>")
     end
