@@ -439,4 +439,27 @@ describe Hwaro::Services::Importers::HugoImporter do
       end
     end
   end
+
+  # Regression: a leaf bundle's `slug` renames the bundle's URL segment in
+  # Hugo (/posts/my-trip/), but the importer wrote `posts/trip/my-trip.md`
+  # beside the copied resources, so the page moved to /posts/trip/my-trip/
+  # and its relative images broke.
+  describe "leaf bundle with slug" do
+    it "keeps the bundle shape under the slugged directory" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/trip/index.md", "+++\ntitle = \"Trip\"\nslug = \"my-trip\"\n+++\n![p](photo.png)\n")
+        write_hugo_content(hugo_dir, "posts/trip/photo.png", "png")
+        write_hugo_content(hugo_dir, "top/index.md", "+++\ntitle = \"Top\"\nslug = \"renamed\"\n+++\nx\n")
+        output_dir = File.join(tmpdir, "out")
+
+        Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+        File.exists?(File.join(output_dir, "posts", "my-trip", "index.md")).should be_true
+        File.exists?(File.join(output_dir, "posts", "my-trip", "photo.png")).should be_true
+        File.exists?(File.join(output_dir, "posts", "trip", "my-trip.md")).should be_false
+        File.exists?(File.join(output_dir, "renamed", "index.md")).should be_true
+      end
+    end
+  end
 end

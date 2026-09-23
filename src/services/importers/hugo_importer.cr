@@ -163,8 +163,20 @@ module Hwaro
           section, filename = section_from_path(file_path, content_dir, "")
 
           # Determine slug for the file
+          leaf_bundle = !section.empty? && (filename == "index.md" || filename == "index.markdown")
           if filename == "_index.md" || filename == "_index.markdown"
             file_slug = "_index"
+          elsif leaf_bundle
+            # A leaf bundle's `slug` renames the bundle's URL segment
+            # (`posts/trip/index.md` + `slug = "my-trip"` → /posts/my-trip/).
+            # Writing it as `posts/trip/my-trip.md` published the page at
+            # /posts/trip/my-trip/, away from its copied resources, so every
+            # relative image in it broke. Keep the bundle shape instead.
+            if slug_val && !slug_val.empty?
+              parent = File.dirname(section)
+              section = parent == "." ? slug_val : File.join(parent, slug_val)
+            end
+            file_slug = "index"
           elsif slug_val && !slug_val.empty?
             file_slug = slug_val
           else
@@ -189,7 +201,7 @@ module Hwaro
           # `section` must be non-empty: a bare `content/index.md` is the site
           # root, not a bundle, and sweeping the whole content root's loose
           # files into the output is not what the author asked for.
-          if dest_path && !section.empty? && (filename == "index.md" || filename == "index.markdown")
+          if dest_path && leaf_bundle
             copy_bundle_assets(File.dirname(file_path), File.dirname(dest_path), output_dir, verbose, force)
           end
 
