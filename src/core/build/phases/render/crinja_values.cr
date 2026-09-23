@@ -163,9 +163,9 @@ module Hwaro::Core::Build::Phases::Render
         end
       end
 
-      if series_name = page.series
-        unless @series_crinja_cache.has_key?(series_name)
-          @series_crinja_cache[series_name] = Crinja::Value.new(page.series_pages.map { |sp|
+      if series_key = series_group_key(page, default_lang)
+        unless @series_crinja_cache.has_key?(series_key)
+          @series_crinja_cache[series_key] = Crinja::Value.new(page.series_pages.map { |sp|
             cached_page_crinja_value(sp, default_lang)
           })
         end
@@ -234,7 +234,10 @@ module Hwaro::Core::Build::Phases::Render
     language : String?,
     site : Models::Site,
   ) : Array(Crinja::Value)
-    pages = site.pages_for_section(section_name, language)
+    # A collision loser (`output_suppressed`, e.g. `a.md` beside `a.en.md`)
+    # is never written; listing it would show its URL twice, once under the
+    # wrong title. Same filter as the section's own pagination listing.
+    pages = site.pages_for_section(section_name, language).reject(&.output_suppressed)
 
     # Use section's sort_by setting if available, otherwise sort by date
     # (newest first) — the SAME default the paginator (paginator.cr) and the

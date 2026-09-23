@@ -89,6 +89,46 @@ describe Hwaro::Core::Build::Phases::Transform do
       child.ancestors.first.section.should eq("docs")
     end
 
+    # Regression: top-level sections were never linked to the root
+    # `_index.md` (section ""), so the homepage's `section.subsections` was
+    # always empty. The root still must not become a breadcrumb ancestor.
+    it "links top-level sections to the root section without making it an ancestor" do
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+
+      root = make_section("_index.md", "")
+      docs = make_section("docs/_index.md", "docs")
+      guide = make_section("docs/guide/_index.md", "docs/guide")
+      ctx.sections = [root, docs, guide]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_build_subsections(ctx)
+
+      root.subsections.map(&.section).should eq(["docs"])
+      docs.subsections.map(&.section).should eq(["docs/guide"])
+      docs.ancestors.should be_empty
+      guide.ancestors.map(&.section).should eq(["docs"])
+    end
+
+    it "does not attach a translated top-level section to the default-language root" do
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      ctx.site = Hwaro::Models::Site.new(config)
+
+      root = make_section("_index.md", "")
+      ko_posts = make_section("posts/_index.ko.md", "posts")
+      ko_posts.language = "ko"
+      ctx.sections = [root, ko_posts]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_build_subsections(ctx)
+
+      root.subsections.should be_empty
+    end
+
     it "links page ancestors based on section path" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)

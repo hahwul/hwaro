@@ -159,7 +159,7 @@ module Hwaro::Core::Build::Phases::Render
         # acquire the cache mutex just to hand back the same empty array.
         Crinja::Value.new([] of Crinja::Value)
       elsif @crinja_caches_frozen
-        if cached_series = page.series.try { |s| @series_crinja_cache[s]? }
+        if cached_series = series_group_key(page, default_lang).try { |k| @series_crinja_cache[k]? }
           @cache_manager.record_hit("series_crinja")
           cached_series
         else
@@ -170,7 +170,7 @@ module Hwaro::Core::Build::Phases::Render
         end
       else
         @crinja_cache_mutex.synchronize do
-          cached_series = page.series.try { |s| @series_crinja_cache[s]? }
+          cached_series = series_group_key(page, default_lang).try { |k| @series_crinja_cache[k]? }
           if cached_series
             @cache_manager.record_hit("series_crinja")
             next cached_series
@@ -179,7 +179,7 @@ module Hwaro::Core::Build::Phases::Render
           val = Crinja::Value.new(page.series_pages.map { |sp|
             cached_page_crinja_value(sp, default_lang)
           })
-          page.series.try { |s| @series_crinja_cache[s] = val }
+          series_group_key(page, default_lang).try { |k| @series_crinja_cache[k] = val }
           val
         end
       end,
@@ -240,6 +240,11 @@ module Hwaro::Core::Build::Phases::Render
     section_description = ""
     section_pages_array = [] of Crinja::Value
     current_section = ""
+    # Whether a section context was resolved. Not `!current_section.empty?`:
+    # the root `_index.md` is a real section whose name is "", and gating on
+    # the name left the homepage's `section.pages` / `paginator.pages` empty
+    # while `section.list` and `get_section` listed its pages.
+    in_section = false
 
     # Section-specific variables
     subsections_array = [] of Crinja::Value
@@ -253,6 +258,7 @@ module Hwaro::Core::Build::Phases::Render
       section_title = page.title
       section_description = page.description || ""
       current_section = page.section
+      in_section = true
 
       # Section-specific properties
       page_template_var = page.page_template || ""
@@ -264,7 +270,9 @@ module Hwaro::Core::Build::Phases::Render
       # per-section Crinja cache, the same source `get_section(...).pages`
       # uses in build_global_vars. Reading `sub.pages.size` here reported 0
       # for every subsection.
-      subsections_array = page.subsections.map do |sub|
+      # Weight-then-path, the order the prev/next chain walks subsections in
+      # (compare_sections_by_weight); discovery order is glob order.
+      subsections_array = page.subsections.sort { |a, b| compare_sections_by_weight(a, b) }.map do |sub|
         Crinja::Value.new({
           "title"       => Crinja::Value.new(sub.title),
           "description" => Crinja::Value.new(sub.description || ""),
@@ -282,6 +290,7 @@ module Hwaro::Core::Build::Phases::Render
         section_title = section_page.title
         section_description = section_page.description || ""
         current_section = page.section
+        in_section = true
         # Use cached section assets to avoid re-allocating per page
         section_assets_val = if @crinja_caches_frozen
                                if cached_arr = @section_assets_crinja_cache[page.section]?
@@ -306,7 +315,7 @@ module Hwaro::Core::Build::Phases::Render
       end
     end
 
-    if !current_section.empty?
+    if in_section
       if paginator
         # Paginated: convert paginator's page subset
         default_lang = config.default_language

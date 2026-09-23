@@ -419,3 +419,45 @@ describe "Pagination: unusable paginate_path" do
     end
   end
 end
+
+# Regression: the root `_index.md` is a section named "" and the per-page
+# template variables gated the section listing on a non-empty name, so the
+# homepage's `section.pages` / `paginator.pages` / `section.pages_count` were
+# always empty while `section.list` and `get_section` listed its pages.
+describe "Pagination: root section listing" do
+  it "exposes the homepage's pages through section.pages and paginator.pages" do
+    build_site(
+      PAGINATION_CONFIG,
+      content_files: {
+        "_index.md" => "---\ntitle: Home\n---\n",
+        "r1.md"     => "---\ntitle: R1\ndate: 2024-01-01\n---\nR1",
+        "r2.md"     => "---\ntitle: R2\ndate: 2024-01-02\n---\nR2",
+        "r3.md"     => "---\ntitle: R3\ndate: 2024-01-03\n---\nR3",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "S={% for p in section.pages %}[{{ p.title }}]{% endfor %}|P={% for p in paginator.pages %}[{{ p.title }}]{% endfor %}|N={{ section.pages_count }}",
+      },
+    ) do
+      File.read("public/index.html").should eq("S=[R3][R2]|P=[R3][R2]|N=2")
+      File.read("public/page/2/index.html").should eq("S=[R1]|P=[R1]|N=1")
+    end
+  end
+
+  it "lists the homepage's pages when pagination is off" do
+    build_site(
+      "title = \"Test\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "_index.md" => "---\ntitle: Home\n---\n",
+        "r1.md"     => "---\ntitle: R1\ndate: 2024-01-01\n---\nR1",
+        "r2.md"     => "---\ntitle: R2\ndate: 2024-01-02\n---\nR2",
+      },
+      template_files: {
+        "page.html"    => "{{ content }}",
+        "section.html" => "S={% for p in section.pages %}[{{ p.title }}]{% endfor %}",
+      },
+    ) do
+      File.read("public/index.html").should eq("S=[R2][R1]")
+    end
+  end
+end

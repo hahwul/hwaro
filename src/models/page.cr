@@ -310,16 +310,26 @@ module Hwaro
 
       # True when a page should be omitted from generated listings (taxonomy
       # indexes, related posts, …): drafts, preview-only unpublished pages,
-      # and synthetic generated pages.
+      # headless (`render = false`) pages that are never written, and
+      # synthetic generated pages.
       def excluded_from_listings? : Bool
-        draft || unpublished || generated
+        draft || unpublished || !render || generated
       end
 
       # True when a page is eligible for the search index / llms.txt: it emits
       # HTML, isn't a draft or preview-only unpublished page, opts into the
-      # search index, and isn't a synthetic generated listing page.
+      # search index, isn't a synthetic generated listing page, and isn't a
+      # `redirect_to` stub (a meta-refresh bounce whose canonical is elsewhere).
       def search_index_eligible? : Bool
-        render && !draft && !unpublished && in_search_index && !generated && !output_suppressed
+        render && !draft && !unpublished && in_search_index && !generated && !output_suppressed && !has_redirect?
+      end
+
+      # True when the page's own HTML is published as content: rendered, not
+      # a draft / preview-only unpublished page, not suppressed by an output
+      # collision, and not a `redirect_to` stub. The sitemap and feeds
+      # advertise only such URLs.
+      def published_content? : Bool
+        render && !draft && !unpublished && !output_suppressed && !has_redirect?
       end
 
       # Recompute `unpublished` from the publication window (`date` in the

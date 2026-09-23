@@ -26,8 +26,10 @@ module Hwaro
           # run with the corresponding include flag.
           # `output_suppressed` too: a page the render phase declined to write
           # because another page owns its output file must not be advertised
-          # as a URL — on a case-folding host it is a guaranteed 404.
-          sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft && !p.unpublished && !p.output_suppressed }
+          # as a URL — on a case-folding host it is a guaranteed 404. And a
+          # `redirect_to` stub declares its target as canonical, so listing
+          # it is a "page with redirect" sitemap error.
+          sitemap_pages = pages.select { |p| p.in_sitemap && p.published_content? }
           # `[versions] search` governs the sitemap too: older versions are
           # advertised only when it is "all" (same switch as search.json).
           versions = site.config.versions
@@ -70,13 +72,14 @@ module Hwaro
 
           # A translation link whose target page is never written (render =
           # false, or a draft/preview-only unpublished page) would advertise
-          # a 404 to crawlers. Build the set of URLs that actually get output
-          # (same eligibility the <loc> entries use, minus in_sitemap — an
-          # in_sitemap=false page is still written and is a valid alternate)
-          # and filter hreflang alternates through it.
+          # a 404 to crawlers, and one that is a `redirect_to` stub points at
+          # a non-canonical bounce page. Build the set of URLs published as
+          # content (same eligibility the <loc> entries use, minus in_sitemap
+          # — an in_sitemap=false page is still written and is a valid
+          # alternate) and filter hreflang alternates through it.
           written_urls = Set(String).new
           pages.each do |p|
-            written_urls << p.url if p.render && !p.draft && !p.unpublished
+            written_urls << p.url if p.published_content?
           end
 
           # Multilingual sites benefit from `<xhtml:link rel="alternate"

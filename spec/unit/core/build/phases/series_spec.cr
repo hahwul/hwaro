@@ -10,6 +10,10 @@ module Hwaro::Core::Build
     def test_compute_series(site)
       compute_series(site)
     end
+
+    def test_recompute_series_for_pages(site, changed)
+      recompute_series_for_pages(site, changed)
+    end
   end
 end
 
@@ -170,5 +174,50 @@ describe "Series support" do
     p1.series.should be_nil
     p1.series_index.should eq(0)
     p1.series_pages.should be_empty
+  end
+end
+
+# Regression: series were grouped by name only, so a post and its
+# translation sharing `series = "…"` formed one interleaved series — the
+# English part 2 reported `series_index = 3` and its series nav linked the
+# Korean pages. Series are per language (like related posts and prev/next).
+describe "Series language scoping" do
+  it "keeps translations in separate per-language series" do
+    builder = Hwaro::Core::Build::Builder.new
+    config = Hwaro::Models::Config.new
+    config.series.enabled = true
+    config.default_language = "en"
+    config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+    site = Hwaro::Models::Site.new(config)
+
+    make = ->(path : String, weight : Int32, lang : String?) do
+      pg = Hwaro::Models::Page.new(path)
+      pg.title = path
+      pg.series = "Intro"
+      pg.series_weight = weight
+      pg.language = lang
+      pg
+    end
+    en1 = make.call("posts/a.md", 1, nil)
+    en2 = make.call("posts/b.md", 2, nil)
+    ko1 = make.call("posts/a.ko.md", 1, "ko")
+    ko2 = make.call("posts/b.ko.md", 2, "ko")
+    site.pages = [en1, ko1, en2, ko2]
+
+    builder.test_compute_series(site)
+
+    en2.series_index.should eq(2)
+    en2.series_pages.map(&.path).should eq(["posts/a.md", "posts/b.md"])
+    ko2.series_index.should eq(2)
+    ko2.series_pages.map(&.path).should eq(["posts/a.ko.md", "posts/b.ko.md"])
+
+    # The incremental path regroups the same way, and a language whose
+    # series shrinks to nothing is cleared without touching the other.
+    ko1.draft = true
+    ko2.draft = true
+    builder.test_recompute_series_for_pages(site, [ko1, ko2])
+    ko2.series_index.should eq(0)
+    en2.series_index.should eq(2)
+    en1.series_pages.map(&.path).should eq(["posts/a.md", "posts/b.md"])
   end
 end

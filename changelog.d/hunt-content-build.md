@@ -1,0 +1,11 @@
+### Fixed
+- Taxonomies: `render = false` pages no longer appear on term pages, term feeds or `get_taxonomy`, which linked a page that is never written
+- Templates: the root `_index.md` now fills `section.pages`, `paginator.pages` and `section.pages_count` with its pages, as `section.list` and `get_section` already did
+- Templates: the root `_index.md`'s `section.subsections` now lists the top-level sections. `site.sections` and `get_section` keep the root entry without subsections, and prev/next order is unchanged
+- Multilingual: a file with an explicit default-language suffix (`about.en.md`) is now treated like the unsuffixed default. It used to drop out of its section's `section.pages`, and a suffixed `_index.en.md` listed none of its unsuffixed pages
+- Feeds: section feeds now include pages from `transparent` subsections, matching the section's `section.pages`
+- SEO: `redirect_to` pages are left out of `sitemap.xml`, including its hreflang alternates, RSS/Atom feeds, `search.json` and `llms.txt`
+- Series: series are now grouped per language (and per version), so a post and its translation sharing a `series` name no longer interleave into one series with the wrong `series_index`
+- Templates: `section.subsections` (and `get_section(...).subsections`) are ordered by `weight` then path, the same order the prev/next chain walks. They used to follow file discovery order
+- Section listings no longer show a page whose output lost a duplicate-URL collision, so each URL is listed once
+- `build --cache`: retitling a child section's `_index.md` now re-renders the parent section's listing, including the homepage for a top-level section

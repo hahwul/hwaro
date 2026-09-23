@@ -284,6 +284,46 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    # A headless page (`render = false`) is never written, so listing it on a
+    # term page or in a term feed advertised a 404 — the main/section feeds,
+    # sitemap, search, related posts, series and menus already skip it.
+    it "keeps render = false pages off term pages and term feeds" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.feed = true
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+
+      shown = Hwaro::Models::Page.new("shown.md")
+      shown.title = "Shown"
+      shown.url = "/blog/shown/"
+      shown.tags = ["x"]
+
+      headless = Hwaro::Models::Page.new("headless.md")
+      headless.title = "Headless"
+      headless.url = "/blog/headless/"
+      headless.tags = ["x", "only-headless"]
+      headless.render = false
+
+      site.pages = [shown, headless]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        term_html = File.read(File.join(output_dir, "tags", "x", "index.html"))
+        term_html.should contain("/blog/shown/")
+        term_html.should_not contain("/blog/headless/")
+        File.read(File.join(output_dir, "tags", "x", "rss.xml")).should_not contain("/blog/headless/")
+        File.exists?(File.join(output_dir, "tags", "only-headless", "index.html")).should be_false
+        site.taxonomies["tags"].has_key?("only-headless").should be_false
+      end
+    end
+
     it "keeps a published term's slug stable when a draft-only term collides (--drafts)" do
       # Under --drafts the render-phase taxonomy map includes draft pages, but
       # the generator skips drafts. The exposed slug for the PUBLISHED term must

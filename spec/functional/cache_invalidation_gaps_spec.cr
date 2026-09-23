@@ -400,3 +400,39 @@ describe "cache: static files edited inside the mtime tolerance" do
     end
   end
 end
+
+# A section index lists its child sections (`section.pages` entries and
+# `section.subsections`), so retitling a child section must re-render the
+# parent. The warm-build filter only treated sections as page-set dependent,
+# and a child `_index.md` edit moves the SECTION set — the parent (and the
+# homepage, for a top-level section) kept the old title.
+describe "cache: parent section listings follow child section edits" do
+  it "re-renders the parent and the homepage when a child section is retitled" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content/a/b")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a/_index.md", "+++\ntitle = \"A\"\n+++\n")
+        File.write("content/a/b/_index.md", "+++\ntitle = \"B\"\n+++\n")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html",
+          "{% for p in section.pages %}[{{ p.title }}]{% endfor %}{% for s in section.subsections %}<{{ s.title }}>{% endfor %}")
+
+        cached_build
+        File.read("public/index.html").should eq("[A]<A>")
+        File.read("public/a/index.html").should eq("[B]<B>")
+
+        File.write("content/a/_index.md", "+++\ntitle = \"A2\"\n+++\n")
+        File.write("content/a/b/_index.md", "+++\ntitle = \"B2\"\n+++\n")
+        File.touch("content/a/_index.md", Time.local + 2.seconds)
+        File.touch("content/a/b/_index.md", Time.local + 2.seconds)
+        cached_build
+
+        File.read("public/index.html").should eq("[A2]<A2>")
+        File.read("public/a/index.html").should eq("[B2]<B2>")
+      end
+    end
+  end
+end

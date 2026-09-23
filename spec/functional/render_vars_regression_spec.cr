@@ -142,3 +142,84 @@ describe "Render vars: get_taxonomy_url language slugs" do
     end
   end
 end
+
+describe "Render vars: root section subsections" do
+  # Regression: top-level sections were never linked under the root
+  # `_index.md`, so the homepage's `section.subsections` was always empty.
+  # Linking them must not duplicate sections in the prev/next reading order.
+  it "lists top-level sections on the homepage without changing prev/next" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md"     => "+++\ntitle = \"Home\"\n+++\n",
+        "a/_index.md"   => "+++\ntitle = \"A\"\nweight = 1\n+++\n",
+        "a/one.md"      => "+++\ntitle = \"One\"\n+++\n",
+        "b/_index.md"   => "+++\ntitle = \"B\"\nweight = 2\n+++\n",
+        "b/c/_index.md" => "+++\ntitle = \"C\"\n+++\n",
+        "b/c/two.md"    => "+++\ntitle = \"Two\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "prev={{ page.lower.url }} next={{ page.higher.url }}",
+        "section.html" => "SUBS={% for s in section.subsections %}[{{ s.url }}]{% endfor %} prev={{ page.lower.url }} next={{ page.higher.url }}",
+      },
+    ) do
+      File.read("public/index.html").should eq("SUBS=[/a/][/b/] prev= next=/a/")
+      File.read("public/b/index.html").should eq("SUBS=[/b/c/] prev=/a/one/ next=/b/c/")
+      File.read("public/b/c/two/index.html").should eq("prev=/b/c/ next=")
+    end
+  end
+end
+
+describe "Render vars: root subsections stay out of global section data" do
+  # The root `_index.md` reports `top_level = true` in `site.sections`, so a
+  # recursive nav over top-level entries would render the whole tree twice
+  # if the root entry also carried the top-level sections as subsections.
+  # Only the homepage's own `section.subsections` lists them.
+  it "keeps site.sections / get_section root entries without subsections" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md"     => "+++\ntitle = \"Home\"\n+++\n",
+        "a/_index.md"   => "+++\ntitle = \"A\"\n+++\n",
+        "a/b/_index.md" => "+++\ntitle = \"B\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "P",
+        "section.html" => "OWN={{ section.subsections | length }} " \
+                          "SITE={% for s in site.sections %}{{ s.name }}:{{ s.subsections | length }};{% endfor %} " \
+                          "GET={{ get_section(path=\"_index.md\").subsections | length }}",
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("OWN=1 ")
+      html.should match(/[=;]:0;/) # the root entry (name "")
+      html.should contain("a:1;")
+      html.should contain("GET=0")
+    end
+  end
+end
+
+describe "Render vars: subsection order" do
+  # `section.subsections` followed discovery (glob) order while the prev/next
+  # chain walks subsections by weight then path; both now use the latter.
+  it "orders section.subsections and get_section subsections by weight" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md"     => "+++\ntitle = \"Home\"\n+++\n",
+        "a/_index.md"   => "+++\ntitle = \"A\"\nweight = 2\n+++\n",
+        "z/_index.md"   => "+++\ntitle = \"Z\"\nweight = 1\n+++\n",
+        "a/b/_index.md" => "+++\ntitle = \"B\"\nweight = 2\n+++\n",
+        "a/y/_index.md" => "+++\ntitle = \"Y\"\nweight = 1\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "P",
+        "section.html" => "OWN={% for s in section.subsections %}{{ s.title }}{% endfor %} " \
+                          "GET={% for s in get_section(path=\"a/_index.md\").subsections %}{{ s.title }}{% endfor %}",
+      },
+    ) do
+      File.read("public/index.html").should eq("OWN=ZA GET=YB")
+      File.read("public/a/index.html").should eq("OWN=YB GET=YB")
+    end
+  end
+end

@@ -228,7 +228,7 @@ A directory with `_index.md` that groups related content.
 | section.pages | Array<Page> | Pages in this section |
 | section.pages_count | Int | Number of pages |
 | section.list | String | Pre-rendered HTML list (`section_list`) |
-| section.subsections | Array<Section> | Child sections |
+| section.subsections | Array<Section> | Child sections, ordered by `weight` then path |
 | section.assets | Array<String> | Static files in section |
 | section.page_template | String? | Default template for pages |
 | section.paginate_path | String | Pagination URL pattern |

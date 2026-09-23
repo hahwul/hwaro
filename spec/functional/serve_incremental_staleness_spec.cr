@@ -459,3 +459,34 @@ describe "serve watch reporting" do
     changeset.display.should eq("config.toml")
   end
 end
+
+# Retitling a top-level section's `_index.md` changes what the homepage (the
+# root `_index.md`) lists, but the incremental affected-section set only held
+# the edited section and its ancestors — never the root, which is not an
+# ancestor — so the homepage kept the old title.
+describe "serve incremental: root listing follows a top-level section edit" do
+  it "re-renders the homepage when a top-level section is retitled" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"S\"\nbase_url = \"https://example.com\"\n")
+        FileUtils.mkdir_p("content/docs")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/docs/_index.md", "+++\ntitle = \"Docs\"\n+++\n")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html",
+          "{% for p in section.pages %}[{{ p.title }}]{% endfor %}{% for s in section.subsections %}<{{ s.title }}>{% endfor %}")
+
+        server = Hwaro::Services::Server.new
+        options = staleness_options
+        server.staleness_builder.run(options).should be_true
+        File.read("public/index.html").should eq("[Docs]<Docs>")
+
+        File.write("content/docs/_index.md", "+++\ntitle = \"Docs Renamed\"\n+++\n")
+        server.staleness_builder.run_incremental(["content/docs/_index.md"], options).should be_true
+
+        File.read("public/index.html").should eq("[Docs Renamed]<Docs Renamed>")
+      end
+    end
+  end
+end

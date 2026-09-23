@@ -201,7 +201,9 @@ module Hwaro::Core::Build::Phases::Transform
       # cross languages — build_subsections attaches a translated subsection
       # to the default-language parent when its own language has no parent
       # `_index` — so keep only this language's subtree.
-      if section.subsections.size > 0
+      # The root section's subsections are the top-level sections, which the
+      # caller already walks as `top_sections` — recursing would list them twice.
+      if section.subsections.size > 0 && !section.section.empty?
         same_lang = section.subsections.select { |sub| (sub.language || default_lang) == lang && sub.version.same?(section.version) }
         # Path tiebreak mirrors top-level sections (compare_sections_by_weight):
         # equal-weight subsections otherwise follow insertion/glob order and
@@ -243,7 +245,20 @@ module Hwaro::Core::Build::Phases::Transform
 
     ctx.sections.each do |section|
       path_parts = section.section.split("/")
-      next if path_parts.size <= 1
+      if path_parts.size <= 1
+        # A top-level section is a direct child of the root `_index.md` (the
+        # section named ""), which is not a breadcrumb ancestor — templates
+        # render "Home" themselves — but must list it in `subsections`. Same
+        # language only: a translated top-level section must not show up on
+        # the default-language homepage when its language has no root index.
+        next if section.section.empty?
+        if (root = lookup_ancestor_section(sections_by_path, "", section.language, default_lang)) &&
+           (root.language || default_lang) == (section.language || default_lang) &&
+           root.version.same?(section.version)
+          root.add_subsection(section)
+        end
+        next
+      end
 
       # Link to the immediate parent section when it exists (same-language first).
       # Never across a version boundary: an unversioned `docs/_index.md` is
@@ -549,26 +564,24 @@ module Hwaro::Core::Build::Phases::Transform
     return affected_series if affected_series.empty?
 
     # Rebuild groups only for affected series
-    groups = {} of String => Array(Models::Page)
+    default_lang = site.config.default_language
+    groups = {} of {String, String, String} => Array(Models::Page)
     site.pages.each do |page|
       next if page.draft || page.unpublished || !page.render
-      if name = page.series
-        next unless affected_series.includes?(name)
-        (groups[name] ||= [] of Models::Page) << page
+      if (key = series_group_key(page, default_lang)) && affected_series.includes?(key[0])
+        (groups[key] ||= [] of Models::Page) << page
       end
     end
 
     assign_series_groups(groups)
 
-    # Clear series data for pages whose series became empty
-    affected_series.each do |series_name|
-      next if groups.has_key?(series_name)
-      site.pages.each do |page|
-        if page.series == series_name
-          page.series_index = 0
-          page.series_pages = [] of Models::Page
-        end
-      end
+    # Clear series data for pages whose series group became empty
+    site.pages.each do |page|
+      next unless key = series_group_key(page, default_lang)
+      next unless affected_series.includes?(key[0])
+      next if groups.has_key?(key)
+      page.series_index = 0
+      page.series_pages = [] of Models::Page
     end
 
     affected_series
@@ -774,7 +787,7 @@ module Hwaro::Core::Build::Phases::Transform
   # Sort each series group by weight/date/title and assign series_index and
   # series_pages. A single-post series gets empty series_pages so the
   # template's `page.series_pages` guard skips the orphan series-nav box.
-  private def assign_series_groups(groups : Hash(String, Array(Models::Page)))
+  private def assign_series_groups(groups : Hash({String, String, String}, Array(Models::Page)))
     groups.each do |_name, pages|
       sorted = pages.sort_by do |p|
         {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
@@ -787,15 +800,25 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
-  # Group pages by series name and assign series_index, series_pages.
+  # A series is scoped to one language and one version, like related posts
+  # and the prev/next chain: `hello.md` and its translation `hello.ko.md`
+  # sharing `series = "intro"` are two parallel series, not one interleaved
+  # four-part series. nil for pages outside every series.
+  private def series_group_key(page : Models::Page, default_lang : String) : {String, String, String}?
+    return unless name = page.series
+    {name, page.language || default_lang, page.version.try(&.name) || ""}
+  end
+
+  # Group pages by series and assign series_index, series_pages.
   # Pages within a series are sorted by series_weight, then date, then title.
   private def compute_series(site : Models::Site)
-    groups = {} of String => Array(Models::Page)
+    default_lang = site.config.default_language
+    groups = {} of {String, String, String} => Array(Models::Page)
 
     site.pages.each do |page|
       next if page.draft || page.unpublished || !page.render
-      if name = page.series
-        (groups[name] ||= [] of Models::Page) << page
+      if key = series_group_key(page, default_lang)
+        (groups[key] ||= [] of Models::Page) << page
       end
     end
 

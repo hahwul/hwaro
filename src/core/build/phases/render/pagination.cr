@@ -25,7 +25,8 @@ module Hwaro::Core::Build::Phases::Render
     # Note: sorting is handled by Paginator.paginate (uses section.sort_by setting)
     section_name = Path[section.path].dirname
     section_name = "" if section_name == "."
-    section_pages = site.pages_for_section(section_name, section.language)
+    # Collision losers are never written — see build_section_pages_crinja.
+    section_pages = site.pages_for_section(section_name, section.language).reject(&.output_suppressed)
 
     # Create paginator and render
     paginator = Content::Pagination::Paginator.new(site.config)

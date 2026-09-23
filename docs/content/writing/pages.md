@@ -74,7 +74,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 | in_search_index | bool | Include in search |
 | in_sitemap | bool | Include in sitemap |
 | insert_anchor_links | bool | Add heading anchors |
-| redirect_to | string | Redirect page to this URL |
+| redirect_to | string | Redirect page to this URL (the redirect stub is left out of the sitemap, feeds, search index and llms.txt) |
 | render | bool | Render page to output (default: true) |
 | expires | date | Auto-exclude after this date |
 | series | string | Series name for grouping |

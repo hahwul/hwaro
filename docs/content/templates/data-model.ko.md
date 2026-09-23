@@ -228,7 +228,7 @@ john-doe:
 | section.pages | Array<Page> | 이 섹션의 페이지 |
 | section.pages_count | Int | 페이지 수 |
 | section.list | String | 미리 렌더링된 HTML 목록(`section_list`) |
-| section.subsections | Array<Section> | 자식 섹션 |
+| section.subsections | Array<Section> | 자식 섹션(`weight`, 경로 순으로 정렬) |
 | section.assets | Array<String> | 섹션의 정적 파일 |
 | section.page_template | String? | 페이지 기본 템플릿 |
 | section.paginate_path | String | 페이지네이션 URL 패턴 |

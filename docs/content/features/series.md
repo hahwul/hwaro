@@ -38,6 +38,8 @@ series_weight = 1
 
 Posts within a series are sorted by `series_weight`, then by date, then by title.
 
+A series is scoped to one language (and, on a [versioned](/features/versioned-docs/) site, one version). On a [multilingual](/features/multilingual/) site, `hello.md` and its translation `hello.ko.md` sharing a `series` name belong to two parallel series, each numbered and linked within its own language.
+
 ## Template Variables
 
 Each page in a series has the following variables:
