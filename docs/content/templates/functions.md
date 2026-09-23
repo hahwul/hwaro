@@ -67,6 +67,10 @@ Retrieve a section by section name, source path, or URL:
 
 **Returns:** Section? (nil if not found)
 
+When translated sections share a name, `get_section()` prefers the current
+page's language, then the default language. Use a source path or URL to select
+a specific language variant.
+
 **Returned Properties:**
 
 | Property | Type |

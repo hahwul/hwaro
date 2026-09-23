@@ -53,6 +53,7 @@ module Hwaro::Core::Build::Phases::Render
 
     all_sections_array = [] of Crinja::Value
     sections_by_key = {} of String => Crinja::Value
+    sections_by_key_by_lang = {} of String => Hash(String, Crinja::Value)
 
     # `Section#pages` is the model property and is *not* populated by the
     # build pipeline — it stays `[]`. The live page list lives in
@@ -100,6 +101,12 @@ module Hwaro::Core::Build::Phases::Render
       sections_by_key[s.path] ||= section_val
       sections_by_key[s.section] ||= section_val unless s.section.empty?
       sections_by_key[s.url] ||= section_val
+
+      language = s.language || default_lang
+      language_map = sections_by_key_by_lang[language] ||= {} of String => Crinja::Value
+      language_map[s.path] ||= section_val
+      language_map[s.section] ||= section_val unless s.section.empty?
+      language_map[s.url] ||= section_val
     end
 
     # Second pass: link each section's `subsections` to its children so
@@ -127,6 +134,11 @@ module Hwaro::Core::Build::Phases::Render
 
     vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
     vars["__sections_by_key__"] = Crinja::Value.new(sections_by_key)
+    sections_by_language = {} of String => Crinja::Value
+    sections_by_key_by_lang.each do |language, sections|
+      sections_by_language[language] = Crinja::Value.new(sections)
+    end
+    vars["__sections_by_key_by_lang__"] = Crinja::Value.new(sections_by_language)
 
     # Build taxonomies hash for get_taxonomy function. Term slugs are
     # disambiguated with the SAME helper the taxonomy generator uses, so a
