@@ -25,6 +25,14 @@ module Hwaro::Core::Build
       render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, warnings: warnings)
     end
 
+    def test_render_shortcode_jinja_with_name(template, args, context, name, crinja_env_override, warnings)
+      render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, shortcode_name: name, warnings: warnings)
+    end
+
+    def test_set_template_paths(paths)
+      @template_paths = paths
+    end
+
     def test_control_tag_open?(tag : String) : Bool
       m = BLOCK_OPEN_RE.match(tag) || raise "#{tag.inspect} does not match BLOCK_OPEN_RE"
       control_tag_open?(m)
@@ -245,6 +253,43 @@ describe Hwaro::Core::Build::Builder do
       content = "{% raw %}{{ x }}{% endraw %}"
       result = builder.test_process_shortcodes_jinja(content, {} of String => String, {} of String => Crinja::Value, crinja_env_override: env)
       result.should eq(content)
+    end
+
+    it "keeps raw shortcode examples intact when a fenced block is inside the raw region" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      content = "{% raw %}\n{{ youtube(id=\"literal-id\") }}\n```text\nfence\n```\n{% endraw %}"
+
+      result = builder.test_process_shortcodes_jinja(
+        content,
+        {} of String => String,
+        {} of String => Crinja::Value,
+        crinja_env_override: env,
+      )
+
+      result.should contain("{{ youtube(id=\"literal-id\") }}")
+      result.should_not contain("<iframe")
+    end
+
+    # Raw tags are case-sensitive, as in Crinja: `{% RAW %}` is not a raw
+    # block, so the fence around a shortcode inside it must still protect
+    # that shortcode instead of pulling it into an unmasked raw chunk.
+    it "treats an uppercase {% RAW %} around a fence as ordinary text" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      content = "{% RAW %}\n```text\n{{ youtube(id=\"x\") }}\n```\n{% ENDRAW %}"
+      results = {} of String => String
+
+      result = builder.test_process_shortcodes_jinja(
+        content,
+        {} of String => String,
+        {} of String => Crinja::Value,
+        results,
+        crinja_env_override: env,
+      )
+
+      result.should eq(content)
+      results.should be_empty
     end
 
     it "processes explicit shortcode calls" do
@@ -667,6 +712,28 @@ describe Hwaro::Core::Build::Builder do
       builder.test_render_shortcode_jinja("{% if %}", {} of String => String, {} of String => Crinja::Value, crinja_env_override: env, warnings: warnings)
       warnings.size.should eq(1)
       warnings.first.should contain("Template error in shortcode")
+    end
+
+    it "keeps source locations distinct for identical shortcode templates" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      builder.test_set_template_paths({
+        "shortcodes/first"  => "templates/shortcodes/first.html",
+        "shortcodes/second" => "templates/shortcodes/second.html",
+      })
+      template = "<div>{{ text.foo.bar }}</div>"
+      context = {} of String => Crinja::Value
+      warnings = [] of String
+
+      first = expect_raises(Crinja::Error) do
+        builder.test_render_shortcode_jinja_with_name(template, {"text" => "a"}, context, "first", env, warnings)
+      end
+      second = expect_raises(Crinja::Error) do
+        builder.test_render_shortcode_jinja_with_name(template, {"text" => "b"}, context, "second", env, warnings)
+      end
+
+      first.message.not_nil!.should contain("first.html:1")
+      second.message.not_nil!.should contain("second.html:1")
     end
 
     it "args override context values" do

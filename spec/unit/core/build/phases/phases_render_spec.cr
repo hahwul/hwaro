@@ -654,6 +654,37 @@ describe Hwaro::Core::Build::Phases::Render do
       first_sub["name"].raw.should eq("posts/cli-series")
       first_sub["pages_count"].raw.should eq(1)
     end
+
+    it "prefers the current language when a section name has translations" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      site = Hwaro::Models::Site.new(config)
+
+      korean = Hwaro::Models::Section.new("blog/_index.ko.md")
+      korean.title = "한국어 블로그"
+      korean.section = "blog"
+      korean.url = "/ko/blog/"
+      korean.language = "ko"
+
+      english = Hwaro::Models::Section.new("blog/_index.md")
+      english.title = "English blog"
+      english.section = "blog"
+      english.url = "/blog/"
+      english.language = "en"
+
+      # The build's section order can put a translated section first. A bare
+      # section name should still resolve against the page's language.
+      site.sections << korean << english
+      builder = Hwaro::Core::Build::Builder.new
+      vars = builder.test_build_global_vars(site)
+      engine = Hwaro::Content::Processors::TemplateEngine.new
+
+      vars["page_language"] = Crinja::Value.new("en")
+      engine.render("{{ get_section(path='blog').title }}", vars).should eq("English blog")
+
+      vars["page_language"] = Crinja::Value.new("ko")
+      engine.render("{{ get_section(path='blog').title }}", vars).should eq("한국어 블로그")
+    end
   end
 
   # `split_priority_pages` underpins `--fast-start` — it picks the page

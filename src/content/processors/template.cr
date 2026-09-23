@@ -397,6 +397,27 @@ module Hwaro
           @env.functions["get_section"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
 
+            # A section name can occur in every language variant. Resolve an
+            # ambiguous name in the current page's language before falling
+            # back to the default language or the legacy site-wide map.
+            language_maps = env.resolve("__sections_by_key_by_lang__").raw
+            if language_maps.is_a?(Hash)
+              language = env.resolve("page_language").to_s
+              default_language = env.resolve("_i18n_default_language").to_s
+              languages = [] of String
+              languages << language unless language.empty?
+              languages << default_language unless default_language.empty? || languages.includes?(default_language)
+
+              languages.each do |candidate|
+                next unless candidate_map = language_maps[candidate]?
+                next unless candidate_map.raw.is_a?(Hash)
+                raw_candidate_map = candidate_map.raw.as(Hash)
+                if found = raw_candidate_map[path_arg]? || raw_candidate_map["/#{path_arg}/"]?
+                  return found
+                end
+              end
+            end
+
             # Optimised O(1) lookup via __sections_by_key__ map
             sections_map = env.resolve("__sections_by_key__")
             if !sections_map.raw.nil? && sections_map.raw.is_a?(Hash)
