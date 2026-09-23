@@ -72,13 +72,14 @@ module Hwaro
 
           # A translation link whose target page is never written (render =
           # false, or a draft/preview-only unpublished page) would advertise
-          # a 404 to crawlers. Build the set of URLs that actually get output
-          # (same eligibility the <loc> entries use, minus in_sitemap — an
-          # in_sitemap=false page is still written and is a valid alternate)
-          # and filter hreflang alternates through it.
+          # a 404 to crawlers, and one that is a `redirect_to` stub points at
+          # a non-canonical bounce page. Build the set of URLs published as
+          # content (same eligibility the <loc> entries use, minus in_sitemap
+          # — an in_sitemap=false page is still written and is a valid
+          # alternate) and filter hreflang alternates through it.
           written_urls = Set(String).new
           pages.each do |p|
-            written_urls << p.url if p.render && !p.draft && !p.unpublished
+            written_urls << p.url if p.published_content?
           end
 
           # Multilingual sites benefit from `<xhtml:link rel="alternate"

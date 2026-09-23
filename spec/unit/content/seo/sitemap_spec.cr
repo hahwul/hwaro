@@ -378,5 +378,34 @@ describe Hwaro::Content::Seo::Sitemap do
         content.should_not contain("/ko/about/")
       end
     end
+
+    it "excludes redirect_to translations from hreflang alternates" do
+      # A translation that is a `redirect_to` stub declares its target as
+      # canonical, so it is not a valid hreflang alternate either.
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        en_page = Hwaro::Models::Page.new("about.md")
+        en_page.url = "/about/"
+        en_page.translations = [
+          Hwaro::Models::TranslationLink.new(code: "en", url: "/about/", title: "About", is_current: true, is_default: true),
+          Hwaro::Models::TranslationLink.new(code: "ko", url: "/ko/about/", title: "소개"),
+        ]
+
+        ko_page = Hwaro::Models::Page.new("about.ko.md")
+        ko_page.url = "/ko/about/"
+        ko_page.language = "ko"
+        ko_page.redirect_to = "/about/"
+
+        Hwaro::Content::Seo::Sitemap.generate([en_page, ko_page], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        content.should contain("<loc>https://example.com/about/</loc>")
+        content.should_not contain("/ko/about/")
+      end
+    end
   end
 end
