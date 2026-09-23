@@ -112,10 +112,9 @@ module Hwaro
       private PRESERVE_TOKEN_PROBE = "\x00HW_HTML_P"
 
       # Regex constants
-      # A comment the minifier keeps: conditional comments (`[if`), SSI
-      # directives (`#`) and the `<!-- more -->` summary marker. Matched
-      # against the text right after `<!--`.
-      private REGEX_KEPT_COMMENT = /\A(?:\[if|#|\s*more\s*-->)/
+      # The `<!-- more -->` summary marker, which the minifier keeps. Matched
+      # against a comment's whole body (between `<!--` and `-->`).
+      private REGEX_MORE_MARKER = /\A\s*more\s*\z/
       # Match a structural token immediately followed by whitespace and
       # lookahead at the next structural token. A "token" here is
       # either a regular tag or one of our protected-block
@@ -293,7 +292,7 @@ module Hwaro
             end
             if b == '<'.ord && i + 3 < n && bytes[i + 1] == '!'.ord && bytes[i + 2] == '-'.ord && bytes[i + 3] == '-'.ord
               close = comment_end(bytes, i + 4, n)
-              if close >= 0 && !kept_comment?(bytes, i + 4, n)
+              if close >= 0 && !kept_comment?(bytes, i + 4, close - 3)
                 i = close # dropped; pending whitespace stays pending
                 next
               end
@@ -328,9 +327,21 @@ module Hwaro
         -1
       end
 
-      private def kept_comment?(bytes : Bytes, from : Int32, n : Int32) : Bool
-        head = String.new(bytes[from, Math.min(64, n - from)])
-        REGEX_KEPT_COMMENT.matches?(head)
+      # True for a comment the minifier keeps: a conditional comment (`[if`),
+      # an SSI directive (`#`) or the `<!-- more -->` summary marker. The
+      # body is `bytes[from...body_end]`. The regex only ever sees that whole
+      # body: both ends sit next to ASCII delimiters, so it is never a slice
+      # cut through a multi-byte character (a fixed-size window was, and
+      # PCRE2 raised "UTF-8 error", failing the whole `--minify` build).
+      private def kept_comment?(bytes : Bytes, from : Int32, body_end : Int32) : Bool
+        size = body_end - from
+        return false if size <= 0
+        first = bytes[from]
+        return true if first == '#'.ord
+        return true if first == '['.ord && size >= 3 && bytes[from + 1] == 'i'.ord && bytes[from + 2] == 'f'.ord
+        # `more` plus any whitespace; skip the regex for anything shorter.
+        return false if size < 4
+        REGEX_MORE_MARKER.matches?(String.new(bytes[from, size]).scrub)
       end
 
       # Collapse whitespace between two structural tokens. The token

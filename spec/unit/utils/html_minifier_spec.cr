@@ -545,5 +545,25 @@ describe Hwaro::Utils::HtmlMinifier do
       Hwaro::Utils::HtmlMinifier.minify("<p>a <!-- c --> b  \nc</p>").should eq("<p>a  b\nc</p>")
       Hwaro::Utils::HtmlMinifier.minify("<p>x</p><!-- more --><p>y</p>").should eq("<p>x</p><!-- more --><p>y</p>")
     end
+
+    # Regression: the kept-comment test decoded a fixed 64-byte window after
+    # `<!--`, which ran past a short comment and could cut a multi-byte UTF-8
+    # character in half; PCRE2 then raised "UTF-8 error" and the whole
+    # `--minify` build failed.
+    it "drops a comment followed by multi-byte text without raising" do
+      korean = Hwaro::Utils::HtmlMinifier.minify("<!-- note -->\n<p>한국어 문서입니다. 빠른 빌드와 작은 출력</p>")
+      korean.should eq("<p>한국어 문서입니다. 빠른 빌드와 작은 출력</p>")
+      em = "<p>Released 2026-09-23: faster builds, smaller output \u2014 and more.</p>"
+      Hwaro::Utils::HtmlMinifier.minify("<!-- nav -->\n#{em}").should eq(em)
+      # Every cut position of a 3-byte run inside the old 64-byte window.
+      (0..8).each do |pad|
+        html = "<p>#{"a" * pad}<!--x-->#{"가나다라마바사아자차카타파하" * 4}</p>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(html.sub("<!--x-->", ""))
+      end
+      # The kept comments are still kept, next to multi-byte text too.
+      Hwaro::Utils::HtmlMinifier.minify("<p>a</p><!--  more \t--><p>한</p>").should eq("<p>a</p><!--  more \t--><p>한</p>")
+      Hwaro::Utils::HtmlMinifier.minify("<p>a</p><!-- more x --><p>한</p>").should eq("<p>a</p><p>한</p>")
+      Hwaro::Utils::HtmlMinifier.minify("<!--[if IE]>한<![endif]--><!--#include x-->").should eq("<!--[if IE]>한<![endif]--><!--#include x-->")
+    end
   end
 end
