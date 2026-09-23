@@ -60,7 +60,17 @@ module Hwaro::Core::Build::Phases::Generate
     tasks = [
       -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose, skip_if_unchanged: skip_unchanged); nil },
       -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose, skip_if_unchanged: skip_feeds, templates: @templates, renderer: feed_template_renderer); nil },
-      -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil },
+      -> {
+        Content::Seo::Robots.generate(site.config, output_dir, verbose)
+        if site.config.robots.enabled
+          # Robots is always rewritten, even on an all-hit cache build.
+          # Claim it explicitly so pruning a static file at this path does
+          # not depend on the filesystem's mtime precision.
+          filename = File.basename(site.config.robots.filename)
+          claim_generated_output(File.join(output_dir, filename))
+        end
+        nil
+      },
       -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose, skip_if_unchanged: skip_unchanged); nil },
     ] of Proc(Nil)
     ParallelHelper.execute(tasks, ctx.options.parallel)

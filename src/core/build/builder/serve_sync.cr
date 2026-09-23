@@ -292,22 +292,58 @@ module Hwaro
         # Delete output files an incremental rebuild has orphaned (slug
         # change, page newly excluded), pruning directories the deletion
         # leaves empty. Guarded so a corrupt path can never delete outside
-        # the output directory. Mirrors Server#remove_stale_outputs.
+        # the output directory, including through a symlinked parent. Mirrors
+        # Server#remove_stale_outputs.
         private def delete_orphaned_outputs(paths : Array(String), output_dir : String)
           paths.each do |path|
+            next unless safe_output_file_deletion?(path, output_dir)
             next unless File.exists?(path)
-            next unless Utils::OutputGuard.within_output_dir?(path, output_dir)
             File.delete(path)
             Logger.info "  Removed stale output: #{path}"
 
             dir = File.dirname(path)
-            while dir != output_dir && Utils::OutputGuard.within_output_dir?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
+            while safe_output_directory_deletion?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
               Dir.delete(dir)
               dir = File.dirname(dir)
             end
           rescue ex
             Logger.debug "  Could not remove stale output #{path}: #{ex.message}"
           end
+        end
+
+        # OutputGuard checks lexical containment, which is enough before
+        # writing a new path but not before deleting an existing one: a
+        # persisted cache path like `public/link/secret` can resolve outside
+        # the output directory when `public/link` is a symlink. Resolve the
+        # existing parent and output root before allowing the unlink. The leaf
+        # may itself be a symlink; File.delete removes that link, not its
+        # target, so only its parent needs to be contained.
+        private def safe_output_file_deletion?(path : String, output_dir : String) : Bool
+          return false unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+
+          cwd = Dir.current
+          root = File.realpath(File.expand_path(output_dir, cwd))
+          parent = File.realpath(File.expand_path(File.dirname(path), cwd))
+          Utils::OutputGuard.within_output_dir?(parent, root)
+        rescue File::Error | IO::Error | ArgumentError
+          false
+        end
+
+        # Empty-directory pruning must also resolve the directory itself.
+        # Otherwise `Dir.empty?` would inspect a directory reached through an
+        # escaping symlink even though the file deletion above was rejected.
+        # Never prune the output root, including when its path uses a
+        # different spelling such as `./public`.
+        private def safe_output_directory_deletion?(path : String, output_dir : String) : Bool
+          return false unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+          return false if File.symlink?(path)
+
+          cwd = Dir.current
+          root = File.realpath(File.expand_path(output_dir, cwd))
+          directory = File.realpath(File.expand_path(path, cwd))
+          directory != root && Utils::OutputGuard.within_output_dir?(directory, root)
+        rescue File::Error | IO::Error | ArgumentError
+          false
         end
 
         # Resolve `path` relative to `root`, falling back to a plain prefix

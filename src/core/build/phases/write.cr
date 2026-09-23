@@ -60,6 +60,9 @@ module Hwaro::Core::Build::Phases::Write
     output_path = File.join(output_dir, "404.html")
     Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
     Hwaro::Utils::FileSafe.atomic_write(output_path, final_html)
+    # 404 is rewritten on every build, so its live claim should not depend on
+    # the filesystem's mtime precision when a static 404.html was removed.
+    claim_generated_output(output_path)
     Logger.action :create, output_path if verbose
   end
 
