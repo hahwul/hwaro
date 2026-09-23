@@ -185,6 +185,12 @@ describe Hwaro::Models::Page do
       summary.not_nil!.should eq("This is the intro.")
     end
 
+    it "finds the marker after a custom element named like a raw-code tag" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "<pre-view>demo</pre-view>\n\nIntro.\n\n<!-- more -->\n\nRest."
+      page.extract_summary.should eq("<pre-view>demo</pre-view>\n\nIntro.")
+    end
+
     it "returns nil when no <!-- more --> marker exists" do
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = "No marker in this content."

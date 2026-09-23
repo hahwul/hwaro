@@ -2090,6 +2090,15 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "raw HTML code blocks" do
+    it "keeps processing after a custom element named like a raw-code tag" do
+      config = make_config(math: true)
+      content = "<style-guide>\n\n~~S1~~ $x$\n\n</style-guide>\n\n~~S2~~"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("<del>S1</del>")
+      html.should contain("<del>S2</del>")
+      html.should contain("math-inline")
+    end
+
     it "leaves math, strikethrough, and footnote references untouched" do
       config = make_config(math: true, footnotes: true)
       content = "<pre>\n$alpha$ ~~literal~~ [^1]\n</pre>\n\n[^1]: note text"

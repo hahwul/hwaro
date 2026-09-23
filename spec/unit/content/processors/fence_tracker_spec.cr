@@ -31,9 +31,24 @@ describe Hwaro::Content::Processors::FenceTracker do
   end
 
   describe "raw HTML code blocks" do
-    it "tracks content until the matching raw-code element closes" do
-      feed(["<pre>", "$x$", "</script>", "~~still code~~", "</pre>", "~~outside~~"])
-        .should eq [true, true, true, true, true, false]
+    it "tracks content until a raw-code element closes" do
+      feed(["<pre>", "$x$", "</pre>", "~~outside~~"]).should eq [true, true, true, false]
+    end
+
+    it "ends the block at any raw-code closing tag, as CommonMark type-1 blocks do" do
+      feed(["<pre>", "$x$", "</script>", "~~outside~~"]).should eq [true, true, true, false]
+      feed(["<textarea>", "text", "</style>", "~~outside~~"]).should eq [true, true, true, false]
+    end
+
+    it "does not open on custom elements whose name starts with a raw-code tag" do
+      %w[<style-guide> <pre-view> <script-x> <textarea-foo> <prefix>].each do |tag|
+        feed([tag, "~~x~~", "</#{tag[1..]}"]).should eq [false, false, false]
+      end
+    end
+
+    it "opens on a raw-code tag followed by attributes or the line end" do
+      feed(["<pre class=\"x\">", "~~x~~", "</pre>"]).should eq [true, true, true]
+      feed(["<script", "~~x~~", "</script>"]).should eq [true, true, true]
     end
 
     it "tracks raw-code blocks inside blockquotes" do

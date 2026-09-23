@@ -64,11 +64,15 @@ module Hwaro
         # which errs toward "not code".
         LIST_MARKER_RE = /\A(?:[-*+]|\d{1,9}[.)])(?=[ \t]|\r?\n?\z)/
 
-        # These CommonMark raw HTML blocks leave their contents uninterpreted.
-        # Preprocessors must treat them like code so math, footnotes, and
-        # inline markup do not rewrite script/style or preformatted text.
-        RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(pre|script|style|textarea)\b/i
-        RAW_HTML_CODE_CLOSE_RE = /<\/(pre|script|style|textarea)\s*>/i
+        # These CommonMark raw HTML blocks (type 1) leave their contents
+        # uninterpreted. Preprocessors must treat them like code so math,
+        # footnotes, and inline markup do not rewrite script/style or
+        # preformatted text. The tag name must end at whitespace, `>` or the
+        # line end — `<style-guide>` or `<pre-view>` is an ordinary element —
+        # and the block ends at the first line containing ANY of the closing
+        # tags, whichever element opened it.
+        RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(?:pre|script|style|textarea)(?:[\s>]|\z)/i
+        RAW_HTML_CODE_CLOSE_RE = /<\/(?:pre|script|style|textarea)\s*>/i
 
         # An ATX heading at up to 3 spaces indent: 1-6 `#` followed by a
         # space/tab or nothing but the line ending. Only used to let an
@@ -88,7 +92,7 @@ module Hwaro
         @fence_char = '`'
         @fence_len = 0
         @fence_bq_depth = 0
-        @raw_html_code_tag = nil.as(String?)
+        @in_raw_html_code = false
         @raw_html_code_bq_depth = 0
         @in_indented_code = false
         @indented_code_column = 4
@@ -143,20 +147,19 @@ module Hwaro
           blank = content.blank?
 
           if @track_raw_html_code
-            if raw_tag = @raw_html_code_tag
+            if @in_raw_html_code
               if depth != @raw_html_code_bq_depth
                 # Raw HTML blocks inside a blockquote end when the quote ends.
-                @raw_html_code_tag = nil
+                @in_raw_html_code = false
               else
-                @raw_html_code_tag = nil if raw_html_code_closed?(content, raw_tag)
+                @in_raw_html_code = false if RAW_HTML_CODE_CLOSE_RE.matches?(content)
                 @prev_blank = false
                 return true
               end
             end
 
-            if opener = content.match(RAW_HTML_CODE_OPEN_RE)
-              tag = opener[1].downcase
-              @raw_html_code_tag = tag unless raw_html_code_closed?(content, tag)
+            if content.includes?('<') && RAW_HTML_CODE_OPEN_RE.matches?(content)
+              @in_raw_html_code = !RAW_HTML_CODE_CLOSE_RE.matches?(content)
               @raw_html_code_bq_depth = depth
               @prev_blank = false
               return true
@@ -260,13 +263,6 @@ module Hwaro
         private def closes_fence?(stripped : String) : Bool
           run = run_length(stripped, @fence_char)
           run >= @fence_len && stripped[run..].blank?
-        end
-
-        private def raw_html_code_closed?(line : String, tag : String) : Bool
-          line.scan(RAW_HTML_CODE_CLOSE_RE) do |match|
-            return true if match[1].downcase == tag
-          end
-          false
         end
 
         # The column Markd has reached after consuming `depth` blockquote
