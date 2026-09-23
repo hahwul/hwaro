@@ -169,3 +169,32 @@ describe "Render vars: root section subsections" do
     end
   end
 end
+
+describe "Render vars: root subsections stay out of global section data" do
+  # The root `_index.md` reports `top_level = true` in `site.sections`, so a
+  # recursive nav over top-level entries would render the whole tree twice
+  # if the root entry also carried the top-level sections as subsections.
+  # Only the homepage's own `section.subsections` lists them.
+  it "keeps site.sections / get_section root entries without subsections" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md"     => "+++\ntitle = \"Home\"\n+++\n",
+        "a/_index.md"   => "+++\ntitle = \"A\"\n+++\n",
+        "a/b/_index.md" => "+++\ntitle = \"B\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "P",
+        "section.html" => "OWN={{ section.subsections | length }} " \
+                          "SITE={% for s in site.sections %}{{ s.name }}:{{ s.subsections | length }};{% endfor %} " \
+                          "GET={{ get_section(path=\"_index.md\").subsections | length }}",
+      },
+    ) do
+      html = File.read("public/index.html")
+      html.should contain("OWN=1 ")
+      html.should match(/[=;]:0;/) # the root entry (name "")
+      html.should contain("a:1;")
+      html.should contain("GET=0")
+    end
+  end
+end

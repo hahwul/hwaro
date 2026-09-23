@@ -108,6 +108,12 @@ module Hwaro::Core::Build::Phases::Render
     # only Section objects carry the `subsections` chain.
     site.sections.each do |s|
       next if s.subsections.empty?
+      # The root `_index.md` (name "") links the top-level sections so the
+      # homepage's own `section.subsections` lists them, but its entry here
+      # also reports `top_level = true`: a recursive nav over the top-level
+      # entries of `site.sections` would render the whole tree twice under
+      # it. Global section data keeps the root without subsections.
+      next if s.section.empty?
       data = section_data_by_path[s.path]?
       next unless data
       subs_array = data[:hash]["subsections"].raw.as(Array)
