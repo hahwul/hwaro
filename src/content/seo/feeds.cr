@@ -476,14 +476,17 @@ module Hwaro
           Utils::TextUtils.encode_url_path(base_url.empty? ? path : base_url + path)
         end
 
-        # Convert a feed timestamp to UTC, but re-anchor "midnight in a non-UTC
-        # zone" to UTC of the same wall-clock date. Date-only TOML/YAML values
-        # (e.g. `date = 2026-03-05`) are parsed as local midnight; a naive
-        # `.to_utc` on a `+09:00` host pushes the calendar date back a day
-        # (`2026-03-04T15:00:00Z`). Both RSS `<pubDate>` and Atom `<updated>`
-        # route through here so the two feeds report the same calendar date.
+        # Convert a feed timestamp to UTC, but re-anchor a LOCAL-zone midnight
+        # to UTC of the same wall-clock date. Date-only values (e.g. `date =
+        # 2026-03-05`) are parsed as local midnight; a naive `.to_utc` on a
+        # `+09:00` host pushes the calendar date back a day
+        # (`2026-03-04T15:00:00Z`). Only the local zone, mirroring
+        # FrontmatterWriter.serialize_time: an authored fixed-offset midnight
+        # (`2026-03-05T00:00:00+09:00`) is a real instant, and re-anchoring it
+        # published the entry nine hours late. Both RSS `<pubDate>` and Atom
+        # `<updated>` route through here so the two feeds agree.
         private def self.normalize_feed_time(time : Time) : Time
-          if time.location != Time::Location::UTC &&
+          if time.location == Time::Location.local && !time.utc? &&
              time.hour == 0 && time.minute == 0 &&
              time.second == 0 && time.nanosecond == 0
             Time.utc(time.year, time.month, time.day)
