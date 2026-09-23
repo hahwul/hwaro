@@ -105,9 +105,7 @@ module Hwaro
           # `public/` itself may be a symlink to an external output directory.
           # Follow links that stay within that resolved source root as well as
           # links within the project; reject links that escape both boundaries.
-          if follow_symlinks && File.symlink?(full) &&
-             !Hwaro::Utils::PathUtils.resolves_within?(full, project_root_real) &&
-             !Hwaro::Utils::PathUtils.resolves_within?(full, source_root_real)
+          if follow_symlinks && link_escapes_roots?(full, source_root_real, project_root_real)
             Logger.warn "Skipped symlink outside project and deploy source roots: #{full}"
             next
           end
@@ -143,6 +141,24 @@ module Hwaro
             block.call(full)
           end
         end
+      end
+
+      # True only for a symlink that resolves, and resolves outside both
+      # roots. Dangling and looping links do not resolve at all; they fall
+      # through to the `File.info?` check below and are skipped silently, as
+      # they always were, instead of being reported as escaping the project.
+      private def link_escapes_roots?(path : String, source_root_real : String, project_root_real : String) : Bool
+        return false unless File.symlink?(path)
+        real = begin
+          File.realpath(path)
+        rescue File::Error | IO::Error
+          return false
+        end
+        !within_real_root?(real, project_root_real) && !within_real_root?(real, source_root_real)
+      end
+
+      private def within_real_root?(real : String, root_real : String) : Bool
+        real == root_real || real.starts_with?(root_real + File::SEPARATOR)
       end
 
       private def relative_to(path : String, root : String) : String

@@ -579,6 +579,40 @@ describe Hwaro::Services::Deployer do
       end
     end
 
+    it "skips dangling and looping source symlinks without calling them outside the project" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        src_dir = File.join(project, "public")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "home")
+        File.write(File.join(outside, "secret.txt"), "secret")
+        File.symlink("missing.txt", File.join(src_dir, "broken.txt"))
+        File.symlink("loop.txt", File.join(src_dir, "loop.txt"))
+        File.symlink(File.join(outside, "secret.txt"), File.join(src_dir, "leak.txt"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        log = with_captured_log do
+          Dir.cd(project) do
+            Hwaro::Services::Deployer.new.run(options, config).should be_true
+          end
+        end
+
+        Dir.children(dest_dir).sort.should eq(["index.html"])
+        log.should contain("leak.txt")
+        log.should_not contain("broken.txt")
+        log.should_not contain("loop.txt")
+      end
+    end
+
     it "follows source symlinks inside a symlinked deploy root" do
       Dir.mktmpdir do |dir|
         project = File.join(dir, "project")
