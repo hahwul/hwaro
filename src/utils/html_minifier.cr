@@ -112,8 +112,9 @@ module Hwaro
       private PRESERVE_TOKEN_PROBE = "\x00HW_HTML_P"
 
       # Regex constants
-      private REGEX_COMMENTS       = /<!--(?!\[if|#|\s*more\s*-->).*?-->/m
-      private REGEX_TRAILING_SPACE = /[ \t]+$/m
+      # The `<!-- more -->` summary marker, which the minifier keeps. Matched
+      # against a comment's whole body (between `<!--` and `-->`).
+      private REGEX_MORE_MARKER = /\A\s*more\s*\z/
       # Match a structural token immediately followed by whitespace and
       # lookahead at the next structural token. A "token" here is
       # either a regular tag or one of our protected-block
@@ -189,8 +190,7 @@ module Hwaro
         html = scrub_nul(html)
         preserves = [] of String
         result = protect_sensitive_blocks(html, preserves)
-        result = result.gsub(REGEX_COMMENTS, "")
-        result = result.gsub(REGEX_TRAILING_SPACE, "")
+        result = strip_comments_and_trailing_space(result)
         result = collapse_intra_tag_whitespace(result)
         result = collapse_inter_token_whitespace(result)
         result = result.gsub(REGEX_BLANK_LINES, "\n")
@@ -262,6 +262,86 @@ module Hwaro
           html = replaced
         end
         html
+      end
+
+      # Drop comments and the spaces/tabs that end a line — in TEXT only.
+      # Tags are copied through verbatim (quote-aware, see find_tag_end): a
+      # `<!-- … -->` or a line-final space inside an attribute value is part
+      # of that value (`data-x="<!-- keep -->"`, a multi-line `content="…"`),
+      # and the regex passes this replaces rewrote both.
+      private def strip_comments_and_trailing_space(html : String) : String
+        bytes = html.to_slice
+        n = bytes.size
+        String.build(n) do |io|
+          # Spaces/tabs seen but not yet written. Kept as bytes, not as an
+          # offset: a dropped comment can sit between two runs.
+          pending = IO::Memory.new
+          i = 0
+          while i < n
+            b = bytes[i]
+            if b == ' '.ord || b == '\t'.ord
+              pending.write_byte(b)
+              i += 1
+              next
+            end
+            if b == '\n'.ord
+              pending.clear # line-final whitespace is dropped
+              io.write_byte(b)
+              i += 1
+              next
+            end
+            if b == '<'.ord && i + 3 < n && bytes[i + 1] == '!'.ord && bytes[i + 2] == '-'.ord && bytes[i + 3] == '-'.ord
+              close = comment_end(bytes, i + 4, n)
+              if close >= 0 && !kept_comment?(bytes, i + 4, close - 3)
+                i = close # dropped; pending whitespace stays pending
+                next
+              end
+            end
+            unless pending.empty?
+              io.write(pending.to_slice)
+              pending.clear
+            end
+            if b == '<'.ord && i + 1 < n && tag_start_byte?(bytes[i + 1])
+              tag_end = find_tag_end(bytes, i, n)
+              if tag_end >= 0
+                io.write(bytes[i, tag_end - i + 1])
+                i = tag_end + 1
+                next
+              end
+            end
+            io.write_byte(b)
+            i += 1
+          end
+          # Whitespace at the very end of the document is line-final too.
+        end
+      end
+
+      # Index just past the `-->` closing a comment whose body starts at
+      # `from`, or -1 when unterminated (left verbatim, like the old regex).
+      private def comment_end(bytes : Bytes, from : Int32, n : Int32) : Int32
+        i = from
+        while i + 2 < n
+          return i + 3 if bytes[i] == '-'.ord && bytes[i + 1] == '-'.ord && bytes[i + 2] == '>'.ord
+          i += 1
+        end
+        -1
+      end
+
+      # True for a comment the minifier keeps: a conditional comment (`[if`),
+      # an SSI directive (`#`) or the `<!-- more -->` summary marker. The
+      # body is `bytes[from...body_end]`. The regex only ever sees that whole
+      # body: both ends sit next to ASCII delimiters, so it is never a slice
+      # cut through a multi-byte character (a fixed-size window was, and
+      # PCRE2 raised "UTF-8 error", failing the whole `--minify` build).
+      private def kept_comment?(bytes : Bytes, from : Int32, body_end : Int32) : Bool
+        size = body_end - from
+        return false if size <= 0
+        first = bytes[from]
+        return true if first == '#'.ord
+        return true if first == '['.ord && size >= 3 && bytes[from + 1] == 'i'.ord && bytes[from + 2] == 'f'.ord
+        # `more` plus any whitespace; skip the regex for anything shorter.
+        return false if size < 4
+        REGEX_MORE_MARKER.matches?(String.new(bytes[from, size]).scrub)
       end
 
       # Collapse whitespace between two structural tokens. The token
@@ -358,6 +438,21 @@ module Hwaro
         -1
       end
 
+      # True when the attribute right before a trailing ` /` has an
+      # UNQUOTED value (`<link href=/favicon.ico />`). There the space is what
+      # ends the value: `href=/favicon.ico/` makes the slash part of the URL
+      # (`/favicon.ico/`, a 404). A quoted value, a bare attribute name or the
+      # tag name itself is ended by its own syntax, so `<br />` → `<br/>` and
+      # `alt="x" />` → `alt="x"/>` stay safe.
+      private def unquoted_value_before_slash?(body : String) : Bool
+        rest = body.rchop(" /")
+        last = rest.split(' ').last? || ""
+        eq = last.index('=')
+        return false unless eq
+        value = last[(eq + 1)..]
+        !value.empty? && !value.ends_with?('"') && !value.ends_with?('\'')
+      end
+
       # Write the tag at `bytes[start..tag_end]` to `io` with internal
       # whitespace collapsed. The tag-name run is copied verbatim;
       # then we collapse whitespace between attributes, preserve
@@ -418,7 +513,9 @@ module Hwaro
         # the byte preceding the `" /"` is part of a multi-byte
         # UTF-8 sequence inside a quoted attribute value.
         body = body.rstrip
-        body = body.rchop(" /") + "/" if body.ends_with?(" /")
+        if body.ends_with?(" /") && !unquoted_value_before_slash?(body)
+          body = body.rchop(" /") + "/"
+        end
         io << body
         io.write_byte('>'.ord.to_u8)
       end

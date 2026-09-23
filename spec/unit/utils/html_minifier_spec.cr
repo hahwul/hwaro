@@ -522,5 +522,48 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should eq("<div><script>var x = \"<style>body{}</style>\";</script></div>")
       end
     end
+
+    # Regression: ` />` after an UNQUOTED attribute value was tightened to
+    # `/>`, which makes the slash part of the value — `href=/favicon.ico/`
+    # (a 404) and `content=width=device-width/`.
+    it "keeps the space before a self-closing slash after an unquoted value" do
+      Hwaro::Utils::HtmlMinifier.minify("<link rel=icon href=/favicon.ico />").should eq("<link rel=icon href=/favicon.ico />")
+      Hwaro::Utils::HtmlMinifier.minify("<img src=a.png alt=x />").should eq("<img src=a.png alt=x />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=\"a b\" />").should eq("<img alt=\"a b\"/>")
+      Hwaro::Utils::HtmlMinifier.minify("<input disabled />").should eq("<input disabled/>")
+      Hwaro::Utils::HtmlMinifier.minify("<br />").should eq("<br/>")
+    end
+
+    # Regression: the comment and trailing-space passes were plain regexes
+    # over the whole document, so they also rewrote attribute values — a
+    # `<!-- … -->` inside a value was deleted and a multi-line value lost
+    # the spaces that ended its lines.
+    it "leaves comments and line-final spaces inside attribute values alone" do
+      Hwaro::Utils::HtmlMinifier.minify("<div data-x=\"<!-- keep -->\">y</div>").should eq("<div data-x=\"<!-- keep -->\">y</div>")
+      Hwaro::Utils::HtmlMinifier.minify("<div title=\"one  \n two\">x</div>").should eq("<div title=\"one  \n two\">x</div>")
+      # Text keeps the old behaviour.
+      Hwaro::Utils::HtmlMinifier.minify("<p>a <!-- c --> b  \nc</p>").should eq("<p>a  b\nc</p>")
+      Hwaro::Utils::HtmlMinifier.minify("<p>x</p><!-- more --><p>y</p>").should eq("<p>x</p><!-- more --><p>y</p>")
+    end
+
+    # Regression: the kept-comment test decoded a fixed 64-byte window after
+    # `<!--`, which ran past a short comment and could cut a multi-byte UTF-8
+    # character in half; PCRE2 then raised "UTF-8 error" and the whole
+    # `--minify` build failed.
+    it "drops a comment followed by multi-byte text without raising" do
+      korean = Hwaro::Utils::HtmlMinifier.minify("<!-- note -->\n<p>한국어 문서입니다. 빠른 빌드와 작은 출력</p>")
+      korean.should eq("<p>한국어 문서입니다. 빠른 빌드와 작은 출력</p>")
+      em = "<p>Released 2026-09-23: faster builds, smaller output \u2014 and more.</p>"
+      Hwaro::Utils::HtmlMinifier.minify("<!-- nav -->\n#{em}").should eq(em)
+      # Every cut position of a 3-byte run inside the old 64-byte window.
+      (0..8).each do |pad|
+        html = "<p>#{"a" * pad}<!--x-->#{"가나다라마바사아자차카타파하" * 4}</p>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(html.sub("<!--x-->", ""))
+      end
+      # The kept comments are still kept, next to multi-byte text too.
+      Hwaro::Utils::HtmlMinifier.minify("<p>a</p><!--  more \t--><p>한</p>").should eq("<p>a</p><!--  more \t--><p>한</p>")
+      Hwaro::Utils::HtmlMinifier.minify("<p>a</p><!-- more x --><p>한</p>").should eq("<p>a</p><p>한</p>")
+      Hwaro::Utils::HtmlMinifier.minify("<!--[if IE]>한<![endif]--><!--#include x-->").should eq("<!--[if IE]>한<![endif]--><!--#include x-->")
+    end
   end
 end

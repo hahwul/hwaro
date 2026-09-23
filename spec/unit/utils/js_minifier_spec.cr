@@ -630,6 +630,46 @@ describe Hwaro::Utils::JsMinifier do
       result.should eq("return e(t)")
     end
 
+    # Regression: a regex after `return` (and the other expression keywords)
+    # was read as division, so a `/*` or `//` inside its body opened a
+    # "comment" that swallowed the rest of the file — every later file of the
+    # bundle included.
+    it "keeps regex literals that follow an expression keyword" do
+      src = "function g(u){ return /\\/*$/.test(u) }\nwindow.ok = 1;"
+      result = Hwaro::Utils::JsMinifier.minify(src)
+      result.should contain("return /\\/*$/.test(u)")
+      result.should contain("window.ok = 1;")
+
+      %w[typeof void throw case delete in instanceof new do else].each do |kw|
+        Hwaro::Utils::JsMinifier.minify("x = #{kw} /a\\/\\/b/;\nlast()").should contain("last()")
+      end
+    end
+
+    it "still treats a keyword-named property or identifier before a slash as division" do
+      Hwaro::Utils::JsMinifier.minify("v = o.return / 2 // note\nw = 1").should eq("v = o.return / 2\nw = 1")
+      Hwaro::Utils::JsMinifier.minify("v = of / 2 // note\nw = 1").should eq("v = of / 2\nw = 1")
+    end
+
+    # Regression: an unescaped `/` inside a regex character class ended the
+    # literal early, and its real closing `\//` then read as a `//` comment
+    # that dropped the rest of the line (npm's own `/^[^\\/]*\//` broke).
+    it "keeps a slash inside a regex character class" do
+      src = "const p = path.replace(/^[^\\\\/]*\\//, '')\nnext()"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      Hwaro::Utils::JsMinifier.minify("var r = /[/]x/; // c\ngo()").should eq("var r = /[/]x/;\ngo()")
+      Hwaro::Utils::JsMinifier.minify("var t = `${ s.replace(/[/]/g, '-') }` // c").should eq("var t = `${ s.replace(/[/]/g, '-') }`")
+    end
+
+    # Regression: `#in`, `#new`, `#do`, ... are private class members, not
+    # keywords, but the keyword check only excluded a preceding `.`, so the
+    # division after `this.#in` opened a regex that swallowed the line.
+    it "treats a slash after a keyword-named private field as division" do
+      %w[in new do delete typeof return].each do |kw|
+        Hwaro::Utils::JsMinifier.minify("v = this.##{kw} / 2 // note\nw = 1").should eq("v = this.##{kw} / 2\nw = 1")
+      end
+      Hwaro::Utils::JsMinifier.minify("class A { #in = 4; h() { return this.#in / 2 / 1 } }\nok()").should contain("ok()")
+    end
+
     it "leaves a counterfeit out-of-range JSPL placeholder token intact" do
       # A real template literal makes protected_spans non-empty so the restore
       # gsub actually runs; the bogus \x00JSPL999\x00 token has an out-of-range

@@ -54,6 +54,8 @@ Each `[[assets.bundles]]` entry defines a single output file:
 
 Files are concatenated in the order listed.
 
+A CSS bundle is published under `output_dir`, not beside its source files. When `source_dir` is `static`, a relative `url(...)` that points at a file next to the source stylesheet is rewritten to reach the same file from the bundle. For example, `url(img/x.png)` in `static/css/a.css` becomes `url(../css/img/x.png)` in `assets/main.css`. Absolute, `data:` and protocol URLs, and relative URLs with no matching file beside the source, are left as written, and so is `url(...)` text inside a CSS string or comment.
+
 ## Template Usage
 
 Use the `asset()` function in templates to reference bundled assets:

@@ -28,8 +28,15 @@ module Hwaro
           date_published = page.date.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           updated_str = page.updated.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           desc = page.description
-          image_url = if image = page.image
-                        abs_or_external(base, image)
+          image_url = if image = page.social_image
+                        # Resolved like og:image (OpenGraph#resolve_image_url):
+                        # an external URL as written, a site path with its
+                        # path component percent-encoded.
+                        if Processors::InternalLinkResolver.has_own_origin?(image)
+                          image
+                        else
+                          abs_path(base, Utils::TextUtils.encode_url_path_keep_query(image))
+                        end
                       end
           # Prefer the resolved display name from site.authors (data/authors
           # enrichment) so the schema.org author matches the visible author name
