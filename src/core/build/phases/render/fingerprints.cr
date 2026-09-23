@@ -102,8 +102,12 @@ module Hwaro::Core::Build::Phases::Render
       pdep, sdep = (listing_memo[entry]? || (listing_memo[entry] = listing_template_deps(entry, templates)))
       # A section index renders its section's page list even via {{ section.list }}
       # (no template marker), so treat every Section as page-set dependent.
+      # That list also carries its child SECTIONS (and `section.subsections`
+      # prints them), so a retitled child `_index.md` — a section-set move —
+      # must re-render the parent too, the root `_index.md` included.
       page_dep = pdep || page.is_a?(Models::Section)
-      (page_dep && page_set_changed) || (sdep && section_set_changed)
+      section_dep = sdep || page.is_a?(Models::Section)
+      (page_dep && page_set_changed) || (section_dep && section_set_changed)
     end
   end
 
