@@ -85,30 +85,43 @@ module Hwaro
         n = bytes.size
         String.build(css.bytesize) do |io|
           i = 0
+          # Last byte written verbatim (0 after a placeholder or at start).
+          last = 0_u8
           while i < n
             b = bytes[i]
             case b
             when '/'.ord
               if i + 1 < n && bytes[i + 1] == '*'.ord
                 # Comment — dropped. An unterminated comment runs to EOF,
-                # which is how browsers parse it too.
+                # which is how browsers parse it too. A comment separates
+                # tokens, so dropping it between two identifier/number
+                # characters must leave a space: `1px/**/2px` is two
+                # dimensions, `1px2px` one dimension with the unit `px2px`
+                # (and `font:12px/**/Arial` would lose its family).
                 i = skip_comment(bytes, i, n)
+                if last != 0_u8 && ident_byte?(last) && i < n && ident_byte?(bytes[i])
+                  io.write_byte(' '.ord.to_u8)
+                  last = ' '.ord.to_u8
+                end
                 next
               end
             when '"'.ord, '\''.ord
               if (stop = scan_string_end(bytes, i, n)) >= 0
                 stash(io, preserves, String.new(bytes[i, stop - i]))
+                last = 0_u8
                 i = stop
                 next
               end
               # Unterminated literal: emit verbatim, like the old regex pass.
             when 'u'.ord, 'U'.ord
               if stop = scan_url(bytes, i, n, preserves, io)
+                last = 0_u8
                 i = stop
                 next
               end
             end
             io.write_byte(b)
+            last = b
             i += 1
           end
         end

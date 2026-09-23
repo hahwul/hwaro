@@ -790,5 +790,17 @@ describe Hwaro::Utils::CssMinifier do
       result = Hwaro::Utils::CssMinifier.minify("a{content:\"\u{0}PRESERVE_999\u{0}\"}")
       result.should contain("PRESERVE_999") # bogus token survives verbatim
     end
+
+    # Regression: a comment is a token separator, so dropping it between two
+    # identifier/number characters fused the tokens — `1px2px` is one
+    # dimension with unit `px2px`, and `12pxArial` voided the `font`
+    # declaration. A comment next to punctuation still leaves no space, so
+    # the compound selector `.a/**/.b` stays `.a.b`.
+    it "keeps tokens separated by a dropped comment apart" do
+      Hwaro::Utils::CssMinifier.minify("a{margin:1px/* v */2px}").should eq("a{margin:1px 2px}")
+      Hwaro::Utils::CssMinifier.minify("a{font:12px/**/Arial}").should eq("a{font:12px Arial}")
+      Hwaro::Utils::CssMinifier.minify(".a/**/.b{color:red}").should eq(".a.b{color:red}")
+      Hwaro::Utils::CssMinifier.minify("a{color:red;/* x */}").should eq("a{color:red}")
+    end
   end
 end
