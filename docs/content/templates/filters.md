@@ -109,7 +109,7 @@ Both sides are normalized to one trailing slash before comparing, so `/posts` an
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| default | Fallback value, preserving the fallback's type | {{ value \| default(value="N/A") }} |
+| default | Fallback for an undefined, none, or empty value (see [Default Values](#default-values)) | {{ value \| default(value="N/A") }} |
 | jsonify | JSON encode | {{ data \| jsonify }} |
 | date | Format date | {{ page.date \| date("%Y-%m-%d") }} |
 
@@ -131,6 +131,8 @@ Always use `safe` for rendered content:
 {{ page.description | default(value=site.description) }}
 {{ page.image | default(value="/images/default.png") }}
 ```
+
+`default` returns the fallback when the value is undefined, `none`, or an empty string. The fallback keeps its type, so `default(value=0)` still works in arithmetic; a `none` fallback (`default(value=none)`) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as `length` or `replace` can follow it.
 
 ### Date Formatting
 
