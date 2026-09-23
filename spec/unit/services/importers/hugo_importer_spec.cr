@@ -483,3 +483,19 @@ describe Hwaro::Services::Importers::HugoImporter do
     end
   end
 end
+
+describe "Hugo import: index.html url" do
+  it "maps url /about/index.html to the directory path with no alias" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+      File.write(File.join(hugo_dir, "content", "about.md"), "---\ntitle: About\nurl: /about/index.html\n---\nx\n")
+      output_dir = File.join(tmpdir, "out")
+      Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir)).success.should be_true
+      about = File.read(File.join(output_dir, "about.md"))
+      about.should contain(%(path = "about"\n))
+      about.should_not contain("aliases")
+    end
+  end
+end

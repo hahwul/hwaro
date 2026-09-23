@@ -541,23 +541,29 @@ module Hwaro
           Utils::DateUtils.parse_lenient(date_str, Utils::DateUtils::IMPORT_FORMATS)
         end
 
-        # Format a Time to the standard frontmatter date format, keeping the
-        # source's zone offset — the previous zone-less `%Y-%m-%d %H:%M:%S`
-        # dropped the offset, so a `+09:00` post re-parsed as UTC shifted by
-        # nine hours in feeds and sort order.
         # Map a source page's literal URL (Hugo `url`, Jekyll `permalink`) onto
         # hwaro's `path` front matter so the page keeps its published address.
-        # hwaro publishes `path = "a/b"` at `/a/b/`, so a `.html` URL becomes
-        # the extensionless path plus an alias at the old address (its
-        # redirect stub keeps inbound links working). Patterns (`:title`),
-        # external URLs and the site root are left alone.
+        # hwaro publishes `path = "a/b"` at `/a/b/`, so:
+        #
+        # - a trailing `index.html` names the directory itself
+        #   (`/docs/index.html` is served at `/docs/`), so it maps to that
+        #   directory with no alias;
+        # - any other `.html` URL becomes the extensionless path plus an alias
+        #   at the old address (its redirect stub keeps inbound links working).
+        #
+        # Patterns (`:title`), external URLs and the site root are left alone.
         protected def apply_source_url(fields : Hash(String, FieldValue), url : String?) : Nil
           return unless url
           url = url.strip
           return if url.empty? || url.includes?(':') || url.starts_with?("//")
           trimmed = url.strip('/')
           return if trimmed.empty?
-          if trimmed =~ /\.html?\z/i
+          segments = trimmed.split('/')
+          last = segments.last
+          if last =~ /\Aindex\.html?\z/i
+            dir = segments[0...-1].join('/')
+            fields["path"] = dir unless dir.empty?
+          elsif last =~ /\.html?\z/i
             fields["path"] = trimmed.sub(/\.html?\z/i, "")
             aliases = (fields["aliases"]?.as?(Array(String)) || [] of String).dup
             original = "/#{trimmed}"
@@ -568,6 +574,10 @@ module Hwaro
           end
         end
 
+        # Format a Time to the standard frontmatter date format, keeping the
+        # source's zone offset — the previous zone-less `%Y-%m-%d %H:%M:%S`
+        # dropped the offset, so a `+09:00` post re-parsed as UTC shifted by
+        # nine hours in feeds and sort order.
         protected def format_date(time : Time) : String
           Hwaro::Utils::FrontmatterWriter.serialize_time(time)
         end

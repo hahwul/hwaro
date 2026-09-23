@@ -802,3 +802,18 @@ describe "Jekyll import: image object" do
     end
   end
 end
+
+describe "Jekyll import: index.html permalinks" do
+  # A permalink ending in `index.html` names the directory itself (Jekyll
+  # serves `/docs/index.html` at `/docs/`); mapping it to `path = "docs/index"`
+  # moved the page to /docs/index/ and left /docs/ as a redirect stub.
+  it "maps a trailing index.html to the directory path with no alias" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "docs.md"), "---\ntitle: Docs\npermalink: /docs/index.html\n---\nd\n")
+      out_dir = import_jekyll(dir)
+      docs = File.read(File.join(out_dir, "docs.md"))
+      docs.should contain(%(path = "docs"\n))
+      docs.should_not contain("aliases")
+    end
+  end
+end
