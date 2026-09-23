@@ -486,7 +486,7 @@ cannot reconcile:
 - Symlinks at the destination are never written or deleted *through*. A link
   standing where a file or directory belongs is replaced; a stale one is
   unlinked without touching what it points at.
-- Source symlinks are followed only when they resolve within the source
+- Source symlinks are followed only when they resolve within the project
   directory; links to files outside it are skipped.
 - `--json` is non-interactive: combining it with `--confirm` fails instead of
   writing a prompt into the JSON document.
@@ -597,8 +597,8 @@ paths and options.
 
 See [Tools & Completion](/start/tools/) for detailed usage.
 
-`import` and `export` skip files reached through symlinks outside their source
-directories. `convert` follows links within the project and skips links outside
+`import` skips files reached through symlinks outside their source trees.
+`export` and `convert` follow links within the project and skip links outside
 it. `agents-md --write` refuses to write when `AGENTS.md` is a symlink.
 
 ### completion
