@@ -533,5 +533,17 @@ describe Hwaro::Utils::HtmlMinifier do
       Hwaro::Utils::HtmlMinifier.minify("<input disabled />").should eq("<input disabled/>")
       Hwaro::Utils::HtmlMinifier.minify("<br />").should eq("<br/>")
     end
+
+    # Regression: the comment and trailing-space passes were plain regexes
+    # over the whole document, so they also rewrote attribute values — a
+    # `<!-- … -->` inside a value was deleted and a multi-line value lost
+    # the spaces that ended its lines.
+    it "leaves comments and line-final spaces inside attribute values alone" do
+      Hwaro::Utils::HtmlMinifier.minify("<div data-x=\"<!-- keep -->\">y</div>").should eq("<div data-x=\"<!-- keep -->\">y</div>")
+      Hwaro::Utils::HtmlMinifier.minify("<div title=\"one  \n two\">x</div>").should eq("<div title=\"one  \n two\">x</div>")
+      # Text keeps the old behaviour.
+      Hwaro::Utils::HtmlMinifier.minify("<p>a <!-- c --> b  \nc</p>").should eq("<p>a  b\nc</p>")
+      Hwaro::Utils::HtmlMinifier.minify("<p>x</p><!-- more --><p>y</p>").should eq("<p>x</p><!-- more --><p>y</p>")
+    end
   end
 end

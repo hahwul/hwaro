@@ -112,8 +112,10 @@ module Hwaro
       private PRESERVE_TOKEN_PROBE = "\x00HW_HTML_P"
 
       # Regex constants
-      private REGEX_COMMENTS       = /<!--(?!\[if|#|\s*more\s*-->).*?-->/m
-      private REGEX_TRAILING_SPACE = /[ \t]+$/m
+      # A comment the minifier keeps: conditional comments (`[if`), SSI
+      # directives (`#`) and the `<!-- more -->` summary marker. Matched
+      # against the text right after `<!--`.
+      private REGEX_KEPT_COMMENT = /\A(?:\[if|#|\s*more\s*-->)/
       # Match a structural token immediately followed by whitespace and
       # lookahead at the next structural token. A "token" here is
       # either a regular tag or one of our protected-block
@@ -189,8 +191,7 @@ module Hwaro
         html = scrub_nul(html)
         preserves = [] of String
         result = protect_sensitive_blocks(html, preserves)
-        result = result.gsub(REGEX_COMMENTS, "")
-        result = result.gsub(REGEX_TRAILING_SPACE, "")
+        result = strip_comments_and_trailing_space(result)
         result = collapse_intra_tag_whitespace(result)
         result = collapse_inter_token_whitespace(result)
         result = result.gsub(REGEX_BLANK_LINES, "\n")
@@ -262,6 +263,74 @@ module Hwaro
           html = replaced
         end
         html
+      end
+
+      # Drop comments and the spaces/tabs that end a line — in TEXT only.
+      # Tags are copied through verbatim (quote-aware, see find_tag_end): a
+      # `<!-- … -->` or a line-final space inside an attribute value is part
+      # of that value (`data-x="<!-- keep -->"`, a multi-line `content="…"`),
+      # and the regex passes this replaces rewrote both.
+      private def strip_comments_and_trailing_space(html : String) : String
+        bytes = html.to_slice
+        n = bytes.size
+        String.build(n) do |io|
+          # Spaces/tabs seen but not yet written. Kept as bytes, not as an
+          # offset: a dropped comment can sit between two runs.
+          pending = IO::Memory.new
+          i = 0
+          while i < n
+            b = bytes[i]
+            if b == ' '.ord || b == '\t'.ord
+              pending.write_byte(b)
+              i += 1
+              next
+            end
+            if b == '\n'.ord
+              pending.clear # line-final whitespace is dropped
+              io.write_byte(b)
+              i += 1
+              next
+            end
+            if b == '<'.ord && i + 3 < n && bytes[i + 1] == '!'.ord && bytes[i + 2] == '-'.ord && bytes[i + 3] == '-'.ord
+              close = comment_end(bytes, i + 4, n)
+              if close >= 0 && !kept_comment?(bytes, i + 4, n)
+                i = close # dropped; pending whitespace stays pending
+                next
+              end
+            end
+            unless pending.empty?
+              io.write(pending.to_slice)
+              pending.clear
+            end
+            if b == '<'.ord && i + 1 < n && tag_start_byte?(bytes[i + 1])
+              tag_end = find_tag_end(bytes, i, n)
+              if tag_end >= 0
+                io.write(bytes[i, tag_end - i + 1])
+                i = tag_end + 1
+                next
+              end
+            end
+            io.write_byte(b)
+            i += 1
+          end
+          # Whitespace at the very end of the document is line-final too.
+        end
+      end
+
+      # Index just past the `-->` closing a comment whose body starts at
+      # `from`, or -1 when unterminated (left verbatim, like the old regex).
+      private def comment_end(bytes : Bytes, from : Int32, n : Int32) : Int32
+        i = from
+        while i + 2 < n
+          return i + 3 if bytes[i] == '-'.ord && bytes[i + 1] == '-'.ord && bytes[i + 2] == '>'.ord
+          i += 1
+        end
+        -1
+      end
+
+      private def kept_comment?(bytes : Bytes, from : Int32, n : Int32) : Bool
+        head = String.new(bytes[from, Math.min(64, n - from)])
+        REGEX_KEPT_COMMENT.matches?(head)
       end
 
       # Collapse whitespace between two structural tokens. The token
