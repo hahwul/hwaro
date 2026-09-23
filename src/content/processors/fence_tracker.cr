@@ -45,7 +45,9 @@ module Hwaro
       #   a list marker and after `>` are measured from Markd's own column,
       #   not the true one). Lines inside a generic HTML block (`<div>` …
       #   blank line, `<!--` … `-->`) never open indented code, since Markd
-      #   passes them through as raw HTML. Known limit: a fence closer
+      #   passes them through as raw HTML; the block ends where Markd's does,
+      #   including when its list item or quote ends. Walkers built with
+      #   `raw_html_code: false` skip this, like raw code blocks. Known limit: a fence closer
       #   followed directly by indented code opens no run.
       # - Fences inside blockquotes (`> ```) are tracked too: the leading
       #   `>` markers are stripped before the opener/closer rules apply, and
@@ -125,6 +127,16 @@ module Hwaro
         # a block tracked too long merely leaves lines unprotected.
         @html_block = 0
         @html_block_bq_depth = 0
+        # Content column of the list item holding the HTML block: a
+        # non-blank line left of it closes the item and the block with it.
+        @html_block_column = 0
+        # The previous line left a paragraph open (plain text, or a list
+        # item's first text), at this quote depth and container column.
+        # Only a paragraph admits lazy continuation lines, and a lone-tag
+        # HTML block (type 7) cannot interrupt one.
+        @paragraph_open = false
+        @paragraph_depth = 0
+        @paragraph_column = 0
 
         # True while inside an open fence: after the opener line was fed,
         # until (and excluding) the line after the closer. Lets callers
@@ -134,7 +146,8 @@ module Hwaro
           @in_fence
         end
 
-        # `raw_html_code: false` turns off raw-HTML code-block tracking.
+        # `raw_html_code: false` turns off raw-HTML code-block tracking and
+        # generic HTML-block tracking.
         # Only the Markdown-extension walkers treat `<pre>`/`<script>`/
         # `<style>`/`<textarea>` blocks as opaque; shortcode expansion (and
         # the checks that must agree with it) and definition-list
@@ -152,6 +165,8 @@ module Hwaro
           # only the plain-text tail re-arms it.
           prev_atx_heading = @prev_atx_heading
           @prev_atx_heading = false
+          paragraph_open = @paragraph_open
+          @paragraph_open = false
 
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
@@ -176,8 +191,13 @@ module Hwaro
           #
           # Inside a generic HTML block every line is raw HTML — a `>` there
           # is text — so none of that applies.
-          in_html_block = inside_html_block?(content, depth, blank)
+          in_html_block = @track_raw_html_code && inside_html_block?(content, depth, blank)
           quote_opened = !in_html_block && depth > @open_quote_depth
+          if !blank && !paragraph_open && !in_html_block
+            # A line outside a quote with no paragraph to continue lazily
+            # closes that quote, and the list items inside it.
+            @list_items.reject! { |item| item[0] > depth }
+          end
           @open_quote_depth = depth if blank || quote_opened
           close_items_left_of_quote_markers(line, depth) unless depth.zero? || in_html_block
           if @empty_item_open
@@ -245,8 +265,10 @@ module Hwaro
             end
           end
 
-          track_list_item(content, depth, column, text_start, prefix) unless blank
-          open_html_block(content, depth) unless blank || in_html_block
+          marker_item = blank ? nil : track_list_item(content, depth, column, text_start, prefix)
+          container_column = marker_item || list_content_column(depth, column)
+          opened_html = !blank && !in_html_block && @track_raw_html_code &&
+                        open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)
 
           stripped = content.lstrip
           heading = !blank && ATX_HEADING_RE.matches?(content)
@@ -267,6 +289,11 @@ module Hwaro
           else
             @prev_blank = blank
             @prev_atx_heading = heading
+            unless blank || heading || in_html_block || opened_html || @empty_item_open
+              @paragraph_open = true
+              @paragraph_depth = depth
+              @paragraph_column = container_column
+            end
             false
           end
         end
@@ -359,9 +386,12 @@ module Hwaro
         # (updating the block's state), so it cannot be indented code.
         private def inside_html_block?(content : String, depth : Int32, blank : Bool) : Bool
           return false if @html_block.zero?
-          # Leaving the block's quote ends it (HTML has no lazy
-          # continuation); a deeper `>` is just more HTML.
-          if depth < @html_block_bq_depth || (blank && @html_block == 1)
+          # Leaving the block's quote or list item ends it (HTML has no
+          # lazy continuation); a deeper `>` is just more HTML. The column
+          # is measured without the quote prefix: only tabs can make it
+          # differ from Markd's, and then only by a few columns.
+          if depth < @html_block_bq_depth || (blank && @html_block == 1) ||
+             (!blank && depth == @html_block_bq_depth && leading_columns(content, 0)[0] < @html_block_column)
             @html_block = 0
             return false
           end
@@ -369,17 +399,28 @@ module Hwaro
           true
         end
 
-        private def open_html_block(content : String, depth : Int32) : Nil
-          return unless content.includes?('<')
+        # Opens an HTML block when this line starts one in Markd: the tag at
+        # most 3 columns into its container (deeper is paragraph text or
+        # code), and a lone tag (type 7) only where it does not continue an
+        # open paragraph. Returns whether the line is an HTML block line.
+        private def open_html_block(content : String, depth : Int32, column : Int32, container_column : Int32, in_paragraph : Bool) : Bool
+          return false unless content.includes?('<')
+          return false if column - container_column >= 4
           stripped = content.lstrip
           if stripped.starts_with?("<!--")
-            @html_block = 2 unless stripped.index("-->", 4)
-          elsif HTML_BLOCK_TAG_RE.matches?(stripped) || HTML_BLOCK_LONE_TAG_RE.matches?(stripped)
+            # `-->` may close it on the same line — even `<!-->`/`<!--->`.
+            return true if stripped.index("-->", 2)
+            @html_block = 2
+          elsif HTML_BLOCK_TAG_RE.matches?(stripped)
+            @html_block = 1
+          elsif !in_paragraph && HTML_BLOCK_LONE_TAG_RE.matches?(stripped)
             @html_block = 1
           else
-            return
+            return false
           end
           @html_block_bq_depth = depth
+          @html_block_column = container_column
+          true
         end
 
         # A `>` marker left of an open item's content column cannot sit
@@ -447,7 +488,8 @@ module Hwaro
         # marker width (it never advances its column to the marker), so the
         # same virtual column is used here. Text that is itself a marker
         # (`- - b`, `* * *`) opens a nested item at that content column.
-        private def track_list_item(content : String, depth : Int32, column : Int32, text_start : Int32, prefix : Int32) : Nil
+        # Returns the content column of the innermost item opened, if any.
+        private def track_list_item(content : String, depth : Int32, column : Int32, text_start : Int32, prefix : Int32) : Int32?
           # Byte probe first: this runs on every non-blank line.
           first_byte = content.byte_at?(text_start)
           return unless first_byte
@@ -459,6 +501,7 @@ module Hwaro
           virtual_column = prefix + base
           offset = text_start
           first = true
+          pushed = nil
           loop do
             rest = content.byte_slice(offset, content.bytesize - offset)
             marker = LIST_MARKER_RE.match(rest)
@@ -483,6 +526,7 @@ module Hwaro
 
             @list_items.reject! { |item| item[0] == depth && item[1] > column } if first
             @list_items << {depth, content_column}
+            pushed = content_column
             @empty_item_open = rest.byte_slice(marker_size).blank?
             break unless simple
 
@@ -491,6 +535,7 @@ module Hwaro
             virtual_column += width
             offset += marker_size + spaces
           end
+          pushed
         end
 
         private def run_length(text : String, char : Char) : Int32

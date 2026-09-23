@@ -203,6 +203,35 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["<div>", "> >     y", "</div>"]).should eq [false, false, false]
     end
 
+    it "closes an HTML comment block when its list item ends" do
+      feed(["- item one", "  <!-- draft note, never closed", "", "Text after list.", "", "    code"])
+        .should eq [false, false, false, false, false, true]
+    end
+
+    it "does not open an HTML block on a paragraph continuation indented four columns" do
+      feed(["Paragraph text", "    <!-- not a comment block", "", "Later.", "", "    code"])
+        .should eq [false, false, false, false, false, true]
+    end
+
+    it "closes the empty HTML comments <!--> and <!---> on their own line" do
+      feed(["<!-->", "", "Text.", "", "    code"]).should eq [false, false, false, false, true]
+      feed(["<!--->", "", "Text.", "", "    code"]).should eq [false, false, false, false, true]
+    end
+
+    it "does not open a lone-tag HTML block inside a paragraph" do
+      feed(["para", "<span>", "> >     y"]).should eq [false, false, true]
+    end
+
+    it "leaves generic HTML blocks to the walkers that see inside raw HTML" do
+      tracker = Hwaro::Content::Processors::FenceTracker.new(raw_html_code: false)
+      ["<!-- open", "", "    code"].map { |line| tracker.fence_line?(line) }.should eq [false, false, true]
+    end
+
+    it "drops a quote's stale empty item once an unquoted line closes the quote" do
+      feed([">1.", "   text", "", "  >         code", "      code", "  >       code ~~x~~"])
+        .should eq [false, false, false, true, true, true]
+    end
+
     it "does not open indented code on a lazy quote continuation" do
       feed(["> para", "lazy", ">     more para"]).should eq [false, false, false]
     end

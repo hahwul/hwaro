@@ -1645,6 +1645,18 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain("<del>")
     end
 
+    it "leaves indented code alone after an unclosed HTML comment" do
+      config = make_config(math: true)
+      ["- item one\n  <!-- draft note, never closed\n\nText after list.\n\n    code ~~C1~~ $y$",
+       "Paragraph text\n    <!-- not a comment block\n\nLater.\n\n    code ~~C1~~ $y$",
+       "<!-->\n\nText.\n\n    code ~~C1~~ $y$"].each do |content|
+        html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+        html.should contain("code ~~C1~~ $y$")
+        html.should_not contain("<del>")
+        html.should_not contain("math-inline")
+      end
+    end
+
     it "leaves indented code alone after a blockquote closes the list above it" do
       config = make_config(math: true, footnotes: true)
       content = "- item one\n- item two\n\n> A note after the list.\n\n    code ~~C1~~ $y$\n\n" \
