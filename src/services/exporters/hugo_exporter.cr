@@ -100,6 +100,15 @@ module Hwaro
               else
                 hugo_fields["expiryDate"] = value
               end
+            when "path"
+              # hwaro's `path` is the page's whole published path (served at
+              # `/<path>/`); Hugo spells that `url` and ignores an unknown
+              # `path` param, so the exported page moved.
+              if !authored?(flattened, "url") && (custom = value.as_s?) && !(trimmed = custom.strip('/')).empty?
+                hugo_fields["url"] = YAML::Any.new("/#{trimmed}/")
+              else
+                hugo_fields[key] = value
+              end
             when "image"
               if authored?(flattened, "images")
                 hugo_fields[key] = value
