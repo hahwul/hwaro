@@ -232,12 +232,34 @@ module Hwaro
         val.try(&.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32)
       end
 
-      # Extracts a string-or-array TOML value into an Array(String). Every
-      # string-list key goes through here, so `sections = "posts"` means
-      # `["posts"]` everywhere: several loaders used to read `as_a?` only and
-      # silently drop a single string — `[sitemap] exclude = "/private/"`
-      # left the private pages in the sitemap, `[amp] sections = "posts"`
-      # turned AMP on for every section, `hooks.pre = "npm ci"` never ran.
+      # Reads a string-list option. An array keeps its string entries as
+      # written, and a single string is a one-item list: several loaders used
+      # to read `as_a?` only and silently drop `[sitemap] exclude =
+      # "/private/"`, `[amp] sections = "posts"` or `hooks.pre = "npm ci"`.
+      #
+      # nil means "not set" and the caller keeps its default, as those
+      # loaders always did for anything but an array. That covers an absent
+      # key, a blank string (`exclude = "${SITEMAP_EXCLUDE:-}"` with the
+      # variable unset must not become [""], which excludes every page) and a
+      # value of the wrong type, which is also reported — `[search] fields =
+      # true` must not drop title and content from the index.
+      private def self.string_list?(raw : TOML::Any?, key : String) : Array(String)?
+        return unless raw
+        if array = raw.as_a?
+          return array.compact_map(&.as_s?)
+        end
+        if string = raw.as_s?
+          return string.blank? ? nil : [string]
+        end
+        Logger.warn "Ignoring #{key} = #{raw.raw.inspect}: expected a string or an array of strings. Keeping the default."
+        nil
+      end
+
+      # Extracts a string-or-array TOML value into an Array(String). Unlike
+      # `string_list?`, a blank string stays [""] and any other value is []:
+      # the options read here (`[robots]` allow/disallow, where an empty
+      # `Disallow:` is meaningful, `[static] exclude`, `[outputs]` formats,
+      # `[content.files]`) have always behaved that way.
       private def self.string_or_array(raw : TOML::Any?) : Array(String)
         return [] of String unless raw
         raw.as_a?.try(&.compact_map(&.as_s?)) ||

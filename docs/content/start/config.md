@@ -7,7 +7,7 @@ toc = true
 
 All site configuration lives in `config.toml` at the project root.
 
-Any option documented as a list of strings also accepts a single string, which is read as a one-item list: `sections = "posts"` means `sections = ["posts"]`.
+Any option documented as a list of strings also accepts a single string, which is read as a one-item list: `sections = "posts"` means `sections = ["posts"]`. An empty string, such as `exclude = "${SITEMAP_EXCLUDE:-}"` with the variable unset, counts as not set and keeps the default. A value that is neither a string nor a list (`fields = true`) is ignored with a warning.
 
 Unknown top-level keys are reported instead of silently ignored. A typo'd
 `[markdonw]` or `titel = "…"` would otherwise disable a feature with no

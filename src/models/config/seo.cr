@@ -111,8 +111,8 @@ module Hwaro
           # so non-finite values fall back to the default here.
           pr = float_value(s["priority"]?, config.sitemap.priority)
           config.sitemap.priority = pr.finite? ? pr : config.sitemap.priority
-          if exclude = s["exclude"]?
-            config.sitemap.exclude = string_or_array(exclude)
+          if exclude = string_list?(s["exclude"]?, "[sitemap] exclude")
+            config.sitemap.exclude = exclude
           end
         end
       end
@@ -180,8 +180,8 @@ module Hwaro
         end
         config.feeds.truncate = int_value(s["truncate"]?, config.feeds.truncate)
         config.feeds.limit = int_value(s["limit"]?, config.feeds.limit)
-        if sections = s["sections"]?
-          config.feeds.sections = string_or_array(sections)
+        if sections = string_list?(s["sections"]?, "[feeds] sections")
+          config.feeds.sections = sections
         end
         config.feeds.default_language_only = bool_value(s["default_language_only"]?, config.feeds.default_language_only)
         config.feeds.full_content = bool_value(s["full_content"]?, config.feeds.full_content)

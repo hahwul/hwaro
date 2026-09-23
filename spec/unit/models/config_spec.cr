@@ -3064,6 +3064,88 @@ describe "Hwaro::Models::Config" do
       config.languages["ko"].taxonomies.should eq(["tags"])
       config.assets.bundles.first.files.should eq(["css/a.css"])
     end
+
+    # `exclude = "${SITEMAP_EXCLUDE:-}"` with the variable unset is a single
+    # "" — read as [""], it excluded every page from the sitemap ("" matches
+    # like "/"), an empty `[search] exclude` suppressed search.json and an
+    # empty `[feeds] sections` dropped the feed's sections. Before single
+    # strings were accepted it was ignored, so it has to mean "not set".
+    it "treats a blank single string as not set" do
+      ENV.delete("HWARO_SPEC_CFG_UNSET_LIST")
+      config = load_config(<<-TOML)
+        [[taxonomies]]
+        name = "tags"
+        [[taxonomies]]
+        name = "authors"
+        [sitemap]
+        exclude = "${HWARO_SPEC_CFG_UNSET_LIST:-}"
+        [search]
+        fields = ""
+        exclude = ""
+        [feeds]
+        sections = "${HWARO_SPEC_CFG_UNSET_LIST:-}"
+        [build]
+        hooks.pre = "  "
+        [related]
+        taxonomies = ""
+        [languages.ko]
+        taxonomies = ""
+        TOML
+      defaults = Hwaro::Models::Config.new
+      config.sitemap.exclude.should eq(defaults.sitemap.exclude)
+      config.search.fields.should eq(defaults.search.fields)
+      config.search.exclude.should eq(defaults.search.exclude)
+      config.feeds.sections.should eq(defaults.feeds.sections)
+      config.build.hooks.pre.should eq(defaults.build.hooks.pre)
+      config.related.taxonomies.should eq(defaults.related.taxonomies)
+      config.languages["ko"].taxonomies.should eq(["tags", "authors"])
+    end
+
+    it "keeps an array's entries as written" do
+      config = load_config(%([sitemap]\nexclude = ["", "/private/"]\n[search]\nfields = []))
+      config.sitemap.exclude.should eq(["", "/private/"])
+      config.search.fields.should eq([] of String)
+    end
+
+    # The value used to be read only when it was an array, so a bool, a
+    # number or a table kept the default. Reading "anything present" instead
+    # turned it into [] — `[search] fields = true` dropped title and content
+    # from search.json, `[languages.ko] taxonomies = false` built no
+    # taxonomies for that language instead of inheriting them.
+    it "keeps the default and warns when a list option is neither a string nor an array" do
+      defaults = Hwaro::Models::Config.new
+      {
+        {"[search]\nfields = true", "[search] fields", ->(c : Hwaro::Models::Config) { c.search.fields }},
+        {"[build]\nhooks.pre = 1", "[build] hooks.pre", ->(c : Hwaro::Models::Config) { c.build.hooks.pre }},
+        {"[build]\nhooks.post = 1", "[build] hooks.post", ->(c : Hwaro::Models::Config) { c.build.hooks.post }},
+        {"[sitemap]\nexclude = true", "[sitemap] exclude", ->(c : Hwaro::Models::Config) { c.sitemap.exclude }},
+        {"[search]\nexclude = 1", "[search] exclude", ->(c : Hwaro::Models::Config) { c.search.exclude }},
+        {"[feeds]\nsections = false", "[feeds] sections", ->(c : Hwaro::Models::Config) { c.feeds.sections }},
+        {"[amp]\nsections = 1", "[amp] sections", ->(c : Hwaro::Models::Config) { c.amp.sections }},
+        {"[pwa]\nicons = 1", "[pwa] icons", ->(c : Hwaro::Models::Config) { c.pwa.icons }},
+        {"[pwa]\nprecache_urls = 1", "[pwa] precache_urls", ->(c : Hwaro::Models::Config) { c.pwa.precache_urls }},
+        {"[related]\ntaxonomies = true", "[related] taxonomies", ->(c : Hwaro::Models::Config) { c.related.taxonomies }},
+        {"[outputs]\nsections = 1", "[outputs] sections", ->(c : Hwaro::Models::Config) { c.outputs.sections }},
+        {"[auto_includes]\ndirs = true", "[auto_includes] dirs", ->(c : Hwaro::Models::Config) { c.auto_includes.dirs }},
+        {"[plugins]\nprocessors = 1", "[plugins] processors", ->(c : Hwaro::Models::Config) { c.plugins.processors }},
+        {"[doctor]\nignore = 1", "[doctor] ignore", ->(c : Hwaro::Models::Config) { c.doctor.ignore }},
+        {"[content.new]\ndefault_fields = {a = 1}", "[content.new] default_fields", ->(c : Hwaro::Models::Config) { c.content_new.default_fields }},
+      }.each do |toml, label, getter|
+        config = nil
+        log = with_captured_log { config = load_config(toml) }
+        getter.call(config.not_nil!).should eq(getter.call(defaults))
+        log.should contain("Ignoring #{label}")
+      end
+
+      config = nil
+      log = with_captured_log do
+        config = load_config("[[taxonomies]]\nname = \"tags\"\n[[taxonomies]]\nname = \"authors\"\n[languages.ko]\ntaxonomies = false\n[[assets.bundles]]\nname = \"a.css\"\nfiles = 1")
+      end
+      config.not_nil!.languages["ko"].taxonomies.should eq(["tags", "authors"])
+      config.not_nil!.assets.bundles.first.files.should eq([] of String)
+      log.should contain("Ignoring [languages.ko] taxonomies")
+      log.should contain("Ignoring [[assets.bundles]] files")
+    end
   end
 
   # Checks ran on the merged document with config.toml as the label, so a

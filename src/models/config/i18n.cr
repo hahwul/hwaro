@@ -182,8 +182,8 @@ module Hwaro
           lang_config.generate_feed = bool_value(lang_hash["generate_feed"]?, lang_config.generate_feed)
           lang_config.build_search_index = bool_value(lang_hash["build_search_index"]?, lang_config.build_search_index)
 
-          if taxonomies = lang_hash["taxonomies"]?
-            lang_config.taxonomies = string_or_array(taxonomies)
+          if taxonomies = string_list?(lang_hash["taxonomies"]?, "[languages.#{lang_code}] taxonomies")
+            lang_config.taxonomies = taxonomies
           else
             # No per-language `taxonomies` key → inherit the global
             # `[[taxonomies]]` set rather than the hardcoded `["tags",
