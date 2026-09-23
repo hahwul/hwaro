@@ -53,6 +53,23 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
       end
     end
 
+    it "refuses to write through a dangling AGENTS.md symlink" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          outside = File.join(dir, "outside")
+          Dir.mkdir(outside)
+          target = File.join(outside, "generated.md")
+          File.symlink(target, "AGENTS.md")
+
+          expect_raises(Hwaro::HwaroError) do
+            Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write"])
+          end
+
+          File.exists?(target).should be_false
+        end
+      end
+    end
+
     it "overwrites an existing AGENTS.md when --force is given" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

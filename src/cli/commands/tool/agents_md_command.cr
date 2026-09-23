@@ -2,6 +2,7 @@ require "option_parser"
 require "../../metadata"
 require "../../prompt"
 require "../../../utils/logger"
+require "../../../utils/errors"
 require "../../../services/defaults/agents_md"
 
 module Hwaro
@@ -74,6 +75,13 @@ module Hwaro
 
             if write
               filename = "AGENTS.md"
+              if File.symlink?(filename)
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "Cannot write AGENTS.md through a symlink.",
+                  hint: "Remove the AGENTS.md symlink before generating this file.",
+                )
+              end
               existed = File.exists?(filename)
               existing = existed ? File.read(filename) : nil
               # Only promise preservation when the merge can actually deliver
