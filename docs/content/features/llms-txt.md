@@ -22,7 +22,7 @@ full_filename = "llms-full.txt"
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| enabled | bool | false | Generate `llms.txt` |
+| enabled | bool | true | Generate `llms.txt` (set `false` to turn it off) |
 | filename | string | "llms.txt" | Output filename |
 | instructions | string | "" | Instructions text for LLM crawlers |
 | full_enabled | bool | false | Generate full content version |
