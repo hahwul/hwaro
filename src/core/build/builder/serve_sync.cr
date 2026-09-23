@@ -311,6 +311,53 @@ module Hwaro
           end
         end
 
+        # Run one taxonomy generation pass, then delete the files the previous
+        # pass on this builder wrote and this one did not: a term whose last
+        # post was deleted, re-tagged or drafted, with its feed and pagination
+        # pages, or a whole taxonomy dropped from config.toml.
+        #
+        # Paths are compared relative to `output_dir`, so a pass into a
+        # different output directory matches nothing and deletes nothing. A
+        # file the current site renders a page to is never deleted, and
+        # neither is anything when the pass raised (the previous set is kept
+        # and widened, so the next complete pass still sees it).
+        def track_taxonomy_outputs(output_dir : String, & : -> Array(Models::Section)) : Array(Models::Section)
+          @generated_claims_mutex.synchronize { @taxonomy_pass_outputs = Set(String).new }
+          begin
+            sections = yield
+          rescue ex
+            finish_taxonomy_pass(output_dir, completed: false)
+            raise ex
+          end
+          finish_taxonomy_pass(output_dir, completed: true)
+          sections
+        end
+
+        private def finish_taxonomy_pass(output_dir : String, completed : Bool) : Nil
+          written = @generated_claims_mutex.synchronize do
+            current = @taxonomy_pass_outputs || Set(String).new
+            @taxonomy_pass_outputs = nil
+            current
+          end
+          relative = written.compact_map { |path| Path[path].relative_to(output_dir).to_s rescue nil }.to_set
+          previous = @last_taxonomy_outputs
+          unless completed
+            @last_taxonomy_outputs = previous ? previous | relative : relative
+            return
+          end
+          @last_taxonomy_outputs = relative
+          prune_stale_taxonomy_outputs(previous - relative, output_dir) if previous
+        end
+
+        private def prune_stale_taxonomy_outputs(stale : Set(String), output_dir : String) : Nil
+          return if stale.empty?
+          cwd = Dir.current
+          owned = owned_output_paths(output_dir).map { |path| File.expand_path(path, cwd) }.to_set
+          paths = stale.map { |relative| File.join(output_dir, relative) }
+          paths.reject! { |path| owned.includes?(File.expand_path(path, cwd)) }
+          delete_orphaned_outputs(paths, output_dir)
+        end
+
         # Resolve `path` relative to `root`, falling back to a plain prefix
         # strip when it can't be made relative (e.g. an absolute path).
         private def path_relative_to(path : String, root : String) : String

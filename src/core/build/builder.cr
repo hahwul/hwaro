@@ -358,6 +358,17 @@ module Hwaro
         # worker fiber.
         @page_derived_outputs : Hash(String, Array(String)) = {} of String => Array(String)
         @page_derived_mutex : Mutex = Mutex.new
+        # Taxonomy index/term/pagination/feed files the PREVIOUS taxonomy
+        # generation wrote, and the set the running one is collecting (nil
+        # outside a pass). The Finalize prune covers these only on a `--cache`
+        # build, and only on the full-build path — a `hwaro serve` session
+        # without `--cache`, and every incremental rebuild with it, left a
+        # term whose last post was deleted (or re-tagged) served until
+        # restart. The serve builder lives for the whole session, so the
+        # previous pass is right here in memory. Guarded by
+        # @generated_claims_mutex (taxonomy rendering fans out).
+        @last_taxonomy_outputs : Set(String)? = nil
+        @taxonomy_pass_outputs : Set(String)? = nil
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -368,7 +379,10 @@ module Hwaro
         # covers. Public: the taxonomy generator is a module that reaches the
         # builder through its `builder:` argument.
         def claim_generated_output(path : String) : Nil
-          @generated_claims_mutex.synchronize { @generated_output_claims << path }
+          @generated_claims_mutex.synchronize do
+            @generated_output_claims << path
+            @taxonomy_pass_outputs.try(&.<<(path))
+          end
         end
 
         # Everything claimed since the last reset.
