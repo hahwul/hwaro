@@ -88,6 +88,7 @@ hwaro tool export hugo --verbose
 | image | images (배열) |
 | expires | expiryDate |
 | weight | weight |
+| path | url (`/<path>/`) |
 | [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
 
 그 외 프론트 매터 키는 Hugo 페이지 파라미터로 그대로 전달됩니다.
@@ -106,6 +107,9 @@ hwaro tool export hugo --verbose
 | categories | categories |
 | image | image |
 | template | layout |
+| path | permalink (`/<path>/`) |
+| aliases | redirect_from (jekyll-redirect-from) |
+| updated | last_modified_at |
 | [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
 
 출력 규칙:

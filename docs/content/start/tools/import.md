@@ -90,6 +90,9 @@ appear in the counts but have no row.
 - When two source files resolve to the **same** destination (a duplicate slug, two same-titled notes, a stripped `YYYY-MM-DD-` date prefix, two collection subfolders flattened into one section), the second and later ones are written alongside the first as `slug-1.md`, `slug-2.md`, … instead of one silently overwriting the other. The number of renamed destinations is reported once at the end of the run rather than one line per file.
 - `--force` means "overwrite files that pre-dated this import". It never lets one imported file clobber another that the *same run* just wrote; those still get the `-1` / `-2` suffix above. Re-running an import is therefore idempotent: every source resolves to the destination it picked the first time and is skipped (or overwritten with `--force`), instead of accumulating `-1` copies on each run.
 - Only known post types are imported (e.g. WordPress `post` and `page`).
+- A page keeps its published address. Hugo `url` and a literal Jekyll `permalink` (not a `:placeholder` pattern) become `path`. A `.html` address becomes an extensionless `path` plus an alias at the old address, and Jekyll `redirect_from` entries become `aliases`.
+- Hugo: JSON front matter is read like TOML and YAML, and a leaf bundle with a `slug` is written as a bundle under the slugged directory (`posts/<slug>/index.md`).
+- Jekyll: `last_modified_at` becomes `updated`, and the `image: {path: …}` form becomes `image`.
 
 ## Example Output
 

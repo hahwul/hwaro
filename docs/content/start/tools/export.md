@@ -88,6 +88,7 @@ while the counts cover content documents only.
 | image | images (array) |
 | expires | expiryDate |
 | weight | weight |
+| path | url (`/<path>/`) |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Every other front-matter key is passed through as a Hugo page param.
@@ -106,6 +107,9 @@ Output structure preserves the original directory layout under `export/content/`
 | categories | categories |
 | image | image |
 | template | layout |
+| path | permalink (`/<path>/`) |
+| aliases | redirect_from (jekyll-redirect-from) |
+| updated | last_modified_at |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Output conventions:
