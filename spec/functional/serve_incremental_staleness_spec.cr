@@ -74,7 +74,13 @@ private def write_listing_site
   File.write("content/misc/archive.md", "---\ntitle: Archive\nweight: 2\ntemplate: archive.html\n---\nlist")
   # Neighbours for the edited post, so the reading-order rule (which pulls a
   # page's prev/next into the render set) cannot be what selects the listing
-  # page — the fan-out under test has to be.
+  # page — the fan-out under test has to be. The `posts` section index sorts
+  # them by weight (pad0, pad1, one, pad2, …) and keeps the listing, an
+  # orphan, at the tail of the chain. Without it `posts` pages are orphans
+  # too, ordered by the default `date` sort with a path tiebreak — which puts
+  # `posts/one.md` first, right after the archive, and legitimately makes the
+  # archive the edited page's neighbour.
+  File.write("content/posts/_index.md", "---\ntitle: Posts\nsort_by: weight\n---\n")
   5.times do |i|
     File.write("content/posts/pad#{i}.md", "---\ntitle: Pad #{i}\nweight: #{10 + i}\n---\npadding")
   end

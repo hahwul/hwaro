@@ -133,10 +133,10 @@ module Hwaro::Core::Build::Phases::Transform
 
     # Add any orphan pages not belonging to any section, leading with the
     # site root index so prev/next starts at the homepage. Pages whose
-    # section has no `_index` in this language land here too, in source
-    # order — better a tail entry than absence from the chain.
+    # section has no `_index` in this language land here too — better a
+    # tail entry than absence from the chain.
     section_names = sections_by_path.keys.to_set
-    append_orphan_pages(pages, section_names, flat_list)
+    append_orphan_pages(pages_by_section, section_names, flat_list)
     flat_list
   end
 
@@ -156,10 +156,18 @@ module Hwaro::Core::Build::Phases::Transform
   # entry point of the reading order, not a trailing page — without this it was
   # pushed to the END, so the book scaffold's prev/next chain wrapped (the home
   # "Introduction" page landed last and the first chapter lost its prev link).
-  # Prepend such root index pages; keep every other true orphan in source order
-  # at the tail.
+  # Prepend such root index pages; every other true orphan follows at the tail.
+  #
+  # Orphans are taken from `pages_by_section` — grouped by section, sections
+  # in path order, each group already sorted like a section's own pages
+  # (`sort_pages`: default `date`, path tiebreak) — never from the order of
+  # the input list. That order is filesystem discovery order for the cold
+  # build (`ctx.pages`) and the site model's order for the serve relink
+  # (`site.pages`): the chain differed between hosts (ext4 hash order vs
+  # APFS), and a relink right after a build saw neighbours "move", so a serve
+  # edit re-rendered pages it never touched.
   private def append_orphan_pages(
-    pages : Array(Models::Page),
+    pages_by_section : Hash(String, Array(Models::Page)),
     section_names : Set(String),
     flat_list : Array(Models::Page),
   )
@@ -167,15 +175,19 @@ module Hwaro::Core::Build::Phases::Transform
     # scan per page, O(n²) on sites with no `_index.md` sections at all
     # (every page an orphan), and this runs again on every incremental relink.
     seen_paths = flat_list.each_with_object(Set(String).new) { |p, set| set << p.path }
-    pages.each do |page|
-      next if section_names.includes?(page.section)
-      next if seen_paths.includes?(page.path)
-      if page.is_index && page.section.empty?
-        flat_list.unshift(page)
-      else
-        flat_list << page
+    root_indexes = [] of Models::Page
+    pages_by_section.keys.sort!.each do |section|
+      next if section_names.includes?(section)
+      pages_by_section[section].each do |page|
+        next unless seen_paths.add?(page.path)
+        if page.is_index && page.section.empty?
+          root_indexes << page
+        else
+          flat_list << page
+        end
       end
     end
+    flat_list[0, 0] = root_indexes unless root_indexes.empty?
   end
 
   # Recursively flatten a list of sections into depth-first reading order.

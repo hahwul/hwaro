@@ -454,6 +454,51 @@ describe Hwaro::Core::Build::Phases::Transform do
     end
   end
 
+  # Regression: pages whose section has no `_index.md` joined the prev/next
+  # chain in the ORDER OF THE INPUT LIST — filesystem discovery order for the
+  # cold build (`ctx.pages`), the site model's order for the serve relink
+  # (`site.pages`). The chain therefore differed between hosts (ext4 hash
+  # order vs APFS) and between a build and the relink right after it, so a
+  # serve edit re-rendered pages whose neighbours only "moved" because the
+  # two lists were ordered differently.
+  describe "orphan page reading order" do
+    it "is independent of the input order and identical for build and relink" do
+      orders = [] of Array(String)
+      [false, true].each do |reverse|
+        index = make_page("index.md", "")
+        index.is_index = true
+        archive = make_page("misc/archive.md", "misc")
+        pages = [index, archive] + (0..3).map { |i| make_page("posts/pad#{i}.md", "posts") } + [make_page("posts/one.md", "posts")]
+        input = reverse ? pages.reverse : pages.rotate(3)
+
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+        ctx.site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+        ctx.pages = input
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_link_page_navigation(ctx)
+
+        chain = [] of String
+        page = pages.first
+        while page
+          chain << page.path
+          page = page.higher
+        end
+        orders << chain
+
+        # The serve relink sees the site model in yet another order; it must
+        # agree with the build and report no neighbour change.
+        site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+        site.pages = input.shuffle(Random.new(42))
+        builder.test_relink_navigation_for_sections(site).should be_empty
+      end
+
+      orders[0].should eq(orders[1])
+      orders[0].size.should eq(7)
+      orders[0].first.should eq("index.md")
+    end
+  end
+
   describe "#relink_navigation_for_sections" do
     it "reports the set of pages whose prev/next changed (block reorder)" do
       site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
