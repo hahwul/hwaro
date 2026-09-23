@@ -702,14 +702,17 @@ describe Hwaro::Core::Build::Builder do
       })
       template = "<div>{{ text.foo.bar }}</div>"
       context = {} of String => Crinja::Value
-      first_warnings = [] of String
-      second_warnings = [] of String
+      warnings = [] of String
 
-      builder.test_render_shortcode_jinja_with_name(template, {"text" => "a"}, context, "first", env, first_warnings)
-      builder.test_render_shortcode_jinja_with_name(template, {"text" => "b"}, context, "second", env, second_warnings)
+      first = expect_raises(Crinja::Error) do
+        builder.test_render_shortcode_jinja_with_name(template, {"text" => "a"}, context, "first", env, warnings)
+      end
+      second = expect_raises(Crinja::Error) do
+        builder.test_render_shortcode_jinja_with_name(template, {"text" => "b"}, context, "second", env, warnings)
+      end
 
-      first_warnings.first.should contain("first.html:1")
-      second_warnings.first.should contain("second.html:1")
+      first.message.not_nil!.should contain("first.html:1")
+      second.message.not_nil!.should contain("second.html:1")
     end
 
     it "args override context values" do

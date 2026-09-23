@@ -1007,7 +1007,13 @@ module Hwaro
                                 end
                               end
             crinja_template.render(context)
-          rescue ex : Crinja::Error
+            # Only syntax errors are downgraded to a warning and a marker.
+            # Runtime errors (undefined attribute access, a missing include —
+            # see src/ext/crinja_error_location_fix.cr) propagate and fail
+            # the build as HWARO_E_TEMPLATE, like a page-template error; the
+            # compiled template's filename already locates them in the
+            # shortcode file.
+          rescue ex : Crinja::TemplateError
             label = shortcode_name ? "shortcode '#{shortcode_name}'" : "shortcode"
             Logger.warn "Template error in #{label}: #{ex.message}"
             # Record the failure on the page (drives the serve error overlay —

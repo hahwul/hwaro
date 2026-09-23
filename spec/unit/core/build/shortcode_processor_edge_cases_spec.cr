@@ -166,19 +166,22 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should eq("<!-- hwaro: template error in shortcode -->")
     end
 
-    it "returns a visible marker for a render-time Crinja error" do
+    it "propagates a render-time Crinja error instead of downgrading it" do
       builder = Hwaro::Core::Build::Builder.new
       # This compiles, but traversing a missing field on a string raises
-      # Crinja::UndefinedError while rendering.
+      # Crinja::UndefinedError while rendering. Runtime errors are fatal,
+      # like page-template errors: only syntax errors get the marker.
       warnings = [] of String
-      result = builder.test_sc_render_jinja(
-        "{{ text.foo.bar }}",
-        {"text" => "value"},
-        {} of String => Crinja::Value,
-        warnings,
-      )
-      result.should eq("<!-- hwaro: template error in shortcode -->")
-      warnings.first.should contain("text.foo is undefined")
+      err = expect_raises(Crinja::Error) do
+        builder.test_sc_render_jinja(
+          "{{ text.foo.bar }}",
+          {"text" => "value"},
+          {} of String => Crinja::Value,
+          warnings,
+        )
+      end
+      err.message.not_nil!.should contain("text.foo is undefined")
+      warnings.should be_empty
     end
 
     it "treats a stray {% end %} preceding shortcodes as literal text" do
