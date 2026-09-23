@@ -169,6 +169,49 @@ describe "serve rebuild parity" do
       end
     end
   end
+
+  # A page's version switcher is derived from its counterparts in the other
+  # versions, but `Versions.link!` only ran in the full parse: re-slugging,
+  # drafting or un-rendering the latest counterpart left the old version's
+  # page linking (and canonicalizing) to a URL that no longer existed.
+  it "refreshes other versions' switchers when a counterpart stops rendering" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "V"
+          base_url = "https://example.com"
+
+          [[versions.list]]
+          name = "v2"
+          path = "docs/v2"
+          latest = true
+
+          [[versions.list]]
+          name = "v1"
+          path = "docs/v1"
+          TOML
+        )
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "<html><head>{{ canonical_tag }}</head><body>{% for v in page.version_links %}[{{ v.name }} {{ v.url }} {{ v.exists }}]{% endfor %}</body></html>")
+        {"v1", "v2"}.each do |v|
+          FileUtils.mkdir_p("content/docs/#{v}")
+          File.write("content/docs/#{v}/_index.md", "---\ntitle: Docs #{v}\n---\n")
+          File.write("content/docs/#{v}/legacy.md", "---\ntitle: Legacy #{v}\n---\nbody")
+        end
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.read("public/docs/v1/legacy/index.html").should contain("[v2 /docs/legacy/ true]")
+
+        File.write("content/docs/v2/legacy.md", "---\ntitle: Legacy v2\nrender: false\n---\nbody")
+        builder.run_incremental(["content/docs/v2/legacy.md"], options).should be_true
+
+        old_version = File.read("public/docs/v1/legacy/index.html")
+        old_version.should contain("[v2 /docs/ false]")
+        old_version.should contain(%(href="https://example.com/docs/v1/legacy/"))
+      end
+    end
+  end
 end
 
 private def write_amp_site
