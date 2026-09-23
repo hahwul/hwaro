@@ -323,7 +323,8 @@ and three dots become their typographic forms:
 
 Code spans, code blocks, raw HTML, and math bodies are never rewritten.
 Raw HTML code blocks such as `<pre>`, `<script>`, `<style>`, and `<textarea>`
-also keep their contents literal during markdown extension processing.
+also keep their contents literal during markdown extension processing
+(shortcodes inside them still expand).
 Table cells, definition bodies, and footnote bodies are pre-rendered
 HTML, so smart punctuation does not apply inside them. The `markdownify`
 template filter follows the site's setting.
