@@ -234,7 +234,9 @@ module Hwaro
         redirects = collect_aliases
         unless redirects.empty?
           lines << ""
-          lines << "# Redirects: Create a `#{output_dir}/_redirects` file with:"
+          # Pages serves `_redirects` from the build output, but every build
+          # regenerates that tree; static/ is copied into it on each build.
+          lines << "# Redirects: Create a `static/_redirects` file with:"
           redirects.each do |from, to|
             # _redirects is space-delimited; an alias with whitespace or a quote
             # would silently corrupt the rule, so skip malformed entries.

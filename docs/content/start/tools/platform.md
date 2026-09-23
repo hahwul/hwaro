@@ -32,7 +32,7 @@ hwaro tool platform vercel --stdout
 |----------|-------------|-------------|
 | netlify | `netlify.toml` | Build settings, redirects, headers |
 | vercel | `vercel.json` | Build command, routing, cache headers |
-| cloudflare | `wrangler.toml` | Workers/Pages site config |
+| cloudflare | `wrangler.toml` | Cloudflare Pages config (`pages_build_output_dir`) |
 | github-pages | `.github/workflows/deploy.yml` | GitHub Actions build + deploy workflow |
 | gitlab-ci | `.gitlab-ci.yml` | GitLab CI/CD pipeline |
 | codeberg-pages | `.forgejo/workflows/deploy.yml` | Codeberg Pages (Forgejo Actions) deploy workflow |

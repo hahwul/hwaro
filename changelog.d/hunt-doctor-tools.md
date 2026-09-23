@@ -2,5 +2,5 @@
 - `tool check-links`: scan `.markdown` files and match Markdown extensions case-insensitively like the build (`post.MD` is scanned, resolves `/post/`, and counts toward pagination bounds).
 - Content tools: include uppercase Markdown files when listing, validating, and collecting asset references.
 - `tool validate`: normalize titled and angle-bracket internal links, and report raw HTML `<img>` elements that have no `alt` attribute (`alt=""` is accepted as decorative). HTML comments and indented code blocks are no longer scanned for images or links, matching `tool check-links`.
-- `tool platform cloudflare`: generate the Cloudflare Pages `pages_build_output_dir` setting.
+- `tool platform cloudflare`: generate the Cloudflare Pages `pages_build_output_dir` setting, and point the redirects note at `static/_redirects` (a `public/_redirects` is deleted by the next build).
 - `tool check-links` and `tool validate`: resolve `@/` links through the same lookup as the build (exact, case-sensitive content path of a page a default build publishes; no percent-decoding, path normalization or extension/`_index.md` guessing), so links to drafts, `@/UPPER.md` on case-insensitive filesystems, `@/./x.md`, `@/../x` and `@/posts/` are reported instead of passed. `tool validate` now also reports an empty `@/` link.

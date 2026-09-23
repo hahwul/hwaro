@@ -126,6 +126,24 @@ describe Hwaro::Services::PlatformConfig do
         result.should contain("name = \"hi-there\"")
       end
 
+      # Cloudflare Pages reads `_redirects` from the build output, and every
+      # build regenerates that tree, so a hand-written `public/_redirects` is
+      # lost on the next build. The file belongs in static/, which the build
+      # copies into the output.
+      it "tells users to put _redirects in static/, not the build output" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/p.md", "---\ntitle: P\naliases:\n  - /old/\n---\nBody\n")
+
+            result = Hwaro::Services::PlatformConfig.new(Hwaro::Models::Config.new).generate("cloudflare")
+
+            result.should contain("`static/_redirects`")
+            result.should_not contain("public/_redirects")
+          end
+        end
+      end
+
       # _redirects is space-delimited; an alias with whitespace or a quote would
       # split into the wrong number of fields and corrupt the file, so such
       # entries are skipped while well-formed ones are kept.

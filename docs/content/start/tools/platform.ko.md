@@ -32,7 +32,7 @@ hwaro tool platform vercel --stdout
 |----------|-------------|-------------|
 | netlify | `netlify.toml` | 빌드 설정, 리다이렉트, 헤더 |
 | vercel | `vercel.json` | 빌드 명령, 라우팅, 캐시 헤더 |
-| cloudflare | `wrangler.toml` | Workers/Pages 사이트 설정 |
+| cloudflare | `wrangler.toml` | Cloudflare Pages 설정 (`pages_build_output_dir`) |
 | github-pages | `.github/workflows/deploy.yml` | GitHub Actions 빌드 + 배포 워크플로 |
 | gitlab-ci | `.gitlab-ci.yml` | GitLab CI/CD 파이프라인 |
 | codeberg-pages | `.forgejo/workflows/deploy.yml` | Codeberg Pages(Forgejo Actions) 배포 워크플로 |
