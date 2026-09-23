@@ -486,8 +486,9 @@ cannot reconcile:
 - Symlinks at the destination are never written or deleted *through*. A link
   standing where a file or directory belongs is replaced; a stale one is
   unlinked without touching what it points at.
-- Source symlinks are followed only when they resolve within the project
-  directory; links to files outside it are skipped.
+- Source symlinks are followed when their targets resolve within the project
+  or the resolved source directory; links escaping both are skipped. This also
+  supports a `public/` symlink to an external deploy directory.
 - `--json` is non-interactive: combining it with `--confirm` fails instead of
   writing a prompt into the JSON document.
 

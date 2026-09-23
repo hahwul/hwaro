@@ -579,6 +579,32 @@ describe Hwaro::Services::Deployer do
       end
     end
 
+    it "follows source symlinks inside a symlinked deploy root" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        source_root = File.join(dir, "www", "site")
+        src_dir = File.join(project, "public")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(project)
+        FileUtils.mkdir_p(File.join(source_root, "v2"))
+        File.write(File.join(source_root, "v2", "index.html"), "version two")
+        File.symlink("./v2/index.html", File.join(source_root, "latest.html"))
+        File.symlink(source_root, src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Dir.cd(project) do
+          Hwaro::Services::Deployer.new.run(options, config).should be_true
+        end
+        File.read(File.join(dest_dir, "latest.html")).should eq("version two")
+      end
+    end
+
     it "refuses to deploy when the destination is a symlink into the source" do
       Dir.mktmpdir do |dir|
         src_dir = File.join(dir, "src")

@@ -88,15 +88,27 @@ module Hwaro
         root_real = Hwaro::Utils::PathUtils.resolved_real_path(root)
         project_root_real = Hwaro::Utils::PathUtils.resolved_real_path(Dir.current)
         visited << root_real
-        walk_project_files(root, project_root_real, visited, follow_symlinks, &block)
+        walk_project_files(root, root_real, project_root_real, visited, follow_symlinks, &block)
       end
 
-      private def walk_project_files(dir : String, project_root_real : String, visited : Set(String), follow_symlinks : Bool, &block : String ->)
+      private def walk_project_files(
+        dir : String,
+        source_root_real : String,
+        project_root_real : String,
+        visited : Set(String),
+        follow_symlinks : Bool,
+        &block : String ->
+      )
         Dir.each_child(dir) do |entry|
           next if entry == ".DS_Store"
           full = File.join(dir, entry)
-          if follow_symlinks && File.symlink?(full) && !Hwaro::Utils::PathUtils.resolves_within?(full, project_root_real)
-            Logger.warn "Skipped symlink outside project root: #{full}"
+          # `public/` itself may be a symlink to an external output directory.
+          # Follow links that stay within that resolved source root as well as
+          # links within the project; reject links that escape both boundaries.
+          if follow_symlinks && File.symlink?(full) &&
+             !Hwaro::Utils::PathUtils.resolves_within?(full, project_root_real) &&
+             !Hwaro::Utils::PathUtils.resolves_within?(full, source_root_real)
+            Logger.warn "Skipped symlink outside project and deploy source roots: #{full}"
             next
           end
           # info? follows symlinks; broken links and ELOOP entries are
@@ -126,7 +138,7 @@ module Hwaro
             end
             next if visited.includes?(real)
             visited << real
-            walk_project_files(full, project_root_real, visited, follow_symlinks, &block)
+            walk_project_files(full, source_root_real, project_root_real, visited, follow_symlinks, &block)
           elsif info.file?
             block.call(full)
           end
