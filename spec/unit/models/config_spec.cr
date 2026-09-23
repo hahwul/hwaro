@@ -3117,6 +3117,21 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  # A non-string rule target (a number, or a dotted key TOML turned into a
+  # nested table) was dropped with no feedback, so the section kept its
+  # original URLs.
+  describe "[permalinks] non-string targets" do
+    it "warns and skips a rule whose target is not a string" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("[permalinks]\nposts = 5\nblog.news = \"news\"\ndocs = \"guide\"")
+      end
+      config.not_nil!.permalinks.should eq({"docs" => "guide"})
+      log.should contain("[permalinks] rule \"posts\"")
+      log.should contain("[permalinks] rule \"blog\"")
+    end
+  end
+
   describe "mistyped section warnings" do
     it "warns when a table section is given a scalar" do
       log = with_captured_log { load_config("sitemap = true\nhighlight = false") }

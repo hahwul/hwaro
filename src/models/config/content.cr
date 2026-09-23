@@ -357,6 +357,10 @@ module Hwaro
             # silently never match (source) or produce double-slash URLs
             # like `http://host//blog//p/` (target).
             config.permalinks[k.strip("/")] = target.strip("/")
+          else
+            # A number, or a dotted key (`blog.news = …`) that TOML parsed as
+            # a nested table, used to be dropped with no feedback.
+            Logger.warn "Ignoring [permalinks] rule #{k.inspect} in config.toml: its target must be a string (quote a source directory that contains a dot, e.g. \"blog.news\" = \"news\")."
           end
         end
       end
