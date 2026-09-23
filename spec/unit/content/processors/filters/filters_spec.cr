@@ -1033,6 +1033,11 @@ describe "CollectionFilters (extended)" do
       result.should eq("1,2,3,")
     end
 
+    it "keeps values of different types distinct when their text is the same" do
+      items = Crinja::Value.new([Crinja::Value.new(1), Crinja::Value.new("1")])
+      render_filter("{{ items | unique | length }}", {"items" => items}).strip.should eq("2")
+    end
+
     it "removes duplicate strings" do
       items = Crinja::Value.new(["a", "b", "a", "c"].map { |s| Crinja::Value.new(s) })
       vars = {"items" => items}
