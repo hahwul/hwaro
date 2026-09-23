@@ -84,9 +84,12 @@ build (the order a lint-then-build CI pipeline uses):
   declares `paginate_by`, so a `/page/N/` link under a non-paginated section
   is still reported
 
-Content-root links such as `@/posts/hello.md` are checked against that exact
-path under `content/`, matching the build's resolver. Include the source file
-extension; `@/posts/hello` does not resolve by guessing `.md` or `.markdown`.
+Content-root links such as `@/posts/hello.md` are looked up the way the build
+resolves them: by the exact source path under `content/` (case-sensitive,
+never percent-decoded, no `./` or `../` normalization), among the pages a
+default build publishes. Include the source file extension and link sections
+through their `_index.md`; `@/posts/hello` and `@/posts/` are reported, and so
+is a link to a draft, future-dated or expired page.
 
 ## Link Types
 

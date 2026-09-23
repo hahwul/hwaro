@@ -428,7 +428,9 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
-    it "skips @/ links with empty path" do
+    # The build warns "Empty internal link '@/'" (and fails under
+    # `[links] broken_internal = "error"`); check-links reports it dead too.
+    it "reports an @/ link with an empty path" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(content_dir)
@@ -437,7 +439,8 @@ describe Hwaro::Services::ContentValidator do
 
         validator = Hwaro::Services::ContentValidator.new(content_dir)
         issues = validator.run
-        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+        broken = issues.select { |i| i.id == "content-internal-link-broken" }
+        broken.map(&.message).should eq(["Possible broken internal link: @/ (empty link)"])
       end
     end
 
@@ -520,17 +523,21 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
-    it "validates internal link to section directory with _index.md" do
+    # The build's resolver looks `@/` up by exact content path, so a section
+    # is linked through its `_index.md`; `@/about` is left unresolved.
+    it "validates internal links to a section through its _index.md path" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(File.join(content_dir, "about"))
 
         File.write(File.join(content_dir, "about", "_index.md"), "---\ntitle: About\ndescription: About\n---\n\nAbout\n")
-        File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: S\n---\n\n[About](@/about)\n")
+        File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: S\n---\n\n[About](@/about/_index.md) [Guess](@/about)\n")
 
         validator = Hwaro::Services::ContentValidator.new(content_dir)
         issues = validator.run
-        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+        broken = issues.select { |i| i.id == "content-internal-link-broken" }
+        broken.size.should eq(1)
+        broken[0].message.should eq("Possible broken internal link: @/about")
       end
     end
 
@@ -685,5 +692,44 @@ describe "ContentValidator raw HTML alt attribute" do
 
   it "still flags an empty Markdown image alt" do
     alt_messages("![](/a.png)").should eq(["Image missing alt text: ![](/a.png)"])
+  end
+end
+
+describe "ContentValidator @/ links resolve like the build" do
+  target = "---\ntitle: T\ndescription: D\n---\nT\n"
+
+  it "accepts the exact content path of a published page" do
+    broken_links("[a](@/posts/p1.md) [b](@/posts/_index.md) [c](@/posts/p1.md#x)", {"posts/p1.md" => target, "posts/_index.md" => target}).should be_empty
+  end
+
+  it "does not guess an extension or a section index" do
+    broken_links("[a](@/posts/p1) [b](@/posts/) [c](@/posts)", {"posts/p1.md" => target, "posts/_index.md" => target}).size.should eq(3)
+  end
+
+  it "does not normalize ./ or ../ segments" do
+    broken_links("[a](@/./x.md) [b](@/posts/../x.md)", {"x.md" => target, "posts/p.md" => target}).size.should eq(2)
+  end
+
+  it "does not percent-decode the path" do
+    broken_links("[a](@/my%20post.md)", {"my post.md" => target}).size.should eq(1)
+  end
+
+  it "is case-sensitive even on a case-insensitive filesystem" do
+    broken_links("[a](@/UPPER.md)", {"upper.md" => target}).size.should eq(1)
+  end
+
+  it "does not resolve a link to a draft, future or expired page" do
+    files = {
+      "draft.md"   => "---\ntitle: D\ndraft: true\n---\n",
+      "future.md"  => "---\ntitle: F\ndate: 2999-01-01\n---\n",
+      "expired.md" => "---\ntitle: E\nexpires: 2000-01-01\n---\n",
+    }
+    messages = broken_links("[a](@/draft.md) [b](@/future.md) [c](@/expired.md)", files)
+    messages.size.should eq(3)
+    messages.first.should contain("draft")
+  end
+
+  it "does not resolve a link that escapes the content directory" do
+    broken_links("[a](@/../README.md)", {"../README.md" => "readme"}).size.should eq(1)
   end
 end

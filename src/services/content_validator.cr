@@ -9,6 +9,7 @@ require "yaml"
 require "toml"
 require "./content_lister"
 require "./doctor"
+require "./internal_link_index"
 require "../utils/errors"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
@@ -34,6 +35,7 @@ module Hwaro
         tags : Array(String) = [] of String
 
       @content_dir : String
+      @link_index : InternalLinkIndex?
 
       def initialize(@content_dir : String = "content")
       end
@@ -332,26 +334,26 @@ module Hwaro
         names
       end
 
-      # Check for broken internal links (@/ prefixed) in markdown body
+      # Check for broken internal links (@/ prefixed) in markdown body.
+      # Resolved through the build's own exact content-path lookup (see
+      # InternalLinkIndex), so this agrees with both `hwaro build` and
+      # `tool check-links`.
       private def check_internal_links(file_path : String, content : String, issues : Array(Issue))
         body = Utils::MarkdownCode.strip(extract_body(content))
         body.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
           raw_url = match[2].strip
-          path = internal_link_path(match[2]) || next
-          next if path.empty?
+          key = InternalLinkIndex.key(link_destination(match[2])) || next
+          reason = link_index.unresolved_reason(key) || next
 
-          target = File.join(@content_dir, path)
-
-          exists = File.exists?(target) ||
-                   File.exists?(target + ".md") ||
-                   File.exists?(File.join(target, "_index.md")) ||
-                   File.exists?(File.join(target, "index.md"))
-
-          unless exists
-            issues << Issue.new(id: "content-internal-link-broken", level: :warning, category: "content", file: file_path,
-              message: "Possible broken internal link: #{raw_url}")
-          end
+          message = "Possible broken internal link: #{raw_url}"
+          message += " (#{InternalLinkIndex.describe(reason)})" unless reason == "not found"
+          issues << Issue.new(id: "content-internal-link-broken", level: :warning, category: "content", file: file_path,
+            message: message)
         end
+      end
+
+      private def link_index : InternalLinkIndex
+        @link_index ||= InternalLinkIndex.new(@content_dir)
       end
 
       # CommonMark destinations may be followed by a title, or be wrapped in
@@ -359,17 +361,14 @@ module Hwaro
       # checking the Hwaro @/ content-root prefix; otherwise valid titled
       # links were looked up with the title appended and angle-wrapped broken
       # links were silently skipped.
-      private def internal_link_path(raw_url : String) : String?
+      private def link_destination(raw_url : String) : String
         destination = raw_url.strip
         if destination.starts_with?('<')
-          closing = destination.index('>') || return
-          destination = destination[1...closing]
+          closing = destination.index('>') || return destination
+          destination[1...closing]
         else
-          destination = destination.split(/\s/, 2).first
+          destination.split(/\s/, 2).first
         end
-
-        return unless destination.starts_with?("@/")
-        destination.lchop("@/").split("#").first.split("?").first.strip
       end
 
       private def extract_body(content : String) : String

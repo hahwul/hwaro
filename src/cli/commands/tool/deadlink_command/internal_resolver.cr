@@ -21,8 +21,22 @@ module Hwaro
           private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, oracle : Utils::BuildOutput::Oracle = Utils::BuildOutput.oracle("public", tool: "check-links")) : Array(Result)
             results = [] of Result
             project_root = Utils::PathUtils.find_project_root(content_dir)
+            link_index : Services::InternalLinkIndex? = nil
 
             links.each do |link|
+              # `@/` page links resolve exactly as the build resolves them:
+              # the raw (never percent-decoded) content path looked up among
+              # the pages a default build publishes. `@/` images are plain
+              # files under content/ and take the path route below.
+              if link.kind != :image && (key = Services::InternalLinkIndex.key(link.url))
+                index = link_index ||= Services::InternalLinkIndex.new(content_dir)
+                if reason = index.unresolved_reason(key)
+                  error = reason == "not found" ? "Internal link target not found" : "Internal link not resolved by the build: #{Services::InternalLinkIndex.describe(reason)}"
+                  results << Result.new(link: link, status: -1, error: error)
+                end
+                next
+              end
+
               decoded_url = URI.decode(link.url)
               resolved_url = decoded_url
               if resolved_url.starts_with?("/") && !base_path.empty?
@@ -367,13 +381,6 @@ module Hwaro
                                 project_root : String, taxonomy_names : Array(String),
                                 oracle : Utils::BuildOutput::Oracle) : Bool
             target = content_target(url, content_dir, base_dir)
-            if url.starts_with?("@/") && link.kind != :image
-              # The build's InternalLinkResolver resolves `@/` against the
-              # exact content path in its page map. Treating `@/target` like a
-              # route and guessing `.md`/`.markdown` made check-links call a
-              # link healthy even though the build left it unresolved.
-              return File.file?(target) && Services::ContentWalk.markdown?(target)
-            end
 
             # Most internal URLs are written with a trailing slash (`/about/`,
             # `/posts/hello/`) — strip it before computing the leaf-file
