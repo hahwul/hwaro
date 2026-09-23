@@ -35,6 +35,20 @@ module Hwaro
       @entries = [] of ScaffoldEntry
       @target_path : String? = nil
 
+      # One planned scaffold write (`content` nil for a directory). Every
+      # `create_file`/`create_directory` call is queued here and only
+      # performed by `commit_scaffold!` once all destinations have been
+      # checked, so a refused destination leaves the target untouched instead
+      # of half-scaffolded.
+      private record PlannedWrite, path : String, content : String?
+
+      @planned = [] of PlannedWrite
+
+      # Directories the plan will create (and their ancestors), so
+      # `write_files` skips re-planning a parent exactly as it skipped
+      # `create_directory` when the parent already existed on disk.
+      @planned_dirs = Set(String).new
+
       def run(options : Config::Options::InitOptions)
         scaffold = if remote = options.scaffold_remote
                      Scaffolds::Remote.new(remote)
@@ -92,6 +106,8 @@ module Hwaro
         from_wizard : Bool = false,
       )
         @target_path = target_path
+        @planned.clear
+        @planned_dirs.clear
 
         if clean && Dir.exists?(target_path) && !Dir.empty?(target_path)
           clean_target(target_path)
@@ -229,6 +245,8 @@ module Hwaro
           create_file(File.join(target_path, "AGENTS.md"), agents_content)
         end
 
+        commit_scaffold!
+
         # Auto-add missing optional config sections (commented out).
         # Only for built-in scaffolds + full_config (remote provides its own config).
         if full_config && !scaffold.is_a?(Scaffolds::Remote)
@@ -346,7 +364,7 @@ module Hwaro
         files.each do |relative_path, content|
           full_path = File.join(base_dir, relative_path)
           dir_path = File.dirname(full_path)
-          create_directory(dir_path) unless Dir.exists?(dir_path)
+          create_directory(dir_path) unless Dir.exists?(dir_path) || @planned_dirs.includes?(dir_path)
           create_file(full_path, content)
         end
       end
@@ -456,25 +474,49 @@ module Hwaro
       end
 
       private def create_directory(path : String)
-        ensure_scaffold_path_within_target!(path)
-        if Dir.exists?(path)
-          @entries << ScaffoldEntry.new(:exist, path, dir: true)
-        else
-          Hwaro::Utils::FileSafe.mkdir_p(path)
-          @created_count += 1
-          @entries << ScaffoldEntry.new(:create, path, dir: true)
+        @planned << PlannedWrite.new(path, nil)
+        dir = path
+        while @planned_dirs.add?(dir)
+          parent = File.dirname(dir)
+          break if parent == dir
+          dir = parent
         end
       end
 
       private def create_file(path : String, content : String)
-        ensure_scaffold_path_within_target!(path)
-        if File.exists?(path)
-          @entries << ScaffoldEntry.new(:exist, path, dir: false)
-        else
-          File.write(path, content)
-          @created_count += 1
-          @entries << ScaffoldEntry.new(:create, path, dir: false)
+        @planned << PlannedWrite.new(path, content)
+      end
+
+      # Check every planned destination, then perform the writes. Something
+      # already present is kept as-is (never overwritten), so it needs no
+      # boundary check: `init --force` on a project whose `templates/` links
+      # to a shared theme elsewhere must still succeed when nothing new would
+      # be written through that link. Only destinations that would be created
+      # must resolve within the target.
+      private def commit_scaffold! : Nil
+        @planned.each do |write|
+          present = write.content ? File.exists?(write.path) : Dir.exists?(write.path)
+          ensure_scaffold_path_within_target!(write.path) unless present
         end
+
+        @planned.each do |write|
+          if content = write.content
+            if File.exists?(write.path)
+              @entries << ScaffoldEntry.new(:exist, write.path, dir: false)
+            else
+              File.write(write.path, content)
+              @created_count += 1
+              @entries << ScaffoldEntry.new(:create, write.path, dir: false)
+            end
+          elsif Dir.exists?(write.path)
+            @entries << ScaffoldEntry.new(:exist, write.path, dir: true)
+          else
+            Hwaro::Utils::FileSafe.mkdir_p(write.path)
+            @created_count += 1
+            @entries << ScaffoldEntry.new(:create, write.path, dir: true)
+          end
+        end
+        @planned.clear
       end
 
       private def ensure_scaffold_path_within_target!(path : String) : Nil

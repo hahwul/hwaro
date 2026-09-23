@@ -143,7 +143,11 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | -q, --quiet | Suppress info output and the banner (errors still go to stderr) |
 | -j, --json | Emit machine-readable JSON output: the scaffold list with `--list-scaffolds`, otherwise a `{"status","path","scaffold","files_created"}` result |
 
-`init` rejects scaffold paths that resolve outside the target directory through a symlink.
+`init` refuses to create scaffold files or directories that would resolve outside the target
+directory through a symlink, and checks every destination before writing, so a refused run
+leaves the target untouched. Existing entries are kept as they are, so `init --force` still
+works when, for example, `templates/` links to a shared theme elsewhere and nothing new would
+be written through it.
 
 ### new
 
