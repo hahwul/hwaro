@@ -115,6 +115,7 @@ hwaro tool export hugo --verbose
 출력 규칙:
 - 일반 글은 `_posts/`에 `YYYY-MM-DD-slug.md` 파일명으로 저장
 - 초안 글은 날짜 접두사 없이 `_drafts/`에 저장
+- `redirect_from`은 Jekyll `_config.yml`의 `plugins:`에서 [jekyll-redirect-from](https://github.com/jekyll/jekyll-redirect-from) 플러그인을 켰을 때만 리다이렉트됩니다(GitHub Pages에서는 허용 목록에 있을 뿐 기본으로 켜져 있지 않음)
 - 섹션 인덱스 파일(`_index.md`)은 `index.md` 페이지로 변환
 - 프론트 매터는 TOML, YAML, JSON에서 YAML(`---`)로 변환
 - `[taxonomies]` 테이블은 최상위 키로 승격됩니다. Hugo도 Jekyll도 중첩 테이블에서

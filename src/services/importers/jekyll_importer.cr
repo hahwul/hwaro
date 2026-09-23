@@ -132,7 +132,8 @@ module Hwaro
               apply_source_url(fields, permalink.as_s?, file_info[:path])
             end
 
-            # jekyll-redirect-from (a GitHub Pages default plugin): each
+            # jekyll-redirect-from (allow-listed on GitHub Pages, enabled under
+            # `plugins:`): each
             # `redirect_from` address is a redirect to this page — hwaro's
             # `aliases`. Dropping them broke every old link the site kept
             # alive on purpose.

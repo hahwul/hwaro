@@ -115,6 +115,7 @@ Output structure preserves the original directory layout under `export/content/`
 Output conventions:
 - Regular posts go to `_posts/` with `YYYY-MM-DD-slug.md` filename
 - Draft posts go to `_drafts/` without date prefix
+- `redirect_from` only redirects when the [jekyll-redirect-from](https://github.com/jekyll/jekyll-redirect-from) plugin is enabled under `plugins:` in the Jekyll `_config.yml` (it is allow-listed, not on by default, on GitHub Pages)
 - Section index files (`_index.md`) become `index.md` pages
 - Frontmatter is converted from TOML, YAML, or JSON to YAML (`---`)
 - A `[taxonomies]` table is hoisted to top-level keys, since neither Hugo nor

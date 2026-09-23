@@ -756,8 +756,9 @@ describe "Jekyll import: published addresses" do
 end
 
 describe "Jekyll import: redirect_from" do
-  # Regression: jekyll-redirect-from addresses (a GitHub Pages default
-  # plugin) were dropped, so every deliberately kept old link broke.
+  # Regression: jekyll-redirect-from addresses (a widely used plugin,
+  # allow-listed on GitHub Pages) were dropped, so every deliberately kept
+  # old link broke.
   it "maps redirect_from to aliases" do
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "_posts"))
