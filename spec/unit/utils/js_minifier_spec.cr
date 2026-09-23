@@ -660,6 +660,16 @@ describe Hwaro::Utils::JsMinifier do
       Hwaro::Utils::JsMinifier.minify("var t = `${ s.replace(/[/]/g, '-') }` // c").should eq("var t = `${ s.replace(/[/]/g, '-') }`")
     end
 
+    # Regression: `#in`, `#new`, `#do`, ... are private class members, not
+    # keywords, but the keyword check only excluded a preceding `.`, so the
+    # division after `this.#in` opened a regex that swallowed the line.
+    it "treats a slash after a keyword-named private field as division" do
+      %w[in new do delete typeof return].each do |kw|
+        Hwaro::Utils::JsMinifier.minify("v = this.##{kw} / 2 // note\nw = 1").should eq("v = this.##{kw} / 2\nw = 1")
+      end
+      Hwaro::Utils::JsMinifier.minify("class A { #in = 4; h() { return this.#in / 2 / 1 } }\nok()").should contain("ok()")
+    end
+
     it "leaves a counterfeit out-of-range JSPL placeholder token intact" do
       # A real template literal makes protected_spans non-empty so the restore
       # gsub actually runs; the bogus \x00JSPL999\x00 token has an out-of-range

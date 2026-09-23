@@ -210,12 +210,14 @@ module Hwaro
       }
 
       # True when the identifier-like word ending at chars[last] is one of
-      # REGEX_PRECEDING_KEYWORDS and not a member name (`a.return`).
+      # REGEX_PRECEDING_KEYWORDS and not a member name (`a.return`) or a
+      # private class member (`this.#in`, `#new`).
       private def regex_keyword_before?(chars, last : Int32) : Bool
         start = last
         while start > 0 && (chars[start - 1].alphanumeric? || chars[start - 1] == '_' || chars[start - 1] == '$')
           start -= 1
         end
+        return false if start > 0 && chars[start - 1] == '#'
         size = last - start + 1
         return false if size > 10 # longer than any keyword above
         word = String.build(size) { |w| (start..last).each { |k| w << chars[k] } }
