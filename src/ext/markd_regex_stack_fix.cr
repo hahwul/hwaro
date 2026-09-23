@@ -9,6 +9,7 @@
 #   Rule::LINK_DESTINATION_BRACES  `(?:[^<>\t\n\\\x00]|ESC)*`
 #   Rule::LINK_TITLE       `"(ESC|[^"\x00])*"`, `'…'`, `\((ESC|[^)\x00])*\)`
 #   Rule::LINK_LABEL       `\[(?:[^\\\[\]]|ESC|\\){0,}\]`
+#   Rule::EMAIL_AUTO_LINK  the domain-label loop `(?:\.LABEL)*`
 #
 # PCRE2's JIT keeps one backtracking frame per repetition, so a long enough
 # line (an HTML tag with ~50k attributes, a 100k-character comment, a
@@ -23,8 +24,14 @@
 #   destination is forced by the characters it sees (an attribute starts with
 #   whitespace + a name character, which the tag's tail `\s*/?>` cannot use;
 #   the comment body steps over `-x` pairs; a lone `\` cannot be consumed in a
-#   braced destination at all), so giving iterations back only ever lands on a
-#   position where the rest of the pattern fails.
+#   braced destination at all; an email domain label starts with `.`), so
+#   giving iterations back only ever lands on a position where the rest of the
+#   pattern fails. The one exception is Unicode whitespace: Crystal compiles
+#   regexes with PCRE2 UCP, so markd's `\s` also matches U+00A0, U+3000, … —
+#   which an unquoted attribute value may contain, and upstream backtracks a
+#   value to end before one. So when the possessive tag regex fails on text
+#   holding such a character, upstream's own regex decides
+#   (`MarkdRegexStackFix.html_tag_length`, `.html_block_open?`).
 #
 # * A linear scanner for the title and label, where backtracking DOES matter:
 #   `(ESC|[^)])*\)` lets the regex split an escaped `\)` back into `\` + `)`,
@@ -76,7 +83,7 @@ module Hwaro
     # Anchored copies of the other `^`-rules `Inline#match` is called with.
     ANCHORED = {
       Markd::Rule::ESCAPABLE           => anchored(Markd::Rule::ESCAPABLE),
-      Markd::Rule::EMAIL_AUTO_LINK     => anchored(Markd::Rule::EMAIL_AUTO_LINK),
+      Markd::Rule::EMAIL_AUTO_LINK     => EMAIL_AUTO_LINK,
       Markd::Rule::AUTO_LINK           => anchored(Markd::Rule::AUTO_LINK),
       Markd::Rule::NUMERIC_HTML_ENTITY => anchored(Markd::Rule::NUMERIC_HTML_ENTITY),
     }
@@ -86,6 +93,72 @@ module Hwaro
       Regex.new(regex.source.lchop('^'), regex.options | Regex::Options::ANCHORED)
     end
 
+    # Rule::EMAIL_AUTO_LINK with its domain-label loop possessive: every
+    # iteration starts with `.`, and giving one back (or shortening its label)
+    # leaves a `.` or an alphanumeric where the closing `>` must be, so
+    # backtracking can never produce a match.
+    EMAIL_AUTO_LINK = Regex.new(
+      "<([a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" \
+      "(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*+)>",
+      Regex::Options::ANCHORED)
+
+    # Upstream's own tag regexes, for the fallback below.
+    UPSTREAM_HTML_TAG = anchored(Markd::Rule::HTML_TAG)
+
+    # A whitespace character outside ASCII. Crystal compiles regexes with
+    # PCRE2 UCP, so markd's `\s` also matches U+00A0, U+3000, U+2000–U+200A,
+    # U+202F, U+205F, U+1680, U+0085, U+2028 and U+2029 — and an unquoted
+    # attribute value may contain those characters too.
+    NON_ASCII_SPACE = /(?=[^\x00-\x7F])\s/
+
+    def self.non_ascii_space?(text : String) : Bool
+      NON_ASCII_SPACE.matches?(text)
+    end
+
+    # Match `regex` at byte `pos` of `text` without copying it. PCRE2 checks
+    # the WHOLE subject for valid UTF-8 on every call unless told not to, so
+    # matching in place once per bracket was still quadratic on a long line;
+    # `valid` (the caller checked `text.valid_encoding?` once) lets it skip
+    # that check. Invalid text keeps the check, and PCRE2's own error for it.
+    def self.match_at(regex : Regex, text : String, pos : Int32, valid : Bool) : Regex::MatchData?
+      options = valid ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
+      regex.match_at_byte_index(text, pos, options)
+    end
+
+    # Byte length of the HTML tag at `pos`, exactly as Rule::HTML_TAG reads it.
+    #
+    # The possessive fast path takes the greedy path upstream tries first, so
+    # when it matches, upstream matches the same text. It can only miss a tag
+    # upstream finds by backtracking an unquoted value to end before a
+    # NON-ASCII `\s` character (the only whitespace a value can contain), so
+    # just then upstream's regex decides. `ucp` is whether the text contains
+    # such a character (callers cache it per paragraph). A fallback that still
+    # exhausts the JIT stack reads as "no tag", where upstream crashed.
+    def self.html_tag_length(text : String, pos : Int32, ucp : Bool = non_ascii_space?(text),
+                             valid : Bool = text.valid_encoding?) : Int32?
+      if m = match_at(HTML_TAG, text, pos, valid)
+        return m.byte_end(0) - pos
+      end
+      return unless ucp
+      begin
+        match_at(UPSTREAM_HTML_TAG, text, pos, valid).try { |upstream| upstream.byte_end(0) - pos }
+      rescue Regex::Error
+        nil
+      end
+    end
+
+    # Whether `line` opens a type-7 HTML block, exactly as the last
+    # Rule::HTML_BLOCK_OPEN pattern decides (same fast path and fallback).
+    def self.html_block_open?(line : String) : Bool
+      return true if line.matches?(HTML_BLOCK_OPEN.last)
+      return false unless non_ascii_space?(line)
+      begin
+        line.matches?(Markd::Rule::HTML_BLOCK_OPEN.last)
+      rescue Regex::Error
+        false
+      end
+    end
+
     # CommonMark's escapable ASCII punctuation (Rule::ESCAPABLE_STRING).
     ESCAPABLE_BYTES = Set(UInt8).new(%q(!"#$%&'()*+,./:;<=>?@[\]^_`{|}~-).bytes)
 
@@ -93,49 +166,53 @@ module Hwaro
     # match the upstream `open (ESC | body)* close` regex produces, including
     # its backtracking — or nil when there is none. `stops` are the bytes the
     # body cannot contain besides `close` (NUL for titles, `[` for labels).
-    #
-    # The regex's search order at each position `p` between iterations is:
-    # a `\X` escape pair (X escapable), then a single body byte (a `\` is
-    # always one), and only when no further iteration succeeds, the closer.
-    # So its result from `p` depends only on its results from `p + 1` and
-    # `p + 2`, and one backward pass computes it with no recursion and no
-    # stack. The pass only needs to reach the first `close`/`stops` byte that
-    # is NOT preceded by `\`: no parse can step past that byte, so nothing
-    # beyond it can affect the match. That bounds the work by the length of
-    # the text the regex itself had to walk.
     def self.bracketed_length(text : String, pos : Int32, close : UInt8, stops : Tuple) : Int32?
+      bracketed_length(bracketed_table(text, close, stops), pos)
+    end
+
+    def self.bracketed_length(table : Array(Int32), pos : Int32) : Int32?
+      finish = table[pos + 1]? || -1
+      finish < 0 ? nil : finish - pos
+    end
+
+    # For every position `p`, where the regex's body loop, entered at `p`,
+    # finally matches the closer (the index just past it), or -1 for no match.
+    # The result for a bracket opening at `pos` is `table[pos + 1]`, and it
+    # does not depend on `pos` itself — so one table answers every attempt in
+    # a paragraph, and a line of thousands of unclosed titles costs one pass
+    # instead of one pass per title.
+    #
+    # The regex's search order at each position is: a `\X` escape pair (X
+    # escapable), then a single body byte (a `\` is always one), and only
+    # when no further iteration succeeds, the closer. So the result at `p`
+    # depends only on the results at `p + 1` and `p + 2`, and one backward
+    # pass computes all of them with no recursion and no stack. A `close` or
+    # `stops` byte NOT preceded by `\` is where every parse stops: the loop
+    # cannot step over it, so the result there is the closer or nothing.
+    def self.bracketed_table(text : String, close : UInt8, stops : Tuple) : Array(Int32)
       bytes = text.to_slice
       size = bytes.size
-      limit = pos + 1
-      while limit < size
-        byte = bytes[limit]
-        break if (byte == close || stops.includes?(byte)) &&
-                 (limit == pos + 1 || bytes[limit - 1] != '\\'.ord || byte == 0_u8)
-        limit += 1
-      end
-      # The regex's result from `limit`: the closer ends it; a stop byte or the
-      # end of the text fails it.
-      at_next = limit < size && bytes[limit] == close ? limit + 1 : nil
-      at_after = nil.as(Int32?)
-      p = limit - 1
-      while p > pos
+      table = Array(Int32).new(size + 1, -1)
+      p = size - 1
+      while p >= 0
         byte = bytes[p]
-        result = nil.as(Int32?)
-        if byte == '\\'.ord
-          if p + 1 < size && ESCAPABLE_BYTES.includes?(bytes[p + 1])
-            # `at_after` is the result from `p + 2`, just past the pair.
-            result = at_after
+        special = byte == close || stops.includes?(byte)
+        if special && (p == 0 || bytes[p - 1] != '\\'.ord || byte == 0_u8)
+          table[p] = byte == close ? p + 1 : -1
+        else
+          result = -1
+          if byte == '\\'.ord
+            result = table[p + 2] if p + 1 < size && ESCAPABLE_BYTES.includes?(bytes[p + 1])
+            result = table[p + 1] if result < 0
+          elsif !special
+            result = table[p + 1]
           end
-          result ||= at_next
-        elsif byte != close && !stops.includes?(byte)
-          result = at_next
+          result = p + 1 if result < 0 && byte == close
+          table[p] = result
         end
-        result ||= p + 1 if byte == close
-        at_after = at_next
-        at_next = result
         p -= 1
       end
-      at_next.try { |end_index| end_index - pos }
+      table
     end
   end
 end
@@ -158,14 +235,18 @@ module Markd::Parser
         end
         return
       end
-      if match = regex.match_at_byte_index(@text, @pos)
+      if match = Hwaro::MarkdRegexStackFix.match_at(regex, @text, @pos, false)
         @pos = match.byte_end(0)
         match[0]
       end
     end
 
     private def html_tag(node : Node)
-      if text = match(Hwaro::MarkdRegexStackFix::HTML_TAG)
+      memo = hwaro_memo
+      length = Hwaro::MarkdRegexStackFix.html_tag_length(@text, @pos, memo.ucp, false)
+      text = length.try { |len| @text.byte_slice(@pos, len) }
+      @pos += length if length
+      if text
         child = Node.new(Node::Type::HTMLInline)
         child.text = text
         node.append_child(child)
@@ -249,6 +330,35 @@ module Markd::Parser
     # `link_destination`).
     @hwaro_in_reference = false
 
+    # Per-paragraph facts the patched methods reuse across attempts, rebuilt
+    # whenever the parser moves to a new `@text`.
+    class HwaroMemo
+      getter text : String
+      getter tables = {} of Char => Array(Int32)
+      getter ucp : Bool
+      getter valid : Bool
+      getter last_dest_stop : Int32
+
+      def initialize(@text : String)
+        @valid = @text.valid_encoding?
+        @ucp = @valid && Hwaro::MarkdRegexStackFix.non_ascii_space?(@text)
+        bytes = @text.to_slice
+        stop = bytes.size - 1
+        while stop >= 0 && !(bytes[stop].unsafe_chr.ascii_whitespace? || bytes[stop] == ')'.ord)
+          stop -= 1
+        end
+        @last_dest_stop = stop
+      end
+    end
+
+    @hwaro_memo : HwaroMemo? = nil
+
+    private def hwaro_memo : HwaroMemo
+      memo = @hwaro_memo
+      return memo if memo && memo.text.same?(@text)
+      @hwaro_memo = HwaroMemo.new(@text)
+    end
+
     def reference(text : String, refmap)
       @hwaro_in_reference = true
       previous_def
@@ -266,7 +376,8 @@ module Markd::Rule
         block_type_size = Hwaro::MarkdRegexStackFix::HTML_BLOCK_OPEN.size - 1
 
         Hwaro::MarkdRegexStackFix::HTML_BLOCK_OPEN.each_with_index do |regex, index|
-          if text.match(regex) &&
+          opens = index < block_type_size ? text.matches?(regex) : Hwaro::MarkdRegexStackFix.html_block_open?(text)
+          if opens &&
              (index < block_type_size || !container.type.paragraph?)
             parser.close_unmatched_blocks
             # We don't adjust parser.offset;

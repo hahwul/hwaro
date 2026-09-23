@@ -25,7 +25,7 @@ end
 
 describe Hwaro::MarkdRegexStackFix do
   describe "equivalence with the upstream regexes (short input)" do
-    title_alphabet = ["\\", ")", "(", "\"", "'", "a", " ", "\\)", "\\\"", "\\'", "\\\\", "\u0000", "\n", "é"]
+    title_alphabet = ["\\", ")", "(", "\"", "'", "a", " ", "\\)", "\\\"", "\\'", "\\\\", "\u0000", "\n", "é", "\u00A0", "\u3000", "\u2003", "\u202F", "\u0085", "\u2028", "\u1680", "\u205F"]
 
     it "scans link titles exactly like Rule::LINK_TITLE" do
       {'"' => '"', '\'' => '\'', '(' => ')'}.each do |open, close|
@@ -47,21 +47,19 @@ describe Hwaro::MarkdRegexStackFix do
     end
 
     it "matches HTML tags exactly like Rule::HTML_TAG" do
-      tag_alphabet = ["<", ">", "/", "a", "b", "=", "\"", "'", " ", "-", "!", "--", "x=", "=\"v\"", "='v'", "=v", "\n", "`"]
+      tag_alphabet = ["<", ">", "/", "a", "b", "=", "\"", "'", " ", "-", "!", "--", "x=", "=\"v\"", "='v'", "=v", "\n", "`", "\u00A0", "\u3000", "\u2003", "\u202F", "\u0085", "\u2028", "\u1680", "\u205F"]
       random_strings(11, tag_alphabet).each do |body|
         ["<a#{body}", "<!--#{body}", "</a#{body}", "<#{body}"].each do |text|
-          ours = Fix::HTML_TAG.match_at_byte_index(text, 0).try(&.[0].bytesize)
-          ours.should eq(upstream_length(Markd::Rule::HTML_TAG, text)), "tag #{text.inspect}"
+          Fix.html_tag_length(text, 0).should eq(upstream_length(Markd::Rule::HTML_TAG, text)), "tag #{text.inspect}"
         end
       end
     end
 
     it "matches the type-7 HTML block opener exactly like upstream" do
-      block_alphabet = ["<", ">", "/", "a", "=", "\"", " ", "x=", "=\"v\"", "=v", "\t", "-"]
+      block_alphabet = ["<", ">", "/", "a", "=", "\"", " ", "x=", "=\"v\"", "=v", "\t", "-", "\u00A0", "\u3000", "\u2003", "\u202F", "\u0085", "\u2028", "\u1680", "\u205F"]
       random_strings(13, block_alphabet).each do |body|
         ["<a#{body}", "</a#{body}"].each do |text|
-          ours = !!text.match(Fix::HTML_BLOCK_OPEN.last)
-          ours.should eq(!!text.match(Markd::Rule::HTML_BLOCK_OPEN.last)), "block #{text.inspect}"
+          Fix.html_block_open?(text).should eq(!!text.match(Markd::Rule::HTML_BLOCK_OPEN.last)), "block #{text.inspect}"
         end
       end
     end
@@ -72,6 +70,28 @@ describe Hwaro::MarkdRegexStackFix do
         text = "<#{body}"
         ours = Fix::LINK_DESTINATION_BRACES.match_at_byte_index(text, 0).try(&.[0].bytesize)
         ours.should eq(upstream_length(Markd::Rule::LINK_DESTINATION_BRACES, text)), "dest #{text.inspect}"
+      end
+    end
+
+    # PCRE2 runs markd's regexes with UCP, so `\s` also matches U+00A0,
+    # U+3000, U+2000–U+200A, … — characters an unquoted attribute value may
+    # also contain. Upstream backtracks the value to end before one so it can
+    # start the next attribute; a possessive loop alone cannot.
+    it "keeps upstream's reading of attributes separated by Unicode spaces" do
+      ["<span title=a\u00A0class=b>", "<a b=x\u3000c='>'>", "<img src=a.png\u3000alt=x>", "<a href=/p\u2003title=\"t\">"].each do |tag|
+        Fix.html_tag_length(tag, 0).should eq(upstream_length(Markd::Rule::HTML_TAG, tag))
+        Fix.html_block_open?(tag).should eq(!!tag.match(Markd::Rule::HTML_BLOCK_OPEN.last))
+      end
+      Markd.to_html("x <span title=a\u00A0class=b>y</span>\n").should contain("<span title=a\u00A0class=b>")
+      Markd.to_html("<img src=a.png\u3000alt=x>\n").should eq("<img src=a.png\u3000alt=x>\n")
+    end
+
+    it "matches email autolinks exactly like Rule::EMAIL_AUTO_LINK" do
+      email_alphabet = ["a", "b", "1", "-", ".", "@", ">", "_", "+", "<", " "]
+      random_strings(19, email_alphabet).each do |body|
+        text = "<#{body}"
+        ours = Fix::EMAIL_AUTO_LINK.match_at_byte_index(text, 0).try(&.[0].bytesize)
+        ours.should eq(upstream_length(Markd::Rule::EMAIL_AUTO_LINK, text)), "email #{text.inspect}"
       end
     end
 
@@ -106,6 +126,10 @@ describe Hwaro::MarkdRegexStackFix do
 
     it "renders a long run of unclosed links in linear-ish time" do
       render_within("[a](" * 16000 + "\n", 10.0).should start_with("<p>")
+    end
+
+    it "renders a very long email-like autolink without a JIT stack error" do
+      render_within("<a@" + "b." * 100000 + "c>\n", 10.0).should start_with("<p>")
     end
   end
 end
