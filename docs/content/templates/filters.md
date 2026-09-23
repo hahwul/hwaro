@@ -62,7 +62,7 @@ same text renders in page bodies. The rest of the extension pipeline
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| unique | Remove duplicates | {{ items \| unique }} |
+| unique | Remove duplicates while keeping distinct value types | {{ items \| unique }} |
 | flatten | Flatten nested arrays | {{ nested \| flatten }} |
 | compact | Remove nil/empty values | {{ items \| compact }} |
 
@@ -109,7 +109,7 @@ Both sides are normalized to one trailing slash before comparing, so `/posts` an
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| default | Fallback value | {{ value \| default(value="N/A") }} |
+| default | Fallback value, preserving the fallback's type | {{ value \| default(value="N/A") }} |
 | jsonify | JSON encode | {{ data \| jsonify }} |
 | date | Format date | {{ page.date \| date("%Y-%m-%d") }} |
 

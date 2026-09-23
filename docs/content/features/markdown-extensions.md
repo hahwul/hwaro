@@ -57,6 +57,8 @@ Render checkboxes in lists.
 - [X] Also completed (case-insensitive)
 ```
 
+Task markers are also converted inside blockquotes, such as `> - [ ] A quoted task`.
+
 ### Output
 
 ```html
@@ -264,7 +266,7 @@ Formula: x<sub>2</sub> + y<sup>2</sup> = z<sub>n</sub></p>
 A pandoc-style attribute block on a heading or inline image, a
 generalization of the [custom heading ID](/writing/pages/#custom-heading-ids)
 shorthand that also sets classes and arbitrary attributes, and extends to
-images.
+images. Heading attributes also work on headings inside blockquotes.
 
 ### Syntax
 
@@ -320,6 +322,8 @@ and three dots become their typographic forms:
 | `...` | … (ellipsis) |
 
 Code spans, code blocks, raw HTML, and math bodies are never rewritten.
+Raw HTML code blocks such as `<pre>`, `<script>`, `<style>`, and `<textarea>`
+also keep their contents literal during markdown extension processing.
 Table cells, definition bodies, and footnote bodies are pre-rendered
 HTML, so smart punctuation does not apply inside them. The `markdownify`
 template filter follows the site's setting.
@@ -373,6 +377,8 @@ Links that already carry a `target=` keep it, and `rel` tokens merge
 into an existing `rel` attribute without duplicating, so a
 render-link hook's explicit choices win. The policy applies to every
 absolute http(s) link, including ones pointing at your own domain.
+Raw HTML anchors are covered regardless of attribute-name case or whether
+their attributes use single or double quotes.
 
 ## Multi-line Footnotes and Definitions
 

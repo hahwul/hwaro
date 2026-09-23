@@ -62,7 +62,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
-| unique | 중복 제거 | {{ items \| unique }} |
+| unique | 서로 다른 값의 타입은 구분해 중복 제거 | {{ items \| unique }} |
 | flatten | 중첩 배열 평탄화 | {{ nested \| flatten }} |
 | compact | nil/빈 값 제거 | {{ items \| compact }} |
 
@@ -109,7 +109,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
-| default | 폴백 값 | {{ value \| default(value="N/A") }} |
+| default | 폴백 값(원래 타입 유지) | {{ value \| default(value="N/A") }} |
 | jsonify | JSON 인코딩 | {{ data \| jsonify }} |
 | date | 날짜 포맷 | {{ page.date \| date("%Y-%m-%d") }} |
 
