@@ -35,7 +35,7 @@ hwaro tool validate --json
 
 - Missing `title` in frontmatter
 - Missing `description` in frontmatter
-- Images without alt text (`![](url)`)
+- Markdown images with empty alt text and raw HTML `<img>` elements with missing or empty `alt` attributes
 - Broken internal links (`@/` prefixed paths that don't resolve)
 - Frontmatter parse errors (TOML/YAML/JSON)
 - Invalid date formats

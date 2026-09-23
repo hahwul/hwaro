@@ -35,7 +35,7 @@ hwaro tool validate --json
 
 - 프론트 매터에 `title` 누락
 - 프론트 매터에 `description` 누락
-- 대체 텍스트가 없는 이미지 (`![](url)`)
+- 대체 텍스트가 비어 있는 Markdown 이미지와 `alt` 속성이 없거나 비어 있는 원시 HTML `<img>` 요소
 - 깨진 내부 링크 (해석되지 않는 `@/` 접두사 경로)
 - 프론트 매터 파싱 오류 (TOML/YAML/JSON)
 - 유효하지 않은 날짜 형식

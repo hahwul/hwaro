@@ -306,6 +306,16 @@ module Hwaro
           issues << Issue.new(id: "content-alt-text-missing", level: :warning, category: "content", file: file_path,
             message: "Image missing alt text: #{match[0]}")
         end
+
+        body.scan(/<img(?:\s[^>]*)?\s*\/?>/i) do |match|
+          tag = match[0]
+          alt_match = tag.match(/(?:\A|\s)alt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i)
+          alt = alt_match.try { |m| m[1]? || m[2]? || m[3]? }
+          next if alt && !alt.strip.empty?
+
+          issues << Issue.new(id: "content-alt-text-missing", level: :warning, category: "content", file: file_path,
+            message: "Image missing alt text: #{tag}")
+        end
       end
 
       # Check for broken internal links (@/ prefixed) in markdown body

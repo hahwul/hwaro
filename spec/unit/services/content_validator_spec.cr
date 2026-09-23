@@ -117,6 +117,46 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "detects missing alt text on rendered raw HTML images" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "html-image.md"), "---\ntitle: Post\ndescription: Desc\n---\n\n<img src=\"/photo.png\">\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+
+        issue = issues.find { |i| i.id == "content-alt-text-missing" }
+        issue.should_not be_nil
+        issue.not_nil!.message.should eq("Image missing alt text: <img src=\"/photo.png\">")
+      end
+    end
+
+    it "requires a non-empty alt attribute without scanning HTML code examples" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "html-images.md"), <<-MD
+          ---
+          title: Post
+          description: Desc
+          ---
+
+          <img src="/good.png" alt="A photo">
+          <img src="/empty.png" alt="">
+          <img src="/decoy.png" data-alt="Not an alt attribute">
+
+          ```html
+          <img src="/example.png">
+          ```
+          MD
+        )
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+
+        issues.count { |i| i.id == "content-alt-text-missing" }.should eq(2)
+      end
+    end
+
     it "ignores images with alt text in code blocks" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
