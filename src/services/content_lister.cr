@@ -61,11 +61,17 @@ module Hwaro
         # build publishes them; every content tool using this walker then
         # silently disagreed with the build.
         Dir.glob(File.join(content_dir, "**", "*")) do |file|
-          next unless MARKDOWN_EXTENSIONS.includes?(File.extname(file).downcase)
+          next unless markdown?(file)
           files << file if readable_file?(file)
         end
 
         files.sort
+      end
+
+      # True when `path` carries a Markdown page extension, compared
+      # case-insensitively like ReadContent's PAGE_EXTENSIONS check.
+      def markdown?(path : String) : Bool
+        MARKDOWN_EXTENSIONS.includes?(File.extname(path).downcase)
       end
 
       def readable_file?(path : String) : Bool

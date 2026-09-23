@@ -999,3 +999,50 @@ describe "check-links redirect and dedup behavior" do
     end
   end
 end
+
+private def dl_link(dir : String, url : String, kind : Symbol = :internal)
+  Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(file: File.join(dir, "source.md"), url: url, kind: kind)
+end
+
+private def dl_dead(dir : String, *urls : String) : Array(String)
+  links = urls.map { |url| dl_link(dir, url) }.to_a
+  Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.check_internal_links_for_test(links, dir).map(&.link.url)
+end
+
+# The build publishes `.MD` / `.MARKDOWN` sources (ReadContent downcases the
+# extension); check-links used lowercase-only globs and probes.
+describe "check-links uppercase Markdown extensions" do
+  it "scans .MD and .MARKDOWN files for internal and external links" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "upper.MD"), "[a](/missing-one/) [x](https://one.example.com)")
+      File.write(File.join(dir, "upper.MARKDOWN"), "[b](/missing-two/) [y](https://two.example.com)")
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.find_internal_links_for_test(dir).map(&.url).sort!.should eq(["/missing-one/", "/missing-two/"])
+      cmd.find_links_for_test(dir).map(&.url).sort!.should eq(["https://one.example.com", "https://two.example.com"])
+    end
+  end
+
+  it "counts uppercase-extension pages when bounding a section's pagination" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "sec"))
+      File.write(File.join(dir, "sec", "_index.md"), "+++\ntitle = \"S\"\npaginate_by = 1\n+++\n")
+      File.write(File.join(dir, "sec", "a.md"), "a")
+      File.write(File.join(dir, "sec", "b.MD"), "b")
+      File.write(File.join(dir, "sec", "c.MARKDOWN"), "c")
+
+      dl_dead(dir, "/sec/page/3/").should be_empty
+      dl_dead(dir, "/sec/page/4/").should eq(["/sec/page/4/"])
+    end
+  end
+
+  it "resolves a route whose source uses an uppercase extension" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "sec", "bundle"))
+      File.write(File.join(dir, "sec", "leaf.MD"), "leaf")
+      File.write(File.join(dir, "sec", "bundle", "index.MARKDOWN"), "bundle")
+
+      dl_dead(dir, "/sec/leaf/", "/sec/bundle/").should be_empty
+    end
+  end
+end

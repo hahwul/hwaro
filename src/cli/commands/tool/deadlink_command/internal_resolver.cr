@@ -191,6 +191,8 @@ module Hwaro
           # Every `_index*` in the directory counts, not just `_index.md`:
           # a multilingual section may declare the flag only in
           # `_index.ko.md`, and `/ko/posts/rss.xml` is a real route then.
+          # The glob stays case-sensitive on purpose: see
+          # SECTION_INDEX_EXTENSIONS.
           private def section_generates_feeds?(dir : String) : Bool
             Dir.glob(File.join(dir, "_index*.{md,markdown}")).any? do |path|
               frontmatter_flag?(path, "generate_feeds")
@@ -265,15 +267,24 @@ module Hwaro
           end
 
           # Upper bound on the pages a section can paginate: every Markdown
-          # descendant that is not itself a section index.
+          # descendant that is not itself a section index. Extensions match
+          # case-insensitively (the build publishes `post.MD`); only a
+          # lowercase-extension `_index` is a section in the build, so an
+          # `_index.MD` still counts as a page.
           private def section_page_count(dir : String) : Int32
             count = 0
-            Dir.glob(File.join(dir, "**", "*.{md,markdown}")) do |path|
-              next if File.basename(path).starts_with?("_index.")
+            Dir.glob(File.join(dir, "**", "*")) do |path|
+              next unless Services::ContentWalk.markdown?(path)
+              next if File.basename(path).starts_with?("_index.") && SECTION_INDEX_EXTENSIONS.includes?(File.extname(path))
               count += 1
             end
             count
           end
+
+          # ReadContent recognizes a section index only when the extension is
+          # already lowercase (`_index.md`); `_index.MD` builds as a plain
+          # page. Section probes (feeds, pagination) keep that exact match.
+          SECTION_INDEX_EXTENSIONS = {".md", ".markdown"}
 
           # Path of the `_index` file backing a section URL, if any.
           private def section_index_path(url : String, content_dir : String, base_dir : String) : String?
@@ -361,7 +372,7 @@ module Hwaro
               # exact content path in its page map. Treating `@/target` like a
               # route and guessing `.md`/`.markdown` made check-links call a
               # link healthy even though the build left it unresolved.
-              return File.file?(target) && CONTENT_PAGE_EXTENSIONS.includes?(File.extname(target).downcase)
+              return File.file?(target) && Services::ContentWalk.markdown?(target)
             end
 
             # Most internal URLs are written with a trailing slash (`/about/`,
@@ -372,12 +383,9 @@ module Hwaro
             target_no_slash = target.rstrip("/")
 
             return true if File.exists?(target) ||
-                           File.exists?(target_no_slash + ".md") ||
-                           File.exists?(target_no_slash + ".markdown") ||
-                           File.exists?(File.join(target_no_slash, "_index.md")) ||
-                           File.exists?(File.join(target_no_slash, "_index.markdown")) ||
-                           File.exists?(File.join(target_no_slash, "index.md")) ||
-                           File.exists?(File.join(target_no_slash, "index.markdown")) ||
+                           markdown_source?(target_no_slash) ||
+                           markdown_source?(File.join(target_no_slash, "_index")) ||
+                           markdown_source?(File.join(target_no_slash, "index")) ||
                            (link.kind != :image && taxonomy_url?(url, taxonomy_names))
 
             # Also accept assets that live in static/ (source) or the build
@@ -394,8 +402,6 @@ module Hwaro
               oracle.exists?(asset_path)
           end
 
-          CONTENT_PAGE_EXTENSIONS = {".md", ".markdown"}
-
           # Language-qualified resolution for a `/<code>/…` URL whose literal
           # path did not resolve. Deliberately narrow: only a `.<code>` source
           # or a taxonomy route counts, never the default-language file.
@@ -404,13 +410,33 @@ module Hwaro
                                          taxonomy_names : Array(String)) : Bool
             target_no_slash = content_target(url, content_dir, base_dir).rstrip("/")
 
-            File.exists?("#{target_no_slash}.#{code}.md") ||
-              File.exists?("#{target_no_slash}.#{code}.markdown") ||
-              File.exists?(File.join(target_no_slash, "_index.#{code}.md")) ||
-              File.exists?(File.join(target_no_slash, "_index.#{code}.markdown")) ||
-              File.exists?(File.join(target_no_slash, "index.#{code}.md")) ||
-              File.exists?(File.join(target_no_slash, "index.#{code}.markdown")) ||
+            markdown_source?("#{target_no_slash}.#{code}") ||
+              markdown_source?(File.join(target_no_slash, "_index.#{code}")) ||
+              markdown_source?(File.join(target_no_slash, "index.#{code}")) ||
               (link.kind != :image && taxonomy_url?(url, taxonomy_names))
+          end
+
+          # True when `stem` plus a Markdown extension names a content file,
+          # the extension matched case-insensitively as ReadContent does:
+          # `content/leaf.MD` and `content/b/index.MARKDOWN` publish `/leaf/`
+          # and `/b/` like their lowercase twins. A directory's stems are
+          # listed once per run (see @markdown_stems).
+          private def markdown_source?(stem : String) : Bool
+            dir = File.dirname(stem)
+            stems = @markdown_stems.fetch(dir) do
+              found = Set(String).new
+              if Dir.exists?(dir)
+                Dir.each_child(dir) do |child|
+                  next unless Services::ContentWalk.markdown?(child)
+                  next unless File.exists?(File.join(dir, child))
+                  found << child[0, child.size - File.extname(child).size]
+                end
+              end
+              @markdown_stems[dir] = found
+            end
+            stems.includes?(File.basename(stem))
+          rescue File::Error
+            false
           end
 
           # Map a link destination onto a path under the content directory.

@@ -20,7 +20,7 @@ module Hwaro
             links = [] of Link
             link_regex = /!?\[[^\]]*?\]\(#{LINK_DEST.source}\)/
 
-            Dir.glob("#{dir}/**/*.{md,markdown}").each do |file|
+            markdown_files(dir).each do |file|
               content = readable_markdown(file) || next
               content.scan(link_regex) do |match|
                 url = clean_external_target(match[1])
@@ -52,6 +52,13 @@ module Hwaro
 
           private def external_url?(url : String) : Bool
             url.starts_with?("http://") || url.starts_with?("https://")
+          end
+
+          # Every Markdown source the build reads under `dir`: the shared
+          # content walker matches extensions case-insensitively, as
+          # ReadContent does, so `post.MD` and `post.MARKDOWN` are scanned too.
+          private def markdown_files(dir : String) : Array(String)
+            @markdown_files.fetch(dir) { @markdown_files[dir] = Services::ContentWalk.find_content_files(dir) }
           end
 
           private def readable_markdown(file : String) : String?
@@ -107,7 +114,7 @@ module Hwaro
             link_re = /(?<!!)\[([^\]]*)\]\(#{LINK_DEST.source}\)/
             image_re = /!\[([^\]]*)\]\(#{LINK_DEST.source}\)/
 
-            Dir.glob("#{dir}/**/*.{md,markdown}").each do |file|
+            markdown_files(dir).each do |file|
               content = readable_markdown(file) || next
 
               # Regular links (exclude images by using negative lookbehind)
