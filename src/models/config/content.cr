@@ -254,8 +254,8 @@ module Hwaro
           end
         end
 
-        if fields = fields_any.try(&.as_a?)
-          config.content_new.default_fields = fields.compact_map(&.as_s?)
+        if fields = fields_any
+          config.content_new.default_fields = string_or_array(fields)
         end
 
         if bundle = bundle_any.try(&.as_bool?)
@@ -309,8 +309,8 @@ module Hwaro
         # crashing `serve` watch rebuilds (the full build guards `limit <= 0`,
         # the incremental path did not — clamping fixes both uniformly).
         config.related.limit = int_value(s["limit"]?, config.related.limit).clamp(0, Int32::MAX)
-        if taxonomies = s["taxonomies"]?.try(&.as_a?)
-          config.related.taxonomies = taxonomies.compact_map(&.as_s?)
+        if taxonomies = s["taxonomies"]?
+          config.related.taxonomies = string_or_array(taxonomies)
         end
       end
 

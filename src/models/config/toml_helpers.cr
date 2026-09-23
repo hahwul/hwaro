@@ -232,7 +232,12 @@ module Hwaro
         val.try(&.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32)
       end
 
-      # Extracts a string-or-array TOML value into an Array(String).
+      # Extracts a string-or-array TOML value into an Array(String). Every
+      # string-list key goes through here, so `sections = "posts"` means
+      # `["posts"]` everywhere: several loaders used to read `as_a?` only and
+      # silently drop a single string — `[sitemap] exclude = "/private/"`
+      # left the private pages in the sitemap, `[amp] sections = "posts"`
+      # turned AMP on for every section, `hooks.pre = "npm ci"` never ran.
       private def self.string_or_array(raw : TOML::Any?) : Array(String)
         return [] of String unless raw
         raw.as_a?.try(&.compact_map(&.as_s?)) ||

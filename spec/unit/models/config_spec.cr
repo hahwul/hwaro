@@ -3011,6 +3011,65 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  # Several string-list keys read `as_a?` only and silently dropped a single
+  # string, in the worst direction: an exclude list became empty (private
+  # pages published) and a sections allowlist became "all sections".
+  describe "single-string list values" do
+    it "treats a single string as a one-element list for every string-list key" do
+      config = load_config(<<-TOML)
+        [build]
+        hooks.pre = "npm ci"
+        hooks.post = "echo done"
+        [sitemap]
+        exclude = "/private/"
+        [search]
+        fields = "title"
+        exclude = "/private"
+        [feeds]
+        sections = "posts"
+        [amp]
+        sections = "posts"
+        [pwa]
+        icons = "static/icon.png"
+        precache_urls = "/"
+        [related]
+        taxonomies = "categories"
+        [outputs]
+        sections = "posts"
+        [auto_includes]
+        dirs = "assets"
+        [plugins]
+        processors = "markdown"
+        [doctor]
+        ignore = "menu-undeclared"
+        [content.new]
+        default_fields = "summary"
+        [languages.ko]
+        taxonomies = "tags"
+        [[assets.bundles]]
+        name = "main.css"
+        files = "css/a.css"
+        TOML
+      config.build.hooks.pre.should eq(["npm ci"])
+      config.build.hooks.post.should eq(["echo done"])
+      config.sitemap.exclude.should eq(["/private/"])
+      config.search.fields.should eq(["title"])
+      config.search.exclude.should eq(["/private"])
+      config.feeds.sections.should eq(["posts"])
+      config.amp.sections.should eq(["posts"])
+      config.pwa.icons.should eq(["static/icon.png"])
+      config.pwa.precache_urls.should eq(["/"])
+      config.related.taxonomies.should eq(["categories"])
+      config.outputs.sections.should eq(["posts"])
+      config.auto_includes.dirs.should eq(["assets"])
+      config.plugins.processors.should eq(["markdown"])
+      config.doctor.ignore.should eq(["menu-undeclared"])
+      config.content_new.default_fields.should eq(["summary"])
+      config.languages["ko"].taxonomies.should eq(["tags"])
+      config.assets.bundles.first.files.should eq(["css/a.css"])
+    end
+  end
+
   describe "mistyped section warnings" do
     it "warns when a table section is given a scalar" do
       log = with_captured_log { load_config("sitemap = true\nhighlight = false") }

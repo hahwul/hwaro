@@ -7,6 +7,8 @@ toc = true
 
 All site configuration lives in `config.toml` at the project root.
 
+Any option documented as a list of strings also accepts a single string, which is read as a one-item list: `sections = "posts"` means `sections = ["posts"]`.
+
 Unknown top-level keys are reported instead of silently ignored. A typo'd
 `[markdonw]` or `titel = "…"` would otherwise disable a feature with no
 feedback. Hwaro warns with a suggestion when one is close to a real key:

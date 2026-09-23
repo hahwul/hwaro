@@ -54,11 +54,11 @@ module Hwaro
         config.search.format = s["format"]?.try(&.as_s?) || config.search.format
         config.search.filename = s["filename"]?.try(&.as_s?) || config.search.filename
         validate_output_filename!("search", "filename", config.search.filename, "search.json", allow_empty: false)
-        if fields = s["fields"]?.try(&.as_a?)
-          config.search.fields = fields.compact_map(&.as_s?)
+        if fields = s["fields"]?
+          config.search.fields = string_or_array(fields)
         end
-        if exclude_arr = s["exclude"]?.try(&.as_a?)
-          config.search.exclude = exclude_arr.compact_map(&.as_s?)
+        if exclude = s["exclude"]?
+          config.search.exclude = string_or_array(exclude)
         end
         config.search.tokenize_cjk = bool_value(s["tokenize_cjk"]?, config.search.tokenize_cjk)
         if shards_any = s["shards"]?

@@ -208,8 +208,8 @@ module Hwaro
       private def self.load_plugins(config : Config)
         return unless s = config.raw["plugins"]?.try(&.as_h?)
 
-        if processors = s["processors"]?.try(&.as_a?)
-          config.plugins.processors = processors.compact_map(&.as_s?)
+        if processors = s["processors"]?
+          config.plugins.processors = string_or_array(processors)
         end
       end
 
@@ -270,11 +270,11 @@ module Hwaro
         config.build.cache = build_bool_value(s, "cache")
 
         if hooks_section = s["hooks"]?.try(&.as_h?)
-          if pre_hooks = hooks_section["pre"]?.try(&.as_a?)
-            config.build.hooks.pre = pre_hooks.compact_map(&.as_s?)
+          if pre_hooks = hooks_section["pre"]?
+            config.build.hooks.pre = string_or_array(pre_hooks)
           end
-          if post_hooks = hooks_section["post"]?.try(&.as_a?)
-            config.build.hooks.post = post_hooks.compact_map(&.as_s?)
+          if post_hooks = hooks_section["post"]?
+            config.build.hooks.post = string_or_array(post_hooks)
           end
         end
       end
@@ -299,8 +299,8 @@ module Hwaro
       private def self.load_doctor(config : Config)
         return unless s = config.raw["doctor"]?.try(&.as_h?)
 
-        if ignore = s["ignore"]?.try(&.as_a?)
-          config.doctor.ignore = ignore.compact_map(&.as_s?)
+        if ignore = s["ignore"]?
+          config.doctor.ignore = string_or_array(ignore)
         end
       end
 
@@ -322,8 +322,8 @@ module Hwaro
         if section_any = s["section"]?
           config.outputs.section = validate_output_formats(string_or_array(section_any))
         end
-        if sections = s["sections"]?.try(&.as_a?)
-          config.outputs.sections = sections.compact_map(&.as_s?)
+        if sections = s["sections"]?
+          config.outputs.sections = string_or_array(sections)
         end
       end
 
