@@ -131,7 +131,7 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
-    it "requires a non-empty alt attribute without scanning HTML code examples" do
+    it "requires an alt attribute without scanning HTML code examples" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(content_dir)
@@ -153,7 +153,10 @@ describe Hwaro::Services::ContentValidator do
 
         issues = Hwaro::Services::ContentValidator.new(content_dir).run
 
-        issues.count { |i| i.id == "content-alt-text-missing" }.should eq(2)
+        # alt="" is a valid decorative image; only the data-alt decoy (no real
+        # alt attribute) is missing one.
+        alt_issues = issues.select { |i| i.id == "content-alt-text-missing" }
+        alt_issues.map(&.message).should eq([%(Image missing alt text: <img src="/decoy.png" data-alt="Not an alt attribute">)])
       end
     end
 
@@ -608,5 +611,79 @@ describe Hwaro::Services::ContentValidator do
         issues.any? { |i| i.id == "content-alt-text-missing" }.should be_false
       end
     end
+  end
+end
+
+private def validator_issues(body : String, files : Hash(String, String) = {} of String => String) : Array(Hwaro::Services::Issue)
+  issues = [] of Hwaro::Services::Issue
+  Dir.mktmpdir do |dir|
+    content_dir = File.join(dir, "content")
+    FileUtils.mkdir_p(content_dir)
+    files.each do |path, text|
+      full = File.join(content_dir, path)
+      FileUtils.mkdir_p(File.dirname(full))
+      File.write(full, text)
+    end
+    File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: Desc\n---\n\n#{body}\n")
+    issues = Hwaro::Services::ContentValidator.new(content_dir).run
+  end
+  issues.select { |i| i.file.try(&.ends_with?("source.md")) }
+end
+
+private def alt_messages(body : String) : Array(String)
+  validator_issues(body).select { |i| i.id == "content-alt-text-missing" }.map(&.message)
+end
+
+private def broken_links(body : String, files : Hash(String, String) = {} of String => String) : Array(String)
+  validator_issues(body, files).select { |i| i.id == "content-internal-link-broken" }.map(&.message)
+end
+
+describe "ContentValidator body scans ignore what the build does not render" do
+  it "ignores an <img> inside a single-line HTML comment" do
+    alt_messages(%(<!-- <img src="/old.png"> -->)).should be_empty
+  end
+
+  it "ignores an <img> inside a multi-line HTML comment" do
+    alt_messages(%(<!--\n<img src="/old.png">\n-->)).should be_empty
+  end
+
+  it "keeps an <img> written after a comment on the same line" do
+    alt_messages(%(<!-- note --> <img src="/real.png">)).should eq([%(Image missing alt text: <img src="/real.png">)])
+  end
+
+  it "ignores an <img> inside an indented code block" do
+    alt_messages(%(Example:\n\n    <img src="/example.png">\n)).should be_empty
+  end
+
+  it "still checks an indented list-item continuation (rendered as HTML)" do
+    alt_messages(%(- item\n    <img src="/listed.png">\n)).should eq([%(Image missing alt text: <img src="/listed.png">)])
+  end
+
+  it "ignores @/ links inside comments and indented code" do
+    broken_links("<!-- [x](@/gone.md) -->\n\nText:\n\n    [y](@/gone-too.md)\n").should be_empty
+  end
+end
+
+describe "ContentValidator raw HTML alt attribute" do
+  it "accepts an explicit decorative alt=\"\"" do
+    alt_messages(%(<img src="/spacer.png" alt="">)).should be_empty
+  end
+
+  it "accepts a bare alt attribute" do
+    alt_messages(%(<img src="/spacer.png" alt>)).should be_empty
+    alt_messages(%(<img alt src="/spacer.png">)).should be_empty
+    alt_messages(%(<img src="/spacer.png" alt/>)).should be_empty
+  end
+
+  it "matches the alt attribute name case-insensitively" do
+    alt_messages(%(<img src="/a.png" ALT="">)).should be_empty
+  end
+
+  it "does not mistake alt text inside another attribute's value for an alt attribute" do
+    alt_messages(%(<img src="/a.png" title="x alt=y">)).size.should eq(1)
+  end
+
+  it "still flags an empty Markdown image alt" do
+    alt_messages("![](/a.png)").should eq(["Image missing alt text: ![](/a.png)"])
   end
 end

@@ -12,6 +12,7 @@ require "./doctor"
 require "../utils/errors"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
+require "../utils/markdown_code"
 require "../utils/text_utils"
 
 module Hwaro
@@ -299,28 +300,41 @@ module Hwaro
         end
       end
 
-      # Check for images with empty alt text: ![](url)
+      # Markdown images with empty alt text (`![](url)`), and raw HTML
+      # `<img>` elements with no `alt` attribute at all. An explicit
+      # `alt=""` (or a bare `alt`) is the HTML/WCAG way to mark an image
+      # decorative, so only a MISSING attribute is reported for raw HTML.
       private def check_image_alt(file_path : String, content : String, issues : Array(Issue))
-        body = strip_code_blocks(extract_body(content))
+        body = Utils::MarkdownCode.strip(extract_body(content))
         body.scan(/!\[\s*\]\([^\)]+\)/) do |match|
           issues << Issue.new(id: "content-alt-text-missing", level: :warning, category: "content", file: file_path,
             message: "Image missing alt text: #{match[0]}")
         end
 
-        body.scan(/<img(?:\s[^>]*)?\s*\/?>/i) do |match|
-          tag = match[0]
-          alt_match = tag.match(/(?:\A|\s)alt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i)
-          alt = alt_match.try { |m| m[1]? || m[2]? || m[3]? }
-          next if alt && !alt.strip.empty?
+        body.scan(HTML_IMG_RE) do |match|
+          next if html_attribute_names(match[1]? || "").includes?("alt")
 
           issues << Issue.new(id: "content-alt-text-missing", level: :warning, category: "content", file: file_path,
-            message: "Image missing alt text: #{tag}")
+            message: "Image missing alt text: #{match[0]}")
         end
+      end
+
+      HTML_IMG_RE = /<img(\s[^>]*)?\/?>/i
+
+      # One HTML attribute: its name, then an optional `=value` (quoted or
+      # not). Consuming each value whole is what keeps `title="x alt=y"`
+      # from reading as an alt attribute.
+      HTML_ATTRIBUTE_RE = /([^\s"'>\/=]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/
+
+      private def html_attribute_names(attributes : String) : Array(String)
+        names = [] of String
+        attributes.scan(HTML_ATTRIBUTE_RE) { |m| names << m[1].downcase }
+        names
       end
 
       # Check for broken internal links (@/ prefixed) in markdown body
       private def check_internal_links(file_path : String, content : String, issues : Array(Issue))
-        body = strip_code_blocks(extract_body(content))
+        body = Utils::MarkdownCode.strip(extract_body(content))
         body.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
           raw_url = match[2].strip
           path = internal_link_path(match[2]) || next
@@ -360,18 +374,6 @@ module Hwaro
 
       private def extract_body(content : String) : String
         Utils::FrontmatterScanner.strip_frontmatter(content)
-      end
-
-      private def strip_code_blocks(text : String) : String
-        # Strip fenced blocks then inline spans. NOTE: indented (4-space/tab)
-        # code blocks are intentionally NOT stripped — a regex can't tell an
-        # indented code block from a list-item continuation (which is also
-        # indented), so stripping them silently dropped genuine broken-link /
-        # alt-text warnings inside list items, and a long contiguous indented
-        # run blew PCRE2's JIT stack. The minor false positive on example
-        # markdown shown via an indented block is the lesser evil.
-        text.gsub(/(?ms)^(`{3,}|~{3,})[^\n]*\n.*?^\1\s*$/, "")
-          .gsub(/`[^`]+`/, "")
       end
     end
   end
