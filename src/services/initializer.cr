@@ -9,6 +9,7 @@ require "../config/options/init_options"
 require "../utils/errors"
 require "../utils/file_safe"
 require "../utils/logger"
+require "../utils/path_utils"
 require "../services/scaffolds/registry"
 require "../services/scaffolds/remote"
 require "./defaults/agents_md"
@@ -32,6 +33,7 @@ module Hwaro
       getter created_count = 0
 
       @entries = [] of ScaffoldEntry
+      @target_path : String? = nil
 
       def run(options : Config::Options::InitOptions)
         scaffold = if remote = options.scaffold_remote
@@ -89,6 +91,8 @@ module Hwaro
         site_title : String? = nil,
         from_wizard : Bool = false,
       )
+        @target_path = target_path
+
         if clean && Dir.exists?(target_path) && !Dir.empty?(target_path)
           clean_target(target_path)
         end
@@ -452,6 +456,7 @@ module Hwaro
       end
 
       private def create_directory(path : String)
+        ensure_scaffold_path_within_target!(path)
         if Dir.exists?(path)
           @entries << ScaffoldEntry.new(:exist, path, dir: true)
         else
@@ -462,6 +467,7 @@ module Hwaro
       end
 
       private def create_file(path : String, content : String)
+        ensure_scaffold_path_within_target!(path)
         if File.exists?(path)
           @entries << ScaffoldEntry.new(:exist, path, dir: false)
         else
@@ -469,6 +475,23 @@ module Hwaro
           @created_count += 1
           @entries << ScaffoldEntry.new(:create, path, dir: false)
         end
+      end
+
+      private def ensure_scaffold_path_within_target!(path : String) : Nil
+        target_path = @target_path
+        return unless target_path
+
+        target_root = Hwaro::Utils::PathUtils.resolved_real_path(target_path)
+        resolved_path = Hwaro::Utils::PathUtils.resolved_real_path(path)
+        within_target = resolved_path == target_root || resolved_path.starts_with?(target_root + File::SEPARATOR)
+        dangling_link = File.symlink?(path) && !File.exists?(path)
+        return if within_target && !dangling_link
+
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Cannot scaffold #{path}: destination cannot be safely resolved within the project.",
+          hint: "Remove the symlink or choose a project directory without paths that resolve outside it.",
+        )
       end
 
       # The scaffolded .gitignore: the build output tree, hwaro's `.hwaro/`

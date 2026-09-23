@@ -45,6 +45,27 @@ describe Hwaro::Services::Initializer do
       end
     end
 
+    it "refuses to write scaffold templates through a symlink outside the project" do
+      Dir.mktmpdir do |dir|
+        target = File.join(dir, "site")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(target)
+        FileUtils.mkdir_p(outside)
+        File.symlink(outside, File.join(target, "templates"))
+
+        expect_raises(Hwaro::HwaroError) do
+          Hwaro::Services::Initializer.new.run(
+            target,
+            force: true,
+            skip_agents_md: true,
+            skip_sample_content: true,
+          )
+        end
+
+        File.exists?(File.join(outside, "page.html")).should be_false
+      end
+    end
+
     describe ".gitignore scaffold" do
       it "scaffolds a .gitignore covering the output dir and hwaro caches" do
         Dir.mktmpdir do |dir|
