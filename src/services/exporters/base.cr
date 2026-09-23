@@ -149,8 +149,14 @@ module Hwaro
         protected def scan_content_files(content_dir : String) : Array(String)
           files = [] of String
           return files unless Dir.exists?(content_dir)
-          Dir.glob(File.join(content_dir, "**", "*.md")) { |f| files << f }
-          Dir.glob(File.join(content_dir, "**", "*.markdown")) { |f| files << f }
+          Dir.glob(File.join(content_dir, "**", "*.md")) do |file|
+            next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, content_dir)
+            files << file
+          end
+          Dir.glob(File.join(content_dir, "**", "*.markdown")) do |file|
+            next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, content_dir)
+            files << file
+          end
           files.sort
         end
 

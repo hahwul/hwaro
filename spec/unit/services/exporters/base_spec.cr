@@ -81,6 +81,21 @@ describe Hwaro::Services::Exporters::Base do
         files.any?(&.ends_with?(".png")).should be_false
       end
     end
+
+    it "skips markdown symlinks that resolve outside the content tree" do
+      Dir.mktmpdir do |dir|
+        content = File.join(dir, "content")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(content)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(content, "local.md"), "local")
+        File.write(File.join(outside, "secret.md"), "secret")
+        File.symlink(File.join(outside, "secret.md"), File.join(content, "leak.md"))
+
+        files = TestExporter.new.test_scan_content_files(content)
+        files.map { |path| File.basename(path) }.should eq(["local.md"])
+      end
+    end
   end
 
   describe "#parse_content" do
