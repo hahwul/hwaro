@@ -56,6 +56,21 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
     end
   end
 
+  describe "built-in positional arguments" do
+    it "keeps an explicitly empty positional slot when mapping later arguments" do
+      builder = Hwaro::Core::Build::Builder.new
+
+      result = builder.test_sc_process(%({{ gist("", "abc123") }}))
+
+      result.should contain("https://gist.github.com//abc123.js")
+      result.should_not contain("https://gist.github.com/abc123/.js")
+
+      block = builder.test_sc_process(%({% alert("", "Heads up") %}Body{% end %}))
+      block.should contain("sc-alert--info")
+      block.should contain(%(sc-alert__title">Heads up</div>))
+    end
+  end
+
   describe "unknown shortcodes" do
     # Regression for https://github.com/hahwul/hwaro/issues/480
     # The old behavior left `{{ unknown(...) }}` literally in the output

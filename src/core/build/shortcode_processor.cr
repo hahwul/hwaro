@@ -822,7 +822,9 @@ module Hwaro
               end
             else
               value = unquote_shortcode_arg(token)
-              next if value.empty?
+              # Preserve explicitly empty positional values. They still
+              # occupy their slot, so `gist("", "id")` must map the empty
+              # username to `_0` and the ID to `_1`.
               args["_#{idx}"] = value
               idx += 1
             end

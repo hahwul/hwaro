@@ -42,6 +42,10 @@ Block shortcodes support two closer styles:
 
 Hwaro ships with built-in shortcodes that work out of the box, with no template files needed.
 
+Pass parameters by name or in the shortcode's documented order. For example,
+`{{ youtube("VIDEO_ID") }}` and `{{ gist("username", "gist_id") }}` use
+positional arguments; quoted empty values still occupy their position.
+
 ### youtube
 
 Embed a YouTube video.
