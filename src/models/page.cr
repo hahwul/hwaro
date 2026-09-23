@@ -310,9 +310,10 @@ module Hwaro
 
       # True when a page should be omitted from generated listings (taxonomy
       # indexes, related posts, …): drafts, preview-only unpublished pages,
-      # and synthetic generated pages.
+      # headless (`render = false`) pages that are never written, and
+      # synthetic generated pages.
       def excluded_from_listings? : Bool
-        draft || unpublished || generated
+        draft || unpublished || !render || generated
       end
 
       # True when a page is eligible for the search index / llms.txt: it emits

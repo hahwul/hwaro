@@ -59,6 +59,13 @@ describe "unpublished (future/expired) content exclusion" do
       page.unpublished = true
       page.excluded_from_listings?.should be_true
     end
+
+    it "excludes headless (render = false) pages from generated listings" do
+      page = Hwaro::Models::Page.new("headless.md")
+      page.excluded_from_listings?.should be_false
+      page.render = false
+      page.excluded_from_listings?.should be_true
+    end
   end
 
   describe "sitemap" do
