@@ -15,8 +15,9 @@ feedback. Hwaro warns with a suggestion when one is close to a real key:
 Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean 'markdown'?
 ```
 
-The check covers top-level keys only; keys nested inside a section are
-validated by that section's own loader. A known section written in the wrong
+The check covers top-level keys only: a misspelled key nested inside a
+section (`[markdown] emoij = true`) is not reported, so double-check nested
+keys against the tables below. A known section written in the wrong
 shape, such as `sitemap = true` instead of a `[sitemap]` table or
 `taxonomies = ["tags"]` instead of `[[taxonomies]]` entries, is ignored with a
 warning as well.
