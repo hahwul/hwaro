@@ -66,6 +66,8 @@ content/
 
 The default language pages are served at the root path. Non-default language pages are prefixed with the language code.
 
+Spelling out the default language suffix is optional: `about.en.md` (with `default_language = "en"`) is the same as `about.md`. It is published at `/about/` and listed with the other default-language pages of its section.
+
 ### Section Translations
 
 Section index files also support language suffixes:

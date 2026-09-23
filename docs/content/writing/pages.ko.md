@@ -74,7 +74,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | in_search_index | bool | 검색 포함 여부 |
 | in_sitemap | bool | 사이트맵 포함 여부 |
 | insert_anchor_links | bool | 헤딩 앵커 추가 |
-| redirect_to | string | 페이지를 이 URL로 리다이렉트 |
+| redirect_to | string | 페이지를 이 URL로 리다이렉트(리다이렉트 페이지는 사이트맵, 피드, 검색 인덱스, llms.txt에서 빠짐) |
 | render | bool | 페이지를 출력으로 렌더링(기본값: true) |
 | expires | date | 이 날짜 이후 자동 제외 |
 | series | string | 묶음용 시리즈 이름 |
