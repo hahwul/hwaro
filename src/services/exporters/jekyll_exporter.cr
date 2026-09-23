@@ -185,6 +185,27 @@ module Hwaro
             handled << "image"
           end
 
+          # The inverse of the Jekyll importer's mappings. Passed through
+          # under hwaro's names, Jekyll ignored all three: the page moved off
+          # its `path`, its `aliases` stopped redirecting, and its
+          # modification date was lost. An authored Jekyll key wins
+          # (existing-key-wins, like `layout` above).
+          if fields["permalink"]?.try(&.raw).nil? && (custom = scalar_string(fields["path"]?)) && !(trimmed = custom.strip('/')).empty?
+            yaml_lines << "permalink: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar("/#{trimmed}/")}"
+            handled << "path"
+          end
+
+          if fields["redirect_from"]?.try(&.raw).nil? && (aliases = string_list_field(fields["aliases"]?))
+            yaml_lines << "redirect_from:"
+            aliases.each { |a| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(a)}" }
+            handled << "aliases"
+          end
+
+          if fields["last_modified_at"]?.try(&.raw).nil? && (updated = scalar_string(fields["updated"]?))
+            yaml_lines << "last_modified_at: #{yaml_date_value(updated)}"
+            handled << "updated"
+          end
+
           if passthrough = passthrough_yaml(fields, handled)
             yaml_lines << passthrough
           end

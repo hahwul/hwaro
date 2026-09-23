@@ -2138,3 +2138,23 @@ describe "Build Integration: root-level page bundle template" do
     end
   end
 end
+
+# ext/toml_datetime_fix: an offset date-time in TOML front matter lost its
+# offset (converted to UTC), so it printed the previous day while the same
+# value in YAML front matter printed the written day.
+describe "Build: TOML and YAML offset dates agree" do
+  it "renders the same calendar date and lastmod for both formats" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n[sitemap]\nenabled = true\n",
+      content_files: {
+        "t.md" => "+++\ntitle = \"T\"\ndate = 2024-03-05T08:20:30+09:00\n+++\nx",
+        "y.md" => "---\ntitle: Y\ndate: 2024-03-05T08:20:30+09:00\n---\nx",
+      },
+      template_files: {"page.html" => "{{ page.date }}"},
+    ) do
+      File.read("public/t/index.html").should eq("2024-03-05")
+      File.read("public/y/index.html").should eq("2024-03-05")
+      File.read("public/sitemap.xml").scan("<lastmod>2024-03-05</lastmod>").size.should eq(2)
+    end
+  end
+end

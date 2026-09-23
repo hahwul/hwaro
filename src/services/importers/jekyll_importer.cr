@@ -119,6 +119,32 @@ module Hwaro
               assign_date_field(fields, "date", date_val)
             end
 
+            # `last_modified_at` (jekyll-seo-tag's dateModified, and the
+            # jekyll-last-modified-at plugin) is hwaro's `updated`.
+            if modified = yaml["last_modified_at"]?
+              assign_date_field(fields, "updated", modified)
+            end
+
+            # A literal per-document `permalink` is the page's published
+            # address; dropping it moved the page (`/about-us.html` →
+            # `/about/`). Pattern permalinks (`/:year/:title/`) describe the
+            # site-wide scheme and are left to hwaro's own URLs.
+            if permalink = yaml["permalink"]?
+              apply_source_url(fields, permalink.as_s?, file_info[:path])
+            end
+
+            # jekyll-redirect-from (allow-listed on GitHub Pages, enabled under
+            # `plugins:`): each
+            # `redirect_from` address is a redirect to this page — hwaro's
+            # `aliases`. Dropping them broke every old link the site kept
+            # alive on purpose.
+            if redirect_from = yaml["redirect_from"]?
+              aliases = (fields["aliases"]?.as?(Array(String)) || [] of String).dup
+              collect_string_list(redirect_from, into: aliases)
+              aliases = aliases.reject(&.includes?("://")).uniq!
+              fields["aliases"] = aliases unless aliases.empty?
+            end
+
             # Layout -> template
             if layout = yaml["layout"]?
               fields["template"] = yaml_string(layout)
@@ -169,7 +195,11 @@ module Hwaro
               when String
                 fields["image"] = yaml_string(image)
               when Hash
-                # Handle nested image object (e.g., image.path or similar)
+                # jekyll-seo-tag's object form `image: {path: …, alt: …}`.
+                # Left empty, it silently dropped the page's social image.
+                if (img_path = image["path"]?) && (ps = img_path.as_s?) && !ps.empty?
+                  fields["image"] = ps
+                end
               end
             end
 

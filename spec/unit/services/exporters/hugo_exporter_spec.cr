@@ -390,3 +390,27 @@ describe Hwaro::Services::Exporters::HugoExporter do
     end
   end
 end
+
+# Regression: hwaro's `path` (the page's whole published path) was passed
+# through as an unknown Hugo param, so the exported page moved to its
+# directory-derived URL. Hugo spells it `url`.
+describe "Hugo export: path" do
+  it "maps path to url" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "p.md"), "+++\ntitle = \"P\"\npath = \"special/place\"\n+++\nbody\n")
+      File.write(File.join(content_dir, "q.md"), "+++\ntitle = \"Q\"\npath = \"a\"\nurl = \"/kept/\"\n+++\nbody\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      p = File.read(File.join(output_dir, "content", "p.md"))
+      p.should contain(%(url = "/special/place/"))
+      p.should_not contain("path =")
+      # An authored `url` wins; `path` then passes through untouched.
+      File.read(File.join(output_dir, "content", "q.md")).should contain(%(url = "/kept/"))
+    end
+  end
+end

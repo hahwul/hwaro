@@ -728,6 +728,111 @@ describe Hwaro::Services::Importers::JekyllImporter do
   end
 end
 
+private def import_jekyll(dir : String) : String
+  output_dir = File.join(dir, "output")
+  options = Hwaro::Config::Options::ImportOptions.new(source_type: "jekyll", path: dir, output_dir: output_dir)
+  Hwaro::Services::Importers::JekyllImporter.new.run(options).success.should be_true
+  output_dir
+end
+
+describe "Jekyll import: published addresses" do
+  # Regression: a literal per-document `permalink` is the page's address,
+  # but it was dropped, so the imported page moved.
+  it "maps a literal permalink to path and keeps a .html address as an alias" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"), "---\ntitle: Hello\npermalink: /blog/hello/\n---\nbody\n")
+      File.write(File.join(dir, "about.md"), "---\ntitle: About\npermalink: /about-us.html\n---\nabout\n")
+      File.write(File.join(dir, "pattern.md"), "---\ntitle: P\npermalink: /:categories/:title/\n---\np\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(path = "blog/hello"))
+      about = File.read(File.join(out_dir, "about.md"))
+      about.should contain(%(path = "about-us"))
+      about.should contain(%(aliases = ["/about-us.html"]))
+      File.read(File.join(out_dir, "pattern.md")).should_not contain("path =")
+    end
+  end
+end
+
+describe "Jekyll import: redirect_from" do
+  # Regression: jekyll-redirect-from addresses (a widely used plugin,
+  # allow-listed on GitHub Pages) were dropped, so every deliberately kept
+  # old link broke.
+  it "maps redirect_from to aliases" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"),
+        "---\ntitle: Hello\nredirect_from:\n  - /old-hello/\n  - /2019/hello.html\n---\nbody\n")
+      File.write(File.join(dir, "about.md"),
+        "---\ntitle: About\npermalink: /about-us.html\nredirect_from: /team/\n---\nabout\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(aliases = ["/old-hello/", "/2019/hello.html"]))
+      File.read(File.join(out_dir, "about.md")).should contain(%(aliases = ["/about-us.html", "/team/"]))
+    end
+  end
+end
+
+describe "Jekyll import: last_modified_at" do
+  # Regression: jekyll-seo-tag's `last_modified_at` was dropped, so imported
+  # pages lost their modification date (feeds, sitemap lastmod, JSON-LD).
+  it "maps last_modified_at to updated" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"),
+        "---\ntitle: Hello\nlast_modified_at: 2024-02-01\n---\nbody\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(updated = "2024-02-01"))
+    end
+  end
+end
+
+describe "Jekyll import: image object" do
+  # Regression: jekyll-seo-tag's `image: {path: …}` object form was matched
+  # and then ignored, dropping the page's social image.
+  it "maps image.path to image" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"),
+        "---\ntitle: Hello\nimage:\n  path: /img/a.png\n  alt: A\n---\nbody\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(image = "/img/a.png"))
+    end
+  end
+end
+
+describe "Jekyll import: index.html permalinks" do
+  # A permalink ending in `index.html` names the directory itself (Jekyll
+  # serves `/docs/index.html` at `/docs/`); mapping it to `path = "docs/index"`
+  # moved the page to /docs/index/ and left /docs/ as a redirect stub.
+  it "maps a trailing index.html to the directory path with no alias" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "docs.md"), "---\ntitle: Docs\npermalink: /docs/index.html\n---\nd\n")
+      out_dir = import_jekyll(dir)
+      docs = File.read(File.join(out_dir, "docs.md"))
+      docs.should contain(%(path = "docs"\n))
+      docs.should_not contain("aliases")
+    end
+  end
+end
+
+describe "Jekyll import: non-page permalinks" do
+  # A permalink naming another kind of file (`/feed.xml`) cannot be a page
+  # path — mapped anyway it published `feed.xml/index.html`. It is left
+  # unmapped with a warning, as before `path` mapping existed.
+  it "leaves a non-HTML file permalink unmapped and warns" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "feed.md"), "---\ntitle: Feed\npermalink: /feed.xml\n---\nf\n")
+      log = with_captured_log { import_jekyll(dir) }
+      File.read(File.join(dir, "output", "feed.md")).should_not contain("path =")
+      log.should contain("/feed.xml")
+    end
+  end
+end
+
 describe "Hwaro::Services::Importers::JekyllImporter symlink boundary" do
   it "imports posts linked elsewhere inside the site and counts links outside it as skipped" do
     Dir.mktmpdir do |root|

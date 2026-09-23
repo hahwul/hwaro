@@ -414,6 +414,141 @@ describe Hwaro::Services::Importers::HugoImporter do
       end
     end
   end
+
+  # Regression: Hugo reads JSON front matter (an object at the top of the
+  # file); the importer did not, so the object landed in the body and the
+  # page lost its title, date, tags and draft flag.
+  describe "JSON front matter" do
+    it "maps JSON front matter like TOML and YAML" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/json.md",
+          "{\n  \"title\": \"JSON FM\",\n  \"date\": \"2024-02-03\",\n  \"tags\": [\"j\", \"k\"],\n  \"draft\": true\n}\n\nJSON body\n")
+        output_dir = File.join(tmpdir, "out")
+
+        result = Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir, drafts: true))
+        result.success.should be_true
+
+        content = File.read(File.join(output_dir, "posts", "json.md"))
+        content.should contain(%(title = "JSON FM"))
+        content.should contain(%(date = "2024-02-03"))
+        content.should contain(%(tags = ["j", "k"]))
+        content.should contain("draft = true")
+        content.should contain("JSON body")
+        content.should_not contain(%("title": "JSON FM"))
+      end
+    end
+  end
+
+  # Regression: a leaf bundle's `slug` renames the bundle's URL segment in
+  # Hugo (/posts/my-trip/), but the importer wrote `posts/trip/my-trip.md`
+  # beside the copied resources, so the page moved to /posts/trip/my-trip/
+  # and its relative images broke.
+  describe "leaf bundle with slug" do
+    it "keeps the bundle shape under the slugged directory" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/trip/index.md", "+++\ntitle = \"Trip\"\nslug = \"my-trip\"\n+++\n![p](photo.png)\n")
+        write_hugo_content(hugo_dir, "posts/trip/photo.png", "png")
+        write_hugo_content(hugo_dir, "top/index.md", "+++\ntitle = \"Top\"\nslug = \"renamed\"\n+++\nx\n")
+        output_dir = File.join(tmpdir, "out")
+
+        Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+        File.exists?(File.join(output_dir, "posts", "my-trip", "index.md")).should be_true
+        File.exists?(File.join(output_dir, "posts", "my-trip", "photo.png")).should be_true
+        File.exists?(File.join(output_dir, "posts", "trip", "my-trip.md")).should be_false
+        File.exists?(File.join(output_dir, "renamed", "index.md")).should be_true
+      end
+    end
+  end
+
+  # Regression: Hugo's `url` front matter (the page's whole published path)
+  # was dropped, so an imported page moved and every link to it broke.
+  describe "url front matter" do
+    it "maps url to path, keeping a .html address as an alias" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/custom.md", "---\ntitle: Custom\nurl: /special/place/\n---\nx\n")
+        write_hugo_content(hugo_dir, "posts/old.md", "---\ntitle: Old\nurl: /old/page.html\n---\nx\n")
+        output_dir = File.join(tmpdir, "out")
+
+        Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+        File.read(File.join(output_dir, "posts", "custom.md")).should contain(%(path = "special/place"))
+        old = File.read(File.join(output_dir, "posts", "old.md"))
+        old.should contain(%(path = "old/page"))
+        old.should contain(%(aliases = ["/old/page.html"]))
+      end
+    end
+  end
+end
+
+describe "Hugo import: index.html url" do
+  it "maps url /about/index.html to the directory path with no alias" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+      File.write(File.join(hugo_dir, "content", "about.md"), "---\ntitle: About\nurl: /about/index.html\n---\nx\n")
+      output_dir = File.join(tmpdir, "out")
+      Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir)).success.should be_true
+      about = File.read(File.join(output_dir, "about.md"))
+      about.should contain(%(path = "about"\n))
+      about.should_not contain("aliases")
+    end
+  end
+end
+
+describe "Hugo import: url with query or fragment" do
+  # `?q=1#top` is not part of the page path; kept, it became a literal
+  # directory name.
+  it "drops the query and fragment" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+      File.write(File.join(hugo_dir, "content", "frag.md"), "---\ntitle: F\nurl: /frag/?q=1#top\n---\nx\n")
+      output_dir = File.join(tmpdir, "out")
+      Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir)).success.should be_true
+      File.read(File.join(output_dir, "frag.md")).should contain(%(path = "frag"\n))
+    end
+  end
+end
+
+describe "Hugo import: slug naming an existing bundle" do
+  # A slug that names a sibling bundle (`posts/trip` with slug `other` next
+  # to `posts/other/`) merged the two: the page became `posts/other/index-1.md`
+  # and showed the other bundle's resources. It keeps its own directory.
+  it "keeps the bundle in its own directory and warns" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      {"posts/trip/index.md"   => "+++\ntitle = \"Trip\"\nslug = \"other\"\n+++\n![p](photo.png)\n",
+       "posts/trip/photo.png"  => "trip",
+       "posts/other/index.md"  => "+++\ntitle = \"Other\"\n+++\n![p](photo.png)\n",
+       "posts/other/photo.png" => "other",
+       "posts/a/index.md"      => "+++\ntitle = \"A\"\nslug = \"same\"\n+++\na\n",
+       "posts/b/index.md"      => "+++\ntitle = \"B\"\nslug = \"same\"\n+++\nb\n"}.each do |rel, body|
+        path = File.join(hugo_dir, "content", rel)
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, body)
+      end
+      output_dir = File.join(tmpdir, "out")
+      log = with_captured_log do
+        Hwaro::Services::Importers::HugoImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir)).success.should be_true
+      end
+
+      File.read(File.join(output_dir, "posts", "trip", "index.md")).should contain("Trip")
+      File.read(File.join(output_dir, "posts", "trip", "photo.png")).should eq("trip")
+      File.read(File.join(output_dir, "posts", "other", "index.md")).should contain("Other")
+      File.exists?(File.join(output_dir, "posts", "other", "index-1.md")).should be_false
+      # Two bundles slugged alike: the first takes the slug, the second stays.
+      File.read(File.join(output_dir, "posts", "same", "index.md")).should contain("A")
+      File.read(File.join(output_dir, "posts", "b", "index.md")).should contain("B")
+      log.should contain("names an existing bundle")
+    end
+  end
 end
 
 describe "Hwaro::Services::Importers::HugoImporter symlink boundary" do

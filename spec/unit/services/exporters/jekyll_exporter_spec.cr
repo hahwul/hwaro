@@ -556,3 +556,28 @@ describe Hwaro::Services::Exporters::JekyllExporter do
     end
   end
 end
+
+# Regression: `path`, `aliases` and `updated` were passed through under
+# hwaro's names, which Jekyll ignores — the exported page moved, its old
+# addresses stopped redirecting and its modification date was lost.
+describe "Jekyll export: address and modification keys" do
+  it "maps path, aliases and updated to permalink, redirect_from and last_modified_at" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "p.md"),
+        "+++\ntitle = \"P\"\ndate = 2024-03-05\nupdated = 2024-04-01\npath = \"special/place\"\naliases = [\"/old/\", \"/older.html\"]\n+++\nbody\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      exported = File.read(File.join(output_dir, "_posts", "2024-03-05-p.md"))
+      exported.should contain(%(permalink: "/special/place/"))
+      exported.should contain(%(redirect_from:\n  - "/old/"\n  - "/older.html"))
+      exported.should contain("last_modified_at: 2024-04-01")
+      exported.should_not contain("path:")
+      exported.should_not contain("aliases:")
+    end
+  end
+end
