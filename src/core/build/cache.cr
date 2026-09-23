@@ -678,12 +678,23 @@ module Hwaro
           # renderer fixes reach incrementally-built sites (see
           # CacheMetadata#generator_version).
           if @metadata.generator_version != Hwaro::VERSION
-            unless @entries.empty?
-              Logger.info "  Cache: hwaro version changed — invalidating all entries."
-              @entries.clear
+            @mutex.synchronize do
+              unless @entries.empty?
+                Logger.info "  Cache: hwaro version changed — invalidating all entries."
+              end
+              # Invalidate the render fingerprints, but keep the previous
+              # output claims so Finalize can remove files that this build no
+              # longer produces. `output_dir` must remain too: the next
+              # `set_global_checksums` compares it with the requested target
+              # and drops relative claims when the build switches directories.
+              previous_generated_outputs = @metadata.generated_outputs
+              previous_output_dir = @metadata.output_dir
+              discard_entries_recording_outputs
+              @metadata = CacheMetadata.new
+              @metadata.generated_outputs = previous_generated_outputs
+              @metadata.output_dir = previous_output_dir
+              @dirty = true
             end
-            @metadata = CacheMetadata.new
-            @dirty = true
           end
         end
 
