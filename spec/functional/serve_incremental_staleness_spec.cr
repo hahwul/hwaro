@@ -157,6 +157,13 @@ describe "serve incremental staleness" do
 
   # The fingerprint gate is what keeps the fan-out cheap: an edit that moves
   # nothing a listing prints must not drag the listings into the render set.
+  #
+  # "Not re-rendered" is checked with a sentinel planted in the built listing,
+  # not by comparing mtimes: a sentinel only disappears if the file is written
+  # again, whatever the filesystem's timestamp clock or resolution. When it
+  # does disappear, the failure carries the incremental pass's own verbose
+  # log (which files it wrote) so the selection that pulled the listing in
+  # can be read straight from CI.
   it "leaves listing pages alone when the edit moves nothing they print (L2)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
@@ -166,13 +173,20 @@ describe "serve incremental staleness" do
         server = Hwaro::Services::Server.new
         options = staleness_options
         server.staleness_builder.run(options).should be_true
-        listing_mtime = File.info("public/misc/archive/index.html").modification_time
+        sentinel = "<!-- listing not re-rendered -->"
+        File.write("public/misc/archive/index.html", sentinel)
 
         File.write("content/posts/one.md", "---\ntitle: Only Title\nweight: 12\n---\nsecond body")
-        server.staleness_builder.run_incremental(["content/posts/one.md"], options).should be_true
+        options.verbose = true
+        log = with_captured_log do
+          server.staleness_builder.run_incremental(["content/posts/one.md"], options).should be_true
+        end
 
         File.read("public/posts/one/index.html").should contain("second body")
-        File.info("public/misc/archive/index.html").modification_time.should eq(listing_mtime)
+        listing = File.read("public/misc/archive/index.html")
+        unless listing == sentinel
+          fail "the incremental pass re-rendered the listing although the edit moved nothing it prints.\nIncremental log:\n#{log}"
+        end
       end
     end
   end
