@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="실전 예제: 하나의 JSON API로 /reports/2026/09/ 차트 페이지 만들기">
+  <title>날짜별 리포트 페이지 - Hwaro</title>
+  <meta property="og:title" content="날짜별 리포트 페이지">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/dated-report-pages/">
+  <meta property="og:description" content="실전 예제: 하나의 JSON API로 /reports/2026/09/ 차트 페이지 만들기">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-dated-report-pages.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="날짜별 리포트 페이지">
+  <meta name="twitter:description" content="실전 예제: 하나의 JSON API로 /reports/2026/09/ 차트 페이지 만들기">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-dated-report-pages.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/dated-report-pages/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/dated-report-pages/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/dated-report-pages/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=cbccac98">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/dated-report-pages/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/dated-report-pages/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/git-info/">Git 메타데이터</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/remote-data/">원격 데이터 소스</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-generation/">콘텐츠 생성</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/dated-report-pages/" class="active">날짜별 리포트 페이지</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/versioned-docs/">버전별 문서</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">날짜별 리포트 페이지</li>
+  </ol>
+</nav>
+    <h1>날짜별 리포트 페이지</h1>
+    <p>세 가지 기능을 함께 쓰는 실전 예제입니다. JSON API 하나가 월별 페이지가 되고,
+<code>/reports/2026/09/</code> 같은 주소로 공개되며, 각 페이지는 자기 달의 차트를
+렌더링합니다. 데이터 파일은 커밋하지 않고, <code>config.toml</code>은 한 번만 작성합니다.
+새 달이 생기는 이유는 API가 레코드를 하나 더 반환했기 때문이지, 누군가 사이트를
+수정했기 때문이 아닙니다.</p>
+<p>구성 요소는 <a href="/ko/features/remote-data/">원격 데이터</a>(페이로드 가져오기),
+<a href="/ko/features/content-generation/">콘텐츠 생성</a>(레코드를 페이지로 만들기),
+그리고 <code>[permalinks]</code> 토큰 패턴(URL 모양 정하기) 세 가지입니다. 각각은 자체
+문서가 있고, 이 문서는 셋을 함께 연결하는 방법을 보여 줍니다.</p>
+<h2 id="소스-하나-배열-하나">소스 하나, 배열 하나</h2>
+<p>엔드포인트가 월별 레코드 하나씩 담긴 배열 하나를 반환하게 하세요. 각 레코드는
+식별자, 표시용 레이블, 날짜, 그리고 자기 데이터 포인트를 가집니다.</p>
+<pre><code class="language-json hljs"><span class="hljs-punctuation">[</span>
+  <span class="hljs-punctuation">{</span>
+    <span class="hljs-name">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-09&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;label&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;September 2026&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;date&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-09-01&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;summary_md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;가입은 유지되고 이탈은 세 달째 줄었습니다.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;datapoints&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">{</span><span class="hljs-name">&quot;day&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-09-01&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;signups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">412</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;churn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">18</span><span class="hljs-punctuation">},</span>
+      <span class="hljs-punctuation">{</span><span class="hljs-name">&quot;day&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-09-08&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;signups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">455</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;churn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">15</span><span class="hljs-punctuation">},</span>
+      <span class="hljs-punctuation">{</span><span class="hljs-name">&quot;day&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-09-15&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;signups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">501</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;churn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">12</span><span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">]</span>
+  <span class="hljs-punctuation">},</span>
+  <span class="hljs-punctuation">{</span>
+    <span class="hljs-name">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-08&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;label&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;August 2026&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;date&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-08-01&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;summary_md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;출시 직후의 급등이 가라앉은 조용한 달이었습니다.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-name">&quot;datapoints&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[{</span><span class="hljs-name">&quot;day&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2026-08-04&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;signups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">380</span><span class="hljs-punctuation">,</span> <span class="hljs-name">&quot;churn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">22</span><span class="hljs-punctuation">}]</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">]</span>
+</code></pre>
+<p>중첩은 키가 아니라 <strong>페이로드 안에</strong> 둡니다. 의도적인 선택입니다.
+<code>[[data.remote]]</code>의 <code>key</code>에는 영문자, 숫자, <code>_</code>, <code>-</code>만 쓸 수 있어서
+<code>data/reports/2026/09.json</code> 같은 트리에 대응하는 원격 키가 존재하지 않습니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[[</span>data<span class="hljs-punctuation">.</span>remote<span class="hljs-punctuation">]]</span>
+key <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;reports.2026&quot;</span>   <span class="hljs-comment"># Error [HWARO_E_CONFIG]: key may contain only</span>
+                       <span class="hljs-comment"># letters, digits, &#39;_&#39; and &#39;-&#39;</span>
+</code></pre>
+<p>로컬 <code>data/</code> 하위 디렉터리는 중첩되지만(<code>data/reports/2026.json</code> →
+<code>site.data.reports.2026</code>), 원격 키는 캐시 파일 이름이기도 하므로 평평합니다.
+API를 <code>reports_2026_09</code>, <code>reports_2026_10</code> …으로 나눠도 동작은 하지만, 그러면
+매달 <code>[[data.remote]]</code> 항목 하나와 <code>[[content.generate]]</code> 규칙 하나를 새로
+추가해야 합니다. 이 구성이 피하려는 바로 그 매달의 설정 수정입니다. 배열 하나,
+키 하나, 규칙 하나로 충분합니다.</p>
+<h2 id="configtoml">config.toml</h2>
+<p>한 번만 쓰는 세 블록입니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[[</span>data<span class="hljs-punctuation">.</span>remote<span class="hljs-punctuation">]]</span>
+key <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;reports&quot;</span>                        <span class="hljs-comment"># site.data.reports</span>
+url <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;https://api.example.com/reports&quot;</span>
+cache <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;1h&quot;</span>                           <span class="hljs-comment"># 신선한 페이로드는 빌드 간 재사용</span>
+on_error <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;warn-and-use-cache&quot;</span>        <span class="hljs-comment"># 불안정한 API가 빌드를 깨뜨리지 않도록</span>
+
+<span class="hljs-punctuation">[[</span>content<span class="hljs-punctuation">.</span>generate<span class="hljs-punctuation">]]</span>
+source <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;reports&quot;</span>                     <span class="hljs-comment"># 배열 전체</span>
+section <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;reports&quot;</span>                    <span class="hljs-comment"># reports 섹션으로 페이지 생성</span>
+slug <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;id&quot;</span>                            <span class="hljs-comment"># &quot;2026-09&quot;</span>
+title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;label&quot;</span>                        <span class="hljs-comment"># &quot;September 2026&quot;</span>
+date <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;date&quot;</span>                          <span class="hljs-comment"># &quot;2026-09-01&quot; — 패턴이 요구함</span>
+body <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;summary_md&quot;</span>                    <span class="hljs-comment"># 선택: 마크다운 본문</span>
+
+<span class="hljs-punctuation">[</span>permalinks<span class="hljs-punctuation">]</span>
+<span class="hljs-string">&quot;reports&quot;</span> <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/reports/:year/:month/&quot;</span>   <span class="hljs-comment"># /reports/2026/09/</span>
+</code></pre>
+<p>몇 가지는 짚고 넘어갈 만합니다.</p>
+<ul>
+<li>
+<p><code>source = &quot;reports&quot;</code>는 배열 자체를 가리킵니다. 중첩된 배열은 점 표기 경로를
+씁니다(<code>&quot;reports.months&quot;</code>). 배열이 아니면 빌드가 실패합니다.</p>
+</li>
+<li>
+<p><code>slug = &quot;id&quot;</code>는 슬러그화되며(<code>2026-09</code>은 그대로), 페이지의 <strong>콘텐츠 경로</strong>
+<code>content/reports/2026-09.md</code>만 결정합니다. 공개 URL은 퍼머링크 패턴이
+정합니다.</p>
+</li>
+<li>
+<p>여기서 <code>date</code>는 선택이 아닙니다. <code>:year</code>와 <code>:month</code>는 페이지 날짜에서
+확장되며, 날짜 없는 레코드는 이름을 지목하며 빌드를 실패시킵니다.</p>
+<pre><code>Error [HWARO_E_CONTENT]: reports/2026-09.md matches [permalinks] rule
+&quot;reports&quot; (pattern '/reports/:year/:month/') which requires a date, but the
+page has none.
+</code></pre>
+</li>
+<li>
+<p>생성 페이지도 작성 페이지와 같은 게시 규칙을 따릅니다. 미래 날짜 레코드는 그
+날짜가 될 때까지 빌드에 들어오지 않습니다. 각 레코드를 그 달 1일로 잡아 두면
+달이 시작되는 순간 공개됩니다.</p>
+</li>
+</ul>
+<p><code>:year</code>, <code>:month</code>, <code>:day</code>는 0을 채우는 날짜 토큰입니다. 전체 토큰 목록은
+<a href="/ko/start/config/#%ED%86%A0%ED%81%B0-%ED%8C%A8%ED%84%B4">설정 › 토큰 패턴</a>에 있습니다. 토큰은 경로 세그먼트
+하나 전체여야 하므로 <code>/reports/:year-:month/</code>는 패턴이 아니라 설정 오류입니다.</p>
+<h2 id="한-달에-레코드-하나">한 달에 레코드 하나</h2>
+<p><code>/reports/:year/:month/</code>에는 <code>:slug</code> 세그먼트가 없으므로 달 자체가 페이지의
+정체성입니다. 같은 달에 들어가는 레코드가 둘이면 URL이 같아지고, Hwaro는
+경고한 뒤 하나만 씁니다.</p>
+<pre><code>[WARN] Duplicate output path '/reports/2026/09/' — 'reports/2026-09.md'
+collides with 'reports/2026-09-late.md' and is not written
+</code></pre>
+<p>API가 한 달에 여러 레코드를 낼 수 있다면 API 쪽에서 집계하거나, 패턴에
+<code>:slug</code>를 다시 넣으세요(아래 <a href="#%EB%B3%80%ED%98%95">변형</a> 참고).</p>
+<h2 id="차트-템플릿">차트 템플릿</h2>
+<p>섹션에 템플릿을 지정하면 그 섹션의 생성 페이지가 모두 그 템플릿으로
+렌더링됩니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-comment"># content/reports/_index.md</span>
++++
+title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;월간 리포트&quot;</span>
+description <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;가입과 이탈, 달마다 한 페이지&quot;</span>
+sort_by <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;date&quot;</span>
+page_template <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;report&quot;</span>
++++
+
+������������ ������ <span class="hljs-number">1</span>������ ���������������<span class="hljs-punctuation">.</span>
+</code></pre>
+<p><code>templates/report.html</code>은 그 달의 데이터 포인트를 <code>page.extra.item</code>에서
+읽습니다. 소스 레코드 전체가 그대로 들어오므로 규칙에서 필드를 하나씩 매핑할
+필요가 없습니다.</p>
+<pre><code class="language-jinja hljs">&lt;h1&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">page.title</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">e</span> <span class="hljs-meta">}}</span>&lt;/h1&gt;
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page.synthesized</span> <span class="hljs-meta">%}</span>
+&lt;script id=&quot;report-data&quot; type=&quot;application/json&quot;&gt;
+  <span class="hljs-meta">{{</span> <span class="hljs-variable">page.extra.item.datapoints</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">jsonify</span> <span class="hljs-meta">}}</span>
+&lt;/script&gt;
+&lt;canvas id=&quot;report-chart&quot;&gt;&lt;/canvas&gt;
+&lt;script&gt;
+  const points = JSON.parse(document.getElementById(&quot;report-data&quot;).textContent);
+  new Chart(document.getElementById(&quot;report-chart&quot;), {
+    type: &quot;line&quot;,
+    data: {
+      labels: points.map(p =&gt; p.day),
+      datasets: [{ label: &quot;Signups&quot;, data: points.map(p =&gt; p.signups) }]
+    }
+  });
+&lt;/script&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<p>두 가지가 이 템플릿을 안전하게 만듭니다.</p>
+<ul>
+<li><code>page.synthesized</code>는 생성 페이지에서만 <code>true</code>입니다. <code>page_template</code>은 섹션의
+모든 페이지에 적용되고, 여기에는 <code>item</code>이 없는 작성 페이지
+<code>content/reports/notes.md</code>도 포함되므로 <code>page.extra.item</code> 접근은 이 값으로
+감싸세요.</li>
+<li><code>jsonify</code>는 실제 값 트리를 직렬화하고 <code>&lt;/</code>를 이스케이프하므로, 데이터가
+<code>&lt;script&gt;</code> 요소를 벗어날 수 없습니다.</li>
+</ul>
+<p>차트 라이브러리는 무엇을 쓰든 방식이 같습니다. Hwaro의 몫은 각 페이지에 자기
+행을 건네주는 데서 끝납니다. 배열 전체는 <code>site.data.reports</code>로도 남아 있으므로,
+같은 한 번의 요청으로 전체 기간 개요 차트도 그릴 수 있습니다.</p>
+<h2 id="빌드-결과">빌드 결과</h2>
+<pre><code>$ hwaro build
+  Generated 2 page(s) from data.reports
+  ...
+  built: 3 content pages
+
+public/reports/index.html            # 섹션 목록
+public/reports/2026/08/index.html
+public/reports/2026/09/index.html
+</code></pre>
+<p>섹션 인덱스가 달 목록을 보여 주는 이유는 생성 페이지가 일급 콘텐츠이기
+때문입니다. <code>sort_by = &quot;date&quot;</code>는 최신순으로 정렬하고, <code>reverse = true</code>를 주면
+오래된 순이 됩니다. 택소노미, 피드, 검색 인덱스, 사이트맵, OG 이미지, 출력
+포맷에도 작성 페이지와 똑같이 참여합니다.</p>
+<h2 id="변형">변형</h2>
+<h3 id="하루에-한-페이지">하루에 한 페이지</h3>
+<p>하루 단위 레코드를 반환하고 월 토큰을 일 토큰으로 바꾸면 됩니다.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>permalinks<span class="hljs-punctuation">]</span>
+<span class="hljs-string">&quot;reports&quot;</span> <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;/reports/:year/:month/:day/&quot;</span>   <span class="hljs-comment"># /reports/2026/09/08/</span>
+</code></pre>
+<p>나머지는 그대로입니다. <code>id</code>가 <code>&quot;2026-09-08&quot;</code>이 되고 <code>date</code>가 그날이 되면 같은
+규칙이 페이지를 만듭니다. 하루에 이름이 다른 리포트가 여럿 필요하다면 <code>:day</code>
+대신 <code>:slug</code>를 쓰세요(<code>/reports/:year/:month/:slug/</code>). 이때 URL에는 슬러그화된
+<code>id</code>가 들어가므로 레코드는 하루에 하나가 아니라 서로 고유하기만 하면 됩니다.</p>
+<h3 id="한-번에-한-달만-주는-api">한 번에 한 달만 주는 API</h3>
+<p><code>[[data.remote]]</code>는 URL 하나, 요청 하나입니다. 데이터가 달 단위로 나뉘어 올
+때(페이지네이션 엔드포인트, 달마다 다른 URL, 여러 응답을 합쳐야 하는 경우)에는
+빌드 전 훅으로 가져와 <code>data/</code> 아래 파일 하나로 합치고, <code>source</code>가 그 파일을
+가리키게 하세요.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>build<span class="hljs-punctuation">]</span>
+hooks<span class="hljs-punctuation">.</span>pre <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;./scripts/fetch-reports.sh&quot;</span><span class="hljs-punctuation">]</span>   <span class="hljs-comment"># data/reports.json을 씀</span>
+
+<span class="hljs-punctuation">[[</span>content<span class="hljs-punctuation">.</span>generate<span class="hljs-punctuation">]]</span>
+source <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;reports&quot;</span>                           <span class="hljs-comment"># 이제 data/에서 온 site.data.reports</span>
+section <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;reports&quot;</span>
+slug <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;id&quot;</span>
+title <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;label&quot;</span>
+date <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;date&quot;</span>
+</code></pre>
+<p>규칙도, 템플릿도, 퍼머링크 패턴도 그대로이고 <code>site.data.reports</code>의 출처만
+바뀝니다. 훅의 계약과 <code>curl -f</code>가 중요한 이유는
+<a href="/ko/features/build-hooks/#api%EC%97%90%EC%84%9C-%EB%8D%B0%EC%9D%B4%ED%84%B0-%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0">빌드 훅 › API에서 데이터 가져오기</a>를
+참고하세요.</p>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/features/remote-data/">원격 데이터 소스</a> — 가져오기, 캐시, 오류 정책</li>
+<li><a href="/ko/features/content-generation/">콘텐츠 생성</a> — <code>[[content.generate]]</code> 전체 레퍼런스</li>
+<li><a href="/ko/start/config/#%ED%8D%BC%EB%A8%B8%EB%A7%81%ED%81%AC">설정 › 퍼머링크</a> — 토큰 패턴과 규칙 순서</li>
+<li><a href="/ko/writing/sections/">섹션</a> — <code>sort_by</code>, <code>page_template</code>, 섹션 목록</li>
+<li><a href="/ko/features/build-hooks/">빌드 훅</a> — 여러 요청이나 GET 이외의 데이터 수집</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/features/versioned-docs/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">버전별 문서</span>
+    <span class="pn-desc">버전 전환기와 함께 여러 문서 버전을 나란히 게시</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/pwa/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">PWA</span>
+    <span class="pn-desc">manifest.json과 서비스 워커를 이용한 프로그레시브 웹 앱 지원</span>
+  </a>
+  
+</nav>
+
+    
+<footer class="site-footer">
+  <p class="footer-meta">
+    <a class="footer-sig" href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul, Built with Love">
+      <span class="hahwul-img" aria-hidden="true"></span>
+      <span class="footer-love">Built with Love</span>
+    </a>
+    <span aria-hidden="true">·</span>
+    <span>MIT · © HAHWUL</span>
+  </p>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#소스-하나-배열-하나">소스 하나, 배열 하나</a></li><li><a href="#configtoml">config.toml</a></li><li><a href="#한-달에-레코드-하나">한 달에 레코드 하나</a></li><li><a href="#차트-템플릿">차트 템플릿</a></li><li><a href="#빌드-결과">빌드 결과</a></li><li><a href="#변형">변형</a><ul><li><a href="#하루에-한-페이지">하루에 한 페이지</a></li><li><a href="#한-번에-한-달만-주는-api">한 번에 한 달만 주는 API</a></li></ul></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=cbccac98"></script>
+</body>
+</html>
