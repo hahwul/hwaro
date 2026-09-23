@@ -130,6 +130,15 @@ module Hwaro
 
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
 
+          # The winner map above was claimed before the exclusion pass and the
+          # relink: a page just drafted still owned its URL, and an alias the
+          # relink added (the versioned parent stub a drafted `docs/_index.md`
+          # hands to the latest root) lost to it and was never written. Re-claim
+          # from the page set that will actually render — as run_rerender does.
+          unless excluded_pages.empty? && relinked_counterparts.empty?
+            @output_url_winners = compute_output_url_winners(all_pages)
+          end
+
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
 
@@ -383,12 +392,18 @@ module Hwaro
           config = site.config
           return [] of Models::Page unless config.multilingual? || config.versions.enabled?
           pages = (site.pages + site.sections).as(Array(Models::Page))
-          before = pages.map { |page| {page.translations.dup, page.version_links.dup} }
+          # Every field the two linkers write: `link_translations!` sets
+          # `translations`; `Versions.link!` sets `version_links` and, with
+          # `latest_at_root = false`, adds the parent-URL alias to the latest
+          # version's root — which appears when an authored parent index
+          # (`docs/_index.md`) is drafted, and must re-render the root or the
+          # stub a cold build writes is missing until a full rebuild.
+          before = pages.map { |page| {page.translations.dup, page.version_links.dup, page.aliases.dup} }
           Content::Multilingual.link_translations!(pages, config)
           Content::Versions.link!(pages, config)
           moved = [] of Models::Page
           pages.each_with_index do |page, i|
-            moved << page if {page.translations, page.version_links} != before[i]
+            moved << page if {page.translations, page.version_links, page.aliases} != before[i]
           end
           moved
         end
