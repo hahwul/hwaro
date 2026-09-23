@@ -92,15 +92,10 @@ module Hwaro
 
         # The stale list was mapped through the PRE-rebuild site, but a
         # single changeset can delete one source and re-create the same URL
-        # from another (foo.md removed + foo/index.md added). The rebuild
-        # just wrote that output for the NEW owner — deleting it here would
-        # 404 the page until an unrelated rebuild. Skip anything the rebuilt
-        # site still claims.
-        unless stale_outputs.empty?
-          owned = @builder.owned_output_paths(output_dir)
-          stale_outputs = stale_outputs.reject { |path| owned.includes?(path) }
-        end
-        remove_stale_outputs(stale_outputs, output_dir)
+        # from another (foo.md removed + foo/index.md added), or hand the
+        # path to an alias stub or a static file. The builder's prune choke
+        # point keeps anything the rebuilt output still stands on.
+        @builder.prune_unclaimed_outputs(stale_outputs, output_dir) unless stale_outputs.empty?
 
         @live_reload_handler.try(&.notify_reload)
       end
@@ -120,26 +115,6 @@ module Hwaro
         end
         if startup.headers != current.headers || startup.fast != current.fast
           Logger.warn "  [serve] settings changed in config — restart `hwaro serve` to apply them."
-        end
-      end
-
-      # Delete output files orphaned by removed sources, pruning any
-      # directories the deletion leaves empty (e.g. `public/guide/old-page/`).
-      # Both operations resolve symlinked parents before touching the path.
-      private def remove_stale_outputs(paths : Array(String), output_dir : String)
-        paths.each do |path|
-          next unless Utils::OutputGuard.safe_to_delete_file?(path, output_dir)
-          next unless File.exists?(path)
-          File.delete(path)
-          Logger.info "  Removed stale output: #{path}"
-
-          dir = File.dirname(path)
-          while Utils::OutputGuard.safe_to_delete_directory?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
-            Dir.delete(dir)
-            dir = File.dirname(dir)
-          end
-        rescue ex
-          Logger.debug "  Could not remove stale output #{path}: #{ex.message}"
         end
       end
 

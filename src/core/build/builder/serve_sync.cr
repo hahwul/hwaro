@@ -299,11 +299,11 @@ module Hwaro
           paths
         end
 
-        # Delete output files an incremental rebuild has orphaned (slug
-        # change, page newly excluded), pruning directories the deletion
-        # leaves empty. Guarded so a corrupt path can never delete outside
-        # the output directory, including through a symlinked parent. Mirrors
-        # Server#remove_stale_outputs.
+        # Delete output files, pruning directories the deletion leaves empty.
+        # Guarded so a corrupt path can never delete outside the output
+        # directory, including through a symlinked parent. Serve prunes reach
+        # this only through `prune_unclaimed_outputs`, which decides WHAT is
+        # stale; this only does the deleting.
         private def delete_orphaned_outputs(paths : Array(String), output_dir : String)
           paths.each do |path|
             next unless Utils::OutputGuard.safe_to_delete_file?(path, output_dir)
@@ -362,11 +362,7 @@ module Hwaro
 
         private def prune_stale_taxonomy_outputs(stale : Set(String), output_dir : String) : Nil
           return if stale.empty?
-          cwd = Dir.current
-          owned = owned_output_paths(output_dir).map { |path| File.expand_path(path, cwd) }.to_set
-          paths = stale.map { |relative| File.join(output_dir, relative) }
-          paths.reject! { |path| owned.includes?(File.expand_path(path, cwd)) }
-          delete_orphaned_outputs(paths, output_dir)
+          prune_unclaimed_outputs(stale.map { |relative| File.join(output_dir, relative) }, output_dir)
         end
 
         # Delete the alias stubs and `/page/N/` files a page's previous render
@@ -383,7 +379,7 @@ module Hwaro
           (site.pages + site.sections).each { |page| live << page.path if page.render }
 
           stale = [] of String
-          claimed = @page_derived_mutex.synchronize do
+          @page_derived_mutex.synchronize do
             pass = @derived_outputs_this_pass
             @derived_outputs_this_pass = {} of String => Array(String)
             pass.each do |page_path, derived|
@@ -397,17 +393,106 @@ module Hwaro
               stale.concat(derived)
               true
             end
-            @rendered_derived_outputs.values.flatten
           end
-          return if stale.empty?
+          prune_unclaimed_outputs(stale, output_dir)
+        end
 
+        # The one choke point every serve prune deletes through. `candidates`
+        # are files an earlier pass wrote that the bookkeeping of THIS pass no
+        # longer names; each is deleted only when nothing in the current
+        # output still stands on it:
+        #
+        #   * a page output of the current site (`owned_output_paths`);
+        #   * an alias stub / pagination page any page's render recorded;
+        #   * a generated-output claim — only while the claim set is this
+        #     build's own (`@generated_claims_current`): an incremental pass
+        #     re-claims nothing, so there the set still names the very files
+        #     being pruned;
+        #   * a file this pass wrote (`written_this_build?` — every serve pass
+        #     re-stamps the epoch, see `begin_serve_pass`);
+        #   * a live `static/` or `content/` file that publishes at that path,
+        #     which is what an incremental pass cannot learn from its claims.
+        #     A static source's bytes are copied back over the stale file —
+        #     it was shadowing them, and a cold build publishes them there.
+        #
+        # Paths are compared by a case-folded key, because the filesystem
+        # deleting them may fold case (APFS, NTFS): `/Old/` → `/old/` is one
+        # file there, and deleting the "old" spelling removes the new one.
+        # Folding everywhere only ever keeps more.
+        def prune_unclaimed_outputs(candidates : Enumerable(String), output_dir : String) : Nil
+          return if candidates.empty?
           cwd = Dir.current
           keep = Set(String).new
-          claimed.each { |path| keep << File.expand_path(path, cwd) }
-          generated_output_claims.each { |path| keep << File.expand_path(path, cwd) }
-          owned_output_paths(output_dir).each { |path| keep << File.expand_path(path, cwd) }
-          stale = stale.uniq.reject { |path| keep.includes?(File.expand_path(path, cwd)) }
+          owned_output_paths(output_dir).each { |path| keep << output_key(path, cwd) }
+          @page_derived_mutex.synchronize do
+            {@rendered_derived_outputs, @derived_outputs_this_pass, @page_derived_outputs}.each do |recorded|
+              recorded.each_value { |paths| paths.each { |path| keep << output_key(path, cwd) } }
+            end
+          end
+          if @generated_claims_current
+            generated_output_claims.each { |path| keep << output_key(path, cwd) }
+          end
+
+          stale = [] of String
+          candidates.to_a.uniq.each do |path|
+            next if keep.includes?(output_key(path, cwd)) || written_this_build?(path)
+            relative = output_relative(path, output_dir, cwd)
+            if relative && (source = static_source_for(relative))
+              # The stale file was sitting on top of a static copy — a cold
+              # build publishes the static bytes there, so put them back.
+              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(path))
+              atomic_copy(source, path)
+            elsif relative && content_source_publishes?(relative)
+              # Same for a `content/` file; left as is rather than re-copied,
+              # since raw files may be processed (minified) on the way out.
+            else
+              stale << path
+            end
+          end
           delete_orphaned_outputs(stale, output_dir) unless stale.empty?
+        end
+
+        # Start an incremental serve pass: stamp the epoch `written_this_build?`
+        # reads, mark the claim set as a previous build's, and drop the mkdir
+        # memo (see `forget_created_dirs`).
+        private def begin_serve_pass : Nil
+          forget_created_dirs
+          mark_build_output_epoch
+          @generated_claims_current = false
+        end
+
+        private def output_key(path : String, cwd : String) : String
+          File.expand_path(path, cwd).downcase
+        rescue ArgumentError
+          path.downcase
+        end
+
+        # `path` relative to the output directory, or nil when it is outside.
+        private def output_relative(path : String, output_dir : String, cwd : String) : String?
+          relative = Path[File.expand_path(path, cwd)].relative_to(File.expand_path(output_dir, cwd)).to_s
+          return if relative.starts_with?("..") || relative == "."
+          relative
+        rescue ArgumentError
+          nil
+        end
+
+        # The live `static/` file that publishes verbatim at `relative`, if
+        # any — same eligibility as the static copy (not excluded, not a Sass
+        # source). Checked on disk, so the filesystem's own case rule applies.
+        private def static_source_for(relative : String) : String?
+          source = File.join("static", relative)
+          return unless File.file?(source) && publishable_static_info(source)
+          return if static_publish_config.excluded?(relative)
+          return if @config.try(&.sass_source?(relative))
+          source
+        end
+
+        # True when a non-page file under `content/` (a `[content.files]`
+        # copy or a page-bundle asset) publishes at `relative`.
+        private def content_source_publishes?(relative : String) : Bool
+          source = File.join("content", relative)
+          File.file?(source) &&
+            !Phases::ReadContent::PAGE_EXTENSIONS.includes?(Path[source].extension.downcase)
         end
 
         # Rewrite the `[amp]` mirrors of pages an incremental strategy just

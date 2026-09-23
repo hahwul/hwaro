@@ -58,7 +58,7 @@ module Hwaro
 
           Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..." if options.verbose
           start_time = Time.instant
-          forget_created_dirs
+          begin_serve_pass
           clear_broken_internal_links
 
           output_dir = options.output_dir
@@ -305,6 +305,7 @@ module Hwaro
           end
 
           Logger.info "Re-parsing #{changed_content_files.size} changed file(s) before full re-render..."
+          begin_serve_pass
 
           output_dir = options.output_dir
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -611,7 +612,7 @@ module Hwaro
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
               stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
-              delete_orphaned_outputs(stale, output_dir)
+              prune_unclaimed_outputs(stale, output_dir)
             end
           end
 
@@ -620,7 +621,7 @@ module Hwaro
             next unless olds = old_output_paths[page.path]?
             relocated.concat(olds - collect_page_output_paths(page, output_dir))
           end
-          delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
+          prune_unclaimed_outputs(relocated, output_dir) unless relocated.empty?
         end
 
         # Re-render pages using reloaded templates without re-parsing content.
@@ -661,7 +662,7 @@ module Hwaro
           end
 
           start_time = Time.instant
-          forget_created_dirs
+          begin_serve_pass
           clear_broken_internal_links
 
           # Reload templates from disk & reset all runtime caches.
@@ -927,7 +928,7 @@ module Hwaro
 
           Logger.info "Fast-start: background-rendering #{pages.size} deferred page(s)..."
           start_time = Time.instant
-          forget_created_dirs
+          begin_serve_pass
 
           output_dir = options.output_dir
           minify = options.minify

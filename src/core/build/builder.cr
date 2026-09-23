@@ -327,6 +327,11 @@ module Hwaro
         # publishes (a superseded `main.<hash>.css`, the `amp/` tree after
         # `[amp]` is switched off). Empty on a process's first build.
         @previous_generated_claims : Set(String) = Set(String).new
+        # True while @generated_output_claims is the running full build's own
+        # set (reset by the Initialize phase); false once an incremental serve
+        # pass starts, which re-claims nothing — so the set then still names
+        # outputs that pass is pruning. See `prune_unclaimed_outputs`.
+        @generated_claims_current : Bool = false
         # Every page output the site of the PREVIOUS build (as the serve
         # session's incremental passes left it) claimed, captured by `run`
         # before it drops that site. A full serve rebuild — any config or
@@ -421,6 +426,7 @@ module Hwaro
             @previous_generated_claims = @generated_output_claims
             @generated_output_claims = Set(String).new
           end
+          @generated_claims_current = true
         end
 
         # Record an output file the static copy just wrote over (see
