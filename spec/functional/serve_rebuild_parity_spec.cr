@@ -144,6 +144,31 @@ describe "serve rebuild parity" do
       end
     end
   end
+
+  # A serve re-parse works on the live page object, and the `<!-- more -->`
+  # chunk was never cleared — deleting the marker left the old marker
+  # summary in every listing instead of the automatic excerpt.
+  it "drops the marker summary once the marker is deleted" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_sidebar_site
+        File.write("templates/section.html", "<html><body>{% for p in section.pages %}[{{ p.summary }}]{% endfor %}</body></html>")
+        File.write("content/guide/_index.md", "---\ntitle: Guide\n---\n")
+        File.write("content/guide/intro.md", "---\ntitle: Intro\n---\nMarker summary\n\n<!-- more -->\n\nrest")
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.read("public/guide/index.html").should contain("Marker summary")
+
+        File.write("content/guide/intro.md", "---\ntitle: Intro\n---\nPlain body now")
+        builder.run_incremental(["content/guide/intro.md"], options).should be_true
+
+        listing = File.read("public/guide/index.html")
+        listing.should contain("Plain body now")
+        listing.should_not contain("Marker summary")
+      end
+    end
+  end
 end
 
 private def write_amp_site
