@@ -1,2 +1,2 @@
 ### Fixed
-- CLI and content services now refuse writes through unresolved or escaping symlinks and skip source files linked outside their input trees.
+- CLI writers now refuse symlinks that escape their project roots. Import, export, and deploy skip sources linked outside their input trees; conversion preserves in-project symlink behavior and skips targets outside the project.

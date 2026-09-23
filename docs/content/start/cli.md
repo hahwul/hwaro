@@ -597,9 +597,9 @@ paths and options.
 
 See [Tools & Completion](/start/tools/) for detailed usage.
 
-`import`, `export`, and `convert` skip content files reached through symlinks
-outside their source/content root. `agents-md --write` refuses to write when
-`AGENTS.md` is a symlink.
+`import` and `export` skip files reached through symlinks outside their source
+directories. `convert` follows links within the project and skips links outside
+it. `agents-md --write` refuses to write when `AGENTS.md` is a symlink.
 
 ### completion
 

@@ -83,9 +83,10 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
 
-    it "does not rewrite a YAML file reached through a symlink outside content" do
+    it "does not rewrite a YAML file reached through a symlink outside the project" do
       Dir.mktmpdir do |dir|
-        content_dir = File.join(dir, "content")
+        project = File.join(dir, "project")
+        content_dir = File.join(project, "content")
         outside = File.join(dir, "outside")
         FileUtils.mkdir_p(content_dir)
         FileUtils.mkdir_p(outside)

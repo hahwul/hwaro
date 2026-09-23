@@ -144,8 +144,9 @@ module Hwaro
         log_skipped : Bool = true,
         skips : Hash(SkipReason, Int32)? = nil,
       ) : ConversionStatus
-        if File.symlink?(file_path) && !Utils::PathUtils.resolves_within?(file_path, @content_dir)
-          Logger.warn "Skipped symlink outside content directory: #{file_path}"
+        project_root = Utils::PathUtils.find_project_root(@content_dir)
+        if File.symlink?(file_path) && !Utils::PathUtils.resolves_within?(file_path, project_root)
+          Logger.warn "Skipped symlink outside project directory: #{file_path}"
           return ConversionStatus::Skipped
         end
 

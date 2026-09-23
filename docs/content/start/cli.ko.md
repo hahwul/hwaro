@@ -598,9 +598,9 @@ hwaro tool export hugo --dry-run
 
 자세한 사용법은 [도구와 자동 완성](/ko/start/tools/)을 참고합니다.
 
-`import`, `export`, `convert`는 소스/콘텐츠 루트 밖에 있는 파일로 연결되는
-심볼릭 링크를 건너뜁니다. `agents-md --write`는 `AGENTS.md`가 심볼릭 링크이면
-쓰기를 거부합니다.
+`import`와 `export`는 소스 디렉터리 밖의 파일로 연결되는 심볼릭 링크를
+건너뜁니다. `convert`는 프로젝트 내부의 링크는 따르고 프로젝트 밖의 링크는
+건너뜁니다. `agents-md --write`는 `AGENTS.md`가 심볼릭 링크이면 쓰기를 거부합니다.
 
 ### completion
 
