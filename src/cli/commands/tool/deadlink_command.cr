@@ -9,11 +9,14 @@ require "../../metadata"
 require "toml"
 require "yaml"
 require "../../../models/config"
+require "../../../services/content_lister"
+require "../../../services/internal_link_index"
 require "../../../utils/frontmatter_scanner"
 require "../../../utils/text_utils"
 require "../../../utils/errors"
 require "../../../utils/logger"
 require "../../../utils/build_output"
+require "../../../utils/markdown_code"
 
 require "./deadlink_command/scanner"
 require "./deadlink_command/internal_resolver"
@@ -360,6 +363,14 @@ module Hwaro
           # external links, once for internal), and without this each file was
           # read and code-stripped twice — and an unreadable one warned twice.
           @scanned = {} of String => String?
+
+          # The Markdown sources under each scanned directory, walked once per
+          # invocation for the same reason (an unfollowable symlink warns once).
+          @markdown_files = {} of String => Array(String)
+
+          # Directory → the stems of its Markdown sources (`leaf` for
+          # `leaf.MD`), so route probes list each directory once per run.
+          @markdown_stems = {} of String => Set(String)
 
           # Memoized per run: the same host used to be resolved synchronously
           # on every occurrence and every redirect hop, stalling all workers

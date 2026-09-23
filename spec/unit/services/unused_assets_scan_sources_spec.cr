@@ -99,6 +99,16 @@ describe Hwaro::Services::UnusedAssets do
       end
     end
 
+    it "sees assets referenced from uppercase Markdown pages accepted by the build" do
+      Dir.mktmpdir do |dir|
+        scaffold_project(dir)
+        File.write(File.join(dir, "content", "upper.MD"), "---\ntitle: Upper\n---\n![Logo](/hero.png)")
+        File.write(File.join(dir, "static", "hero.png"), "png")
+
+        unused_basenames(dir).should be_empty
+      end
+    end
+
     describe "unreadable reference sources (review finding 10)" do
       it "skips a file containing invalid UTF-8 instead of aborting the scan" do
         # The corpus is concatenated and regex-scanned, so one bad byte made

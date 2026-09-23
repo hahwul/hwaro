@@ -23,11 +23,12 @@ describe "PlatformConfig honors [build] output_dir" do
     JSON.parse(generator.generate("vercel"))["outputDirectory"].as_s.should eq("dist")
   end
 
-  it "points cloudflare's bucket and dashboard note at the configured output_dir" do
+  it "points Cloudflare Pages at the configured output_dir" do
     generator = platform_config_with("dist")
     result = generator.generate("cloudflare")
-    result.should contain(%(bucket = "./dist"))
-    result.should contain("# Build output directory: /dist")
+    result.should contain(%(pages_build_output_dir = "./dist"))
+    result.should_not contain("[site]")
+    result.should contain("# Build output directory: ./dist")
   end
 
   it "publishes the configured output_dir from the gitlab-ci pages job" do
@@ -54,7 +55,7 @@ describe "PlatformConfig honors [build] output_dir" do
     generator = platform_config_with(nil)
     generator.generate("netlify").should contain(%(publish = "public"))
     JSON.parse(generator.generate("vercel"))["outputDirectory"].as_s.should eq("public")
-    generator.generate("cloudflare").should contain(%(bucket = "./public"))
+    generator.generate("cloudflare").should contain(%(pages_build_output_dir = "./public"))
     generator.generate("codeberg-pages").should contain("cd public")
 
     gitlab = generator.generate("gitlab-ci")
@@ -72,6 +73,7 @@ describe "PlatformConfig honors [build] output_dir" do
     TOML.parse(netlify_fm)["build"].as_h["publish"].as_s.should eq(%(my "site" out))
 
     JSON.parse(generator.generate("vercel"))["outputDirectory"].as_s.should eq(%(my "site" out))
+    TOML.parse(generator.generate("cloudflare"))["pages_build_output_dir"].as_s.should eq(%(./my "site" out))
     generator.generate("codeberg-pages").should contain(%(cd 'my "site" out'))
     generator.generate("gitlab-ci").should contain(%(      - "my \\"site\\" out"))
   end
@@ -82,7 +84,7 @@ describe "PlatformConfig normalizes [build] output_dir" do
     %w[./public public/ ./public/].each do |dir|
       generator = platform_config_with(dir)
       generator.generate("gitlab-ci").should_not contain("publish:")
-      generator.generate("cloudflare").should contain(%(bucket = "./public"))
+      generator.generate("cloudflare").should contain(%(pages_build_output_dir = "./public"))
       generator.generate("netlify").should contain(%(publish = "public"))
     end
   end
@@ -90,7 +92,7 @@ describe "PlatformConfig normalizes [build] output_dir" do
   it "normalizes a ./-prefixed custom directory" do
     generator = platform_config_with("./build/out/")
     generator.generate("netlify").should contain(%(publish = "build/out"))
-    generator.generate("cloudflare").should contain(%(bucket = "./build/out"))
+    generator.generate("cloudflare").should contain(%(pages_build_output_dir = "./build/out"))
   end
 
   it "falls back to public for an absolute output_dir and says so" do
