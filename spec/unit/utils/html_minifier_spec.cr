@@ -522,5 +522,16 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should eq("<div><script>var x = \"<style>body{}</style>\";</script></div>")
       end
     end
+
+    # Regression: ` />` after an UNQUOTED attribute value was tightened to
+    # `/>`, which makes the slash part of the value — `href=/favicon.ico/`
+    # (a 404) and `content=width=device-width/`.
+    it "keeps the space before a self-closing slash after an unquoted value" do
+      Hwaro::Utils::HtmlMinifier.minify("<link rel=icon href=/favicon.ico />").should eq("<link rel=icon href=/favicon.ico />")
+      Hwaro::Utils::HtmlMinifier.minify("<img src=a.png alt=x />").should eq("<img src=a.png alt=x />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=\"a b\" />").should eq("<img alt=\"a b\"/>")
+      Hwaro::Utils::HtmlMinifier.minify("<input disabled />").should eq("<input disabled/>")
+      Hwaro::Utils::HtmlMinifier.minify("<br />").should eq("<br/>")
+    end
   end
 end

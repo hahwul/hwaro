@@ -358,6 +358,21 @@ module Hwaro
         -1
       end
 
+      # True when the attribute right before a trailing ` /` has an
+      # UNQUOTED value (`<link href=/favicon.ico />`). There the space is what
+      # ends the value: `href=/favicon.ico/` makes the slash part of the URL
+      # (`/favicon.ico/`, a 404). A quoted value, a bare attribute name or the
+      # tag name itself is ended by its own syntax, so `<br />` → `<br/>` and
+      # `alt="x" />` → `alt="x"/>` stay safe.
+      private def unquoted_value_before_slash?(body : String) : Bool
+        rest = body.rchop(" /")
+        last = rest.split(' ').last? || ""
+        eq = last.index('=')
+        return false unless eq
+        value = last[(eq + 1)..]
+        !value.empty? && !value.ends_with?('"') && !value.ends_with?('\'')
+      end
+
       # Write the tag at `bytes[start..tag_end]` to `io` with internal
       # whitespace collapsed. The tag-name run is copied verbatim;
       # then we collapse whitespace between attributes, preserve
@@ -418,7 +433,9 @@ module Hwaro
         # the byte preceding the `" /"` is part of a multi-byte
         # UTF-8 sequence inside a quoted attribute value.
         body = body.rstrip
-        body = body.rchop(" /") + "/" if body.ends_with?(" /")
+        if body.ends_with?(" /") && !unquoted_value_before_slash?(body)
+          body = body.rchop(" /") + "/"
+        end
         io << body
         io.write_byte('>'.ord.to_u8)
       end
