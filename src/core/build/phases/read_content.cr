@@ -109,7 +109,13 @@ module Hwaro::Core::Build::Phases::ReadContent
           page.section = path_parts.size > 1 ? path_parts[0..-2].join("/") : ""
         end
         page.is_index = is_index
-        page.language = language
+        # Default-language content carries `nil` whether or not the file
+        # spells the suffix out (`about.md` vs `about.en.md`): section
+        # listings, per-language feeds and lookups compare `language`
+        # exactly, so an explicit default suffix silently dropped the page
+        # from its section's `pages` (and a suffixed `_index.en.md` lost all
+        # of its unsuffixed pages). PermalinkResolver strips the suffix.
+        page.language = language == config.try(&.default_language) ? nil : language
         # Version membership is purely positional: whatever `[[versions.list]]`
         # directory the file sits under. nil (the common case) when the site
         # declares no versions.

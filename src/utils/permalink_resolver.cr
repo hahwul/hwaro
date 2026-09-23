@@ -167,9 +167,16 @@ module Hwaro
 
         stem = Path[relative_path].stem
 
-        # Remove language suffix from stem (e.g. "hello-world.ko" -> "hello-world")
+        # Remove language suffix from stem (e.g. "hello-world.ko" -> "hello-world").
+        # Default-language pages arrive with `language = nil` even when the
+        # file carries the default suffix (`about.en.md`, see ReadContent),
+        # so strip that suffix too — ReadContent only reads a suffix as a
+        # language when a non-empty base name remains, hence the size guard.
+        default_suffix = config && config.multilingual? ? ".#{config.default_language}" : nil
         clean_stem = if language
                        stem.chomp(".#{language}")
+                     elsif default_suffix && stem.size > default_suffix.size
+                       stem.chomp(default_suffix)
                      else
                        stem
                      end

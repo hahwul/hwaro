@@ -179,6 +179,30 @@ describe Hwaro::Core::Build::Phases::ReadContent do
       end
     end
 
+    # Regression: `about.en.md` on an `en`-default site got language "en"
+    # while unsuffixed default-language content gets nil, and listings
+    # compare the two exactly — the page vanished from its section's pages.
+    it "normalizes an explicit default-language suffix to nil" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          File.write("content/about.en.md", "---\ntitle: About\n---\n")
+          File.write("content/_index.en.md", "---\ntitle: Home\n---\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          config = Hwaro::Models::Config.new
+          config.default_language = "en"
+          config.languages["ko"] = Hwaro::Models::LanguageConfig.new(code: "ko")
+          ctx = make_ctx(config)
+
+          builder.test_collect_content_paths(ctx)
+          ctx.pages.first.language.should be_nil
+          ctx.sections.first.language.should be_nil
+          ctx.sections.first.is_index.should be_true
+        end
+      end
+    end
+
     it "collects .markdown files as pages, sections, and bundles" do
       # The markdown processor declares [".md", ".markdown"]; read_content
       # must agree, or `.markdown` sources silently vanish from the build.
