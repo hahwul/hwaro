@@ -30,6 +30,18 @@ describe Hwaro::Content::Processors::FenceTracker do
     end
   end
 
+  describe "raw HTML code blocks" do
+    it "tracks content until the matching raw-code element closes" do
+      feed(["<pre>", "$x$", "</script>", "~~still code~~", "</pre>", "~~outside~~"])
+        .should eq [true, true, true, true, true, false]
+    end
+
+    it "tracks raw-code blocks inside blockquotes" do
+      feed(["> <pre>", "> $x$", "> </pre>", "> ~~outside raw block~~"])
+        .should eq [true, true, true, false]
+    end
+  end
+
   describe "blockquoted fences" do
     it "opens and closes a fence behind a single marker" do
       feed(["> ```", "> code", "> ```", "> after"]).should eq [true, true, true, false]
@@ -113,6 +125,13 @@ describe Hwaro::Content::Processors::FenceTracker do
     it "keeps the list open across indented continuations" do
       feed(["- item", "", "  wrapped", "", "    still list"])
         .should eq [false, false, false, false, false]
+    end
+  end
+
+  describe "list-indented code" do
+    it "tracks code indented four columns beyond a list item's content indent" do
+      feed(["- item", "", "      - [ ] code", "      ~~still code~~", "", "- next"])
+        .should eq [false, false, true, true, true, false]
     end
   end
 end

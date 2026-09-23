@@ -1553,6 +1553,16 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
       result.scan("checkbox").size.should eq 2
     end
+
+    it "leaves indented code inside a list item untouched" do
+      config = make_config(task_lists: true)
+      content = "- item\n\n      - [ ] literal task\n      - ~~literal strike~~"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("- [ ] literal task")
+      html.should contain("- ~~literal strike~~")
+      html.should_not contain("checkbox")
+      html.should_not contain("<del>")
+    end
   end
 
   describe "math fence and code-span awareness" do
@@ -2041,6 +2051,19 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
       result.should contain("<code>`tick`</code>")
       result.should contain("<del>x</del>")
+    end
+  end
+
+  describe "raw HTML code blocks" do
+    it "leaves math, strikethrough, and footnote references untouched" do
+      config = make_config(math: true, footnotes: true)
+      content = "<pre>\n$alpha$ ~~literal~~ [^1]\n</pre>\n\n[^1]: note text"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("$alpha$ ~~literal~~ [^1]")
+      html.should_not contain("math-inline")
+      html.should_not contain("<del>")
+      html.should_not contain(%(<sup class="footnote-ref">))
+      html.should_not contain(%(<section class="footnotes">))
     end
   end
 end

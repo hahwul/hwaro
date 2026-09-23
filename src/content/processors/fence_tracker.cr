@@ -25,15 +25,14 @@ module Hwaro
       #   non-blank line opens a run when nothing before it can absorb the
       #   indent — after a blank line, or directly after an ATX heading,
       #   which CommonMark (and Markd) let indented code follow with no
-      #   blank line in between — unless a list is open, where the same
-      #   indent is item continuation, not code. The run survives blanks
+      #   blank line in between. Inside a list, a run opens only at least
+      #   four columns beyond the current item's content indent. The run survives blanks
       #   until the first non-blank line back under 4 columns. The list heuristic is deliberately sticky (a marker
       #   opens it; only a blank followed by a flush-left non-marker line
       #   closes it): staying "in list" too long merely keeps today's
       #   under-protective behavior, while leaving it too early would newly
-      #   skip transforms on real list content. Known limits: code indented
-      #   6+ columns inside list items is not recognized (unchanged), and
-      #   a fence closer followed directly by indented code opens no run.
+      #   skip transforms on real list content. Known limit: a fence closer
+      #   followed directly by indented code opens no run.
       # - Fences inside blockquotes (`> ```) are tracked too: the leading
       #   `>` markers are stripped before the opener/closer rules apply, and
       #   the marker depth is remembered. Because CommonMark gives fenced
@@ -49,7 +48,14 @@ module Hwaro
         # trailing space/tab is required — CommonMark's empty-item form
         # (a bare "-") is intentionally not matched; a missed marker only
         # keeps the list heuristic closed in a case too rare to matter.
-        LIST_MARKER_RE = /\A {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/
+        LIST_MARKER_RE         = /\A {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/
+        LIST_MARKER_DETAILS_RE = /\A( {0,3})([-*+]|\d{1,9}[.)])([ \t]+)/
+
+        # These CommonMark raw HTML blocks leave their contents uninterpreted.
+        # Preprocessors must treat them like code so math, footnotes, and
+        # inline markup do not rewrite script/style or preformatted text.
+        RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(pre|script|style|textarea)\b/i
+        RAW_HTML_CODE_CLOSE_RE = /<\/(pre|script|style|textarea)\s*>/i
 
         # An ATX heading at up to 3 spaces indent: 1-6 `#` followed by a
         # space/tab or nothing but the line ending. Only used to let an
@@ -69,8 +75,12 @@ module Hwaro
         @fence_char = '`'
         @fence_len = 0
         @fence_bq_depth = 0
+        @raw_html_code_tag = nil.as(String?)
+        @raw_html_code_bq_depth = 0
+        @track_raw_html_code = true
         @in_indented_code = false
         @in_list = false
+        @list_code_indents = [] of {Int32, Int32}
         @prev_blank = true
         @prev_atx_heading = false
 
@@ -80,6 +90,13 @@ module Hwaro
         # feeding the line.
         def in_fence? : Bool
           @in_fence
+        end
+
+        # Structural preprocessors such as definition-list extraction can
+        # intentionally consume a raw-HTML line as text; other walkers keep
+        # raw code elements opaque by default.
+        def track_raw_html_code=(value : Bool) : Nil
+          @track_raw_html_code = value
         end
 
         # Feed the next line (with or without its trailing newline).
@@ -108,6 +125,27 @@ module Hwaro
           content, depth = strip_blockquote_markers(line)
           blank = content.blank?
 
+          if @track_raw_html_code
+            if raw_tag = @raw_html_code_tag
+              if depth != @raw_html_code_bq_depth
+                # Raw HTML blocks inside a blockquote end when the quote ends.
+                @raw_html_code_tag = nil
+              else
+                @raw_html_code_tag = nil if raw_html_code_closed?(content, raw_tag)
+                @prev_blank = false
+                return true
+              end
+            end
+
+            if opener = content.match(RAW_HTML_CODE_OPEN_RE)
+              tag = opener[1].downcase
+              @raw_html_code_tag = tag unless raw_html_code_closed?(content, tag)
+              @raw_html_code_bq_depth = depth
+              @prev_blank = false
+              return true
+            end
+          end
+
           if @in_indented_code
             if blank
               @prev_blank = true
@@ -121,7 +159,8 @@ module Hwaro
             @in_indented_code = false
           end
 
-          if !blank && indented?(content) && (@prev_blank || prev_atx_heading) && !@in_list
+          if !blank && indented?(content) && (@prev_blank || prev_atx_heading) &&
+             (!@in_list || list_code_indentation?(content))
             @in_indented_code = true
             @prev_blank = false
             return true
@@ -129,10 +168,12 @@ module Hwaro
 
           if LIST_MARKER_RE.matches?(content)
             @in_list = true
+            track_list_code_indent(content)
           elsif @in_list && @prev_blank && !blank && !content.starts_with?(' ') && !content.starts_with?('\t')
             # A flush-left non-marker block after a blank line ends the
             # list context; indented lines and lazy continuations keep it.
             @in_list = false
+            @list_code_indents.clear
           end
 
           stripped = content.lstrip
@@ -195,6 +236,48 @@ module Hwaro
         private def closes_fence?(stripped : String) : Bool
           run = run_length(stripped, @fence_char)
           run >= @fence_len && stripped[run..].blank?
+        end
+
+        private def raw_html_code_closed?(line : String, tag : String) : Bool
+          line.scan(RAW_HTML_CODE_CLOSE_RE) do |match|
+            return true if match[1].downcase == tag
+          end
+          false
+        end
+
+        private def track_list_code_indent(content : String) : Nil
+          match = LIST_MARKER_DETAILS_RE.match(content)
+          return unless match
+
+          indent = match[1].size
+          column = indent + match[2].size
+          match[3].each_char do |char|
+            column = char == '\t' ? column + 4 - column % 4 : column + 1
+          end
+          code_indent = column + 4
+
+          while previous = @list_code_indents.last?
+            if previous[0] > indent
+              @list_code_indents.pop
+            elsif previous[0] == indent
+              @list_code_indents[-1] = {indent, code_indent}
+              return
+            else
+              break
+            end
+          end
+          @list_code_indents << {indent, code_indent}
+        end
+
+        private def list_code_indentation?(content : String) : Bool
+          return false unless list = @list_code_indents.last?
+
+          columns = 0
+          content.each_char do |char|
+            break unless char == ' ' || char == '\t'
+            columns = char == '\t' ? columns + 4 - columns % 4 : columns + 1
+          end
+          columns >= list[1]
         end
 
         private def run_length(text : String, char : Char) : Int32
