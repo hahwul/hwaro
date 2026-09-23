@@ -40,7 +40,7 @@ on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 | `key` | yes | Name under `site.data`. It accepts letters, digits, `_`, and `-`; each key is unique case-insensitively. |
 | `url` | yes | Absolute `http://` or `https://` URL. Other schemes are rejected when loading config. |
 | `format` | no | `json`, `toml`, `yaml`, or `csv`. When omitted, Hwaro uses the response `Content-Type`, then the final URL extension after redirects. Set it explicitly if neither identifies a format. |
-| `headers` | no | Extra request headers. They are treated as credentials: never logged, and dropped if a redirect leaves the original origin. |
+| `headers` | no | Extra request headers. They are treated as credentials: never logged, and dropped once a redirect leaves the original origin, including any later redirect back to it. |
 | `cache` | no | Disk-cache TTL such as `"90s"`, `"30m"`, `"1h"`, `"7d"`, or `"1h30m"`. A fresh cache skips the request. |
 | `on_error` | no | Fetch/parse failure policy: `fail` (default), `warn-and-use-cache`, or `warn-and-skip`. |
 

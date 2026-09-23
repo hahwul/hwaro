@@ -69,10 +69,22 @@ module Hwaro::Core::Build::Phases::Finalize
     live = Set(String).new
     owned = Set(String).new
     ctx.all_pages.each do |page|
-      # A synthesized page has no source file and therefore no cache entry;
+      # A synthesized page has no source file and therefore no cache entry —
+      # claim its outputs like any other source-less output instead, so the
+      # page of a record that later disappears from the data is pruned by the
+      # claims diff below rather than published forever.
       # `render = false` and a URL that escapes the output dir write nothing,
       # so the file they wrote on an earlier build is stale now.
-      next if page.synthesized?
+      if page.synthesized?
+        # Claims are diffed relative to the output directory (see
+        # `stale_generated_outputs`), while page output paths are absolute.
+        root = File.expand_path(output_dir, cwd)
+        collect_page_output_paths(page, output_dir).each do |path|
+          relative = Path[File.expand_path(path, cwd)].relative_to(root).to_s
+          claim_generated_output(File.join(output_dir, relative)) unless relative.starts_with?("..")
+        end
+        next
+      end
       next unless page.render
       source, output = cache_paths_for(page, output_dir)
       next unless output

@@ -202,13 +202,19 @@ module Hwaro
           # One clock for the whole entry: hops and body reads share it, so a
           # chain of individually-prompt responses can't outlast the budget.
           started = Time.instant
+          # Once any hop leaves the original origin the configured headers are
+          # gone for the rest of the chain: a host we never sent them to must
+          # not be able to redirect back and pick which URL on the origin
+          # receives the credential (curl and `requests` behave the same).
+          credentials = true
 
           loop do
             check_deadline!(started, deadline)
             validate_hop!(current)
+            credentials &&= same_origin?(original, current)
             client = build_client(current)
             outcome = begin
-              client.get(current.request_target, headers: request_headers(entry, original, current)) do |response|
+              client.get(current.request_target, headers: request_headers(entry, credentials)) do |response|
                 if response.status.redirection?
                   location = response.headers["Location"]? ||
                              raise FetchError.new("redirect (HTTP #{response.status_code}) without a Location header")
@@ -257,14 +263,13 @@ module Hwaro
           client
         end
 
-        private def request_headers(entry : Models::RemoteDataConfig, original : URI, current : URI) : HTTP::Headers
+        # Configured headers usually carry credentials; a redirect that
+        # leaves the original origin must not receive them (curl and browser
+        # fetch drop Authorization the same way). `credentials` is false from
+        # the first cross-origin hop on (see `fetch`).
+        private def request_headers(entry : Models::RemoteDataConfig, credentials : Bool) : HTTP::Headers
           headers = HTTP::Headers{"User-Agent" => "Hwaro", "Accept" => "*/*"}
-          # Configured headers usually carry credentials; a redirect that
-          # leaves the original origin must not receive them (curl and
-          # browser fetch drop Authorization the same way).
-          if same_origin?(original, current)
-            entry.headers.each { |name, value| headers[name] = value }
-          end
+          entry.headers.each { |name, value| headers[name] = value } if credentials
           headers
         end
 

@@ -602,6 +602,41 @@ describe "RemoteData.load" do
     seen_auth.should be_nil
   end
 
+  # A host the credential was never sent to used to be able to bounce the
+  # request back to the origin and choose which origin URL received it.
+  it "keeps configured headers dropped after a redirect leaves the origin" do
+    seen_auth = "unset".as(String?)
+    other_base = ""
+    origin_handler = ->(ctx : HTTP::Server::Context) do
+      if ctx.request.path == "/start"
+        ctx.response.status_code = 302
+        ctx.response.headers["Location"] = "#{other_base}/bounce"
+      else
+        seen_auth = ctx.request.headers["Authorization"]?
+        ctx.response.content_type = "application/json"
+        ctx.response.print %({"ok": true})
+      end
+    end
+
+    with_test_server(origin_handler) do |base|
+      bounce_handler = ->(ctx : HTTP::Server::Context) do
+        ctx.response.status_code = 302
+        ctx.response.headers["Location"] = "#{base}/chosen-by-other-host"
+      end
+
+      with_test_server(bounce_handler) do |bounce_base|
+        other_base = bounce_base
+        Dir.mktmpdir do |dir|
+          entry = remote_entry("#{base}/start", headers: {"Authorization" => "Bearer tok-123"})
+          result = RemoteData.load(entry, cache_dir: File.join(dir, "cache")).not_nil!
+          result.value["ok"].truthy?.should be_true
+        end
+      end
+    end
+
+    seen_auth.should be_nil
+  end
+
   it "rejects a redirect to a non-http(s) scheme" do
     handler = ->(ctx : HTTP::Server::Context) do
       ctx.response.status_code = 302

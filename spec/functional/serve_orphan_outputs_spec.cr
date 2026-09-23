@@ -279,4 +279,24 @@ describe "serve orphaned outputs" do
       end
     end
   end
+
+  # `generate_feeds` lives in a section's front matter, so turning it off is
+  # an incremental edit, and incremental passes run no claims diff.
+  it "removes a section feed an incremental edit turned off" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        File.write("templates/section.html", "<html><body>{{ section.title }}</body></html>")
+        File.write("content/posts/_index.md", "---\ntitle: Posts\ngenerate_feeds: true\n---\n")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/posts/rss.xml").should be_true
+
+        File.write("content/posts/_index.md", "---\ntitle: Posts\n---\n")
+        server.orphan_builder.run_incremental(["content/posts/_index.md"], options).should be_true
+        File.exists?("public/posts/rss.xml").should be_false
+      end
+    end
+  end
 end

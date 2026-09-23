@@ -440,6 +440,13 @@ module Hwaro::Core::Build::Phases::ParseContent
     # fan-out — it needs every page's final URL (internal links) and the
     # body's full pipeline (shortcodes, markdown extensions, emoji), none of
     # which are available while pages are still being parsed in parallel.
+    #
+    # Cleared first: a serve incremental re-parse works on the LIVE page, and
+    # extract_summary keeps whatever chunk is already set when the body has
+    # no marker — so deleting `<!-- more -->` left the old marker summary
+    # (and its rendered HTML) in every listing until restart.
+    page.summary = nil
+    page.summary_html = nil
     page.extract_summary
 
     if page.is_a?(Models::Section)
