@@ -83,6 +83,28 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
 
+    it "does not rewrite a YAML file reached through a symlink outside content" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(outside)
+        external_file = File.join(outside, "secret.md")
+        original = "---\ntitle: Secret\n---\n\n# Content"
+        File.write(external_file, original)
+        link = File.join(content_dir, "leak.md")
+        File.symlink(external_file, link)
+
+        result = Hwaro::Services::FrontmatterConverter.new(content_dir).convert_file(
+          link,
+          Hwaro::Services::FrontmatterFormat::TOML,
+        )
+
+        result.should be_false
+        File.read(external_file).should eq(original)
+      end
+    end
+
     it "converts TOML file to YAML" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)

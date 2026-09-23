@@ -144,6 +144,11 @@ module Hwaro
         log_skipped : Bool = true,
         skips : Hash(SkipReason, Int32)? = nil,
       ) : ConversionStatus
+        if File.symlink?(file_path) && !Utils::PathUtils.resolves_within?(file_path, @content_dir)
+          Logger.warn "Skipped symlink outside content directory: #{file_path}"
+          return ConversionStatus::Skipped
+        end
+
         # Strip a BOM before detection so a BOM'd file isn't misread as
         # "no frontmatter" and skipped. The rewrite below drops the BOM too.
         content = Utils::TextUtils.strip_bom(File.read(file_path))
