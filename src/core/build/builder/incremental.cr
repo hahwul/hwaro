@@ -269,6 +269,11 @@ module Hwaro
           sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
 
+          # The 404 page renders site-wide listings too (a docs sidebar, the
+          # nav) and is never in the render set above — regenerate it so it
+          # doesn't keep printing the pre-edit titles. One page; always cheap.
+          generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
+
           # --- 5. Regenerate taxonomy index/term pages ---
           # Merge the generated taxonomy pages into the page set the SEO
           # generators read so taxonomy.sitemap/feed take effect on incremental
@@ -823,8 +828,12 @@ module Hwaro
                   end
           raise_on_broken_internal_links!
 
-          # Re-generate 404 page with new template
-          if affected_templates.nil? || affected_templates.includes?("404")
+          # Re-generate the 404 page with the new template — and whenever
+          # content moved: it renders the same site-wide listings (a docs
+          # sidebar, the nav) as every other page, so a retitled page or
+          # section left it printing the old names.
+          if affected_templates.nil? || affected_templates.includes?("404") ||
+             (force_pages && !force_pages.empty?) || membership_changed
             generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
           end
 
