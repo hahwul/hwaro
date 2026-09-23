@@ -313,9 +313,7 @@ module Hwaro
         body = strip_code_blocks(extract_body(content))
         body.scan(/(?<!!)\[([^\]]*)\]\(([^\)]+)\)/) do |match|
           raw_url = match[2].strip
-          next unless raw_url.starts_with?("@/")
-
-          path = raw_url.lchop("@/").split("#").first.split("?").first.strip
+          path = internal_link_path(match[2]) || next
           next if path.empty?
 
           target = File.join(@content_dir, path)
@@ -330,6 +328,24 @@ module Hwaro
               message: "Possible broken internal link: #{raw_url}")
           end
         end
+      end
+
+      # CommonMark destinations may be followed by a title, or be wrapped in
+      # angle brackets when they contain spaces. Strip that syntax before
+      # checking the Hwaro @/ content-root prefix; otherwise valid titled
+      # links were looked up with the title appended and angle-wrapped broken
+      # links were silently skipped.
+      private def internal_link_path(raw_url : String) : String?
+        destination = raw_url.strip
+        if destination.starts_with?('<')
+          closing = destination.index('>') || return
+          destination = destination[1...closing]
+        else
+          destination = destination.split(/\s/, 2).first
+        end
+
+        return unless destination.starts_with?("@/")
+        destination.lchop("@/").split("#").first.split("?").first.strip
       end
 
       private def extract_body(content : String) : String

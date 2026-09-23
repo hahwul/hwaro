@@ -153,6 +153,31 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "detects broken angle-bracket internal links" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "broken-angle.md"), "---\ntitle: Post\ndescription: Desc\n---\n\n[Link](<@/missing-page.md>)\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_true
+      end
+    end
+
+    it "ignores Markdown link titles when resolving valid internal links" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "target.md"), "---\ntitle: Target\ndescription: Desc\n---\nTarget\n")
+        File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: Desc\n---\n[Target](@/target.md \"A title\")\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+
+        issues.any? { |i| i.id == "content-internal-link-broken" }.should be_false
+      end
+    end
+
     it "accepts valid internal links" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
