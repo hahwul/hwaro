@@ -48,6 +48,37 @@ module Hwaro
         contains?(dir, target)
       end
 
+      # Check an existing file before unlinking it. Lexical containment alone
+      # is not enough for a persisted stale path such as
+      # `public/link/secret`: `public/link` may point outside the output tree.
+      # The leaf may itself be a symlink because deleting it removes the link,
+      # so resolve and check its parent instead.
+      def safe_to_delete_file?(path : String, output_dir : String) : Bool
+        return false unless within_output_dir?(path, output_dir)
+
+        cwd = Dir.current
+        root = File.realpath(File.expand_path(output_dir, cwd))
+        parent = File.realpath(File.expand_path(File.dirname(path), cwd))
+        within_output_dir?(parent, root)
+      rescue File::Error | IO::Error | ArgumentError
+        false
+      end
+
+      # Check an existing directory before pruning it. Resolve the directory
+      # itself (including symlinked ancestors), reject a symlink leaf, and
+      # never allow pruning the output root.
+      def safe_to_delete_directory?(path : String, output_dir : String) : Bool
+        return false unless within_output_dir?(path, output_dir)
+        return false if File.symlink?(path)
+
+        cwd = Dir.current
+        root = File.realpath(File.expand_path(output_dir, cwd))
+        directory = File.realpath(File.expand_path(path, cwd))
+        directory != root && within_output_dir?(directory, root)
+      rescue File::Error | IO::Error | ArgumentError
+        false
+      end
+
       private def contains?(canonical_dir : String, canonical_output : String) : Bool
         return true if canonical_output == canonical_dir
         # Build the prefix from the canonical dir rather than always appending
