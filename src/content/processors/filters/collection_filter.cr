@@ -83,13 +83,12 @@ module Hwaro
             env.filters["unique"] = Crinja.filter do
               safe_array do
                 arr = target.as_a
-                seen = Set(String).new
+                seen = Set(Crinja::Value).new
                 arr.select do |item|
-                  key = item.to_s
-                  if seen.includes?(key)
+                  if seen.includes?(item)
                     false
                   else
-                    seen << key
+                    seen << item
                     true
                   end
                 end

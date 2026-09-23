@@ -10,7 +10,7 @@ module Hwaro
       module MarkdownExtensions
         # --- Task Lists ---
         # Converts - [ ] and - [x] to checkbox HTML in list items
-        TASK_LIST_RE = /^(\s*[-*+]\s)\[([ xX])\]/m
+        TASK_LIST_RE = /^((?:[ \t]{0,3}>[ \t]?)*[ \t]*[-*+][ \t])\[([ xX])\]/m
 
         def preprocess_task_lists(content : String) : String
           content.gsub(TASK_LIST_RE) do |_|

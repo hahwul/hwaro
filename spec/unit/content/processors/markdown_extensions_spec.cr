@@ -52,6 +52,16 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("checkbox\" disabled")
       result.should contain("- Normal")
     end
+
+    it "converts task items inside blockquotes" do
+      cfg = make_config(task_lists: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> - [ ] Todo\n> - [x] Done",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<input type="checkbox" disabled> Todo))
+      html.should contain(%(<input type="checkbox" checked disabled> Done))
+    end
   end
 
   describe "definition lists" do
@@ -743,6 +753,24 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should eq("## My Heading <!--HID:custom-id-->")
     end
 
+    it "extracts explicit IDs from headings inside blockquotes" do
+      cfg = make_config(heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> ## Heading {#custom-id}",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<h2 id="custom-id">Heading</h2>))
+    end
+
+    it "applies attribute blocks to headings inside blockquotes" do
+      cfg = make_config(attributes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> ## Heading {#custom-id .feature}",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<h2 id="custom-id" class="feature">Heading</h2>))
+    end
+
     it "extracts a digit-leading id (#792)" do
       content = "## 1. Fuzzer로 요청 보내기 {#1-send-a-request-to-the-fuzzer}"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
@@ -1429,6 +1457,36 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain(%(rel="noopener"))
     end
 
+    it "honors case-insensitive href attribute names in raw HTML" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(<a HREF="https://example.com">x</a>),
+        markdown_config: cfg,
+      )
+      html.should contain(%(HREF="https://example.com" target="_blank" rel="noopener"))
+    end
+
+    it "honors single-quoted href attributes in raw HTML" do
+      cfg = make_config
+      cfg.external_links_target_blank = true
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(<a href='https://example.com'>x</a>),
+        markdown_config: cfg,
+      )
+      html.should contain(%(href='https://example.com' target="_blank" rel="noopener"))
+    end
+
+    it "merges rel tokens into a single-quoted rel attribute" do
+      cfg = make_config
+      cfg.external_links_no_follow = true
+      html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+        %(<a href="https://example.com" rel='me'>x</a>), cfg
+      )
+      html.should contain(%(rel='me nofollow'))
+      html.scan("rel=").size.should eq(1)
+    end
+
     it "leaves links inside code blocks and mailto links alone" do
       cfg = make_config
       cfg.external_links_target_blank = true
@@ -1458,6 +1516,101 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "inline markup in link destinations" do
+    it "leaves extension delimiters in paragraph destinations unchanged" do
+      cfg = make_config(ins: true, mark: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[strike](https://example.com/a~~b~~) and [insert](https://example.com/c++d++)",
+        markdown_config: cfg,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+      html.should contain(%(href="https://example.com/c++d++"))
+      html.should_not contain("<del>")
+      html.should_not contain("<ins>")
+    end
+
+    it "leaves extension delimiters in table-cell destinations unchanged" do
+      cfg = make_config(ins: true, mark: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "| Link |\n| --- |\n| [strike](https://example.com/a~~b~~) |",
+        markdown_config: cfg,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+      html.should_not contain(%(href="https://example.com/a<del>b</del>"))
+    end
+
+    it "scans long lines of unmatched link syntax in linear time" do
+      cfg = make_config
+      ["x](" * 16000, "[x](" * 12000, "[x](a \"" * 7000, "[a](b (" * 7000, "[a](" * 8000 + " \"" + "t" * 8000].each do |line|
+        started = Time.instant
+        Hwaro::Content::Processors::MarkdownExtensions.preprocess(line + " ~~s~~", cfg).should contain("<del>s</del>")
+        (Time.instant - started).should be < 1.second
+      end
+    end
+
+    it "matches reference definitions on very long lines without exhausting the regex stack" do
+      cfg = make_config
+      ["> " * 100_000 + "[a]: b ~~x~~", "[a]: u \"" + "x" * 300_000 + "\" ~~x~~", "[a]: <" + "u" * 300_000 + "> ~~x~~"].each do |line|
+        Hwaro::Content::Processors::MarkdownExtensions.preprocess(line, cfg).should be_a(String)
+      end
+      html_line = "<a" + %( b="c") * 50_000 + " ~~x~~>"
+      Hwaro::Content::Processors::MarkdownExtensions.preprocess(html_line, cfg).should contain("<del>x</del>")
+    end
+
+    it "rewrites delimiters after text that is not an inline link" do
+      html, _ = Hwaro::Processor::Markdown.render("[a](b ~~c~~)", markdown_config: make_config)
+      html.should contain("<del>c</del>")
+    end
+
+    it "leaves extension delimiters in a titled reference definition unchanged" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ref][target]\n\n[target]: https://example.com/a~~b~~ \"T ~~t~~\"",
+        markdown_config: make_config,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+      html.should contain(%(title="T ~~t~~"))
+      html.should_not contain("<del>")
+    end
+
+    it "shields a reference definition whose label has multibyte characters" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[참고][대상]\n\n[대상]: https://example.com/a~~b~~",
+        markdown_config: make_config,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+    end
+
+    it "rewrites delimiters on a line that only looks like a reference definition" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[Label]: not ~~x~~ a def because trailing text",
+        markdown_config: make_config,
+      )
+      html.should contain("<del>x</del>")
+    end
+
+    it "leaves delimiters in raw HTML attributes unchanged" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(<span title="~~t~~">x</span> ~~s~~),
+        markdown_config: make_config,
+      )
+      html.should contain(%(title="~~t~~"))
+      html.should contain("<del>s</del>")
+    end
+
+    it "rewrites delimiters in text that only looks like an HTML tag" do
+      html, _ = Hwaro::Processor::Markdown.render("<b ~~x~~ y>", markdown_config: make_config)
+      html.should contain("<del>x</del>")
+    end
+
+    it "leaves extension delimiters in reference destinations unchanged" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ref][target]\n\n[target]: https://example.com/a~~b~~",
+        markdown_config: make_config,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+    end
+  end
+
   describe "indented code blocks" do
     it "leaves transforms alone inside an indented code run" do
       config = make_config(math: true)
@@ -1480,6 +1633,57 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       content = "- [ ] outer\n    - [ ] nested"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, config)
       result.scan("checkbox").size.should eq 2
+    end
+
+    it "leaves indented code inside a list item untouched" do
+      config = make_config(task_lists: true)
+      content = "- item\n\n      - [ ] literal task\n      - ~~literal strike~~"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("- [ ] literal task")
+      html.should contain("- ~~literal strike~~")
+      html.should_not contain("checkbox")
+      html.should_not contain("<del>")
+    end
+
+    it "leaves indented code alone after an unclosed HTML comment" do
+      config = make_config(math: true)
+      ["- item one\n  <!-- draft note, never closed\n\nText after list.\n\n    code ~~C1~~ $y$",
+       "Paragraph text\n    <!-- not a comment block\n\nLater.\n\n    code ~~C1~~ $y$",
+       "<!-->\n\nText.\n\n    code ~~C1~~ $y$"].each do |content|
+        html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+        html.should contain("code ~~C1~~ $y$")
+        html.should_not contain("<del>")
+        html.should_not contain("math-inline")
+      end
+    end
+
+    it "leaves indented code alone after a blockquote closes the list above it" do
+      config = make_config(math: true, footnotes: true)
+      content = "- item one\n- item two\n\n> A note after the list.\n\n    code ~~C1~~ $y$\n\n" \
+                "1. step\n\n> [!NOTE]\n> tip\n\n    $ echo ~~C2~~ [^n]\n\n[^n]: foot"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("code ~~C1~~ $y$")
+      html.should contain("$ echo ~~C2~~ [^n]")
+      html.should_not contain("<del>")
+      html.should_not contain("math-inline")
+      html.should_not contain(%(<section class="footnotes">))
+    end
+
+    it "applies extensions in nested list items indented four or more columns" do
+      config = make_config(task_lists: true, math: true, ins: true, mark: true, footnotes: true)
+      content = "- a\n\n    - b ~~S1~~\n\n        - c ~~S2~~ $x^2$ ++I1++\n\n" \
+                "        - [ ] task\n\n      paragraph of b ~~S3~~ ==M1== [^f1]\n\n[^f1]: note"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should_not contain("<pre>")
+      html.should contain("<del>S1</del>")
+      html.should contain("<del>S2</del>")
+      html.should contain("<del>S3</del>")
+      html.should contain("<ins>I1</ins>")
+      html.should contain("<mark>M1</mark>")
+      html.should contain("math-inline")
+      html.should contain("checkbox")
+      html.should contain(%(<sup class="footnote-ref">))
+      html.should contain(%(<section class="footnotes">))
     end
   end
 
@@ -1969,6 +2173,28 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
       result.should contain("<code>`tick`</code>")
       result.should contain("<del>x</del>")
+    end
+  end
+
+  describe "raw HTML code blocks" do
+    it "keeps processing after a custom element named like a raw-code tag" do
+      config = make_config(math: true)
+      content = "<style-guide>\n\n~~S1~~ $x$\n\n</style-guide>\n\n~~S2~~"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("<del>S1</del>")
+      html.should contain("<del>S2</del>")
+      html.should contain("math-inline")
+    end
+
+    it "leaves math, strikethrough, and footnote references untouched" do
+      config = make_config(math: true, footnotes: true)
+      content = "<pre>\n$alpha$ ~~literal~~ [^1]\n</pre>\n\n[^1]: note text"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("$alpha$ ~~literal~~ [^1]")
+      html.should_not contain("math-inline")
+      html.should_not contain("<del>")
+      html.should_not contain(%(<sup class="footnote-ref">))
+      html.should_not contain(%(<section class="footnotes">))
     end
   end
 end

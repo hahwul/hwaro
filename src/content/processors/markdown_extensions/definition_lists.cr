@@ -31,7 +31,9 @@ module Hwaro
 
           lines = content.split("\n")
 
-          tracker = FenceTracker.new
+          # This extension treats a raw-HTML line used as term text as content
+          # and escapes it; preserve that established behavior here.
+          tracker = FenceTracker.new(raw_html_code: false)
           fenced = lines.map { |line| tracker.fence_line?(line) }
 
           result = [] of String

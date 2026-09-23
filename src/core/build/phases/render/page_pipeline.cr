@@ -422,7 +422,7 @@ module Hwaro::Core::Build::Phases::Render
     # FenceTracker + inline-code masking the shortcode pre-filter uses
     # (content_may_contain_shortcodes?) so the two can't disagree about
     # what is fenced.
-    tracker = Content::Processors::FenceTracker.new
+    tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
     raw.each_line(chomp: false) do |line|
       next if tracker.fence_line?(line)
       next unless line.includes?("{{<")

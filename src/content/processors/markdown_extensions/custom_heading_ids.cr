@@ -22,7 +22,7 @@ module Hwaro
         # we capture and preserve so Markd still recognises the line as a heading.
         # `\r?` before `$`: CRLF content otherwise never matches and the id is
         # silently dropped.
-        HEADING_ID_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([\w][\w:-]*)\}[ \t]*\r?$/
+        HEADING_ID_RE = /^((?: {0,3}>[ \t]?)* {0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{\#([\w][\w:-]*)\}[ \t]*\r?$/
 
         # --- Custom Attributes (F9) ---
         # Generalized `{#id .class key=val}` attribute blocks — headings and
@@ -32,7 +32,7 @@ module Hwaro
         # regexes disjoint on `## H {#id}` (HEADING_ID_RE wins) while still
         # catching `## H {#id .class}` (falls through to this one, since
         # HEADING_ID_RE requires the braces to contain ONLY `#id`).
-        HEADING_ATTR_RE = /^([ ]{0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{([^{}]+)\}[ \t]*\r?$/
+        HEADING_ATTR_RE = /^((?: {0,3}>[ \t]?)* {0,3})(\#{1,6})[ \t]+(.+?)[ \t]*\{([^{}]+)\}[ \t]*\r?$/
         # `![alt](url){.class key=val}` — an attribute block immediately
         # following an inline image's closing `)`. Matched inside
         # `transform_outside_code_spans` so a literal example in a code span

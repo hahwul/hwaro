@@ -122,6 +122,7 @@ module Hwaro
         SCPH_TOKEN_RE            = /\x00SCPH(\d+)\x00/
         MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d+)\x00/
         CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d+)\x00/
+        LINK_TAG_TOKEN_RE        = /\x00IMTAG(\d+)\x00/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
@@ -195,6 +196,16 @@ module Hwaro
             end
           end
 
+          # The emphasis-like passes below run over rendered inline HTML so
+          # link text gets formatting too. Keep generated <a>/<img> opening
+          # tags opaque during those passes; otherwise delimiters in a valid
+          # URL are inserted into an href/src attribute.
+          link_tags = [] of String
+          result = result.gsub(/<(?:a|img)\b[^>]*>/i) do |tag|
+            link_tags << tag
+            "\x00IMTAG#{link_tags.size - 1}\x00"
+          end
+
           result = result.gsub(INLINE_BOLD_ASTERISK_RE) { "<strong>#{$1}</strong>" }
           result = result.gsub(INLINE_BOLD_UNDERSCORE_RE) { "<strong>#{$1}</strong>" }
           result = result.gsub(INLINE_ITALIC_ASTERISK_RE) { "<em>#{$1}</em>" }
@@ -205,6 +216,10 @@ module Hwaro
           result = result.gsub(INLINE_MARK_RE) { "<mark>#{$1}</mark>" } if flags.mark
           result = result.gsub(INLINE_SUB_RE) { "<sub>#{$1}</sub>" } if flags.sub
           result = result.gsub(INLINE_SUP_RE) { "<sup>#{$1}</sup>" } if flags.sup
+
+          unless link_tags.empty?
+            result = result.gsub(LINK_TAG_TOKEN_RE) { link_tags[$1.to_i]?.try(&.itself) || $0 }
+          end
 
           # One pass per token kind, not one `gsub` per span: the per-span
           # loop rescanned the whole string for every span, so a cell or

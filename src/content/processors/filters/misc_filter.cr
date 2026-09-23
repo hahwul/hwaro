@@ -54,13 +54,23 @@ module Hwaro
               JSON.build(indent_str) { |b| MiscFilters.build_json(b, target) }.gsub("</", "<\\/")
             end
 
-            # Default filter — returns fallback when target is nil/undefined or empty string
+            # Default filter — returns the fallback when the target is
+            # undefined, none, or renders as an empty string. The fallback
+            # keeps its type (`default(value=0) + 1` is arithmetic), except
+            # that a none fallback renders as "". A non-empty array, hash or
+            # object passes through unchanged; any other non-empty target is
+            # stringified, as it always was, so string filters chained after
+            # it (`| length`, `| replace`) keep working on numbers and bools.
             env.filters["default"] = Crinja.filter({value: ""}) do
+              fallback = arguments["value"]
+              fallback = Crinja::Value.new("") if fallback.none?
               if target.raw.nil? || target.undefined?
-                arguments["value"].to_s
+                fallback
+              elsif target.indexable? || target.mapping?
+                target
               else
                 val = target.to_s
-                val.empty? ? arguments["value"].to_s : val
+                val.empty? ? fallback : Crinja::Value.new(val)
               end
             end
 

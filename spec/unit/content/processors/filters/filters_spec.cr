@@ -524,6 +524,33 @@ describe "MiscFilters" do
       result.strip.should eq("fallback")
     end
 
+    it "preserves the fallback value's type" do
+      render_filter("{{ (missing | default(value=40)) + 2 }}").strip.should eq("42")
+    end
+
+    it "renders a none fallback as an empty string" do
+      render_filter("[{{ missing | default(value=none) }}]").strip.should eq("[]")
+      vars = {"text" => Crinja::Value.new("")}
+      render_filter("[{{ text | default(value=none) }}]", vars).strip.should eq("[]")
+    end
+
+    it "stringifies a non-empty scalar value so string filters keep working" do
+      vars = {"num" => Crinja::Value.new(42), "flag" => Crinja::Value.new(true)}
+      render_filter("{{ num | default(value='') | length }}", vars).strip.should eq("2")
+      render_filter("{{ num | default(value='') | replace('4', '5') }}", vars).strip.should eq("52")
+      render_filter("{{ flag | default(value='') | length }}", vars).strip.should eq("4")
+    end
+
+    it "passes a non-empty array or hash through unchanged" do
+      items = Crinja::Value.new([Crinja::Value.new(1), Crinja::Value.new(2), Crinja::Value.new(3)])
+      hash = Crinja::Value.new({Crinja::Value.new("a") => Crinja::Value.new("x")})
+      vars = {"items" => items, "meta" => hash}
+      render_filter("{{ items | default(value=[]) | length }}", vars).strip.should eq("3")
+      render_filter("{% for i in items | default(value=[]) %}{{ i }},{% endfor %}", vars).strip.should eq("1,2,3,")
+      render_filter("{% set m = meta | default(value='') %}{{ m.a }}", vars).strip.should eq("x")
+      render_filter("{{ items | default(value='') }}", vars).should_not contain("Crinja::Value")
+    end
+
     it "returns default value for undefined variable" do
       result = render_filter("{{ undefined_var | default(value='fallback') }}")
       result.strip.should eq("fallback")
@@ -1031,6 +1058,11 @@ describe "CollectionFilters (extended)" do
       vars = {"items" => items}
       result = render_filter("{% for i in items | unique %}{{ i }},{% endfor %}", vars)
       result.should eq("1,2,3,")
+    end
+
+    it "keeps values of different types distinct when their text is the same" do
+      items = Crinja::Value.new([Crinja::Value.new(1), Crinja::Value.new("1")])
+      render_filter("{{ items | unique | length }}", {"items" => items}).strip.should eq("2")
     end
 
     it "removes duplicate strings" do
