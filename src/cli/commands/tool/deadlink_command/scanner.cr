@@ -134,7 +134,7 @@ module Hwaro
             links = [] of Link
             link_regex = /!?\[[^\]]*?\]\(#{LINK_DEST.source}\)/
 
-            Dir.glob("#{dir}/**/*.md").each do |file|
+            Dir.glob("#{dir}/**/*.{md,markdown}").each do |file|
               content = readable_markdown(file) || next
               content.scan(link_regex) do |match|
                 url = clean_external_target(match[1])
@@ -221,7 +221,7 @@ module Hwaro
             link_re = /(?<!!)\[([^\]]*)\]\(#{LINK_DEST.source}\)/
             image_re = /!\[([^\]]*)\]\(#{LINK_DEST.source}\)/
 
-            Dir.glob("#{dir}/**/*.md").each do |file|
+            Dir.glob("#{dir}/**/*.{md,markdown}").each do |file|
               content = readable_markdown(file) || next
 
               # Regular links (exclude images by using negative lookbehind)

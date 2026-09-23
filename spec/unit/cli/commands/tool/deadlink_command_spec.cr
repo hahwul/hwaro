@@ -86,16 +86,19 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
-    it "only scans .md files" do
+    it "scans build-supported Markdown extensions and ignores non-content files" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "[Link](https://example.com)")
+        File.write(File.join(dir, "test.markdown"), "[Link](https://markdown.example.com)\n[Broken](/missing/)")
         File.write(File.join(dir, "test.txt"), "[Link](https://other.com)")
 
         cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
-        links.size.should eq(1)
-        links[0].url.should eq("https://example.com")
+        links.map(&.url).sort!.should eq(["https://example.com", "https://markdown.example.com"])
+
+        internal_links = cmd.find_internal_links_for_test(dir)
+        internal_links.map(&.url).should eq(["/missing/"])
       end
     end
 
