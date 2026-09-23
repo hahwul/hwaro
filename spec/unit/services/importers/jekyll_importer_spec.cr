@@ -817,3 +817,17 @@ describe "Jekyll import: index.html permalinks" do
     end
   end
 end
+
+describe "Jekyll import: non-page permalinks" do
+  # A permalink naming another kind of file (`/feed.xml`) cannot be a page
+  # path — mapped anyway it published `feed.xml/index.html`. It is left
+  # unmapped with a warning, as before `path` mapping existed.
+  it "leaves a non-HTML file permalink unmapped and warns" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "feed.md"), "---\ntitle: Feed\npermalink: /feed.xml\n---\nf\n")
+      log = with_captured_log { import_jekyll(dir) }
+      File.read(File.join(dir, "output", "feed.md")).should_not contain("path =")
+      log.should contain("/feed.xml")
+    end
+  end
+end

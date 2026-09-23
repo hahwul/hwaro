@@ -545,16 +545,19 @@ module Hwaro
         # hwaro's `path` front matter so the page keeps its published address.
         # hwaro publishes `path = "a/b"` at `/a/b/`, so:
         #
+        # - a query or fragment is dropped (it is not part of the page path);
         # - a trailing `index.html` names the directory itself
         #   (`/docs/index.html` is served at `/docs/`), so it maps to that
         #   directory with no alias;
         # - any other `.html` URL becomes the extensionless path plus an alias
-        #   at the old address (its redirect stub keeps inbound links working).
+        #   at the old address (its redirect stub keeps inbound links working);
+        # - a URL naming another kind of file (`/feed.xml`) cannot be a page
+        #   path, so it is left unmapped with a warning, as before.
         #
         # Patterns (`:title`), external URLs and the site root are left alone.
-        protected def apply_source_url(fields : Hash(String, FieldValue), url : String?) : Nil
+        protected def apply_source_url(fields : Hash(String, FieldValue), url : String?, source : String = "") : Nil
           return unless url
-          url = url.strip
+          url = url.strip.split(/[?#]/, 2).first
           return if url.empty? || url.includes?(':') || url.starts_with?("//")
           trimmed = url.strip('/')
           return if trimmed.empty?
@@ -569,6 +572,8 @@ module Hwaro
             original = "/#{trimmed}"
             aliases << original unless aliases.includes?(original)
             fields["aliases"] = aliases
+          elsif last.includes?('.')
+            Logger.warn "#{source.empty? ? "" : "#{source}: "}URL #{url.inspect} names a file, not a page; it is not kept as the imported page's path."
           else
             fields["path"] = trimmed
           end

@@ -129,7 +129,7 @@ module Hwaro
             # `/about/`). Pattern permalinks (`/:year/:title/`) describe the
             # site-wide scheme and are left to hwaro's own URLs.
             if permalink = yaml["permalink"]?
-              apply_source_url(fields, permalink.as_s?)
+              apply_source_url(fields, permalink.as_s?, file_info[:path])
             end
 
             # jekyll-redirect-from (a GitHub Pages default plugin): each

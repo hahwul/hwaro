@@ -148,7 +148,7 @@ module Hwaro
 
             # Hugo's `url` sets the page's whole published path; dropping it
             # moved the page and broke every link to it.
-            apply_source_url(fields, string_value(data, "url"))
+            apply_source_url(fields, string_value(data, "url"), file_path)
 
             # image (from images[0] or featured_image)
             image = extract_image(data)

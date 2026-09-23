@@ -499,3 +499,19 @@ describe "Hugo import: index.html url" do
     end
   end
 end
+
+describe "Hugo import: url with query or fragment" do
+  # `?q=1#top` is not part of the page path; kept, it became a literal
+  # directory name.
+  it "drops the query and fragment" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+      File.write(File.join(hugo_dir, "content", "frag.md"), "---\ntitle: F\nurl: /frag/?q=1#top\n---\nx\n")
+      output_dir = File.join(tmpdir, "out")
+      Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir)).success.should be_true
+      File.read(File.join(output_dir, "frag.md")).should contain(%(path = "frag"\n))
+    end
+  end
+end
