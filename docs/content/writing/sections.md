@@ -201,7 +201,7 @@ When rendering a section page (`_index.md`), these variables are available:
 | section.pages | Array<Page> | Pages shown in the current section list |
 | section.pages_count | Int | Number of items in `section.pages` |
 | section.list | String | Pre-rendered HTML list (same value as `section_list`) |
-| section.subsections | Array<Section> | Direct child sections (`title`, `description`, `url`, `pages_count`) |
+| section.subsections | Array<Section> | Direct child sections (`title`, `description`, `url`, `pages_count`), ordered by `weight` then path. On the root `_index.md` these are the top-level sections |
 | section.assets | Array<String> | Colocated section assets |
 | section.page_template | String | Default template name for child pages |
 | section.paginate_path | String | Pagination path segment |

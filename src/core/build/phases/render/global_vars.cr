@@ -117,7 +117,8 @@ module Hwaro::Core::Build::Phases::Render
       data = section_data_by_path[s.path]?
       next unless data
       subs_array = data[:hash]["subsections"].raw.as(Array)
-      s.subsections.each do |child|
+      # Same weight-then-path order as the page's own `section.subsections`.
+      s.subsections.sort { |a, b| compare_sections_by_weight(a, b) }.each do |child|
         if child_data = section_data_by_path[child.path]?
           subs_array << Crinja::Value.new(child_data[:hash])
         end

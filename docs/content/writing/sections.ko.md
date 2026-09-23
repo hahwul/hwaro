@@ -192,7 +192,7 @@ content/
 | section.pages | Array<Page> | 현재 섹션 목록에 표시되는 페이지 |
 | section.pages_count | Int | `section.pages`의 항목 수 |
 | section.list | String | 미리 렌더링된 HTML 목록(`section_list`와 동일한 값) |
-| section.subsections | Array<Section> | 직계 하위 섹션(`title`, `description`, `url`, `pages_count`) |
+| section.subsections | Array<Section> | 직계 하위 섹션(`title`, `description`, `url`, `pages_count`). `weight`, 경로 순으로 정렬되며, 루트 `_index.md`에서는 최상위 섹션 |
 | section.assets | Array<String> | 섹션과 함께 둔 에셋 |
 | section.page_template | String | 하위 페이지의 기본 템플릿 이름 |
 | section.paginate_path | String | 페이지네이션 경로 세그먼트 |

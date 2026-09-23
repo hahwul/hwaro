@@ -198,3 +198,28 @@ describe "Render vars: root subsections stay out of global section data" do
     end
   end
 end
+
+describe "Render vars: subsection order" do
+  # `section.subsections` followed discovery (glob) order while the prev/next
+  # chain walks subsections by weight then path; both now use the latter.
+  it "orders section.subsections and get_section subsections by weight" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md"     => "+++\ntitle = \"Home\"\n+++\n",
+        "a/_index.md"   => "+++\ntitle = \"A\"\nweight = 2\n+++\n",
+        "z/_index.md"   => "+++\ntitle = \"Z\"\nweight = 1\n+++\n",
+        "a/b/_index.md" => "+++\ntitle = \"B\"\nweight = 2\n+++\n",
+        "a/y/_index.md" => "+++\ntitle = \"Y\"\nweight = 1\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "P",
+        "section.html" => "OWN={% for s in section.subsections %}{{ s.title }}{% endfor %} " \
+                          "GET={% for s in get_section(path=\"a/_index.md\").subsections %}{{ s.title }}{% endfor %}",
+      },
+    ) do
+      File.read("public/index.html").should eq("OWN=ZA GET=YB")
+      File.read("public/a/index.html").should eq("OWN=YB GET=YB")
+    end
+  end
+end

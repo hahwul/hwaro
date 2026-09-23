@@ -270,7 +270,9 @@ module Hwaro::Core::Build::Phases::Render
       # per-section Crinja cache, the same source `get_section(...).pages`
       # uses in build_global_vars. Reading `sub.pages.size` here reported 0
       # for every subsection.
-      subsections_array = page.subsections.map do |sub|
+      # Weight-then-path, the order the prev/next chain walks subsections in
+      # (compare_sections_by_weight); discovery order is glob order.
+      subsections_array = page.subsections.sort { |a, b| compare_sections_by_weight(a, b) }.map do |sub|
         Crinja::Value.new({
           "title"       => Crinja::Value.new(sub.title),
           "description" => Crinja::Value.new(sub.description || ""),
