@@ -493,6 +493,21 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
+    it "does not resolve extensionless @/ links by guessing a page extension" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "target.markdown"), "target page")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "source.md"), url: "@/target", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
+        results.size.should eq(1)
+        results[0].error.not_nil!.should contain("not found")
+      end
+    end
+
     it "detects broken image paths" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "content")

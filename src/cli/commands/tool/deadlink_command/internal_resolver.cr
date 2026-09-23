@@ -356,6 +356,14 @@ module Hwaro
                                 project_root : String, taxonomy_names : Array(String),
                                 oracle : Utils::BuildOutput::Oracle) : Bool
             target = content_target(url, content_dir, base_dir)
+            if url.starts_with?("@/") && link.kind != :image
+              # The build's InternalLinkResolver resolves `@/` against the
+              # exact content path in its page map. Treating `@/target` like a
+              # route and guessing `.md`/`.markdown` made check-links call a
+              # link healthy even though the build left it unresolved.
+              return File.file?(target) && CONTENT_PAGE_EXTENSIONS.includes?(File.extname(target).downcase)
+            end
+
             # Most internal URLs are written with a trailing slash (`/about/`,
             # `/posts/hello/`) — strip it before computing the leaf-file
             # candidate so `target_no_slash + ".md"` resolves to
@@ -385,6 +393,8 @@ module Hwaro
             File.exists?(File.join(project_root, "static", asset_path)) ||
               oracle.exists?(asset_path)
           end
+
+          CONTENT_PAGE_EXTENSIONS = {".md", ".markdown"}
 
           # Language-qualified resolution for a `/<code>/…` URL whose literal
           # path did not resolve. Deliberately narrow: only a `.<code>` source
