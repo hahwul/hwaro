@@ -239,3 +239,64 @@ describe "Template error location: operators and missing templates" do
     message.should_not contain("cause: Division by 0")
   end
 end
+
+# A shortcode template is a template: a runtime error inside one must fail the
+# build (HWARO_E_TEMPLATE, exit 4) exactly like a page template, naming the
+# shortcode file and line. Downgrading it to a warning plus an HTML comment
+# let `hwaro build --json` report `status: ok` and ship the broken page.
+describe "Template error location: shortcodes" do
+  it "fails the build on a runtime error inside a content shortcode" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello {{ bad(text=\"x\") }}"},
+        template_files: {
+          "page.html"           => "<html>{{ content }}</html>",
+          "shortcodes/bad.html" => "<b>\n{{ text.foo.bar }}</b>",
+        },
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    message = err.message.not_nil!
+    message.should contain("text.foo is undefined")
+    message.should contain("templates/shortcodes/bad.html:2:")
+    message.should contain("{{ text.foo.bar }}")
+  end
+
+  it "fails the build on a missing include inside a content shortcode" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello {{ bad() }}"},
+        template_files: {
+          "page.html"           => "<html>{{ content }}</html>",
+          "shortcodes/bad.html" => "{% include \"nope.html\" %}",
+        },
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    message = err.message.not_nil!
+    message.should contain("nope.html")
+    message.should contain("templates/shortcodes/bad.html:1:")
+  end
+
+  it "fails the build on a runtime error inside a shortcode called from a page template" do
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"index.md" => "---\ntitle: Home\n---\nhello"},
+        template_files: {
+          "page.html"           => "<html>{{ bad(text=\"x\") }}{{ content }}</html>",
+          "shortcodes/bad.html" => "{{ text.foo.bar }}",
+        },
+      ) { }
+    end
+
+    err.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+    message = err.message.not_nil!
+    message.should contain("text.foo is undefined")
+    message.should contain("templates/shortcodes/bad.html:1:")
+  end
+end

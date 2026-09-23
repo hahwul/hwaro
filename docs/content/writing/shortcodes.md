@@ -38,9 +38,17 @@ Block shortcodes support two closer styles:
 
 **We strongly recommend named closers** (`{% endNAME %}`) for any non-trivial content. They make your Markdown much easier to read and maintain, especially when mixing multiple shortcodes or using deep nesting.
 
+To keep shortcode syntax literal in a Markdown page outside a code fence, wrap
+it in a raw block. The `{% raw %}` and `{% endraw %}` markers remain visible in
+Markdown output; fenced blocks inside the region do not split it.
+
 ## Built-in Shortcodes
 
 Hwaro ships with built-in shortcodes that work out of the box, with no template files needed.
+
+Pass parameters by name or in the shortcode's documented order. For example,
+`{{ youtube("VIDEO_ID") }}` and `{{ gist("username", "gist_id") }}` use
+positional arguments; quoted empty values still occupy their position.
 
 ### youtube
 
@@ -168,6 +176,16 @@ to find the dead embed on the published page:
 ## Creating Custom Shortcodes
 
 Shortcode templates live in `templates/shortcodes/`.
+
+A shortcode template that fails while rendering (for example, an undefined
+attribute access or an `{% include %}` of a missing template) fails the build
+with `HWARO_E_TEMPLATE` (exit code 4), just like a page template. The error
+names the shortcode file and line, such as `templates/shortcodes/alert.html:3:5`.
+Under `hwaro serve` it appears in the error overlay instead.
+
+A syntax error in a shortcode template is reported as a warning with the same
+file and location. Hwaro places a visible HTML comment at the call and keeps
+rendering the page.
 
 ### Example: Alert Box
 

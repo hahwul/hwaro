@@ -1574,10 +1574,9 @@ describe Hwaro::Content::Seo::Feeds do
       page = Hwaro::Models::Page.new("post.md")
       page.title = "Date Only"
       page.url = "/post/"
-      # Mimic what a TOML local-date (`date = 2026-03-05`) becomes after
-      # parsing on a `+09:00` host: midnight in `Asia/Seoul`.
-      seoul = Time::Location.fixed("Asia/Seoul", 9 * 3600)
-      page.date = Time.local(2026, 3, 5, 0, 0, 0, location: seoul)
+      # What a TOML local-date (`date = 2026-03-05`) becomes after parsing:
+      # midnight in the host's local zone.
+      page.date = Time.local(2026, 3, 5, 0, 0, 0, location: Time::Location.local)
       page.raw_content = "Content"
 
       rss = Hwaro::Content::Seo::Feeds.generate_rss(
@@ -2504,8 +2503,8 @@ describe Hwaro::Content::Seo::Feeds do
       page.render = true
       page.is_index = false
       page.raw_content = "body"
-      # Local midnight in a +09:00 zone (independent of the host's real zone).
-      page.date = Time.local(2026, 3, 5, 0, 0, 0, location: Time::Location.fixed(9 * 3600))
+      # A parsed date-only value: midnight in the host's local zone.
+      page.date = Time.local(2026, 3, 5, 0, 0, 0, location: Time::Location.local)
 
       Dir.mktmpdir do |output_dir|
         Hwaro::Content::Seo::Feeds.generate([page], config, output_dir)
@@ -2533,8 +2532,9 @@ describe Hwaro::Content::Seo::Feeds do
       newest.render = true
       newest.is_index = false
       newest.raw_content = "body"
-      # Normalizes to 2026-03-05T00:00:00Z (raw instant 2026-03-04T15:00Z).
-      newest.date = Time.local(2026, 3, 5, 0, 0, 0, location: Time::Location.fixed(9 * 3600))
+      # A local-zone midnight: normalizes to 2026-03-05T00:00:00Z (raw
+      # instant 2026-03-04T15:00Z on a +09:00 host).
+      newest.date = Time.local(2026, 3, 5, 0, 0, 0, location: Time::Location.local)
 
       older = Hwaro::Models::Page.new("posts/older.md")
       older.title = "Older"
@@ -2737,6 +2737,37 @@ describe Hwaro::Content::Seo::Feeds do
         feed = File.read(File.join(output_dir, "rss.xml"))
         feed.should contain("<content:encoded><![CDATA[for n &lt; 10...]]></content:encoded>")
       end
+    end
+  end
+end
+
+describe "feed dates: authored offset midnight" do
+  # normalize_feed_time re-anchored ANY non-UTC midnight as a bare date, so
+  # an authored `2024-03-05T00:00:00+09:00` (2024-03-04 15:00 UTC) was
+  # published as 2024-03-05 00:00 UTC — nine hours late. Only a local-zone
+  # midnight (a parsed bare date) is a date without a time of day.
+  it "keeps the instant of an authored fixed-offset midnight" do
+    config = Hwaro::Models::Config.new
+    config.feeds.enabled = true
+    config.feeds.type = "rss"
+    config.base_url = "https://example.com"
+    page = Hwaro::Models::Page.new("posts/a.md")
+    page.title = "A"
+    page.url = "/posts/a/"
+    page.date = Time.local(2024, 3, 5, location: Time::Location.fixed(9 * 3600))
+    page.raw_content = "a"
+
+    bare = Hwaro::Models::Page.new("posts/b.md")
+    bare.title = "B"
+    bare.url = "/posts/b/"
+    bare.date = Time.local(2024, 3, 6, location: Time::Location.local)
+    bare.raw_content = "b"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Seo::Feeds.generate([page, bare], config, output_dir)
+      rss = File.read(File.join(output_dir, "rss.xml"))
+      rss.should contain("<pubDate>Mon, 04 Mar 2024 15:00:00 +0000</pubDate>")
+      rss.should contain("<pubDate>Wed, 06 Mar 2024 00:00:00 +0000</pubDate>")
     end
   end
 end

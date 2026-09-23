@@ -134,10 +134,12 @@ module Hwaro
             # HWARO-SHORTCODE-PLACEHOLDER token then shipped in the HTML,
             # the feed and the search index).
             body_lines = block_body_lines(content)
+            raw_lines = raw_block_lines(content)
             line_no = 0
 
             content.each_line(chomp: false) do |line|
               in_body = body_lines[line_no]? || false
+              in_raw_region = raw_lines[line_no]? || false
               line_no += 1
 
               # Fence lines flush the pending chunk and pass through
@@ -146,7 +148,7 @@ module Hwaro
               # a chunk boundary (block_body_lines already guarantees the
               # fences inside a body are balanced, so the tracker resumes in
               # the same state on the far side).
-              if !in_body && tracker.fence_line?(line)
+              if !in_body && tracker.fence_line?(line) && !in_raw_region
                 io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, warnings: warnings)
                 buffer = String::Builder.new
                 io << line
@@ -236,6 +238,53 @@ module Hwaro
           body_map
         end
 
+        # Matched raw blocks must stay in one processing chunk so
+        # `mask_raw_blocks` can protect the whole region. Fences inside raw
+        # content still feed the tracker, but do not flush that chunk; the
+        # tracker then resumes in the correct state after `{% endraw %}`.
+        private def raw_block_lines(content : String) : Array(Bool)
+          return [] of Bool unless Utils::ByteScan.includes?(content, "{%")
+
+          tracker = Content::Processors::FenceTracker.new
+          open_line : Int32? = nil
+          pairs = [] of Tuple(Int32, Int32)
+          line_count = 0
+
+          content.each_line(chomp: false) do |line|
+            line_no = line_count
+            line_count += 1
+            in_fence = tracker.fence_line?(line)
+            scan_line = line.includes?('`') ? mask_inline_code(line)[0] : line
+            next if in_fence && open_line.nil?
+
+            scan_line.scan(RAW_TAG_RE) do |match|
+              tag = match[1]
+              if tag == "raw"
+                open_line ||= line_no
+              elsif opened = open_line
+                pairs << {opened, line_no}
+                open_line = nil
+              end
+            end
+          end
+
+          return [] of Bool if pairs.empty?
+
+          deltas = Array(Int32).new(line_count + 1, 0)
+          pairs.each do |(opened, closed)|
+            deltas[opened] += 1
+            deltas[closed + 1] -= 1
+          end
+
+          depth = 0
+          raw_map = Array(Bool).new(line_count, false)
+          line_count.times do |i|
+            depth += deltas[i]
+            raw_map[i] = depth > 0
+          end
+          raw_map
+        end
+
         private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil, depth : Int32 = 0, warnings : Array(String)? = nil) : String
           # Inline code spans (`…`, ``…``) are opaque to the shortcode
           # processor — running shortcodes inside `<code>` would both
@@ -293,6 +342,10 @@ module Hwaro
         # in a template and in a markdown body has to survive identically, so
         # the two must never disagree about where a raw block starts and ends.
         RAW_BLOCK_RE = /\{\%-?\s*raw\s*-?\%\}.*?\{\%-?\s*end\s*raw\s*-?\%\}/m
+        # The single tags of RAW_BLOCK_RE, for `raw_block_lines`. Must stay
+        # case-sensitive like it: a region this marks but `mask_raw_blocks`
+        # does not mask loses its fence protection.
+        RAW_TAG_RE = /\{\%-?\s*(raw|end\s*raw)\s*-?\%\}/
 
         # Hide `{% raw %}` regions from the shortcode passes.
         #
@@ -323,10 +376,6 @@ module Hwaro
         # code spans already restored so no token ever nests inside another
         # (unmasking is a single gsub pass).
         #
-        # Known limit: a raw region straddling a fenced code block is split
-        # across chunks by the fence loop in `process_shortcodes_jinja` and
-        # stays unmasked — the fenced half is protected by the fence itself,
-        # and the rest behaves exactly as it did before.
         private def mask_raw_blocks(content : String, spans : Array(String)) : String
           # Substring probe first: raw blocks are rare and this runs on every
           # chunk of every page.
@@ -822,7 +871,9 @@ module Hwaro
               end
             else
               value = unquote_shortcode_arg(token)
-              next if value.empty?
+              # Preserve explicitly empty positional values. They still
+              # occupy their slot, so `gist("", "id")` must map the empty
+              # username to `_0` and the ID to `_1`.
               args["_#{idx}"] = value
               idx += 1
             end
@@ -920,8 +971,9 @@ module Hwaro
               context[key] = Crinja::Value.new(value)
             end
 
-            # Cache compiled shortcode templates by content hash to avoid
-            # re-parsing the template AST on every shortcode invocation.
+            # Cache compiled shortcode templates by name and source hash to
+            # avoid re-parsing the AST while keeping each template bound to
+            # its own source filename for error locations.
             # XOR with a salt to avoid collisions with page template cache entries
             # that share the same cache map.
             #
@@ -934,11 +986,14 @@ module Hwaro
             # the worker's own env — no cross-worker env mutation, and no mutex
             # needed since a single fiber owns the cache. Only the shared
             # fallback cache (sequential path) needs the reentrant mutex.
-            cache_key = template.hash ^ 0x5C0DE_CAFE_u64
             # User shortcodes live at templates/shortcodes/<name>.html; resolving
             # that key through compile_template attaches the filename so errors
-            # point at the file. Builtins aren't on disk and stay anonymous.
+            # point at the file. Identical source under another name still
+            # needs its own compiled template, or Crinja reports the first
+            # file's path for errors in both shortcodes. Builtins aren't on
+            # disk and stay anonymous.
             template_key = shortcode_name.try { |n| "shortcodes/#{n}" }
+            cache_key = {template_key, template}.hash ^ 0x5C0DE_CAFE_u64
             crinja_template = if wcache = template_cache_override
                                 wcache[cache_key]? || begin
                                   compiled = compile_template(env, template, template_key)
@@ -955,6 +1010,12 @@ module Hwaro
                                 end
                               end
             crinja_template.render(context)
+            # Only syntax errors are downgraded to a warning and a marker.
+            # Runtime errors (undefined attribute access, a missing include —
+            # see src/ext/crinja_error_location_fix.cr) propagate and fail
+            # the build as HWARO_E_TEMPLATE, like a page-template error; the
+            # compiled template's filename already locates them in the
+            # shortcode file.
           rescue ex : Crinja::TemplateError
             label = shortcode_name ? "shortcode '#{shortcode_name}'" : "shortcode"
             Logger.warn "Template error in #{label}: #{ex.message}"

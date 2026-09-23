@@ -86,16 +86,19 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
-    it "only scans .md files" do
+    it "scans build-supported Markdown extensions and ignores non-content files" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "[Link](https://example.com)")
+        File.write(File.join(dir, "test.markdown"), "[Link](https://markdown.example.com)\n[Broken](/missing/)")
         File.write(File.join(dir, "test.txt"), "[Link](https://other.com)")
 
         cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         links = cmd.find_links_for_test(dir)
 
-        links.size.should eq(1)
-        links[0].url.should eq("https://example.com")
+        links.map(&.url).sort!.should eq(["https://example.com", "https://markdown.example.com"])
+
+        internal_links = cmd.find_internal_links_for_test(dir)
+        internal_links.map(&.url).should eq(["/missing/"])
       end
     end
 
@@ -485,6 +488,21 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
 
         cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
         results = cmd.check_internal_links_for_test([link], dir)
+        results.size.should eq(1)
+        results[0].error.not_nil!.should contain("not found")
+      end
+    end
+
+    it "does not resolve extensionless @/ links by guessing a page extension" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "target.markdown"), "target page")
+        link = Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(
+          file: File.join(dir, "source.md"), url: "@/target", kind: :internal
+        )
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        results = cmd.check_internal_links_for_test([link], dir)
+
         results.size.should eq(1)
         results[0].error.not_nil!.should contain("not found")
       end
@@ -978,6 +996,107 @@ describe "check-links redirect and dedup behavior" do
     ensure
       server.try(&.close)
       Hwaro::CLI::Commands::Tool::DeadlinkCommand.disable_private_host_check = false
+    end
+  end
+end
+
+private def dl_link(dir : String, url : String, kind : Symbol = :internal)
+  Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(file: File.join(dir, "source.md"), url: url, kind: kind)
+end
+
+private def dl_dead(dir : String, *urls : String) : Array(String)
+  links = urls.map { |url| dl_link(dir, url) }.to_a
+  Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.check_internal_links_for_test(links, dir).map(&.link.url)
+end
+
+# The build publishes `.MD` / `.MARKDOWN` sources (ReadContent downcases the
+# extension); check-links used lowercase-only globs and probes.
+describe "check-links uppercase Markdown extensions" do
+  it "scans .MD and .MARKDOWN files for internal and external links" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "upper.MD"), "[a](/missing-one/) [x](https://one.example.com)")
+      File.write(File.join(dir, "upper.MARKDOWN"), "[b](/missing-two/) [y](https://two.example.com)")
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.find_internal_links_for_test(dir).map(&.url).sort!.should eq(["/missing-one/", "/missing-two/"])
+      cmd.find_links_for_test(dir).map(&.url).sort!.should eq(["https://one.example.com", "https://two.example.com"])
+    end
+  end
+
+  it "counts uppercase-extension pages when bounding a section's pagination" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "sec"))
+      File.write(File.join(dir, "sec", "_index.md"), "+++\ntitle = \"S\"\npaginate_by = 1\n+++\n")
+      File.write(File.join(dir, "sec", "a.md"), "a")
+      File.write(File.join(dir, "sec", "b.MD"), "b")
+      File.write(File.join(dir, "sec", "c.MARKDOWN"), "c")
+
+      dl_dead(dir, "/sec/page/3/").should be_empty
+      dl_dead(dir, "/sec/page/4/").should eq(["/sec/page/4/"])
+    end
+  end
+
+  it "resolves a route whose source uses an uppercase extension" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "sec", "bundle"))
+      File.write(File.join(dir, "sec", "leaf.MD"), "leaf")
+      File.write(File.join(dir, "sec", "bundle", "index.MARKDOWN"), "bundle")
+
+      dl_dead(dir, "/sec/leaf/", "/sec/bundle/").should be_empty
+    end
+  end
+end
+
+# `@/` links resolve through the build's exact, case-sensitive content-path
+# lookup of published pages (see Services::InternalLinkIndex).
+describe "check-links @/ links resolve like the build" do
+  it "accepts exact published page and section paths, with fragment and query" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "_index.md"), "+++\ntitle = \"P\"\n+++\n")
+      File.write(File.join(dir, "posts", "p1.MD"), "+++\ntitle = \"P1\"\n+++\n")
+
+      dl_dead(dir, "@/posts/_index.md", "@/posts/p1.MD").should be_empty
+    end
+  end
+
+  it "rejects links the build leaves unresolved" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "x.md"), "+++\ntitle = \"X\"\n+++\n")
+      File.write(File.join(dir, "upper.md"), "+++\ntitle = \"U\"\n+++\n")
+      File.write(File.join(dir, "my post.md"), "+++\ntitle = \"M\"\n+++\n")
+      File.write(File.join(dir, "draft.md"), "+++\ntitle = \"D\"\ndraft = true\n+++\n")
+      File.write(File.join(dir, "posts", "_index.md"), "+++\ntitle = \"P\"\n+++\n")
+      File.write(File.join(dir, "README.md"), "not content")
+
+      dead = dl_dead(dir, "@/draft.md", "@/UPPER.md", "@/./x.md", "@/posts/../x.md",
+        "@/my%20post.md", "@/posts/", "@/posts", "@/x")
+      dead.should eq(["@/draft.md", "@/UPPER.md", "@/./x.md", "@/posts/../x.md",
+                      "@/my%20post.md", "@/posts/", "@/posts", "@/x"])
+    end
+  end
+
+  it "does not resolve a link that escapes the content directory" do
+    Dir.mktmpdir do |dir|
+      content = File.join(dir, "content")
+      FileUtils.mkdir_p(content)
+      File.write(File.join(dir, "README.md"), "outside")
+
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        .check_internal_links_for_test([dl_link(content, "@/../README.md")], content)
+        .size.should eq(1)
+    end
+  end
+
+  it "says why a link to an unpublished page is dead" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "draft.md"), "+++\ntitle = \"D\"\ndraft = true\n+++\n")
+
+      results = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        .check_internal_links_for_test([dl_link(dir, "@/draft.md")], dir)
+      results.size.should eq(1)
+      results[0].error.not_nil!.should contain("draft")
     end
   end
 end

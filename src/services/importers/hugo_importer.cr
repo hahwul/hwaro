@@ -1,3 +1,4 @@
+require "json"
 require "yaml"
 require "toml"
 require "./base"
@@ -145,6 +146,10 @@ module Hwaro
             aliases = array_string_value(data, "aliases")
             fields["aliases"] = aliases unless aliases.empty?
 
+            # Hugo's `url` sets the page's whole published path; dropping it
+            # moved the page and broke every link to it.
+            apply_source_url(fields, string_value(data, "url"), file_path)
+
             # image (from images[0] or featured_image)
             image = extract_image(data)
             fields["image"] = image if image
@@ -162,8 +167,32 @@ module Hwaro
           section, filename = section_from_path(file_path, content_dir, "")
 
           # Determine slug for the file
+          leaf_bundle = !section.empty? && (filename == "index.md" || filename == "index.markdown")
           if filename == "_index.md" || filename == "_index.markdown"
             file_slug = "_index"
+          elsif leaf_bundle
+            # A leaf bundle's `slug` renames the bundle's URL segment
+            # (`posts/trip/index.md` + `slug = "my-trip"` → /posts/my-trip/).
+            # Writing it as `posts/trip/my-trip.md` published the page at
+            # /posts/trip/my-trip/, away from its copied resources, so every
+            # relative image in it broke. Keep the bundle shape instead.
+            if slug_val && !slug_val.empty?
+              parent = File.dirname(section)
+              target = parent == "." ? slug_val : File.join(parent, slug_val)
+              # The slugged directory may already be another bundle — a
+              # sibling source directory, or a bundle this run already moved
+              # there. Merging into it would write `index-1.md` beside the
+              # other bundle's resources, so this page keeps its own
+              # directory (and its own URL) instead.
+              target_index = resolve_content_path(output_dir, target, "index")
+              if target != section &&
+                 (Dir.exists?(File.join(content_dir, target)) || (target_index && destination_claimed?(target_index)))
+                Logger.warn "#{file_path}: slug #{slug_val.inspect} names an existing bundle (#{target}/); keeping the bundle at #{section}/."
+              else
+                section = target
+              end
+            end
+            file_slug = "index"
           elsif slug_val && !slug_val.empty?
             file_slug = slug_val
           else
@@ -188,7 +217,7 @@ module Hwaro
           # `section` must be non-empty: a bare `content/index.md` is the site
           # root, not a bundle, and sweeping the whole content root's loose
           # files into the output is not what the author asked for.
-          if dest_path && !section.empty? && (filename == "index.md" || filename == "index.markdown")
+          if dest_path && leaf_bundle
             copy_bundle_assets(File.dirname(file_path), File.dirname(dest_path), output_dir, verbose, force)
           end
 
@@ -209,6 +238,22 @@ module Hwaro
                 data = TOML.parse(toml_str)
                 return {data, body}
               rescue TOML::ParseException
+                return {nil, raw}
+              end
+            end
+          elsif raw.starts_with?("{")
+            # Hugo also reads JSON front matter: a JSON object at the top of
+            # the file. Unrecognised, it landed in the imported body verbatim
+            # and the page lost its title, date, tags and draft flag.
+            if end_idx = Utils::FrontmatterScanner.find_json_end(raw)
+              begin
+                if h = JSON.parse(raw.byte_slice(0, end_idx)).as_h?
+                  data = {} of String => TOML::Any
+                  h.each { |k, v| data[k] = json_any_to_toml_any(v) }
+                  return {data, raw.byte_slice(end_idx).lstrip('\n').lstrip("\r\n")}
+                end
+              rescue ex : JSON::ParseException
+                Logger.debug "JSON front matter parse failed: #{ex.message}"
                 return {nil, raw}
               end
             end
@@ -245,6 +290,23 @@ module Hwaro
 
         # `depth` guards a cyclic YAML::Any (self-referencing anchor); see
         # `Utils::Nesting`.
+        private def json_any_to_toml_any(value : JSON::Any, depth : Int32 = 0) : TOML::Any
+          Utils::Nesting.check!(depth)
+          case raw = value.raw
+          when String, Int64, Float64, Bool
+            TOML::Any.new(raw)
+          when Array
+            TOML::Any.new(raw.map { |item| json_any_to_toml_any(item, depth + 1) })
+          when Hash
+            hash = {} of String => TOML::Any
+            raw.each { |k, v| hash[k] = json_any_to_toml_any(v, depth + 1) }
+            TOML::Any.new(hash)
+          else
+            # null, like YAML's `~` in yaml_any_to_toml_any.
+            TOML::Any.new("")
+          end
+        end
+
         private def yaml_any_to_toml_any(value : YAML::Any, depth : Int32 = 0) : TOML::Any
           Utils::Nesting.check!(depth)
           raw = value.raw

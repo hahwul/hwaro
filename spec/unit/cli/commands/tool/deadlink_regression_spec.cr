@@ -295,3 +295,19 @@ describe "check-links section feed routes" do
     end
   end
 end
+
+# ReadContent only treats a lowercase-extension `_index` as a section index;
+# `_index.MD` builds as an ordinary page, so its `generate_feeds` writes no
+# section feed and the checker must not invent one.
+describe "check-links section feeds and uppercase _index extensions" do
+  it "does not accept /<section>/rss.xml for an _index.MD that opts in" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "_index.MD"), "---\ntitle: Posts\ngenerate_feeds: true\n---\n")
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      routes = cmd.routes_for_test(Hwaro::Models::Config.new)
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/posts/rss.xml")], dir, routes).size.should eq(1)
+    end
+  end
+end

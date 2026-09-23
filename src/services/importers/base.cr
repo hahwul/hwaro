@@ -374,6 +374,11 @@ module Hwaro
         # either way, and resolving it properly would mean computing every
         # destination before writing any — a two-pass restructure of all eight
         # importers for a cosmetic difference.
+        # True when an earlier item of this run already wrote to `path`.
+        protected def destination_claimed?(path : String) : Bool
+          @claimed_paths.includes?(path)
+        end
+
         private def claim_path(path : String) : String
           return path if @claimed_paths.add?(path)
 
@@ -556,6 +561,44 @@ module Hwaro
         # Parse a date string in common formats, returns nil on failure.
         protected def parse_date(date_str : String) : Time?
           Utils::DateUtils.parse_lenient(date_str, Utils::DateUtils::IMPORT_FORMATS)
+        end
+
+        # Map a source page's literal URL (Hugo `url`, Jekyll `permalink`) onto
+        # hwaro's `path` front matter so the page keeps its published address.
+        # hwaro publishes `path = "a/b"` at `/a/b/`, so:
+        #
+        # - a query or fragment is dropped (it is not part of the page path);
+        # - a trailing `index.html` names the directory itself
+        #   (`/docs/index.html` is served at `/docs/`), so it maps to that
+        #   directory with no alias;
+        # - any other `.html` URL becomes the extensionless path plus an alias
+        #   at the old address (its redirect stub keeps inbound links working);
+        # - a URL naming another kind of file (`/feed.xml`) cannot be a page
+        #   path, so it is left unmapped with a warning, as before.
+        #
+        # Patterns (`:title`), external URLs and the site root are left alone.
+        protected def apply_source_url(fields : Hash(String, FieldValue), url : String?, source : String = "") : Nil
+          return unless url
+          url = url.strip.split(/[?#]/, 2).first
+          return if url.empty? || url.includes?(':') || url.starts_with?("//")
+          trimmed = url.strip('/')
+          return if trimmed.empty?
+          segments = trimmed.split('/')
+          last = segments.last
+          if last =~ /\Aindex\.html?\z/i
+            dir = segments[0...-1].join('/')
+            fields["path"] = dir unless dir.empty?
+          elsif last =~ /\.html?\z/i
+            fields["path"] = trimmed.sub(/\.html?\z/i, "")
+            aliases = (fields["aliases"]?.as?(Array(String)) || [] of String).dup
+            original = "/#{trimmed}"
+            aliases << original unless aliases.includes?(original)
+            fields["aliases"] = aliases
+          elsif last.includes?('.')
+            Logger.warn "#{source.empty? ? "" : "#{source}: "}URL #{url.inspect} names a file, not a page; it is not kept as the imported page's path."
+          else
+            fields["path"] = trimmed
+          end
         end
 
         # Format a Time to the standard frontmatter date format, keeping the

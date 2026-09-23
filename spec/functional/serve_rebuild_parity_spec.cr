@@ -249,6 +249,55 @@ describe "serve rebuild parity" do
       end
     end
   end
+
+  # With `latest_at_root = false`, an authored `docs/_index.md` owns /docs/;
+  # drafting it hands that URL to the latest version's root as an alias stub.
+  # `Versions.link!` added the alias in memory, but the relink only
+  # re-rendered pages whose switcher links moved — so /docs/ 404'd until a
+  # full rebuild, while a cold build writes the stub.
+  it "writes the parent alias stub once an authored parent index is drafted" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "V"
+          base_url = "https://example.com"
+
+          [versions]
+          latest_at_root = false
+
+          [[versions.list]]
+          name = "v2"
+          path = "docs/v2"
+          latest = true
+
+          [[versions.list]]
+          name = "v1"
+          path = "docs/v1"
+          TOML
+        )
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "<html><body>PAGE {{ page.title }}</body></html>")
+        File.write("templates/section.html", "<html><body>SECTION {{ section.title }}</body></html>")
+        FileUtils.mkdir_p("content/docs")
+        File.write("content/docs/_index.md", "---\ntitle: Docs Home\n---\n")
+        {"v1", "v2"}.each do |v|
+          FileUtils.mkdir_p("content/docs/#{v}")
+          File.write("content/docs/#{v}/_index.md", "---\ntitle: Docs #{v}\n---\n")
+        end
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.read("public/docs/index.html").should contain("Docs Home")
+
+        File.write("content/docs/_index.md", "---\ntitle: Docs Home\ndraft: true\n---\n")
+        builder.run_incremental(["content/docs/_index.md"], options).should be_true
+
+        stub = File.read("public/docs/index.html")
+        stub.should_not contain("Docs Home")
+        stub.should contain("/docs/v2/")
+      end
+    end
+  end
 end
 
 private def write_amp_site

@@ -14,8 +14,8 @@ module Hwaro::Core::Build
       process_shortcodes_jinja(content, templates, context, results)
     end
 
-    def test_sc_render_jinja(template, args, context = {} of String => Crinja::Value)
-      render_shortcode_jinja(template, args, context)
+    def test_sc_render_jinja(template, args, context = {} of String => Crinja::Value, warnings = nil)
+      render_shortcode_jinja(template, args, context, warnings: warnings)
     end
 
     def test_sc_parse_args(s)
@@ -53,6 +53,21 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
         templates,
       )
       result.should contain(%(<div class="box">))
+    end
+  end
+
+  describe "built-in positional arguments" do
+    it "keeps an explicitly empty positional slot when mapping later arguments" do
+      builder = Hwaro::Core::Build::Builder.new
+
+      result = builder.test_sc_process(%({{ gist("", "abc123") }}))
+
+      result.should contain("https://gist.github.com//abc123.js")
+      result.should_not contain("https://gist.github.com/abc123/.js")
+
+      block = builder.test_sc_process(%({% alert("", "Heads up") %}Body{% end %}))
+      block.should contain("sc-alert--info")
+      block.should contain(%(sc-alert__title">Heads up</div>))
     end
   end
 
@@ -149,6 +164,24 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
         {} of String => Crinja::Value,
       )
       result.should eq("<!-- hwaro: template error in shortcode -->")
+    end
+
+    it "propagates a render-time Crinja error instead of downgrading it" do
+      builder = Hwaro::Core::Build::Builder.new
+      # This compiles, but traversing a missing field on a string raises
+      # Crinja::UndefinedError while rendering. Runtime errors are fatal,
+      # like page-template errors: only syntax errors get the marker.
+      warnings = [] of String
+      err = expect_raises(Crinja::Error) do
+        builder.test_sc_render_jinja(
+          "{{ text.foo.bar }}",
+          {"text" => "value"},
+          {} of String => Crinja::Value,
+          warnings,
+        )
+      end
+      err.message.not_nil!.should contain("text.foo is undefined")
+      warnings.should be_empty
     end
 
     it "treats a stray {% end %} preceding shortcodes as literal text" do

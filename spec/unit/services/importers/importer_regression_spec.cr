@@ -282,7 +282,9 @@ describe "importer regressions" do
             source_type: "hugo", path: dir, output_dir: output_dir,
           ))
 
-        md = File.join(output_dir, "posts", "bundle", "renamed.md")
+        # A slugged leaf bundle stays a bundle under the slugged directory
+        # (Hugo publishes it at /posts/renamed/).
+        md = File.join(output_dir, "posts", "renamed", "index.md")
         File.exists?(md).should be_true
         # Asset lands in the directory the markdown was actually written to.
         File.exists?(File.join(File.dirname(md), "feature.png")).should be_true

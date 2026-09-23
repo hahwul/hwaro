@@ -231,8 +231,7 @@ module Hwaro
         scan_files = [] of String
 
         if Dir.exists?(@content_dir)
-          Dir.glob(File.join(@content_dir, "**", "*.md")) { |f| scan_files << f }
-          Dir.glob(File.join(@content_dir, "**", "*.markdown")) { |f| scan_files << f }
+          scan_files.concat(ContentWalk.find_content_files(@content_dir))
         end
 
         if Dir.exists?(@templates_dir)

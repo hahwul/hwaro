@@ -14,7 +14,7 @@ Deploy your Hwaro site to Cloudflare Pages for fast global delivery.
 hwaro tool platform cloudflare
 ```
 
-This creates a `wrangler.toml` with project settings and site bucket configuration.
+This creates a `wrangler.toml` with Cloudflare Pages settings. Its `pages_build_output_dir` follows your `[build] output_dir` value (`public` by default).
 
 ### Deploy via Dashboard
 
@@ -53,9 +53,7 @@ Or create `wrangler.toml`:
 ```toml
 name = "my-site"
 compatibility_date = "2024-01-01" # Use current date when deploying
-
-[site]
-  bucket = "./public"
+pages_build_output_dir = "./public"
 ```
 
 ## Redirects

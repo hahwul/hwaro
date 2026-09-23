@@ -14,7 +14,7 @@ Cloudflare Pages에 Hwaro 사이트를 배포해 전 세계에 빠르게 서비�
 hwaro tool platform cloudflare
 ```
 
-프로젝트 설정과 사이트 버킷 구성이 담긴 `wrangler.toml`이 생성됩니다.
+Cloudflare Pages 설정이 담긴 `wrangler.toml`이 생성됩니다. `pages_build_output_dir`는 `[build] output_dir` 값을 따릅니다(기본값은 `public`).
 
 ### 대시보드로 배포
 
@@ -53,9 +53,7 @@ wrangler pages deploy public --project-name my-site
 ```toml
 name = "my-site"
 compatibility_date = "2024-01-01" # 배포 시점의 날짜 사용
-
-[site]
-  bucket = "./public"
+pages_build_output_dir = "./public"
 ```
 
 ## 리다이렉트
