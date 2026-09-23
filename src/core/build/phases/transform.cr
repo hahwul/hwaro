@@ -201,7 +201,9 @@ module Hwaro::Core::Build::Phases::Transform
       # cross languages — build_subsections attaches a translated subsection
       # to the default-language parent when its own language has no parent
       # `_index` — so keep only this language's subtree.
-      if section.subsections.size > 0
+      # The root section's subsections are the top-level sections, which the
+      # caller already walks as `top_sections` — recursing would list them twice.
+      if section.subsections.size > 0 && !section.section.empty?
         same_lang = section.subsections.select { |sub| (sub.language || default_lang) == lang && sub.version.same?(section.version) }
         # Path tiebreak mirrors top-level sections (compare_sections_by_weight):
         # equal-weight subsections otherwise follow insertion/glob order and
@@ -243,7 +245,20 @@ module Hwaro::Core::Build::Phases::Transform
 
     ctx.sections.each do |section|
       path_parts = section.section.split("/")
-      next if path_parts.size <= 1
+      if path_parts.size <= 1
+        # A top-level section is a direct child of the root `_index.md` (the
+        # section named ""), which is not a breadcrumb ancestor — templates
+        # render "Home" themselves — but must list it in `subsections`. Same
+        # language only: a translated top-level section must not show up on
+        # the default-language homepage when its language has no root index.
+        next if section.section.empty?
+        if (root = lookup_ancestor_section(sections_by_path, "", section.language, default_lang)) &&
+           (root.language || default_lang) == (section.language || default_lang) &&
+           root.version.same?(section.version)
+          root.add_subsection(section)
+        end
+        next
+      end
 
       # Link to the immediate parent section when it exists (same-language first).
       # Never across a version boundary: an unversioned `docs/_index.md` is

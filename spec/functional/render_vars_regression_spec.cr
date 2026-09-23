@@ -142,3 +142,30 @@ describe "Render vars: get_taxonomy_url language slugs" do
     end
   end
 end
+
+describe "Render vars: root section subsections" do
+  # Regression: top-level sections were never linked under the root
+  # `_index.md`, so the homepage's `section.subsections` was always empty.
+  # Linking them must not duplicate sections in the prev/next reading order.
+  it "lists top-level sections on the homepage without changing prev/next" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md"     => "+++\ntitle = \"Home\"\n+++\n",
+        "a/_index.md"   => "+++\ntitle = \"A\"\nweight = 1\n+++\n",
+        "a/one.md"      => "+++\ntitle = \"One\"\n+++\n",
+        "b/_index.md"   => "+++\ntitle = \"B\"\nweight = 2\n+++\n",
+        "b/c/_index.md" => "+++\ntitle = \"C\"\n+++\n",
+        "b/c/two.md"    => "+++\ntitle = \"Two\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "prev={{ page.lower.url }} next={{ page.higher.url }}",
+        "section.html" => "SUBS={% for s in section.subsections %}[{{ s.url }}]{% endfor %} prev={{ page.lower.url }} next={{ page.higher.url }}",
+      },
+    ) do
+      File.read("public/index.html").should eq("SUBS=[/a/][/b/] prev= next=/a/")
+      File.read("public/b/index.html").should eq("SUBS=[/b/c/] prev=/a/one/ next=/b/c/")
+      File.read("public/b/c/two/index.html").should eq("prev=/b/c/ next=")
+    end
+  end
+end
