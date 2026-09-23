@@ -564,26 +564,24 @@ module Hwaro::Core::Build::Phases::Transform
     return affected_series if affected_series.empty?
 
     # Rebuild groups only for affected series
-    groups = {} of String => Array(Models::Page)
+    default_lang = site.config.default_language
+    groups = {} of {String, String, String} => Array(Models::Page)
     site.pages.each do |page|
       next if page.draft || page.unpublished || !page.render
-      if name = page.series
-        next unless affected_series.includes?(name)
-        (groups[name] ||= [] of Models::Page) << page
+      if (key = series_group_key(page, default_lang)) && affected_series.includes?(key[0])
+        (groups[key] ||= [] of Models::Page) << page
       end
     end
 
     assign_series_groups(groups)
 
-    # Clear series data for pages whose series became empty
-    affected_series.each do |series_name|
-      next if groups.has_key?(series_name)
-      site.pages.each do |page|
-        if page.series == series_name
-          page.series_index = 0
-          page.series_pages = [] of Models::Page
-        end
-      end
+    # Clear series data for pages whose series group became empty
+    site.pages.each do |page|
+      next unless key = series_group_key(page, default_lang)
+      next unless affected_series.includes?(key[0])
+      next if groups.has_key?(key)
+      page.series_index = 0
+      page.series_pages = [] of Models::Page
     end
 
     affected_series
@@ -789,7 +787,7 @@ module Hwaro::Core::Build::Phases::Transform
   # Sort each series group by weight/date/title and assign series_index and
   # series_pages. A single-post series gets empty series_pages so the
   # template's `page.series_pages` guard skips the orphan series-nav box.
-  private def assign_series_groups(groups : Hash(String, Array(Models::Page)))
+  private def assign_series_groups(groups : Hash({String, String, String}, Array(Models::Page)))
     groups.each do |_name, pages|
       sorted = pages.sort_by do |p|
         {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
@@ -802,15 +800,25 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
-  # Group pages by series name and assign series_index, series_pages.
+  # A series is scoped to one language and one version, like related posts
+  # and the prev/next chain: `hello.md` and its translation `hello.ko.md`
+  # sharing `series = "intro"` are two parallel series, not one interleaved
+  # four-part series. nil for pages outside every series.
+  private def series_group_key(page : Models::Page, default_lang : String) : {String, String, String}?
+    return unless name = page.series
+    {name, page.language || default_lang, page.version.try(&.name) || ""}
+  end
+
+  # Group pages by series and assign series_index, series_pages.
   # Pages within a series are sorted by series_weight, then date, then title.
   private def compute_series(site : Models::Site)
-    groups = {} of String => Array(Models::Page)
+    default_lang = site.config.default_language
+    groups = {} of {String, String, String} => Array(Models::Page)
 
     site.pages.each do |page|
       next if page.draft || page.unpublished || !page.render
-      if name = page.series
-        (groups[name] ||= [] of Models::Page) << page
+      if key = series_group_key(page, default_lang)
+        (groups[key] ||= [] of Models::Page) << page
       end
     end
 

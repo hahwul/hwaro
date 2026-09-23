@@ -231,7 +231,9 @@ module Hwaro
         # Per-page Crinja::Value cache — avoids repeated Page→Crinja::Value conversion
         # across build_global_vars, section page lists, and page_to_crinja_list_value
         @page_crinja_value_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
-        @series_crinja_cache : Hash(String, Crinja::Value) = {} of String => Crinja::Value
+        # Keyed by the series group ({name, language, version}, see
+        # Transform#series_group_key), not the bare name.
+        @series_crinja_cache : Hash({String, String, String}, Crinja::Value) = {} of {String, String, String} => Crinja::Value
         # Per-section ancestors Crinja::Value cache, keyed by
         # {section_name, language} (pages in the same section+language share ancestors)
         @ancestors_crinja_cache : Hash({String, String?}, Array(Crinja::Value)) = {} of {String, String?} => Array(Crinja::Value)
@@ -766,7 +768,7 @@ module Hwaro
               @related_posts_crinja_cache.delete(page.path)
 
               if series_name = page.series
-                @series_crinja_cache.delete(series_name)
+                @series_crinja_cache.reject! { |key, _| key[0] == series_name }
               end
 
               # Neighbors' cached values reference this page

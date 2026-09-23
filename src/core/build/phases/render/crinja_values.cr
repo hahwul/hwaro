@@ -163,9 +163,9 @@ module Hwaro::Core::Build::Phases::Render
         end
       end
 
-      if series_name = page.series
-        unless @series_crinja_cache.has_key?(series_name)
-          @series_crinja_cache[series_name] = Crinja::Value.new(page.series_pages.map { |sp|
+      if series_key = series_group_key(page, default_lang)
+        unless @series_crinja_cache.has_key?(series_key)
+          @series_crinja_cache[series_key] = Crinja::Value.new(page.series_pages.map { |sp|
             cached_page_crinja_value(sp, default_lang)
           })
         end

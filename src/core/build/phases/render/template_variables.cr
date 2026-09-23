@@ -159,7 +159,7 @@ module Hwaro::Core::Build::Phases::Render
         # acquire the cache mutex just to hand back the same empty array.
         Crinja::Value.new([] of Crinja::Value)
       elsif @crinja_caches_frozen
-        if cached_series = page.series.try { |s| @series_crinja_cache[s]? }
+        if cached_series = series_group_key(page, default_lang).try { |k| @series_crinja_cache[k]? }
           @cache_manager.record_hit("series_crinja")
           cached_series
         else
@@ -170,7 +170,7 @@ module Hwaro::Core::Build::Phases::Render
         end
       else
         @crinja_cache_mutex.synchronize do
-          cached_series = page.series.try { |s| @series_crinja_cache[s]? }
+          cached_series = series_group_key(page, default_lang).try { |k| @series_crinja_cache[k]? }
           if cached_series
             @cache_manager.record_hit("series_crinja")
             next cached_series
@@ -179,7 +179,7 @@ module Hwaro::Core::Build::Phases::Render
           val = Crinja::Value.new(page.series_pages.map { |sp|
             cached_page_crinja_value(sp, default_lang)
           })
-          page.series.try { |s| @series_crinja_cache[s] = val }
+          series_group_key(page, default_lang).try { |k| @series_crinja_cache[k] = val }
           val
         end
       end,

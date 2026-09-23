@@ -150,7 +150,7 @@ module Hwaro
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
           @crinja_cache_mutex.synchronize do
-            affected_series.each { |s| @series_crinja_cache.delete(s) }
+            @series_crinja_cache.reject! { |key, _| affected_series.includes?(key[0]) } unless affected_series.empty?
             related_pages_updated.each { |path| @related_posts_crinja_cache.delete(path) }
 
             # A changed SECTION's title/url is embedded in every descendant's

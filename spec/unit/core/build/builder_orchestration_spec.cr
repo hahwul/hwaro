@@ -29,7 +29,7 @@ module Hwaro::Core::Build
       @page_crinja_value_cache["a.md"] = Crinja::Value.new("a")
       @page_crinja_value_cache["b.md"] = Crinja::Value.new("b")
       @related_posts_crinja_cache["a.md"] = Crinja::Value.new("ra")
-      @series_crinja_cache["tutorial"] = Crinja::Value.new("series")
+      @series_crinja_cache[{"tutorial", "en", ""}] = Crinja::Value.new("series")
       # Seed with non-empty arrays so the eviction tests can distinguish
       # "key removed" from "key emptied". The ancestors cache is keyed by
       # {section, language} (like section_pages), so it is invalidated by
