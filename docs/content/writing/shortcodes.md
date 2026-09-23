@@ -38,6 +38,10 @@ Block shortcodes support two closer styles:
 
 **We strongly recommend named closers** (`{% endNAME %}`) for any non-trivial content. They make your Markdown much easier to read and maintain, especially when mixing multiple shortcodes or using deep nesting.
 
+To keep shortcode syntax literal in a Markdown page outside a code fence, wrap
+it in a raw block. The `{% raw %}` and `{% endraw %}` markers remain visible in
+Markdown output; fenced blocks inside the region do not split it.
+
 ## Built-in Shortcodes
 
 Hwaro ships with built-in shortcodes that work out of the box, with no template files needed.

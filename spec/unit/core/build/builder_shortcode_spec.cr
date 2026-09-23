@@ -247,6 +247,22 @@ describe Hwaro::Core::Build::Builder do
       result.should eq(content)
     end
 
+    it "keeps raw shortcode examples intact when a fenced block is inside the raw region" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      content = "{% raw %}\n{{ youtube(id=\"literal-id\") }}\n```text\nfence\n```\n{% endraw %}"
+
+      result = builder.test_process_shortcodes_jinja(
+        content,
+        {} of String => String,
+        {} of String => Crinja::Value,
+        crinja_env_override: env,
+      )
+
+      result.should contain("{{ youtube(id=\"literal-id\") }}")
+      result.should_not contain("<iframe")
+    end
+
     it "processes explicit shortcode calls" do
       builder = Hwaro::Core::Build::Builder.new
       env = Crinja.new

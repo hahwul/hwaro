@@ -134,10 +134,12 @@ module Hwaro
             # HWARO-SHORTCODE-PLACEHOLDER token then shipped in the HTML,
             # the feed and the search index).
             body_lines = block_body_lines(content)
+            raw_lines = raw_block_lines(content)
             line_no = 0
 
             content.each_line(chomp: false) do |line|
               in_body = body_lines[line_no]? || false
+              in_raw_region = raw_lines[line_no]? || false
               line_no += 1
 
               # Fence lines flush the pending chunk and pass through
@@ -146,7 +148,7 @@ module Hwaro
               # a chunk boundary (block_body_lines already guarantees the
               # fences inside a body are balanced, so the tracker resumes in
               # the same state on the far side).
-              if !in_body && tracker.fence_line?(line)
+              if !in_body && tracker.fence_line?(line) && !in_raw_region
                 io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, warnings: warnings)
                 buffer = String::Builder.new
                 io << line
@@ -236,6 +238,53 @@ module Hwaro
           body_map
         end
 
+        # Matched raw blocks must stay in one processing chunk so
+        # `mask_raw_blocks` can protect the whole region. Fences inside raw
+        # content still feed the tracker, but do not flush that chunk; the
+        # tracker then resumes in the correct state after `{% endraw %}`.
+        private def raw_block_lines(content : String) : Array(Bool)
+          return [] of Bool unless Utils::ByteScan.includes?(content, "{%")
+
+          tracker = Content::Processors::FenceTracker.new
+          open_line : Int32? = nil
+          pairs = [] of Tuple(Int32, Int32)
+          line_count = 0
+
+          content.each_line(chomp: false) do |line|
+            line_no = line_count
+            line_count += 1
+            in_fence = tracker.fence_line?(line)
+            scan_line = line.includes?('`') ? mask_inline_code(line)[0] : line
+            next if in_fence && open_line.nil?
+
+            scan_line.scan(RAW_TAG_RE) do |match|
+              tag = match[1].downcase
+              if tag == "raw"
+                open_line ||= line_no
+              elsif opened = open_line
+                pairs << {opened, line_no}
+                open_line = nil
+              end
+            end
+          end
+
+          return [] of Bool if pairs.empty?
+
+          deltas = Array(Int32).new(line_count + 1, 0)
+          pairs.each do |(opened, closed)|
+            deltas[opened] += 1
+            deltas[closed + 1] -= 1
+          end
+
+          depth = 0
+          raw_map = Array(Bool).new(line_count, false)
+          line_count.times do |i|
+            depth += deltas[i]
+            raw_map[i] = depth > 0
+          end
+          raw_map
+        end
+
         private def process_shortcodes_in_text(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)? = nil, crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil, depth : Int32 = 0, warnings : Array(String)? = nil) : String
           # Inline code spans (`…`, ``…``) are opaque to the shortcode
           # processor — running shortcodes inside `<code>` would both
@@ -293,6 +342,7 @@ module Hwaro
         # in a template and in a markdown body has to survive identically, so
         # the two must never disagree about where a raw block starts and ends.
         RAW_BLOCK_RE = /\{\%-?\s*raw\s*-?\%\}.*?\{\%-?\s*end\s*raw\s*-?\%\}/m
+        RAW_TAG_RE   = /\{\%-?\s*(raw|end\s*raw)\s*-?\%\}/i
 
         # Hide `{% raw %}` regions from the shortcode passes.
         #
@@ -323,10 +373,6 @@ module Hwaro
         # code spans already restored so no token ever nests inside another
         # (unmasking is a single gsub pass).
         #
-        # Known limit: a raw region straddling a fenced code block is split
-        # across chunks by the fence loop in `process_shortcodes_jinja` and
-        # stays unmasked — the fenced half is protected by the fence itself,
-        # and the rest behaves exactly as it did before.
         private def mask_raw_blocks(content : String, spans : Array(String)) : String
           # Substring probe first: raw blocks are rare and this runs on every
           # chunk of every page.
