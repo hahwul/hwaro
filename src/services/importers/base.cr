@@ -88,18 +88,25 @@ module Hwaro
         # `extensions`. `skip_dir`, when given, receives each subdirectory's
         # basename and skips recursion into it when it returns true.
         #
+        # `source_root` is the site the user pointed `tool import` at, not
+        # `dir`: importers walk subdirectories (`_posts/`, `content/`), and a
+        # post linked in from a sibling directory of the same site
+        # (`_posts/x.md -> ../_shared/x.md`) is part of the source. Only file
+        # links resolving outside `source_root` are skipped; they are counted
+        # in the run's `skipped_count` (see `import_each`).
+        #
         # Entries are walked in sorted order. `Dir.each_child` yields in
         # filesystem order, which varies by platform and by directory history
         # — and since destination collisions are resolved in walk order, an
         # unsorted walk made *which* file got the `-1` suffix differ between
         # machines for the same source tree.
-        protected def walk_files(dir : String, extensions : Array(String) = [".md", ".markdown"], skip_dir : Proc(String, Bool)? = nil) : Array(String)
+        protected def walk_files(dir : String, extensions : Array(String) = [".md", ".markdown"], skip_dir : Proc(String, Bool)? = nil, *, source_root : String) : Array(String)
           files = [] of String
-          walk_files_into(dir, files, extensions, skip_dir)
+          walk_files_into(dir, Utils::PathUtils.resolved_real_path(source_root), files, extensions, skip_dir)
           files
         end
 
-        private def walk_files_into(dir : String, files : Array(String), extensions : Array(String), skip_dir : Proc(String, Bool)?)
+        private def walk_files_into(dir : String, source_root : String, files : Array(String), extensions : Array(String), skip_dir : Proc(String, Bool)?)
           # An unreadable subdirectory (permissions, or one removed mid-walk)
           # raised straight out of the recursion and aborted the entire
           # import. Skip it and keep importing everything that is readable.
@@ -122,8 +129,13 @@ module Hwaro
                 next
               end
               next if skip_dir && skip_dir.call(entry)
-              walk_files_into(full_path, files, extensions, skip_dir)
+              walk_files_into(full_path, source_root, files, extensions, skip_dir)
             elsif extensions.any? { |ext| entry.ends_with?(ext) }
+              if File.symlink?(full_path) && !Utils::PathUtils.resolves_within?(full_path, source_root)
+                Logger.warn "Skipped symlinked file outside source directory: #{full_path}"
+                @outside_source_skips += 1
+                next
+              end
               files << full_path
             end
           end
@@ -240,6 +252,10 @@ module Hwaro
         # with many collisions otherwise buries every other diagnostic.
         @collision_count = 0
 
+        # Source files `walk_files` dropped because they are symlinks
+        # resolving outside the import source; folded into `skipped_count`.
+        getter outside_source_skips = 0
+
         # Reset per-run state. Importers call this at the top of `run` so a
         # reused importer instance doesn't disambiguate against a previous
         # run's destinations.
@@ -247,6 +263,7 @@ module Hwaro
           @claimed_paths.clear
           @claim_suffixes.clear
           @collision_count = 0
+          @outside_source_skips = 0
           @file_actions.clear
         end
 
@@ -259,7 +276,7 @@ module Hwaro
         # (`summary_message`). Both messages have per-engine overrides.
         protected def import_each(items : Array(T), engine : String, wrapped_note : String? = nil, & : T -> Symbol) : ImportResult forall T
           imported = 0
-          skipped = 0
+          skipped = @outside_source_skips
           errors = 0
           wrapped = 0
 

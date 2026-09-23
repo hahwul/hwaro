@@ -30,6 +30,7 @@ module Hwaro
             return ImportResult.new(
               success: true,
               message: "No Hexo posts found in #{path}",
+              skipped_count: outside_source_skips,
             )
           end
 
@@ -44,7 +45,7 @@ module Hwaro
           # Hexo stores posts in source/_posts/
           posts_dir = File.join(path, "source", "_posts")
           if Dir.exists?(posts_dir)
-            scan_markdown(posts_dir).each do |file|
+            scan_markdown(posts_dir, path).each do |file|
               files << {path: file, draft: false}
             end
           end
@@ -52,7 +53,7 @@ module Hwaro
           if include_drafts
             drafts_dir = File.join(path, "source", "_drafts")
             if Dir.exists?(drafts_dir)
-              scan_markdown(drafts_dir).each do |file|
+              scan_markdown(drafts_dir, path).each do |file|
                 files << {path: file, draft: true}
               end
             end
@@ -61,8 +62,8 @@ module Hwaro
           files
         end
 
-        private def scan_markdown(dir : String) : Array(String)
-          walk_files(dir)
+        private def scan_markdown(dir : String, source_root : String) : Array(String)
+          walk_files(dir, source_root: source_root)
         end
 
         private def import_file(

@@ -33,6 +33,7 @@ module Hwaro
             return ImportResult.new(
               success: true,
               message: "No Markdown files found in #{path}",
+              skipped_count: outside_source_skips,
             )
           end
 
@@ -42,7 +43,7 @@ module Hwaro
         end
 
         private def collect_markdown_files(path : String) : Array(String)
-          walk_files(path)
+          walk_files(path, source_root: path)
         end
 
         private def import_file(

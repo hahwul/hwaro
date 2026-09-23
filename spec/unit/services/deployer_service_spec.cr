@@ -526,6 +526,119 @@ describe Hwaro::Services::Deployer do
       end
     end
 
+    it "does not deploy files reached through symlinks outside the project root" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        src_dir = File.join(project, "public")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "home")
+        File.write(File.join(outside, "secret.txt"), "secret")
+        File.symlink(File.join(outside, "secret.txt"), File.join(src_dir, "leak.txt"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Dir.cd(project) do
+          Hwaro::Services::Deployer.new.run(options, config).should be_true
+        end
+        File.exists?(File.join(dest_dir, "index.html")).should be_true
+        File.exists?(File.join(dest_dir, "leak.txt")).should be_false
+      end
+    end
+
+    it "deploys files reached through symlinks elsewhere inside the project" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        src_dir = File.join(project, "public")
+        shared_dir = File.join(project, "shared")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(shared_dir)
+        File.write(File.join(src_dir, "index.html"), "home")
+        File.write(File.join(shared_dir, "x.txt"), "shared file")
+        File.symlink("../shared/x.txt", File.join(src_dir, "x.txt"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Dir.cd(project) do
+          Hwaro::Services::Deployer.new.run(options, config).should be_true
+        end
+        File.read(File.join(dest_dir, "x.txt")).should eq("shared file")
+      end
+    end
+
+    it "skips dangling and looping source symlinks without calling them outside the project" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        src_dir = File.join(project, "public")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "home")
+        File.write(File.join(outside, "secret.txt"), "secret")
+        File.symlink("missing.txt", File.join(src_dir, "broken.txt"))
+        File.symlink("loop.txt", File.join(src_dir, "loop.txt"))
+        File.symlink(File.join(outside, "secret.txt"), File.join(src_dir, "leak.txt"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        log = with_captured_log do
+          Dir.cd(project) do
+            Hwaro::Services::Deployer.new.run(options, config).should be_true
+          end
+        end
+
+        Dir.children(dest_dir).sort.should eq(["index.html"])
+        log.should contain("leak.txt")
+        log.should_not contain("broken.txt")
+        log.should_not contain("loop.txt")
+      end
+    end
+
+    it "follows source symlinks inside a symlinked deploy root" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        source_root = File.join(dir, "www", "site")
+        src_dir = File.join(project, "public")
+        dest_dir = File.join(dir, "dest")
+        FileUtils.mkdir_p(project)
+        FileUtils.mkdir_p(File.join(source_root, "v2"))
+        File.write(File.join(source_root, "v2", "index.html"), "version two")
+        File.symlink("./v2/index.html", File.join(source_root, "latest.html"))
+        File.symlink(source_root, src_dir)
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Dir.cd(project) do
+          Hwaro::Services::Deployer.new.run(options, config).should be_true
+        end
+        File.read(File.join(dest_dir, "latest.html")).should eq("version two")
+      end
+    end
+
     it "refuses to deploy when the destination is a symlink into the source" do
       Dir.mktmpdir do |dir|
         src_dir = File.join(dir, "src")

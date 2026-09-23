@@ -24,7 +24,7 @@ module Hwaro
             )
           end
 
-          import_each(scan_markdown_files(content_dir), "Hugo", wrapped_note: "contained Hugo shortcodes. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_path|
+          import_each(scan_markdown_files(content_dir, hugo_path), "Hugo", wrapped_note: "contained Hugo shortcodes. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_path|
             process_file(file_path, content_dir, output_dir, include_drafts, verbose, force)
           end
         end
@@ -37,8 +37,8 @@ module Hwaro
           "Imported #{imported} items, skipped #{skipped}, errors #{errors}"
         end
 
-        private def scan_markdown_files(content_dir : String) : Array(String)
-          walk_files(content_dir)
+        private def scan_markdown_files(content_dir : String, source_root : String) : Array(String)
+          walk_files(content_dir, source_root: source_root)
         end
 
         private def process_file(

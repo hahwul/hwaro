@@ -36,6 +36,7 @@ module Hwaro
             return ImportResult.new(
               success: true,
               message: "No Markdown files found in #{path}",
+              skipped_count: outside_source_skips,
             )
           end
 
@@ -54,7 +55,7 @@ module Hwaro
         end
 
         private def collect_markdown_files(path : String) : Array(String)
-          walk_files(path, skip_dir: ->(entry : String) { entry.starts_with?(".") })
+          walk_files(path, skip_dir: ->(entry : String) { entry.starts_with?(".") }, source_root: path)
         end
 
         # Build a name → URL map covering every note in the vault. Keys are

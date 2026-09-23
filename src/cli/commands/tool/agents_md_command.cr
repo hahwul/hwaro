@@ -2,6 +2,8 @@ require "option_parser"
 require "../../metadata"
 require "../../prompt"
 require "../../../utils/logger"
+require "../../../utils/errors"
+require "../../../utils/path_utils"
 require "../../../services/defaults/agents_md"
 
 module Hwaro
@@ -74,6 +76,13 @@ module Hwaro
 
             if write
               filename = "AGENTS.md"
+              if File.symlink?(filename) && !link_target_within_project?(filename)
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "Cannot write AGENTS.md through a symlink that resolves outside the project.",
+                  hint: "Point the AGENTS.md symlink at a file inside the project, or remove it.",
+                )
+              end
               existed = File.exists?(filename)
               existing = existed ? File.read(filename) : nil
               # Only promise preservation when the merge can actually deliver
@@ -118,6 +127,29 @@ module Hwaro
             else
               puts content
             end
+          end
+
+          # Whether writing through the symlink `path` lands inside the current
+          # project. The project's own symlink rule: follow links resolving
+          # within it (the common `AGENTS.md -> CLAUDE.md`), refuse links
+          # resolving outside. A dangling link would create its target, so the
+          # chain is followed hop by hop to where `File.write` would create the
+          # file; a loop resolves nowhere and is refused.
+          private def link_target_within_project?(path : String) : Bool
+            target = File.expand_path(path)
+            40.times do
+              return within_project?(target) unless File.symlink?(target)
+              link = File.readlink?(target)
+              return false unless link
+              target = File.expand_path(link, File.dirname(target))
+            end
+            false
+          end
+
+          private def within_project?(path : String) : Bool
+            root = Utils::PathUtils.resolved_real_path(Dir.current)
+            resolved = Utils::PathUtils.resolved_real_path(path)
+            resolved == root || resolved.starts_with?(root + File::SEPARATOR)
           end
 
           # The generated document ends with a "Site-Specific Instructions"

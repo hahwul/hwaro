@@ -44,6 +44,8 @@ Both modes include a **Site-Specific Instructions** section where you can add yo
 
 By default, the command prints to stdout so you can inspect the content before saving. Use `--write` to save to file. If `AGENTS.md` already exists, you'll be prompted for confirmation unless `--force` is used. Either way, your **Site-Specific Instructions** section is preserved across the rewrite.
 
+When `AGENTS.md` is a symlink, `--write` updates the file it points at as long as that file resolves inside the project (for example `AGENTS.md -> CLAUDE.md`); a link resolving outside the project is refused.
+
 ## Relation to `hwaro init`
 
 When creating a new project, `hwaro init` also generates an AGENTS.md file. You can control the content mode with the `--agents` flag:
