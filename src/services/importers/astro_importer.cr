@@ -30,12 +30,13 @@ module Hwaro
             )
           end
 
-          files = collect_markdown_files(content_dir)
+          files = collect_markdown_files(content_dir, path)
 
           if files.empty?
             return ImportResult.new(
               success: true,
               message: "No content files found in #{content_dir}",
+              skipped_count: outside_source_skips,
             )
           end
 
@@ -44,8 +45,8 @@ module Hwaro
           end
         end
 
-        private def collect_markdown_files(dir : String) : Array(String)
-          walk_files(dir, [".md", ".mdx"])
+        private def collect_markdown_files(dir : String, source_root : String) : Array(String)
+          walk_files(dir, [".md", ".mdx"], source_root: source_root)
         end
 
         private def import_file(

@@ -31,8 +31,8 @@ class TestImporter < Hwaro::Services::Importers::Base
     strip_redundant_title_h1(body, title)
   end
 
-  def test_walk_files(dir, extensions = [".md", ".markdown"] of String)
-    walk_files(dir, extensions)
+  def test_walk_files(dir, extensions = [".md", ".markdown"] of String, source_root = dir)
+    walk_files(dir, extensions, source_root: source_root)
   end
 end
 

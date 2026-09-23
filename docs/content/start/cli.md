@@ -598,7 +598,8 @@ paths and options.
 
 See [Tools & Completion](/start/tools/) for detailed usage.
 
-`import` skips files reached through symlinks outside their source trees.
+`import` follows file symlinks within the site directory you pass it and skips
+(and counts as skipped) those resolving outside it.
 `export` and `convert` follow links within the project and skip links outside
 it. `agents-md --write` refuses to write when `AGENTS.md` is a symlink.
 

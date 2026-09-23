@@ -41,6 +41,7 @@ module Hwaro
             return ImportResult.new(
               success: true,
               message: "No content files found in #{path}",
+              skipped_count: outside_source_skips,
             )
           end
 
@@ -56,7 +57,7 @@ module Hwaro
           # Skip common non-content directories
           walk_files(path, skip_dir: ->(entry : String) {
             entry.starts_with?(".") || {"node_modules", "_site", "_includes", "_layouts", "_data"}.includes?(entry)
-          })
+          }, source_root: path)
         end
 
         # Load 11ty directory data files (dirname.json or dirname.11tydata.json)

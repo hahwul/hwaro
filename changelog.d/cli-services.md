@@ -1,2 +1,2 @@
 ### Fixed
-- CLI writers now refuse symlinks that escape their project roots. Import skips sources linked outside its input tree; export skips links outside the project, while deploy follows links within the project or resolved source root and skips targets outside both. Conversion preserves in-project symlink behavior and skips targets outside the project.
+- CLI writers now refuse symlinks that escape their project roots. Import follows file links within the site directory it is given and skips (and counts) those outside it; export skips links outside the project, while deploy follows links within the project or resolved source root and skips targets outside both. Conversion preserves in-project symlink behavior and skips targets outside the project.

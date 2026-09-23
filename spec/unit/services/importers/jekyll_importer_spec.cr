@@ -727,3 +727,34 @@ describe Hwaro::Services::Importers::JekyllImporter do
     end
   end
 end
+
+describe "Hwaro::Services::Importers::JekyllImporter symlink boundary" do
+  it "imports posts linked elsewhere inside the site and counts links outside it as skipped" do
+    Dir.mktmpdir do |root|
+      site = File.join(root, "site")
+      posts_dir = File.join(site, "_posts")
+      shared_dir = File.join(site, "_shared")
+      FileUtils.mkdir_p(posts_dir)
+      FileUtils.mkdir_p(shared_dir)
+      post = "---\ntitle: \"%s\"\n---\nBody.\n"
+      File.write(File.join(posts_dir, "2024-01-01-local.md"), post % "Local")
+      File.write(File.join(shared_dir, "2024-01-02-shared.md"), post % "Shared")
+      File.symlink("../_shared/2024-01-02-shared.md", File.join(posts_dir, "2024-01-02-shared.md"))
+      File.write(File.join(root, "secret.md"), post % "Secret")
+      File.symlink(File.join(root, "secret.md"), File.join(posts_dir, "2024-01-03-leak.md"))
+
+      output_dir = File.join(root, "out")
+      options = Hwaro::Config::Options::ImportOptions.new(source_type: "jekyll", path: site, output_dir: output_dir)
+      log = with_captured_log do
+        result = Hwaro::Services::Importers::JekyllImporter.new.run(options)
+        result.imported_count.should eq(2)
+        result.skipped_count.should eq(1)
+      end
+
+      File.exists?(File.join(output_dir, "posts", "shared.md")).should be_true
+      File.exists?(File.join(output_dir, "posts", "leak.md")).should be_false
+      log.should contain("2024-01-03-leak.md")
+      log.should_not contain("2024-01-02-shared.md")
+    end
+  end
+end
