@@ -630,6 +630,26 @@ describe Hwaro::Utils::JsMinifier do
       result.should eq("return e(t)")
     end
 
+    # Regression: a regex after `return` (and the other expression keywords)
+    # was read as division, so a `/*` or `//` inside its body opened a
+    # "comment" that swallowed the rest of the file — every later file of the
+    # bundle included.
+    it "keeps regex literals that follow an expression keyword" do
+      src = "function g(u){ return /\\/*$/.test(u) }\nwindow.ok = 1;"
+      result = Hwaro::Utils::JsMinifier.minify(src)
+      result.should contain("return /\\/*$/.test(u)")
+      result.should contain("window.ok = 1;")
+
+      %w[typeof void throw case delete in instanceof new do else].each do |kw|
+        Hwaro::Utils::JsMinifier.minify("x = #{kw} /a\\/\\/b/;\nlast()").should contain("last()")
+      end
+    end
+
+    it "still treats a keyword-named property or identifier before a slash as division" do
+      Hwaro::Utils::JsMinifier.minify("v = o.return / 2 // note\nw = 1").should eq("v = o.return / 2\nw = 1")
+      Hwaro::Utils::JsMinifier.minify("v = of / 2 // note\nw = 1").should eq("v = of / 2\nw = 1")
+    end
+
     it "leaves a counterfeit out-of-range JSPL placeholder token intact" do
       # A real template literal makes protected_spans non-empty so the restore
       # gsub actually runs; the bogus \x00JSPL999\x00 token has an out-of-range
