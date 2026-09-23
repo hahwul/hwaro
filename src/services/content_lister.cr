@@ -37,6 +37,8 @@ module Hwaro
     module ContentWalk
       extend self
 
+      MARKDOWN_EXTENSIONS = {".md", ".markdown"}
+
       # True when `path` is a regular file that can actually be opened.
       #
       # Anything that simply is not a file (a directory, or a FIFO/socket
@@ -54,11 +56,12 @@ module Hwaro
       def find_content_files(content_dir : String) : Array(String)
         files = [] of String
 
-        Dir.glob(File.join(content_dir, "**", "*.md")) do |file|
-          files << file if readable_file?(file)
-        end
-
-        Dir.glob(File.join(content_dir, "**", "*.markdown")) do |file|
+        # Match ReadContent's case-insensitive extension check. Lowercase-only
+        # glob patterns omitted `post.MD` and `post.MARKDOWN`, even though the
+        # build publishes them; every content tool using this walker then
+        # silently disagreed with the build.
+        Dir.glob(File.join(content_dir, "**", "*")) do |file|
+          next unless MARKDOWN_EXTENSIONS.includes?(File.extname(file).downcase)
           files << file if readable_file?(file)
         end
 

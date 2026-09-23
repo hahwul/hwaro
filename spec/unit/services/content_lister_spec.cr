@@ -26,6 +26,19 @@ describe Hwaro::Services::ContentLister do
       end
     end
 
+    it "includes pages with uppercase Markdown extensions accepted by the build" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "upper.MD"), "---\ntitle: Uppercase page\n---\nBody")
+        File.write(File.join(content_dir, "longer.MARKDOWN"), "---\ntitle: Uppercase Markdown page\n---\nBody")
+
+        result = Hwaro::Services::ContentLister.new(content_dir).list_all
+
+        result.map(&.title).sort!.should eq(["Uppercase Markdown page", "Uppercase page"])
+      end
+    end
+
     it "returns only draft files with Drafts filter" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
