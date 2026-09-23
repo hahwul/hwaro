@@ -432,6 +432,26 @@ describe "warm --cache builds" do
     end
   end
 
+  # A `[[content.generate]]` page has no source file, so no cache entry named
+  # its output: when its record disappeared from the data, the page stayed in
+  # `public/` for every later warm build.
+  it "removes the page of a generated record that left the data" do
+    with_cached_site do
+      File.open("config.toml", "a") do |io|
+        io << "\n[[content.generate]]\nsource = \"products\"\nsection = \"posts\"\nslug = \"sku\"\ntitle = \"name\"\n"
+      end
+      FileUtils.mkdir_p("data")
+      File.write("data/products.json", %([{"sku": "stay", "name": "Stay"}, {"sku": "leave", "name": "Leave"}]))
+      cached_build
+      File.exists?("public/posts/leave/index.html").should be_true
+
+      File.write("data/products.json", %([{"sku": "stay", "name": "Stay"}]))
+      cached_build
+      File.exists?("public/posts/leave/index.html").should be_false
+      File.exists?("public/posts/stay/index.html").should be_true
+    end
+  end
+
   it "leaves an untouched page's output alone" do
     with_cached_site do
       cached_build
