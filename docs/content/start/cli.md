@@ -143,6 +143,8 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | -q, --quiet | Suppress info output and the banner (errors still go to stderr) |
 | -j, --json | Emit machine-readable JSON output: the scaffold list with `--list-scaffolds`, otherwise a `{"status","path","scaffold","files_created"}` result |
 
+`init` rejects scaffold paths that resolve outside the target directory through a symlink.
+
 ### new
 
 Create a new content file:
@@ -184,6 +186,8 @@ stay predictable. Pass a `<path>` (and any flags) to skip the prompts entirely.
 | --no-bundle | Force a single file (`foo.md`); overrides `[content.new].bundle = true` |
 | --list-archetypes | List archetypes in the current project and exit |
 | --json | Emit machine-readable JSON output (archetypes listing and classified errors) |
+
+`hwaro new` rejects destinations that cannot be resolved within `content/`, including paths through symlinks outside it.
 
 **Archetypes:**
 
@@ -482,6 +486,8 @@ cannot reconcile:
 - Symlinks at the destination are never written or deleted *through*. A link
   standing where a file or directory belongs is replaced; a stale one is
   unlinked without touching what it points at.
+- Source symlinks are followed only when they resolve within the source
+  directory; links to files outside it are skipped.
 - `--json` is non-interactive: combining it with `--confirm` fails instead of
   writing a prompt into the JSON document.
 
@@ -590,6 +596,10 @@ paths and options.
 | -h, --help | Show help |
 
 See [Tools & Completion](/start/tools/) for detailed usage.
+
+`import`, `export`, and `convert` skip content files reached through symlinks
+outside their source/content root. `agents-md --write` refuses to write when
+`AGENTS.md` is a symlink.
 
 ### completion
 

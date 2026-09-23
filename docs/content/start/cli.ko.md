@@ -145,6 +145,8 @@ API 요청 제한을 피하려면 `GITHUB_TOKEN` 환경 변수를 설정합니�
 | -q, --quiet | 정보 출력과 배너 숨김 (오류는 stderr로 계속 출력) |
 | -j, --json | 기계가 읽을 수 있는 JSON 출력: `--list-scaffolds`와 함께면 스캐폴드 목록, 그 외에는 `{"status","path","scaffold","files_created"}` 결과 |
 
+`init`은 심볼릭 링크를 따라 대상 디렉터리 밖으로 이어지는 스캐폴드 경로가 있으면 거부합니다.
+
 ### new
 
 새 콘텐츠 파일을 만듭니다:
@@ -188,6 +190,8 @@ hwaro new my-post.md --section blog --draft --tags "go,web" --date 2026-03-22
 | --no-bundle | 단일 파일(`foo.md`) 강제; `[content.new].bundle = true`보다 우선 |
 | --list-archetypes | 현재 프로젝트의 아키타입 목록 출력 후 종료 |
 | --json | 기계가 읽을 수 있는 JSON 출력 (아키타입 목록과 분류된 오류) |
+
+`hwaro new`는 `content/` 안에서 확인할 수 없는 경로(디렉터리 밖으로 이어지는 심볼릭 링크 포함)를 거부합니다.
 
 **아키타입:**
 
@@ -483,6 +487,8 @@ hwaro deploy --dry-run
 - 대상에 있는 심볼릭 링크를 **따라가서** 쓰거나 지우지 않습니다. 파일이나
   디렉터리가 있어야 할 자리의 링크는 교체하고, 오래된 링크는 가리키는 대상을
   건드리지 않은 채 링크만 제거합니다.
+- 소스 심볼릭 링크는 소스 디렉터리 안에서 확인되는 경우에만 따라가며,
+  디렉터리 밖의 파일을 가리키는 링크는 건너뜁니다.
 - `--json`은 비대화형입니다. `--confirm`과 함께 쓰면 JSON 문서에 프롬프트를
   섞어 넣는 대신 오류로 실패합니다.
 
@@ -591,6 +597,10 @@ hwaro tool export hugo --dry-run
 | -h, --help | 도움말 표시 |
 
 자세한 사용법은 [도구와 자동 완성](/ko/start/tools/)을 참고합니다.
+
+`import`, `export`, `convert`는 소스/콘텐츠 루트 밖에 있는 파일로 연결되는
+심볼릭 링크를 건너뜁니다. `agents-md --write`는 `AGENTS.md`가 심볼릭 링크이면
+쓰기를 거부합니다.
 
 ### completion
 
