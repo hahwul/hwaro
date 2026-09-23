@@ -121,6 +121,29 @@ describe "serve rebuild parity" do
       end
     end
   end
+
+  # Pruning the old output of a moved page deletes the directory it leaves
+  # empty, but the builder's mkdir memo still listed it — so moving the page
+  # back failed the rebuild with ENOENT on the temp file.
+  it "renders a page back into a directory an earlier rebuild pruned" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_sidebar_site
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.exists?("public/guide/intro/index.html").should be_true
+
+        File.write("content/guide/intro.md", "---\ntitle: Old Intro\nslug: away\n---\nbody")
+        builder.run_incremental(["content/guide/intro.md"], options).should be_true
+        Dir.exists?("public/guide/intro").should be_false
+
+        File.write("content/guide/intro.md", "---\ntitle: Old Intro\n---\nbody")
+        builder.run_incremental(["content/guide/intro.md"], options).should be_true
+        File.exists?("public/guide/intro/index.html").should be_true
+      end
+    end
+  end
 end
 
 private def write_amp_site

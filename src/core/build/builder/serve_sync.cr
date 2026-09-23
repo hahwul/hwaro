@@ -314,6 +314,7 @@ module Hwaro
             dir = File.dirname(path)
             while Utils::OutputGuard.safe_to_delete_directory?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
               Dir.delete(dir)
+              forget_created_dirs(dir)
               dir = File.dirname(dir)
             end
           rescue ex

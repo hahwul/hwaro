@@ -58,6 +58,7 @@ module Hwaro
 
           Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..." if options.verbose
           start_time = Time.instant
+          forget_created_dirs
           clear_broken_internal_links
 
           output_dir = options.output_dir
@@ -660,6 +661,7 @@ module Hwaro
           end
 
           start_time = Time.instant
+          forget_created_dirs
           clear_broken_internal_links
 
           # Reload templates from disk & reset all runtime caches.
@@ -925,6 +927,7 @@ module Hwaro
 
           Logger.info "Fast-start: background-rendering #{pages.size} deferred page(s)..."
           start_time = Time.instant
+          forget_created_dirs
 
           output_dir = options.output_dir
           minify = options.minify
