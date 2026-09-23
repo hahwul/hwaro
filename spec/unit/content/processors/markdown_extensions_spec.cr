@@ -1645,6 +1645,18 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain("<del>")
     end
 
+    it "leaves indented code alone after a blockquote closes the list above it" do
+      config = make_config(math: true, footnotes: true)
+      content = "- item one\n- item two\n\n> A note after the list.\n\n    code ~~C1~~ $y$\n\n" \
+                "1. step\n\n> [!NOTE]\n> tip\n\n    $ echo ~~C2~~ [^n]\n\n[^n]: foot"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should contain("code ~~C1~~ $y$")
+      html.should contain("$ echo ~~C2~~ [^n]")
+      html.should_not contain("<del>")
+      html.should_not contain("math-inline")
+      html.should_not contain(%(<section class="footnotes">))
+    end
+
     it "applies extensions in nested list items indented four or more columns" do
       config = make_config(task_lists: true, math: true, ins: true, mark: true, footnotes: true)
       content = "- a\n\n    - b ~~S1~~\n\n        - c ~~S2~~ $x^2$ ++I1++\n\n" \

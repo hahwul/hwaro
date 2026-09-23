@@ -170,6 +170,43 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["- a", "", "      code", "    text"]).should eq [false, false, true, false]
     end
 
+    it "closes a list when a blockquote starts left of its content" do
+      feed(["- item one", "- item two", "", "> A note", "", "    code"])
+        .should eq [false, false, false, false, false, true]
+      feed(["- item", "> quote", "", "    code"]).should eq [false, false, false, true]
+    end
+
+    it "closes a quoted list when a nested blockquote starts left of its content" do
+      feed(["> - item", ">", "> > nested quote", ">", ">     code"])
+        .should eq [false, false, false, false, true]
+    end
+
+    it "opens indented code right after quoted code ends" do
+      feed([">     quoted code", "    unquoted code"]).should eq [true, true]
+      feed(["    code", "> >       more code"]).should eq [true, true]
+    end
+
+    it "closes an empty list item at the blank line after it" do
+      feed(["-", "", "    code"]).should eq [false, false, true]
+    end
+
+    it "closes a list item at a heading left of its content" do
+      feed(["- a", "# h", "    code"]).should eq [false, false, true]
+    end
+
+    it "measures a tab after a quote marker the way Markd consumes it" do
+      feed(["> >\t# h"]).should eq [false]
+      feed([" - a", "", "   >   \tx"]).should eq [false, false, false]
+    end
+
+    it "never opens indented code inside a generic HTML block" do
+      feed(["<div>", "> >     y", "</div>"]).should eq [false, false, false]
+    end
+
+    it "does not open indented code on a lazy quote continuation" do
+      feed(["> para", "lazy", ">     more para"]).should eq [false, false, false]
+    end
+
     it "keeps list items behind a blockquote inside an outer item" do
       feed(["- a", "", "  > quote", "", "  b", "", "     not code"])
         .should eq [false, false, false, false, false, false, false]

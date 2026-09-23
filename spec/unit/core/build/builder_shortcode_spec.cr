@@ -320,6 +320,17 @@ describe Hwaro::Core::Build::Builder do
       result.should_not contain("<div>skip</div>")
     end
 
+    it "keeps a shortcode literal in indented code after a blockquote ends a list" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/hi" => "hi {{ name }}"}
+      context = {} of String => Crinja::Value
+
+      content = "- item one\n- item two\n\n> A note after the list.\n\n    code block {{ hi(name=\"x\") }}"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain(%(code block {{ hi(name="x") }}))
+    end
+
     it "expands shortcodes inside raw HTML code blocks" do
       # Raw <pre>/<script>/<textarea> blocks are opaque to the Markdown
       # extensions only; shortcode expansion has always run inside them

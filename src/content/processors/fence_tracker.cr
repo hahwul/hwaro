@@ -39,12 +39,14 @@ module Hwaro
       #   a line look *less* like code (today's under-protective
       #   behaviour); a missed one would make real list content look like
       #   code and silently skip every extension on it. Items are keyed by
-      #   blockquote depth, so a quote inside an item never pops the item.
+      #   blockquote depth, so a quote inside an item never pops the item,
+      #   while a `>` marker left of an item's content closes it.
       #   Column arithmetic mirrors Markd, including its quirks (tabs after
       #   a list marker and after `>` are measured from Markd's own column,
-      #   not the true one). Known limits: a fence closer followed directly
-      #   by indented code opens no run, and lines inside a generic HTML
-      #   block (`<div>` … blank line) are not recognized as raw.
+      #   not the true one). Lines inside a generic HTML block (`<div>` …
+      #   blank line, `<!--` … `-->`) never open indented code, since Markd
+      #   passes them through as raw HTML. Known limit: a fence closer
+      #   followed directly by indented code opens no run.
       # - Fences inside blockquotes (`> ```) are tracked too: the leading
       #   `>` markers are stripped before the opener/closer rules apply, and
       #   the marker depth is remembered. Because CommonMark gives fenced
@@ -74,6 +76,12 @@ module Hwaro
         RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(?:pre|script|style|textarea)(?:[\s>]|\z)/i
         RAW_HTML_CODE_CLOSE_RE = /<\/(?:pre|script|style|textarea)\s*>/i
 
+        # Starts of CommonMark HTML blocks that run to a blank line (Markd's
+        # HTML_BLOCK_OPEN types 6 and 7, the latter with possessive
+        # quantifiers so a long line cannot exhaust the PCRE JIT stack).
+        HTML_BLOCK_TAG_RE      = /\A {0,3}<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|section|source|title|summary|table|tbody|td|tfoot|th|thead|tr|track|ul)(?:\s|\/?>|\z)/i
+        HTML_BLOCK_LONE_TAG_RE = /\A {0,3}(?:<[A-Za-z][A-Za-z0-9-]*+(?:\s++[a-zA-Z_:][a-zA-Z0-9:._-]*+(?:\s*+=\s*+(?:[^"'=<>`\x00-\x20]++|'[^']*+'|"[^"]*+"))?+)*+\s*+\/?>|<\/[A-Za-z][A-Za-z0-9-]*+\s*+>)\s*\z/
+
         # An ATX heading at up to 3 spaces indent: 1-6 `#` followed by a
         # space/tab or nothing but the line ending. Only used to let an
         # indented-code run open on the line right after a heading — the
@@ -102,6 +110,21 @@ module Hwaro
         @list_items = [] of {Int32, Int32}
         @prev_blank = true
         @prev_atx_heading = false
+        # Deepest blockquote that may still hold an open paragraph: raised by
+        # any line at a deeper quote, lowered only by a blank line (which
+        # closes the paragraph and every quote deeper than its markers).
+        @open_quote_depth = 0
+        # The last line opened an empty list item (`-` alone). If the next
+        # line is blank the item is over: an item may begin with at most
+        # one blank line, and an empty one followed by a blank has none.
+        @empty_item_open = false
+        # An open generic HTML block (0 none, 1 ends at a blank line — the
+        # CommonMark type 6/7 blocks, 2 an HTML comment ending at `-->`) and
+        # the quote depth it lives in. Its lines are raw HTML to Markd, so
+        # they never open indented code. Only that suppression is modelled:
+        # a block tracked too long merely leaves lines unprotected.
+        @html_block = 0
+        @html_block_bq_depth = 0
 
         # True while inside an open fence: after the opener line was fed,
         # until (and excluding) the line after the closer. Lets callers
@@ -146,6 +169,22 @@ module Hwaro
           content, depth = strip_blockquote_markers(line)
           blank = content.blank?
 
+          # A line deeper than any quote still open starts a new blockquote,
+          # which holds no paragraph yet — indented code may open at once.
+          # A shallower line may be a lazy paragraph continuation, so the
+          # open depth only drops at a blank line.
+          #
+          # Inside a generic HTML block every line is raw HTML — a `>` there
+          # is text — so none of that applies.
+          in_html_block = inside_html_block?(content, depth, blank)
+          quote_opened = !in_html_block && depth > @open_quote_depth
+          @open_quote_depth = depth if blank || quote_opened
+          close_items_left_of_quote_markers(line, depth) unless depth.zero? || in_html_block
+          if @empty_item_open
+            @list_items.pop if blank
+            @empty_item_open = false
+          end
+
           if @track_raw_html_code
             if @in_raw_html_code
               if depth != @raw_html_code_bq_depth
@@ -166,9 +205,10 @@ module Hwaro
             end
           end
 
-          prefix = depth.zero? ? 0 : blockquote_prefix_column(line, depth)
-          column, text_start = leading_columns(content, prefix)
+          prefix, tab_consumed = depth.zero? ? {0, false} : blockquote_prefix_column(line, depth)
+          column, text_start = leading_columns(content, prefix, tab_consumed)
 
+          code_left_quote = false
           if @in_indented_code
             if blank
               @prev_blank = true
@@ -178,19 +218,23 @@ module Hwaro
               return true
             end
             # First non-blank line back under the run's column ends the run
-            # and is evaluated normally below.
+            # and is evaluated normally below. Code has no lazy
+            # continuation, so a line at another quote depth closes the
+            # quote (or opens one) with no paragraph for indented code to
+            # interrupt.
+            code_left_quote = depth != @indented_code_bq_depth
             @in_indented_code = false
           end
 
           if !blank && @prev_blank
             # After a blank line, a line left of an item's content column
-            # closes that item. Items of an enclosing container (a list
-            # around this blockquote) are never judged by this line; items
-            # of quotes that ended at the blank line are dropped.
+            # closes that item; items of quotes that ended at the blank line
+            # are dropped. (Items of an enclosing container are closed by
+            # this line's `>` markers instead, above.)
             @list_items.reject! { |item| item[0] > depth || (item[0] == depth && item[1] > column) }
           end
 
-          if !blank && (@prev_blank || prev_atx_heading)
+          if !blank && !in_html_block && (@prev_blank || prev_atx_heading || quote_opened || code_left_quote)
             base = list_content_column(depth, column)
             if column - base >= 4
               @in_indented_code = true
@@ -202,9 +246,18 @@ module Hwaro
           end
 
           track_list_item(content, depth, column, text_start, prefix) unless blank
+          open_html_block(content, depth) unless blank || in_html_block
 
           stripped = content.lstrip
-          if !indented?(content) && (run = opener_run(stripped))
+          heading = !blank && ATX_HEADING_RE.matches?(content)
+          fence_run = indented?(content) ? nil : opener_run(stripped)
+          if heading || fence_run
+            # Headings and fences are never lazy continuations: one left of
+            # an item's content closes it, like a line after a blank.
+            @list_items.reject! { |item| item[0] > depth || (item[0] == depth && item[1] > column) }
+          end
+
+          if run = fence_run
             @in_fence = true
             @fence_char = stripped[0]
             @fence_len = run
@@ -213,7 +266,7 @@ module Hwaro
             true
           else
             @prev_blank = blank
-            @prev_atx_heading = ATX_HEADING_RE.matches?(content)
+            @prev_atx_heading = heading
             false
           end
         end
@@ -268,40 +321,100 @@ module Hwaro
         # The column Markd has reached after consuming `depth` blockquote
         # markers. Markd never advances its column over the up-to-3 spaces
         # before a `>` (`advance_next_nonspace` updates only the offset), so
-        # only the `>` and its optional following space count; a tab after
-        # `>` counts one (partially consumed) column and stays in the
-        # content, exactly as `strip_blockquote_markers` leaves it.
-        private def blockquote_prefix_column(line : String, depth : Int32) : Int32
+        # only an enclosing list item's content column, the `>`, and its
+        # optional following space count. A tab after
+        # `>` counts one column and stays in the content, exactly as
+        # `strip_blockquote_markers` leaves it — unless that one column
+        # reaches a tab stop, in which case Markd consumed the whole tab and
+        # the flag tells `leading_columns` to skip it.
+        private def blockquote_prefix_column(line : String, depth : Int32) : {Int32, Bool}
           slice = line.to_slice
           pos = 0
           column = 0
-          depth.times do
+          depth.times do |level|
             spaces = 0
             while pos < slice.size && slice[pos] === ' ' && spaces < 3
               pos += 1
               spaces += 1
             end
             break unless pos < slice.size && slice[pos] === '>'
+            # A list item holding this quote was consumed first, by columns.
+            column += list_content_column(level, spaces)
             pos += 1
             column += 1
             if pos < slice.size && slice[pos] === ' '
               pos += 1
               column += 1
             elsif pos < slice.size && slice[pos] === '\t'
+              # One column of the tab is the optional space; when that is
+              # the whole tab (it ends on a tab stop), Markd consumes it.
+              return {column + 1, true} if column % 4 == 3
               column += 1
             end
           end
-          column
+          {column, false}
+        end
+
+        # Whether this line continues a generic HTML block opened earlier
+        # (updating the block's state), so it cannot be indented code.
+        private def inside_html_block?(content : String, depth : Int32, blank : Bool) : Bool
+          return false if @html_block.zero?
+          # Leaving the block's quote ends it (HTML has no lazy
+          # continuation); a deeper `>` is just more HTML.
+          if depth < @html_block_bq_depth || (blank && @html_block == 1)
+            @html_block = 0
+            return false
+          end
+          @html_block = 0 if @html_block == 2 && content.includes?("-->")
+          true
+        end
+
+        private def open_html_block(content : String, depth : Int32) : Nil
+          return unless content.includes?('<')
+          stripped = content.lstrip
+          if stripped.starts_with?("<!--")
+            @html_block = 2 unless stripped.index("-->", 4)
+          elsif HTML_BLOCK_TAG_RE.matches?(stripped) || HTML_BLOCK_LONE_TAG_RE.matches?(stripped)
+            @html_block = 1
+          else
+            return
+          end
+          @html_block_bq_depth = depth
+        end
+
+        # A `>` marker left of an open item's content column cannot sit
+        # inside that item: the item closes (a blockquote start is never a
+        # lazy continuation), and with it every item of the quotes nested in
+        # it. Marker `level` is measured from the content of quote depth
+        # `level`, where that depth's items keep their columns.
+        private def close_items_left_of_quote_markers(line : String, depth : Int32) : Nil
+          return if @list_items.empty?
+
+          slice = line.to_slice
+          pos = 0
+          depth.times do |level|
+            spaces = 0
+            while pos < slice.size && slice[pos] === ' ' && spaces < 3
+              pos += 1
+              spaces += 1
+            end
+            break unless pos < slice.size && slice[pos] === '>'
+            if @list_items.any? { |item| item[0] == level && item[1] > spaces }
+              @list_items.reject! { |item| item[0] > level || (item[0] == level && item[1] > spaces) }
+            end
+            pos += 1
+            pos += 1 if pos < slice.size && slice[pos] === ' '
+          end
         end
 
         # Column of the first non-whitespace character, measured from the
         # end of the stripped blockquote prefix (`prefix` columns wide) but
         # with tabs advancing to the next absolute multiple of 4, as Markd
         # expands them; plus that character's byte offset.
-        private def leading_columns(content : String, prefix : Int32) : {Int32, Int32}
+        private def leading_columns(content : String, prefix : Int32, tab_consumed : Bool = false) : {Int32, Int32}
           column = prefix
-          offset = 0
-          content.each_byte do |byte|
+          offset = tab_consumed && content.starts_with?('\t') ? 1 : 0
+          content.to_slice[offset..].each do |byte|
             if byte === ' '
               column += 1
             elsif byte === '\t'
@@ -370,6 +483,7 @@ module Hwaro
 
             @list_items.reject! { |item| item[0] == depth && item[1] > column } if first
             @list_items << {depth, content_column}
+            @empty_item_open = rest.byte_slice(marker_size).blank?
             break unless simple
 
             first = false
