@@ -26,8 +26,10 @@ module Hwaro
           # run with the corresponding include flag.
           # `output_suppressed` too: a page the render phase declined to write
           # because another page owns its output file must not be advertised
-          # as a URL — on a case-folding host it is a guaranteed 404.
-          sitemap_pages = pages.select { |p| p.in_sitemap && p.render && !p.draft && !p.unpublished && !p.output_suppressed }
+          # as a URL — on a case-folding host it is a guaranteed 404. And a
+          # `redirect_to` stub declares its target as canonical, so listing
+          # it is a "page with redirect" sitemap error.
+          sitemap_pages = pages.select { |p| p.in_sitemap && p.published_content? }
           # `[versions] search` governs the sitemap too: older versions are
           # advertised only when it is "all" (same switch as search.json).
           versions = site.config.versions

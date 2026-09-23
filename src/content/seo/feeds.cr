@@ -52,7 +52,7 @@ module Hwaro
             # `output_suppressed`: the render phase declined to write this
             # page's file (another page owns it), so a feed entry pointing at
             # its URL is a dead link.
-            site_pages = pages.reject { |p| p.draft || p.unpublished || !p.render || p.output_suppressed || p.is_a?(Models::Section) }
+            site_pages = pages.select { |p| p.published_content? && !p.is_a?(Models::Section) }
             site_pages = dedupe_by_output_url(site_pages)
 
             # Filter by section if configured for main feed
@@ -80,7 +80,7 @@ module Hwaro
           # 2. Generate Section Feeds — pre-group pages by section for O(1) lookup
           pages_by_section = {} of String => Array(Models::Page)
           pages.each do |p|
-            next if p.draft || p.unpublished || !p.render || p.output_suppressed || p.is_a?(Models::Section)
+            next if !p.published_content? || p.is_a?(Models::Section)
             (pages_by_section[p.section] ||= [] of Models::Page) << p
           end
 
@@ -180,7 +180,7 @@ module Hwaro
 
             # Filter pages for this language (single pass)
             lang_pages = pages.select { |p|
-              !p.draft && !p.unpublished && p.render && !p.output_suppressed && !p.is_a?(Models::Section) && p.language == lang_code
+              p.published_content? && !p.is_a?(Models::Section) && p.language == lang_code
             }
             lang_pages = dedupe_by_output_url(lang_pages)
 
