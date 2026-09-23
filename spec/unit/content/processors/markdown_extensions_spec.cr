@@ -1498,6 +1498,38 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     end
   end
 
+  describe "inline markup in link destinations" do
+    it "leaves extension delimiters in paragraph destinations unchanged" do
+      cfg = make_config(ins: true, mark: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[strike](https://example.com/a~~b~~) and [insert](https://example.com/c++d++)",
+        markdown_config: cfg,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+      html.should contain(%(href="https://example.com/c++d++"))
+      html.should_not contain("<del>")
+      html.should_not contain("<ins>")
+    end
+
+    it "leaves extension delimiters in table-cell destinations unchanged" do
+      cfg = make_config(ins: true, mark: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "| Link |\n| --- |\n| [strike](https://example.com/a~~b~~) |",
+        markdown_config: cfg,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+      html.should_not contain(%(href="https://example.com/a<del>b</del>"))
+    end
+
+    it "leaves extension delimiters in reference destinations unchanged" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ref][target]\n\n[target]: https://example.com/a~~b~~",
+        markdown_config: make_config,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+    end
+  end
+
   describe "indented code blocks" do
     it "leaves transforms alone inside an indented code run" do
       config = make_config(math: true)

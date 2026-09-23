@@ -18,8 +18,12 @@ module Hwaro
         # When math is also enabled, `preprocess` stashes `$…$`/`$$…$$`
         # spans into opaque placeholders before this pass runs, so `$~~x~~$`
         # reaches KaTeX verbatim instead of being rewritten here.
-        STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
-        STRIKETHROUGH_CODE_RE = /`[^`]+`/
+        STRIKETHROUGH_RE          = InlineMarkdown::INLINE_STRIKETHROUGH_RE
+        STRIKETHROUGH_CODE_RE     = /`[^`]+`/
+        LINK_DEFINITION_PREFIX_RE = /\A(?: {0,3}>[ \t]?)* {0,3}\[[^\]]+\]:[ \t]*/
+        LINK_DEST_TOKEN_RE        = /\x00LD(\d+)\x00/
+        HTML_TAG_RE               = /<\/?[a-z][\w:-]*(?:[^>"']|"[^"]*"|'[^']*')*>/i
+        HTML_TAG_TOKEN_RE         = /\x00HT(\d+)\x00/
 
         def preprocess_strikethrough(content : String) : String
           return content unless content.includes?("~~")
@@ -50,7 +54,9 @@ module Hwaro
         private def transform_outside_code_spans(text : String, code_span_re : Regex = STRIKETHROUGH_CODE_RE, & : String -> String) : String
           has_backticks = text.includes?('`')
           has_html_code = text.includes?("<code")
-          return yield text unless has_backticks || has_html_code
+          has_link_destinations = text.includes?("](") || text.includes?("]:")
+          has_html_tags = text.includes?('<') && text.matches?(HTML_TAG_RE)
+          return yield text unless has_backticks || has_html_code || has_link_destinations || has_html_tags
 
           code_spans = [] of String
           stashed = text
@@ -67,7 +73,27 @@ module Hwaro
             end
           end
 
+          link_destinations = [] of String
+          stashed = stash_markdown_link_destinations(stashed, link_destinations) if has_link_destinations
+
+          html_tags = [] of String
+          stashed = stashed.gsub(HTML_TAG_RE) do |tag|
+            html_tags << tag
+            "\x00HT#{html_tags.size - 1}\x00"
+          end if has_html_tags
+
           rewritten = yield stashed
+
+          unless link_destinations.empty?
+            rewritten = rewritten.gsub(LINK_DEST_TOKEN_RE) do |match|
+              link_destinations[$1.to_i]?.try(&.itself) || match
+            end
+          end
+          unless html_tags.empty?
+            rewritten = rewritten.gsub(HTML_TAG_TOKEN_RE) do |match|
+              html_tags[$1.to_i]?.try(&.itself) || match
+            end
+          end
 
           # Single-pass restore per nesting level (the per-index `sub` loop
           # rescanned the line once per span). An HTML code span stashed
@@ -89,6 +115,122 @@ module Hwaro
             rewritten = replaced
           end
           rewritten
+        end
+
+        # Inline extensions act on Markdown text, but a delimiter inside
+        # `](destination "title")` is URL/title data. Stash that part while
+        # the caller rewrites emphasis-like syntax, then restore it before
+        # Markd parses the link. Code spans have already been stashed by the
+        # caller, so their brackets cannot be mistaken for a real link.
+        private def stash_markdown_link_destinations(text : String, store : Array(String)) : String
+          slice = text.to_slice
+          return text if slice.size < 3
+
+          # A reference-definition destination and optional title occupy the
+          # remainder of their line; neither is inline Markdown text.
+          if definition = text.match(LINK_DEFINITION_PREFIX_RE)
+            start = definition.end
+            return text if start >= slice.size
+
+            return String.build(text.bytesize) do |io|
+              io.write(slice[0, start])
+              store << text.byte_slice(start, slice.size - start)
+              io << "\x00LD#{store.size - 1}\x00"
+            end
+          end
+
+          String.build(text.bytesize) do |io|
+            copied_until = 0
+            search_from = 0
+
+            while close_bracket = text.byte_index(']', search_from)
+              if close_bracket + 1 < slice.size && slice[close_bracket + 1] === '(' &&
+                 !escaped_markdown_delimiter?(slice, close_bracket) && has_matching_link_label?(slice, close_bracket)
+                destination_start = close_bracket + 2
+                if close_paren = find_link_destination_end(slice, destination_start)
+                  io.write(slice[copied_until, destination_start - copied_until])
+                  store << text.byte_slice(destination_start, close_paren - destination_start)
+                  io << "\x00LD#{store.size - 1}\x00"
+                  copied_until = close_paren
+                  search_from = close_paren + 1
+                else
+                  search_from = close_bracket + 1
+                end
+              else
+                search_from = close_bracket + 1
+              end
+            end
+
+            io.write(slice[copied_until, slice.size - copied_until])
+          end
+        end
+
+        private def has_matching_link_label?(slice : Bytes, close_bracket : Int32) : Bool
+          depth = 1
+          pos = close_bracket - 1
+          while pos >= 0
+            char = slice[pos]
+            if (char === '[' || char === ']') && !escaped_markdown_delimiter?(slice, pos)
+              if char === ']'
+                depth += 1
+              else
+                depth -= 1
+                return true if depth.zero?
+              end
+            end
+            pos -= 1
+          end
+          false
+        end
+
+        private def escaped_markdown_delimiter?(slice : Bytes, pos : Int32) : Bool
+          slashes = 0
+          cursor = pos - 1
+          while cursor >= 0 && slice[cursor] === '\\'
+            slashes += 1
+            cursor -= 1
+          end
+          slashes.odd?
+        end
+
+        # Returns the outer `)` for one inline link, counting balanced
+        # parentheses in an unquoted destination/title and ignoring escaped
+        # delimiters, angle-bracket destinations, and quoted titles.
+        private def find_link_destination_end(slice : Bytes, start : Int32) : Int32?
+          nested = 0
+          angle_destination = false
+          quote = 0_u8
+          pos = start
+
+          while pos < slice.size
+            char = slice[pos]
+            if char === '\\'
+              pos += 2
+              next
+            end
+
+            if quote != 0
+              quote = 0_u8 if char == quote
+            elsif angle_destination
+              angle_destination = false if char === '>'
+            else
+              case char
+              when '<'
+                angle_destination = true
+              when '"', '\''
+                quote = char
+              when '('
+                nested += 1
+              when ')'
+                return pos if nested.zero?
+                nested -= 1
+              end
+            end
+
+            pos += 1
+          end
+
+          nil
         end
       end
     end
