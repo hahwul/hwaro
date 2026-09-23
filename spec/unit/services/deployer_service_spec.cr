@@ -526,6 +526,30 @@ describe Hwaro::Services::Deployer do
       end
     end
 
+    it "does not deploy files reached through symlinks outside the source tree" do
+      Dir.mktmpdir do |dir|
+        src_dir = File.join(dir, "src")
+        dest_dir = File.join(dir, "dest")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(src_dir)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(src_dir, "index.html"), "home")
+        File.write(File.join(outside, "secret.txt"), "secret")
+        File.symlink(File.join(outside, "secret.txt"), File.join(src_dir, "leak.txt"))
+
+        config = Hwaro::Models::Config.new
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "local"
+        target.url = "file://#{dest_dir}"
+        config.deployment.targets << target
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src_dir, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, config).should be_true
+        File.exists?(File.join(dest_dir, "index.html")).should be_true
+        File.exists?(File.join(dest_dir, "leak.txt")).should be_false
+      end
+    end
+
     it "refuses to deploy when the destination is a symlink into the source" do
       Dir.mktmpdir do |dir|
         src_dir = File.join(dir, "src")

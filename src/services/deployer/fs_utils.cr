@@ -85,14 +85,19 @@ module Hwaro
 
       private def each_project_file(root : String, follow_symlinks : Bool = true, &block : String ->)
         visited = Set(String).new
-        visited << Hwaro::Utils::PathUtils.resolved_real_path(root)
-        walk_project_files(root, visited, follow_symlinks, &block)
+        root_real = Hwaro::Utils::PathUtils.resolved_real_path(root)
+        visited << root_real
+        walk_project_files(root, root_real, visited, follow_symlinks, &block)
       end
 
-      private def walk_project_files(dir : String, visited : Set(String), follow_symlinks : Bool, &block : String ->)
+      private def walk_project_files(dir : String, root_real : String, visited : Set(String), follow_symlinks : Bool, &block : String ->)
         Dir.each_child(dir) do |entry|
           next if entry == ".DS_Store"
           full = File.join(dir, entry)
+          if follow_symlinks && File.symlink?(full) && !Hwaro::Utils::PathUtils.resolves_within?(full, root_real)
+            Logger.warn "Skipped symlink outside deploy source directory: #{full}"
+            next
+          end
           # info? follows symlinks; broken links and ELOOP entries are
           # skipped instead of crashing the deploy mid-walk.
           info = begin
@@ -120,7 +125,7 @@ module Hwaro
             end
             next if visited.includes?(real)
             visited << real
-            walk_project_files(full, visited, follow_symlinks, &block)
+            walk_project_files(full, root_real, visited, follow_symlinks, &block)
           elsif info.file?
             block.call(full)
           end
