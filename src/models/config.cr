@@ -399,21 +399,29 @@ module Hwaro
       # suggestions tie-break the same way regardless of load order.
       KNOWN_TOP_LEVEL_KEYS = SCALAR_KEYS + SECTION_LOADERS.flat_map(&.keys).uniq!.sort!
 
-      # Section keys read as an array of tables (`[[taxonomies]]`); `versions`
-      # accepts both a `[versions]` table and a bare `[[versions]]` array.
-      # Every other registered section key is a table.
-      ARRAY_SECTION_KEYS  = %w[taxonomies]
-      EITHER_SECTION_KEYS = %w[versions]
+      # Section keys read as an array of tables (`[[taxonomies]]`). Every
+      # other registered section key is a table, except the two below.
+      ARRAY_SECTION_KEYS = %w[taxonomies]
+
+      # Sections whose loader also accepts a boolean: `sitemap = true` is the
+      # pre-table form `load_sitemap` still honours for backward compatibility.
+      BOOLEAN_SECTION_KEYS = %w[sitemap]
+
+      # Sections whose loader validates the shape itself: `[versions]` takes a
+      # table or a bare `[[versions]]` array and raises a config error for
+      # anything else, so "Ignoring" would be wrong.
+      SELF_VALIDATING_SECTION_KEYS = %w[versions]
 
       # A known section in the wrong TOML shape is skipped by its loader
-      # (`as_h?`/`as_a?` → nil), so `sitemap = true` never enabled the
-      # sitemap, `highlight = false` never disabled highlighting and
-      # `taxonomies = ["tags"]` built no taxonomies — all with no feedback.
-      # Say so, like the unknown-key warning above.
+      # (`as_h?`/`as_a?` → nil), so `highlight = false` never disabled
+      # highlighting and `taxonomies = ["tags"]` built no taxonomies — all
+      # with no feedback. Say so, like the unknown-key warning above, but only
+      # where the loader really ignores the value.
       private def self.warn_mistyped_sections(raw : Hash(String, TOML::Any), config_path : String)
         raw.each do |key, value|
           next if SCALAR_KEYS.includes?(key) || !KNOWN_TOP_LEVEL_KEYS.includes?(key)
-          next if EITHER_SECTION_KEYS.includes?(key) && (value.as_h? || value.as_a?)
+          next if SELF_VALIDATING_SECTION_KEYS.includes?(key)
+          next if BOOLEAN_SECTION_KEYS.includes?(key) && !value.as_bool?.nil?
           if ARRAY_SECTION_KEYS.includes?(key)
             next if value.as_a?
             Logger.warn "Ignoring '#{key}' in #{config_path}: it must be an array of tables — write each entry as [[#{key}]] with its own keys (e.g. name = \"tags\")."

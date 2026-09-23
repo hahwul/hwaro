@@ -18,9 +18,10 @@ Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean '
 ```
 
 이 검사는 최상위 키만 대상으로 합니다. 섹션 안에 중첩된 키의 오타
-(`[markdown] emoij = true`)는 보고되지 않으므로 아래 표와 대조해 확인하세요. `[sitemap]` 테이블 대신 `sitemap = true`를 쓰거나
+(`[markdown] emoij = true`)는 보고되지 않으므로 아래 표와 대조해 확인하세요. `[highlight]` 테이블 대신 `highlight = false`를 쓰거나
 `[[taxonomies]]` 항목 대신 `taxonomies = ["tags"]`를 쓰는 것처럼 알려진
-섹션의 형태가 틀린 경우에도 경고와 함께 무시합니다.
+섹션의 형태가 틀린 경우에도 경고와 함께 무시합니다. 예외적으로
+`sitemap = true`는 `[sitemap] enabled = true`와 같은 뜻으로 계속 받아들입니다.
 
 ## 사이트 설정
 

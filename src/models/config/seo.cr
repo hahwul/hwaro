@@ -91,8 +91,11 @@ module Hwaro
   module Models
     class Config
       private def self.load_sitemap(config : Config)
-        # Handle backward compatibility where sitemap was just a boolean
-        if sitemap_bool = config.raw["sitemap"]?.try(&.as_bool?)
+        # Backward compatibility: `sitemap = true|false` predates the
+        # `[sitemap]` table. `warn_mistyped_sections` exempts this form
+        # (BOOLEAN_SECTION_KEYS), so both values must really be applied.
+        sitemap_bool = config.raw["sitemap"]?.try(&.as_bool?)
+        if !sitemap_bool.nil?
           config.sitemap.enabled = sitemap_bool
         elsif s = config.raw["sitemap"]?.try(&.as_h?)
           config.sitemap.enabled = bool_value(s["enabled"]?, config.sitemap.enabled)

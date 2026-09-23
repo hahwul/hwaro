@@ -2990,10 +2990,6 @@ describe "Hwaro::Models::Config" do
     end
   end
 
-  # A known section with the wrong TOML shape used to be ignored with no
-  # feedback at all: `sitemap = true` never enabled the sitemap,
-  # `highlight = false` never disabled highlighting, and
-  # `taxonomies = ["tags"]` built a site with no taxonomies.
   describe "environment substitution inside TOML strings" do
     it "loads a value holding quotes and backslashes verbatim" do
       ENV["HWARO_SPEC_CFG_TITLE"] = %(He said "hi" at C:\\new\\temp)
@@ -3078,10 +3074,10 @@ describe "Hwaro::Models::Config" do
         base = File.join(dir, "config.toml")
         env_path = File.join(dir, "config.production.toml")
         File.write(base, %(title = "Base"\n))
-        File.write(env_path, "sitemap = true\n[sitemp]\nenabled = true\n")
+        File.write(env_path, "highlight = false\n[sitemp]\nenabled = true\n")
         log = with_captured_log { Hwaro::Models::Config.load(base, env: "production") }
         log.should contain("Unknown key 'sitemp' in #{env_path}")
-        log.should contain("Ignoring 'sitemap' in #{env_path}")
+        log.should contain("Ignoring 'highlight' in #{env_path}")
         log.should_not contain("in #{base}")
 
         File.write(env_path, %(title = "a\\u0000b"\n))
@@ -3142,12 +3138,35 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  # A known section with the wrong TOML shape used to be ignored with no
+  # feedback at all: `highlight = false` never disabled highlighting, and
+  # `taxonomies = ["tags"]` built a site with no taxonomies.
   describe "mistyped section warnings" do
     it "warns when a table section is given a scalar" do
-      log = with_captured_log { load_config("sitemap = true\nhighlight = false") }
-      log.should contain("'sitemap' in")
-      log.should contain("[sitemap]")
+      log = with_captured_log { load_config("search = true\nhighlight = false") }
+      log.should contain("'search' in")
+      log.should contain("[search]")
       log.should contain("'highlight' in")
+    end
+
+    # `sitemap = true` is the pre-table form load_sitemap still honours, so
+    # warning "Ignoring 'sitemap'" while building the sitemap was false.
+    it "accepts the boolean sitemap form silently" do
+      config = nil
+      log = with_captured_log { config = load_config("sitemap = true") }
+      config.not_nil!.sitemap.enabled.should be_true
+      log.should_not contain("'sitemap'")
+      log = with_captured_log { load_config("sitemap = false") }
+      log.should_not contain("'sitemap'")
+      log = with_captured_log { load_config(%(sitemap = "yes")) }
+      log.should contain("Ignoring 'sitemap'")
+    end
+
+    # load_versions raises its own error for any other shape; "Ignoring"
+    # right before a failed load is wrong.
+    it "leaves a mis-shaped versions value to its own error" do
+      log = with_captured_log { expect_config_error(%(versions = "v1")) }
+      log.should_not contain("Ignoring 'versions'")
     end
 
     it "warns when taxonomies is not an array of tables" do

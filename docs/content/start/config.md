@@ -20,9 +20,10 @@ Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean '
 The check covers top-level keys only: a misspelled key nested inside a
 section (`[markdown] emoij = true`) is not reported, so double-check nested
 keys against the tables below. A known section written in the wrong
-shape, such as `sitemap = true` instead of a `[sitemap]` table or
+shape, such as `highlight = false` instead of a `[highlight]` table or
 `taxonomies = ["tags"]` instead of `[[taxonomies]]` entries, is ignored with a
-warning as well.
+warning as well. `sitemap = true` is the one short form still accepted: it
+means `[sitemap] enabled = true`.
 
 ## Site Settings
 
