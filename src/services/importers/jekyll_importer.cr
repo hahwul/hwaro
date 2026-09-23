@@ -193,7 +193,11 @@ module Hwaro
               when String
                 fields["image"] = yaml_string(image)
               when Hash
-                # Handle nested image object (e.g., image.path or similar)
+                # jekyll-seo-tag's object form `image: {path: …, alt: …}`.
+                # Left empty, it silently dropped the page's social image.
+                if (img_path = image["path"]?) && (ps = img_path.as_s?) && !ps.empty?
+                  fields["image"] = ps
+                end
               end
             end
 

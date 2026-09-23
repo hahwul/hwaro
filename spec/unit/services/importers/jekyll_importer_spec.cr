@@ -787,3 +787,18 @@ describe "Jekyll import: last_modified_at" do
     end
   end
 end
+
+describe "Jekyll import: image object" do
+  # Regression: jekyll-seo-tag's `image: {path: …}` object form was matched
+  # and then ignored, dropping the page's social image.
+  it "maps image.path to image" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"),
+        "---\ntitle: Hello\nimage:\n  path: /img/a.png\n  alt: A\n---\nbody\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(image = "/img/a.png"))
+    end
+  end
+end
