@@ -415,27 +415,27 @@ module Hwaro
         #     A static source's bytes are copied back over the stale file —
         #     it was shadowing them, and a cold build publishes them there.
         #
-        # Paths are compared by a case-folded key, because the filesystem
-        # deleting them may fold case (APFS, NTFS): `/Old/` → `/old/` is one
-        # file there, and deleting the "old" spelling removes the new one.
-        # Folding everywhere only ever keeps more.
+        # Paths are compared through `kept_output?`, which also treats a spelling
+        # that differs only by case as kept when it is the same file on disk
+        # (a case-folding filesystem: APFS, NTFS).
         def prune_unclaimed_outputs(candidates : Enumerable(String), output_dir : String) : Nil
           return if candidates.empty?
           cwd = Dir.current
-          keep = Set(String).new
-          owned_output_paths(output_dir).each { |path| keep << output_key(path, cwd) }
+          exact = Set(String).new
+          folded = {} of String => Array(String)
+          kept = owned_output_paths(output_dir).to_a
+          kept.concat(bundle_asset_outputs(output_dir))
           @page_derived_mutex.synchronize do
             {@rendered_derived_outputs, @derived_outputs_this_pass, @page_derived_outputs}.each do |recorded|
-              recorded.each_value { |paths| paths.each { |path| keep << output_key(path, cwd) } }
+              recorded.each_value { |paths| kept.concat(paths) }
             end
           end
-          if @generated_claims_current
-            generated_output_claims.each { |path| keep << output_key(path, cwd) }
-          end
+          kept.concat(generated_output_claims.to_a) if @generated_claims_current
+          kept.each { |path| keep_output(path, cwd, exact, folded) }
 
           stale = [] of String
           candidates.to_a.uniq.each do |path|
-            next if keep.includes?(output_key(path, cwd)) || written_this_build?(path)
+            next if kept_output?(path, cwd, exact, folded) || written_this_build?(path)
             relative = output_relative(path, output_dir, cwd)
             if relative && (source = static_source_for(relative))
               # The stale file was sitting on top of a static copy — a cold
@@ -443,13 +443,65 @@ module Hwaro
               Hwaro::Utils::FileSafe.mkdir_p(File.dirname(path))
               atomic_copy(source, path)
             elsif relative && content_source_publishes?(relative)
-              # Same for a `content/` file; left as is rather than re-copied,
-              # since raw files may be processed (minified) on the way out.
+              # Same for a `[content.files]` copy; left as is rather than
+              # re-copied, since raw files may be processed (minified) on the
+              # way out.
             else
               stale << path
             end
           end
           delete_orphaned_outputs(stale, output_dir) unless stale.empty?
+        end
+
+        # Add `path` to the keep-set of `prune_unclaimed_outputs`: exact
+        # expanded paths, plus an index by case-folded key.
+        private def keep_output(path : String, cwd : String, exact : Set(String), folded : Hash(String, Array(String))) : Nil
+          expanded = expand_output_path(path, cwd)
+          return unless exact.add?(expanded)
+          (folded[expanded.downcase] ||= [] of String) << expanded
+        end
+
+        # A candidate is kept when it names a kept path exactly, or — the
+        # filesystem may fold case (APFS, NTFS) — when it differs only by case
+        # AND is the very same file on disk. The second test keeps both
+        # filesystem kinds right: on a folding one `posts/Foo/` and
+        # `posts/foo/` are one file, so deleting the old spelling would remove
+        # the new page; on a case-sensitive one they are two files, and the
+        # old spelling is stale.
+        private def kept_output?(path : String, cwd : String, exact : Set(String), folded : Hash(String, Array(String))) : Bool
+          expanded = expand_output_path(path, cwd)
+          return true if exact.includes?(expanded)
+          return false unless kept = folded[expanded.downcase]?
+          kept.any? do |other|
+            File.same?(expanded, other)
+          rescue File::Error
+            false
+          end
+        end
+
+        private def expand_output_path(path : String, cwd : String) : String
+          File.expand_path(path, cwd)
+        rescue ArgumentError
+          path
+        end
+
+        # Where the current site publishes its page-bundle assets — the same
+        # destination `process_assets` computes. A bundle page that moved or
+        # was drafted leaves its assets at the old URL; only these are live.
+        private def bundle_asset_outputs(output_dir : String) : Array(String)
+          outputs = [] of String
+          site = @site
+          return outputs unless site
+          (site.pages + site.sections).each do |page|
+            next if page.assets.empty? || !page.render
+            next unless url_path = url_output_path(page.url.lchop("/"))
+            bundle_dir = File.dirname(page.path)
+            dest_dir = File.join(output_dir, url_path)
+            page.assets.each do |asset|
+              outputs << File.join(dest_dir, Path[asset].relative_to(bundle_dir).to_s)
+            end
+          end
+          outputs
         end
 
         # Start an incremental serve pass: stamp the epoch `written_this_build?`
@@ -459,12 +511,6 @@ module Hwaro
           forget_created_dirs
           mark_build_output_epoch
           @generated_claims_current = false
-        end
-
-        private def output_key(path : String, cwd : String) : String
-          File.expand_path(path, cwd).downcase
-        rescue ArgumentError
-          path.downcase
         end
 
         # `path` relative to the output directory, or nil when it is outside.
@@ -487,12 +533,13 @@ module Hwaro
           source
         end
 
-        # True when a non-page file under `content/` (a `[content.files]`
-        # copy or a page-bundle asset) publishes at `relative`.
+        # True when `[content.files]` publishes a `content/` file verbatim at
+        # `relative` — the raw copy a cold build makes. A page-bundle asset is
+        # NOT this: it publishes under its page's URL (`bundle_asset_outputs`).
         private def content_source_publishes?(relative : String) : Bool
-          source = File.join("content", relative)
-          File.file?(source) &&
-            !Phases::ReadContent::PAGE_EXTENSIONS.includes?(Path[source].extension.downcase)
+          config = @config
+          return false unless config && config.content_files.enabled?
+          File.file?(File.join("content", relative)) && config.content_files.publish?(relative)
         end
 
         # Rewrite the `[amp]` mirrors of pages an incremental strategy just

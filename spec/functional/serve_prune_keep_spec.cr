@@ -162,4 +162,68 @@ describe "serve prune keep-set" do
       end
     end
   end
+
+  # The case-folded comparison only keeps a candidate that is the SAME file
+  # as a kept path. On a case-sensitive filesystem `posts/Foo/` and
+  # `posts/foo/` are two files, and the old spelling is stale.
+  it "removes the old spelling of a slug renamed by case (case-sensitive filesystems)" do
+    pending!("case-folding filesystem") if case_insensitive_fs?
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_keep_site
+        File.write("content/posts/keep.md", "---\ntitle: Keep\nslug: Foo\ntags: [shared]\n---\nkeep")
+        builder = keep_builder
+        options = keep_options
+        builder.run(options).should be_true
+        File.exists?("public/posts/Foo/index.html").should be_true
+
+        File.write("content/posts/keep.md", "---\ntitle: Keep\nslug: foo\ntags: [shared]\n---\nkeep")
+        builder.run_incremental(["content/posts/keep.md"], options).should be_true
+
+        File.exists?("public/posts/foo/index.html").should be_true
+        Dir.exists?("public/posts/Foo").should be_false
+      end
+    end
+  end
+
+  it "keeps a slug renamed by case (case-folding filesystems)" do
+    pending!("case-sensitive filesystem") unless case_insensitive_fs?
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_keep_site
+        File.write("content/posts/keep.md", "---\ntitle: Keep\nslug: Foo\ntags: [shared]\n---\nkeep")
+        builder = keep_builder
+        options = keep_options
+        builder.run(options).should be_true
+
+        File.write("content/posts/keep.md", "---\ntitle: Keep\nslug: foo\ntags: [shared]\n---\nkeep")
+        builder.run_incremental(["content/posts/keep.md"], options).should be_true
+
+        File.exists?("public/posts/foo/index.html").should be_true
+      end
+    end
+  end
+
+  # A bundle asset publishes under its page's URL. Its source still being on
+  # disk kept the copy at the OLD URL alive after the page moved.
+  it "removes a moved bundle page's assets from the old URL" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_keep_site
+        FileUtils.mkdir_p("content/posts/bund")
+        File.write("content/posts/bund/index.md", "---\ntitle: Bund\n---\nbody")
+        File.write("content/posts/bund/pic.png", "PNG")
+        builder = keep_builder
+        options = keep_options
+        builder.run(options).should be_true
+        File.exists?("public/posts/bund/pic.png").should be_true
+
+        File.write("content/posts/bund/index.md", "---\ntitle: Bund\nslug: moved\n---\nbody")
+        builder.run(options).should be_true
+
+        File.exists?("public/posts/moved/pic.png").should be_true
+        Dir.exists?("public/posts/bund").should be_false
+      end
+    end
+  end
 end
