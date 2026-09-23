@@ -14,6 +14,7 @@ require "../../../utils/text_utils"
 require "../../../utils/errors"
 require "../../../utils/logger"
 require "../../../utils/build_output"
+require "../../../utils/markdown_code"
 
 require "./deadlink_command/scanner"
 require "./deadlink_command/internal_resolver"
