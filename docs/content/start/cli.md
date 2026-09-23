@@ -605,7 +605,9 @@ See [Tools & Completion](/start/tools/) for detailed usage.
 `import` follows file symlinks within the site directory you pass it and skips
 (and counts as skipped) those resolving outside it.
 `export` and `convert` follow links within the project and skip links outside
-it. `agents-md --write` refuses to write when `AGENTS.md` is a symlink.
+it. `agents-md --write` writes through an `AGENTS.md`
+symlink that resolves inside the project (such as `AGENTS.md -> CLAUDE.md`) and
+refuses one that resolves outside it.
 
 ### completion
 

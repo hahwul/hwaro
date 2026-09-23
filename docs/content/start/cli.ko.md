@@ -605,7 +605,9 @@ hwaro tool export hugo --dry-run
 `import`는 지정한 사이트 디렉터리 안을 가리키는 파일 심볼릭 링크는 따라가고,
 그 밖을 가리키는 링크는 건너뛰고 건너뛴 파일 수에 포함합니다.
 `export`와 `convert`는 프로젝트 내부의 링크는 따르고 프로젝트 밖의 링크는
-건너뜁니다. `agents-md --write`는 `AGENTS.md`가 심볼릭 링크이면 쓰기를 거부합니다.
+건너뜁니다. `agents-md --write`는
+`AGENTS.md`가 프로젝트 안을 가리키는 심볼릭 링크(예: `AGENTS.md -> CLAUDE.md`)이면 링크 대상에
+쓰고, 프로젝트 밖을 가리키는 링크이면 쓰기를 거부합니다.
 
 ### completion
 
