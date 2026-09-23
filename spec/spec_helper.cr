@@ -2,6 +2,7 @@ require "spec"
 require "../src/hwaro"
 require "./support/config_helper"
 require "./support/sass_helper"
+require "./support/registry_helper"
 
 # Suppress Logger output during tests
 Hwaro::Logger.io = IO::Memory.new

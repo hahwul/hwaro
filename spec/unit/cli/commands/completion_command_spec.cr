@@ -15,6 +15,10 @@ private def ensure_commands_registered
 end
 
 describe Hwaro::CLI::Commands::CompletionCommand do
+  # ensure_commands_registered installs stub handlers and the escaping
+  # examples register a synthetic command; restore the process-global
+  # registry after each example so neither leaks into later specs.
+  around_each { |example| with_isolated_registries { example.run } }
   before_each { ensure_commands_registered }
 
   describe "bash completion" do

@@ -115,8 +115,9 @@ describe Hwaro::Content::Processors::Base do
 end
 
 describe "Hwaro::Content::Processors::Registry (isolated)" do
-  # Test registry behavior without clearing global state.
-  # We register test processors, verify them, then clean up only what we added.
+  # Every example registers test processors into the process-global registry;
+  # restore it afterwards so registration_order_spec never sees them.
+  around_each { |example| with_isolated_registries { example.run } }
 
   it "can register and retrieve a test processor" do
     processor = TestProcessor.new
