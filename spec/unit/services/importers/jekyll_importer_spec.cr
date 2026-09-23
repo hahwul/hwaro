@@ -754,3 +754,21 @@ describe "Jekyll import: published addresses" do
     end
   end
 end
+
+describe "Jekyll import: redirect_from" do
+  # Regression: jekyll-redirect-from addresses (a GitHub Pages default
+  # plugin) were dropped, so every deliberately kept old link broke.
+  it "maps redirect_from to aliases" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"),
+        "---\ntitle: Hello\nredirect_from:\n  - /old-hello/\n  - /2019/hello.html\n---\nbody\n")
+      File.write(File.join(dir, "about.md"),
+        "---\ntitle: About\npermalink: /about-us.html\nredirect_from: /team/\n---\nabout\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(aliases = ["/old-hello/", "/2019/hello.html"]))
+      File.read(File.join(out_dir, "about.md")).should contain(%(aliases = ["/about-us.html", "/team/"]))
+    end
+  end
+end
