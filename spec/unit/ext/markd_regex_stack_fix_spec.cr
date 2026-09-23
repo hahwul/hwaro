@@ -95,6 +95,38 @@ describe Hwaro::MarkdRegexStackFix do
       end
     end
 
+    # `Paragraph#token` now reads each definition at an offset into one
+    # string instead of from a fresh slice; the two must agree exactly.
+    it "reads reference definitions at an offset exactly as from a slice" do
+      pieces = ["[a]: /u \"t\"\n", "[b]:\n/v\n", "[c]: <x y> (p)\n", "[d]: /w 't'\n", "[e]: /z \"bad\" x\n",
+                "[f]:\n", "[ ]: /q\n", "[g]: /r\n\"multi\nline\"\n", "[h]: <>\n", "not a def\n", "[i]:/s\n",
+                "[A]: /dup\n", "[j]: /t (un\\)closed\n", "[k\\]]: /e\n", "[l]: /é \"\u00A0\"\n"]
+      rng = Random.new(23)
+      300.times do
+        text = String.build { |io| rng.rand(1..8).times { io << pieces.sample(rng) } }
+        sliced = Markd::Parser::Inline.new(Markd::Options.new)
+        offset_lexer = Markd::Parser::Inline.new(Markd::Options.new)
+        sliced_map = {} of String => Hash(String, String)
+        offset_map = {} of String => Hash(String, String)
+        rest = text
+        offset = 0
+        loop do
+          a = rest.starts_with?('[') ? sliced.reference(rest, sliced_map) : 0
+          b = text.byte_at?(offset) == '['.ord ? offset_lexer.hwaro_reference_at(text, offset, offset_map) : 0
+          b.should eq(a), "at #{offset} of #{text.inspect}"
+          break if a <= 0
+          rest = rest.byte_slice(a)
+          offset += a
+        end
+        offset_map.should eq(sliced_map)
+      end
+    end
+
+    it "renders a paragraph of reference definitions with the links they define" do
+      Markd.to_html("[a]: /u \"t\"\n[b]: /v\n\n[a] [b]\n").should eq(
+        "<p><a href=\"/u\" title=\"t\">a</a> <a href=\"/v\">b</a></p>\n")
+    end
+
     it "renders ordinary links, titles, labels and inline HTML as before" do
       markdown = "[a](/u \"t\") [b](/v 'x') [c](/w (y)) [d](<p q> \"\\\"z\\\"\") " \
                  "<span class=\"k\" id=x>s</span> <!-- c --> [e]\n\n[e]: /r (ti\\)tle)\n"

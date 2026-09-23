@@ -60,7 +60,7 @@ require "markd"
 # shard bump that changes them would be silently reverted. Fail the build
 # loudly instead; re-verify against the new source, then bump the pin.
 {% if Markd::VERSION != "0.5.0" %}
-  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#match/#html_tag/#link_title/#link_label/#link_destination and Markd::Rule::HTMLBlock#match verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
+  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#match/#html_tag/#link_title/#link_label/#link_destination/#reference and Markd::Rule::HTMLBlock#match/Paragraph#token verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
 {% end %}
 
 module Hwaro
@@ -140,12 +140,17 @@ module Hwaro
     # just then upstream's regex decides. `ucp` is whether the text contains
     # such a character (callers cache it per paragraph). A fallback that still
     # exhausts the JIT stack reads as "no tag", where upstream crashed.
-    def self.html_tag_length(text : String, pos : Int32, ucp : Bool = non_ascii_space?(text),
-                             valid : Bool = text.valid_encoding?) : Int32?
+    def self.html_tag_length(text : String, pos : Int32) : Int32?
+      html_tag_length(text, pos, text.valid_encoding?) { non_ascii_space?(text) }
+    end
+
+    # `ucp` is asked only when the fast path misses, so callers can compute
+    # (or cache) it lazily.
+    def self.html_tag_length(text : String, pos : Int32, valid : Bool, & : -> Bool) : Int32?
       if m = match_at(HTML_TAG, text, pos, valid)
         return m.byte_end(0) - pos
       end
-      return unless ucp
+      return unless yield
       begin
         match_at(UPSTREAM_HTML_TAG, text, pos, valid).try { |upstream| upstream.byte_end(0) - pos }
       rescue Regex::Error
@@ -249,7 +254,7 @@ module Markd::Parser
 
     private def html_tag(node : Node)
       memo = hwaro_memo
-      length = Hwaro::MarkdRegexStackFix.html_tag_length(@text, @pos, memo.ucp, memo.valid)
+      length = Hwaro::MarkdRegexStackFix.html_tag_length(@text, @pos, memo.valid) { memo.ucp }
       text = length.try { |len| @text.byte_slice(@pos, len) }
       @pos += length if length
       if text
@@ -349,13 +354,31 @@ module Markd::Parser
     class HwaroMemo
       getter text : String
       getter tables = {} of Char => Array(Int32)
-      getter ucp : Bool
-      getter valid : Bool
-      getter last_dest_stop : Int32
+      @valid : Bool? = nil
+      @ucp : Bool? = nil
+      @last_dest_stop : Int32? = nil
 
       def initialize(@text : String)
+      end
+
+      # Each fact is computed on first use: most paragraphs never need any
+      # of them, and a reference definition only needs `valid`.
+      def valid : Bool
+        cached = @valid
+        return cached unless cached.nil?
         @valid = @text.valid_encoding?
-        @ucp = @valid && Hwaro::MarkdRegexStackFix.non_ascii_space?(@text)
+      end
+
+      def ucp : Bool
+        cached = @ucp
+        return cached unless cached.nil?
+        @ucp = valid && Hwaro::MarkdRegexStackFix.non_ascii_space?(@text)
+      end
+
+      def last_dest_stop : Int32
+        if cached = @last_dest_stop
+          return cached
+        end
         bytes = @text.to_slice
         stop = bytes.size - 1
         while stop >= 0 && !(bytes[stop].unsafe_chr.ascii_whitespace? || bytes[stop] == ')'.ord)
@@ -374,8 +397,87 @@ module Markd::Parser
     end
 
     def reference(text : String, refmap)
+      hwaro_reference_at(text, 0, refmap)
+    end
+
+    # Upstream `reference` (markd 0.5.0) reading the definition that starts at
+    # byte `start` of `text`, instead of at 0 of a fresh slice. Every position
+    # it tracks is relative to `@pos`; the one absolute offset, the raw
+    # label's `byte_slice(0, …)`, now starts at `startpos`. Returns the
+    # definition's byte length, or 0 — exactly what `reference` returned for
+    # `text.byte_slice(start)`. See `Rule::Paragraph#token`.
+    def hwaro_reference_at(text : String, start : Int32, refmap)
       @hwaro_in_reference = true
-      previous_def
+      @text = text
+      @pos = start
+
+      startpos = @pos
+      match_chars = link_label
+
+      # label
+      return 0 if match_chars == 0
+      raw_label = @text.byte_slice(startpos, match_chars + 1)
+
+      # colon
+      if char_at?(@pos) == ':'
+        @pos += 1
+      else
+        @pos = startpos
+        return 0
+      end
+
+      # link url
+      spnl
+
+      save_pos = @pos
+      dest = link_destination
+
+      if !dest || (dest.size == 0 && !(@pos == save_pos + 2 && @text.byte_slice(save_pos, 2) == "<>"))
+        @pos = startpos
+        return 0
+      end
+
+      before_title = @pos
+      spnl
+      if @pos != before_title
+        title = link_title
+      end
+
+      unless title
+        title = ""
+        @pos = before_title
+      end
+
+      at_line_end = true
+      unless space_at_end_of_line?
+        if title.empty?
+          at_line_end = false
+        else
+          title = ""
+          @pos = before_title
+          at_line_end = space_at_end_of_line?
+        end
+      end
+
+      unless at_line_end
+        @pos = startpos
+        return 0
+      end
+
+      normal_label = normalize_reference(raw_label)
+      if normal_label.empty?
+        @pos = startpos
+        return 0
+      end
+
+      unless refmap[normal_label]?
+        refmap[normal_label] = {
+          "destination" => dest,
+          "title"       => title,
+        }
+      end
+
+      @pos - startpos
     ensure
       @hwaro_in_reference = false
     end
@@ -383,6 +485,30 @@ module Markd::Parser
 end
 
 module Markd::Rule
+  struct Paragraph
+    # Upstream re-sliced the rest of the paragraph after every reference
+    # definition (`container.text = container.text.byte_slice(pos)`), so a
+    # paragraph of N consecutive definitions cost O(N²) in copying — and the
+    # inline lexer's per-paragraph caches, keyed on the text object, were
+    # rebuilt for every slice. Walk one string with an offset instead and
+    # slice once at the end; each definition is read by
+    # `Inline#hwaro_reference_at` exactly as `reference` read the slice.
+    def token(parser : Parser, container : Node) : Nil
+      has_reference_defs = false
+      text = container.text
+      offset = 0
+
+      while text.byte_at?(offset) == '['.ord &&
+            (pos = parser.inline_lexer.hwaro_reference_at(text, offset, parser.refmap)) && pos > 0
+        offset += pos
+        has_reference_defs = true
+      end
+      container.text = text.byte_slice(offset) if offset > 0
+
+      container.unlink if has_reference_defs && container.text.each_char.all? &.ascii_whitespace?
+    end
+  end
+
   struct HTMLBlock
     def match(parser : Parser, container : Node) : MatchValue
       if !parser.indented && parser.line[parser.next_nonspace]? == '<'
