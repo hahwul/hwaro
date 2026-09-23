@@ -234,7 +234,10 @@ module Hwaro::Core::Build::Phases::Render
     language : String?,
     site : Models::Site,
   ) : Array(Crinja::Value)
-    pages = site.pages_for_section(section_name, language)
+    # A collision loser (`output_suppressed`, e.g. `a.md` beside `a.en.md`)
+    # is never written; listing it would show its URL twice, once under the
+    # wrong title. Same filter as the section's own pagination listing.
+    pages = site.pages_for_section(section_name, language).reject(&.output_suppressed)
 
     # Use section's sort_by setting if available, otherwise sort by date
     # (newest first) — the SAME default the paginator (paginator.cr) and the

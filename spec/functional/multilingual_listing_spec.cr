@@ -40,3 +40,27 @@ describe "Multilingual: explicit default-language suffix" do
     end
   end
 end
+
+# `a.md` + `a.en.md` publish the same URL (a warned collision); only the
+# winner is written, so only the winner may be listed — otherwise the section
+# lists the same URL twice, once under the losing page's title.
+describe "Multilingual: default-language duplicate output" do
+  it "lists a collision loser nowhere" do
+    build_site(
+      MULTILINGUAL_LISTING_CONFIG,
+      content_files: {
+        "posts/_index.md" => "+++\ntitle = \"Posts\"\n+++\n",
+        "posts/a.md"      => "+++\ntitle = \"A\"\n+++\n",
+        "posts/a.en.md"   => "+++\ntitle = \"A EN\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "P",
+        "section.html" => "{% for p in section.pages %}[{{ p.title }}]{% endfor %}|{{ section.list }}",
+      },
+    ) do
+      html = File.read("public/posts/index.html")
+      html.should start_with("[A EN]|")
+      html.scan("/posts/a/").size.should eq(1)
+    end
+  end
+end
