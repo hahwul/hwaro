@@ -122,6 +122,10 @@ module Hwaro
         # the caller rewrites emphasis-like syntax, then restore it before
         # Markd parses the link. Code spans have already been stashed by the
         # caller, so their brackets cannot be mistaken for a real link.
+        #
+        # Linear in the line length: bracket and parenthesis matches come
+        # from one forward pass each, the destination scan jumps straight to
+        # the precomputed `)` or whitespace, and each title is scanned once.
         private def stash_markdown_link_destinations(text : String, store : Array(String)) : String
           slice = text.to_slice
           return text if slice.size < 3
@@ -139,15 +143,16 @@ module Hwaro
             end
           end
 
+          label_close, paren_match, next_space, next_paren_stop = link_syntax_tables(slice)
+          title_ends = {} of Int32 => Int32
           String.build(text.bytesize) do |io|
             copied_until = 0
             search_from = 0
 
             while close_bracket = text.byte_index(']', search_from)
-              if close_bracket + 1 < slice.size && slice[close_bracket + 1] === '(' &&
-                 !escaped_markdown_delimiter?(slice, close_bracket) && has_matching_link_label?(slice, close_bracket)
+              if close_bracket + 1 < slice.size && slice[close_bracket + 1] === '(' && label_close[close_bracket]
                 destination_start = close_bracket + 2
-                if close_paren = find_link_destination_end(slice, destination_start)
+                if close_paren = inline_link_end(slice, destination_start, paren_match, next_space, next_paren_stop, title_ends)
                   io.write(slice[copied_until, destination_start - copied_until])
                   store << text.byte_slice(destination_start, close_paren - destination_start)
                   io << "\x00LD#{store.size - 1}\x00"
@@ -165,72 +170,133 @@ module Hwaro
           end
         end
 
-        private def has_matching_link_label?(slice : Bytes, close_bracket : Int32) : Bool
-          depth = 1
-          pos = close_bracket - 1
-          while pos >= 0
-            char = slice[pos]
-            if (char === '[' || char === ']') && !escaped_markdown_delimiter?(slice, pos)
-              if char === ']'
-                depth += 1
-              else
-                depth -= 1
-                return true if depth.zero?
-              end
-            end
-            pos -= 1
-          end
-          false
-        end
+        # One forward pass over the line: which `]` closes an earlier
+        # unescaped `[`, the `)` balancing each unescaped `(`, and (filled
+        # backward) the next ASCII whitespace and the next unescaped `)` or
+        # NUL at or after every offset. A backslash escapes the next ASCII
+        # punctuation character, as in CommonMark, so an escaped bracket or
+        # paren never pairs.
+        private def link_syntax_tables(slice : Bytes) : {Array(Bool), Array(Int32), Array(Int32), Array(Int32)}
+          size = slice.size
+          label_close = Array(Bool).new(size, false)
+          paren_match = Array(Int32).new(size, -1)
+          next_space = Array(Int32).new(size + 1, size)
+          next_paren_stop = Array(Int32).new(size + 1, size)
 
-        private def escaped_markdown_delimiter?(slice : Bytes, pos : Int32) : Bool
-          slashes = 0
-          cursor = pos - 1
-          while cursor >= 0 && slice[cursor] === '\\'
-            slashes += 1
-            cursor -= 1
-          end
-          slashes.odd?
-        end
-
-        # Returns the outer `)` for one inline link, counting balanced
-        # parentheses in an unquoted destination/title and ignoring escaped
-        # delimiters, angle-bracket destinations, and quoted titles.
-        private def find_link_destination_end(slice : Bytes, start : Int32) : Int32?
-          nested = 0
-          angle_destination = false
-          quote = 0_u8
-          pos = start
-
-          while pos < slice.size
+          brackets = [] of Int32
+          parens = [] of Int32
+          pos = 0
+          while pos < size
             char = slice[pos]
             if char === '\\'
-              pos += 2
+              pos += pos + 1 < size && link_punctuation?(slice[pos + 1]) ? 2 : 1
               next
             end
-
-            if quote != 0
-              quote = 0_u8 if char == quote
-            elsif angle_destination
-              angle_destination = false if char === '>'
-            else
-              case char
-              when '<'
-                angle_destination = true
-              when '"', '\''
-                quote = char
-              when '('
-                nested += 1
-              when ')'
-                return pos if nested.zero?
-                nested -= 1
+            case char
+            when '['
+              brackets << pos
+            when ']'
+              label_close[pos] = true if brackets.pop?
+            when '('
+              parens << pos
+            when ')'
+              next_paren_stop[pos] = pos
+              if open = parens.pop?
+                paren_match[open] = pos
               end
+            when 0
+              next_paren_stop[pos] = pos
             end
-
             pos += 1
           end
 
-          nil
+          (size - 1).downto(0) do |i|
+            next_space[i] = link_space?(slice[i]) ? i : next_space[i + 1]
+            next_paren_stop[i] = next_paren_stop[i + 1] unless next_paren_stop[i] == i
+          end
+
+          {label_close, paren_match, next_space, next_paren_stop}
+        end
+
+        # Mirrors Markd's inline-link parse after `](` (`start` is the offset
+        # after the `(`): spaces, a destination (`<…>`, or everything up to
+        # whitespace or the `)` balancing the opening paren), spaces, an
+        # optional title that must follow whitespace, spaces, and the closing
+        # `)`. Returns that `)`'s offset, or nil when the text is not an
+        # inline link. The destination and `(…)` title scans jump through the
+        # precomputed tables, and a quoted title is scanned once per opening
+        # quote (`title_ends`) — a quoted scan stops at the next same quote,
+        # so those scans never overlap — keeping a line full of `[x](` linear.
+        private def inline_link_end(slice : Bytes, start : Int32, paren_match : Array(Int32), next_space : Array(Int32), next_paren_stop : Array(Int32), title_ends : Hash(Int32, Int32)) : Int32?
+          size = slice.size
+          pos = skip_link_spaces(slice, start)
+          return if pos >= size
+
+          if slice[pos] === '<'
+            pos += 1
+            while pos < size
+              char = slice[pos]
+              if char === '\\'
+                return unless pos + 1 < size && link_punctuation?(slice[pos + 1])
+                pos += 2
+                next
+              end
+              break if char === '>' || char === '<' || char === '\t' || char === '\n' || char == 0
+              pos += 1
+            end
+            return unless pos < size && slice[pos] === '>'
+            pos += 1
+          else
+            close = paren_match[start - 1]
+            space = next_space[pos]
+            pos = close >= 0 && close < space ? close : space
+          end
+
+          pos = skip_link_spaces(slice, pos)
+          if pos < size && link_space?(slice[pos - 1]) && (slice[pos] === '"' || slice[pos] === '\'' || slice[pos] === '(')
+            title_close = if slice[pos] === '('
+                            stop = next_paren_stop[pos + 1]
+                            stop < size && slice[stop] === ')' ? stop : -1
+                          else
+                            title_ends[pos] ||= link_title_end(slice, pos)
+                          end
+            pos = skip_link_spaces(slice, title_close + 1) if title_close >= 0
+          end
+
+          pos < size && slice[pos] === ')' ? pos : nil
+        end
+
+        # Offset of the quote closing the link title opened by the `"` or `'`
+        # at `open`, or -1 when it never closes.
+        private def link_title_end(slice : Bytes, open : Int32) : Int32
+          closer = slice[open]
+          pos = open + 1
+          while pos < slice.size
+            char = slice[pos]
+            if char === '\\' && pos + 1 < slice.size && link_punctuation?(slice[pos + 1])
+              pos += 2
+              next
+            end
+            return -1 if char == 0
+            return pos if char == closer
+            pos += 1
+          end
+          -1
+        end
+
+        private def skip_link_spaces(slice : Bytes, pos : Int32) : Int32
+          while pos < slice.size && slice[pos] === ' '
+            pos += 1
+          end
+          pos
+        end
+
+        private def link_space?(byte : UInt8) : Bool
+          byte === ' ' || byte === '\t' || byte === '\n' || byte === '\r' || byte == 0x0b || byte == 0x0c
+        end
+
+        private def link_punctuation?(byte : UInt8) : Bool
+          (0x21 <= byte <= 0x2f) || (0x3a <= byte <= 0x40) || (0x5b <= byte <= 0x60) || (0x7b <= byte <= 0x7e)
         end
       end
     end

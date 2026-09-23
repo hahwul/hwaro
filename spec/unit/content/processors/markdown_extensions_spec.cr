@@ -1539,6 +1539,20 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain(%(href="https://example.com/a<del>b</del>"))
     end
 
+    it "scans long lines of unmatched link syntax in linear time" do
+      cfg = make_config
+      ["x](" * 16000, "[x](" * 12000, "[x](a \"" * 7000, "[a](b (" * 7000, "[a](" * 8000 + " \"" + "t" * 8000].each do |line|
+        started = Time.instant
+        Hwaro::Content::Processors::MarkdownExtensions.preprocess(line + " ~~s~~", cfg).should contain("<del>s</del>")
+        (Time.instant - started).should be < 1.second
+      end
+    end
+
+    it "rewrites delimiters after text that is not an inline link" do
+      html, _ = Hwaro::Processor::Markdown.render("[a](b ~~c~~)", markdown_config: make_config)
+      html.should contain("<del>c</del>")
+    end
+
     it "leaves extension delimiters in reference destinations unchanged" do
       html, _ = Hwaro::Processor::Markdown.render(
         "[ref][target]\n\n[target]: https://example.com/a~~b~~",
