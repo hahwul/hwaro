@@ -29,7 +29,8 @@ module Hwaro
           updated_str = page.updated.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           desc = page.description
           image_url = if image = page.social_image
-                        abs_or_external(base, image)
+                        # Encoded like og:image (OpenGraph#resolve_image_url).
+                        abs_or_external(base, Utils::TextUtils.encode_url_path(image))
                       end
           # Prefer the resolved display name from site.authors (data/authors
           # enrichment) so the schema.org author matches the visible author name

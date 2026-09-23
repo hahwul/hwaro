@@ -157,3 +157,27 @@ describe "SEO: bundle-relative page image" do
     end
   end
 end
+
+# og:url is percent-encoded; og:image / twitter:image / JSON-LD image emitted
+# the raw path, so `my photo.png` or a Unicode filename produced an invalid
+# URL that scrapers reject.
+describe "SEO: social image URLs are percent-encoded" do
+  it "encodes spaces and non-ASCII in og:image and JSON-LD image" do
+    build_site(
+      SEO_BASIC_CONFIG,
+      content_files: {
+        "posts/trip/index.md"     => "+++\ntitle = \"Trip\"\nimage = \"my photo.png\"\n+++\nbody",
+        "posts/trip/my photo.png" => "png",
+        "about.md"                => "+++\ntitle = \"About\"\nimage = \"/img/사진.png\"\n+++\nbody",
+      },
+      template_files: {"page.html" => "{{ og_all_tags | safe }}|{{ jsonld | safe }}"},
+    ) do
+      trip = File.read("public/posts/trip/index.html")
+      trip.should contain(%(og:image" content="http://localhost/posts/trip/my%20photo.png"))
+      trip.should contain(%(twitter:image" content="http://localhost/posts/trip/my%20photo.png"))
+      trip.should contain(%("image":"http://localhost/posts/trip/my%20photo.png"))
+      about = File.read("public/about/index.html")
+      about.should contain(%(og:image" content="http://localhost/img/%EC%82%AC%EC%A7%84.png"))
+    end
+  end
+end
