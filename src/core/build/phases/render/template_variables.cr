@@ -240,6 +240,11 @@ module Hwaro::Core::Build::Phases::Render
     section_description = ""
     section_pages_array = [] of Crinja::Value
     current_section = ""
+    # Whether a section context was resolved. Not `!current_section.empty?`:
+    # the root `_index.md` is a real section whose name is "", and gating on
+    # the name left the homepage's `section.pages` / `paginator.pages` empty
+    # while `section.list` and `get_section` listed its pages.
+    in_section = false
 
     # Section-specific variables
     subsections_array = [] of Crinja::Value
@@ -253,6 +258,7 @@ module Hwaro::Core::Build::Phases::Render
       section_title = page.title
       section_description = page.description || ""
       current_section = page.section
+      in_section = true
 
       # Section-specific properties
       page_template_var = page.page_template || ""
@@ -282,6 +288,7 @@ module Hwaro::Core::Build::Phases::Render
         section_title = section_page.title
         section_description = section_page.description || ""
         current_section = page.section
+        in_section = true
         # Use cached section assets to avoid re-allocating per page
         section_assets_val = if @crinja_caches_frozen
                                if cached_arr = @section_assets_crinja_cache[page.section]?
@@ -306,7 +313,7 @@ module Hwaro::Core::Build::Phases::Render
       end
     end
 
-    if !current_section.empty?
+    if in_section
       if paginator
         # Paginated: convert paginator's page subset
         default_lang = config.default_language
