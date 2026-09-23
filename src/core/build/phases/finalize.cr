@@ -126,8 +126,12 @@ module Hwaro::Core::Build::Phases::Finalize
   # protections: nothing a live page renders to, nothing claimed now, nothing
   # written by this build. A one-shot cold build has no previous claims and
   # prunes nothing.
+  #
+  # The previous site's page outputs (`@previous_page_outputs`) go through the
+  # same filter: a page this build moved, drafted or stopped rendering left
+  # its old file behind otherwise.
   private def prune_unclaimed_generated_outputs(ctx : Lifecycle::BuildContext) : Nil
-    previous = @generated_claims_mutex.synchronize { @previous_generated_claims }
+    previous = @generated_claims_mutex.synchronize { @previous_generated_claims } | @previous_page_outputs
     return if previous.empty?
     output_dir = ctx.options.output_dir
     cwd = Dir.current
@@ -135,11 +139,10 @@ module Hwaro::Core::Build::Phases::Finalize
     keep = Set(String).new
     generated_output_claims.each { |path| keep << protected_output_key(path, cwd) }
     ctx.all_pages.each do |page|
-      next unless page.render
       collect_page_output_paths(page, output_dir).each { |path| keep << protected_output_key(path, cwd) }
     end
 
-    stale = previous.reject do |path|
+    stale = previous.to_a.reject do |path|
       keep.includes?(protected_output_key(path, cwd)) || written_this_build?(path)
     end
     delete_orphaned_outputs(stale.sort!, output_dir) unless stale.empty?

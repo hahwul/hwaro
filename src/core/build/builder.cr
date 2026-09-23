@@ -327,6 +327,14 @@ module Hwaro
         # publishes (a superseded `main.<hash>.css`, the `amp/` tree after
         # `[amp]` is switched off). Empty on a process's first build.
         @previous_generated_claims : Set(String) = Set(String).new
+        # Every page output the site of the PREVIOUS build (as the serve
+        # session's incremental passes left it) claimed, captured by `run`
+        # before it drops that site. A full serve rebuild — any config or
+        # data edit, or a file added alongside a content edit — renders only
+        # the new site and never looked back, so a page it moved (`slug`,
+        # `path`, a permalink rule), drafted or turned `render = false` kept
+        # its old file. Empty on a process's first build.
+        @previous_page_outputs : Set(String) = Set(String).new
         @generated_claims_mutex : Mutex = Mutex.new
         # Output files the static copy actually (re)wrote this build, in the
         # canonical absolute form `get_output_path` produces. `static/` is
@@ -712,6 +720,7 @@ module Hwaro
           @context = ctx
 
           # Reset internal caches (preserve @config loaded above)
+          @previous_page_outputs = @site ? owned_output_paths(options.output_dir) : Set(String).new
           @site = nil
           @templates = nil
           @cache_manager.clear_runtime

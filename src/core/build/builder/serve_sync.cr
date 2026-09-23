@@ -286,6 +286,9 @@ module Hwaro
         # to prune the old files when an edit relocates the page's URL or
         # excludes the page from the site.
         private def collect_page_output_paths(page : Models::Page, output_dir : String) : Array(String)
+          # A `render = false` page writes nothing, so it owns nothing: an
+          # edit that turns rendering off must orphan the file it wrote.
+          return [] of String unless page.render
           paths = [get_output_path(page, output_dir)].compact
           if cfg = @config
             paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))

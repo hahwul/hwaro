@@ -226,4 +226,57 @@ describe "serve orphaned outputs" do
       end
     end
   end
+
+  # A full serve rebuild (config/data edit, or a file added alongside the
+  # edit) renders only the new site and never looked back at the old one's
+  # page outputs.
+  it "removes the old output of a page a full rebuild moved" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/posts/keep/index.html").should be_true
+
+        File.write("content/posts/keep.md", "---\ntitle: Keep\nslug: kept\ntags: [shared]\n---\nkeep")
+        server.orphan_builder.run(options).should be_true
+
+        File.exists?("public/posts/kept/index.html").should be_true
+        Dir.exists?("public/posts/keep").should be_false
+      end
+    end
+  end
+
+  it "removes the output of a page a full rebuild drafted" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+
+        File.write("content/posts/keep.md", "---\ntitle: Keep\ndraft: true\n---\nkeep")
+        server.orphan_builder.run(options).should be_true
+
+        Dir.exists?("public/posts/keep").should be_false
+      end
+    end
+  end
+
+  it "removes the output of a page an incremental edit turned render = false" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+
+        File.write("content/posts/keep.md", "---\ntitle: Keep\nrender: false\ntags: [shared]\n---\nkeep")
+        server.orphan_builder.run_incremental(["content/posts/keep.md"], options).should be_true
+
+        Dir.exists?("public/posts/keep").should be_false
+      end
+    end
+  end
 end
