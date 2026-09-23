@@ -52,7 +52,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 
 | 필드 | 타입 | 기본값 | 설명 |
 |-------|------|---------|-------------|
-| date | string | — | 발행일. `YYYY-MM-DD`, 시간 포함 가능(`YYYY-MM-DD HH:MM:SS` 또는 RFC 3339 datetime). 따옴표 없는 TOML/YAML 날짜도 허용. 적어 둔 UTC 오프셋(`+09:00`)은 유지되므로 TOML과 YAML 모두 적은 날짜 그대로 표시 |
+| date | string | — | 발행일. `YYYY-MM-DD`, 시간 포함 가능(`YYYY-MM-DD HH:MM:SS` 또는 RFC 3339 datetime). 따옴표 없는 TOML/YAML 날짜도 허용. 적어 둔 UTC 오프셋(`+09:00`)은 유지되므로 TOML과 YAML 모두 적은 날짜 그대로 표시. 이 수정 이후 TOML 오프셋 날짜는 날짜 퍼머링크 토큰(`:year`/`:month`/`:day`)과 연/월 그룹에도 적은 그대로 쓰이므로, 예전 UTC 날짜로 만든 URL이 바뀔 수 있음(예: `/2024/02/29/` → `/2024/03/01/`). 예전 URL을 유지하려면 `aliases`에 추가 |
 | description | string | — | SEO 설명 |
 | draft | bool | false | 프로덕션 빌드에서 제외 |
 | template | string | "page" | 사용할 템플릿 |
