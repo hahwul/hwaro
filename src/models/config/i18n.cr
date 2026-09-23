@@ -133,7 +133,7 @@ module Hwaro
           taxonomy_hash = taxonomy_any.as_h?
           name = taxonomy_hash.try(&.["name"]?).try(&.as_s?)
           if taxonomy_hash.nil? || name.nil? || name.strip.empty?
-            Logger.warn "Ignoring [[taxonomies]] entry ##{index + 1} in config.toml: it needs a non-empty string name (e.g. name = \"tags\")."
+            Logger.warn "Ignoring [[taxonomies]] entry ##{index + 1}: it needs a non-empty string name (e.g. name = \"tags\")."
             next
           end
           unless seen.add?(name)

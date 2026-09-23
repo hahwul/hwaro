@@ -3162,6 +3162,14 @@ describe "Hwaro::Models::Config" do
         log.should contain("Ignoring 'highlight' in #{env_path}")
         log.should_not contain("in #{base}")
 
+        # Loader warnings run on the merged document and cannot tell which
+        # file an entry came from, so they must not blame config.toml.
+        File.write(env_path, "[[taxonomies]]\nnme = \"tags\"\n[permalinks]\nposts = 5\n")
+        log = with_captured_log { Hwaro::Models::Config.load(base, env: "production") }
+        log.should contain("[[taxonomies]] entry #1")
+        log.should contain("[permalinks] rule \"posts\"")
+        log.should_not contain("config.toml")
+
         File.write(env_path, %(title = "a\\u0000b"\n))
         err = expect_raises(Hwaro::HwaroError) { Hwaro::Models::Config.load(base, env: "production") }
         (err.message || "").should contain(env_path)

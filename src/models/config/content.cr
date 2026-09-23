@@ -360,7 +360,7 @@ module Hwaro
           else
             # A number, or a dotted key (`blog.news = …`) that TOML parsed as
             # a nested table, used to be dropped with no feedback.
-            Logger.warn "Ignoring [permalinks] rule #{k.inspect} in config.toml: its target must be a string (quote a source directory that contains a dot, e.g. \"blog.news\" = \"news\")."
+            Logger.warn "Ignoring [permalinks] rule #{k.inspect}: its target must be a string (quote a source directory that contains a dot, e.g. \"blog.news\" = \"news\")."
           end
         end
       end
