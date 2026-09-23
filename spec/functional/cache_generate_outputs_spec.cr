@@ -218,4 +218,43 @@ describe "cache: generated outputs converge on the clean build" do
       end
     end
   end
+
+  it "prunes outputs from a previous generator version" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "Cache Site"
+          base_url = "http://localhost"
+
+          [[taxonomies]]
+          name = "tags"
+          TOML
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/taxonomy.html", "{{ content }}")
+        File.write("templates/taxonomy_term.html", "{{ content }}")
+        File.write("content/old.md", "---\ntitle: Old\ntags: [legacy]\n---\nOld body")
+
+        run_builder(true, false)
+        File.exists?("public/old/index.html").should be_true
+        File.exists?("public/tags/legacy/index.html").should be_true
+
+        cache = Hwaro::Core::Build::CacheData.from_json(File.read(".hwaro_cache.json"))
+        cache.metadata.generated_outputs.should contain("tags/legacy/index.html")
+        metadata = cache.metadata
+        metadata.generator_version = "0.0.0-older-generator"
+        File.write(".hwaro_cache.json", Hwaro::Core::Build::CacheData.new(metadata, cache.entries).to_json)
+
+        File.delete("content/old.md")
+        File.write("content/new.md", "---\ntitle: New\ntags: [current]\n---\nNew body")
+        run_builder(true, false)
+
+        File.exists?("public/new/index.html").should be_true
+        File.exists?("public/tags/current/index.html").should be_true
+        File.exists?("public/old/index.html").should be_false
+        File.exists?("public/tags/legacy/index.html").should be_false
+      end
+    end
+  end
 end

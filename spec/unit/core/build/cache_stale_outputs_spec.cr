@@ -47,6 +47,12 @@ private def cached_build
   builder
 end
 
+class Hwaro::Core::Build::Builder
+  def run_delete_orphaned_outputs(paths : Array(String), output_dir : String)
+    delete_orphaned_outputs(paths, output_dir)
+  end
+end
+
 describe "warm --cache builds" do
   it "removes the output of a deleted page" do
     with_cached_site do
@@ -349,6 +355,10 @@ describe "warm --cache builds" do
         File.read("public/robots.txt").should_not contain("custom")
         File.exists?("public/404.html").should be_true
         File.read("public/404.html").should contain("not found")
+
+        cache = Hwaro::Core::Build::CacheData.from_json(File.read(".hwaro_cache.json"))
+        cache.metadata.generated_outputs.should contain("robots.txt")
+        cache.metadata.generated_outputs.should contain("404.html")
       end
     end
 
@@ -431,6 +441,27 @@ describe "warm --cache builds" do
       File.exists?("public/posts/keep/index.html").should be_true
       File.read("public/posts/keep/index.html").should eq(before)
       File.exists?("public/posts/gone/index.html").should be_true
+    end
+  end
+end
+
+describe "orphaned output deletion" do
+  it "does not follow a symlinked output parent outside the output directory" do
+    Dir.mktmpdir do |dir|
+      output_dir = File.join(dir, "public")
+      outside_dir = File.join(dir, "outside", "nested")
+      FileUtils.mkdir_p(output_dir)
+      FileUtils.mkdir_p(outside_dir)
+      victim = File.join(outside_dir, "victim.html")
+      File.write(victim, "keep")
+      File.symlink(File.dirname(outside_dir), File.join(output_dir, "escape"))
+
+      builder = Hwaro::Core::Build::Builder.new
+      stale = File.join(output_dir, "escape", "nested", "victim.html")
+      builder.run_delete_orphaned_outputs([stale], output_dir)
+
+      File.read(victim).should eq("keep")
+      Dir.exists?(outside_dir).should be_true
     end
   end
 end
