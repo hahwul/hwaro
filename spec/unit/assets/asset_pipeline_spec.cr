@@ -1083,4 +1083,53 @@ describe Hwaro::Assets::Pipeline do
       end
     end
   end
+
+  # Regression: a bundle is published under `[assets] output_dir`, but a
+  # stylesheet's relative `url(...)` resolves against the stylesheet's own
+  # directory — `url(img/x.png)` from `static/css/a.css` pointed at
+  # `/assets/img/x.png`, a 404 (and vendor CSS lost its fonts).
+  describe "#process — relative url() in CSS bundles" do
+    it "rebases a url() that points at a file beside the source stylesheet" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css/img")
+          FileUtils.mkdir_p("static/fonts")
+          File.write("static/css/img/x.png", "png")
+          File.write("static/fonts/f.woff2", "font")
+          File.write("static/css/a.css",
+            ".a{background:url(img/x.png)}\n" \
+            ".b{src:url('../fonts/f.woff2?v=2#f')}\n" \
+            ".c{background:url(missing.png)}\n" \
+            ".d{background:url(/abs.png)} .e{background:url(data:image/png;base64,AA)}")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
+          Hwaro::Assets::Pipeline.new(config, "").process("public")
+
+          css = File.read("public/assets/main.css")
+          css.should contain("url(../css/img/x.png)")
+          css.should contain("url('../fonts/f.woff2?v=2#f')")
+          css.should contain("url(missing.png)") # no such file beside the source: untouched
+          css.should contain("url(/abs.png)")
+          css.should contain("url(data:image/png;base64,AA)")
+        end
+      end
+    end
+
+    it "leaves url()s alone when the source dir is not the published static/ tree" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("src/css/img")
+          File.write("src/css/img/x.png", "png")
+          File.write("src/css/a.css", ".a{background:url(img/x.png)}")
+
+          config = make_config(source_dir: "src")
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
+          Hwaro::Assets::Pipeline.new(config, "").process("public")
+
+          File.read("public/assets/main.css").should contain("url(img/x.png)")
+        end
+      end
+    end
+  end
 end

@@ -62,6 +62,10 @@ module Hwaro
 
       private def process_bundle(bundle : Models::AssetBundleConfig, assets_output : String)
         separator = bundle_separator(bundle.name)
+        css_bundle = File.extname(bundle.name).downcase == ".css"
+        # Output-root-relative directory the bundle is published in
+        # ("assets", or "assets/vendor" for a "vendor/x.css" bundle name).
+        bundle_dir = Path.posix(@config.output_dir, File.dirname(bundle.name)).normalize.to_s
         # Read and concatenate source files
         contents = String.build do |io|
           wrote_any = false
@@ -96,6 +100,7 @@ module Hwaro
             if @sass_enabled && file.ends_with?(".scss")
               content = SassCompiler.compile_source(content, source)
             end
+            content = rebase_css_urls(content, file, bundle_dir) if css_bundle && publishes_source_dir?
             io << content
             wrote_any = true
           end
@@ -142,6 +147,43 @@ module Hwaro
         @manifest[bundle.name] = manifest_path
 
         Logger.debug "  Asset: #{bundle.name} → #{manifest_path} (#{contents.bytesize} bytes)"
+      end
+
+      # `static/` is copied to the output root verbatim, so a file beside a
+      # stylesheet in `source_dir = "static"` is published beside that
+      # stylesheet's own copy. Any other source_dir is not published, and
+      # its relative URLs have no published target to rebase onto.
+      private def publishes_source_dir? : Bool
+        File.expand_path(@config.source_dir) == File.expand_path("static")
+      end
+
+      CSS_URL_RE = /url\(\s*(["']?)([^"')]+?)\1\s*\)/i
+
+      # A stylesheet's relative `url(...)` resolves against the stylesheet's
+      # own location, but the bundle is published elsewhere
+      # (`/assets/main.<hash>.css`): `url(img/x.png)` written in
+      # `static/css/a.css` pointed at `/assets/img/x.png`, a 404, and vendor
+      # CSS lost its fonts the same way. Rewrite such a URL to the same file
+      # seen from the bundle's directory — but only when that file exists
+      # beside the source, so a URL the author already wrote relative to the
+      # bundle output keeps working. Relative results keep subpath
+      # (`base_path`) deploys working.
+      private def rebase_css_urls(css : String, file : String, bundle_dir : String) : String
+        source_dir = File.dirname(file)
+        return css if source_dir == bundle_dir
+        css.gsub(CSS_URL_RE) do |whole|
+          quote = $1
+          url = $2.strip
+          next whole if url.empty? || url.starts_with?('/') || url.starts_with?('#') ||
+                        url.includes?("://") || url.starts_with?("//") || url.matches?(/\A[a-z][a-z0-9+.-]*:/i)
+          path_part = url.split(/[?#]/, 2).first
+          suffix = url[path_part.size..]
+          target = Path.posix(source_dir, path_part).normalize
+          next whole if target.to_s.starts_with?("..")
+          next whole unless File.file?(File.join(@config.source_dir, target.to_s))
+          rebased = target.relative_to(Path.posix(bundle_dir)).to_s
+          "url(#{quote}#{rebased}#{suffix}#{quote})"
+        end
       end
 
       # Separator placed between concatenated bundle sources.
