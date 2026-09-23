@@ -154,10 +154,16 @@ module Hwaro
         # markdown.math_engine only renders when set to a value the
         # build pipeline actually loads; other strings silently produce
         # no math. Skip when math is off — the field is a no-op there.
-        if config.markdown.math && !VALID_MATH_ENGINES.includes?(config.markdown.math_engine)
-          issues << Issue.new(id: "markdown-math-engine-invalid", level: :warning, category: "config", file: @config_path,
-            message: "markdown.math_engine \"#{config.markdown.math_engine}\" is not supported (expected: #{VALID_MATH_ENGINES.join(", ")})")
-        end
+        # Read the RAW value: `Config.load` now falls an unknown engine back
+        # to the default (and accepts any casing), so the parsed field is
+        # always valid by the time it gets here — same shape as the pwa
+        # checks below.
+        return unless config.markdown.math
+        raw = config.raw["markdown"]?.try(&.as_h?).try(&.["math_engine"]?).try(&.as_s?)
+        return unless raw
+        return if VALID_MATH_ENGINES.includes?(raw.strip.downcase)
+        issues << Issue.new(id: "markdown-math-engine-invalid", level: :warning, category: "config", file: @config_path,
+          message: "markdown.math_engine \"#{raw}\" is not supported (expected: #{VALID_MATH_ENGINES.join(", ")})")
       end
 
       private def check_image_processing_widths(issues : Array(Issue), config : Models::Config) : Nil
