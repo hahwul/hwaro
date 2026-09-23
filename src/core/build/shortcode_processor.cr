@@ -73,7 +73,10 @@ module Hwaro
           # FenceTracker (shared with the table/definition/math walkers and,
           # critically, process_shortcodes_jinja below) so the skip decision
           # and the actual expansion can never disagree about what's fenced.
-          tracker = Content::Processors::FenceTracker.new
+          # Every shortcode walker passes `raw_html_code: false`: shortcodes
+          # expand inside raw <pre>/<script>/<textarea> blocks, which only
+          # the Markdown extensions treat as opaque.
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
 
           content.each_line(chomp: false) do |line|
             next if tracker.fence_line?(line)
@@ -115,7 +118,7 @@ module Hwaro
           # text in CommonMark) and never closed on a longer closer run,
           # desyncing fence state for the rest of the document.
           String.build do |io|
-            tracker = Content::Processors::FenceTracker.new
+            tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
             buffer = String::Builder.new
             # Lines that live inside a block-shortcode body. While inside one
             # we must NOT treat a fence line as a buffer boundary, otherwise a
@@ -180,7 +183,7 @@ module Hwaro
         private def block_body_lines(content : String) : Array(Bool)
           return [] of Bool unless Utils::ByteScan.includes?(content, "{%")
 
-          tracker = Content::Processors::FenceTracker.new
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
           open_lines = [] of Int32
           pairs = [] of Tuple(Int32, Int32)
           line_count = 0

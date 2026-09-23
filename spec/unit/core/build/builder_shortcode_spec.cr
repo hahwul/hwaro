@@ -320,6 +320,36 @@ describe Hwaro::Core::Build::Builder do
       result.should_not contain("<div>skip</div>")
     end
 
+    it "expands shortcodes inside raw HTML code blocks" do
+      # Raw <pre>/<script>/<textarea> blocks are opaque to the Markdown
+      # extensions only; shortcode expansion has always run inside them
+      # (a shortcode that fills a <pre> or a <script> config is a
+      # supported pattern), and so does the pre-filter.
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/greeting" => "hi {{ name }}"}
+      context = {} of String => Crinja::Value
+
+      %w[pre script textarea].each do |tag|
+        content = "<#{tag}>\n{{ greeting(name=\"raw\") }}\n</#{tag}>"
+        result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+        result.should contain("hi raw")
+        result.should_not contain("greeting(")
+      end
+    end
+
+    it "expands a block shortcode whose opener sits inside a raw HTML block" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/note" => "<b>{{ body }}</b>"}
+      context = {} of String => Crinja::Value
+
+      content = "<pre>\n{% note %}\ninside\n{% end %}\n</pre>"
+      result = builder.test_process_shortcodes_jinja(content, templates, context, crinja_env_override: env)
+      result.should contain("<b>")
+      result.should_not contain("{% note %}")
+    end
+
     it "keeps a fenced code block inside a block shortcode body intact" do
       # The original block-shortcode-wraps-a-fence fix must still hold: the
       # whole block (including its fenced body) stays together and renders.

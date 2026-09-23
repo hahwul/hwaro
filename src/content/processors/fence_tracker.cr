@@ -90,7 +90,6 @@ module Hwaro
         @fence_bq_depth = 0
         @raw_html_code_tag = nil.as(String?)
         @raw_html_code_bq_depth = 0
-        @track_raw_html_code = true
         @in_indented_code = false
         @indented_code_column = 4
         @indented_code_bq_depth = 0
@@ -108,11 +107,13 @@ module Hwaro
           @in_fence
         end
 
-        # Structural preprocessors such as definition-list extraction can
-        # intentionally consume a raw-HTML line as text; other walkers keep
-        # raw code elements opaque by default.
-        def track_raw_html_code=(value : Bool) : Nil
-          @track_raw_html_code = value
+        # `raw_html_code: false` turns off raw-HTML code-block tracking.
+        # Only the Markdown-extension walkers treat `<pre>`/`<script>`/
+        # `<style>`/`<textarea>` blocks as opaque; shortcode expansion (and
+        # the checks that must agree with it) and definition-list
+        # extraction keep their long-standing behaviour of seeing inside.
+        def initialize(raw_html_code : Bool = true)
+          @track_raw_html_code = raw_html_code
         end
 
         # Feed the next line (with or without its trailing newline).

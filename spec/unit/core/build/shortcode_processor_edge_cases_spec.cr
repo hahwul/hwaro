@@ -517,6 +517,16 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       builder.test_content_may_contain_shortcodes?("{{ youtube(id=\"x\") }}").should be_true
     end
 
+    it "returns true for shortcodes inside raw HTML code blocks" do
+      # Only the Markdown extensions treat raw <pre>/<script>/<textarea>
+      # blocks as opaque; shortcode expansion runs inside them.
+      builder = Hwaro::Core::Build::Builder.new
+      %w[pre script textarea].each do |tag|
+        content = "<#{tag}>\n{{ youtube(id=\"x\") }}\n</#{tag}>"
+        builder.test_content_may_contain_shortcodes?(content).should be_true
+      end
+    end
+
     it "returns false when {{ and {% only appear inside fenced code blocks" do
       builder = Hwaro::Core::Build::Builder.new
       content = <<-MD
