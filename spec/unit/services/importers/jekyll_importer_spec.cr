@@ -772,3 +772,18 @@ describe "Jekyll import: redirect_from" do
     end
   end
 end
+
+describe "Jekyll import: last_modified_at" do
+  # Regression: jekyll-seo-tag's `last_modified_at` was dropped, so imported
+  # pages lost their modification date (feeds, sitemap lastmod, JSON-LD).
+  it "maps last_modified_at to updated" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "_posts"))
+      File.write(File.join(dir, "_posts", "2024-01-02-hello.md"),
+        "---\ntitle: Hello\nlast_modified_at: 2024-02-01\n---\nbody\n")
+
+      out_dir = import_jekyll(dir)
+      File.read(File.join(out_dir, "posts", "hello.md")).should contain(%(updated = "2024-02-01"))
+    end
+  end
+end

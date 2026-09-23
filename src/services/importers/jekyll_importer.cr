@@ -118,6 +118,12 @@ module Hwaro
               assign_date_field(fields, "date", date_val)
             end
 
+            # `last_modified_at` (jekyll-seo-tag's dateModified, and the
+            # jekyll-last-modified-at plugin) is hwaro's `updated`.
+            if modified = yaml["last_modified_at"]?
+              assign_date_field(fields, "updated", modified)
+            end
+
             # A literal per-document `permalink` is the page's published
             # address; dropping it moved the page (`/about-us.html` →
             # `/about/`). Pattern permalinks (`/:year/:title/`) describe the
