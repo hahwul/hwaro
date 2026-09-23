@@ -181,3 +181,34 @@ describe "SEO: social image URLs are percent-encoded" do
     end
   end
 end
+
+# Regression: the social-image encoder escaped the whole value once it held a
+# space or non-ASCII byte, so a cache-busting query (`사진.png?v=2`) became
+# `…png%3Fv%3D2` (a 404), and JSON-LD also encoded external URLs that og:image
+# leaves as written — the three surfaces disagreed.
+describe "SEO: social image query strings and external URLs" do
+  it "encodes only the path and leaves external image URLs as written" do
+    build_site(
+      SEO_BASIC_CONFIG,
+      content_files: {
+        "about.md" => "+++\ntitle = \"About\"\nimage = \"/img/사진.png?v=2&s=1#top\"\n+++\nbody",
+        "cdn.md"   => "+++\ntitle = \"Cdn\"\nimage = \"https://cdn.example.com/사진 1.png?w=1\"\n+++\nbody",
+      },
+      template_files: {"page.html" => "{{ og_all_tags | safe }}|{{ jsonld | safe }}|{{ seo.og_image }}"},
+    ) do
+      about = File.read("public/about/index.html")
+      encoded = "http://localhost/img/%EC%82%AC%EC%A7%84.png?v=2&amp;s=1#top"
+      about.should contain(%(og:image" content="#{encoded}"))
+      about.should contain(%(twitter:image" content="#{encoded}"))
+      # JSON-LD escapes `&` as `&`; seo.og_image is the raw URL.
+      about.should contain(%("image":"http://localhost/img/%EC%82%AC%EC%A7%84.png?v=2\\u0026s=1#top"))
+      about.should contain("|http://localhost/img/%EC%82%AC%EC%A7%84.png?v=2&s=1#top")
+
+      cdn = File.read("public/cdn/index.html")
+      raw = "https://cdn.example.com/사진 1.png?w=1"
+      cdn.should contain(%(og:image" content="#{raw}"))
+      cdn.should contain(%(twitter:image" content="#{raw}"))
+      cdn.should contain(%("image":"#{raw}"))
+    end
+  end
+end
