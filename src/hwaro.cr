@@ -32,6 +32,7 @@ require "./ext/markd_list_fix"
 require "./ext/markd_thematic_break_fix"
 require "toml"
 require "./ext/toml_nesting_limit_fix"
+require "./ext/toml_datetime_fix"
 require "emoji"
 
 # Load utilities
