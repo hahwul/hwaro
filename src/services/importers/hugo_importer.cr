@@ -1,3 +1,4 @@
+require "json"
 require "yaml"
 require "toml"
 require "./base"
@@ -212,6 +213,22 @@ module Hwaro
                 return {nil, raw}
               end
             end
+          elsif raw.starts_with?("{")
+            # Hugo also reads JSON front matter: a JSON object at the top of
+            # the file. Unrecognised, it landed in the imported body verbatim
+            # and the page lost its title, date, tags and draft flag.
+            if end_idx = Utils::FrontmatterScanner.find_json_end(raw)
+              begin
+                if h = JSON.parse(raw.byte_slice(0, end_idx)).as_h?
+                  data = {} of String => TOML::Any
+                  h.each { |k, v| data[k] = json_any_to_toml_any(v) }
+                  return {data, raw.byte_slice(end_idx).lstrip('\n').lstrip("\r\n")}
+                end
+              rescue ex : JSON::ParseException
+                Logger.debug "JSON front matter parse failed: #{ex.message}"
+                return {nil, raw}
+              end
+            end
           elsif raw.starts_with?("---")
             if match = YAML_FM_REGEX.match(raw)
               yaml_str = match[1].strip
@@ -245,6 +262,23 @@ module Hwaro
 
         # `depth` guards a cyclic YAML::Any (self-referencing anchor); see
         # `Utils::Nesting`.
+        private def json_any_to_toml_any(value : JSON::Any, depth : Int32 = 0) : TOML::Any
+          Utils::Nesting.check!(depth)
+          case raw = value.raw
+          when String, Int64, Float64, Bool
+            TOML::Any.new(raw)
+          when Array
+            TOML::Any.new(raw.map { |item| json_any_to_toml_any(item, depth + 1) })
+          when Hash
+            hash = {} of String => TOML::Any
+            raw.each { |k, v| hash[k] = json_any_to_toml_any(v, depth + 1) }
+            TOML::Any.new(hash)
+          else
+            # null, like YAML's `~` in yaml_any_to_toml_any.
+            TOML::Any.new("")
+          end
+        end
+
         private def yaml_any_to_toml_any(value : YAML::Any, depth : Int32 = 0) : TOML::Any
           Utils::Nesting.check!(depth)
           raw = value.raw

@@ -414,4 +414,29 @@ describe Hwaro::Services::Importers::HugoImporter do
       end
     end
   end
+
+  # Regression: Hugo reads JSON front matter (an object at the top of the
+  # file); the importer did not, so the object landed in the body and the
+  # page lost its title, date, tags and draft flag.
+  describe "JSON front matter" do
+    it "maps JSON front matter like TOML and YAML" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/json.md",
+          "{\n  \"title\": \"JSON FM\",\n  \"date\": \"2024-02-03\",\n  \"tags\": [\"j\", \"k\"],\n  \"draft\": true\n}\n\nJSON body\n")
+        output_dir = File.join(tmpdir, "out")
+
+        result = Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir, drafts: true))
+        result.success.should be_true
+
+        content = File.read(File.join(output_dir, "posts", "json.md"))
+        content.should contain(%(title = "JSON FM"))
+        content.should contain(%(date = "2024-02-03"))
+        content.should contain(%(tags = ["j", "k"]))
+        content.should contain("draft = true")
+        content.should contain("JSON body")
+        content.should_not contain(%("title": "JSON FM"))
+      end
+    end
+  end
 end
