@@ -17,8 +17,11 @@
 # matter (Crystal's YAML keeps the offset) printed `2024-03-05`. The offset is
 # now kept as a fixed-offset location, exactly as YAML parses it.
 #
-# Remove when: upstream accepts arbitrary fractional-second precision and
-# keeps offsets.
+# A local time (`07:32:00`) was dated to the day the build ran — see
+# `consume_time` below.
+#
+# Remove when: upstream accepts arbitrary fractional-second precision, keeps
+# offsets and models local times.
 
 require "toml"
 
@@ -48,19 +51,32 @@ class TOML::Lexer
     nanos
   end
 
+  # A TOML *local time* (`t = 07:32:00`) has no date. Upstream pinned it to
+  # the day the build ran, so the value — and any front matter `tool
+  # convert` rewrote from it — changed every day. Crystal has no time-of-day
+  # type, so it is lexed as the string it spells (validated first), which is
+  # also how YAML reads `t: 07:32:00`.
   private def consume_time(hour)
     minute = consume_datetime_component 2, "expected minute digit"
     raise "expected ':'" unless next_char == ':'
     second = consume_datetime_component 2, "expected second digit"
+    raise "invalid local time" if hour > 23 || minute > 59 || second > 60
 
-    nanosecond = next_char == '.' ? hwaro_consume_fraction : 0
+    text = String.build do |io|
+      io << hour.to_s.rjust(2, '0') << ':' << minute.to_s.rjust(2, '0') << ':' << second.to_s.rjust(2, '0')
+      if next_char == '.'
+        io << '.'
+        char = next_char
+        raise "expected fractional second digit" unless char.ascii_number?
+        while char.ascii_number?
+          io << char
+          char = next_char
+        end
+      end
+    end
 
-    time_local = Time.local
-    time = Time.local(time_local.year, time_local.month, time_local.day, hour.to_i32,
-      minute, second, nanosecond: nanosecond)
-
-    @token.type = :TIME
-    @token.time_value = time
+    @token.type = :STRING
+    @token.string_value = text
   end
 
   private def consume_datetime(year)

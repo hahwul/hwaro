@@ -36,3 +36,17 @@ describe "TOML offset date-times (ext/toml_datetime_fix)" do
     TOML.parse("a = 2024-03-05T08:20:30Z")["a"].raw.as(Time).utc?.should be_true
   end
 end
+
+describe "TOML local times (ext/toml_datetime_fix)" do
+  # Regression: a local time was pinned to the day the build ran, so the
+  # value changed daily (and `tool convert` wrote today's date into it).
+  it "reads a local time as the time-of-day string it spells" do
+    TOML.parse("t = 07:32:00")["t"].raw.should eq("07:32:00")
+    TOML.parse("t = 00:32:00.999999")["t"].raw.should eq("00:32:00.999999")
+    TOML.parse("t = [07:32:00, 23:59:59.5]")["t"].raw.as(Array).map(&.raw).should eq(["07:32:00", "23:59:59.5"])
+  end
+
+  it "still rejects an impossible local time" do
+    expect_raises(TOML::ParseException) { TOML.parse("t = 25:00:00") }
+  end
+end
