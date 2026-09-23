@@ -785,3 +785,27 @@ describe "#taxonomy_values" do
     page.taxonomy_values("tags").should eq(["from-taxonomies"])
   end
 end
+
+describe "Hwaro::Models::Page#social_image" do
+  it "resolves a bundle-relative image against the page URL" do
+    page = Hwaro::Models::Page.new("posts/trip/index.md")
+    page.url = "/posts/trip/"
+    page.assets = ["posts/trip/cover.png", "posts/trip/img/wide.png"]
+    page.image = "cover.png"
+    page.social_image.should eq("/posts/trip/cover.png")
+    page.image = "img/wide.png"
+    page.social_image.should eq("/posts/trip/img/wide.png")
+  end
+
+  it "keeps root-relative, external and non-asset relative images as written" do
+    page = Hwaro::Models::Page.new("posts/trip/index.md")
+    page.url = "/posts/trip/"
+    page.assets = ["posts/trip/cover.png"]
+    {"/img/hero.png", "https://cdn.example.com/x.png", "images/site-wide.png"}.each do |img|
+      page.image = img
+      page.social_image.should eq(img)
+    end
+    page.image = nil
+    page.social_image.should be_nil
+  end
+end

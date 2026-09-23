@@ -133,3 +133,27 @@ describe "SEO: seo object exposes structured SEO data" do
     end
   end
 end
+
+# Regression: `image = "cover.png"` beside a bundle's index.md is published at
+# the page's URL, but og:image / twitter:image / JSON-LD / seo.og_image
+# resolved it against the site root (`/cover.png`, a 404).
+describe "SEO: bundle-relative page image" do
+  it "points og:image and JSON-LD at the bundle asset" do
+    build_site(
+      SEO_BASIC_CONFIG,
+      content_files: {
+        "posts/trip/index.md"  => "+++\ntitle = \"Trip\"\nimage = \"cover.png\"\n+++\nbody",
+        "posts/trip/cover.png" => "png",
+      },
+      template_files: {"page.html" => "{{ og_all_tags | safe }}|{{ jsonld | safe }}|{{ seo.og_image }}"},
+    ) do
+      html = File.read("public/posts/trip/index.html")
+      html.should contain(%(og:image" content="http://localhost/posts/trip/cover.png"))
+      html.should contain(%(twitter:image" content="http://localhost/posts/trip/cover.png"))
+      html.should contain(%("image":"http://localhost/posts/trip/cover.png"))
+      html.should contain("|http://localhost/posts/trip/cover.png")
+      html.should_not contain("http://localhost/cover.png")
+      File.exists?("public/posts/trip/cover.png").should be_true
+    end
+  end
+end

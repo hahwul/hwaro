@@ -57,7 +57,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 | draft | bool | false | Exclude from production builds |
 | template | string | "page" | Template to use |
 | weight | int | 0 | Sort order (lower = first) |
-| image | string | — | Featured image for social sharing |
+| image | string | — | Featured image for social sharing. A relative path naming a file in the page bundle (`image = "cover.png"` beside `index.md`) resolves to that file |
 | tags | array | [] | Tag taxonomy terms |
 | categories | array | [] | Category taxonomy terms |
 
