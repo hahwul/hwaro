@@ -968,8 +968,9 @@ module Hwaro
               context[key] = Crinja::Value.new(value)
             end
 
-            # Cache compiled shortcode templates by content hash to avoid
-            # re-parsing the template AST on every shortcode invocation.
+            # Cache compiled shortcode templates by name and source hash to
+            # avoid re-parsing the AST while keeping each template bound to
+            # its own source filename for error locations.
             # XOR with a salt to avoid collisions with page template cache entries
             # that share the same cache map.
             #
@@ -982,11 +983,14 @@ module Hwaro
             # the worker's own env — no cross-worker env mutation, and no mutex
             # needed since a single fiber owns the cache. Only the shared
             # fallback cache (sequential path) needs the reentrant mutex.
-            cache_key = template.hash ^ 0x5C0DE_CAFE_u64
             # User shortcodes live at templates/shortcodes/<name>.html; resolving
             # that key through compile_template attaches the filename so errors
-            # point at the file. Builtins aren't on disk and stay anonymous.
+            # point at the file. Identical source under another name still
+            # needs its own compiled template, or Crinja reports the first
+            # file's path for errors in both shortcodes. Builtins aren't on
+            # disk and stay anonymous.
             template_key = shortcode_name.try { |n| "shortcodes/#{n}" }
+            cache_key = {template_key, template}.hash ^ 0x5C0DE_CAFE_u64
             crinja_template = if wcache = template_cache_override
                                 wcache[cache_key]? || begin
                                   compiled = compile_template(env, template, template_key)
