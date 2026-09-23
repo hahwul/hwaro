@@ -515,3 +515,38 @@ describe "Hugo import: url with query or fragment" do
     end
   end
 end
+
+describe "Hugo import: slug naming an existing bundle" do
+  # A slug that names a sibling bundle (`posts/trip` with slug `other` next
+  # to `posts/other/`) merged the two: the page became `posts/other/index-1.md`
+  # and showed the other bundle's resources. It keeps its own directory.
+  it "keeps the bundle in its own directory and warns" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      {"posts/trip/index.md"   => "+++\ntitle = \"Trip\"\nslug = \"other\"\n+++\n![p](photo.png)\n",
+       "posts/trip/photo.png"  => "trip",
+       "posts/other/index.md"  => "+++\ntitle = \"Other\"\n+++\n![p](photo.png)\n",
+       "posts/other/photo.png" => "other",
+       "posts/a/index.md"      => "+++\ntitle = \"A\"\nslug = \"same\"\n+++\na\n",
+       "posts/b/index.md"      => "+++\ntitle = \"B\"\nslug = \"same\"\n+++\nb\n"}.each do |rel, body|
+        path = File.join(hugo_dir, "content", rel)
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, body)
+      end
+      output_dir = File.join(tmpdir, "out")
+      log = with_captured_log do
+        Hwaro::Services::Importers::HugoImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir)).success.should be_true
+      end
+
+      File.read(File.join(output_dir, "posts", "trip", "index.md")).should contain("Trip")
+      File.read(File.join(output_dir, "posts", "trip", "photo.png")).should eq("trip")
+      File.read(File.join(output_dir, "posts", "other", "index.md")).should contain("Other")
+      File.exists?(File.join(output_dir, "posts", "other", "index-1.md")).should be_false
+      # Two bundles slugged alike: the first takes the slug, the second stays.
+      File.read(File.join(output_dir, "posts", "same", "index.md")).should contain("A")
+      File.read(File.join(output_dir, "posts", "b", "index.md")).should contain("B")
+      log.should contain("names an existing bundle")
+    end
+  end
+end

@@ -178,7 +178,19 @@ module Hwaro
             # relative image in it broke. Keep the bundle shape instead.
             if slug_val && !slug_val.empty?
               parent = File.dirname(section)
-              section = parent == "." ? slug_val : File.join(parent, slug_val)
+              target = parent == "." ? slug_val : File.join(parent, slug_val)
+              # The slugged directory may already be another bundle — a
+              # sibling source directory, or a bundle this run already moved
+              # there. Merging into it would write `index-1.md` beside the
+              # other bundle's resources, so this page keeps its own
+              # directory (and its own URL) instead.
+              target_index = resolve_content_path(output_dir, target, "index")
+              if target != section &&
+                 (Dir.exists?(File.join(content_dir, target)) || (target_index && destination_claimed?(target_index)))
+                Logger.warn "#{file_path}: slug #{slug_val.inspect} names an existing bundle (#{target}/); keeping the bundle at #{section}/."
+              else
+                section = target
+              end
             end
             file_slug = "index"
           elsif slug_val && !slug_val.empty?

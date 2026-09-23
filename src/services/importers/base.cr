@@ -357,6 +357,11 @@ module Hwaro
         # either way, and resolving it properly would mean computing every
         # destination before writing any — a two-pass restructure of all eight
         # importers for a cosmetic difference.
+        # True when an earlier item of this run already wrote to `path`.
+        protected def destination_claimed?(path : String) : Bool
+          @claimed_paths.includes?(path)
+        end
+
         private def claim_path(path : String) : String
           return path if @claimed_paths.add?(path)
 
