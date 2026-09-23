@@ -753,6 +753,24 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should eq("## My Heading <!--HID:custom-id-->")
     end
 
+    it "extracts explicit IDs from headings inside blockquotes" do
+      cfg = make_config(heading_ids: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> ## Heading {#custom-id}",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<h2 id="custom-id">Heading</h2>))
+    end
+
+    it "applies attribute blocks to headings inside blockquotes" do
+      cfg = make_config(attributes: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> ## Heading {#custom-id .feature}",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<h2 id="custom-id" class="feature">Heading</h2>))
+    end
+
     it "extracts a digit-leading id (#792)" do
       content = "## 1. Fuzzer로 요청 보내기 {#1-send-a-request-to-the-fuzzer}"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
