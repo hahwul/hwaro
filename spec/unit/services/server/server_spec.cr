@@ -874,6 +874,24 @@ describe "stale output cleanup on file removal" do
       File.exists?(outside).should be_true
     end
   end
+
+  it "does not follow a symlinked output parent when deleting stale files" do
+    Dir.mktmpdir do |dir|
+      output_dir = File.join(dir, "public")
+      outside_dir = File.join(dir, "outside", "nested")
+      FileUtils.mkdir_p(output_dir)
+      FileUtils.mkdir_p(outside_dir)
+      victim = File.join(outside_dir, "victim.html")
+      File.write(victim, "keep")
+      File.symlink(File.dirname(outside_dir), File.join(output_dir, "escape"))
+
+      stale = File.join(output_dir, "escape", "nested", "victim.html")
+      Hwaro::Services::Server.new.test_remove_stale_outputs([stale], output_dir)
+
+      File.read(victim).should eq("keep")
+      Dir.exists?(outside_dir).should be_true
+    end
+  end
 end
 
 describe Hwaro::Services::ChangeSet do

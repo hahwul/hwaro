@@ -125,15 +125,16 @@ module Hwaro
 
       # Delete output files orphaned by removed sources, pruning any
       # directories the deletion leaves empty (e.g. `public/guide/old-page/`).
+      # Both operations resolve symlinked parents before touching the path.
       private def remove_stale_outputs(paths : Array(String), output_dir : String)
         paths.each do |path|
+          next unless Utils::OutputGuard.safe_to_delete_file?(path, output_dir)
           next unless File.exists?(path)
-          next unless Utils::OutputGuard.within_output_dir?(path, output_dir)
           File.delete(path)
           Logger.info "  Removed stale output: #{path}"
 
           dir = File.dirname(path)
-          while dir != output_dir && Utils::OutputGuard.within_output_dir?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
+          while Utils::OutputGuard.safe_to_delete_directory?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
             Dir.delete(dir)
             dir = File.dirname(dir)
           end
