@@ -3070,6 +3070,27 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  # Checks ran on the merged document with config.toml as the label, so a
+  # mistake inside config.<env>.toml was blamed on the base file.
+  describe "environment override diagnostics" do
+    it "names the override file for a typo, a mistyped section and a NUL there" do
+      Dir.mktmpdir do |dir|
+        base = File.join(dir, "config.toml")
+        env_path = File.join(dir, "config.production.toml")
+        File.write(base, %(title = "Base"\n))
+        File.write(env_path, "sitemap = true\n[sitemp]\nenabled = true\n")
+        log = with_captured_log { Hwaro::Models::Config.load(base, env: "production") }
+        log.should contain("Unknown key 'sitemp' in #{env_path}")
+        log.should contain("Ignoring 'sitemap' in #{env_path}")
+        log.should_not contain("in #{base}")
+
+        File.write(env_path, %(title = "a\\u0000b"\n))
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Models::Config.load(base, env: "production") }
+        (err.message || "").should contain(env_path)
+      end
+    end
+  end
+
   describe "mistyped section warnings" do
     it "warns when a table section is given a scalar" do
       log = with_captured_log { load_config("sitemap = true\nhighlight = false") }

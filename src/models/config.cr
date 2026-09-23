@@ -286,6 +286,11 @@ module Hwaro
         raw_content = File.read(config_path)
         substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, config_path)
         config.raw = parse_toml(substituted_content, config_path)
+        # Checked per file, before the merge, so a typo in the environment
+        # override is reported against that file rather than config.toml.
+        reject_null_bytes!(config.raw, config_path)
+        warn_unknown_top_level_keys(config.raw, config_path)
+        warn_mistyped_sections(config.raw, config_path)
 
         # Merge environment-specific override (e.g. config.production.toml).
         # A missing override is recoverable (we just use the base config), but
@@ -299,16 +304,15 @@ module Hwaro
             env_content = File.read(env_path)
             env_substituted = Utils::EnvSubstitutor.substitute_with_warnings(env_content, env_path)
             env_raw = parse_toml(env_substituted, env_path)
+            reject_null_bytes!(env_raw, env_path)
+            warn_unknown_top_level_keys(env_raw, env_path)
+            warn_mistyped_sections(env_raw, env_path)
             config.raw = deep_merge(config.raw, env_raw)
             Logger.info "Loaded environment config: #{env_path}"
           else
             Logger.warn "--env #{env_name}: override file '#{env_path}' not found; continuing with base #{config_path} only. If you intended to ship environment-specific settings (e.g. a production base_url), create #{env_path} or check for a typo in --env."
           end
         end
-
-        warn_unknown_top_level_keys(config.raw, config_path)
-        warn_mistyped_sections(config.raw, config_path)
-        reject_null_bytes!(config.raw, config_path)
 
         config.title = string_or_default(config.raw, "title", config.title)
         config.description = string_or_default(config.raw, "description", config.description)
