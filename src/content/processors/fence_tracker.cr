@@ -25,14 +25,26 @@ module Hwaro
       #   non-blank line opens a run when nothing before it can absorb the
       #   indent — after a blank line, or directly after an ATX heading,
       #   which CommonMark (and Markd) let indented code follow with no
-      #   blank line in between. Inside a list, a run opens only at least
-      #   four columns beyond the current item's content indent. The run survives blanks
-      #   until the first non-blank line back under 4 columns. The list heuristic is deliberately sticky (a marker
-      #   opens it; only a blank followed by a flush-left non-marker line
-      #   closes it): staying "in list" too long merely keeps today's
-      #   under-protective behavior, while leaving it too early would newly
-      #   skip transforms on real list content. Known limit: a fence closer
-      #   followed directly by indented code opens no run.
+      #   blank line in between. Inside a list item the run opens only
+      #   four columns beyond the item's content column (tabs expanded to
+      #   4-column stops), and it survives blanks until the first non-blank
+      #   line back under that column.
+      # - List items are tracked as a stack of content columns, one entry
+      #   per open item, at ANY indentation: a nested `- b` sits wherever
+      #   its parent's content puts it, four spaces or a tab included. The
+      #   stack errs toward keeping items open — a marker always pushes, an
+      #   item is only popped by a marker left of its content or by a
+      #   non-blank line left of its content after a blank line (the one
+      #   case where Markd certainly closes it). A stale item can only make
+      #   a line look *less* like code (today's under-protective
+      #   behaviour); a missed one would make real list content look like
+      #   code and silently skip every extension on it. Items are keyed by
+      #   blockquote depth, so a quote inside an item never pops the item.
+      #   Column arithmetic mirrors Markd, including its quirks (tabs after
+      #   a list marker and after `>` are measured from Markd's own column,
+      #   not the true one). Known limits: a fence closer followed directly
+      #   by indented code opens no run, and lines inside a generic HTML
+      #   block (`<div>` … blank line) are not recognized as raw.
       # - Fences inside blockquotes (`> ```) are tracked too: the leading
       #   `>` markers are stripped before the opener/closer rules apply, and
       #   the marker depth is remembered. Because CommonMark gives fenced
@@ -44,12 +56,13 @@ module Hwaro
       #   inside list items are still invisible, and tab-formed `>` markers
       #   (`>\t`) are not recognized.
       class FenceTracker
-        # A bullet or ordered-list marker at up to 3 spaces indent. The
-        # trailing space/tab is required — CommonMark's empty-item form
-        # (a bare "-") is intentionally not matched; a missed marker only
-        # keeps the list heuristic closed in a case too rare to matter.
-        LIST_MARKER_RE         = /\A {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]/
-        LIST_MARKER_DETAILS_RE = /\A( {0,3})([-*+]|\d{1,9}[.)])([ \t]+)/
+        # A bullet or ordered-list marker, matched after the line's leading
+        # whitespace (so at any indentation — which list it belongs to is
+        # decided by the item stack), followed by a space/tab or nothing
+        # (CommonMark's empty item). Over-matching (a `* * *` thematic break,
+        # a `2.` that cannot interrupt a paragraph) only pushes a stale item,
+        # which errs toward "not code".
+        LIST_MARKER_RE = /\A(?:[-*+]|\d{1,9}[.)])(?=[ \t]|\r?\n?\z)/
 
         # These CommonMark raw HTML blocks leave their contents uninterpreted.
         # Preprocessors must treat them like code so math, footnotes, and
@@ -79,8 +92,11 @@ module Hwaro
         @raw_html_code_bq_depth = 0
         @track_raw_html_code = true
         @in_indented_code = false
-        @in_list = false
-        @list_code_indents = [] of {Int32, Int32}
+        @indented_code_column = 4
+        @indented_code_bq_depth = 0
+        # Open list items as {blockquote depth, content column}, outermost
+        # first.
+        @list_items = [] of {Int32, Int32}
         @prev_blank = true
         @prev_atx_heading = false
 
@@ -146,35 +162,42 @@ module Hwaro
             end
           end
 
+          prefix = depth.zero? ? 0 : blockquote_prefix_column(line, depth)
+          column, text_start = leading_columns(content, prefix)
+
           if @in_indented_code
             if blank
               @prev_blank = true
               return true
-            elsif indented?(content)
+            elsif depth == @indented_code_bq_depth && column >= @indented_code_column
               @prev_blank = false
               return true
             end
-            # First non-blank line back under 4 columns ends the run and
-            # is evaluated normally below.
+            # First non-blank line back under the run's column ends the run
+            # and is evaluated normally below.
             @in_indented_code = false
           end
 
-          if !blank && indented?(content) && (@prev_blank || prev_atx_heading) &&
-             (!@in_list || list_code_indentation?(content))
-            @in_indented_code = true
-            @prev_blank = false
-            return true
+          if !blank && @prev_blank
+            # After a blank line, a line left of an item's content column
+            # closes that item. Items of an enclosing container (a list
+            # around this blockquote) are never judged by this line; items
+            # of quotes that ended at the blank line are dropped.
+            @list_items.reject! { |item| item[0] > depth || (item[0] == depth && item[1] > column) }
           end
 
-          if LIST_MARKER_RE.matches?(content)
-            @in_list = true
-            track_list_code_indent(content)
-          elsif @in_list && @prev_blank && !blank && !content.starts_with?(' ') && !content.starts_with?('\t')
-            # A flush-left non-marker block after a blank line ends the
-            # list context; indented lines and lazy continuations keep it.
-            @in_list = false
-            @list_code_indents.clear
+          if !blank && (@prev_blank || prev_atx_heading)
+            base = list_content_column(depth, column)
+            if column - base >= 4
+              @in_indented_code = true
+              @indented_code_column = base + 4
+              @indented_code_bq_depth = depth
+              @prev_blank = false
+              return true
+            end
           end
+
+          track_list_item(content, depth, column, text_start, prefix) unless blank
 
           stripped = content.lstrip
           if !indented?(content) && (run = opener_run(stripped))
@@ -245,39 +268,118 @@ module Hwaro
           false
         end
 
-        private def track_list_code_indent(content : String) : Nil
-          match = LIST_MARKER_DETAILS_RE.match(content)
-          return unless match
-
-          indent = match[1].size
-          column = indent + match[2].size
-          match[3].each_char do |char|
-            column = char == '\t' ? column + 4 - column % 4 : column + 1
+        # The column Markd has reached after consuming `depth` blockquote
+        # markers. Markd never advances its column over the up-to-3 spaces
+        # before a `>` (`advance_next_nonspace` updates only the offset), so
+        # only the `>` and its optional following space count; a tab after
+        # `>` counts one (partially consumed) column and stays in the
+        # content, exactly as `strip_blockquote_markers` leaves it.
+        private def blockquote_prefix_column(line : String, depth : Int32) : Int32
+          slice = line.to_slice
+          pos = 0
+          column = 0
+          depth.times do
+            spaces = 0
+            while pos < slice.size && slice[pos] === ' ' && spaces < 3
+              pos += 1
+              spaces += 1
+            end
+            break unless pos < slice.size && slice[pos] === '>'
+            pos += 1
+            column += 1
+            if pos < slice.size && slice[pos] === ' '
+              pos += 1
+              column += 1
+            elsif pos < slice.size && slice[pos] === '\t'
+              column += 1
+            end
           end
-          code_indent = column + 4
+          column
+        end
 
-          while previous = @list_code_indents.last?
-            if previous[0] > indent
-              @list_code_indents.pop
-            elsif previous[0] == indent
-              @list_code_indents[-1] = {indent, code_indent}
-              return
+        # Column of the first non-whitespace character, measured from the
+        # end of the stripped blockquote prefix (`prefix` columns wide) but
+        # with tabs advancing to the next absolute multiple of 4, as Markd
+        # expands them; plus that character's byte offset.
+        private def leading_columns(content : String, prefix : Int32) : {Int32, Int32}
+          column = prefix
+          offset = 0
+          content.each_byte do |byte|
+            if byte === ' '
+              column += 1
+            elsif byte === '\t'
+              column += 4 - column % 4
             else
               break
             end
+            offset += 1
           end
-          @list_code_indents << {indent, code_indent}
+          {column - prefix, offset}
         end
 
-        private def list_code_indentation?(content : String) : Bool
-          return false unless list = @list_code_indents.last?
-
-          columns = 0
-          content.each_char do |char|
-            break unless char == ' ' || char == '\t'
-            columns = char == '\t' ? columns + 4 - columns % 4 : columns + 1
+        # The content column of the innermost open item (at this blockquote
+        # depth) that a line starting at `column` sits inside; 0 outside any.
+        private def list_content_column(depth : Int32, column : Int32) : Int32
+          @list_items.reverse_each do |item|
+            return item[1] if item[0] == depth && item[1] <= column
           end
-          columns >= list[1]
+          0
+        end
+
+        # A list marker less than 4 columns right of its container's content
+        # opens an item (4+ is paragraph continuation or code, never a
+        # marker): items whose content starts right of the marker cannot
+        # contain it and close. The new item's content column follows
+        # Markd's `parse_list_marker` — the text after 1-4 columns of
+        # whitespace, or one column past the marker for an empty item or one
+        # whose text is itself indented code (5+ columns). Markd measures
+        # tabs after the marker from the container's content column plus the
+        # marker width (it never advances its column to the marker), so the
+        # same virtual column is used here. Text that is itself a marker
+        # (`- - b`, `* * *`) opens a nested item at that content column.
+        private def track_list_item(content : String, depth : Int32, column : Int32, text_start : Int32, prefix : Int32) : Nil
+          # Byte probe first: this runs on every non-blank line.
+          first_byte = content.byte_at?(text_start)
+          return unless first_byte
+          return unless first_byte === '-' || first_byte === '*' || first_byte === '+' || first_byte.unsafe_chr.ascii_number?
+
+          base = list_content_column(depth, column)
+          return if column - base >= 4
+
+          virtual_column = prefix + base
+          offset = text_start
+          first = true
+          loop do
+            rest = content.byte_slice(offset, content.bytesize - offset)
+            marker = LIST_MARKER_RE.match(rest)
+            break unless marker
+
+            marker_size = marker[0].bytesize
+            virtual_column += marker_size
+            width = 0
+            spaces = 0
+            rest.to_slice[marker_size..].each do |byte|
+              if byte === ' '
+                width += 1
+              elsif byte === '\t'
+                width += 4 - (virtual_column + width) % 4
+              else
+                break
+              end
+              spaces += 1
+            end
+            simple = 1 <= width <= 4 && !rest.byte_slice(marker_size).blank?
+            content_column = column + marker_size + (simple ? width : 1)
+
+            @list_items.reject! { |item| item[0] == depth && item[1] > column } if first
+            @list_items << {depth, content_column}
+            break unless simple
+
+            first = false
+            column = content_column
+            virtual_column += width
+            offset += marker_size + spaces
+          end
         end
 
         private def run_length(text : String, char : Char) : Int32

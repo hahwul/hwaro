@@ -133,5 +133,31 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["- item", "", "      - [ ] code", "      ~~still code~~", "", "- next"])
         .should eq [false, false, true, true, true, false]
     end
+
+    it "tracks nested items indented four or more columns" do
+      feed([
+        "- a", "", "    - b", "", "        - c", "", "        - d",
+        "", "      paragraph of b", "", "          code in b",
+      ]).should eq [false, false, false, false, false, false, false, false, false, false, true]
+    end
+
+    it "expands tabs to four-column stops for nested items" do
+      feed(["- a", "", "\t- b", "", "\t  text of b", "", "\t      code in b"])
+        .should eq [false, false, false, false, false, false, true]
+    end
+
+    it "keeps deep two-space nesting out of indented code" do
+      feed(["- a", "  - b", "    - c", "      - d", "", "        text of d"])
+        .should eq [false, false, false, false, false, false]
+    end
+
+    it "ends an indented code run where the item's content resumes" do
+      feed(["- a", "", "      code", "    text"]).should eq [false, false, true, false]
+    end
+
+    it "keeps list items behind a blockquote inside an outer item" do
+      feed(["- a", "", "  > quote", "", "  b", "", "     not code"])
+        .should eq [false, false, false, false, false, false, false]
+    end
   end
 end

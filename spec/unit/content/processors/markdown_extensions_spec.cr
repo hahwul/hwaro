@@ -1581,6 +1581,23 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain("checkbox")
       html.should_not contain("<del>")
     end
+
+    it "applies extensions in nested list items indented four or more columns" do
+      config = make_config(task_lists: true, math: true, ins: true, mark: true, footnotes: true)
+      content = "- a\n\n    - b ~~S1~~\n\n        - c ~~S2~~ $x^2$ ++I1++\n\n" \
+                "        - [ ] task\n\n      paragraph of b ~~S3~~ ==M1== [^f1]\n\n[^f1]: note"
+      html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: config)
+      html.should_not contain("<pre>")
+      html.should contain("<del>S1</del>")
+      html.should contain("<del>S2</del>")
+      html.should contain("<del>S3</del>")
+      html.should contain("<ins>I1</ins>")
+      html.should contain("<mark>M1</mark>")
+      html.should contain("math-inline")
+      html.should contain("checkbox")
+      html.should contain(%(<sup class="footnote-ref">))
+      html.should contain(%(<section class="footnotes">))
+    end
   end
 
   describe "math fence and code-span awareness" do
