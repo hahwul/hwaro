@@ -478,6 +478,77 @@ describe "warm --cache builds" do
     end
   end
 
+  # Sitemap, feed and llms files were never claimed, so the claims diff
+  # could not see the ones an earlier config published and this one does not.
+  it "removes sitemap.xml once the sitemap is disabled" do
+    with_cached_site do
+      cached_build
+      File.exists?("public/sitemap.xml").should be_true
+
+      File.write("config.toml", File.read("config.toml").sub("[sitemap]\nenabled = true", "[sitemap]\nenabled = false"))
+      cached_build
+      File.exists?("public/sitemap.xml").should be_false
+    end
+  end
+
+  it "removes the main feed once feeds are disabled" do
+    with_cached_site do
+      base = File.read("config.toml")
+      File.write("config.toml", base + "\n[feeds]\nenabled = true\n")
+      cached_build
+      File.exists?("public/rss.xml").should be_true
+
+      File.write("config.toml", base + "\n[feeds]\nenabled = false\n")
+      cached_build
+      File.exists?("public/rss.xml").should be_false
+    end
+  end
+
+  it "removes a section feed once the section stops generating it" do
+    with_cached_site do
+      File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\ngenerate_feeds = true\n+++\n")
+      cached_build
+      File.exists?("public/posts/rss.xml").should be_true
+
+      File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+      cached_build
+      File.exists?("public/posts/rss.xml").should be_false
+      File.exists?("public/posts/index.html").should be_true
+    end
+  end
+
+  it "removes taxonomy term feeds once the taxonomy stops generating them" do
+    with_cached_site do
+      base = File.read("config.toml")
+      File.write("config.toml", base.sub("name = \"tags\"", "name = \"tags\"\nfeed = true"))
+      cached_build
+      File.exists?("public/tags/keep-tag/rss.xml").should be_true
+
+      File.write("config.toml", base)
+      cached_build
+      File.exists?("public/tags/keep-tag/rss.xml").should be_false
+      File.exists?("public/tags/keep-tag/index.html").should be_true
+    end
+  end
+
+  it "removes llms files once they are disabled" do
+    with_cached_site do
+      base = File.read("config.toml")
+      File.write("config.toml", base + "\n[llms]\nenabled = true\nfull_enabled = true\n")
+      cached_build
+      File.exists?("public/llms-full.txt").should be_true
+
+      File.write("config.toml", base + "\n[llms]\nenabled = true\nfull_enabled = false\n")
+      cached_build
+      File.exists?("public/llms-full.txt").should be_false
+      File.exists?("public/llms.txt").should be_true
+
+      File.write("config.toml", base + "\n[llms]\nenabled = false\n")
+      cached_build
+      File.exists?("public/llms.txt").should be_false
+    end
+  end
+
   it "leaves an untouched page's output alone" do
     with_cached_site do
       cached_build

@@ -5,5 +5,7 @@
 - `hwaro serve` refreshes translation links (`page.translations`, the language switcher, sitemap hreflang alternates) when one translation is re-slugged or retitled. The other languages' pages, and the edited page's own switcher, kept the old URL and title.
 - `hwaro build --cache` removes search outputs the `[search]` config no longer publishes: `search.json` after `single_file = false` or a `filename` change, the `search/` shard directory after `shards = "none"`, and everything once search is disabled.
 
+- `hwaro build --cache` and `hwaro serve` stop publishing sitemap, feed and llms files the config no longer produces: `sitemap.xml` once `[sitemap]` is disabled or renamed, the main feed once `[feeds]` is disabled, a section feed once the section drops `generate_feeds` (including through an incremental serve edit), a language feed once the language stops generating one, and `llms.txt` / `llms-full.txt` once disabled. Only a cold build removed them before.
+
 ### Security
 - `[[data.remote]]` keeps configured headers dropped for the rest of a redirect chain once a redirect leaves the original origin. A third-party host could previously redirect back to the origin and choose which origin URL received the credential.

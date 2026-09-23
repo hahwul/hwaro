@@ -58,8 +58,21 @@ module Hwaro::Core::Build::Phases::Generate
     skip_feeds = skip_unchanged && !feed_template_present?
     # Run independent SEO generators in parallel.
     tasks = [
-      -> { Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose, skip_if_unchanged: skip_unchanged); nil },
-      -> { Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose, skip_if_unchanged: skip_feeds, templates: @templates, renderer: feed_template_renderer); nil },
+      # Each generator's published files are claimed whether written or
+      # skipped as unchanged: the claim list is "what this build publishes"
+      # (see Phases::Finalize), so disabling or renaming an output removes
+      # the file an earlier build wrote.
+      -> {
+        Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose, skip_if_unchanged: skip_unchanged)
+        Content::Seo::Sitemap.published_outputs(site.config, output_dir).each { |path| claim_generated_output(path) }
+        nil
+      },
+      -> {
+        feeds = Content::Seo::Feeds.generate(all_pages, site.config, output_dir, verbose, skip_if_unchanged: skip_feeds, templates: @templates, renderer: feed_template_renderer)
+        feeds.each { |path| claim_generated_output(path) }
+        track_feed_outputs(feeds, output_dir)
+        nil
+      },
       -> {
         Content::Seo::Robots.generate(site.config, output_dir, verbose)
         if site.config.robots.enabled
@@ -71,7 +84,11 @@ module Hwaro::Core::Build::Phases::Generate
         end
         nil
       },
-      -> { Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose, skip_if_unchanged: skip_unchanged); nil },
+      -> {
+        Content::Seo::Llms.generate(site.config, all_pages, output_dir, verbose, skip_if_unchanged: skip_unchanged)
+        Content::Seo::Llms.published_outputs(site.config, output_dir).each { |path| claim_generated_output(path) }
+        nil
+      },
     ] of Proc(Nil)
     ParallelHelper.execute(tasks, ctx.options.parallel)
   end
