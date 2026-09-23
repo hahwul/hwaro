@@ -95,11 +95,12 @@ module Hwaro
         # machines for the same source tree.
         protected def walk_files(dir : String, extensions : Array(String) = [".md", ".markdown"], skip_dir : Proc(String, Bool)? = nil) : Array(String)
           files = [] of String
-          walk_files_into(dir, files, extensions, skip_dir)
+          source_root = Utils::PathUtils.resolved_real_path(dir)
+          walk_files_into(dir, source_root, files, extensions, skip_dir)
           files
         end
 
-        private def walk_files_into(dir : String, files : Array(String), extensions : Array(String), skip_dir : Proc(String, Bool)?)
+        private def walk_files_into(dir : String, source_root : String, files : Array(String), extensions : Array(String), skip_dir : Proc(String, Bool)?)
           # An unreadable subdirectory (permissions, or one removed mid-walk)
           # raised straight out of the recursion and aborted the entire
           # import. Skip it and keep importing everything that is readable.
@@ -122,8 +123,12 @@ module Hwaro
                 next
               end
               next if skip_dir && skip_dir.call(entry)
-              walk_files_into(full_path, files, extensions, skip_dir)
+              walk_files_into(full_path, source_root, files, extensions, skip_dir)
             elsif extensions.any? { |ext| entry.ends_with?(ext) }
+              if File.symlink?(full_path) && !Utils::PathUtils.resolves_within?(full_path, source_root)
+                Logger.warn "Skipped symlinked file outside source directory: #{full_path}"
+                next
+              end
               files << full_path
             end
           end

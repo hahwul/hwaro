@@ -30,9 +30,30 @@ class TestImporter < Hwaro::Services::Importers::Base
   def test_strip_redundant_title_h1(body, title)
     strip_redundant_title_h1(body, title)
   end
+
+  def test_walk_files(dir, extensions = [".md", ".markdown"] of String)
+    walk_files(dir, extensions)
+  end
 end
 
 describe Hwaro::Services::Importers::Base do
+  describe "#walk_files" do
+    it "skips markdown symlinks that resolve outside the source tree" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "source")
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(source)
+        FileUtils.mkdir_p(outside)
+        File.write(File.join(source, "local.md"), "local")
+        File.write(File.join(outside, "secret.md"), "secret")
+        File.symlink(File.join(outside, "secret.md"), File.join(source, "leak.md"))
+
+        files = TestImporter.new.test_walk_files(source)
+        files.map { |path| File.basename(path) }.should eq(["local.md"])
+      end
+    end
+  end
+
   describe "#generate_frontmatter" do
     it "generates TOML frontmatter with string values" do
       importer = TestImporter.new
