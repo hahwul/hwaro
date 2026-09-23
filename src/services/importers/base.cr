@@ -545,6 +545,29 @@ module Hwaro
         # source's zone offset — the previous zone-less `%Y-%m-%d %H:%M:%S`
         # dropped the offset, so a `+09:00` post re-parsed as UTC shifted by
         # nine hours in feeds and sort order.
+        # Map a source page's literal URL (Hugo `url`, Jekyll `permalink`) onto
+        # hwaro's `path` front matter so the page keeps its published address.
+        # hwaro publishes `path = "a/b"` at `/a/b/`, so a `.html` URL becomes
+        # the extensionless path plus an alias at the old address (its
+        # redirect stub keeps inbound links working). Patterns (`:title`),
+        # external URLs and the site root are left alone.
+        protected def apply_source_url(fields : Hash(String, FieldValue), url : String?) : Nil
+          return unless url
+          url = url.strip
+          return if url.empty? || url.includes?(':') || url.starts_with?("//")
+          trimmed = url.strip('/')
+          return if trimmed.empty?
+          if trimmed =~ /\.html?\z/i
+            fields["path"] = trimmed.sub(/\.html?\z/i, "")
+            aliases = (fields["aliases"]?.as?(Array(String)) || [] of String).dup
+            original = "/#{trimmed}"
+            aliases << original unless aliases.includes?(original)
+            fields["aliases"] = aliases
+          else
+            fields["path"] = trimmed
+          end
+        end
+
         protected def format_date(time : Time) : String
           Hwaro::Utils::FrontmatterWriter.serialize_time(time)
         end

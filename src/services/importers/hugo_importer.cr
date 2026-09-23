@@ -146,6 +146,10 @@ module Hwaro
             aliases = array_string_value(data, "aliases")
             fields["aliases"] = aliases unless aliases.empty?
 
+            # Hugo's `url` sets the page's whole published path; dropping it
+            # moved the page and broke every link to it.
+            apply_source_url(fields, string_value(data, "url"))
+
             # image (from images[0] or featured_image)
             image = extract_image(data)
             fields["image"] = image if image

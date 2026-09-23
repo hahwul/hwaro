@@ -462,4 +462,24 @@ describe Hwaro::Services::Importers::HugoImporter do
       end
     end
   end
+
+  # Regression: Hugo's `url` front matter (the page's whole published path)
+  # was dropped, so an imported page moved and every link to it broke.
+  describe "url front matter" do
+    it "maps url to path, keeping a .html address as an alias" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/custom.md", "---\ntitle: Custom\nurl: /special/place/\n---\nx\n")
+        write_hugo_content(hugo_dir, "posts/old.md", "---\ntitle: Old\nurl: /old/page.html\n---\nx\n")
+        output_dir = File.join(tmpdir, "out")
+
+        Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+        File.read(File.join(output_dir, "posts", "custom.md")).should contain(%(path = "special/place"))
+        old = File.read(File.join(output_dir, "posts", "old.md"))
+        old.should contain(%(path = "old/page"))
+        old.should contain(%(aliases = ["/old/page.html"]))
+      end
+    end
+  end
 end
