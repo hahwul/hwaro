@@ -452,6 +452,32 @@ describe "warm --cache builds" do
     end
   end
 
+  # The search generator claimed nothing, so the claims diff could not see
+  # the files an earlier config published and this one does not.
+  it "removes search outputs the search config stopped publishing" do
+    with_cached_site do
+      base = File.read("config.toml")
+      File.write("config.toml", base + "\n[search]\nenabled = true\nshards = \"section\"\n")
+      cached_build
+      File.exists?("public/search.json").should be_true
+      File.exists?("public/search/index.json").should be_true
+
+      File.write("config.toml", base + "\n[search]\nenabled = true\nshards = \"section\"\nsingle_file = false\n")
+      cached_build
+      File.exists?("public/search.json").should be_false
+      File.exists?("public/search/posts.json").should be_true
+
+      File.write("config.toml", base + "\n[search]\nenabled = true\n")
+      cached_build
+      File.exists?("public/search.json").should be_true
+      Dir.exists?("public/search").should be_false
+
+      File.write("config.toml", base)
+      cached_build
+      File.exists?("public/search.json").should be_false
+    end
+  end
+
   it "leaves an untouched page's output alone" do
     with_cached_site do
       cached_build

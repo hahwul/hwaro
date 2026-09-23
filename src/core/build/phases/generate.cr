@@ -82,5 +82,8 @@ module Hwaro::Core::Build::Phases::Generate
     site = @site || raise "Site not initialized"
     Content::Search.generate(ctx.all_pages, site.config, ctx.options.output_dir, ctx.options.verbose,
       skip_if_unchanged: generate_outputs_unchanged?(ctx))
+    # Claimed whether written or skipped: the claim list is "what this build
+    # publishes" (see Phases::Finalize).
+    Content::Search.published_outputs(site.config, ctx.options.output_dir).each { |path| claim_generated_output(path) }
   end
 end
