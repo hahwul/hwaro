@@ -52,6 +52,16 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("checkbox\" disabled")
       result.should contain("- Normal")
     end
+
+    it "converts task items inside blockquotes" do
+      cfg = make_config(task_lists: true)
+      html, _ = Hwaro::Processor::Markdown.render(
+        "> - [ ] Todo\n> - [x] Done",
+        markdown_config: cfg,
+      )
+      html.should contain(%(<input type="checkbox" disabled> Todo))
+      html.should contain(%(<input type="checkbox" checked disabled> Done))
+    end
   end
 
   describe "definition lists" do
