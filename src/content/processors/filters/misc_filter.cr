@@ -57,10 +57,10 @@ module Hwaro
             # Default filter — returns fallback when target is nil/undefined or empty string
             env.filters["default"] = Crinja.filter({value: ""}) do
               if target.raw.nil? || target.undefined?
-                arguments["value"].to_s
+                arguments["value"]
               else
                 val = target.to_s
-                val.empty? ? arguments["value"].to_s : val
+                val.empty? ? arguments["value"] : target
               end
             end
 

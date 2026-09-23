@@ -524,6 +524,10 @@ describe "MiscFilters" do
       result.strip.should eq("fallback")
     end
 
+    it "preserves the fallback value's type" do
+      render_filter("{{ (missing | default(value=40)) + 2 }}").strip.should eq("42")
+    end
+
     it "returns default value for undefined variable" do
       result = render_filter("{{ undefined_var | default(value='fallback') }}")
       result.strip.should eq("fallback")
