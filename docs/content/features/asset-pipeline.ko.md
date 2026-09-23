@@ -54,7 +54,7 @@ files = ["js/util.js", "js/app.js"]
 
 파일은 나열한 순서대로 이어 붙입니다.
 
-CSS 번들은 원본 파일 옆이 아니라 `output_dir` 아래에 게시됩니다. `source_dir`가 `static`이면, 원본 스타일시트 옆에 있는 파일을 가리키는 상대 `url(...)`을 번들 위치에서도 같은 파일에 닿도록 고쳐 씁니다. 예를 들어 `static/css/a.css`의 `url(img/x.png)`는 `assets/main.css`에서 `url(../css/img/x.png)`가 됩니다. 절대 URL, `data:`·프로토콜 URL, 원본 옆에 해당 파일이 없는 상대 URL은 그대로 둡니다.
+CSS 번들은 원본 파일 옆이 아니라 `output_dir` 아래에 게시됩니다. `source_dir`가 `static`이면, 원본 스타일시트 옆에 있는 파일을 가리키는 상대 `url(...)`을 번들 위치에서도 같은 파일에 닿도록 고쳐 씁니다. 예를 들어 `static/css/a.css`의 `url(img/x.png)`는 `assets/main.css`에서 `url(../css/img/x.png)`가 됩니다. 절대 URL, `data:`·프로토콜 URL, 원본 옆에 해당 파일이 없는 상대 URL, CSS 문자열이나 주석 안의 `url(...)` 텍스트는 그대로 둡니다.
 
 ## 템플릿에서 사용
 
