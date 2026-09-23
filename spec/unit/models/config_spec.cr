@@ -2990,6 +2990,39 @@ describe "Hwaro::Models::Config" do
     end
   end
 
+  # A known section with the wrong TOML shape used to be ignored with no
+  # feedback at all: `sitemap = true` never enabled the sitemap,
+  # `highlight = false` never disabled highlighting, and
+  # `taxonomies = ["tags"]` built a site with no taxonomies.
+  describe "mistyped section warnings" do
+    it "warns when a table section is given a scalar" do
+      log = with_captured_log { load_config("sitemap = true\nhighlight = false") }
+      log.should contain("'sitemap' in")
+      log.should contain("[sitemap]")
+      log.should contain("'highlight' in")
+    end
+
+    it "warns when taxonomies is not an array of tables" do
+      log = with_captured_log { load_config(%(taxonomies = ["tags"])) }
+      log.should contain("[[taxonomies]]")
+      log = with_captured_log { load_config("[taxonomies]\ntag = \"tags\"") }
+      log.should contain("[[taxonomies]]")
+    end
+
+    it "warns for a [[taxonomies]] entry without a name" do
+      log = with_captured_log { load_config("[[taxonomies]]\nfeed = true\n\n[[taxonomies]]\nname = \"\"") }
+      log.scan("[[taxonomies]] entry").size.should eq(2)
+    end
+
+    it "accepts both documented [versions] shapes and correct sections silently" do
+      log = with_captured_log do
+        load_config("[sitemap]\nenabled = true\n\n[[taxonomies]]\nname = \"tags\"\n\n[[versions]]\nname = \"v1\"\npath = \"docs/v1\"")
+      end
+      log.should_not contain("must be")
+      log.should_not contain("[[taxonomies]] entry")
+    end
+  end
+
   describe "unknown top-level key warnings" do
     it "warns with a did-you-mean suggestion for a typo'd section" do
       log = with_captured_log do

@@ -307,6 +307,7 @@ module Hwaro
         end
 
         warn_unknown_top_level_keys(config.raw, config_path)
+        warn_mistyped_sections(config.raw, config_path)
         reject_null_bytes!(config.raw, config_path)
 
         config.title = string_or_default(config.raw, "title", config.title)
@@ -393,6 +394,31 @@ module Hwaro
       # top-level key is always dead configuration. Sorted, so "did you mean"
       # suggestions tie-break the same way regardless of load order.
       KNOWN_TOP_LEVEL_KEYS = SCALAR_KEYS + SECTION_LOADERS.flat_map(&.keys).uniq!.sort!
+
+      # Section keys read as an array of tables (`[[taxonomies]]`); `versions`
+      # accepts both a `[versions]` table and a bare `[[versions]]` array.
+      # Every other registered section key is a table.
+      ARRAY_SECTION_KEYS  = %w[taxonomies]
+      EITHER_SECTION_KEYS = %w[versions]
+
+      # A known section in the wrong TOML shape is skipped by its loader
+      # (`as_h?`/`as_a?` → nil), so `sitemap = true` never enabled the
+      # sitemap, `highlight = false` never disabled highlighting and
+      # `taxonomies = ["tags"]` built no taxonomies — all with no feedback.
+      # Say so, like the unknown-key warning above.
+      private def self.warn_mistyped_sections(raw : Hash(String, TOML::Any), config_path : String)
+        raw.each do |key, value|
+          next if SCALAR_KEYS.includes?(key) || !KNOWN_TOP_LEVEL_KEYS.includes?(key)
+          next if EITHER_SECTION_KEYS.includes?(key) && (value.as_h? || value.as_a?)
+          if ARRAY_SECTION_KEYS.includes?(key)
+            next if value.as_a?
+            Logger.warn "Ignoring '#{key}' in #{config_path}: it must be an array of tables — write each entry as [[#{key}]] with its own keys (e.g. name = \"tags\")."
+          else
+            next if value.as_h?
+            Logger.warn "Ignoring '#{key}' in #{config_path}: it must be a table — write it as a [#{key}] section with its keys underneath."
+          end
+        end
+      end
 
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
         raw.each_key do |key|

@@ -127,12 +127,15 @@ module Hwaro
         # `hwaro doctor` already flags the duplicate; the build has to refuse
         # it too. First declaration wins, like a table-array key.
         seen = Set(String).new
-        config.taxonomies = taxonomies_section.compact_map do |taxonomy_any|
+        config.taxonomies = taxonomies_section.each_with_index.to_a.compact_map do |(taxonomy_any, index)|
+          # A nameless or non-table entry was dropped with no feedback, so a
+          # typo'd `nme = "tags"` silently built a site without the taxonomy.
           taxonomy_hash = taxonomy_any.as_h?
-          next unless taxonomy_hash
-
-          name = taxonomy_hash["name"]?.try(&.as_s?)
-          next unless name
+          name = taxonomy_hash.try(&.["name"]?).try(&.as_s?)
+          if taxonomy_hash.nil? || name.nil? || name.strip.empty?
+            Logger.warn "Ignoring [[taxonomies]] entry ##{index + 1} in config.toml: it needs a non-empty string name (e.g. name = \"tags\")."
+            next
+          end
           unless seen.add?(name)
             Logger.warn "Duplicate [[taxonomies]] name #{name.inspect} in config.toml — the first declaration wins; remove the later one."
             next

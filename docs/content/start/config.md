@@ -16,7 +16,10 @@ Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean '
 ```
 
 The check covers top-level keys only; keys nested inside a section are
-validated by that section's own loader.
+validated by that section's own loader. A known section written in the wrong
+shape, such as `sitemap = true` instead of a `[sitemap]` table or
+`taxonomies = ["tags"]` instead of `[[taxonomies]]` entries, is ignored with a
+warning as well.
 
 ## Site Settings
 
