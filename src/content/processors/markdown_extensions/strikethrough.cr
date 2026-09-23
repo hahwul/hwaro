@@ -18,12 +18,24 @@ module Hwaro
         # When math is also enabled, `preprocess` stashes `$…$`/`$$…$$`
         # spans into opaque placeholders before this pass runs, so `$~~x~~$`
         # reaches KaTeX verbatim instead of being rewritten here.
-        STRIKETHROUGH_RE          = InlineMarkdown::INLINE_STRIKETHROUGH_RE
-        STRIKETHROUGH_CODE_RE     = /`[^`]+`/
-        LINK_DEFINITION_PREFIX_RE = /\A(?: {0,3}>[ \t]?)* {0,3}\[[^\]]+\]:[ \t]*/
-        LINK_DEST_TOKEN_RE        = /\x00LD(\d+)\x00/
-        HTML_TAG_RE               = /<\/?[a-z][\w:-]*(?:[^>"']|"[^"]*"|'[^']*')*>/i
-        HTML_TAG_TOKEN_RE         = /\x00HT(\d+)\x00/
+        STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
+        STRIKETHROUGH_CODE_RE = /`[^`]+`/
+        LINK_DEST_TOKEN_RE    = /\x00LD(\d+)\x00/
+        HTML_TAG_TOKEN_RE     = /\x00HT(\d+)\x00/
+
+        # A whole-line reference definition: `[label]:`, a destination
+        # (`<…>` or a non-space run), an optional title after whitespace, and
+        # nothing else. Group 1 ends where the destination starts. A line
+        # with trailing text is a paragraph to Markd, not a definition.
+        LINK_DEFINITION_RE = /\A((?: {0,3}>[ \t]?)* {0,3}\[[^\]]+\]:[ \t]*)(?:<[^<>\n\\]*+(?:\\.[^<>\n\\]*+)*+>|[^<\s]\S*+)(?:[ \t]++(?:"[^"\\]*+(?:\\.[^"\\]*+)*+"|'[^'\\]*+(?:\\.[^'\\]*+)*+'|\([^()\\]*+(?:\\.[^()\\]*+)*+\)))?[ \t]*\r?\n?\z/
+
+        # Raw inline HTML tags as Markd recognizes them (Markd::Rule::OPEN_TAG
+        # and CLOSE_TAG: tag name, attributes with optional unquoted/quoted
+        # values, `/>` or `>`), so text that merely starts with `<` —
+        # `<b ~~x~~ y>` — stays Markdown. Possessive quantifiers give the
+        # same matches without backtracking frames, so a tag with thousands
+        # of attributes cannot exhaust the PCRE JIT stack.
+        HTML_TAG_RE = /<[A-Za-z][A-Za-z0-9-]*+(?:\s++[a-zA-Z_:][a-zA-Z0-9:._-]*+(?:\s*+=\s*+(?:[^"'=<>`\x00-\x20]++|'[^']*+'|"[^"]*+"))?+)*+\s*+\/?>|<\/[A-Za-z][A-Za-z0-9-]*+\s*+>/
 
         def preprocess_strikethrough(content : String) : String
           return content unless content.includes?("~~")
@@ -132,9 +144,8 @@ module Hwaro
 
           # A reference-definition destination and optional title occupy the
           # remainder of their line; neither is inline Markdown text.
-          if definition = text.match(LINK_DEFINITION_PREFIX_RE)
-            start = definition.end
-            return text if start >= slice.size
+          if text.includes?("]:") && (definition = text.match(LINK_DEFINITION_RE))
+            start = definition.byte_end(1)
 
             return String.build(text.bytesize) do |io|
               io.write(slice[0, start])

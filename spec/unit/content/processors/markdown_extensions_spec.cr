@@ -1553,6 +1553,46 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<del>c</del>")
     end
 
+    it "leaves extension delimiters in a titled reference definition unchanged" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[ref][target]\n\n[target]: https://example.com/a~~b~~ \"T ~~t~~\"",
+        markdown_config: make_config,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+      html.should contain(%(title="T ~~t~~"))
+      html.should_not contain("<del>")
+    end
+
+    it "shields a reference definition whose label has multibyte characters" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[참고][대상]\n\n[대상]: https://example.com/a~~b~~",
+        markdown_config: make_config,
+      )
+      html.should contain(%(href="https://example.com/a~~b~~"))
+    end
+
+    it "rewrites delimiters on a line that only looks like a reference definition" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        "[Label]: not ~~x~~ a def because trailing text",
+        markdown_config: make_config,
+      )
+      html.should contain("<del>x</del>")
+    end
+
+    it "leaves delimiters in raw HTML attributes unchanged" do
+      html, _ = Hwaro::Processor::Markdown.render(
+        %(<span title="~~t~~">x</span> ~~s~~),
+        markdown_config: make_config,
+      )
+      html.should contain(%(title="~~t~~"))
+      html.should contain("<del>s</del>")
+    end
+
+    it "rewrites delimiters in text that only looks like an HTML tag" do
+      html, _ = Hwaro::Processor::Markdown.render("<b ~~x~~ y>", markdown_config: make_config)
+      html.should contain("<del>x</del>")
+    end
+
     it "leaves extension delimiters in reference destinations unchanged" do
       html, _ = Hwaro::Processor::Markdown.render(
         "[ref][target]\n\n[target]: https://example.com/a~~b~~",
