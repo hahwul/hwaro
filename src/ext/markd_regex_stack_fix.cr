@@ -39,12 +39,18 @@
 #   bracket counts as escaped. `MarkdRegexStackFix.bracketed_length` computes
 #   the regex's exact result, backtracking included, in one backward pass.
 #
-# `[a](` x 16_000 on one line took over 100 seconds: every failed inline link
-# entity-decoded and URI-normalized the whole rest of the line as its
-# destination before noticing there was no `)`, and `Inline#match` copied the
-# rest of the paragraph (`byte_slice`) on every call. A doomed destination is
-# no longer decoded, and matching happens in place at `@pos` with anchored
-# copies of the `^`-rules.
+# `[a](` x 16_000 on one line took over 100 seconds, because markd redid
+# O(line) work for every bracket:
+#
+# * a failed inline link entity-decoded and URI-normalized the whole rest of
+#   the line as its destination before noticing there was no `)` — a
+#   destination whose scan must run to the end of the text is now recognised
+#   in O(1) and not decoded;
+# * `Inline#match` copied the rest of the paragraph (`byte_slice`) and PCRE2
+#   re-validated the UTF-8 of the whole subject on every call — matching now
+#   happens in place, with `NO_UTF_CHECK` once the paragraph is known valid;
+# * each title/label attempt rescanned to the end of an unclosed run — the
+#   scanner's per-position results are computed once per paragraph.
 #
 # Remove when: upstream markd stops repeating groups over unbounded input.
 
@@ -235,7 +241,7 @@ module Markd::Parser
         end
         return
       end
-      if match = Hwaro::MarkdRegexStackFix.match_at(regex, @text, @pos, false)
+      if match = Hwaro::MarkdRegexStackFix.match_at(regex, @text, @pos, hwaro_memo.valid)
         @pos = match.byte_end(0)
         match[0]
       end
@@ -243,7 +249,7 @@ module Markd::Parser
 
     private def html_tag(node : Node)
       memo = hwaro_memo
-      length = Hwaro::MarkdRegexStackFix.html_tag_length(@text, @pos, memo.ucp, false)
+      length = Hwaro::MarkdRegexStackFix.html_tag_length(@text, @pos, memo.ucp, memo.valid)
       text = length.try { |len| @text.byte_slice(@pos, len) }
       @pos += length if length
       if text
@@ -279,7 +285,8 @@ module Markd::Parser
     # Consume the bracketed construct at `@pos` (see
     # `MarkdRegexStackFix.bracketed_length`), returning its text.
     private def bracketed(close : Char, stops : Tuple) : String?
-      length = Hwaro::MarkdRegexStackFix.bracketed_length(@text, @pos, close.ord.to_u8, stops)
+      table = hwaro_memo.tables[close] ||= Hwaro::MarkdRegexStackFix.bracketed_table(@text, close.ord.to_u8, stops)
+      length = Hwaro::MarkdRegexStackFix.bracketed_length(table, @pos)
       return unless length
       text = @text.byte_slice(@pos, length)
       @pos += length
@@ -290,6 +297,13 @@ module Markd::Parser
       dest = if text = match(Hwaro::MarkdRegexStackFix::LINK_DESTINATION_BRACES)
                text[1..-2]
              elsif char_at?(@pos) != '<'
+               # Past the last ASCII whitespace and `)`, the scan below cannot
+               # stop before the end of the text (see the `return ""` after
+               # it), so skip walking there once per unclosed link.
+               if !@hwaro_in_reference && @pos > hwaro_memo.last_dest_stop
+                 @pos = @text.bytesize
+                 return ""
+               end
                save_pos = @pos
                open_parens = 0
                while char = char_at?(@pos)

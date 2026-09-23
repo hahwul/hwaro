@@ -124,8 +124,20 @@ describe Hwaro::MarkdRegexStackFix do
       render_within("[a](<#{"b" * 200000}>)\n", 10.0).should contain("href=")
     end
 
-    it "renders a long run of unclosed links in linear-ish time" do
-      render_within("[a](" * 16000 + "\n", 10.0).should start_with("<p>")
+    # Scaling, not a wall-clock constant: time a 4x larger input against a
+    # smaller one (best of three, to damp scheduler noise on a busy CI box)
+    # and require near-linear growth. Linear work grows ~4x, the quadratic
+    # behaviour this guards against ~16x; 9 leaves room for a slow debug
+    # build without letting that through.
+    it "renders runs of unclosed links and titles in linear time" do
+      best = ->(markdown : String) { Array.new(3) { started = Time.instant; Markd.to_html(markdown); Time.instant - started }.min }
+      ["[a](", "[a](b ("].each do |unit|
+        Markd.to_html(unit * 500 + "\n") # warm up
+        small = best.call(unit * 6000 + "\n")
+        large = best.call(unit * 24000 + "\n")
+        ratio = large / {small, 1.millisecond}.max
+        ratio.should be < 9.0, "#{unit.inspect}: #{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+      end
     end
 
     it "renders a very long email-like autolink without a JIT stack error" do
