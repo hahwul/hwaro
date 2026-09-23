@@ -84,10 +84,19 @@ module Hwaro
             (pages_by_section[p.section] ||= [] of Models::Page) << p
           end
 
+          # Sections by parent directory, for the transparent-subsection walk.
+          sections_by_parent = {} of String => Array(Models::Section)
+          pages.each do |p|
+            next unless p.is_a?(Models::Section)
+            next if p.section.empty?
+            parent = (idx = p.section.rindex('/')) ? p.section[0, idx] : ""
+            (sections_by_parent[parent] ||= [] of Models::Section) << p
+          end
+
           pages.each do |page|
             # Check if it's a section and has feed generation enabled
             if page.is_a?(Models::Section) && page.generate_feeds && page.render && !page.draft && !page.unpublished
-              section_pages = pages_by_section[page.section]? || [] of Models::Page
+              section_pages = section_feed_pages(page, pages_by_section, sections_by_parent)
 
               # A section feed is a per-language surface: the section object
               # for each language carries that language's URL (e.g. /posts/
@@ -130,6 +139,31 @@ module Hwaro
           if config.feeds.enabled && config.multilingual?
             generate_language_feeds(pages, config, output_dir, verbose, templates, renderer)
           end
+        end
+
+        # The section's own pages plus those bubbled up from `transparent`
+        # subsections (recursively) — the same set Site#pages_for_section
+        # lists in the section's `section.pages`, so the feed never omits
+        # entries the section page shows. Subsections match on language and
+        # version exactly like that listing.
+        private def self.section_feed_pages(
+          section : Models::Section,
+          pages_by_section : Hash(String, Array(Models::Page)),
+          sections_by_parent : Hash(String, Array(Models::Section)),
+        ) : Array(Models::Page)
+          result = (pages_by_section[section.section]? || [] of Models::Page).dup
+          visited = Set{section.section}
+          queue = [section.section]
+          while name = queue.shift?
+            sections_by_parent[name]?.try &.each do |sub|
+              next unless sub.transparent
+              next unless sub.language == section.language && sub.version.same?(section.version)
+              next unless visited.add?(sub.section)
+              pages_by_section[sub.section]?.try { |list| result.concat(list) }
+              queue << sub.section
+            end
+          end
+          result
         end
 
         # Generate per-language feeds for non-default languages.

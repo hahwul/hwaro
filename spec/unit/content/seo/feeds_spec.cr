@@ -2425,6 +2425,64 @@ describe Hwaro::Content::Seo::Feeds do
         feed.should_not contain("Loser")
       end
     end
+
+    # Regression: a section feed only read the section's direct pages, while
+    # the section listing (`section.pages`) also includes pages bubbled up
+    # from `transparent` subsections — the feed silently dropped them.
+    it "includes pages from transparent subsections in section feeds" do
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = false
+      config.feeds.type = "rss"
+      config.base_url = "https://example.com"
+      config.title = "Test Site"
+
+      blog = Hwaro::Models::Section.new("blog/_index.md")
+      blog.section = "blog"
+      blog.url = "/blog/"
+      blog.title = "Blog"
+      blog.generate_feeds = true
+
+      year = Hwaro::Models::Section.new("blog/2024/_index.md")
+      year.section = "blog/2024"
+      year.url = "/blog/2024/"
+      year.transparent = true
+
+      month = Hwaro::Models::Section.new("blog/2024/01/_index.md")
+      month.section = "blog/2024/01"
+      month.url = "/blog/2024/01/"
+      month.transparent = true
+
+      opaque = Hwaro::Models::Section.new("blog/archive/_index.md")
+      opaque.section = "blog/archive"
+      opaque.url = "/blog/archive/"
+
+      make = ->(path : String, section : String, title : String) do
+        pg = Hwaro::Models::Page.new(path)
+        pg.title = title
+        pg.section = section
+        pg.url = "/#{path.rchop(".md")}/"
+        pg.date = Time.utc(2024, 1, 1)
+        pg.raw_content = title
+        pg
+      end
+
+      pages = [
+        blog, year, month, opaque,
+        make.call("blog/direct.md", "blog", "Direct"),
+        make.call("blog/2024/nested.md", "blog/2024", "Nested"),
+        make.call("blog/2024/01/deep.md", "blog/2024/01", "Deep"),
+        make.call("blog/archive/old.md", "blog/archive", "Archived"),
+      ] of Hwaro::Models::Page
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate(pages, config, output_dir)
+        feed = File.read(File.join(output_dir, "blog", "rss.xml"))
+        feed.should contain("Direct")
+        feed.should contain("Nested")
+        feed.should contain("Deep")
+        feed.should_not contain("Archived")
+      end
+    end
   end
 
   describe "atom entry dates" do
