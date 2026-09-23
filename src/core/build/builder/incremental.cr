@@ -126,7 +126,7 @@ module Hwaro
           update_taxonomies_incremental(site, changed_pages + excluded_pages, old_taxonomies_snapshot, excluded_paths)
 
           drop_excluded_and_orphaned_outputs(site, changed_pages, excluded_pages, old_output_paths, output_dir)
-          relinked_versions = relink_versions(site)
+          relinked_counterparts = relink_counterparts(site)
 
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
 
@@ -151,7 +151,7 @@ module Hwaro
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
-          invalidate_caches_for_pages(relinked_versions, Set(String).new) unless relinked_versions.empty?
+          invalidate_caches_for_pages(relinked_counterparts, Set(String).new) unless relinked_counterparts.empty?
           @crinja_cache_mutex.synchronize do
             @series_crinja_cache.reject! { |key, _| affected_series.includes?(key[0]) } unless affected_series.empty?
             related_pages_updated.each { |path| @related_posts_crinja_cache.delete(path) }
@@ -172,8 +172,8 @@ module Hwaro
 
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = Set(Models::Page).new(changed_pages)
-          # Other versions' pages whose switcher (and canonical) moved.
-          relinked_versions.each { |p| pages_to_render << p }
+          # Translations / other versions whose switcher (or canonical) moved.
+          relinked_counterparts.each { |p| pages_to_render << p }
 
           # Section index pages whose content lists include the changed pages.
           # Include every language variant of the section (multilingual sites
@@ -346,8 +346,8 @@ module Hwaro
           update_taxonomies_incremental(site, changed_pages + excluded_pages, reparsed.old_taxonomies_snapshot, excluded_paths)
 
           drop_excluded_and_orphaned_outputs(site, changed_pages, excluded_pages, old_output_paths, output_dir)
-          relinked_versions = relink_versions(site)
-          invalidate_caches_for_pages(relinked_versions, Set(String).new) unless relinked_versions.empty?
+          relinked_counterparts = relink_counterparts(site)
+          invalidate_caches_for_pages(relinked_counterparts, Set(String).new) unless relinked_counterparts.empty?
 
           site.build_lookup_index
           relink_navigation_for_sections(site, affected_sections)
@@ -366,25 +366,30 @@ module Hwaro
           # bare mtime touch). Flips INTO the set escalate to a full rebuild
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
-          run_rerender(options, force_pages: (changed_pages + relinked_versions).uniq, membership_changed: !excluded_pages.empty?,
+          run_rerender(options, force_pages: (changed_pages + relinked_counterparts).uniq, membership_changed: !excluded_pages.empty?,
             listing_sets: listing_sets)
         end
 
-        # Re-run `Versions.link!` over the live page set, exactly as the full
-        # parse does, and return every page whose `version_links` moved. The
-        # switcher (and an old version's canonical) of a page is derived from
-        # its COUNTERPARTS in the other versions: a counterpart that was
-        # re-slugged, drafted or turned `render = false` changes pages the
-        # edit never touched, which kept linking to (and canonicalizing on) a
-        # URL that no longer existed until the next full rebuild.
-        private def relink_versions(site : Models::Site) : Array(Models::Page)
+        # Re-run the counterpart linkers — `Multilingual.link_translations!`
+        # and `Versions.link!` — over the live page set, exactly as the full
+        # parse does, and return every page whose links moved. A page's
+        # language switcher, hreflang alternates, version switcher and (for
+        # an old version) canonical are all derived from its COUNTERPARTS: a
+        # counterpart that was re-slugged, retitled, drafted or turned
+        # `render = false` changes pages the edit never touched, which kept
+        # linking to (and canonicalizing on) a URL that no longer existed
+        # until the next full rebuild.
+        private def relink_counterparts(site : Models::Site) : Array(Models::Page)
           config = site.config
-          return [] of Models::Page unless config.versions.enabled?
+          return [] of Models::Page unless config.multilingual? || config.versions.enabled?
           pages = (site.pages + site.sections).as(Array(Models::Page))
-          before = pages.map(&.version_links.dup)
+          before = pages.map { |page| {page.translations.dup, page.version_links.dup} }
+          Content::Multilingual.link_translations!(pages, config)
           Content::Versions.link!(pages, config)
           moved = [] of Models::Page
-          pages.each_with_index { |page, i| moved << page if page.version_links != before[i] }
+          pages.each_with_index do |page, i|
+            moved << page if {page.translations, page.version_links} != before[i]
+          end
           moved
         end
 

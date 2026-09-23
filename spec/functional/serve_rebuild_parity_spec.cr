@@ -212,6 +212,43 @@ describe "serve rebuild parity" do
       end
     end
   end
+
+  # Same for translations: `link_translations!` only ran in the full parse,
+  # so re-slugging or retitling one translation left every other language's
+  # switcher (and the page's own) pointing at the old URL and title.
+  it "refreshes translation links when a translation is re-slugged" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "M"
+          base_url = "https://example.com"
+          default_language = "en"
+
+          [languages.en]
+          language_name = "English"
+
+          [languages.ko]
+          language_name = "Korean"
+          TOML
+        )
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("content/posts")
+        File.write("templates/page.html", "<html><body>{% for t in page.translations %}[{{ t.code }} {{ t.url }} {{ t.title }}]{% endfor %}</body></html>")
+        File.write("content/posts/hello.md", "---\ntitle: Hello\n---\nhi")
+        File.write("content/posts/hello.ko.md", "---\ntitle: Annyeong\n---\nhi")
+        builder = Hwaro::Services::Server.new.@builder
+        options = parity_options
+        builder.run(options).should be_true
+        File.read("public/posts/hello/index.html").should contain("[ko /ko/posts/hello/ Annyeong]")
+
+        File.write("content/posts/hello.ko.md", "---\ntitle: Bangapseumnida\nslug: bangap\n---\nhi")
+        builder.run_incremental(["content/posts/hello.ko.md"], options).should be_true
+
+        File.read("public/posts/hello/index.html").should contain("[ko /ko/posts/bangap/ Bangapseumnida]")
+        File.read("public/ko/posts/bangap/index.html").should contain("[ko /ko/posts/bangap/ Bangapseumnida]")
+      end
+    end
+  end
 end
 
 private def write_amp_site
