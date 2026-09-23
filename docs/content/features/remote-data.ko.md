@@ -40,7 +40,7 @@ on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 | `key` | 예 | `site.data` 아래 이름. 영문자, 숫자, `_`, `-`를 쓸 수 있고 대소문자를 구분하지 않고 고유해야 합니다. |
 | `url` | 예 | 절대 `http://` 또는 `https://` URL. 다른 스킴은 설정 로딩 시 거부됩니다. |
 | `format` | 아니오 | `json`, `toml`, `yaml`, `csv`. 생략하면 응답의 `Content-Type`, 그다음 리다이렉트 뒤 최종 URL 확장자로 판단합니다. 둘 다 알 수 없으면 명시하세요. |
-| `headers` | 아니오 | 추가 요청 헤더. 자격 증명으로 취급하여 로그에 남기지 않으며, 리다이렉트가 원래 origin을 벗어나면 제거합니다. |
+| `headers` | 아니오 | 추가 요청 헤더. 자격 증명으로 취급하여 로그에 남기지 않으며, 리다이렉트가 원래 origin을 벗어나면 제거합니다. 이후 원래 origin으로 다시 리다이렉트되어도 보내지 않습니다. |
 | `cache` | 아니오 | `"90s"`, `"30m"`, `"1h"`, `"7d"`, `"1h30m"` 같은 디스크 캐시 TTL. 캐시가 신선하면 요청하지 않습니다. |
 | `on_error` | 아니오 | 가져오기/파싱 실패 정책: `fail`(기본값), `warn-and-use-cache`, `warn-and-skip`. |
 
