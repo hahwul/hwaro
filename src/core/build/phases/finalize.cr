@@ -9,9 +9,14 @@ module Hwaro::Core::Build::Phases::Finalize
     profiler.start_phase("Finalize")
     result = @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
       build_cache = @cache || raise "Cache not initialized"
+      # Serve rebuilds keep their output directory; see
+      # `sweep_stale_derived_outputs` (a no-op on the first build).
+      sweep_stale_derived_outputs(ctx.options.output_dir)
       if ctx.options.cache
         prune_orphaned_cached_outputs(ctx, build_cache)
         build_cache.save
+      else
+        prune_unclaimed_generated_outputs(ctx)
       end
     end
     profiler.end_phase
@@ -111,6 +116,25 @@ module Hwaro::Core::Build::Phases::Finalize
     return if stale.empty?
 
     delete_orphaned_outputs(stale, output_dir)
+  end
+
+  # The cacheless counterpart of the `stale_generated_outputs` half of the
+  # prune above, for a builder that runs more than one build into the same
+  # output directory — the `hwaro serve` session, whose rebuilds keep the
+  # directory. Diffs this build's claims against the ones the builder held
+  # when this build started (`@previous_generated_claims`), through the keep
+  # set of `prune_unclaimed_outputs`. A one-shot cold build has no previous
+  # claims and prunes nothing.
+  #
+  # The previous site's page outputs (`@previous_page_outputs`) go through the
+  # same filter: a page this build moved, drafted or stopped rendering left
+  # its old file behind otherwise.
+  private def prune_unclaimed_generated_outputs(ctx : Lifecycle::BuildContext) : Nil
+    previous = @generated_claims_mutex.synchronize { @previous_generated_claims } | @previous_page_outputs
+    return if previous.empty?
+    # Page outputs, stubs, this build's claims, this build's writes and live
+    # source copies are all kept by the shared choke point.
+    prune_unclaimed_outputs(previous.to_a.sort!, ctx.options.output_dir)
   end
 
   # Comparison key for "is this file still written by this build?".

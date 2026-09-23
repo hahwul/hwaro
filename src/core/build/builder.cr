@@ -321,6 +321,27 @@ module Hwaro
         # today's behaviour instead of losing files. Reset by the Initialize
         # phase; guarded because taxonomy rendering fans out.
         @generated_output_claims : Set(String) = Set(String).new
+        # What the builder had claimed when the current build reset the set:
+        # the previous build's claims plus everything a serve session's
+        # incremental passes claimed since. Without `--cache` there is no
+        # persisted list to diff against, and this in-memory one is what lets
+        # a `hwaro serve` full rebuild drop the outputs it no longer
+        # publishes (a superseded `main.<hash>.css`, the `amp/` tree after
+        # `[amp]` is switched off). Empty on a process's first build.
+        @previous_generated_claims : Set(String) = Set(String).new
+        # True while @generated_output_claims is the running full build's own
+        # set (reset by the Initialize phase); false once an incremental serve
+        # pass starts, which re-claims nothing — so the set then still names
+        # outputs that pass is pruning. See `prune_unclaimed_outputs`.
+        @generated_claims_current : Bool = false
+        # Every page output the site of the PREVIOUS build (as the serve
+        # session's incremental passes left it) claimed, captured by `run`
+        # before it drops that site. A full serve rebuild — any config or
+        # data edit, or a file added alongside a content edit — renders only
+        # the new site and never looked back, so a page it moved (`slug`,
+        # `path`, a permalink rule), drafted or turned `render = false` kept
+        # its old file. Empty on a process's first build.
+        @previous_page_outputs : Set(String) = Set(String).new
         @generated_claims_mutex : Mutex = Mutex.new
         # Output files the static copy actually (re)wrote this build, in the
         # canonical absolute form `get_output_path` produces. `static/` is
@@ -360,6 +381,27 @@ module Hwaro
         # worker fiber.
         @page_derived_outputs : Hash(String, Array(String)) = {} of String => Array(String)
         @page_derived_mutex : Mutex = Mutex.new
+        # The derived files (see above) each page's LAST render wrote, and
+        # those the running pass has recorded so far. The cache entry is the
+        # only other record, and it is pruned only by a `--cache` build's
+        # Finalize — so a `hwaro serve` session kept serving an alias stub
+        # after the alias was removed (or its page deleted or drafted) and a
+        # `/page/N/` a shrinking section no longer fills. Diffed by
+        # `sweep_stale_derived_outputs` once a render pass has finished.
+        # Guarded by @page_derived_mutex.
+        @rendered_derived_outputs : Hash(String, Array(String)) = {} of String => Array(String)
+        @derived_outputs_this_pass : Hash(String, Array(String)) = {} of String => Array(String)
+        # Taxonomy index/term/pagination/feed files the PREVIOUS taxonomy
+        # generation wrote, and the set the running one is collecting (nil
+        # outside a pass). The Finalize prune covers these only on a `--cache`
+        # build, and only on the full-build path — a `hwaro serve` session
+        # without `--cache`, and every incremental rebuild with it, left a
+        # term whose last post was deleted (or re-tagged) served until
+        # restart. The serve builder lives for the whole session, so the
+        # previous pass is right here in memory. Guarded by
+        # @generated_claims_mutex (taxonomy rendering fans out).
+        @last_taxonomy_outputs : Set(String)? = nil
+        @taxonomy_pass_outputs : Set(String)? = nil
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -370,7 +412,10 @@ module Hwaro
         # covers. Public: the taxonomy generator is a module that reaches the
         # builder through its `builder:` argument.
         def claim_generated_output(path : String) : Nil
-          @generated_claims_mutex.synchronize { @generated_output_claims << path }
+          @generated_claims_mutex.synchronize do
+            @generated_output_claims << path
+            @taxonomy_pass_outputs.try(&.<<(path))
+          end
         end
 
         # Everything claimed since the last reset.
@@ -379,7 +424,11 @@ module Hwaro
         end
 
         def reset_generated_output_claims : Nil
-          @generated_claims_mutex.synchronize { @generated_output_claims.clear }
+          @generated_claims_mutex.synchronize do
+            @previous_generated_claims = @generated_output_claims
+            @generated_output_claims = Set(String).new
+          end
+          @generated_claims_current = true
         end
 
         # Record an output file the static copy just wrote over (see
@@ -470,9 +519,14 @@ module Hwaro
           @page_derived_mutex.synchronize { @page_derived_outputs.delete(page_path) }
         end
 
-        # Take (and forget) what this page derived.
+        # Take (and forget) what this page derived, remembering it as what the
+        # page's render in this pass wrote (see `@derived_outputs_this_pass`).
         def take_page_derived_outputs(page_path : String) : Array(String)
-          @page_derived_mutex.synchronize { @page_derived_outputs.delete(page_path) } || [] of String
+          @page_derived_mutex.synchronize do
+            derived = @page_derived_outputs.delete(page_path) || [] of String
+            @derived_outputs_this_pass[page_path] = derived
+            derived
+          end
         end
 
         # Access cache manager for external inspection
@@ -674,6 +728,7 @@ module Hwaro
           @context = ctx
 
           # Reset internal caches (preserve @config loaded above)
+          @previous_page_outputs = @site ? owned_output_paths(options.output_dir) : Set(String).new
           @site = nil
           @templates = nil
           @cache_manager.clear_runtime

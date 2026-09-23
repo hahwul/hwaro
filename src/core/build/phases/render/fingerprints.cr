@@ -502,6 +502,11 @@ module Hwaro::Core::Build::Phases::Render
   # filter_changed_pages skip the page forever — even after the collision
   # is resolved and it becomes the rightful writer.
   private def record_page_cache_entry(page : Models::Page, cache : Cache, templates : Hash(String, String), site : Models::Site, output_dir : String)
+    # Alias stubs and `/page/N/` pagination files the render just wrote (see
+    # `@page_derived_outputs`): taken on every render, cache or not, so the
+    # serve builder can prune what a later render stops writing. Sorted so a
+    # re-render in a different fiber order can't make the entry look changed.
+    derived = take_page_derived_outputs(page.path).sort!
     return unless cache.enabled?
     # A `[[content.generate]]` page has no source file to stat or hash —
     # `cache.update` would raise on the missing path. Skipping keeps it
@@ -515,10 +520,6 @@ module Hwaro::Core::Build::Phases::Render
     # up-to-date would let filter_changed_pages skip it forever.
     return unless output_path
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-    # Alias stubs and `/page/N/` pagination files the render just wrote (see
-    # `@page_derived_outputs`): recorded here, sorted so a re-render in a
-    # different fiber order can't make the entry look changed.
-    derived = take_page_derived_outputs(page.path).sort!
     cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), derived_paths: derived)
   end
 

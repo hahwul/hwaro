@@ -427,6 +427,20 @@ module Hwaro
           canonical_output
         end
 
+        # The mirror `generate` writes for `page`, or nil when it writes none
+        # (AMP off, section not enabled, draft/generated/unrendered page, or
+        # a refused prefix). Same gates as `generate`, so the builder can
+        # count the mirror among the files a page owns — and delete it with
+        # the page.
+        def self.mirror_output_for(page : Models::Page, config : Models::Config, output_dir : String) : String?
+          return unless config.amp.enabled
+          return if page.draft || page.generated || !page.render
+          return unless config.amp.section_enabled?(page.section)
+          prefix = effective_prefix(config)
+          return unless prefix
+          amp_output_path(page, output_dir, prefix)
+        end
+
         private def self.output_path_for(page : Models::Page, output_dir : String) : String
           url_path = page.url.lchop("/")
           File.join(output_dir, url_path, "index.html")

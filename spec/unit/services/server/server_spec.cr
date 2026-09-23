@@ -33,7 +33,7 @@ module Hwaro
       end
 
       def test_remove_stale_outputs(paths : Array(String), output_dir : String)
-        remove_stale_outputs(paths, output_dir)
+        @builder.prune_unclaimed_outputs(paths, output_dir)
       end
     end
   end

@@ -251,6 +251,10 @@ module Hwaro
                   elsif cfg = @config
                     outputs.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
                   end
+                  # Its `[amp]` mirror goes with it.
+                  if (cfg = @config) && (mirror = Content::Seo::Amp.mirror_output_for(page, cfg, output_dir))
+                    outputs << mirror
+                  end
                 end
               else
                 dest = File.join(output_dir, path.lchop("content/"))
@@ -282,18 +286,24 @@ module Hwaro
         # to prune the old files when an edit relocates the page's URL or
         # excludes the page from the site.
         private def collect_page_output_paths(page : Models::Page, output_dir : String) : Array(String)
+          # A `render = false` page writes nothing, so it owns nothing: an
+          # edit that turns rendering off must orphan the file it wrote.
+          return [] of String unless page.render
           paths = [get_output_path(page, output_dir)].compact
           if cfg = @config
             paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
+            if mirror = Content::Seo::Amp.mirror_output_for(page, cfg, output_dir)
+              paths << mirror
+            end
           end
           paths
         end
 
-        # Delete output files an incremental rebuild has orphaned (slug
-        # change, page newly excluded), pruning directories the deletion
-        # leaves empty. Guarded so a corrupt path can never delete outside
-        # the output directory, including through a symlinked parent. Mirrors
-        # Server#remove_stale_outputs.
+        # Delete output files, pruning directories the deletion leaves empty.
+        # Guarded so a corrupt path can never delete outside the output
+        # directory, including through a symlinked parent. Serve prunes reach
+        # this only through `prune_unclaimed_outputs`, which decides WHAT is
+        # stale; this only does the deleting.
         private def delete_orphaned_outputs(paths : Array(String), output_dir : String)
           paths.each do |path|
             next unless Utils::OutputGuard.safe_to_delete_file?(path, output_dir)
@@ -304,11 +314,243 @@ module Hwaro
             dir = File.dirname(path)
             while Utils::OutputGuard.safe_to_delete_directory?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
               Dir.delete(dir)
+              forget_created_dirs(dir)
               dir = File.dirname(dir)
             end
           rescue ex
             Logger.debug "  Could not remove stale output #{path}: #{ex.message}"
           end
+        end
+
+        # Run one taxonomy generation pass, then delete the files the previous
+        # pass on this builder wrote and this one did not: a term whose last
+        # post was deleted, re-tagged or drafted, with its feed and pagination
+        # pages, or a whole taxonomy dropped from config.toml.
+        #
+        # Paths are compared relative to `output_dir`, so a pass into a
+        # different output directory matches nothing and deletes nothing. A
+        # file the current site renders a page to is never deleted, and
+        # neither is anything when the pass raised (the previous set is kept
+        # and widened, so the next complete pass still sees it).
+        def track_taxonomy_outputs(output_dir : String, & : -> Array(Models::Section)) : Array(Models::Section)
+          @generated_claims_mutex.synchronize { @taxonomy_pass_outputs = Set(String).new }
+          begin
+            sections = yield
+          rescue ex
+            finish_taxonomy_pass(output_dir, completed: false)
+            raise ex
+          end
+          finish_taxonomy_pass(output_dir, completed: true)
+          sections
+        end
+
+        private def finish_taxonomy_pass(output_dir : String, completed : Bool) : Nil
+          written = @generated_claims_mutex.synchronize do
+            current = @taxonomy_pass_outputs || Set(String).new
+            @taxonomy_pass_outputs = nil
+            current
+          end
+          relative = written.compact_map { |path| Path[path].relative_to(output_dir).to_s rescue nil }.to_set
+          previous = @last_taxonomy_outputs
+          unless completed
+            @last_taxonomy_outputs = previous ? previous | relative : relative
+            return
+          end
+          @last_taxonomy_outputs = relative
+          prune_stale_taxonomy_outputs(previous - relative, output_dir) if previous
+        end
+
+        private def prune_stale_taxonomy_outputs(stale : Set(String), output_dir : String) : Nil
+          return if stale.empty?
+          prune_unclaimed_outputs(stale.map { |relative| File.join(output_dir, relative) }, output_dir)
+        end
+
+        # Delete the alias stubs and `/page/N/` files a page's previous render
+        # wrote and its render in the pass that just finished did not, plus
+        # every derived file of a page that is no longer in the site
+        # (deleted, drafted, `render = false`). Called once a render pass is
+        # complete, never per page: a stub one page dropped may be exactly
+        # the file another page claims in the same pass, so nothing a live
+        # page or any current stub still claims is deleted.
+        def sweep_stale_derived_outputs(output_dir : String) : Nil
+          site = @site
+          return unless site
+          live = Set(String).new
+          (site.pages + site.sections).each { |page| live << page.path if page.render }
+
+          stale = [] of String
+          @page_derived_mutex.synchronize do
+            pass = @derived_outputs_this_pass
+            @derived_outputs_this_pass = {} of String => Array(String)
+            pass.each do |page_path, derived|
+              if previous = @rendered_derived_outputs[page_path]?
+                stale.concat(previous - derived)
+              end
+              @rendered_derived_outputs[page_path] = derived
+            end
+            @rendered_derived_outputs.reject! do |page_path, derived|
+              next false if live.includes?(page_path)
+              stale.concat(derived)
+              true
+            end
+          end
+          prune_unclaimed_outputs(stale, output_dir)
+        end
+
+        # The one choke point every serve prune deletes through. `candidates`
+        # are files an earlier pass wrote that the bookkeeping of THIS pass no
+        # longer names; each is deleted only when nothing in the current
+        # output still stands on it:
+        #
+        #   * a page output of the current site (`owned_output_paths`);
+        #   * an alias stub / pagination page any page's render recorded;
+        #   * a generated-output claim — only while the claim set is this
+        #     build's own (`@generated_claims_current`): an incremental pass
+        #     re-claims nothing, so there the set still names the very files
+        #     being pruned;
+        #   * a file this pass wrote (`written_this_build?` — every serve pass
+        #     re-stamps the epoch, see `begin_serve_pass`);
+        #   * a live `static/` or `content/` file that publishes at that path,
+        #     which is what an incremental pass cannot learn from its claims.
+        #     A static source's bytes are copied back over the stale file —
+        #     it was shadowing them, and a cold build publishes them there.
+        #
+        # Paths are compared through `kept_output?`, which also treats a spelling
+        # that differs only by case as kept when it is the same file on disk
+        # (a case-folding filesystem: APFS, NTFS).
+        def prune_unclaimed_outputs(candidates : Enumerable(String), output_dir : String) : Nil
+          return if candidates.empty?
+          cwd = Dir.current
+          exact = Set(String).new
+          folded = {} of String => Array(String)
+          kept = owned_output_paths(output_dir).to_a
+          kept.concat(bundle_asset_outputs(output_dir))
+          @page_derived_mutex.synchronize do
+            {@rendered_derived_outputs, @derived_outputs_this_pass, @page_derived_outputs}.each do |recorded|
+              recorded.each_value { |paths| kept.concat(paths) }
+            end
+          end
+          kept.concat(generated_output_claims.to_a) if @generated_claims_current
+          kept.each { |path| keep_output(path, cwd, exact, folded) }
+
+          stale = [] of String
+          candidates.to_a.uniq.each do |path|
+            next if kept_output?(path, cwd, exact, folded) || written_this_build?(path)
+            relative = output_relative(path, output_dir, cwd)
+            if relative && (source = static_source_for(relative))
+              # The stale file was sitting on top of a static copy — a cold
+              # build publishes the static bytes there, so put them back.
+              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(path))
+              atomic_copy(source, path)
+            elsif relative && content_source_publishes?(relative)
+              # Same for a `[content.files]` copy; left as is rather than
+              # re-copied, since raw files may be processed (minified) on the
+              # way out.
+            else
+              stale << path
+            end
+          end
+          delete_orphaned_outputs(stale, output_dir) unless stale.empty?
+        end
+
+        # Add `path` to the keep-set of `prune_unclaimed_outputs`: exact
+        # expanded paths, plus an index by case-folded key.
+        private def keep_output(path : String, cwd : String, exact : Set(String), folded : Hash(String, Array(String))) : Nil
+          expanded = expand_output_path(path, cwd)
+          return unless exact.add?(expanded)
+          (folded[expanded.downcase] ||= [] of String) << expanded
+        end
+
+        # A candidate is kept when it names a kept path exactly, or — the
+        # filesystem may fold case (APFS, NTFS) — when it differs only by case
+        # AND is the very same file on disk. The second test keeps both
+        # filesystem kinds right: on a folding one `posts/Foo/` and
+        # `posts/foo/` are one file, so deleting the old spelling would remove
+        # the new page; on a case-sensitive one they are two files, and the
+        # old spelling is stale.
+        private def kept_output?(path : String, cwd : String, exact : Set(String), folded : Hash(String, Array(String))) : Bool
+          expanded = expand_output_path(path, cwd)
+          return true if exact.includes?(expanded)
+          return false unless kept = folded[expanded.downcase]?
+          kept.any? do |other|
+            File.same?(expanded, other)
+          rescue File::Error
+            false
+          end
+        end
+
+        private def expand_output_path(path : String, cwd : String) : String
+          File.expand_path(path, cwd)
+        rescue ArgumentError
+          path
+        end
+
+        # Where the current site publishes its page-bundle assets — the same
+        # destination `process_assets` computes. A bundle page that moved or
+        # was drafted leaves its assets at the old URL; only these are live.
+        private def bundle_asset_outputs(output_dir : String) : Array(String)
+          outputs = [] of String
+          site = @site
+          return outputs unless site
+          (site.pages + site.sections).each do |page|
+            next if page.assets.empty? || !page.render
+            next unless url_path = url_output_path(page.url.lchop("/"))
+            bundle_dir = File.dirname(page.path)
+            dest_dir = File.join(output_dir, url_path)
+            page.assets.each do |asset|
+              outputs << File.join(dest_dir, Path[asset].relative_to(bundle_dir).to_s)
+            end
+          end
+          outputs
+        end
+
+        # Start an incremental serve pass: stamp the epoch `written_this_build?`
+        # reads, mark the claim set as a previous build's, and drop the mkdir
+        # memo (see `forget_created_dirs`).
+        private def begin_serve_pass : Nil
+          forget_created_dirs
+          mark_build_output_epoch
+          @generated_claims_current = false
+        end
+
+        # `path` relative to the output directory, or nil when it is outside.
+        private def output_relative(path : String, output_dir : String, cwd : String) : String?
+          relative = Path[File.expand_path(path, cwd)].relative_to(File.expand_path(output_dir, cwd)).to_s
+          return if relative.starts_with?("..") || relative == "."
+          relative
+        rescue ArgumentError
+          nil
+        end
+
+        # The live `static/` file that publishes verbatim at `relative`, if
+        # any — same eligibility as the static copy (not excluded, not a Sass
+        # source). Checked on disk, so the filesystem's own case rule applies.
+        private def static_source_for(relative : String) : String?
+          source = File.join("static", relative)
+          return unless File.file?(source) && publishable_static_info(source)
+          return if static_publish_config.excluded?(relative)
+          return if @config.try(&.sass_source?(relative))
+          source
+        end
+
+        # True when `[content.files]` publishes a `content/` file verbatim at
+        # `relative` — the raw copy a cold build makes. A page-bundle asset is
+        # NOT this: it publishes under its page's URL (`bundle_asset_outputs`).
+        private def content_source_publishes?(relative : String) : Bool
+          config = @config
+          return false unless config && config.content_files.enabled?
+          File.file?(File.join("content", relative)) && config.content_files.publish?(relative)
+        end
+
+        # Rewrite the `[amp]` mirrors of pages an incremental strategy just
+        # re-rendered. The mirror is converted from the canonical HTML, and
+        # the conversion also injects `<link rel="amphtml">` into that HTML —
+        # only the full build's AfterRender hook ran it, so every incremental
+        # re-render dropped the link from the canonical page and left the
+        # mirror serving the pre-edit content.
+        private def regenerate_amp_mirrors(pages : Enumerable(Models::Page), site : Models::Site, output_dir : String, verbose : Bool) : Nil
+          return unless site.config.amp.enabled
+          Content::Seo::Amp.generate(pages.to_a, site.config, output_dir, verbose, builder: self)
         end
 
         # Resolve `path` relative to `root`, falling back to a plain prefix

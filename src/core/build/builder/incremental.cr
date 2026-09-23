@@ -58,6 +58,7 @@ module Hwaro
 
           Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..." if options.verbose
           start_time = Time.instant
+          begin_serve_pass
           clear_broken_internal_links
 
           output_dir = options.output_dir
@@ -265,8 +266,15 @@ module Hwaro
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
           raise_on_broken_internal_links!
+          regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
+          sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
+
+          # The 404 page renders site-wide listings too (a docs sidebar, the
+          # nav) and is never in the render set above — regenerate it so it
+          # doesn't keep printing the pre-edit titles. One page; always cheap.
+          generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
 
           # --- 5. Regenerate taxonomy index/term pages ---
           # Merge the generated taxonomy pages into the page set the SEO
@@ -297,6 +305,7 @@ module Hwaro
           end
 
           Logger.info "Re-parsing #{changed_content_files.size} changed file(s) before full re-render..."
+          begin_serve_pass
 
           output_dir = options.output_dir
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -603,7 +612,7 @@ module Hwaro
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
               stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
-              delete_orphaned_outputs(stale, output_dir)
+              prune_unclaimed_outputs(stale, output_dir)
             end
           end
 
@@ -612,7 +621,7 @@ module Hwaro
             next unless olds = old_output_paths[page.path]?
             relocated.concat(olds - collect_page_output_paths(page, output_dir))
           end
-          delete_orphaned_outputs(relocated, output_dir) unless relocated.empty?
+          prune_unclaimed_outputs(relocated, output_dir) unless relocated.empty?
         end
 
         # Re-render pages using reloaded templates without re-parsing content.
@@ -653,6 +662,7 @@ module Hwaro
           end
 
           start_time = Time.instant
+          begin_serve_pass
           clear_broken_internal_links
 
           # Reload templates from disk & reset all runtime caches.
@@ -821,9 +831,14 @@ module Hwaro
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
           raise_on_broken_internal_links!
+          regenerate_amp_mirrors(pages_to_render, site, output_dir, verbose)
 
-          # Re-generate 404 page with new template
-          if affected_templates.nil? || affected_templates.includes?("404")
+          # Re-generate the 404 page with the new template — and whenever
+          # content moved: it renders the same site-wide listings (a docs
+          # sidebar, the nav) as every other page, so a retitled page or
+          # section left it printing the old names.
+          if affected_templates.nil? || affected_templates.includes?("404") ||
+             (force_pages && !force_pages.empty?) || membership_changed
             generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
           end
 
@@ -868,6 +883,7 @@ module Hwaro
             end
           end
 
+          sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
 
           elapsed = Time.instant - start_time
@@ -912,6 +928,7 @@ module Hwaro
 
           Logger.info "Fast-start: background-rendering #{pages.size} deferred page(s)..."
           start_time = Time.instant
+          begin_serve_pass
 
           output_dir = options.output_dir
           minify = options.minify
@@ -967,6 +984,7 @@ module Hwaro
           # rescues this and routes it into the error overlay via
           # notify_build_error; the server keeps running.
           raise_on_broken_internal_links!
+          regenerate_amp_mirrors(renderable, site, output_dir, verbose)
 
           # Refresh feeds / sitemap / search now that every page has rendered
           # content. Without this, feed descriptions and the search index
@@ -985,6 +1003,7 @@ module Hwaro
           # already saved once; without this second save, killing the server
           # before any watch rebuild loses the deferred pages' cache entries
           # and the next `--cache` cold start has to re-render them.
+          sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
 
           # Clear the stash so a second call is a no-op and subsequent

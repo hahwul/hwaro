@@ -20,6 +20,17 @@ module Hwaro
   module Content
     class Taxonomies
       def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false, builder : Core::Build::Builder? = nil) : Array(Models::Section)
+        # A caller-supplied builder may have run an earlier pass into this
+        # same output directory (the serve session's builder); it removes
+        # what that pass wrote and this one no longer does. See
+        # `Builder#track_taxonomy_outputs`.
+        return generate_untracked(site, output_dir, templates, verbose, builder) unless builder
+        builder.track_taxonomy_outputs(output_dir) do
+          generate_untracked(site, output_dir, templates, verbose, builder)
+        end
+      end
+
+      private def self.generate_untracked(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool, builder : Core::Build::Builder?) : Array(Models::Section)
         config = site.config
         return [] of Models::Section if config.taxonomies.empty?
 

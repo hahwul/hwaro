@@ -256,6 +256,23 @@ module Hwaro::Core::Build::Phases::Write
   # "No such file or directory" under -Dpreview_mt. Two fibers may now both
   # mkdir_p the same new directory, but mkdir_p is idempotent and MT-safe, so
   # the worst case is one duplicate syscall, never a missing directory.
+  # The memo is only a hint that `dir` existed when this builder last made
+  # it. A serve session outlives that: pruning an orphaned output removes the
+  # directory it leaves empty (a slug edit, a removed alias), and the next
+  # rebuild writing back into it — the slug reverted — failed with ENOENT
+  # because the memo skipped the mkdir. Every rebuild entry point starts over
+  # (`forget_created_dirs`), and the builder's own pruning forgets exactly
+  # the directories it deletes.
+  private def forget_created_dirs(dir : String? = nil) : Nil
+    @created_dirs_mutex.synchronize do
+      if dir
+        @created_dirs.delete(dir)
+      else
+        @created_dirs.clear
+      end
+    end
+  end
+
   private def ensure_dir(dir : String)
     return if @created_dirs_mutex.synchronize { @created_dirs.includes?(dir) }
     Hwaro::Utils::FileSafe.mkdir_p(dir)
