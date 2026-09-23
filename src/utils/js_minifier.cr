@@ -159,25 +159,7 @@ module Hwaro
               # operators, punctuation, or keywords like return/typeof/in/etc.
               if regex_context?(chars, i)
                 # Regex literal — pass through unchanged
-                io << c
-                i += 1
-                while i < len
-                  rc = chars[i]
-                  io << rc
-                  if rc == '\\' && i + 1 < len
-                    i += 1
-                    io << chars[i]
-                  elsif rc == '/'
-                    # Consume regex flags (g, i, m, s, u, y)
-                    i += 1
-                    while i < len && chars[i].ascii_letter?
-                      io << chars[i]
-                      i += 1
-                    end
-                    break
-                  end
-                  i += 1
-                end
+                i = scan_regex(chars, i, len, io)
                 next
               end
             end
@@ -353,20 +335,31 @@ module Hwaro
       end
 
       # Scan a regex literal beginning at chars[i] == '/'. Appends it (and its
-      # flags) verbatim and returns the index just past the literal. Mirrors the
-      # main loop's regex handling, including its limitation of not modelling
-      # `[...]` character classes (an unescaped `/` inside a class still ends the
-      # literal) — kept identical so behaviour matches the top-level scanner.
+      # flags) verbatim and returns the index just past the literal. Used by
+      # the main loop and inside `${...}` interpolations alike.
+      #
+      # An unescaped `/` inside a `[...]` character class does not end the
+      # literal (`/[^\\/]*\//`): ending it there left the class's tail to the
+      # main loop, where the literal's closing `\//` read as a `//` comment and
+      # swallowed the rest of the line. A line break always ends the scan — a
+      # regex literal cannot contain one — so a misclassified division can
+      # never run on past its own line.
       private def scan_regex(chars, i : Int32, len : Int32, lb : String::Builder) : Int32
         lb << chars[i] # opening /
         i += 1
+        in_class = false
         while i < len
           c = chars[i]
+          break if c == '\n' || c == '\r'
           lb << c
           if c == '\\' && i + 1 < len
             i += 1
             lb << chars[i]
-          elsif c == '/'
+          elsif c == '['
+            in_class = true
+          elsif c == ']'
+            in_class = false
+          elsif c == '/' && !in_class
             i += 1
             while i < len && chars[i].ascii_letter?
               lb << chars[i]

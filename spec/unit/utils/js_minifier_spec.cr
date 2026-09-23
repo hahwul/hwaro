@@ -650,6 +650,16 @@ describe Hwaro::Utils::JsMinifier do
       Hwaro::Utils::JsMinifier.minify("v = of / 2 // note\nw = 1").should eq("v = of / 2\nw = 1")
     end
 
+    # Regression: an unescaped `/` inside a regex character class ended the
+    # literal early, and its real closing `\//` then read as a `//` comment
+    # that dropped the rest of the line (npm's own `/^[^\\/]*\//` broke).
+    it "keeps a slash inside a regex character class" do
+      src = "const p = path.replace(/^[^\\\\/]*\\//, '')\nnext()"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      Hwaro::Utils::JsMinifier.minify("var r = /[/]x/; // c\ngo()").should eq("var r = /[/]x/;\ngo()")
+      Hwaro::Utils::JsMinifier.minify("var t = `${ s.replace(/[/]/g, '-') }` // c").should eq("var t = `${ s.replace(/[/]/g, '-') }`")
+    end
+
     it "leaves a counterfeit out-of-range JSPL placeholder token intact" do
       # A real template literal makes protected_spans non-empty so the restore
       # gsub actually runs; the bogus \x00JSPL999\x00 token has an out-of-range
