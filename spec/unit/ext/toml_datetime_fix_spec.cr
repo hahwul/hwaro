@@ -18,3 +18,21 @@ describe "TOML datetime lexing (ext/toml_datetime_fix)" do
     expect_raises(TOML::ParseException) { TOML.parse("a = 2024-03-05T10:20:30.Z") }
   end
 end
+
+describe "TOML offset date-times (ext/toml_datetime_fix)" do
+  # Regression: the offset was converted away to UTC, so TOML front matter
+  # printed a different calendar day than the same value written in YAML.
+  it "keeps the author's offset, like YAML" do
+    t = TOML.parse("a = 2024-03-05T08:20:30+09:00")["a"].raw.as(Time)
+    t.offset.should eq(9 * 3600)
+    t.day.should eq(5)
+    t.hour.should eq(8)
+    t.should eq(YAML.parse("a: 2024-03-05T08:20:30+09:00")["a"].raw.as(Time))
+
+    neg = TOML.parse("a = 2024-03-05T08:20:30-05:30")["a"].raw.as(Time)
+    neg.offset.should eq(-(5 * 3600 + 30 * 60))
+    neg.to_utc.should eq(Time.utc(2024, 3, 5, 13, 50, 30))
+
+    TOML.parse("a = 2024-03-05T08:20:30Z")["a"].raw.as(Time).utc?.should be_true
+  end
+end

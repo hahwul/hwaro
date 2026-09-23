@@ -10,7 +10,15 @@
 # date aborted the build with HWARO_E_CONTENT. Digits past nanoseconds are
 # truncated, as the TOML spec permits.
 #
-# Remove when: upstream accepts arbitrary fractional-second precision.
+# An offset date-time (`2024-03-05T08:20:30+09:00`) was converted to UTC and
+# the offset thrown away. The instant survived, but everything that prints a
+# calendar date — `page.date`, `date` filters, sitemap `lastmod`, `tool
+# convert` output — saw `2024-03-04`, while the same value in YAML front
+# matter (Crystal's YAML keeps the offset) printed `2024-03-05`. The offset is
+# now kept as a fixed-offset location, exactly as YAML parses it.
+#
+# Remove when: upstream accepts arbitrary fractional-second precision and
+# keeps offsets.
 
 require "toml"
 
@@ -101,10 +109,13 @@ class TOML::Lexer
 
     if local_time
       time = Time.local(year.to_i32, month, day, hour, minute, second, nanosecond: nanosecond)
+    elsif hour_offset && minute_offset
+      # Keep the author's offset (see the header); `Z` stays UTC below.
+      offset = (hour_offset * 3600 + minute_offset * 60) * (negative ? -1 : 1)
+      time = Time.local(year.to_i32, month, day, hour, minute, second,
+        nanosecond: nanosecond, location: Time::Location.fixed(offset))
     else
       time = Time.utc(year.to_i32, month, day, hour, minute, second, nanosecond: nanosecond)
-      time += (negative ? hour_offset : -hour_offset).hours if hour_offset
-      time += (negative ? minute_offset : -minute_offset).minutes if minute_offset
     end
 
     @token.type = :TIME
