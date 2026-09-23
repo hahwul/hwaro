@@ -98,4 +98,83 @@ describe "serve orphaned outputs" do
       end
     end
   end
+
+  # Alias stubs and `/page/N/` files are recorded only in a page's `--cache`
+  # entry, so without `--cache` nothing ever deleted the ones a later render
+  # stopped writing — and incremental rebuilds skip the cache prune even with
+  # it.
+  it "removes an alias stub the page no longer declares (incremental)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        File.write("content/posts/keep.md", "---\ntitle: Keep\naliases: [/old-keep/]\n---\nkeep")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/old-keep/index.html").should be_true
+
+        File.write("content/posts/keep.md", "---\ntitle: Keep\n---\nkeep")
+        server.orphan_builder.run_incremental(["content/posts/keep.md"], options).should be_true
+
+        Dir.exists?("public/old-keep").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+  end
+
+  it "removes the alias stubs of a deleted page (full rebuild)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        File.write("content/posts/gone.md", "---\ntitle: Gone\naliases: [/old-gone/]\n---\ngone")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/old-gone/index.html").should be_true
+
+        File.delete("content/posts/gone.md")
+        server.orphan_builder.run(options).should be_true
+
+        Dir.exists?("public/old-gone").should be_false
+      end
+    end
+  end
+
+  it "keeps a stub another page takes over in the same rebuild" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        File.write("content/posts/gone.md", "---\ntitle: Gone\naliases: [/moved/]\n---\ngone")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+
+        File.write("content/posts/gone.md", "---\ntitle: Gone\n---\ngone")
+        File.write("content/posts/keep.md", "---\ntitle: Keep\naliases: [/moved/]\n---\nkeep")
+        server.orphan_builder.run(options).should be_true
+
+        File.read("public/moved/index.html").should contain("/posts/keep/")
+      end
+    end
+  end
+
+  it "removes a pagination page a shrinking section no longer fills" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        File.write("content/posts/_index.md", "---\ntitle: Posts\npaginate: 1\n---\n")
+        File.write("templates/section.html", "<html><body>{{ section.title }}</body></html>")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/posts/page/2/index.html").should be_true
+
+        File.write("content/posts/_index.md", "---\ntitle: Posts\npaginate: 5\n---\n")
+        server.orphan_builder.run_incremental(["content/posts/_index.md"], options).should be_true
+
+        Dir.exists?("public/posts/page/2").should be_false
+        File.exists?("public/posts/index.html").should be_true
+      end
+    end
+  end
 end

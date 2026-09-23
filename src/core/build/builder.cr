@@ -358,6 +358,16 @@ module Hwaro
         # worker fiber.
         @page_derived_outputs : Hash(String, Array(String)) = {} of String => Array(String)
         @page_derived_mutex : Mutex = Mutex.new
+        # The derived files (see above) each page's LAST render wrote, and
+        # those the running pass has recorded so far. The cache entry is the
+        # only other record, and it is pruned only by a `--cache` build's
+        # Finalize — so a `hwaro serve` session kept serving an alias stub
+        # after the alias was removed (or its page deleted or drafted) and a
+        # `/page/N/` a shrinking section no longer fills. Diffed by
+        # `sweep_stale_derived_outputs` once a render pass has finished.
+        # Guarded by @page_derived_mutex.
+        @rendered_derived_outputs : Hash(String, Array(String)) = {} of String => Array(String)
+        @derived_outputs_this_pass : Hash(String, Array(String)) = {} of String => Array(String)
         # Taxonomy index/term/pagination/feed files the PREVIOUS taxonomy
         # generation wrote, and the set the running one is collecting (nil
         # outside a pass). The Finalize prune covers these only on a `--cache`
@@ -482,9 +492,14 @@ module Hwaro
           @page_derived_mutex.synchronize { @page_derived_outputs.delete(page_path) }
         end
 
-        # Take (and forget) what this page derived.
+        # Take (and forget) what this page derived, remembering it as what the
+        # page's render in this pass wrote (see `@derived_outputs_this_pass`).
         def take_page_derived_outputs(page_path : String) : Array(String)
-          @page_derived_mutex.synchronize { @page_derived_outputs.delete(page_path) } || [] of String
+          @page_derived_mutex.synchronize do
+            derived = @page_derived_outputs.delete(page_path) || [] of String
+            @derived_outputs_this_pass[page_path] = derived
+            derived
+          end
         end
 
         # Access cache manager for external inspection

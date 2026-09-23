@@ -266,6 +266,7 @@ module Hwaro
           end
           raise_on_broken_internal_links!
 
+          sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
 
           # --- 5. Regenerate taxonomy index/term pages ---
@@ -868,6 +869,7 @@ module Hwaro
             end
           end
 
+          sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
 
           elapsed = Time.instant - start_time
@@ -985,6 +987,7 @@ module Hwaro
           # already saved once; without this second save, killing the server
           # before any watch rebuild loses the deferred pages' cache entries
           # and the next `--cache` cold start has to re-render them.
+          sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
 
           # Clear the stash so a second call is a no-op and subsequent

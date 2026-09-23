@@ -358,6 +358,47 @@ module Hwaro
           delete_orphaned_outputs(paths, output_dir)
         end
 
+        # Delete the alias stubs and `/page/N/` files a page's previous render
+        # wrote and its render in the pass that just finished did not, plus
+        # every derived file of a page that is no longer in the site
+        # (deleted, drafted, `render = false`). Called once a render pass is
+        # complete, never per page: a stub one page dropped may be exactly
+        # the file another page claims in the same pass, so nothing a live
+        # page or any current stub still claims is deleted.
+        def sweep_stale_derived_outputs(output_dir : String) : Nil
+          site = @site
+          return unless site
+          live = Set(String).new
+          (site.pages + site.sections).each { |page| live << page.path if page.render }
+
+          stale = [] of String
+          claimed = @page_derived_mutex.synchronize do
+            pass = @derived_outputs_this_pass
+            @derived_outputs_this_pass = {} of String => Array(String)
+            pass.each do |page_path, derived|
+              if previous = @rendered_derived_outputs[page_path]?
+                stale.concat(previous - derived)
+              end
+              @rendered_derived_outputs[page_path] = derived
+            end
+            @rendered_derived_outputs.reject! do |page_path, derived|
+              next false if live.includes?(page_path)
+              stale.concat(derived)
+              true
+            end
+            @rendered_derived_outputs.values.flatten
+          end
+          return if stale.empty?
+
+          cwd = Dir.current
+          keep = Set(String).new
+          claimed.each { |path| keep << File.expand_path(path, cwd) }
+          generated_output_claims.each { |path| keep << File.expand_path(path, cwd) }
+          owned_output_paths(output_dir).each { |path| keep << File.expand_path(path, cwd) }
+          stale = stale.uniq.reject { |path| keep.includes?(File.expand_path(path, cwd)) }
+          delete_orphaned_outputs(stale, output_dir) unless stale.empty?
+        end
+
         # Resolve `path` relative to `root`, falling back to a plain prefix
         # strip when it can't be made relative (e.g. an absolute path).
         private def path_relative_to(path : String, root : String) : String

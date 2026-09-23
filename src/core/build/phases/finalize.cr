@@ -9,6 +9,9 @@ module Hwaro::Core::Build::Phases::Finalize
     profiler.start_phase("Finalize")
     result = @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
       build_cache = @cache || raise "Cache not initialized"
+      # Serve rebuilds keep their output directory; see
+      # `sweep_stale_derived_outputs` (a no-op on the first build).
+      sweep_stale_derived_outputs(ctx.options.output_dir)
       if ctx.options.cache
         prune_orphaned_cached_outputs(ctx, build_cache)
         build_cache.save
