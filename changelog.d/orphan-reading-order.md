@@ -1,2 +1,0 @@
-### Fixed
-- Prev/next (`page.lower` / `page.higher`) for pages in a section without an `_index.md` followed the filesystem's directory order, so the chain differed between hosts, and `hwaro serve` re-rendered untouched pages after an edit because its relink saw a different order than the build. Such pages are now ordered like a section's own pages (the default `date` sort, path tiebreak), grouped by section

@@ -17,7 +17,6 @@ just check              # crystal tool format --check + bin/ameba   (CI gates on
 just fix                # crystal tool format + bin/ameba --fix
 just baseline           # build main into ../hwaro-baseline/bin/hwaro
 just verify             # byte-identity gate: baseline vs bin/hwaro (add --serve --deploy)
-just changelog          # merge changelog.d/ fragments into CHANGELOG.md (--check to validate)
 just dev                # serve the docs site (bin/hwaro serve -i docs)
 ```
 
@@ -129,9 +128,9 @@ registration-order spec tells you if a merge broke it.
   `Dir.mktmpdir`.
 
 ## Changelog and docs
-- Do not edit `CHANGELOG.md` in a PR; add `changelog.d/<slug>.md` with
-  `### Added|Changed|Deprecated|Removed|Fixed|Security` headings and bullets
-  (see `changelog.d/README.md`). `just changelog` merges them at release time.
+- Do not edit `CHANGELOG.md` in a PR; it is written at release time from the
+  git history, so commit messages and PR descriptions should say what changed
+  for users.
 - User-facing changes update the docs site in both languages:
   `docs/content/**.md` and the matching `.ko.md`.
 - PRs that resolve issues use `Closes #N` / `Fixes #N`.

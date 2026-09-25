@@ -54,8 +54,7 @@ spec/
   functional/             end-to-end builds through Builder#run and the bin/hwaro binary
 docs/                     the documentation site (built with hwaro itself; en + ko)
 scripts/                  verify_byte_identity.sh, check_no_toplevel_effects.sh,
-                          changelog_assemble.cr, benchmark_run.cr, version_*.cr
-changelog.d/              one changelog fragment per PR (see its README)
+                          benchmark_run.cr, version_*.cr
 ```
 
 ## Build pipeline
@@ -167,8 +166,7 @@ Touch the files in the order listed; the last column says where the test lives.
 | a deploy target kind | `services/deployer/command_target.cr` (`auto_command_for_url`) or `directory_sync.cr` → `docs/content/deploy/` | `spec/unit/services/deployer_service_spec.cr` |
 | a Sass builtin | `assets/sass/functions.cr` | `spec/unit/assets/sass/functions_spec.cr` |
 
-Also, every PR: a fragment in `changelog.d/` (not `CHANGELOG.md`), and bilingual
-docs (`.md` + `.ko.md`) when user-facing.
+Also, every PR: bilingual docs (`.md` + `.ko.md`) when user-facing.
 
 ## Invariants worth knowing before editing
 
