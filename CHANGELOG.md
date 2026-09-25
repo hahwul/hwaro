@@ -1,5 +1,122 @@
 # Changelog
 
+## Unreleased
+
+### Security
+- `[[data.remote]]` keeps configured headers dropped for the rest of a redirect chain once a redirect leaves the original origin. A third-party host could previously redirect back to the origin and choose which origin URL received the credential.
+- Prevent stale output cleanup from deleting files through symlinked directories outside the configured output directory.
+
+### Fixed
+- `hwaro build --cache`: remove outputs no longer produced after a generator version change.
+- Keep generated `robots.txt` and `404.html` when static files at those paths are removed.
+- CLI writers now refuse symlinks that escape their project roots. `init` checks every scaffold destination before writing, so a refused run leaves the target untouched, and keeps existing entries (such as a `templates/` link to a shared theme) without refusing them. Import follows file links within the site directory it is given and skips (and counts) those outside it; export skips links outside the project, while deploy follows links within the project or resolved source root and skips targets outside both. Conversion preserves in-project symlink behavior and skips targets outside the project. `tool agents-md --write` writes through an `AGENTS.md` symlink resolving inside the project (such as `AGENTS.md -> CLAUDE.md`) and refuses one resolving outside it.
+- A known `config.toml` section written in the wrong shape (`highlight = false` instead of a `[highlight]` table, `taxonomies = ["tags"]` instead of `[[taxonomies]]` entries) is now reported. It was ignored with no feedback, and so was a `[[taxonomies]]` entry without a `name`. The backward-compatible `sitemap = true` short form is still accepted without a warning.
+- Environment variables substituted into a double-quoted `config.toml` string are inserted verbatim: a value with a `"` no longer fails the config load, and a backslash (a Windows path) is no longer re-read as an escape (`C:\new` became a newline). `$VAR` inside a `#` comment is no longer substituted or warned about. Placeholders outside strings (`paginate = ${N}`) still insert raw TOML.
+- Every option documented as a list of strings accepts a single string as a one-item list. `[sitemap] exclude = "/private/"`, `[search] exclude`/`fields`, `[feeds] sections`, `[amp] sections`, `[build] hooks.pre`/`hooks.post` and others silently dropped a single string. Private pages stayed in the sitemap and search index, AMP applied to every section, and the hook never ran. An empty string (an unset `${VAR:-}`) still leaves the option unset, and a value that is neither a string nor an array keeps the default with a warning.
+- A typo, a mistyped section or a NUL byte in `config.<env>.toml` is reported against that file instead of `config.toml`.
+- `[markdown] math_engine` and `[feeds] type` accept any casing (`"MathJax"`, `"Atom"`) and warn about an unknown value. An unrecognised math engine loaded no renderer, so formulas shipped as raw TeX, and an unknown feed type was published as RSS without a word.
+- A `[permalinks]` rule whose target is not a string (a number, or a dotted key such as `blog.news = "news"` that TOML reads as a nested table) is reported instead of silently ignored.
+- `[og] fb_app_id` accepts an unquoted numeric id. It was dropped, and no `fb:app_id` meta tag was emitted.
+- The docs listed `[llms] enabled` as defaulting to `false` (it is `true`) and a language's `taxonomies` as `[]` (it inherits every `[[taxonomies]]` name). They also claimed nested section keys are validated, which they are not.
+- Hugo and Jekyll exports now parse JSON front matter, preserving metadata and respecting draft filtering; malformed JSON headers report export errors.
+- `tool list`, `tool convert`, `tool check-links`, `tool stats`, `tool validate`, and `tool unused-assets` reject unexpected positional arguments, including arguments after `--`, instead of silently ignoring them.
+- Markdown: allow optional whitespace between `:::` and container type name in custom containers.
+- Markdown: support case-insensitive alert types in GitHub/Obsidian admonition syntax (`> [!note]`, `> [!tip]`, etc.).
+- Importers: support importing standalone root-level and subfolder markdown pages in Jekyll importer.
+- Code health: normalize `require` path in HTML filter.
+- JS minification: a regex literal after an expression keyword (`return /\/*$/.test(u)`) was read as division, and a `/*` or `//` in its body swallowed the rest of the file, including every later file of the bundle
+- JS minification: a `/` inside a regex character class (`/^[^\\/]*\//`) no longer ends the literal early and turns its closing `\//` into a line comment
+- CSS minification: dropping a comment between two tokens of a declaration value no longer fuses them (`margin:1px/**/2px` became `1px2px`, and `font:12px/**/Arial` lost its family). Selectors and at-rule preludes are unchanged: `div/**/p` does not become the descendant selector `div p`
+- HTML minification: `<link href=/favicon.ico />` no longer becomes `href=/favicon.ico/`. The space before `/>` is kept after an unquoted attribute value
+- HTML minification: comments and line-final spaces inside attribute values are left alone (`data-x="<!-- keep -->"` used to become empty)
+- Asset pipeline: relative `url(...)` values in bundled CSS are rebased onto the bundle's location when they point at a file beside the source stylesheet in `static/` (`url(img/x.png)` from `static/css/a.css` used to 404 from `/assets/`). Text inside CSS strings and comments is left alone
+- SEO: a page-bundle `image = "cover.png"` now resolves to the bundle asset in `og:image`, `twitter:image`, JSON-LD and `seo.og_image`, instead of `/cover.png`
+- SEO: the path of a site-relative `og:image`, `twitter:image` and JSON-LD image URL is percent-encoded like `og:url`. A `?query` or `#fragment` is kept as written, and external image URLs are left untouched on all three
+- Taxonomies: `render = false` pages no longer appear on term pages, term feeds or `get_taxonomy`, which linked a page that is never written
+- Templates: the root `_index.md` now fills `section.pages`, `paginator.pages` and `section.pages_count` with its pages, as `section.list` and `get_section` already did
+- Templates: the root `_index.md`'s `section.subsections` now lists the top-level sections. `site.sections` and `get_section` keep the root entry without subsections, and prev/next order is unchanged
+- Multilingual: a file with an explicit default-language suffix (`about.en.md`) is now treated like the unsuffixed default. It used to drop out of its section's `section.pages`, and a suffixed `_index.en.md` listed none of its unsuffixed pages
+- Feeds: section feeds now include pages from `transparent` subsections, matching the section's `section.pages`
+- SEO: `redirect_to` pages are left out of `sitemap.xml`, including its hreflang alternates, RSS/Atom feeds, `search.json` and `llms.txt`
+- Series: series are now grouped per language (and per version), so a post and its translation sharing a `series` name no longer interleave into one series with the wrong `series_index`
+- Templates: `section.subsections` (and `get_section(...).subsections`) are ordered by `weight` then path, the same order the prev/next chain walks. They used to follow file discovery order
+- Section listings no longer show a page whose output lost a duplicate-URL collision, so each URL is listed once
+- `build --cache`: retitling a child section's `_index.md` now re-renders the parent section's listing, including the homepage for a top-level section
+- `tool check-links`: scan `.markdown` files and match Markdown extensions case-insensitively like the build (`post.MD` is scanned, resolves `/post/`, and counts toward pagination bounds).
+- Content tools: include uppercase Markdown files when listing, validating, and collecting asset references.
+- `tool validate`: normalize titled and angle-bracket internal links, and report raw HTML `<img>` elements that have no `alt` attribute (`alt=""` is accepted as decorative). HTML comments and indented code blocks are no longer scanned for images or links, matching `tool check-links`.
+- `tool platform cloudflare`: generate the Cloudflare Pages `pages_build_output_dir` setting, and point the redirects note at `static/_redirects` (a `public/_redirects` is deleted by the next build).
+- `tool check-links` and `tool validate`: resolve `@/` links through the same lookup as the build (exact, case-sensitive content path of a page a default build publishes; no percent-decoding, path normalization or extension/`_index.md` guessing), so links to drafts, `@/UPPER.md` on case-insensitive filesystems, `@/./x.md`, `@/../x` and `@/posts/` are reported instead of passed. `tool validate` now also reports an empty `@/` link.
+- TOML: fractional seconds of any precision (`2024-03-05T10:20:30.123Z`) parse instead of failing the build with "expected microsecond digit"
+- TOML: an offset date-time keeps its UTC offset, so `date = 2024-03-05T08:20:30+09:00` prints `2024-03-05` like the same value in YAML front matter, instead of the previous day in UTC
+- TOML: an out-of-range UTC offset (`+25:00`, `+23:99`) is a parse error, like any other malformed value
+- Feeds: an authored midnight with an explicit offset (`2024-03-05T00:00:00+09:00`) keeps its instant in `<pubDate>` / `<updated>`; only a date-only value is re-anchored to UTC midnight
+- TOML: a local time (`t = 07:32:00`) is read as that string, instead of being dated to the day the build ran; an out-of-range local time is a parse error instead of a crash
+- `tool import hugo`: JSON front matter is read (it used to land in the body); a leaf bundle with `slug` stays a bundle under the slugged directory (or in its own directory, with a warning, when the slug names another bundle); `url` maps to `path`
+- `tool import jekyll`: a literal `permalink` maps to `path`, `redirect_from` to `aliases`, `last_modified_at` to `updated`, and `image: {path: …}` to `image`
+- Imported `url` / `permalink` values: a `.html` address becomes an extensionless `path` plus an alias, a trailing `index.html` maps to its directory, a query/fragment is dropped, and a URL naming another kind of file is left unmapped with a warning
+- `tool export hugo`: `path` maps to `url`
+- `tool export jekyll`: `path`, `aliases` and `updated` map to `permalink`, `redirect_from` and `last_modified_at`
+- `hwaro build` rejects unexpected positional arguments (`hwaro build mysite`) instead of silently ignoring them and building the current directory.
+- `--cache` builds no longer keep publishing files whose source is gone: a deleted `static/` file, a deleted `[content.files]`/raw file, and a page-bundle asset removed from its bundle are now dropped from the output directory, and fingerprinted asset bundles no longer accumulate one stale `main.<hash>.css` per edit.
+- `--cache`: a `static/` file that publishes to a page's URL (`static/about/index.html` beside `content/about.md`) no longer replaces that page's rendered HTML on a warm build — the page is re-rendered, exactly as on a cold build where the render runs after the static copy.
+- `--cache`: the stale-output prune never deletes a file the build itself wrote, so a `static/robots.txt` or `static/404.html` that shadows a generated file can be removed without taking the generated output with it.
+- `--cache`: a `static/` file that lands on an `aliases` redirect stub or a section's `/page/N/` pagination page no longer replaces it on warm builds — those files are written only by a render, so the owning page is re-rendered too.
+- `hwaro serve`: a static save that lands on a file a page renders escalates to a full rebuild instead of leaving the static bytes on that URL for the rest of the session.
+- `--stream --cache`: warm builds re-render cache-hit page content again, so `search.json`, `rss.xml` and taxonomy feeds no longer ship raw `{% shortcode %}` markup, unresolved `@/` links or un-prefixed subpath URLs.
+- A page whose `aliases` entry escapes the output directory is no longer counted in the build receipt's "not published" row or in `--json`'s `pages_not_published`; the page itself published fine. An alias refused for resolving outside the output directory now warns instead of vanishing silently.
+- A page bundle whose URL traverses out of the output directory no longer creates a stray directory beside it, and a bundle whose assets are all skipped no longer leaves an empty destination directory.
+- A failing `[build] hooks.pre` command now exits with `HWARO_E_CONFIG` (exit 3) and names the hook, instead of the `HWARO_E_INTERNAL` / exit 70 reserved for hwaro's own faults.
+- `--full` without `--cache` warns that it has no effect instead of silently doing nothing.
+- The asset pipeline no longer leaves an empty `assets/` directory in the output when no bundle is produced.
+- The listing-template source memo is keyed by the template snapshot itself rather than its `object_id`, so a reloaded snapshot at a recycled address can no longer serve the previous snapshot's cache-invalidation decisions.
+- `hwaro serve` re-renders pages that print a global listing — the homepage's "latest posts", an archive, a nav built from `site.menus`, a tag pill resolved through `get_taxonomy_url` — when an edit moves what that listing reads. Retitling a post used to leave every such page showing the pre-edit title until an unrelated save happened to re-render it. Each kind of listing is gated on a fingerprint of its own inputs, so a post edit refreshes the homepage without dragging every page that merely renders the shared nav into the rebuild.
+- `hwaro serve` rebuilds `.markdown` pages on save. They were classified as content assets, whose republish path drops page extensions, so editing one rebuilt nothing at all and the served HTML stayed stale for the whole session.
+- `hwaro serve` watches a configured `[assets] source_dir` that lives outside `static/`. Bundle sources there produced no watch event, so a fingerprinted CSS/JS bundle kept serving its pre-edit bytes for the whole session.
+- `hwaro serve` answers a non-canonical directory URL (`//posts/`, `/posts//`, `/./posts/`) with a redirect to `/posts/` instead of `/posts/index.html`. The `index.html` rewrite used to leak into the canonicalising redirect, producing a URL the site never links to and no static host emits.
+- `hwaro serve` returns 404 for a request path whose percent-escapes decode to invalid UTF-8 (`/%c0%ae%c0%ae/`), matching what a static host does. It previously answered a 302 whose `Location` had every undecodable byte replaced with U+FFFD.
+- The serve watch timeline names the config file that actually changed, so an edit to a `config.<env>.toml` overlay is no longer reported as `config.toml`.
+- Serve rebuild receipts read "1 page" rather than "1 pages".
+- Markdown with a very long single line no longer fails to render with `Regex match error: JIT stack limit reached` (build exit 4). Examples are an HTML tag with tens of thousands of attributes (inline or as a block), a 100k-character HTML comment, a long link label or `<…>` destination, or a run of unclosed link titles such as `[a](b (` repeated thousands of times, including in reference definitions. The affected markd patterns are now possessive or replaced by a linear scanner that returns exactly what the regex did, so ordinary Markdown renders byte-for-byte as before.
+- A line of thousands of unclosed inline links (`[a](` repeated) or unclosed link titles now renders in linear time: 32,000 of them take about 40 ms in a release build, where 16,000 took minutes. Every failed link used to entity-decode the whole rest of the line, and markd re-scanned and re-validated it once per bracket.
+- Long paragraphs build in linear time. markd copied the whole paragraph for every added line, and re-sliced it after every link reference definition. A paragraph of 20,000 consecutive definitions now renders in 75 ms instead of 7 s (release build).
+- A very long email-like autolink (`<a@b.b.b…>`) no longer fails with the same JIT stack error.
+- Markdown task lists, custom heading IDs, and heading attributes now work inside blockquotes.
+- Markdown extension delimiters no longer rewrite inline-link or reference-definition destinations and titles, or raw HTML tag attributes. Raw `<pre>`, `<script>`, `<style>`, and `<textarea>` blocks and indented code inside list items (at any nesting depth) stay literal to the Markdown extensions; shortcodes still expand inside raw HTML blocks.
+- External link policies now handle case-insensitive and single-quoted raw HTML attributes without duplicating `rel`.
+- Template `unique` preserves distinct values with different types.
+- Template `default` returns its fallback with the fallback's own type (`default(value=0) + 1` is arithmetic; a `none` fallback still renders as an empty string), and passes a non-empty array, map, or object through instead of printing its internal representation. Other non-empty values are still returned as strings.
+- Prev/next (`page.lower` / `page.higher`) for pages in a section without an `_index.md` followed the filesystem's directory order, so the chain differed between hosts, and `hwaro serve` re-rendered untouched pages after an edit because its relink saw a different order than the build. Such pages are now ordered like a section's own pages (the default `date` sort, path tiebreak), grouped by section
+- `hwaro build --cache` removes the page of a `[[content.generate]]` record that disappeared from its data. Generated pages have no source file, so nothing recorded their output and the page stayed published and deployed on every later warm build.
+- `hwaro serve` drops a page's `<!-- more -->` summary once the marker is deleted. The re-parse kept the old marker summary, so every listing showed it instead of the description or automatic excerpt until restart.
+- `hwaro serve` refreshes the version switcher (`page.version_links`) and an old version's canonical link when a counterpart in another version is re-slugged, drafted or turned `render = false`. The unchanged version's page kept linking and canonicalizing to a URL that no longer existed.
+- `hwaro serve` refreshes translation links (`page.translations`, the language switcher, sitemap hreflang alternates) when one translation is re-slugged or retitled. The other languages' pages, and the edited page's own switcher, kept the old URL and title.
+- `hwaro build --cache` removes search outputs the `[search]` config no longer publishes: `search.json` after `single_file = false` or a `filename` change, the `search/` shard directory after `shards = "none"`, and everything once search is disabled.
+- `hwaro build --cache` and `hwaro serve` stop publishing sitemap, feed and llms files the config no longer produces: `sitemap.xml` once `[sitemap]` is disabled or renamed, the main feed once `[feeds]` is disabled, a section feed once the section drops `generate_feeds` (including through an incremental serve edit), a language feed once the language stops generating one, and `llms.txt` / `llms-full.txt` once disabled. Only a cold build removed them before.
+- `hwaro serve` writes the versioned parent redirect stub (`/docs/` → the latest version's root, `[versions] latest_at_root = false`) as soon as an authored `content/docs/_index.md` is drafted. The incremental rebuild re-rendered only pages whose switcher links moved, not the latest root that gained the alias, and still counted the drafted page as the URL's owner, so `/docs/` returned 404 until a full rebuild.
+- `hwaro serve` removes a taxonomy term page (with its feed and pagination pages) once no page carries the term — after the last tagged post is deleted, drafted or re-tagged, or the taxonomy is dropped from `config.toml`. Only a `--cache` full build pruned these before, so a plain serve session kept serving `/tags/<old>/` until restart.
+- `hwaro serve` removes an alias redirect stub once the page no longer declares it (or is deleted or drafted), and a section's `/page/N/` file once the section no longer fills that page.
+- `hwaro serve` regenerates `404.html` on incremental content rebuilds. It renders the same site-wide listings as every page (a docs sidebar, the nav), but kept printing the pre-edit titles until a full rebuild.
+- `hwaro serve` keeps `[amp]` mirrors in step with incremental rebuilds: a re-rendered page keeps its `<link rel="amphtml">`, its mirror shows the edit, and a deleted, drafted or moved page takes its mirror with it.
+- `hwaro serve` without `--cache` drops generated outputs a rebuild no longer publishes: the superseded `main.<hash>.css` after every stylesheet save, and the whole `amp/` tree once `[amp]` is switched off.
+- `hwaro serve` removes the old output of a page a full rebuild moved (`slug`, `path`, a permalink rule), drafted or turned `render = false`. Any config or data edit, or a file added alongside the edit, runs a full rebuild, and those rebuilds never looked at the previous site's pages. An incremental `render = false` edit removes the page's file too.
+- `hwaro serve` removes stale output through one check: a file stays while a page, an alias stub, a static or content-file copy, or anything written by the current rebuild still publishes at that path. A spelling that differs only by case counts as the same path when it is the same file on disk, so on case-insensitive filesystems (APFS, NTFS) an alias, slug or taxonomy renamed only by case keeps its pages, while case-sensitive filesystems still drop the old spelling. A moved or drafted page-bundle page no longer leaves its assets at the old URL unless `[content.files]` publishes them there. When a stale file was covering a `static/` file at the same path, the static copy is restored, as a cold build would publish it.
+- `hwaro serve` no longer fails a rebuild with `No such file or directory` when a page moves back into a directory an earlier rebuild pruned (a `slug` edited and then reverted, `render = false` turned back off).
+- Shortcode positional arguments retain explicitly empty values in their parameter slots.
+- `get_section()` resolves translated section names against the current page language.
+- Raw shortcode blocks remain protected when they contain fenced code.
+- Identical shortcode templates report errors against their own source files.
+
+### Changed
+- A TOML offset date-time keeps its written offset, so date permalink tokens (`:year`/`:month`/`:day`) and year/month grouping now use the written calendar day. A URL built from the old UTC day can move (e.g. `/2024/02/29/` → `/2024/03/01/`); add the old URL to `aliases` to keep it working
+- Builds are substantially faster, with byte-identical HTML output: 5000-page listing-heavy corpus −37%, 5000-page blog corpus −14%, the docs site −29%. Small sites are unchanged.
+- OG images and generated PNG variants now deflate through zlib instead of stb's bundled compressor. The images are pixel-identical and about 24% smaller, and encoding them is faster — cached OG images stay valid and are not regenerated.
+- The sitemap, feed, llms and search files are now recorded in the `--cache` metadata. Rolling back to an older dev binary with the same version number after a `--cache` build can therefore drop those files for one build; they regenerate on the next.
+
+### Added
+- Shortcodes: add optional `start` parameter (timestamp in seconds) to built-in `youtube` shortcode (#629).
+
+
 ## v0.20.2
 
 ### Added
