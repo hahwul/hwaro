@@ -408,6 +408,12 @@ module Hwaro
         # @generated_claims_mutex.
         @last_feed_outputs : Set(String)? = nil
         @taxonomy_pass_outputs : Set(String)? = nil
+        # Content-relative directories that host a bundle index (`index.md` /
+        # `_index.md`, any language) as READ — before draft/future/expiry
+        # filtering. A directory here whose index pages all failed the filter
+        # is a withheld bundle: its files must not publish through the raw
+        # lane either (see Phases::Write#withheld_content_file?).
+        @content_index_dirs : Set(String) = Set(String).new
 
         def initialize
           @lifecycle = Lifecycle::Manager.new

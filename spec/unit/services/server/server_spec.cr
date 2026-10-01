@@ -2100,6 +2100,41 @@ describe "Builder incremental methods" do
         end
       end
     end
+
+    it "does not republish an edited asset of a draft bundle" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content", "posts", "secret"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+
+        File.write(File.join(dir, "config.toml"), <<-TOML
+          title = "Test"
+          base_url = "http://localhost"
+
+          [content.files]
+          allow_extensions = ["jpg"]
+          TOML
+        )
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "posts", "secret", "index.md"),
+          "+++\ntitle = \"S\"\ndraft = true\n+++\nx\n")
+        File.write(File.join(dir, "content", "posts", "secret", "product.jpg"), "OLD")
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new)
+
+          published = File.join(dir, "public", "posts", "secret", "product.jpg")
+          File.exists?(published).should be_false
+
+          File.write(File.join(dir, "content", "posts", "secret", "product.jpg"), "NEW")
+          builder.copy_changed_content_files(["content/posts/secret/product.jpg"], File.join(dir, "public"), false)
+
+          File.exists?(published).should be_false
+          builder.reject_withheld_content_sources(["content/posts/secret/product.jpg"]).should be_empty
+        end
+      end
+    end
   end
 
   describe "#run_incremental" do

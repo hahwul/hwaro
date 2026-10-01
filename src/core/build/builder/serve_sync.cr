@@ -185,6 +185,7 @@ module Hwaro
           end
 
           copied = 0
+          withheld = withheld_bundle_dirs
           changed_files.each do |src_path|
             next unless File.exists?(src_path)
             next if File.directory?(src_path)
@@ -192,6 +193,9 @@ module Hwaro
             relative = path_relative_to(src_path, "content")
 
             next unless config.content_files.publish?(relative)
+            # Same rule as the full build's raw lane: an edited asset of a
+            # draft / future / expired bundle stays unpublished.
+            next if withheld_content_file?(relative, withheld)
 
             dest_path = File.join(output_dir, relative)
             unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
@@ -205,6 +209,14 @@ module Hwaro
             copied += 1
           end
           Logger.outcome("copied", "#{copied} content #{copied == 1 ? "file" : "files"}") if copied > 0
+        end
+
+        # `content/` source paths minus the files of withheld (draft / future /
+        # expired) bundles — see Phases::Write#withheld_content_file?.
+        def reject_withheld_content_sources(paths : Array(String)) : Array(String)
+          withheld = withheld_bundle_dirs
+          return paths if withheld.empty?
+          paths.reject { |path| withheld_content_file?(path_relative_to(path, "content"), withheld) }
         end
 
         # Map source paths that were removed from disk to the output files
@@ -539,7 +551,8 @@ module Hwaro
         private def content_source_publishes?(relative : String) : Bool
           config = @config
           return false unless config && config.content_files.enabled?
-          File.file?(File.join("content", relative)) && config.content_files.publish?(relative)
+          File.file?(File.join("content", relative)) && config.content_files.publish?(relative) &&
+            !withheld_content_file?(relative)
         end
 
         # Rewrite the `[amp]` mirrors of pages an incremental strategy just

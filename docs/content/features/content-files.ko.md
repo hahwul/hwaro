@@ -47,6 +47,14 @@ content/
 
 파일은 대응하는 출력 경로로 그대로 복사되며, `content/` 접두사는 자동으로 제거됩니다.
 
+### 게시되지 않는 번들
+
+게시되지 않는 페이지의 페이지 번들 안에 있는 파일도 복사되지 않습니다. 초안(`--drafts`로 빌드하지 않은 경우), 날짜가 미래인 페이지(`--include-future` 없이), 만료된 페이지(`--include-expired` 없이)가 해당합니다. 위 예시에서 `blog/my-post/index.md`에 `draft = true`를 설정하면 `diagram.svg`와 `screenshot.png`도 게시되지 않습니다. 게시되지 않는 번들 안에 중첩된, 게시되는 번들은 자신의 파일을 그대로 게시합니다.
+
+### JSON과 XML 파일
+
+`content/` 아래의 `.json`과 `.xml` 파일은 `allow_extensions`에 없어도 원본 파일로 게시됩니다(`--minify` 시 축소). 다만 아래의 차단 규칙(`disallow_extensions`, `disallow_paths`)과 위의 게시되지 않는 번들 규칙은 그대로 적용됩니다.
+
 ## 확장자 매칭
 
 ### 허용 목록
