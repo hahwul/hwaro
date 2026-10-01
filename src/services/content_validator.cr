@@ -196,6 +196,10 @@ module Hwaro
             # which already reaches them via its `{}` result.
             return ParsedFrontmatter.new({} of String => FrontmatterValue)
           rescue ex
+            # Prose between two thematic breaks (`---`, `*Note*: …`, `---`)
+            # is not front matter to the build, which renders it; only a
+            # block that looks like front matter is reported as broken.
+            return unless Utils::FrontmatterScanner.yaml_front_matter_like?(match[1])
             issues << Issue.new(id: "content-frontmatter-yaml-error", level: :error, category: "content", file: file_path,
               message: "YAML frontmatter parse error: #{ex.message}")
             return

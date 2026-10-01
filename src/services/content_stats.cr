@@ -220,7 +220,9 @@ module Hwaro
               return yaml_string_array(nested)
             end
           rescue ex : YAML::ParseException | ArgumentError
-            warn_unparsed_frontmatter(path, "YAML", ex)
+            # Prose after a thematic break is body text, not broken front
+            # matter (see FrontmatterScanner.yaml_front_matter?).
+            warn_unparsed_frontmatter(path, "YAML", ex) if Utils::FrontmatterScanner.yaml_front_matter_like?(source)
           end
         when :json
           # JSON front matter is a first-class dialect for the build, so a

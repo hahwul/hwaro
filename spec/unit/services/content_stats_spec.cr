@@ -379,5 +379,22 @@ describe Hwaro::Services::ContentStats do
         result.tags.should eq({"crystal" => 2, "web" => 2})
       end
     end
+
+    # The build counts a thematic-break note as body words and has no front
+    # matter to complain about; stats stripped it and warned.
+    it "counts prose between thematic breaks as body words without a warning" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        content = "---\n\n*Note*: imported from an old blog.\n\n---\n\nBody text here.\n"
+        File.write(File.join(content_dir, "hr-note.md"), content)
+
+        log = with_captured_log do
+          result = Hwaro::Services::ContentStats.new(content_dir).run
+          result.words_total.should eq(Hwaro::Utils::TextUtils.count_words(content))
+        end
+        log.should_not contain("frontmatter parse error")
+      end
+    end
   end
 end

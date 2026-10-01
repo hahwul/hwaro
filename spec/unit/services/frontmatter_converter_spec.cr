@@ -502,6 +502,22 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
 
+    # Same build decision for convert: prose between two thematic breaks is
+    # not front matter, so it is left alone instead of failing the run.
+    it "skips prose between thematic breaks instead of failing the run" do
+      Dir.mktmpdir do |dir|
+        file_path = File.join(dir, "hr-note.md")
+        content = "---\n\n*Note*: imported from an old blog.\n\n---\n\nBody text here.\n"
+        File.write(file_path, content)
+
+        result = Hwaro::Services::FrontmatterConverter.new(dir).convert_to_toml
+        result.success.should be_true
+        result.error_count.should eq(0)
+        result.skipped_count.should eq(1)
+        File.read(file_path).should eq(content)
+      end
+    end
+
     it "converts JSON file to YAML" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)

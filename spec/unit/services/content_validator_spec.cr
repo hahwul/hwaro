@@ -335,6 +335,22 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    # A page opening with a thematic break around a note is body text to the
+    # build, which renders it; reporting it as broken YAML failed validate
+    # (exit 5) on a tree that builds.
+    it "does not report prose between thematic breaks as broken YAML front matter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "hr-note.md"), "---\n\n*Note*: imported from an old blog.\n\n---\n\nBody text here.\n")
+        File.write(File.join(content_dir, "broken.md"), "---\ntitle: [unclosed\n---\nBody\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        errors = issues.select { |i| i.level == :error }
+        errors.map { |i| File.basename(i.file || "") }.should eq(["broken.md"])
+      end
+    end
+
     it "detects invalid date format" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
