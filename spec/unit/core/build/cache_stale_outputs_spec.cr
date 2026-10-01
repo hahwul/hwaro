@@ -460,6 +460,23 @@ describe "warm --cache builds" do
       end
     end
 
+    # ...while a static edit anywhere else keeps the skip: regenerating the
+    # SEO outputs also hydrates every cached page, which nearly doubled an
+    # all-hit warm build of the docs site for a changed image.
+    it "keeps skipping the SEO generators for a static edit elsewhere" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        File.write("static/logo.svg", "<svg/>")
+        cached_build
+        File.write("public/sitemap.xml", "SENTINEL")
+
+        File.write("static/logo.svg", "<svg>v2</svg>")
+        cached_build
+        File.read("public/logo.svg").should eq("<svg>v2</svg>")
+        File.read("public/sitemap.xml").should eq("SENTINEL")
+      end
+    end
+
     it "re-renders a page whose alias stub the static copy overwrote" do
       with_cached_site do
         FileUtils.mkdir_p("static/legacy")
