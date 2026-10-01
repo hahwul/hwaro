@@ -29,8 +29,10 @@ private def parity_project(dir : String)
   File.write(File.join(dir, "content", "_index.md"), "---\ntitle: H\n---\nBody")
 end
 
+# Both requirement ids: a missing `page` is an error, a missing `section`
+# a warning (sections then render through `page`).
 private def required_missing_count(dir : String) : Int32
-  parity_doctor(dir).run.count { |i| i.id == "template-required-missing" }
+  parity_doctor(dir).run.count { |i| i.id.in?("template-required-missing", "template-section-missing") }
 end
 
 describe Hwaro::Services::Doctor do
@@ -49,8 +51,8 @@ describe Hwaro::Services::Doctor do
       end
     end
 
-    # `page.html.jinja` loads as "page.html", NOT "page" — the build falls back
-    # to its built-in default and the file is never applied. Verified with a
+    # `page.html.jinja` loads as "page.html", NOT "page" — the file is never
+    # applied and pages render as raw, layout-less content. Verified with a
     # marker in the template body. Doctor must report it missing.
     {"jinja", "j2", "jinja2", "ecr"}.each do |ext|
       it "rejects page.html.#{ext} (loader name \"page.html\", never applied)" do

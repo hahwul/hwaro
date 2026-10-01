@@ -97,9 +97,9 @@ module Hwaro
       def run : Array(Issue)
         issues = [] of Issue
         config = check_config(issues)
-        check_templates(issues)
+        template_names = check_templates(issues)
         check_directory_structure(issues, config)
-        check_content_frontmatter(issues, config)
+        check_content_frontmatter(issues, config, template_names)
         if config
           check_referenced_paths(issues, config)
           check_sass(issues, config)

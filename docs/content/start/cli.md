@@ -514,12 +514,13 @@ severe issue reported, so CI pipelines can gate on it directly:
 |---|---|
 | No issues, warnings only, or info-level findings | `0` |
 | Config errors (missing/broken `config.toml`) | `3` (`HWARO_E_CONFIG`) |
-| Template errors (missing required file, unclosed tags) | `4` (`HWARO_E_TEMPLATE`) |
-| Content errors (malformed front matter, when the check lands) | `5` (`HWARO_E_CONTENT`) |
+| Template errors (missing `page.html`, unclosed tags) | `4` (`HWARO_E_TEMPLATE`) |
+| Content errors (malformed front matter, unreadable file) | `5` (`HWARO_E_CONTENT`) |
 | Other error-level issues | `1` |
 
 Warnings (empty `base_url`, trailing slash, duplicate taxonomy names, etc.)
-are advisory and never change the exit code.
+are advisory and do not change the exit code unless you pass `--strict` or
+`--max-warnings N`.
 
 For content validation, use `hwaro tool validate`. See [doctor](/start/tools/doctor/) for details.
 
