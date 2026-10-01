@@ -289,6 +289,38 @@ describe "tool publication-state parity" do
     end
   end
 
+  describe Hwaro::Services::GeneratedContent do
+    # A record missing the rule's `body` field fails every build; planning
+    # without bodies listed its rows (and the rule's healthy ones) as
+    # publishable with no hint that the build cannot run.
+    it "does not list rows of a rule whose body field fails the build" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("data")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "name"
+            body = "body"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "a", "name": "A", "body": "x"}, {"id": "b", "name": "B"}]))
+
+          infos = [] of Hwaro::Services::ContentInfo
+          log = with_captured_log { infos = Hwaro::Services::GeneratedContent.infos("content") }
+          infos.should be_empty
+          log.should contain("missing field 'body'")
+        end
+      end
+    end
+  end
+
   describe Hwaro::Services::ContentValidator do
     it "applies the tag-case convention to [taxonomies] tags" do
       Dir.mktmpdir do |dir|
