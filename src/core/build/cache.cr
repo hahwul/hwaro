@@ -183,6 +183,18 @@ module Hwaro
         @[JSON::Field(key: "generated_outputs", emit_null: false)]
         property generated_outputs : Array(String) = [] of String
 
+        # Digest of what templates read OUTSIDE the tracked files: the
+        # build-derived globals (asset-bundle manifest, auto-include tags and
+        # their `?v=`) plus the current value of every recorded render read
+        # (`env()` names, `load_data()` files, `resize_image()` sources —
+        # see `TemplateEngine.record_render_read`). Only the digest and the
+        # read KEYS are stored: an env value may be a secret. "" (a cache
+        # written before this existed) compares as unknown, not as a change.
+        @[JSON::Field(key: "render_inputs_hash", emit_null: false)]
+        property render_inputs_hash : String = ""
+        @[JSON::Field(key: "render_input_keys", emit_null: false)]
+        property render_input_keys : Array(String) = [] of String
+
         def initialize(@template_hash : String = "", @config_hash : String = "",
                        @page_set_hash : String = "", @section_set_hash : String = "")
         end
@@ -294,6 +306,40 @@ module Hwaro
           @metadata.template_hash = template_hash
           @metadata.config_hash = config_hash
           @metadata.output_dir = output_key unless output_key.empty?
+        end
+
+        # The render reads the last build recorded (see
+        # `CacheMetadata#render_input_keys`).
+        def render_input_keys : Array(String)
+          @mutex.synchronize { @metadata.render_input_keys.dup }
+        end
+
+        # Compare the current render-inputs digest (computed over
+        # `render_input_keys`) with the last build's. A change invalidates
+        # every entry, like a config edit: the reads are global, and a cached
+        # page cannot say which of them it made. Returns true when it did.
+        def check_render_inputs(digest : String) : Bool
+          return false unless @enabled
+          @mutex.synchronize do
+            stored = @metadata.render_inputs_hash
+            next false if stored.empty? || stored == digest
+            Logger.info "  Cache: template inputs (env, load_data, images, assets) changed — invalidating all entries."
+            discard_entries_recording_outputs
+            @dirty = true
+            true
+          end
+        end
+
+        # Persist this build's render-inputs digest and the read keys it
+        # covers; marks the cache dirty only when either moved.
+        def record_render_inputs(digest : String, keys : Array(String)) : Nil
+          return unless @enabled
+          @mutex.synchronize do
+            next if @metadata.render_inputs_hash == digest && @metadata.render_input_keys == keys
+            @metadata.render_inputs_hash = digest
+            @metadata.render_input_keys = keys
+            @dirty = true
+          end
         end
 
         # Has the global page set (content page metadata that listings render —

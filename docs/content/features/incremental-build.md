@@ -66,6 +66,12 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
   page's template closure. Since a hook isn't reached via a page's
   `{% include %}`/`{% extends %}` graph, editing one re-renders **every**
   page rather than a narrowed set.
+- **Template inputs** — what templates read outside the tracked files: the
+  fingerprinted `asset()` bundle names, the `[auto_includes]` tags and their
+  `?v=` digest, `env()` values, `load_data()` files outside `data/`, and the
+  source images behind `resize_image()`. A change to any of them re-renders
+  **all** pages. Only the variable names, file paths and a digest are stored in
+  `.hwaro_cache.json` — never an environment variable's value.
 
 Template dependency tracking requires every template reference to be a string
 literal. If any template uses a dynamic reference (`{% include some_var %}`),

@@ -25,6 +25,18 @@ module Hwaro
         @@lqip_map = {} of String => Hash(String, String)
         @@lqip_map_mutex = Mutex.new
 
+        # Class-level map: original_url => source image file the variants are
+        # cut from. Guarded by @@resize_map_mutex and replaced with it. Lets
+        # `resize_image()` report which file a page's output depends on, so a
+        # `--cache` build notices when that image is replaced (see
+        # `TemplateEngine.record_render_read`).
+        @@source_map = {} of String => String
+        # Whether the last `image:resize` run processed images at all. When it
+        # did not (`enabled = false`, no widths, `--skip-image-processing`),
+        # `resize_image()` returns the URL it was given whatever the bytes,
+        # so the source is not a render input. Guarded by @@resize_map_mutex.
+        @@processing_active = false
+
         # Max number of concurrent image processing fibers
         CONCURRENCY = 8
 
@@ -62,6 +74,16 @@ module Hwaro
           @@resize_map_mutex.synchronize do
             @@resize_map[url]?.try { |m| m[width]? }
           end
+        end
+
+        # Source file behind `url` as of the last `image:resize` run, or nil
+        # when no image job covered it.
+        def self.processing_active? : Bool
+          @@resize_map_mutex.synchronize { @@processing_active }
+        end
+
+        def self.source_path_for(url : String) : String?
+          @@resize_map_mutex.synchronize { @@source_map[url]? }
         end
 
         def self.lqip_map : Hash(String, Hash(String, String))
@@ -118,6 +140,7 @@ module Hwaro
           url_prefix : String
 
         private def process_images(ctx : Core::Lifecycle::BuildContext)
+          @@resize_map_mutex.synchronize { @@processing_active = false }
           config = ctx.config
           return unless config
           if ctx.options.skip_image_processing
@@ -126,6 +149,7 @@ module Hwaro
           end
           return unless config.image_processing.enabled
           return if config.image_processing.widths.empty?
+          @@resize_map_mutex.synchronize { @@processing_active = true }
 
           start = ctx.profiler ? Time.instant : nil
 
@@ -187,9 +211,15 @@ module Hwaro
             end
           end
 
+          source_map = jobs.to_h { |job| {job.original_url, job.source_path} }
+
           if jobs_to_process.empty?
-            @@resize_map_mutex.synchronize { @@resize_map = new_map }
+            @@resize_map_mutex.synchronize do
+              @@resize_map = new_map
+              @@source_map = source_map
+            end
             @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+            claim_variants(ctx, jobs, new_map)
             Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
             return
           end
@@ -232,8 +262,12 @@ module Hwaro
           # Wait for all workers
           CONCURRENCY.times { done_channel.receive }
 
-          @@resize_map_mutex.synchronize { @@resize_map = new_map }
+          @@resize_map_mutex.synchronize do
+            @@resize_map = new_map
+            @@source_map = source_map
+          end
           @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+          claim_variants(ctx, jobs, new_map)
           # Count variants (widths × successful jobs), matching the pre-#389
           # meaning. Counting source images instead would silently halve/third
           # the number users see and make the "Generated N" line less useful
@@ -246,6 +280,24 @@ module Hwaro
           if (p = ctx.profiler) && start
             elapsed = (Time.instant - start).total_milliseconds
             p.record_asset_generation("image:resize", resized_count, reused_count, elapsed)
+          end
+        end
+
+        # Claim every variant file this build publishes (reused ones too — an
+        # unclaimed file is pruned on the next build). Variants are named by
+        # width, and the width set follows the source image (no variant is
+        # upscaled), so replacing `hero.png` with a bigger image wrote
+        # `hero_1024w.png` and left the old `hero_900w.png` published forever
+        # on a `--cache` build, which keeps the output directory. Claimed, the
+        # Finalize phase prunes the one this build no longer writes.
+        private def claim_variants(ctx : Core::Lifecycle::BuildContext, jobs : Array(ImageJob),
+                                   width_maps : Hash(String, Hash(Int32, String))) : Nil
+          builder = ctx.builder
+          return unless builder
+          jobs.each do |job|
+            width_maps[job.original_url]?.try &.each_value do |url|
+              builder.claim_generated_output(File.join(job.dest_dir, File.basename(url)))
+            end
           end
         end
 
