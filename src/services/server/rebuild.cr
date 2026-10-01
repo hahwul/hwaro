@@ -181,9 +181,15 @@ module Hwaro
         # Highlight and `[auto_includes]` asset tags carry a `?v=` digest of
         # these very files, printed into every page that references them;
         # the copy alone left every page on the old hash (and browsers on
-        # the cached bytes). Same reasoning as the fingerprint case above.
+        # the cached bytes). Only the layout moved — the digest lands in the
+        # global vars — so the pages re-render without the full build's
+        # re-parse, image and OG passes: this is the most frequent theming
+        # save, and a full build made each one a multi-second wait.
         if build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
-          Logger.info "  A cache-busted asset changed — rebuilding pages to update its ?v= hash."
+          Logger.info "  A cache-busted asset changed — re-rendering pages to update its ?v= hash."
+          if site = @builder.site
+            return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
+          end
           return run_full_build(build_options)
         end
         # A template reads one of the files through `load_data()`: the

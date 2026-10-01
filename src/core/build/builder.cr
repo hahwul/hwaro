@@ -843,7 +843,10 @@ module Hwaro
           # Human-readable reports (--profile, --debug) go to stderr under
           # --json: stdout must carry exactly one JSON document, and these
           # tables printed ahead of the build envelope made it unparseable.
-          report_io = CLI::Runner.json_mode? ? STDERR : STDOUT
+          # Through Logger's guarded streams: on a closed stdout (a serve whose
+          # reader went away) a raw STDOUT write failed the rebuild here, after
+          # the pages were written but before the post-build hooks.
+          report_io = CLI::Runner.json_mode? ? Logger.err_io : Logger.io
 
           # Print profiling report if enabled
           profiler.report(report_io)

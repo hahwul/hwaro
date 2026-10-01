@@ -476,12 +476,17 @@ module Hwaro
 
       def call(context)
         return call_next(context) unless context.request.method == "HEAD"
-        context.response.output = BodySink.new(context.response.output)
+        context.response.output = BodySink.new(context.response.output, context.response)
         call_next(context)
       end
 
+      # Counts what it drops: a response that set no Content-Length (the
+      # static handler's single-range 206) would otherwise go out as
+      # `Content-Length: 0` instead of the length the GET carries.
       private class BodySink < IO
-        def initialize(@io : IO)
+        @dropped = 0_i64
+
+        def initialize(@io : IO, @response : HTTP::Server::Response)
         end
 
         def read(slice : Bytes) : Int32
@@ -489,12 +494,17 @@ module Hwaro
         end
 
         def write(slice : Bytes) : Nil
+          @dropped += slice.size
         end
 
         def flush : Nil
         end
 
         def close : Nil
+          headers = @response.headers
+          if @dropped > 0 && !headers.has_key?("Content-Length") && !headers.has_key?("Transfer-Encoding")
+            @response.content_length = @dropped
+          end
           @io.close
         end
 

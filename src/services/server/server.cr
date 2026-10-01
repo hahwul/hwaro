@@ -488,11 +488,20 @@ module Hwaro
       protected def acquire_output_lock(output_dir : String) : Nil
         lock_path = "#{output_dir}.lock"
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(lock_path))
-        file = File.open(lock_path, "w")
+        # "a", not "w": truncating a file another process holds locked fails
+        # on Windows before the lock is even tried.
+        file = File.open(lock_path, "a")
         begin
           file.flock_exclusive(blocking: false)
-        rescue IO::Error
+        rescue ex : IO::Error
           file.close
+          # Only contention means another session. A filesystem without
+          # locking (NFS without lockd, some FUSE/shared-folder mounts) must
+          # not stop serve from starting — it just runs unguarded.
+          unless ex.os_error.in?(Errno::EAGAIN, Errno::EWOULDBLOCK)
+            Logger.warn "Could not lock #{lock_path} (#{ex.message}); running without the one-session guard."
+            return
+          end
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
             message: "Another 'hwaro serve' is already running for this project (it builds into #{output_dir})",
@@ -576,14 +585,27 @@ module Hwaro
         return "" unless path.starts_with?("/")
         path = path.rstrip("/")
         return "" if path.empty?
-        # Percent-encoded, the form browsers put on the request line, which is
-        # what BasePathHandler compares against and what the Location / ready
-        # URLs must carry. `URI.parse` keeps the path exactly as written, so a
-        # `--base-url http://host/문서/` mount matched no request at all and
-        # redirected `/` to raw UTF-8 bytes. Decoding first keeps an
+        # Percent-encoded the way browsers put it on the request line, which
+        # is what BasePathHandler compares against and what the Location /
+        # ready URLs must carry. `URI.parse` keeps the path exactly as
+        # written, so a `--base-url http://host/문서/` mount matched no
+        # request at all and redirected `/` to raw UTF-8 bytes. RFC 3986
+        # path characters stay as they are — browsers send `/c++/` raw, and
+        # encoding the `+` would 404 that mount. Decoding first keeps an
         # already-encoded `/my%20blog` unchanged.
-        URI.encode_path(URI.decode(path))
+        String.build do |io|
+          URI.decode(path).each_byte do |byte|
+            if byte < 0x80 && (byte.unsafe_chr.ascii_alphanumeric? || MOUNT_PATH_CHARS.includes?(byte.unsafe_chr))
+              io << byte.unsafe_chr
+            else
+              io << '%' << byte.to_s(16, upcase: true).rjust(2, '0')
+            end
+          end
+        end
       end
+
+      # RFC 3986 `pchar`s besides ALPHA / DIGIT, plus the segment separator.
+      MOUNT_PATH_CHARS = "-._~!$&'()*+,;=:@/"
 
       # Assemble the dev server's handler chain. Extracted from
       # `run_with_options` so specs can drive the real chain over a fixture

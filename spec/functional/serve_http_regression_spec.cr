@@ -232,6 +232,18 @@ end
       end
     end
 
+    it "reports the range length for a HEAD with Range" do
+      with_dev_server(base_path: mount || "") do |port, _|
+        headers = HTTP::Headers{"Range" => "bytes=0-9"}
+        head = dev_client(port, &.head(at.call("/large.txt"), headers))
+        get = dev_client(port, &.get(at.call("/large.txt"), headers))
+
+        head.status_code.should eq(206)
+        get.body.bytesize.should eq(10)
+        head.headers["Content-Length"].should eq(get.headers["Content-Length"]? || "10")
+      end
+    end
+
     it "reports the same Content-Length for HEAD and GET" do
       with_dev_server(base_path: mount || "") do |port, _|
         head_length = dev_client(port, &.head(at.call("/"))).headers["Content-Length"]

@@ -806,6 +806,8 @@ describe Hwaro::Services::Server do
       server.dev_fixes_base_path_for("http://127.0.0.1:3000/문서/").should eq("/%EB%AC%B8%EC%84%9C")
       server.dev_fixes_base_path_for("http://127.0.0.1:3000/%EB%AC%B8%EC%84%9C/").should eq("/%EB%AC%B8%EC%84%9C")
       server.dev_fixes_base_path_for("http://127.0.0.1:3000/my%20blog/").should eq("/my%20blog")
+      # Reserved characters reach the server raw; encoding them 404'd the mount.
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000/c++/").should eq("/c++")
     end
 
     it "yields an empty prefix for a domain-root or missing base_url" do
