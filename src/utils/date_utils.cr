@@ -4,17 +4,18 @@
 # not be merged:
 #
 # - `parse_lenient` is the RFC-3339-first, format-table parser used by
-#   importers and content listings, which read dates written by OTHER tools.
+#   importers, which read dates written by OTHER tools.
 # - `parse_content_date` mirrors the build's front-matter parser
 #   (`Processors::Markdown#parse_time` delegates here), which defines what
-#   a hwaro site itself accepts.
+#   a hwaro site itself accepts — so the content tools that report what a
+#   build will do (`tool list` / `tool stats`) use it too.
 
 module Hwaro
   module Utils
     module DateUtils
       extend self
 
-      # Formats accepted by content listings. Zone-bearing formats come
+      # Formats accepted by `parse_lenient`. Zone-bearing formats come
       # FIRST: Crystal's `Time.parse` ignores trailing input, so a zone-less
       # pattern would happily match `2026-07-01T10:00:00+09:00`, silently
       # drop the `+09:00`, and shift the instant by the whole offset.

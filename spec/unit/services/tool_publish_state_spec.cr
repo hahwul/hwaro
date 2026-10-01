@@ -99,6 +99,7 @@ describe "tool publication-state parity" do
         content_dir = File.join(dir, "content")
         blog = File.join(content_dir, "blog")
         FileUtils.mkdir_p(blog)
+        File.write(File.join(dir, "config.toml"), %(title = "S"\ndefault_language = "en"\n[languages.en]\n[languages.ko]\n))
         File.write(File.join(blog, "_index.md"),
           "+++\ntitle = \"Blog\"\n[cascade]\ndraft = true\n+++\n")
         File.write(File.join(blog, "post.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
@@ -126,6 +127,49 @@ describe "tool publication-state parity" do
         post = Hwaro::Services::ContentLister.new(content_dir)
           .list_content(Hwaro::Services::ContentFilter::All).find! { |i| i.title == "EN" }
         post.draft.should be_true
+      end
+    end
+
+    # ReadContent only reads a filename suffix as a language on a
+    # multilingual site and only for a DECLARED code. A shape-based guess
+    # read `setup.mac.md` (or `post.ko.md` on a single-language site) as a
+    # translation that escapes the section's cascade: listed as published
+    # while the build dropped it as a draft.
+    it "applies the cascade to suffixes the build does not read as languages" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        blog = File.join(content_dir, "blog")
+        FileUtils.mkdir_p(blog)
+        File.write(File.join(dir, "config.toml"), %(title = "S"\n))
+        File.write(File.join(blog, "_index.md"),
+          "+++\ntitle = \"Blog\"\n[cascade]\ndraft = true\n+++\n")
+        File.write(File.join(blog, "setup.mac.md"), "+++\ntitle = \"Mac\"\n+++\n")
+        File.write(File.join(blog, "post.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
+        File.write(File.join(blog, "about.en.md"), "+++\ntitle = \"EN\"\n+++\n")
+
+        by_title = Hwaro::Services::ContentLister.new(content_dir)
+          .list_content(Hwaro::Services::ContentFilter::All).to_h { |i| {i.title, i} }
+        by_title["Mac"].status.should eq("draft")
+        by_title["KO"].status.should eq("draft")
+        by_title["EN"].status.should eq("draft")
+      end
+    end
+
+    it "applies the cascade to an undeclared suffix on a multilingual site" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        blog = File.join(content_dir, "blog")
+        FileUtils.mkdir_p(blog)
+        File.write(File.join(dir, "config.toml"), %(title = "S"\n[languages.en]\n[languages.ko]\n))
+        File.write(File.join(blog, "_index.md"),
+          "+++\ntitle = \"Blog\"\n[cascade]\ndraft = true\n+++\n")
+        File.write(File.join(blog, "setup.mac.md"), "+++\ntitle = \"Mac\"\n+++\n")
+        File.write(File.join(blog, "post.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
+
+        by_title = Hwaro::Services::ContentLister.new(content_dir)
+          .list_content(Hwaro::Services::ContentFilter::All).to_h { |i| {i.title, i} }
+        by_title["Mac"].status.should eq("draft")
+        by_title["KO"].status.should eq("published")
       end
     end
 

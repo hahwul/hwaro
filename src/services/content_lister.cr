@@ -228,7 +228,7 @@ module Hwaro
 
       # Content directory path
       @content_dir : String
-      @default_language : String? = nil
+      @language_setup : LanguageSetup? = nil
       # Pre-planned `[[content.generate]]` entries (no files on disk for the
       # walker to find, but part of what a build publishes) — the list
       # command computes these; see ListCommand#generated_content_infos.
@@ -536,7 +536,7 @@ module Hwaro
 
         files.each do |file_path|
           basename = File.basename(file_path)
-          next unless basename.starts_with?("_index.")
+          next unless section_index?(basename)
           value = cascade_draft_value(file_path)
           next if value.nil?
           map[{relative_dir(file_path), language_token(basename)}] = value
@@ -588,7 +588,7 @@ module Hwaro
           end
         end
         # Cascade applies to descendants only.
-        chain.pop if basename.starts_with?("_index.")
+        chain.pop if section_index?(basename)
 
         result = false
         chain.each do |ancestor|
@@ -615,40 +615,86 @@ module Hwaro
       # language to `config.default_language`, so a file that spells the
       # DEFAULT code out (`about.en.md` on an `en` site) has to normalize to
       # the same bucket as `about.md` — otherwise the two stop sharing a
-      # section's cascade. The suffix test is shape-based: the build only
-      # routes suffixes that look like a language code anyway.
+      # section's cascade.
       private def language_token(basename : String) : String
-        stem = basename.sub(/\.(md|markdown)\z/, "")
-        parts = stem.split('.')
-        return "" if parts.size < 2
-        candidate = parts.last
-        return "" unless candidate.matches?(/\A[a-z]{2,3}(-[A-Za-z]{2,4})?\z/)
-        candidate == default_language ? "" : candidate
+        code = filename_language(basename)
+        return "" if code.nil? || code == language_setup.default
+        code
       end
 
-      # `default_language` from the project's `config.toml`, or `""` when
-      # there is none to read. Parsed directly rather than through
-      # `Models::Config` so the lister keeps taking nothing but a directory.
-      private def default_language : String
-        @default_language ||= read_default_language
+      # Mirrors `Phases::ReadContent#extract_language_from_filename`: the
+      # text between the last two dots is a language only on a multilingual
+      # site, and only when it is a DECLARED code (or the default). A
+      # shape-based guess read `setup.mac.md` — or `about.en.md` on a site
+      # with no `[languages]` — as a translation, so the file missed its
+      # section's `[cascade] draft = true` and was listed as published while
+      # the build dropped it.
+      private def filename_language(basename : String) : String?
+        setup = language_setup
+        return unless setup.multilingual
+        ext = File.extname(basename)
+        return if ext.empty?
+        stem = basename[0, basename.size - ext.size]
+        idx = stem.rindex('.')
+        return unless idx && idx > 0
+        code = stem[(idx + 1)..]
+        return if code.empty?
+        code if setup.codes.includes?(code) || code == setup.default
       end
 
-      private def read_default_language : String
+      # A section `_index` the way ReadContent decides it: the basename with
+      # any recognised language suffix removed is `_index` + extension. An
+      # undeclared suffix (`_index.old.md`) makes a regular page.
+      private def section_index?(basename : String) : Bool
+        ext = File.extname(basename)
+        clean = if code = filename_language(basename)
+                  "#{basename.rchop(".#{code}#{ext}")}#{ext}"
+                else
+                  basename
+                end
+        clean == "_index#{ext.downcase}"
+      end
+
+      private record LanguageSetup, default : String, codes : Set(String), multilingual : Bool
+
+      # The project's language configuration, read from its `config.toml`
+      # with the build's defaults (`default_language` falls back to "en").
+      # Parsed directly rather than through `Models::Config` so the lister
+      # keeps taking nothing but a directory.
+      private def language_setup : LanguageSetup
+        @language_setup ||= read_language_setup
+      end
+
+      private def read_language_setup : LanguageSetup
+        default = "en"
+        codes = Set(String).new
         parent = File.dirname(@content_dir.rstrip(File::SEPARATOR))
         {File.join(parent, "config.toml"), "config.toml"}.each do |path|
           next unless File.exists?(path)
           begin
-            return TOML.parse(Utils::TextUtils.strip_bom(File.read(path)))["default_language"]?.try(&.as_s?) || ""
+            raw = TOML.parse(Utils::TextUtils.strip_bom(File.read(path)))
+            default = raw["default_language"]?.try(&.as_s?) || default
+            # Config#load_languages only registers table-valued entries.
+            raw["languages"]?.try(&.as_h?).try &.each do |code, entry|
+              codes << code if entry.as_h?
+            end
           rescue
-            return ""
           end
+          break
         end
-        ""
+        all = codes.to_a
+        all << default unless default.empty?
+        LanguageSetup.new(default, codes, all.uniq.size > 1)
       end
 
+      # The build's own front-matter date parser (zone-less values in the
+      # local zone, the same accepted shapes), so a status and a `date` in
+      # the JSON payload agree with what `hwaro build` does. The lenient
+      # importer parser accepted shapes the build rejects — `"2099-01-01
+      # 10:00"` listed as `future` while the build treated it as undated and
+      # published it — and read zone-less values as UTC.
       private def parse_time(time_str : String?) : Time?
-        return unless time_str
-        Utils::DateUtils.parse_lenient(time_str)
+        Utils::DateUtils.parse_content_date(time_str)
       end
 
       # Cap a cell at `max_length` terminal COLUMNS. Measuring in codepoints
