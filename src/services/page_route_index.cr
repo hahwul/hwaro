@@ -47,13 +47,23 @@ module Hwaro
       @index_dirs = Set(String).new
 
       def initialize(content_dir : String, config : Models::Config?)
-        lister = ContentLister.new(content_dir, GeneratedContent.infos(content_dir))
-        lister.list_all.each do |info|
-          if info.generated_from
-            add_generated(info, config)
-          else
-            add_authored(info, content_dir, config)
+        # Reading every page through the build's parsers replays the build's
+        # diagnostics (unknown front-matter keys, unparseable dates, skipped
+        # generate rules). Those belong to `hwaro build` / `tool validate`;
+        # here they would bury the link report, one line per page.
+        previous = Logger.level
+        Logger.level = Logger::Level::Error
+        begin
+          lister = ContentLister.new(content_dir, GeneratedContent.infos(content_dir))
+          lister.list_all.each do |info|
+            if info.generated_from
+              add_generated(info, config)
+            else
+              add_authored(info, content_dir, config)
+            end
           end
+        ensure
+          Logger.level = previous
         end
       end
 

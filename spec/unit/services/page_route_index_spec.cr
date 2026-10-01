@@ -46,3 +46,19 @@ describe Hwaro::Services::PageRouteIndex do
     end
   end
 end
+
+describe Hwaro::Services::PageRouteIndex do
+  # The index reads every page through the build's front-matter parser,
+  # which warns about unknown keys and bad dates. Those warnings belong to
+  # `hwaro build`; replayed here they buried the check-links report.
+  it "does not replay the build's front-matter warnings" do
+    Dir.mktmpdir do |dir|
+      route_index_page(dir, "posts/typo.md", %(titel = "x"))
+
+      output = with_captured_log { Hwaro::Services::PageRouteIndex.new(dir, nil) }
+
+      output.should_not contain("titel")
+      Hwaro::Logger.level.should eq(Hwaro::Logger::Level::Info)
+    end
+  end
+end
