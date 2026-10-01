@@ -408,6 +408,47 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # The build's shortcode pass expands closed block shortcodes before
+      # Crinja parses the layout; every other unknown tag fails the build
+      # with Crinja's "no tag with name" error, so doctor must report it.
+      describe "unknown tags" do
+        syntax_errors = ->(page : String) do
+          Dir.mktmpdir do |dir|
+            config_path = File.join(dir, "config.toml")
+            File.write(config_path, base_config)
+            templates_dir = File.join(dir, "templates")
+            FileUtils.mkdir_p(templates_dir)
+            File.write(File.join(templates_dir, "page.html"), page)
+            File.write(File.join(templates_dir, "section.html"), "{{ content }}")
+
+            doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+            doctor.run.select(&.category.==("template"))
+          end
+        end
+
+        [
+          %({% alert(type="info") %}x{% end %}),
+          %({% alert type="info" %}x{% endalert %}),
+          %({% alert %}x{% end alert %}),
+        ].each do |page|
+          it "tolerates a closed block shortcode: #{page}" do
+            syntax_errors.call(page).should be_empty
+          end
+        end
+
+        [
+          %({% includ "footer.html" %}),
+          %({% alert(type="info") %}x),
+          %({% includ "footer.html" %}{% alert(type="info") %}x{% end %}),
+        ].each do |page|
+          it "reports an unknown tag the build cannot expand: #{page}" do
+            issues = syntax_errors.call(page)
+            issues.map(&.id).should eq(["template-syntax-error"])
+            issues.first.message.should contain("no tag with name")
+          end
+        end
+      end
+
       it "no template warnings when all valid" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
