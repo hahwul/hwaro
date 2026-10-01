@@ -316,6 +316,17 @@ describe Hwaro::Utils::FrontmatterWriter do
       TOML.parse(doc)["x"].should eq("")
     end
 
+    it "omits a null only for the named top-level keys" do
+      fields = {"slug" => YAML.parse("---\n"), "draft" => YAML.parse("---\n"), "extra" => YAML.parse("slug: ~\n")}
+      wrapped = {} of YAML::Any => YAML::Any
+      fields.each { |k, v| wrapped[YAML::Any.new(k)] = v }
+      doc = Hwaro::Utils::FrontmatterWriter::TomlBuilder.new(Set{"slug"}).build(YAML::Any.new(wrapped))
+      parsed = TOML.parse(doc)
+      parsed.has_key?("slug").should be_false
+      parsed["draft"].should eq("")
+      parsed["extra"]["slug"].should eq("")
+    end
+
     # Crystal spells these "Infinity"/"NaN", which TOML cannot reparse.
     it "spells non-finite floats the way TOML does" do
       doc = toml_build({

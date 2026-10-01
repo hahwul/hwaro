@@ -408,6 +408,47 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # The build's shortcode pass expands closed block shortcodes before
+      # Crinja parses the layout; every other unknown tag fails the build
+      # with Crinja's "no tag with name" error, so doctor must report it.
+      describe "unknown tags" do
+        syntax_errors = ->(page : String) do
+          Dir.mktmpdir do |dir|
+            config_path = File.join(dir, "config.toml")
+            File.write(config_path, base_config)
+            templates_dir = File.join(dir, "templates")
+            FileUtils.mkdir_p(templates_dir)
+            File.write(File.join(templates_dir, "page.html"), page)
+            File.write(File.join(templates_dir, "section.html"), "{{ content }}")
+
+            doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+            doctor.run.select(&.category.==("template"))
+          end
+        end
+
+        [
+          %({% alert(type="info") %}x{% end %}),
+          %({% alert type="info" %}x{% endalert %}),
+          %({% alert %}x{% end alert %}),
+        ].each do |page|
+          it "tolerates a closed block shortcode: #{page}" do
+            syntax_errors.call(page).should be_empty
+          end
+        end
+
+        [
+          %({% includ "footer.html" %}),
+          %({% alert(type="info") %}x),
+          %({% includ "footer.html" %}{% alert(type="info") %}x{% end %}),
+        ].each do |page|
+          it "reports an unknown tag the build cannot expand: #{page}" do
+            issues = syntax_errors.call(page)
+            issues.map(&.id).should eq(["template-syntax-error"])
+            issues.first.message.should contain("no tag with name")
+          end
+        end
+      end
+
       it "no template warnings when all valid" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
@@ -574,6 +615,21 @@ describe Hwaro::Services::Doctor do
 
           content = File.read(config_path)
           content.should contain("[og.auto_image]")
+        end
+      end
+
+      # An unquoted placeholder is documented ("numbers and booleans work")
+      # and is only TOML once substituted, which `Config.load` does first.
+      it "handles unquoted environment placeholders like Config.load does" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config("[pagination]\nenabled = true\nper_page = ${HWARO_DOCTOR_SPEC_UNSET_PER_PAGE:-10}\n"))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          doctor.run.map(&.id).should contain("missing-config-og")
+          summary = doctor.fix_config(approve_sections: true)
+          summary.sections_added.should contain("og")
+          File.read(config_path).should contain("per_page = ${HWARO_DOCTOR_SPEC_UNSET_PER_PAGE:-10}\n")
         end
       end
 
@@ -1765,6 +1821,29 @@ describe "sass diagnostics" do
       issue.should_not be_nil
       issue.not_nil!.level.should eq(:info)
       issue.not_nil!.message.should contain("1 SCSS entry file(s)")
+    end
+  end
+
+  # `[static] exclude` keeps the sources out of the output entirely, so the
+  # "they publish as raw .scss" advisory would be false.
+  it "does not count SCSS entries that [static] exclude keeps out of the output" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n\n[static]\nexclude = ["vendor/**"]\n))
+      FileUtils.mkdir_p(File.join(dir, "static", "css"))
+      FileUtils.mkdir_p(File.join(dir, "static", "vendor"))
+      File.write(File.join(dir, "static", "vendor", "lib.scss"), ".a { color: red; }")
+
+      doctor = Hwaro::Services::Doctor.new(
+        content_dir: File.join(dir, "content"),
+        config_path: config_path,
+        static_dir: File.join(dir, "static"),
+      )
+      doctor.run.any? { |i| i.id == "sass-disabled-with-sources" }.should be_false
+
+      File.write(File.join(dir, "static", "css", "style.scss"), ".a { color: red; }")
+      issue = doctor.run.find! { |i| i.id == "sass-disabled-with-sources" }
+      issue.message.should contain("1 SCSS entry file(s)")
     end
   end
 

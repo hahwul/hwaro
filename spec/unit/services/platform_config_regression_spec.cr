@@ -131,3 +131,52 @@ describe "PlatformConfig alias-scan stability" do
     end
   end
 end
+
+# Regression: an alias naming the page's own URL (the build skips it) was
+# emitted as a forced 301 from the page to itself — an endless redirect loop
+# that made the page unreachable on Netlify/Vercel.
+describe "PlatformConfig self-referencing aliases" do
+  it "skips aliases that resolve to the page's own URL" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/moved.md",
+          "---\ntitle: Moved\naliases:\n  - /posts/moved/\n  - /posts/moved\n  - posts/moved/index.html\n  - /old/\n---\nBody\n")
+
+        generator = Hwaro::Services::PlatformConfig.new(Hwaro::Models::Config.new)
+        netlify = generator.generate("netlify")
+        netlify.scan("[[redirects]]").size.should eq(1)
+        netlify.should contain("from = \"/old/\"")
+
+        vercel = JSON.parse(generator.generate("vercel"))
+        vercel["redirects"].as_a.map(&.["source"].as_s).should eq(["/old/"])
+      end
+    end
+  end
+end
+
+# Regression: the self-alias mirror compared URL strings only, so another
+# spelling of the page's own output file (`/posts/moved//`) still became a
+# 301 to itself; and aliases the build refuses (absolute, protocol-relative,
+# traversing) were emitted as host redirects although no stub exists.
+describe "PlatformConfig aliases the build does not publish" do
+  it "skips same-file spellings and refused aliases" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/moved.md",
+          "---\ntitle: Moved\naliases:\n  - /posts/moved//\n  - https://old.example/x\n  - //cdn.example/x\n  - /a/../b/\n  - /old/\n---\nBody\n")
+
+        generator = Hwaro::Services::PlatformConfig.new(Hwaro::Models::Config.new)
+        netlify = ""
+        log = with_captured_log { netlify = generator.generate("netlify") }
+        netlify.scan("[[redirects]]").size.should eq(1)
+        netlify.should contain("from = \"/old/\"")
+        log.should contain("Skipping alias \"https://old.example/x\"")
+
+        vercel = JSON.parse(generator.generate("vercel"))
+        vercel["redirects"].as_a.map(&.["source"].as_s).should eq(["/old/"])
+      end
+    end
+  end
+end

@@ -801,6 +801,20 @@ describe "check-links ember output" do
       output.should_not contain("✗")
     end
   end
+
+  # `URI#host` keeps an IPv6 literal's brackets (`[::1]`). The guard resolved
+  # that string, the lookup failed, a failed lookup read as "not private",
+  # and the client then connected to the loopback address anyway.
+  it "skips bracketed IPv6 loopback and IPv4-mapped literals" do
+    cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+    links = ["http://[::1]:1/admin", "http://[::ffff:127.0.0.1]:1/admin"].map do |url|
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(file: "test.md", url: url, kind: :external)
+    end
+
+    results = cmd.check_links_concurrently_for_test(links, 2, 2)
+
+    results.map(&.error).should eq(["Skipped: private/internal address"] * 2)
+  end
 end
 
 describe "check-links redirect and dedup behavior" do

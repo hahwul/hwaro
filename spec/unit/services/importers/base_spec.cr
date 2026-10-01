@@ -123,6 +123,40 @@ describe Hwaro::Services::Importers::Base do
       importer = TestImporter.new
       importer.test_parse_date("not-a-date").should be_nil
     end
+
+    it "does not misread a month-and-year string as a day of year 22" do
+      importer = TestImporter.new
+      importer.test_parse_date("May 2022").should be_nil
+      importer.test_parse_date("July 8 2022 10:00").should eq(Time.utc(2022, 7, 8))
+    end
+
+    it "keeps the offset of a zoned slash date" do
+      importer = TestImporter.new
+      importer.test_parse_date("2024/01/20 14:00:00 +0900").should eq(Time.utc(2024, 1, 20, 5))
+      importer.test_parse_date("2024/01/20 14:00 +09:00").should eq(Time.utc(2024, 1, 20, 5))
+      importer.test_parse_date("2024/01/20 14:00:00 +0900").not_nil!.offset.should eq(9 * 3600)
+    end
+
+    it "parses the date shapes Jekyll, Hexo and Astro front matter use" do
+      importer = TestImporter.new
+      {
+        # Astro's blog template (`pubDate: 'Jul 08 2022'`) — was dropped
+        "Jul 08 2022"  => Time.utc(2022, 7, 8),
+        "July 8, 2022" => Time.utc(2022, 7, 8),
+        # minute precision — the time was silently dropped
+        "2024-01-21 14:05"       => Time.utc(2024, 1, 21, 14, 5),
+        "2024-01-21T14:05"       => Time.utc(2024, 1, 21, 14, 5),
+        "2024-01-21 14:05 +0900" => Time.utc(2024, 1, 21, 5, 5),
+        # Hexo slash dates — were dropped
+        "2024/01/20 14:00:00" => Time.utc(2024, 1, 20, 14),
+        "2024/01/20"          => Time.utc(2024, 1, 20),
+        # unchanged
+        "2024-01-15 10:30:45" => Time.utc(2024, 1, 15, 10, 30, 45),
+        "2024-01-15"          => Time.utc(2024, 1, 15),
+      }.each do |input, expected|
+        importer.test_parse_date(input).should eq(expected), "#{input.inspect}"
+      end
+    end
   end
 
   describe "#write_content_file" do

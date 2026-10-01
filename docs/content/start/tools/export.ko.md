@@ -84,7 +84,7 @@ hwaro tool export hugo --verbose
 | updated | lastmod |
 | tags | tags |
 | series | series |
-| aliases | aliases |
+| aliases | aliases (상대 alias에는 앞에 `/`를 붙임. 빌드가 건너뛰는 절대 URL, `//host`, `..` alias는 제외) |
 | image | images (배열) |
 | expires | expiryDate |
 | weight | weight |
@@ -94,6 +94,10 @@ hwaro tool export hugo --verbose
 그 외 프론트 매터 키는 Hugo 페이지 파라미터로 그대로 전달됩니다.
 
 출력 구조는 `export/content/` 아래에 원본 디렉터리 배치를 그대로 유지합니다.
+사이트 루트의 `index.md`, 또는 아래에 다른 페이지가 있는 `index.md`는
+`_index.md`로 기록됩니다. Hugo는 `index.md`를 리프 번들로 읽어 그 아래의 모든
+페이지를 번들 리소스로 바꾸기 때문입니다. 리프 번들(`posts/my-post/index.md`)은
+이름을 그대로 유지합니다.
 
 ### Jekyll
 
@@ -108,7 +112,7 @@ hwaro tool export hugo --verbose
 | image | image |
 | template | layout |
 | path | permalink (`/<path>/`) |
-| aliases | redirect_from (jekyll-redirect-from) |
+| aliases | redirect_from (jekyll-redirect-from. 빌드가 건너뛰는 alias는 제외) |
 | updated | last_modified_at |
 | [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
 
@@ -116,7 +120,7 @@ hwaro tool export hugo --verbose
 - 일반 글은 `_posts/`에 `YYYY-MM-DD-slug.md` 파일명으로 저장
 - 초안 글은 날짜 접두사 없이 `_drafts/`에 저장
 - `redirect_from`은 Jekyll `_config.yml`의 `plugins:`에서 [jekyll-redirect-from](https://github.com/jekyll/jekyll-redirect-from) 플러그인을 켰을 때만 리다이렉트됩니다(GitHub Pages에서는 허용 목록에 있을 뿐 기본으로 켜져 있지 않음)
-- 섹션 인덱스 파일(`_index.md`)은 `index.md` 페이지로 변환
+- 섹션 인덱스 파일(`_index.md`, 그리고 `_index.ko.md` 같은 번역본)은 `index.md`(`index.ko.md`) 페이지로 변환
 - 프론트 매터는 TOML, YAML, JSON에서 YAML(`---`)로 변환
 - `[taxonomies]` 테이블은 최상위 키로 승격됩니다. Hugo도 Jekyll도 중첩 테이블에서
   분류 소속을 읽지 않기 때문입니다. 같은 이름의 최상위 키가 이미 있으면 그쪽이
@@ -131,8 +135,12 @@ hwaro tool export hugo --verbose
 [About](@/about/_index.md)
 
 <!-- Exported -->
-[About](/about)
+[About](/about/)
 ```
+
+섹션 `_index.md`와 페이지 번들 `index.md`는 모두 해당 디렉터리 URL로 변환됩니다.
+코드 블록이나 인라인 코드 안의 링크는 빌드에서도 해석하지 않으므로 작성한
+그대로 유지됩니다.
 
 ## 출력 예시
 

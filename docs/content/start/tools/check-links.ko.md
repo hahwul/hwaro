@@ -54,7 +54,8 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 2. 외부 URL(http/https 링크)과 내부 링크(상대/절대 경로)를 수집
 3. 외부 URL에 동시 HEAD 요청 전송 (호스트가 HEAD를 405/403/501로 거부하면
    GET으로 재시도, 리다이렉트는 최대 5회 추적)
-4. 내부 링크 대상이 디스크에 존재하는지 확인 (`.md`, `_index.md`, `index.md` 검사)
+4. 내부 링크 대상을 기본 빌드가 게시하는 페이지와 대조
+   ([페이지 링크](#페이지-링크) 참고)
 5. 빌드가 생성하는 경로는 소스 파일 없이도 유효한 것으로 인정
 6. 파이프라인이 만들어 내는 에셋은 직전 빌드 출력에서 확인
    ([빌드 출력을 근거로 사용하기](#빌드-출력을-근거로-사용하기) 참고)
@@ -63,6 +64,25 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 사설/내부 주소(localhost, RFC 1918 대역, `.local`/`.internal` 호스트)로
 해석되는 외부 링크에는 요청을 보내지 않습니다. 이런 링크는 사람용 출력과
 JSON의 `skipped_external` 항목 모두에 "건너뜀"으로 보고됩니다.
+
+### 페이지 링크
+
+페이지로 가는 링크는 기본 `hwaro build`가 그 URL에 페이지를 쓸 때만 유효합니다.
+URL은 빌드와 같은 방식으로 원본에서 계산하므로 첫 빌드 전에도 그대로 적용됩니다.
+
+- `slug`, `path`, `[permalinks]`로 정해진 URL과 모든 `aliases` 항목은 유효합니다
+  (`/posts/original-name/`이 아니라 `/posts/renamed/`). 다른 곳에 게시되는
+  페이지의 원본 경로로 링크하면, 실제로 게시되는 URL과 함께 보고됩니다.
+- 초안, 미래 날짜·만료된 페이지, `render = false` 페이지로의 링크는 보고됩니다.
+  빌드가 그 자리에 아무것도 쓰지 않기 때문입니다.
+- `/about/`, `/about`, `/about/index.html`은 모두 `content/about.md`에 닿지만
+  `/about.md`는 아닙니다. 빌드는 마크다운 원본을 원래 이름으로 게시하지 않습니다.
+- 페이지 번들이나 섹션 인덱스 옆의 파일은 그 페이지의 URL 아래에서 유효하며,
+  번역본에도 해당합니다(`/ko/posts/my-trip/photo.jpg`).
+- 상대 링크는 원본 파일의 폴더가 아니라 브라우저처럼 페이지의 URL을 기준으로
+  해석합니다. `/posts/a/`로 게시되는 `content/posts/a.md`에서 `../b/`는
+  `/posts/b/`에 닿고, `![](photo.png)`는 `/posts/a/photo.png`를 요청합니다.
+  페이지 이미지는 번들(`content/posts/a/index.md`)에 함께 두세요.
 
 ### 생성 경로
 
@@ -113,6 +133,8 @@ checked: 50 links, 3 dead
 `→ url status` 상세 줄로 표시되고, 마지막에 `✦ checked` 결과 줄이 붙습니다(모든
 링크가 정상이면 `checked: 50 links · all healthy`). 깨진 링크가 발견되면 명령이
 0이 아닌 종료 코드를 반환하므로 CI 게이트로 쓸 수 있습니다.
+`-q`/`--quiet`를 주면 보고서는 출력되지 않지만, 깨진 링크는 각각
+`파일: url  상태` 한 줄로 stderr에 계속 출력됩니다.
 
 ## JSON 출력
 

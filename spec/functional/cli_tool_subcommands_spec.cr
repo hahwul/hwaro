@@ -58,9 +58,9 @@ private def run_hwaro_no_chdir(args : Array(String))
 end
 
 describe "hwaro tool (router)" do
-  it "exits 1 and prints help when no subcommand is given" do
+  it "exits with HWARO_E_USAGE and prints help when no subcommand is given" do
     status, output, _ = run_hwaro_no_chdir(["tool"])
-    status.success?.should be_false
+    status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
     output.should contain("Usage")
     output.should contain("subcommand")
   end
@@ -145,6 +145,16 @@ describe "hwaro tool validate" do
     end
   end
 
+  it "prints findings on stderr under --quiet" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "broken.md"), "+++\ntitle = \"Broken\ndraft = false\n+++\nbody\n")
+      status, output, error = run_hwaro(["tool", "validate", "-q"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_CONTENT)
+      output.should be_empty
+      error.should contain("broken.md")
+    end
+  end
+
   it "emits {findings:[…]} under --json" do
     with_initialized_project do |project_dir|
       status, output, _ = run_hwaro(["tool", "validate", "--json"], chdir: project_dir)
@@ -203,6 +213,16 @@ describe "hwaro tool check-links" do
       # check-links exits 0 when no broken links and 1 when some are found.
       # Anything else (e.g. signal-based exit from a crash) is a bug.
       [0, 1].includes?(status.exit_code).should be_true
+    end
+  end
+
+  it "prints dead links on stderr under --quiet" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "linker.md"), "+++\ntitle = \"Linker\"\n+++\n\n[gone](/no-such-page/)\n")
+      status, output, error = run_hwaro(["tool", "check-links", "--internal-only", "-q"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_GENERIC)
+      output.should be_empty
+      error.should contain("/no-such-page/")
     end
   end
 

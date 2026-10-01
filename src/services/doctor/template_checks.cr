@@ -130,18 +130,44 @@ module Hwaro
           )
         end
       rescue ex
-        msg = ex.message.to_s
-        # Custom shortcodes (e.g. {% details %}, {% gallery %}) used inside
-        # template files for documentation/demo purposes are expected to be
-        # unknown to the bare Crinja parser used by doctor. These are not
-        # real template syntax errors — the project provides the shortcode
-        # implementation at build time via templates/shortcodes/*.html.
-        if msg.includes?("no tag with name") && msg.includes?("registered")
+        # Block shortcodes (`{% alert(type="info") %}…{% end %}`) are unknown
+        # to the bare Crinja parser used here, but the build expands them in
+        # its shortcode pass before Crinja ever sees the template, so they
+        # are not syntax errors. Only that shape is tolerated: any unknown
+        # tag used to be, so a typo such as `{% includ "footer.html" %}`
+        # passed doctor while `hwaro build` failed with the very same
+        # "no tag with name" error.
+        if (tag = UNKNOWN_TAG_RE.match(ex.message.to_s).try(&.[1])) &&
+           content && shortcode_block?(content, tag)
           return
         end
 
-        issues << Issue.new(id: "template-read-error", level: :error, category: "template", file: file_path,
-          message: "Failed to read template: #{ex.message}")
+        if ex.is_a?(Crinja::Error)
+          issues << Issue.new(id: "template-syntax-error", level: :error, category: "template", file: file_path,
+            message: format_crinja_error(ex))
+        else
+          issues << Issue.new(id: "template-read-error", level: :error, category: "template", file: file_path,
+            message: "Failed to read template: #{ex.message}")
+        end
+      end
+
+      # Crinja's `FeatureLibrary::UnknownFeatureError` message for a tag.
+      UNKNOWN_TAG_RE = /\Ano tag with name "([^"]+)" registered/
+
+      # True when `source` uses `name` as a block shortcode the build's
+      # shortcode pass consumes: an opener the pass recognizes
+      # (`ShortcodeProcessor::BLOCK_OPEN_RE`) followed by a shortcode closer
+      # (`{% end %}`, `{% end name %}` or `{% endname %}`). An unclosed
+      # opener is left in place by that pass ("never closed") and then fails
+      # in Crinja exactly as it does here.
+      private def shortcode_block?(source : String, name : String) : Bool
+        closer = /\{\%\s*end(?:\s*#{Regex.escape(name)})?\s*\%\}/i
+        pos = 0
+        while m = Core::Build::ShortcodeProcessor::BLOCK_OPEN_RE.match_at_byte_index(source, pos)
+          pos = m.byte_end(0)
+          return true if m[1] == name && closer.match_at_byte_index(source, pos)
+        end
+        false
       end
 
       private def template_parse_env : Crinja

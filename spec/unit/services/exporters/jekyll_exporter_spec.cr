@@ -472,6 +472,28 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
+    it "maps a translated _index.ko.md to index.ko.md, not an underscore file Jekyll ignores" do
+      # Jekyll never reads underscore-prefixed files, so a verbatim
+      # `posts/_index.ko.md` dropped that language's section landing page.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
+
+        File.write(File.join(content_dir, "_index.ko.md"), "+++\ntitle = \"홈\"\n+++\n\n환영\n")
+        File.write(File.join(content_dir, "posts", "_index.ko.md"), "+++\ntitle = \"글\"\n+++\n\n목록\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options).success.should be_true
+
+        File.read(File.join(output_dir, "index.ko.md")).should contain("title: \"홈\"")
+        File.read(File.join(output_dir, "posts", "index.ko.md")).should contain("title: \"글\"")
+        File.exists?(File.join(output_dir, "_index.ko.md")).should be_false
+        File.exists?(File.join(output_dir, "posts", "_index.ko.md")).should be_false
+      end
+    end
+
     it "quotes list items and images that YAML would reinterpret" do
       # `- beta: gamma` reparses as a mapping and `- NO` as boolean false
       # under Jekyll's YAML 1.1 loader.
@@ -578,6 +600,35 @@ describe "Jekyll export: address and modification keys" do
       exported.should contain("last_modified_at: 2024-04-01")
       exported.should_not contain("path:")
       exported.should_not contain("aliases:")
+    end
+  end
+end
+
+# Regression: aliases the build refuses (absolute, protocol-relative,
+# traversing) were carried into `redirect_from`, creating redirects the
+# source site never had.
+describe "Jekyll export: refused aliases" do
+  it "drops the aliases the build refuses from redirect_from" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"),
+        "+++\ntitle = \"A\"\naliases = [\"https://old.example/a\", \"//cdn.example/a\", \"../up\", \"/kept/\"]\n+++\nbody\n")
+      File.write(File.join(content_dir, "b.md"), "+++\ntitle = \"B\"\naliases = [\"https://old.example/b\"]\n+++\nbody\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      with_captured_log do
+        Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+      end
+
+      a = File.read(File.join(output_dir, "a.md"))
+      a.should contain("redirect_from:\n  - \"/kept/\"\n")
+      a.should_not contain("example")
+      a.should_not contain("../up")
+      b = File.read(File.join(output_dir, "b.md"))
+      b.should_not contain("redirect_from")
+      b.should_not contain("aliases")
     end
   end
 end

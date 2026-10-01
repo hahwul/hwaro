@@ -84,7 +84,7 @@ while the counts cover content documents only.
 | updated | lastmod |
 | tags | tags |
 | series | series |
-| aliases | aliases |
+| aliases | aliases (a relative alias gains a leading `/`; absolute, `//host` and `..` aliases, which the build skips, are dropped) |
 | image | images (array) |
 | expires | expiryDate |
 | weight | weight |
@@ -94,6 +94,10 @@ while the counts cover content documents only.
 Every other front-matter key is passed through as a Hugo page param.
 
 Output structure preserves the original directory layout under `export/content/`.
+An `index.md` at the site root, or one with other pages below it, is written
+as `_index.md`: Hugo reads `index.md` as a leaf bundle, which turns every page
+beneath it into a bundle resource. Leaf bundles (`posts/my-post/index.md`)
+keep their name.
 
 ### Jekyll
 
@@ -108,7 +112,7 @@ Output structure preserves the original directory layout under `export/content/`
 | image | image |
 | template | layout |
 | path | permalink (`/<path>/`) |
-| aliases | redirect_from (jekyll-redirect-from) |
+| aliases | redirect_from (jekyll-redirect-from; aliases the build skips are dropped) |
 | updated | last_modified_at |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
@@ -116,7 +120,7 @@ Output conventions:
 - Regular posts go to `_posts/` with `YYYY-MM-DD-slug.md` filename
 - Draft posts go to `_drafts/` without date prefix
 - `redirect_from` only redirects when the [jekyll-redirect-from](https://github.com/jekyll/jekyll-redirect-from) plugin is enabled under `plugins:` in the Jekyll `_config.yml` (it is allow-listed, not on by default, on GitHub Pages)
-- Section index files (`_index.md`) become `index.md` pages
+- Section index files (`_index.md`, and translations such as `_index.ko.md`) become `index.md` (`index.ko.md`) pages
 - Frontmatter is converted from TOML, YAML, or JSON to YAML (`---`)
 - A `[taxonomies]` table is hoisted to top-level keys, since neither Hugo nor
   Jekyll reads taxonomy membership from a nested table. An explicit top-level
@@ -131,8 +135,12 @@ Internal links using the `@/` prefix are automatically converted to absolute pat
 [About](@/about/_index.md)
 
 <!-- Exported -->
-[About](/about)
+[About](/about/)
 ```
+
+A section `_index.md` and a page-bundle `index.md` both map to their directory
+URL. Links shown inside code blocks or inline code spans are left exactly as
+written, since the build does not resolve them there either.
 
 ## Example Output
 

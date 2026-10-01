@@ -82,3 +82,40 @@ describe Hwaro::CLI::Commands::Tool::PlatformCommand do
     end
   end
 end
+
+# Regression: a second positional (an attempted output path, or a second
+# platform) was silently dropped — the default file was written, exit 0.
+describe "tool platform positional argument validation" do
+  it "rejects extra positional arguments before writing anything" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"Test Site\"\n")
+        ex = expect_raises(Hwaro::HwaroError) do
+          Hwaro::CLI::Commands::Tool::PlatformCommand.new.run(["netlify", "deploy/netlify.toml"])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        ex.message.to_s.should contain("unexpected extra argument(s): 'deploy/netlify.toml'")
+        File.exists?("netlify.toml").should be_false
+
+        ex = expect_raises(Hwaro::HwaroError) do
+          Hwaro::CLI::Commands::Tool::PlatformCommand.new.run(["netlify", "--stdout", "--", "vercel"])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      end
+    end
+  end
+end
+
+# Regression: an unknown flag reached unknown_args and was reported as an
+# "unexpected extra argument", blaming the valid positional instead.
+describe "tool platform unknown flags" do
+  it "reports an unknown flag as an invalid option" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        expect_raises(OptionParser::InvalidOption, "Invalid option: --bogus") do
+          Hwaro::CLI::Commands::Tool::PlatformCommand.new.run(["--bogus", "netlify", "--stdout"])
+        end
+      end
+    end
+  end
+end

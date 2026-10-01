@@ -81,7 +81,8 @@ hwaro doctor --json
   빌드가 `page.html` 대신 `default.html`을 사용하므로 `default.html`도 인정합니다.
 - `section.html` 누락 (warning: 섹션 페이지가 `page.html`로 렌더링됨)
 - 빌드와 동일한 Crinja 파서로 검사한 템플릿 문법 오류
-  (프로젝트 전용 숏코드 태그는 오류로 보지 않습니다)
+  (빌드가 파싱 전에 펼치는 `{% alert(type="info") %}…{% end %}` 같은 블록 숏코드는
+  오류로 보지 않지만, `{% includ %}`처럼 철자가 틀린 알 수 없는 태그는 오류입니다)
 
 **콘텐츠 진단:**
 

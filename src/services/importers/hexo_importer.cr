@@ -172,8 +172,9 @@ module Hwaro
             fields["draft"] = true
           end
 
-          # Handle Hexo's <!-- more --> excerpt separator.
-          body = body.gsub(/<!--\s*more\s*-->/, "")
+          # Hexo's `<!-- more -->` excerpt separator is kept verbatim: hwaro
+          # reads the same marker as the page summary, so deleting it threw
+          # away the excerpt the author chose.
 
           # Track files with Hexo tag plugins; the `run` method emits a
           # single summary so the user knows how many files need manual

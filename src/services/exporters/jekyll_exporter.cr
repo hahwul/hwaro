@@ -195,9 +195,11 @@ module Hwaro
             handled << "path"
           end
 
-          if fields["redirect_from"]?.try(&.raw).nil? && (aliases = string_list_field(fields["aliases"]?))
-            yaml_lines << "redirect_from:"
-            aliases.each { |a| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(a)}" }
+          if fields["redirect_from"]?.try(&.raw).nil? && (aliases = publishable_aliases(fields["aliases"]?, file_path))
+            unless aliases.empty?
+              yaml_lines << "redirect_from:"
+              aliases.each { |a| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(a)}" }
+            end
             handled << "aliases"
           end
 
@@ -350,9 +352,14 @@ module Hwaro
           # Section indices become regular pages (Jekyll has no `_index`).
           # The site root maps to `index.md` at the export root — an
           # `index/index.md` would be served at `/index/`, leaving `/` empty.
-          if filename == "_index.md" || filename == "_index.markdown"
-            return File.join(output_dir, "index.md") if dir_part == "." || dir_part.empty?
-            return File.join(output_dir, dir_part, "index.md")
+          # A translated index (`_index.ko.md`) keeps its language suffix:
+          # passed through verbatim it kept the leading underscore, and
+          # Jekyll never reads an underscore-prefixed file — the section's
+          # landing page vanished from that language.
+          if index_match = filename.match(/\A_index((?:\.[^.\/]+)?)\.(?:md|markdown)\z/)
+            index_name = "index#{index_match[1]}.md"
+            return File.join(output_dir, index_name) if dir_part == "." || dir_part.empty?
+            return File.join(output_dir, dir_part, index_name)
           end
 
           date_str = fields["date"]?.try(&.as_s?)

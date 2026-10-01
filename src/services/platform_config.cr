@@ -5,6 +5,7 @@ require "../models/page"
 require "../content/processors/markdown"
 require "../utils/frontmatter_writer"
 require "../utils/logger"
+require "../utils/path_utils"
 require "./github_actions_workflow"
 
 module Hwaro
@@ -151,10 +152,12 @@ module Hwaro
 
         # Headers for caching. Target the configured asset output dir rather
         # than a hardcoded /assets/ so a customized [assets] output_dir is honored.
-        lines << "[[headers]]"
-        lines << "  for = \"#{with_base_path("/#{assets_url_dir}/*")}\""
-        lines << "  [headers.values]"
-        lines << "    Cache-Control = \"public, max-age=31536000, immutable\""
+        if immutable_assets?
+          lines << "[[headers]]"
+          lines << "  for = \"#{with_base_path("/#{assets_url_dir}/*")}\""
+          lines << "  [headers.values]"
+          lines << "    Cache-Control = \"public, max-age=31536000, immutable\""
+        end
 
         lines.join("\n") + "\n"
       end
@@ -167,6 +170,21 @@ module Hwaro
       private def with_base_path(path : String) : String
         normalized = path.starts_with?("/") ? path : "/#{path}"
         @config.with_base_path(normalized)
+      end
+
+      # Whether every file under the asset output dir is content-hashed, so a
+      # year-long `immutable` cache rule is safe. Only fingerprinted
+      # `[[assets.bundles]]` outputs are named by content. With the pipeline
+      # off (the default), fingerprinting off, or no bundles, nothing there is
+      # hashed; and `static/<output_dir>/` is copied into the same URL space
+      # verbatim (`static/assets/css/…` → `/assets/css/…`, the docs site's
+      # shape), so its presence leaves unhashed files under the rule too.
+      # Marking such files immutable kept browsers on the old CSS/JS for a
+      # year after every deploy.
+      private def immutable_assets? : Bool
+        assets = @config.assets
+        return false if !assets.enabled || !assets.fingerprint || assets.bundles.empty?
+        !Dir.exists?(File.join("static", assets_url_dir))
       end
 
       # URL path segment where the asset pipeline emits fingerprinted files,
@@ -194,18 +212,20 @@ module Hwaro
         end
 
         # Headers for caching
-        header_entries = [
-          JSON::Any.new({
-            "source"  => JSON::Any.new(with_base_path("/#{assets_url_dir}/(.*)")),
-            "headers" => JSON::Any.new([
-              JSON::Any.new({
-                "key"   => JSON::Any.new("Cache-Control"),
-                "value" => JSON::Any.new("public, max-age=31536000, immutable"),
-              }),
-            ]),
-          }),
-        ]
-        config_hash["headers"] = JSON::Any.new(header_entries)
+        if immutable_assets?
+          header_entries = [
+            JSON::Any.new({
+              "source"  => JSON::Any.new(with_base_path("/#{assets_url_dir}/(.*)")),
+              "headers" => JSON::Any.new([
+                JSON::Any.new({
+                  "key"   => JSON::Any.new("Cache-Control"),
+                  "value" => JSON::Any.new("public, max-age=31536000, immutable"),
+                }),
+              ]),
+            }),
+          ]
+          config_hash["headers"] = JSON::Any.new(header_entries)
+        end
 
         result = {
           "buildCommand"    => JSON::Any.new(build_command),
@@ -427,7 +447,26 @@ module Hwaro
         target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path], language, data[:date], data[:title])
         return unless target_url
 
+        own_url = normalize_alias_url(target_url)
+        own_file_key = Utils::PathUtils.output_file_key(own_url)
         aliases.each do |alias_path|
+          # Aliases the build refuses (absolute or protocol-relative URLs,
+          # traversing paths) publish no redirect stub, so they get no host
+          # redirect either.
+          if reason = Utils::PathUtils.alias_refusal(alias_path)
+            Logger.warn "Skipping alias #{alias_path.inspect} on #{path}: #{reason}."
+            next
+          end
+          # An alias naming the page's own URL is skipped by the build (it
+          # would overwrite the page with a redirect to itself). Emitted
+          # here as a forced 301 from the page to itself, it made the page
+          # an endless redirect loop on Netlify/Vercel — including the
+          # `/moved` vs `/moved/` spelling, which those hosts match alike,
+          # and spellings of the same output FILE (`/moved//`), which the
+          # build compares by `output_file_key`.
+          norm = normalize_alias_url(alias_path)
+          next if norm == own_url
+          next if own_file_key && Utils::PathUtils.output_file_key(norm) == own_file_key
           # Carry base_path so generated redirects match the build's own
           # redirect HTML (`url=/myrepo/moved/`) on subpath deploys. Ensure a
           # leading slash first since with_base_path only prefixes root-relative
@@ -442,6 +481,21 @@ module Hwaro
         # must not abort ALL platform config generation — degrade per file,
         # matching how check-links skips unreadable Markdown.
         Logger.warn "Skipping #{path} while collecting aliases: #{ex.message}"
+      end
+
+      # Mirror of the render phase's `normalize_alias_url`: one spelling per
+      # published path (`/a`, `/a/` and `/a/index.html` all name `/a/`).
+      private def normalize_alias_url(alias_path : String) : String
+        norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
+        {"index.html", "index.htm"}.each do |leaf|
+          if norm == "/#{leaf}"
+            return "/"
+          elsif norm.ends_with?("/#{leaf}")
+            return norm[0, norm.size - leaf.size]
+          end
+        end
+        return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+        "#{norm}/"
       end
 
       # Calculate the URL for a page through the same shared resolver as the

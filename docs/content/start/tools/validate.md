@@ -67,6 +67,10 @@ error code (5), while warning-driven failures from `--strict` or
 `--max-warnings` exit with the generic code (1), so a consumer can still tell a
 broken file from a tightened gate. Both flags apply to `--json` runs too.
 
+With `-q`/`--quiet` the report is suppressed, but each error and warning is
+still printed to stderr as one `file: message` line, so a failing quiet run
+says why it failed.
+
 ## Rule IDs
 
 | ID | Level | Description |

@@ -1,5 +1,6 @@
 require "yaml"
 require "./base"
+require "../../content/processors/fence_tracker"
 
 module Hwaro
   module Services
@@ -154,10 +155,7 @@ module Hwaro
           # can emit a single summary warning.
           has_mdx_components = false
           if file_path.ends_with?(".mdx")
-            # [^\n], not `.+`: Crystal's /m makes `.` match newlines, so `.+$`
-            # swallowed everything from the first import line to EOF —
-            # deleting the entire article body of any real MDX file.
-            body = body.gsub(/^import[ \t]+[^\n]+$\n?/m, "")
+            body = strip_mdx_imports(body)
             if body.matches?(/<[A-Z]/)
               Logger.warn "MDX components detected in #{file_path} — manual conversion needed."
               has_mdx_components = true
@@ -182,6 +180,50 @@ module Hwaro
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
           has_mdx_components ? :imported_wrapped : :imported
+        end
+
+        # Drop MDX's top-level ESM `import` statements. Only lines outside
+        # fenced code are statements: a JavaScript sample in a ``` block
+        # starting with `import …` is article content, and deleting it
+        # mangled every MDX post that shows how to import a module.
+        #
+        # A multi-line `import {` statement is dropped through the line that
+        # starts with its closing `}`, but only while the lines in between
+        # look like a specifier list (identifiers, `as`, commas, `//`
+        # comments). Anything else — a blank line, prose — means it was not
+        # a statement after all, and the held lines are kept, so an
+        # unclosed `import {` can't swallow the rest of the article.
+        private def strip_mdx_imports(body : String) : String
+          tracker = Content::Processors::FenceTracker.new
+          pending : String? = nil
+          String.build do |io|
+            body.each_line(chomp: false) do |line|
+              fenced = tracker.fence_line?(line)
+              if held = pending
+                code = line.sub(%r{//.*}, "").strip
+                if !fenced && code.starts_with?('}')
+                  pending = nil
+                  next
+                elsif !fenced && code.matches?(/\A[\w$\s,]+\z/)
+                  pending = held + line
+                  next
+                end
+                io << held
+                pending = nil
+              end
+
+              if fenced
+                io << line
+              elsif line.matches?(/\Aimport[ \t]/)
+                code = line.sub(%r{//.*}, "")
+                pending = line if code.includes?('{') && !code.includes?('}')
+              else
+                io << line
+              end
+            end
+            # Never closed: not a statement, keep it.
+            pending.try { |held| io << held }
+          end
         end
       end
     end

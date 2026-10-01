@@ -500,6 +500,84 @@ describe "Hugo import: index.html url" do
   end
 end
 
+describe "Hugo import: front matter key case" do
+  it "reads capitalised and lowercase keys the way Hugo does" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      posts = File.join(hugo_dir, "content", "posts")
+      FileUtils.mkdir_p(posts)
+      File.write(File.join(posts, "caps.md"), %(+++\nTitle = "Capital Keys"\nDate = 2024-02-01T10:00:00+09:00\nTags = ["go"]\nexpirydate = "2030-01-01"\n+++\nBody.\n))
+      File.write(File.join(posts, "pub.md"), "---\ntitle: Pub\npublishdate: 2024-04-04\n---\nPub.\n")
+      File.write(File.join(posts, "hidden.md"), "---\ntitle: Hidden\nDraft: true\n---\nSecret.\n")
+      output_dir = File.join(tmpdir, "out")
+
+      result = Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+
+      caps = File.read(File.join(output_dir, "posts", "caps.md"))
+      caps.should contain(%(title = "Capital Keys"))
+      caps.should contain(%(date = "2024-02-01T10:00:00+09:00"))
+      caps.should contain(%(tags = ["go"]))
+      caps.should contain(%(expires = "2030-01-01"))
+      File.read(File.join(output_dir, "posts", "pub.md")).should contain(%(date = "2024-04-04"))
+      # A `Draft: true` page must stay unpublished, not leak onto the site.
+      File.exists?(File.join(output_dir, "posts", "hidden.md")).should be_false
+      result.skipped_count.should eq(1)
+    end
+  end
+end
+
+describe "Hugo import: TOML local dates" do
+  it "keeps a bare TOML date bare instead of pinning it to the machine's zone" do
+    saved = Time::Location.local
+    Time::Location.local = Time::Location.fixed("KST", 9 * 3600)
+    begin
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = File.join(tmpdir, "hugo_site")
+        FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+        File.write(File.join(hugo_dir, "content", "p.md"), "+++\ntitle = \"P\"\ndate = 2024-05-02\nlastmod = 2024-06-01\nexpiryDate = 2030-01-01\n+++\nx\n")
+        output_dir = File.join(tmpdir, "out")
+        Hwaro::Services::Importers::HugoImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+        content = File.read(File.join(output_dir, "p.md"))
+        content.should contain(%(date = "2024-05-02"\n))
+        content.should contain(%(updated = "2024-06-01"\n))
+        content.should contain(%(expires = "2030-01-01"\n))
+      end
+    ensure
+      Time::Location.local = saved
+    end
+  end
+
+  # The same source must import identically on a UTC machine (CI, Docker)
+  # and a +09:00 laptop: a TOML local date-time stays zone-less, an offset
+  # or `Z` date-time keeps its zone.
+  [Time::Location::UTC, Time::Location.fixed("KST", 9 * 3600)].each do |zone|
+    it "keeps a TOML local date-time zone-less (machine zone #{zone})" do
+      saved = Time::Location.local
+      Time::Location.local = zone
+      begin
+        Dir.mktmpdir do |tmpdir|
+          hugo_dir = File.join(tmpdir, "hugo_site")
+          FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+          File.write(File.join(hugo_dir, "content", "p.md"),
+            "+++\ntitle = \"P\"\ndate = 2024-05-02T10:00:00 # local\nlastmod = 2024-05-03T10:00:00Z\n" \
+            "expiryDate = 2030-01-01 12:30:00\n[params]\nother = 2024-01-01T00:00:00\n+++\nx\n")
+          output_dir = File.join(tmpdir, "out")
+          Hwaro::Services::Importers::HugoImporter.new.run(
+            Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+          content = File.read(File.join(output_dir, "p.md"))
+          content.should contain(%(date = "2024-05-02T10:00:00"\n))
+          content.should contain(%(updated = "2024-05-03T10:00:00Z"\n))
+          content.should contain(%(expires = "2030-01-01T12:30:00"\n))
+        end
+      ensure
+        Time::Location.local = saved
+      end
+    end
+  end
+end
+
 describe "Hugo import: url with query or fragment" do
   # `?q=1#top` is not part of the page path; kept, it became a literal
   # directory name.

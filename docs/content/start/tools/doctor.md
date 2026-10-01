@@ -83,7 +83,9 @@ hwaro doctor --json
   `default.html` counts, because the build uses it in place of `page.html`.
 - `section.html` missing (a warning: section pages render with `page.html`)
 - Template syntax errors, reported by the same Crinja parser the build uses
-  (unknown project shortcodes are tolerated)
+  (block shortcodes such as `{% alert(type="info") %}…{% end %}`, which the
+  build expands before parsing, are not errors; an unknown tag such as a
+  misspelled `{% includ %}` is)
 
 **Content diagnostics:**
 

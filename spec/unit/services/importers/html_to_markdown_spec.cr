@@ -208,5 +208,98 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
       result.should contain(%q(| a | x \| y |))
     end
+
+    it "keeps entity-encoded markup in prose as text, not live HTML" do
+      # The author wrote `&lt;script&gt;` to SHOW the tag. Decoding it to a
+      # bare `<script>` made the Markdown renderer emit a live, unclosed
+      # script element that swallowed the rest of the page.
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>Use the &lt;script&gt; tag &amp; the &lt;!-- comment --&gt;.</p>")
+      result.should eq("Use the &lt;script> tag & the &lt;!-- comment -->.")
+      html = Hwaro::Content::Processors::Markdown.new.render(result)[0]
+      html.should_not contain("<script>")
+      html.should contain("&lt;script&gt;")
+    end
+
+    it "keeps a literal entity name in prose literal" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>Write &amp;copy; for ©, or &mdash;</p>")
+      result.should eq("Write &amp;copy; for ©, or &mdash;")
+    end
+
+    it "decodes inline code exactly once and leaves it unescaped (guard: prose escaping must not reach code spans)" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>Wrap it in <code>&lt;div&gt;</code> &amp; done</p>")
+      result.should eq("Wrap it in `<div>` & done")
+    end
+
+    it "keeps links, emphasis and code inside list items" do
+      html = %(<ul><li><a href="https://crystal-lang.org">Crystal</a> is <strong>fast</strong></li><li>Read <code>docs</code> and <em>enjoy</em></li></ul>)
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("- [Crystal](https://crystal-lang.org) is **fast**\n- Read `docs` and *enjoy*")
+    end
+
+    it "keeps links and code inside table cells" do
+      html = %(<table><tr><th>Name</th><th>Link</th></tr><tr><td><code>a|b</code></td><td><a href="https://hwaro.dev">site</a></td></tr></table>)
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should contain(%q(| `a\|b` | [site](https://hwaro.dev) |))
+    end
+
+    it "keeps the paragraphs of a blockquote apart" do
+      html = %(<blockquote class="wp-block-quote"><p>First.</p><p>Second.</p><cite>Someone</cite></blockquote>)
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("> First.\n>\n> Second.\n>\n> Someone")
+    end
+
+    it "unwraps a [caption] shortcode into the image and its caption" do
+      html = %([caption id="attachment_12" align="aligncenter" width="300"]<img src="https://example.com/cat.jpg" alt="A cat" width="300" /> My lovely cat[/caption])
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("![A cat](https://example.com/cat.jpg)\n\nMy lovely cat")
+    end
+
+    it "reads a pre-3.4 [caption] whose text is an attribute" do
+      html = %([caption id="a" caption="Old caption"]<a href="https://example.com/big.jpg"><img src="https://example.com/cat.jpg" alt="" /></a>[/caption])
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("[![](https://example.com/cat.jpg)](https://example.com/big.jpg)\n\nOld caption")
+    end
+
+    it "keeps WordPress's <!--more--> tag as hwaro's excerpt marker" do
+      html = "<!-- wp:paragraph -->\n<p>Teaser.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:more -->\n<!--more Keep reading-->\n<!-- /wp:more -->\n\n<p>Rest.</p>"
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("Teaser.\n\n<!-- more -->\n\nRest.")
+    end
+
+    it "moves edge whitespace outside emphasis delimiters" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>This is <strong>bold </strong>text and <em> spaced</em>.</p>")
+      result.should eq("This is **bold** text and  *spaced*.")
+    end
+
+    it "moves a no-break space at the edge outside emphasis delimiters" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p><strong>important&nbsp;</strong>stuff and <em>&#160;x</em>y</p>")
+      result.should eq("**important** stuff and \u00A0*x*y")
+    end
+
+    it "keeps an author comment that merely starts with \"more\" out of the excerpt marker" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>text <!-- more of the same, todo --> rest</p>")
+      result.should_not contain("<!-- more -->")
+      result.should eq("text  rest")
+    end
+
+    it "drops a more tag inside a list item or table cell instead of splitting the block" do
+      list = Hwaro::Services::Importers::HtmlToMarkdown.convert("<ul><li>a<!--more-->b</li><li>c</li></ul>")
+      list.should eq("- ab\n- c")
+      table = Hwaro::Services::Importers::HtmlToMarkdown.convert("<table><tr><th>h</th></tr><tr><td>x<!--more-->y</td></tr></table>")
+      table.should eq("| h |\n| --- |\n| xy |")
+    end
+
+    it "does not escape pipes inside a fenced block in a table cell" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<table><tr><td>h</td></tr><tr><td><pre>a|b</pre></td></tr></table>")
+      result.should contain("a|b")
+      result.should_not contain(%q(a\|b))
+    end
+
+    it "decodes every spelling of an encoded ampersand exactly once" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>See &#38;copy; and &#x26;lt;b&#x26;gt; and &#038;amp; ok</p>")
+      result.should eq("See &amp;copy; and &amp;lt;b&amp;gt; and &amp;amp; ok")
+      code = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p><code>&#038;amp;</code></p>")
+      code.should eq("`&amp;`")
+    end
   end
 end
