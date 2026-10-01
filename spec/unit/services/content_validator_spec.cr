@@ -573,6 +573,22 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    # RFC 3339 allows fractional seconds and the build parses them; the
+    # validator's shape check rejected them, so `--strict` failed on dates
+    # such as JavaScript's `toISOString()` output.
+    it "accepts RFC 3339 dates with fractional seconds" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "f1.md"), "---\ntitle: P\ndescription: D\ndate: \"2024-05-01T10:00:00.123Z\"\n---\n\nA\n")
+        File.write(File.join(content_dir, "f2.md"), "+++\ntitle = \"P\"\ndescription = \"D\"\ndate = \"2024-05-01T10:00:00.5+09:00\"\n+++\n\nA\n")
+
+        Hwaro::Utils::DateUtils.parse_content_date("2024-05-01T10:00:00.123Z").should_not be_nil
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        issues.select { |i| i.id == "content-date-invalid" }.should be_empty
+      end
+    end
+
     it "handles out-of-range dates raising ArgumentError as content-date-invalid (regression)" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

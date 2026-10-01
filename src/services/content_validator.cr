@@ -262,7 +262,11 @@ module Hwaro
       end
 
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))
-        unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
+        # Fractional seconds (`10:00:00.123Z`, what JavaScript's
+        # `toISOString` and most exporters write) are RFC 3339 and the build
+        # parses them; without `(\.\d+)?` every such date was flagged, which
+        # failed `--strict` / `--max-warnings` on content that builds.
+        unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
           issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
             message: "Date format may be invalid: \"#{date_str}\"")
           return
