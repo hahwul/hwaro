@@ -4,6 +4,8 @@
 # with the regexes below. JSON frontmatter uses balanced braces — this
 # module provides a brace-aware scanner that respects string literals.
 
+require "yaml"
+
 module Hwaro
   module Utils
     module FrontmatterScanner
@@ -28,11 +30,32 @@ module Hwaro
           {:toml, match[1]}
         elsif match = content.match(YAML_FRONTMATTER_RE)
           {:yaml, match[1]}
-        elsif content.starts_with?('{') && (end_idx = find_json_end(content))
+        elsif json_start?(content) && (end_idx = find_json_end(content))
           # find_json_end returns a BYTE offset; byte_slice keeps multibyte
           # JSON front matter intact.
           {:json, content.byte_slice(0, end_idx)}
         end
+      end
+
+      # True when `content` opens the way JSON front matter does: a `{` at
+      # byte 0 followed (after optional whitespace) by `"` (the first key) or
+      # `}` (an empty object). This is the build's own test
+      # (`Processors::Markdown#json_front_matter_start?`): a `{` also opens
+      # shortcodes (`{{ … }}`), Jinja tags (`{% … %}`) and attribute lists
+      # (`{:.class}`), which the build renders as body text. Treating those
+      # as front matter made the read-only tools disagree with the build —
+      # `tool validate` failed such a page with a JSON parse error.
+      def json_start?(content : String) : Bool
+        return false unless content.starts_with?('{')
+        reader = Char::Reader.new(content)
+        reader.next_char # skip the leading '{'
+        while reader.has_next?
+          ch = reader.current_char
+          return true if ch == '"' || ch == '}'
+          return false unless ch.whitespace?
+          reader.next_char
+        end
+        false
       end
 
       # Strip front matter, if any. The TOML and YAML strips are mutually
@@ -40,14 +63,52 @@ module Hwaro
       # eat a *body* that opens with a thematic break (`---\n…\n---`) once
       # the TOML front matter had already been removed, silently dropping
       # the first block of the document.
+      #
+      # A leading `---` pair is only stripped when the build reads it as
+      # front matter (see `yaml_front_matter?`); a thematic break around
+      # prose stays part of the body, as it does in the build.
       def strip_frontmatter(content : String) : String
-        if content.starts_with?('{') && (end_idx = find_json_end(content))
+        if json_start?(content) && (end_idx = find_json_end(content))
           content.byte_slice(end_idx)
         elsif content.matches?(TOML_FRONTMATTER_RE)
           content.sub(TOML_FRONTMATTER_RE, "")
+        elsif (match = content.match(YAML_FRONTMATTER_RE)) && yaml_front_matter?(match[1])
+          match.post_match
         else
-          content.sub(YAML_FRONTMATTER_RE, "")
+          content
         end
+      end
+
+      # A top-level `key:` line — what separates broken YAML front matter
+      # from prose between two thematic breaks. Same pattern as
+      # `Processors::Markdown::YAML_KEY_LINE_RE`.
+      YAML_KEY_LINE_RE = /^[\p{L}_][\p{L}\p{N}_.-]*\s*:(\s|$)/
+
+      # Whether the build treats the text between a leading `---` pair as
+      # front matter (`Processors::Markdown#parse`): a mapping, an empty or
+      # comment-only block, or a block that fails to parse but carries a
+      # `key:` line (the build reports that as invalid front matter). Any
+      # other block — a list, a scalar, prose that is not valid YAML — is
+      # body text opening with a thematic break, and the build renders it.
+      def yaml_front_matter?(block : String) : Bool
+        parsed = begin
+          YAML.parse(block)
+        rescue
+          return yaml_front_matter_like?(block)
+        end
+        return true if parsed.as_h?
+        return false unless parsed.raw.nil?
+        block.each_line.all? do |line|
+          stripped = line.strip
+          stripped.empty? || stripped.starts_with?('#')
+        end
+      end
+
+      # True when a block that failed to parse as YAML still looks like front
+      # matter, so the failure is the author's broken front matter rather
+      # than prose after a thematic break.
+      def yaml_front_matter_like?(block : String) : Bool
+        block.each_line.any?(&.matches?(YAML_KEY_LINE_RE))
       end
 
       # Returns the end offset (exclusive) of the first balanced top-level JSON

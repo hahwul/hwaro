@@ -322,15 +322,14 @@ module Hwaro
         case format
         when FrontmatterFormat::YAML
           return false unless match = content.match(YAML_FRONTMATTER_RE)
-          begin
-            parsed = YAML.parse(match[1])
-            # An empty block (`---\n---\n`) parses to nil; that is empty
-            # front matter, not body text — it must convert, not be skipped
-            # as "not front matter".
-            parsed.raw.nil? || parsed.as_h? ? true : false
-          rescue YAML::ParseException
-            true
-          end
+          # The build's own decision: a mapping or an empty/comment-only
+          # block is front matter (an empty one must convert, not be skipped
+          # as "not front matter"); a block that fails to parse is front
+          # matter only when it carries a `key:` line. Prose between two
+          # thematic breaks that is not valid YAML (`*Note*: …`) used to be
+          # reported as a conversion failure — failing the whole run — for
+          # a page the build renders fine.
+          Utils::FrontmatterScanner.yaml_front_matter?(match[1])
         when FrontmatterFormat::TOML
           # TOML.parse always yields a table; just require a closing delimiter.
           content.matches?(TOML_FRONTMATTER_RE)

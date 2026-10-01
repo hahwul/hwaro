@@ -319,6 +319,38 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    # `hwaro build` renders these pages fine (a leading `{` is only JSON
+    # front matter when a key or `}` follows), so validate must not fail
+    # them with a JSON parse error and exit 5.
+    it "does not report a page opening with a shortcode as broken JSON front matter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "shortcode.md"), %({{ youtube(id="abc") }}\n\nBody.\n))
+        File.write(File.join(content_dir, "brace.md"), %({ not json }\n\nBody.\n))
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        issues.select { |i| i.level == :error }.should be_empty
+        issues.count { |i| i.id == "content-title-missing" }.should eq(2)
+      end
+    end
+
+    # A page opening with a thematic break around a note is body text to the
+    # build, which renders it; reporting it as broken YAML failed validate
+    # (exit 5) on a tree that builds.
+    it "does not report prose between thematic breaks as broken YAML front matter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "hr-note.md"), "---\n\n*Note*: imported from an old blog.\n\n---\n\nBody text here.\n")
+        File.write(File.join(content_dir, "broken.md"), "---\ntitle: [unclosed\n---\nBody\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        errors = issues.select { |i| i.level == :error }
+        errors.map { |i| File.basename(i.file || "") }.should eq(["broken.md"])
+      end
+    end
+
     it "detects invalid date format" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
@@ -538,6 +570,22 @@ describe Hwaro::Services::ContentValidator do
         broken = issues.select { |i| i.id == "content-internal-link-broken" }
         broken.size.should eq(1)
         broken[0].message.should eq("Possible broken internal link: @/about")
+      end
+    end
+
+    # RFC 3339 allows fractional seconds and the build parses them; the
+    # validator's shape check rejected them, so `--strict` failed on dates
+    # such as JavaScript's `toISOString()` output.
+    it "accepts RFC 3339 dates with fractional seconds" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "f1.md"), "---\ntitle: P\ndescription: D\ndate: \"2024-05-01T10:00:00.123Z\"\n---\n\nA\n")
+        File.write(File.join(content_dir, "f2.md"), "+++\ntitle = \"P\"\ndescription = \"D\"\ndate = \"2024-05-01T10:00:00.5+09:00\"\n+++\n\nA\n")
+
+        Hwaro::Utils::DateUtils.parse_content_date("2024-05-01T10:00:00.123Z").should_not be_nil
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        issues.select { |i| i.id == "content-date-invalid" }.should be_empty
       end
     end
 

@@ -469,6 +469,55 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
 
+    # TOML has no null. Writing a YAML/JSON null back as `""` turned "unset"
+    # into a SET value: the build gave the page an empty title and, with
+    # `slug = ""`, a URL equal to its section index — so the post was dropped
+    # from the site as a duplicate output path. Judge by the build's parser.
+    it "omits null-valued keys instead of writing empty strings (YAML and JSON to TOML)" do
+      {
+        "---\ntitle:\ndescription: ~\nslug:\nimage: ~\ndate: 2024-05-01T10:00:00Z\nextra:\n  a: ~\n  b: kept\n  inline: [{k: ~, j: 1}]\n---\nBody.\n",
+        %({"title": null, "slug": null, "image": null, "date": "2024-05-01T10:00:00Z", "extra": {"a": null, "b": "kept", "inline": [{"k": null, "j": 1}]}}\nBody.\n),
+      }.each do |source|
+        Dir.mktmpdir do |dir|
+          converter = Hwaro::Services::FrontmatterConverter.new(dir)
+          file_path = File.join(dir, "nulls.md")
+          File.write(file_path, source)
+
+          before = Hwaro::Content::Processors::Markdown.new.parse(source, "nulls.md")
+          converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+          converted = File.read(file_path)
+          converted.should_not contain(%(""))
+          after = Hwaro::Content::Processors::Markdown.new.parse(converted, "nulls.md")
+
+          after[:title].should eq(before[:title])
+          after[:title].should eq("Untitled")
+          after[:slug].should be_nil
+          after[:image].should be_nil
+          after[:description].should be_nil
+          after[:date].should eq(before[:date])
+          after[:extra]["b"].should eq("kept")
+          after[:extra].has_key?("a").should be_false
+          after[:content].should eq(before[:content])
+        end
+      end
+    end
+
+    # Same build decision for convert: prose between two thematic breaks is
+    # not front matter, so it is left alone instead of failing the run.
+    it "skips prose between thematic breaks instead of failing the run" do
+      Dir.mktmpdir do |dir|
+        file_path = File.join(dir, "hr-note.md")
+        content = "---\n\n*Note*: imported from an old blog.\n\n---\n\nBody text here.\n"
+        File.write(file_path, content)
+
+        result = Hwaro::Services::FrontmatterConverter.new(dir).convert_to_toml
+        result.success.should be_true
+        result.error_count.should eq(0)
+        result.skipped_count.should eq(1)
+        File.read(file_path).should eq(content)
+      end
+    end
+
     it "converts JSON file to YAML" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)

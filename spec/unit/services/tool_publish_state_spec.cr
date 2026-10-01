@@ -99,6 +99,7 @@ describe "tool publication-state parity" do
         content_dir = File.join(dir, "content")
         blog = File.join(content_dir, "blog")
         FileUtils.mkdir_p(blog)
+        File.write(File.join(dir, "config.toml"), %(title = "S"\ndefault_language = "en"\n[languages.en]\n[languages.ko]\n))
         File.write(File.join(blog, "_index.md"),
           "+++\ntitle = \"Blog\"\n[cascade]\ndraft = true\n+++\n")
         File.write(File.join(blog, "post.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
@@ -126,6 +127,49 @@ describe "tool publication-state parity" do
         post = Hwaro::Services::ContentLister.new(content_dir)
           .list_content(Hwaro::Services::ContentFilter::All).find! { |i| i.title == "EN" }
         post.draft.should be_true
+      end
+    end
+
+    # ReadContent only reads a filename suffix as a language on a
+    # multilingual site and only for a DECLARED code. A shape-based guess
+    # read `setup.mac.md` (or `post.ko.md` on a single-language site) as a
+    # translation that escapes the section's cascade: listed as published
+    # while the build dropped it as a draft.
+    it "applies the cascade to suffixes the build does not read as languages" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        blog = File.join(content_dir, "blog")
+        FileUtils.mkdir_p(blog)
+        File.write(File.join(dir, "config.toml"), %(title = "S"\n))
+        File.write(File.join(blog, "_index.md"),
+          "+++\ntitle = \"Blog\"\n[cascade]\ndraft = true\n+++\n")
+        File.write(File.join(blog, "setup.mac.md"), "+++\ntitle = \"Mac\"\n+++\n")
+        File.write(File.join(blog, "post.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
+        File.write(File.join(blog, "about.en.md"), "+++\ntitle = \"EN\"\n+++\n")
+
+        by_title = Hwaro::Services::ContentLister.new(content_dir)
+          .list_content(Hwaro::Services::ContentFilter::All).to_h { |i| {i.title, i} }
+        by_title["Mac"].status.should eq("draft")
+        by_title["KO"].status.should eq("draft")
+        by_title["EN"].status.should eq("draft")
+      end
+    end
+
+    it "applies the cascade to an undeclared suffix on a multilingual site" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        blog = File.join(content_dir, "blog")
+        FileUtils.mkdir_p(blog)
+        File.write(File.join(dir, "config.toml"), %(title = "S"\n[languages.en]\n[languages.ko]\n))
+        File.write(File.join(blog, "_index.md"),
+          "+++\ntitle = \"Blog\"\n[cascade]\ndraft = true\n+++\n")
+        File.write(File.join(blog, "setup.mac.md"), "+++\ntitle = \"Mac\"\n+++\n")
+        File.write(File.join(blog, "post.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
+
+        by_title = Hwaro::Services::ContentLister.new(content_dir)
+          .list_content(Hwaro::Services::ContentFilter::All).to_h { |i| {i.title, i} }
+        by_title["Mac"].status.should eq("draft")
+        by_title["KO"].status.should eq("published")
       end
     end
 
@@ -209,6 +253,70 @@ describe "tool publication-state parity" do
           %({"title": "Post", "date": "2020-01-01", "tags": ["json"]}\n\nbody\n))
 
         Hwaro::Services::ContentStats.new(content_dir).run.tags.keys.should eq(["json"])
+      end
+    end
+    # A `[[content.generate]]` page has no file at its listed path, so stats
+    # counted it as published but silently dropped its tags and month — the
+    # build writes /tags/<term>/ pages for it like for any authored post.
+    it "counts the tags and month of a [[content.generate]] page" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content/products")
+          FileUtils.mkdir_p("data")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "name"
+            date = "date"
+            [content.generate.taxonomies]
+            tags = "tags"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "alpha", "name": "Alpha", "date": "2024-02-03", "tags": ["gen", "alpha"]}]))
+          File.write("content/products/_index.md", "+++\ntitle = \"Products\"\n+++\n")
+
+          result = Hwaro::Services::ContentStats.new("content").run
+          result.published.should eq(2)
+          result.tags.should eq({"gen" => 1, "alpha" => 1})
+          result.monthly.should eq({"2024-02" => 1})
+        end
+      end
+    end
+  end
+
+  describe Hwaro::Services::GeneratedContent do
+    # A record missing the rule's `body` field fails every build; planning
+    # without bodies listed its rows (and the rule's healthy ones) as
+    # publishable with no hint that the build cannot run.
+    it "does not list rows of a rule whose body field fails the build" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("data")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "name"
+            body = "body"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "a", "name": "A", "body": "x"}, {"id": "b", "name": "B"}]))
+
+          infos = [] of Hwaro::Services::ContentInfo
+          log = with_captured_log { infos = Hwaro::Services::GeneratedContent.infos("content") }
+          infos.should be_empty
+          log.should contain("missing field 'body'")
+        end
       end
     end
   end
