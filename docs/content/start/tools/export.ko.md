@@ -94,6 +94,10 @@ hwaro tool export hugo --verbose
 그 외 프론트 매터 키는 Hugo 페이지 파라미터로 그대로 전달됩니다.
 
 출력 구조는 `export/content/` 아래에 원본 디렉터리 배치를 그대로 유지합니다.
+사이트 루트의 `index.md`, 또는 아래에 다른 페이지가 있는 `index.md`는
+`_index.md`로 기록됩니다. Hugo는 `index.md`를 리프 번들로 읽어 그 아래의 모든
+페이지를 번들 리소스로 바꾸기 때문입니다. 리프 번들(`posts/my-post/index.md`)은
+이름을 그대로 유지합니다.
 
 ### Jekyll
 

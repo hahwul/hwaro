@@ -94,6 +94,10 @@ while the counts cover content documents only.
 Every other front-matter key is passed through as a Hugo page param.
 
 Output structure preserves the original directory layout under `export/content/`.
+An `index.md` at the site root, or one with other pages below it, is written
+as `_index.md`: Hugo reads `index.md` as a leaf bundle, which turns every page
+beneath it into a bundle resource. Leaf bundles (`posts/my-post/index.md`)
+keep their name.
 
 ### Jekyll
 

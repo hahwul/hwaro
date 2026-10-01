@@ -4,6 +4,13 @@ module Hwaro
   module Services
     module Exporters
       class HugoExporter < Base
+        # `index.md`, `index.markdown` and their translations (`index.ko.md`).
+        INDEX_FILE_RE = /\Aindex((?:\.[^.\/]+)?)\.(md|markdown)\z/
+
+        # Content-relative paths of every file this run scanned, so an
+        # `index.md` can be judged against the pages around it.
+        @relative_files = Set(String).new
+
         def run(options : Config::Options::ExportOptions) : ExportResult
           content_dir = options.content_dir
           output_dir = options.output_dir
@@ -11,6 +18,7 @@ module Hwaro
           verbose = options.verbose
 
           files = scan_content_files(content_dir)
+          @relative_files = files.map { |f| f.sub(content_dir, "").lstrip('/') }.to_set
 
           if files.empty?
             return ExportResult.new(
@@ -127,7 +135,7 @@ module Hwaro
 
           # Preserve directory structure
           relative = file_path.sub(content_dir, "").lstrip('/')
-          out_path = File.join(output_dir, "content", relative)
+          out_path = File.join(output_dir, "content", hugo_relative_path(relative))
 
           # A refused destination (outside `output_dir`) is reported as
           # skipped, and its bundle assets are not copied either — there is no
@@ -149,6 +157,41 @@ module Hwaro
           end
 
           :exported
+        end
+
+        # Where `relative` lands under Hugo's `content/`.
+        #
+        # Hugo reads `index.md` as a LEAF bundle, and a leaf bundle has no
+        # descendant pages: every other Markdown file beneath it becomes an
+        # inert resource of the bundle. Hwaro has no such rule — its
+        # `index.md` is just the page served at the directory URL — and the
+        # `blog`/`docs`/`book` scaffolds all use `content/index.md` as the
+        # homepage, so a verbatim export made Hugo publish the homepage and
+        # nothing else. The root (never a bundle in hwaro) and any directory
+        # with pages below its `index.md` export it as `_index.md`, Hugo's
+        # branch bundle, which serves the same URL and keeps the descendants
+        # (and co-located assets) intact. An authored `_index` twin already
+        # owns that slot, so the file is then left as it is.
+        private def hugo_relative_path(relative : String) : String
+          match = File.basename(relative).match(INDEX_FILE_RE)
+          return relative unless match
+
+          dir = File.dirname(relative)
+          branch_name = "_index#{match[1]}.#{match[2]}"
+          prefix = dir == "." ? "" : "#{dir}/"
+          twin = {"md", "markdown"}.any? { |ext| @relative_files.includes?("#{prefix}_index#{match[1]}.#{ext}") }
+          return relative if twin
+          return "#{prefix}#{branch_name}" if dir == "." || descendant_pages?(dir)
+          relative
+        end
+
+        # Whether `dir` holds content pages besides its own `index` variants.
+        private def descendant_pages?(dir : String) : Bool
+          prefix = "#{dir}/"
+          @relative_files.any? do |path|
+            next false unless path.starts_with?(prefix)
+            File.dirname(path) != dir || !File.basename(path).matches?(INDEX_FILE_RE)
+          end
         end
 
         # An authored, non-null value for `key` exists in the source fields.
