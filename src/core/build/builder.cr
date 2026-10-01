@@ -329,6 +329,14 @@ module Hwaro
         # publishes (a superseded `main.<hash>.css`, the `amp/` tree after
         # `[amp]` is switched off). Empty on a process's first build.
         @previous_generated_claims : Set(String) = Set(String).new
+        # The claims above that a GENERATOR made — every claimer but the
+        # static copy (404.html, feeds, sitemap, robots, llms, the search
+        # index, taxonomy pages, raw content files, bundles). On a cold build
+        # each of them is written after `static/` is copied, so a static file
+        # at one of these paths loses; the serve static lane needs to know
+        # when an edit lands on one (see `copy_changed_static`). Reset with
+        # the claims; guarded by @generated_claims_mutex.
+        @generator_output_claims : Set(String) = Set(String).new
         # True while @generated_output_claims is the running full build's own
         # set (reset by the Initialize phase); false once an incremental serve
         # pass starts, which re-claims nothing — so the set then still names
@@ -417,9 +425,14 @@ module Hwaro
         # Record an output file this build produced that no cache entry
         # covers. Public: the taxonomy generator is a module that reaches the
         # builder through its `builder:` argument.
-        def claim_generated_output(path : String) : Nil
+        #
+        # `static_copy` marks the Initialize phase's copy of `static/`: it is
+        # a claim like any other, but not a generator's (see
+        # `@generator_output_claims`).
+        def claim_generated_output(path : String, static_copy : Bool = false) : Nil
           @generated_claims_mutex.synchronize do
             @generated_output_claims << path
+            @generator_output_claims << path unless static_copy
             @taxonomy_pass_outputs.try(&.<<(path))
           end
         end
@@ -433,6 +446,7 @@ module Hwaro
           @generated_claims_mutex.synchronize do
             @previous_generated_claims = @generated_output_claims
             @generated_output_claims = Set(String).new
+            @generator_output_claims = Set(String).new
           end
           @generated_claims_current = true
         end

@@ -128,8 +128,9 @@ module Hwaro
         # bundle pipeline below — handing them to copy_changed_static would
         # compute a `../`-relative destination and log a warning for every save.
         static_sources = changeset.modified_static.select(&.starts_with?("static/"))
-        # True when a copy landed on a file a page renders: the static-only
-        # strategy re-renders nothing, so the page's URL would serve the
+        # True when a copy landed on a file a page renders or a generator
+        # writes (robots.txt, a feed, a taxonomy page, an alias stub): the
+        # static-only strategy re-renders nothing, so that URL would serve the
         # static bytes for the rest of the session. Escalated below, with the
         # bundle-fingerprint case, to a full rebuild.
         static_shadowed_page = @builder.copy_changed_static(static_sources, output_dir, build_options.verbose)
@@ -175,7 +176,7 @@ module Hwaro
           return run_full_build(build_options)
         end
         if static_shadowed_page
-          Logger.info "  A static file publishes where a page renders — rebuilding so the page wins that path."
+          Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
           return run_full_build(build_options)
         end
         true

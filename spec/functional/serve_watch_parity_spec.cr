@@ -242,3 +242,80 @@ describe "serve watch parity: [[content.generate]] body templates" do
     end
   end
 end
+
+# Static files sitting where the build writes something that is not a page's
+# own output: a generator file, a taxonomy page, an alias stub, a pagination
+# page, the PWA files. A cold build writes them all after copying static/,
+# but the static-only lane copied the edit and re-rendered nothing.
+private def write_shadow_site
+  File.write("config.toml", <<-TOML
+    title = "Shadow"
+    base_url = "https://example.com"
+
+    [[taxonomies]]
+    name = "tags"
+
+    [pwa]
+    enabled = true
+    TOML
+  )
+  FileUtils.mkdir_p("content/posts")
+  FileUtils.mkdir_p("templates")
+  File.write("templates/page.html", "<html><body>{{ page.title }}</body></html>")
+  File.write("templates/section.html", "<html><body>{{ section.title }}</body></html>")
+  File.write("templates/taxonomy_term.html", "<html><body>TERM {{ page.title }}</body></html>")
+  File.write("templates/404.html", "<html><body>NOT FOUND</body></html>")
+  File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\npaginate = 1\n+++\n")
+  File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = \"2024-01-01\"\ntags = [\"hello\"]\naliases = [\"/old-a/\"]\n+++\na")
+  File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = \"2024-01-02\"\n+++\nb")
+  {
+    "robots.txt", "404.html", "sw.js", "manifest.json", "tags/hello/index.html",
+    "old-a/index.html", "posts/page/2/index.html", "plain.txt",
+  }.each do |relative|
+    FileUtils.mkdir_p(File.dirname(File.join("static", relative)))
+    File.write(File.join("static", relative), "USER BYTES v1")
+  end
+end
+
+describe "serve watch parity: static edits over generated outputs" do
+  it "lets the generated file win again when a shadowing static file is edited" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_shadow_site
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        generated = {
+          "robots.txt", "404.html", "sw.js", "manifest.json", "tags/hello/index.html",
+          "old-a/index.html", "posts/page/2/index.html",
+        }
+        generated.each do |relative|
+          fail "cold build served the static #{relative}" if File.read(File.join("public", relative)).includes?("USER BYTES")
+        end
+
+        generated.each do |relative|
+          File.write(File.join("static", relative), "USER BYTES v2")
+          server.watch_parity_apply_changeset(watch_parity_changeset(static: ["static/#{relative}"]), options)
+          if File.read(File.join("public", relative)).includes?("USER BYTES")
+            fail "a static edit of #{relative} replaced the generated file"
+          end
+        end
+      end
+    end
+  end
+
+  it "still copies an ordinary static file without a rebuild" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_shadow_site
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+
+        File.write("static/plain.txt", "USER BYTES v2")
+        builder.copy_changed_static(["static/plain.txt"], "public").should be_false
+        File.read("public/plain.txt").should eq("USER BYTES v2")
+      end
+    end
+  end
+end

@@ -435,7 +435,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # so without the claim a file deleted from `static/` kept being served
       # (and deployed) forever; with it, Finalize deletes exactly the copies
       # whose source is gone (see Phases::Finalize#stale_generated_outputs).
-      claim_generated_output(dest_path)
+      claim_generated_output(dest_path, static_copy: true)
       # `info` from above already carries the source mtime — re-statting
       # src_path here tripled the stat count over static/ on watch rebuilds.
       #
