@@ -61,11 +61,17 @@ module Hwaro
       private def self.load_deployment_targets(config : Config, s : Hash(String, TOML::Any))
         return unless targets_any = s["targets"]?.try(&.as_a?)
 
-        config.deployment.targets = targets_any.compact_map do |target_any|
+        config.deployment.targets = targets_any.each_with_index.to_a.compact_map do |(target_any, idx)|
           next unless target_h = target_any.as_h?
 
           name = target_h["name"]?.try(&.as_s?)
-          next unless name
+          unless name
+            # Targets are selected by name, so a nameless one can never be
+            # deployed — say so instead of letting it vanish and surfacing as
+            # "No deployment targets configured."
+            Logger.warn "Ignoring [[deployment.targets]] entry ##{idx + 1}: it has no string 'name'."
+            next
+          end
 
           target = DeploymentTarget.new
           target.name = name

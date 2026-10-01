@@ -7,7 +7,6 @@ require "uri"
 require "../cli/prompt"
 require "../cli/runner"
 require "../models/config"
-require "../utils/command_runner"
 require "../utils/dev_marker"
 require "../utils/errors"
 require "../utils/file_safe"
@@ -31,6 +30,12 @@ module Hwaro
         source : String?,
         destination : String? do
         include JSON::Serializable
+
+        # Every op carries every documented key: a delete has no source, and
+        # dropping the key (JSON::Serializable's default for nil) broke
+        # consumers that index `op["source"]`.
+        @[JSON::Field(emit_null: true)]
+        @source : String?
       end
 
       # Per-target summary emitted by `#deploy_structured` for
@@ -53,8 +58,9 @@ module Hwaro
 
       # Counts collected while deploying a single target. Command-based
       # targets report zeros since we can't introspect what the external
-      # tool did.
-      private struct TargetCounts
+      # tool did. A class, so the counts filled in before a mid-sync failure
+      # still reach the `deploy --json` error result.
+      private class TargetCounts
         property created : Int32
         property updated : Int32
         property deleted : Int32
@@ -90,7 +96,7 @@ module Hwaro
         targets.each do |target|
           if command = target.command
             warn_unapplied_target_options(target)
-            require_non_empty_source!(source_dir, effective) if command_reads_source?(command)
+            classify_io_errors(target) { require_non_empty_source!(source_dir, effective) } if command_reads_source?(command)
             ops << PlannedOp.new(
               target: target.name,
               action: "command",
@@ -107,23 +113,28 @@ module Hwaro
           if directory_destination = local_directory_destination(url)
             # `--dry-run` is only useful if it fails the way the real deploy
             # would, so the plan runs the exact preparation (overlap check,
-            # destination validation, delete cap) a deploy does — it only
-            # stops short of creating the destination directory.
-            sync = prepare_directory_sync(target, source_dir, directory_destination, effective, deployment, create_dest: false, force_patterns: force_patterns)
-            dest_dir = sync.dest_dir
+            # destination validation, delete cap) a deploy does.
+            classify_io_errors(target) do
+              sync = prepare_directory_sync(target, source_dir, directory_destination, effective, deployment, force_patterns: force_patterns)
+              dest_dir = sync.dest_dir
+              symlink_memo = {} of String => Bool
 
-            sync.to_copy.each do |dest_rel, src_path|
-              dest_path = File.join(dest_dir, dest_rel)
-              action = File.exists?(dest_path) ? "update" : "create"
-              ops << PlannedOp.new(target: target.name, action: action, path: dest_rel, source: src_path, destination: dest_path)
-            end
+              sync.to_copy.each do |dest_rel, src_path|
+                dest_path = File.join(dest_dir, dest_rel)
+                # Same rule the write pass counts by: a path reached through a
+                # destination symlink, or standing where a stale directory is
+                # cleared first, is created, not updated.
+                action = replaces_existing_file?(dest_dir, dest_rel, symlink_memo) ? "update" : "create"
+                ops << PlannedOp.new(target: target.name, action: action, path: dest_rel, source: src_path, destination: dest_path)
+              end
 
-            sync.to_delete.each do |rel|
-              ops << PlannedOp.new(target: target.name, action: "delete", path: rel, source: nil, destination: File.join(dest_dir, rel))
+              sync.to_delete.each do |rel|
+                ops << PlannedOp.new(target: target.name, action: "delete", path: rel, source: nil, destination: File.join(dest_dir, rel))
+              end
             end
           elsif auto_command = auto_command_for_url(url, source_dir)
             warn_unapplied_target_options(target)
-            require_non_empty_source!(source_dir, effective) if command_reads_source?(auto_command)
+            classify_io_errors(target) { require_non_empty_source!(source_dir, effective) } if command_reads_source?(auto_command)
             ops << PlannedOp.new(
               target: target.name,
               action: "command",
@@ -209,7 +220,7 @@ module Hwaro
         error : Hwaro::HwaroError? = nil
 
         begin
-          ok, counts = deploy_target_with_counts(target, source_dir, effective, deployment)
+          ok, counts = deploy_target_with_counts(target, source_dir, effective, deployment, counts: counts)
         rescue ex : Hwaro::HwaroError
           error = ex
         rescue ex
@@ -285,6 +296,7 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
         structured : Bool = true,
+        counts : TargetCounts = TargetCounts.new,
       ) : {Bool, TargetCounts}
         if command = target.command
           ok = deploy_via_command(target, source_dir, command, effective)
@@ -295,11 +307,14 @@ module Hwaro
         raise_missing_url!(target) if url.empty?
 
         if directory_destination = local_directory_destination(url)
-          if structured
-            return deploy_to_directory_with_counts(target, source_dir, directory_destination, effective, deployment)
+          outcome = classify_io_errors(target) do
+            if structured
+              deploy_to_directory_with_counts(target, source_dir, directory_destination, effective, deployment, counts)
+            else
+              {deploy_to_directory(target, source_dir, directory_destination, effective, deployment), TargetCounts.new}
+            end
           end
-          ok = deploy_to_directory(target, source_dir, directory_destination, effective, deployment)
-          return {ok, TargetCounts.new}
+          return outcome
         end
 
         if auto_command = auto_command_for_url(url, source_dir)

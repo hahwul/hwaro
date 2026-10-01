@@ -20,7 +20,12 @@ module Hwaro
       ) : Bool
         Logger.heading("deploy", target.name)
         warn_unapplied_target_options(target)
-        require_non_empty_source!(source_dir, effective) if command_reads_source?(command)
+        if command_reads_source?(command)
+          # The one filesystem read a command target does; classified here
+          # rather than around the whole run, so a closed stdout later on is
+          # not blamed on the source or destination.
+          classify_io_errors(target) { require_non_empty_source!(source_dir, effective) }
+        end
         expanded = expand_placeholders(command, source_dir, target)
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
@@ -37,9 +42,18 @@ module Hwaro
         # Always show the command that will be executed
         Logger.info "  Command: #{expanded}"
 
-        # Warn and require confirmation for commands with shell metacharacters
+        # Warn and require confirmation for commands with shell
+        # metacharacters. Judge the *template* the author wrote: placeholder
+        # values are single-quoted, so judging the expansion flagged a project
+        # living under `r&d/` or `$work/` and blocked every non-interactive
+        # s3/gs/az deploy from it. The quoting only holds where the
+        # placeholder stands as a bare word, though — inside `"…"` or `'…'`
+        # the template's own quotes undo it — so a quoted placeholder is
+        # still judged by its expanded value.
         needs_confirm = effective.confirm
-        if !effective.force && DANGEROUS_SHELL_PATTERNS.matches?(expanded)
+        risky = DANGEROUS_SHELL_PATTERNS.matches?(command) ||
+                (quoted_placeholder?(command) && DANGEROUS_SHELL_PATTERNS.matches?(expanded))
+        if !effective.force && risky
           Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
           needs_confirm = true
         end
@@ -49,20 +63,24 @@ module Hwaro
           return true
         end
 
-        result = Utils::CommandRunner.run(expanded, env: env)
-        unless result.output.empty?
-          result.output.each_line { |line| Logger.info "  #{line}" }
-        end
-        unless result.success
-          # Surface stderr from the subprocess before raising so the user
-          # sees the tool-specific failure detail; the classified error
-          # itself carries only the summary exit-code info.
-          unless result.error.empty?
-            result.error.each_line { |line| Logger.error "  #{line}" }
+        status, stderr = run_deploy_command(expanded, env)
+        unless status.success?
+          # A quiet run streamed nothing, so surface the tool's stderr before
+          # raising; the classified error itself carries only the summary.
+          if Logger.quiet? && !stderr.empty?
+            stderr.each_line { |line| Logger.error "  #{line}" }
           end
+          # `exit_code` raises for a signal-terminated child (a killed
+          # `rsync`, an OOM-killed uploader), which crashed the deploy with
+          # an unclassified RuntimeError instead of reporting the failure.
+          how = if code = status.exit_code?
+                  "exit #{code}"
+                else
+                  "terminated by signal #{status.exit_signal?.try(&.to_s) || "?"}"
+                end
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
-            message: "Deploy command failed (exit #{result.exit_code}): #{expanded}",
+            message: "Deploy command failed (#{how}): #{expanded}",
             hint: "Inspect the stderr above for details from the deploy tool.",
           )
         end
@@ -70,6 +88,109 @@ module Hwaro
         Logger.info "" if Logger.color_enabled?
         Logger.outcome("deployed", target.name)
         true
+      end
+
+      # Run a deploy command, streaming its output as it arrives. Deploy tools
+      # run for minutes (`aws s3 sync`, `rsync` over a slow link); buffering
+      # until exit left the terminal silent the whole time, and stderr — where
+      # those tools print warnings and progress — was dropped entirely unless
+      # the command failed. stdout goes through `Logger.info` (so `--quiet`
+      # and `--json` keep it off stdout), stderr to `Logger.err_io`.
+      #
+      # stdin is handed to the child only on a visible interactive run, so a
+      # tool that asks to confirm or log in can be answered; pipes, CI,
+      # `--json` and `--quiet` (which hides the prompt) keep it closed so
+      # nothing blocks on input that will never come.
+      #
+      # Both pipes are always drained to EOF, even after echoing them fails
+      # (`hwaro deploy | head`, a closed stderr): a pipe nobody reads fills
+      # up and blocks the deploy tool forever. The output was only ever
+      # informational, so the deploy itself runs to completion either way.
+      #
+      # Returns the exit status and the stderr captured for a quiet run.
+      private def run_deploy_command(command : String, env : Hash(String, String)) : {Process::Status, String}
+        quiet = Logger.quiet?
+        input = CLI::Prompt.interactive? && !quiet ? Process::Redirect::Inherit : Process::Redirect::Close
+        process = Process.new(command, shell: true, env: env, input: input,
+          output: Process::Redirect::Pipe, error: Process::Redirect::Pipe)
+
+        begin
+          captured = IO::Memory.new
+          # The lock keeps lines whole when the logger writes both streams to
+          # one IO (as specs do).
+          lock = Mutex.new
+          drained = Channel(Nil).new(1)
+          spawn do
+            echo = true
+            process.error.each_line do |line|
+              lock.synchronize do
+                if quiet
+                  captured.puts line
+                elsif echo
+                  begin
+                    Logger.err_io.puts "  #{line}"
+                  rescue IO::Error
+                    echo = false
+                  end
+                end
+              end
+            end
+          rescue IO::Error
+            # The pipe itself failed; the child sees EPIPE and exits.
+          ensure
+            drained.send(nil)
+          end
+
+          echo = true
+          process.output.each_line do |line|
+            next unless echo
+            begin
+              lock.synchronize { Logger.info "  #{line}" }
+            rescue IO::Error
+              echo = false
+            end
+          end
+          drained.receive
+        rescue ex
+          # Never leave the deploy tool running behind an exception. Only
+          # reached before `wait`, so the pid is still ours to signal.
+          begin
+            process.terminate
+            process.wait
+          rescue
+          end
+          raise ex
+        end
+
+        {process.wait, captured.to_s}
+      end
+
+      # True when a known placeholder sits inside single or double quotes in
+      # the template, where its single-quoted expansion is no longer one
+      # inert word: `"{source}"` re-opens the value to `$(…)` expansion.
+      private def quoted_placeholder?(command : String) : Bool
+        quote = nil.as(Char?)
+        escaped = false
+        command.each_char_with_index do |char, idx|
+          if escaped
+            escaped = false
+            next
+          end
+          case char
+          when '\\'
+            escaped = quote != '\''
+          when '\'', '"'
+            if quote.nil?
+              quote = char
+            elsif quote == char
+              quote = nil
+            end
+          when '{'
+            next if quote.nil?
+            return true if COMMAND_PLACEHOLDERS.any? { |name| command[idx + 1, name.size + 1] == "#{name}}" }
+          end
+        end
+        false
       end
 
       # A command target only reads the deploy source if its template
@@ -115,7 +236,11 @@ module Hwaro
         command : String,
         target : Models::DeploymentTarget,
       ) : Nil
+        # `${NAME}` with an unknown NAME is shell parameter expansion
+        # (`${HWARO_DEPLOY_TARGET}`), not a misspelt placeholder; it is left
+        # to the shell. `${source}` still expands like `{source}`.
         unresolved = command.scan(COMMAND_PLACEHOLDER_RE)
+          .reject { |m| m.begin(0) > 0 && command[m.begin(0) - 1] == '$' && !COMMAND_PLACEHOLDERS.includes?(m[1]) }
           .map { |m| m[1] }
           .uniq!
           .reject { |name| COMMAND_PLACEHOLDERS.includes?(name) }
@@ -187,9 +312,12 @@ module Hwaro
           # For a relative form (file://./out, file://relative/path) URI puts the
           # first segment in `host`; prepend it so the path isn't silently
           # rooted at the filesystem root (file://./out must be ./out, not /out).
+          # `localhost` is the one host RFC 8089 defines: file://localhost/x
+          # is the absolute /x, not a directory named `localhost` under the
+          # project.
           path = uri.path
-          if host = uri.host
-            path = host + path unless host.empty?
+          if (host = uri.host) && !host.empty? && host.downcase != "localhost"
+            path = host + path
           end
           return if path.empty?
           # URI components stay percent-encoded (a space is `%20`); decode so

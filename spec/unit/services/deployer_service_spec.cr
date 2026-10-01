@@ -871,8 +871,9 @@ describe Hwaro::Services::Deployer do
         src_dir = File.join(dir, "src")
         dest_dir = File.join(dir, "dest")
         FileUtils.mkdir_p(src_dir)
-        # A directory sits where index.html has to go.
-        FileUtils.mkdir_p(File.join(dest_dir, "index.html"))
+        # A directory sits where index.html has to go, holding something the
+        # sync never deletes (a dot-directory), so it cannot be cleared.
+        FileUtils.mkdir_p(File.join(dest_dir, "index.html", ".keep"))
         File.write(File.join(src_dir, "index.html"), "x")
 
         config = Hwaro::Models::Config.new

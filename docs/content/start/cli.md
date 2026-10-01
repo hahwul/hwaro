@@ -71,8 +71,8 @@ exit code `1`, so this is a strictly additive contract.
 | `HWARO_E_CONFIG` | config | 3 | `config.toml` missing, unparseable, or invalid |
 | `HWARO_E_TEMPLATE` | template | 4 | Crinja template render error |
 | `HWARO_E_CONTENT` | content | 5 | Content file parse error, invalid frontmatter |
-| `HWARO_E_IO` | io | 6 | Filesystem access error (missing dir, permission denied) |
-| `HWARO_E_NETWORK` | network | 7 | Deploy upload, remote scaffold fetch failure |
+| `HWARO_E_IO` | io | 6 | Filesystem access error (missing dir, permission denied), failed deploy command or sync |
+| `HWARO_E_NETWORK` | network | 7 | Remote scaffold or remote data fetch failure |
 | `HWARO_E_INTERNAL` | internal | 70 | Unrecoverable bug or unexpected state |
 | *(unclassified)* | — | 1 | Legacy/generic failure path |
 | *(success)* | — | 0 | Command completed normally |
@@ -495,6 +495,13 @@ cannot reconcile:
   supports a `public/` symlink to an external deploy directory.
 - `--json` is non-interactive: combining it with `--confirm` fails instead of
   writing a prompt into the JSON document.
+- A command whose template contains shell metacharacters (`|`, `;`, `&`,
+  `` ` ``, `$`, `sudo`, `rm -rf`) asks for confirmation first; `--force` skips
+  that prompt. The template you wrote is what gets checked: `{source}`/`{url}`
+  values are single-quoted, so a path like `r&d/` does not trigger it. A
+  placeholder you wrap in quotes yourself (`"{source}"`) loses that
+  protection, and then its expanded value is checked too.
+- `--dry-run` writes nothing: a missing destination directory is not created.
 
 ### doctor
 
