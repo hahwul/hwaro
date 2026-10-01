@@ -64,8 +64,10 @@ module Hwaro
         # a listing the global page-set fingerprint gates, so retitling a post
         # left its neighbours' "next: …" link — and every `@/` link to a
         # renamed page — stale on warm builds. "" when the page reads none of
-        # them, and for legacy entries — so such pages never rebuild because
-        # of this field.
+        # them, and for legacy entries: a page that reads none never rebuilds
+        # because of this field, while every page that does re-renders once
+        # on the first warm build after upgrading (its legacy "" no longer
+        # matches).
         @[JSON::Field(key: "relations_hash", emit_null: false)]
         property relations_hash : String
 

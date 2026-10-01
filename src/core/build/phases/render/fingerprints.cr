@@ -112,14 +112,23 @@ module Hwaro::Core::Build::Phases::Render
   # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters.
   INTERNAL_LINK_TARGET_RE = /@\/([^\s()"'#?<>\[\]]+)/
 
-  # Which relations one page's template closure reads (see the markers above).
+  # A content-derived field or `[extra]` read straight off a relation —
+  # `page.higher.summary`, `get_page(path="x").extra.badge` — where the
+  # receiver is an attribute or a call result, so the `<receiver>.<field>`
+  # patterns above (which need a bare word receiver) cannot see it.
+  CHAINED_CONTENT_DERIVED_RE = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*(?:summary(?:_truncated)?|word_count|reading_time)\b|\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["'])/
+  CHAINED_EXTRA_RE           = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*extra\b|\[\s*["']extra["'])/
+
+  # Which relations one page's template closure reads (see the markers above),
+  # and which optional page fields it reads off them (`fields`).
   record RelationDeps,
     neighbors : Bool,
     series : Bool,
     related : Bool,
     translations : Bool,
     ancestors : Bool,
-    get_page_targets : Array(String) do
+    get_page_targets : Array(String),
+    fields : Builder::ListingPageFields do
     def reads_any? : Bool
       neighbors || series || related || translations || ancestors || !get_page_targets.empty?
     end
@@ -169,12 +178,30 @@ module Hwaro::Core::Build::Phases::Render
         translations: RELATION_TRANSLATION_MARKERS.any? { |m| blob.includes?(m) },
         ancestors: RELATION_ANCESTOR_MARKERS.any? { |m| blob.includes?(m) },
         get_page_targets: get_page_targets(blob),
+        fields: relation_page_fields(blob),
       ),
     )
     @page_template_scan_mutex.synchronize do
       @page_template_scan_memo[key] = scan if @page_template_scan_memo_key.same?(templates)
     end
     scan
+  end
+
+  # The optional page fields (`[extra]`, excerpt/word count/reading time) a
+  # closure reads off a page OTHER than the one it renders. Same receiver
+  # rules as the listing union (see `reads_other_page_field?`), plus the
+  # chained reads off a relation. Folding them unconditionally made a body
+  # edit — which moves only the content-derived fields — re-render every
+  # neighbour, and a section body edit every page under it.
+  private def relation_page_fields(blob : String) : Builder::ListingPageFields
+    rebound = blob.matches?(REBINDS_SELF_RE)
+    Builder::ListingPageFields.new(
+      extra: blob.matches?(CHAINED_EXTRA_RE) ||
+             reads_other_page_field?(blob, EXTRA_ATTR_RE, EXTRA_INDEX_RE, EXTRA_ARG_RE, rebound),
+      content_derived: blob.matches?(CHAINED_CONTENT_DERIVED_RE) ||
+                       reads_other_page_field?(blob, CONTENT_DERIVED_ATTR_RE,
+                         CONTENT_DERIVED_INDEX_RE, CONTENT_DERIVED_ARG_RE, rebound),
+    )
   end
 
   # Shortcode templates (`shortcodes/<name>`) the page's content calls.
@@ -682,18 +709,17 @@ module Hwaro::Core::Build::Phases::Render
     @page_template_hash_mutex.synchronize { @filter_relations_hashes.clear }
   end
 
-  # Every page field a relation can render — the full page-set fold, `[extra]`
-  # and excerpts included: a neighbour, series member or `get_page` target
-  # reaches the template as the same page object a listing iterates.
-  RELATION_PAGE_FIELDS = Builder::ListingPageFields.new(extra: true, content_derived: true)
-
   # Fingerprint of what this page renders from OTHER pages (see
   # CacheEntry#relations_hash). "" when it renders nothing of them, so such
   # pages compare equal to legacy entries.
   #
   # Only the relations the page's template closure actually reads are
-  # folded: a template without `page.lower` must not re-render because a
-  # neighbour was retitled. `@/` links are folded from the content itself,
+  # folded, and of each related page only what the closure can print: the
+  # page-set fields, plus `[extra]`/excerpts when the closure reads them off
+  # another page (RelationDeps#fields), and for ancestors just the title and
+  # URL a breadcrumb shows. A template without `page.lower` must not
+  # re-render because a neighbour was retitled, and one printing only
+  # neighbour titles must not re-render because a neighbour's body changed. `@/` links are folded from the content itself,
   # target path plus the URL it resolves to ("" while unresolved, so the
   # page also re-renders once the missing target appears).
   protected def page_relations_hash(page : Models::Page, templates : Hash(String, String), site : Models::Site, link_targets : Hash(String, Models::Page)) : String
@@ -704,17 +730,17 @@ module Hwaro::Core::Build::Phases::Render
     digest = Digest::MD5.new
     if rel.neighbors
       fp_value(digest, "n")
-      fp_relation(digest, page.lower)
-      fp_relation(digest, page.higher)
+      fp_relation(digest, page.lower, rel.fields)
+      fp_relation(digest, page.higher, rel.fields)
     end
     if rel.series
       fp_value(digest, "s#{page.series_index}")
       fp_value(digest, "a#{page.series_pages.size}")
-      page.series_pages.each { |p| fp_relation(digest, p) }
+      page.series_pages.each { |p| fp_relation(digest, p, rel.fields) }
     end
     if rel.related
       fp_value(digest, "r#{page.related_posts.size}")
-      page.related_posts.each { |p| fp_relation(digest, p) }
+      page.related_posts.each { |p| fp_relation(digest, p, rel.fields) }
     end
     if rel.translations
       fp_value(digest, "t#{page.translations.size}")
@@ -728,13 +754,19 @@ module Hwaro::Core::Build::Phases::Render
     end
     if rel.ancestors
       fp_value(digest, "c#{page.ancestors.size}")
-      page.ancestors.each { |p| fp_relation(digest, p) }
+      # `page.ancestors` and the JSON-LD breadcrumb expose nothing but each
+      # ancestor's title and URL (build_ancestors_crinja).
+      page.ancestors.each do |a|
+        fp_value(digest, a.path)
+        fp_value(digest, a.url)
+        fp_value(digest, a.title)
+      end
     end
     unless rel.get_page_targets.empty?
       fp_value(digest, "g#{rel.get_page_targets.size}")
       rel.get_page_targets.each do |target|
         fp_value(digest, target)
-        fp_relation(digest, resolve_get_page_target(target, site))
+        fp_relation(digest, resolve_get_page_target(target, site), rel.fields)
       end
     end
     unless links.empty?
@@ -749,24 +781,24 @@ module Hwaro::Core::Build::Phases::Render
 
   # Fingerprint the LOOKUP projection for the serve fan-out: the pages the
   # site's literal `get_page(path=...)` calls return (see GET_PAGE_LITERAL_RE).
-  # "" when no template makes one.
-  private def compute_get_page_lookup_fingerprint(site : Models::Site, targets : Array(String)) : String
+  # "" when no template makes one. `fields` as for the relations hash.
+  private def compute_get_page_lookup_fingerprint(site : Models::Site, targets : Array(String), fields : Builder::ListingPageFields) : String
     return "" if targets.empty?
     digest = Digest::MD5.new
     targets.each do |target|
       fp_value(digest, target)
-      fp_relation(digest, resolve_get_page_target(target, site))
+      fp_relation(digest, resolve_get_page_target(target, site), fields)
     end
     digest.final.hexstring
   end
 
-  private def fp_relation(digest : ::Digest, page : Models::Page?) : Nil
+  private def fp_relation(digest : ::Digest, page : Models::Page?, fields : Builder::ListingPageFields) : Nil
     unless page
       fp_value(digest, "-")
       return
     end
     fp_value(digest, "+")
-    fp_page(digest, page, RELATION_PAGE_FIELDS)
+    fp_page(digest, page, fields)
     fp_value(digest, page.language || "")
   end
 
