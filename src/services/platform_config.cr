@@ -441,7 +441,14 @@ module Hwaro
         target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path], language, data[:date], data[:title])
         return unless target_url
 
+        own_url = normalize_alias_url(target_url)
         aliases.each do |alias_path|
+          # An alias naming the page's own URL is skipped by the build (it
+          # would overwrite the page with a redirect to itself). Emitted
+          # here as a forced 301 from the page to itself, it made the page
+          # an endless redirect loop on Netlify/Vercel — including the
+          # `/moved` vs `/moved/` spelling, which those hosts match alike.
+          next if normalize_alias_url(alias_path) == own_url
           # Carry base_path so generated redirects match the build's own
           # redirect HTML (`url=/myrepo/moved/`) on subpath deploys. Ensure a
           # leading slash first since with_base_path only prefixes root-relative
@@ -456,6 +463,21 @@ module Hwaro
         # must not abort ALL platform config generation — degrade per file,
         # matching how check-links skips unreadable Markdown.
         Logger.warn "Skipping #{path} while collecting aliases: #{ex.message}"
+      end
+
+      # Mirror of the render phase's `normalize_alias_url`: one spelling per
+      # published path (`/a`, `/a/` and `/a/index.html` all name `/a/`).
+      private def normalize_alias_url(alias_path : String) : String
+        norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
+        {"index.html", "index.htm"}.each do |leaf|
+          if norm == "/#{leaf}"
+            return "/"
+          elsif norm.ends_with?("/#{leaf}")
+            return norm[0, norm.size - leaf.size]
+          end
+        end
+        return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+        "#{norm}/"
       end
 
       # Calculate the URL for a page through the same shared resolver as the
