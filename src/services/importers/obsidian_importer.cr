@@ -453,13 +453,17 @@ module Hwaro
 
                 ranges = inline_code_ranges(line)
 
-                line.gsub(/(?:^|(?<=\s))#([a-zA-Z][\w\-\/]*)/) do |match|
+                stripped = line.gsub(/(?:^|(?<=\s))#([a-zA-Z][\w\-\/]*)/) do |match|
                   if ranges.any?(&.includes?($~.begin(0)))
                     match
                   else
                     ""
                   end
-                end.rstrip
+                end
+                # Trim only what removing a tag left behind: an unconditional
+                # rstrip also ate the two trailing spaces of every Markdown
+                # hard line break.
+                stripped == line ? line : stripped.rstrip
               end
             end
           end

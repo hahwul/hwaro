@@ -549,3 +549,19 @@ describe "Obsidian import: %% comments" do
     end
   end
 end
+
+describe "Obsidian import: hard line breaks" do
+  it "keeps the trailing double space of a hard line break" do
+    Dir.mktmpdir do |dir|
+      vault = File.join(dir, "vault")
+      FileUtils.mkdir_p(vault)
+      File.write(File.join(vault, "Poem.md"), "---\ntitle: Poem\n---\nRoses are red,  \nviolets are blue. #poetry\n")
+      output_dir = File.join(dir, "out")
+      Hwaro::Services::Importers::ObsidianImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "obsidian", path: vault, output_dir: output_dir))
+      content = File.read(File.join(output_dir, "posts", "poem.md"))
+      content.should contain("Roses are red,  \nviolets are blue.\n")
+      content.should contain(%(tags = ["poetry"]))
+    end
+  end
+end
