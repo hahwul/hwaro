@@ -151,10 +151,12 @@ module Hwaro
 
         # Headers for caching. Target the configured asset output dir rather
         # than a hardcoded /assets/ so a customized [assets] output_dir is honored.
-        lines << "[[headers]]"
-        lines << "  for = \"#{with_base_path("/#{assets_url_dir}/*")}\""
-        lines << "  [headers.values]"
-        lines << "    Cache-Control = \"public, max-age=31536000, immutable\""
+        if immutable_assets?
+          lines << "[[headers]]"
+          lines << "  for = \"#{with_base_path("/#{assets_url_dir}/*")}\""
+          lines << "  [headers.values]"
+          lines << "    Cache-Control = \"public, max-age=31536000, immutable\""
+        end
 
         lines.join("\n") + "\n"
       end
@@ -167,6 +169,16 @@ module Hwaro
       private def with_base_path(path : String) : String
         normalized = path.starts_with?("/") ? path : "/#{path}"
         @config.with_base_path(normalized)
+      end
+
+      # Whether every file under the asset output dir is content-hashed, so a
+      # year-long `immutable` cache rule is safe. Only the asset pipeline
+      # with fingerprinting names its output by content: with the pipeline
+      # off (the default) `/assets/` is just whatever `static/assets/` holds,
+      # and marking those unhashed files immutable kept browsers on the old
+      # CSS/JS for a year after every deploy.
+      private def immutable_assets? : Bool
+        @config.assets.enabled && @config.assets.fingerprint
       end
 
       # URL path segment where the asset pipeline emits fingerprinted files,
@@ -194,18 +206,20 @@ module Hwaro
         end
 
         # Headers for caching
-        header_entries = [
-          JSON::Any.new({
-            "source"  => JSON::Any.new(with_base_path("/#{assets_url_dir}/(.*)")),
-            "headers" => JSON::Any.new([
-              JSON::Any.new({
-                "key"   => JSON::Any.new("Cache-Control"),
-                "value" => JSON::Any.new("public, max-age=31536000, immutable"),
-              }),
-            ]),
-          }),
-        ]
-        config_hash["headers"] = JSON::Any.new(header_entries)
+        if immutable_assets?
+          header_entries = [
+            JSON::Any.new({
+              "source"  => JSON::Any.new(with_base_path("/#{assets_url_dir}/(.*)")),
+              "headers" => JSON::Any.new([
+                JSON::Any.new({
+                  "key"   => JSON::Any.new("Cache-Control"),
+                  "value" => JSON::Any.new("public, max-age=31536000, immutable"),
+                }),
+              ]),
+            }),
+          ]
+          config_hash["headers"] = JSON::Any.new(header_entries)
+        end
 
         result = {
           "buildCommand"    => JSON::Any.new(build_command),

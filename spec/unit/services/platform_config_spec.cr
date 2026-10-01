@@ -41,13 +41,27 @@ describe Hwaro::Services::PlatformConfig do
         result.should contain("[build.environment]")
       end
 
-      it "includes cache headers" do
+      it "includes cache headers for fingerprinted pipeline assets" do
         config = Hwaro::Models::Config.new
+        config.assets.enabled = true
         generator = Hwaro::Services::PlatformConfig.new(config)
         result = generator.generate("netlify")
 
         result.should contain("[[headers]]")
         result.should contain("Cache-Control")
+      end
+
+      # Regression: `/assets/*` was marked `immutable` for a year even when
+      # nothing there is content-hashed (asset pipeline off — the default —
+      # or fingerprint = false), so browsers kept stale CSS/JS after deploys.
+      it "omits the immutable cache rule when assets are not fingerprinted" do
+        config = Hwaro::Models::Config.new
+        Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("immutable")
+
+        config = Hwaro::Models::Config.new
+        config.assets.enabled = true
+        config.assets.fingerprint = false
+        Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("[[headers]]")
       end
 
       # Regression for gh#528 (D): the example HWARO_VERSION pin had
@@ -75,13 +89,21 @@ describe Hwaro::Services::PlatformConfig do
         parsed["outputDirectory"].as_s.should eq("public")
       end
 
-      it "includes cache headers" do
+      it "includes cache headers for fingerprinted pipeline assets" do
         config = Hwaro::Models::Config.new
+        config.assets.enabled = true
         generator = Hwaro::Services::PlatformConfig.new(config)
         result = generator.generate("vercel")
 
         parsed = JSON.parse(result)
         parsed["headers"].as_a.should_not be_empty
+      end
+
+      it "omits the immutable cache rule when assets are not fingerprinted" do
+        config = Hwaro::Models::Config.new
+        parsed = JSON.parse(Hwaro::Services::PlatformConfig.new(config).generate("vercel"))
+        parsed["headers"]?.should be_nil
+        parsed["outputDirectory"].as_s.should eq("public")
       end
     end
 
@@ -333,6 +355,7 @@ describe Hwaro::Services::PlatformConfig do
 
             config = Hwaro::Models::Config.new
             config.base_url = "https://example.com/myrepo/"
+            config.assets.enabled = true
             generator = Hwaro::Services::PlatformConfig.new(config)
 
             netlify = generator.generate("netlify")

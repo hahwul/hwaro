@@ -61,7 +61,7 @@ Each config includes:
   publishes the directory `hwaro build` actually writes. For `gitlab-ci` a
   non-default directory also adds `publish:` to the `pages` job.
 - **Redirects**: 301 redirects from page [`aliases`](/writing/pages/) defined in frontmatter (e.g., `aliases: ["/old-url/"]`)
-- **Cache headers**: Long-lived caching for static assets
+- **Cache headers**: a year-long `immutable` rule for the `[assets]` output directory, emitted only when the asset pipeline is enabled with `fingerprint = true` (the only files whose names change with their content)
 
 ### Netlify Output
 
