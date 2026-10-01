@@ -372,3 +372,25 @@ describe "Astro import: MDX import statements" do
     end
   end
 end
+
+describe "Astro import: unclosed multi-line MDX import" do
+  it "keeps the lines an unclosed `import {` would have swallowed" do
+    Dir.mktmpdir do |dir|
+      blog_dir = File.join(dir, "src", "content", "blog")
+      FileUtils.mkdir_p(blog_dir)
+      File.write(File.join(blog_dir, "broken.mdx"), "---\ntitle: Broken\n---\nimport {\n  Card,\n\nThe whole article.\n\nMore text.\n")
+      File.write(File.join(blog_dir, "commented.mdx"), "---\ntitle: Commented\n---\nimport {\n  Card, // {legacy}\n  Grid,\n} from './c'\n\nBody here.\n")
+      output_dir = File.join(dir, "out")
+      Hwaro::Services::Importers::AstroImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "astro", path: dir, output_dir: output_dir))
+
+      broken = File.read(File.join(output_dir, "blog", "broken.md"))
+      broken.should contain("The whole article.")
+      broken.should contain("More text.")
+      commented = File.read(File.join(output_dir, "blog", "commented.md"))
+      commented.should_not contain("Grid,")
+      commented.should_not contain("from './c'")
+      commented.should contain("Body here.")
+    end
+  end
+end
