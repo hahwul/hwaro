@@ -56,6 +56,11 @@ module Hwaro
           files
         end
 
+        # Pages the menus/nav link to (kept as stubs by --skip-sample-content).
+        protected def skeleton_page_paths : Array(String)
+          ["index.md", "about.md", "archives.md", "posts/_index.md"]
+        end
+
         # Blog templates share the same chrome (header nav + search
         # overlay + container open) across page/section/post/archives/
         # taxonomy/404. We extract those into `partials/` so users editing

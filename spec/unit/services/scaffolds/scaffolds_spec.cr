@@ -748,3 +748,31 @@ describe "prepend_translation_notice" do
     result.should contain("---\ntitle: X")
   end
 end
+
+describe "scaffold init audit regressions" do
+  it "escapes regex metacharacters in the search highlighter (blog/docs/book)" do
+    js = Hwaro::Services::Scaffolds::Docs.new.template_files.values.join + Hwaro::Services::Scaffolds::Docs.new.static_files.values.join
+    js.should contain(%q(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    js.should contain(%q(.replace(/\s+/g, ' ')))
+    js.should_not contain(%q([\\]\\\\]))
+  end
+
+  it "renders a language switcher in simple, bare and book headers" do
+    [Hwaro::Services::Scaffolds::Simple.new, Hwaro::Services::Scaffolds::Bare.new, Hwaro::Services::Scaffolds::Book.new].each do |scaffold|
+      scaffold.template_files.values.join.should contain("page.translations")
+    end
+  end
+
+  it "comments out [related] when taxonomies are skipped" do
+    config = Hwaro::Services::Scaffolds::Simple.new.config_content(skip_taxonomies: true)
+    config.should_not match(/^\[related\]/m)
+    TOML.parse(config)["related"]?.should be_nil
+  end
+
+  it "ships an uncommentable [[deployment.matchers]] example" do
+    config = Hwaro::Services::Scaffolds::Simple.new.config_content
+    line = config.lines.find! { |l| l.includes?("# pattern = ") && l.includes?("html") }
+    doc = TOML.parse("[[deployment.matchers]]\n" + line.sub(/^\s*# /, ""))
+    doc["deployment"]["matchers"][0]["pattern"].as_s.should eq("^.+\\.html$")
+  end
+end

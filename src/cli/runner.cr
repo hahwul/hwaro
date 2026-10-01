@@ -165,7 +165,7 @@ module Hwaro
       # from `Runner.json_mode?` (set by commands that saw `--json`) or from
       # the raw ARGV (unknown-command path, before any parser runs).
       def self.emit_hwaro_error(err : Hwaro::HwaroError, io : IO = STDERR)
-        json = @@json_mode || ARGV.includes?("--json")
+        json = @@json_mode || flag_args(ARGV).includes?("--json")
         if json
           STDOUT.puts err.to_error_payload.to_json
         else
@@ -177,18 +177,29 @@ module Hwaro
         end
       end
 
+      # The arguments that can be flags: everything before a `--` separator.
+      # Raw-argv scans for global flags must stop there, or `hwaro init -- -q`
+      # (a directory named `-q`) loses its only positional and falls back to
+      # `.` — with `--clean`, emptying the current directory.
+      def self.flag_args(argv : Array(String)) : Array(String)
+        (dash = argv.index("--")) ? argv[0, dash] : argv
+      end
+
       # Strip `--quiet` / `-q` from argv and enable Logger.quiet when present.
       # Mutates the given array in place so subsequent parsers don't see it.
+      # Arguments after `--` are positionals and are left alone.
       def self.apply_global_quiet!(argv : Array(String))
+        dash = argv.index("--") || argv.size
+        kept = [] of String
         found = false
-        argv.reject! do |arg|
-          if arg == "--quiet" || arg == "-q"
+        argv.each_with_index do |arg, i|
+          if i < dash && (arg == "--quiet" || arg == "-q")
             found = true
-            true
           else
-            false
+            kept << arg
           end
         end
+        argv.replace(kept)
         Logger.quiet = true if found
       end
 

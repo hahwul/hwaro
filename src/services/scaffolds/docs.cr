@@ -90,6 +90,11 @@ module Hwaro
             MD
         end
 
+        # Pages the menus/nav link to (kept as stubs by --skip-sample-content).
+        protected def skeleton_page_paths : Array(String)
+          ["index.md", "getting-started/_index.md", "guide/_index.md", "reference/_index.md"]
+        end
+
         # Docs templates share nav, search, and sidebar across page,
         # section, taxonomy, and 404 — extracting those into `partials/`
         # makes "edit the nav" a one-file change and keeps 404/taxonomy
@@ -1375,7 +1380,7 @@ module Hwaro
 
             ## Prerequisites
 
-            - [Crystal](https://crystal-lang.org/) 1.0 or later
+            - [Crystal](https://crystal-lang.org/) 1.21 or later
             - Git (optional, for cloning)
 
             ## Install from Source
@@ -1760,8 +1765,8 @@ module Hwaro
             |--------|-------------|
             | `--scaffold TYPE` | Scaffold type: simple, bare, blog, docs, book (default: simple) |
             | `--force` | Allow a non-empty directory (keeps existing files, adds only missing ones) |
-            | `--clean` | Remove the target directory's contents first (refuses if `.git/` exists) |
-            | `--skip-sample-content` | Don't create sample content |
+            | `--clean` | Remove the target directory's contents first (refuses if it contains `.git`) |
+            | `--skip-sample-content` | Skip sample content (keeps front-matter-only stubs for the pages the navigation links to) |
 
             **Examples:**
 
@@ -1784,8 +1789,10 @@ module Hwaro
 
             | Option | Description |
             |--------|-------------|
-            | `--config FILE` | Use a custom config file |
-            | `--output DIR` | Output directory (default: public) |
+            | `-i`, `--input DIR` | Project directory (default: current directory) |
+            | `-o`, `--output DIR` | Output directory (default: public) |
+            | `-e`, `--env ENV` | Also load `config.<env>.toml` |
+            | `-d`, `--drafts` | Include draft content |
 
             ## hwaro serve
 
@@ -1799,15 +1806,16 @@ module Hwaro
 
             | Option | Description |
             |--------|-------------|
-            | `--port PORT` | Server port (default: 3000) |
-            | `--host HOST` | Server host (default: localhost) |
+            | `-p`, `--port PORT` | Server port (default: 3000) |
+            | `-b`, `--bind HOST` | Bind address (default: 127.0.0.1) |
+            | `--open` | Open the browser after starting |
 
             ## hwaro new
 
             Create a new content file.
 
             ```bash
-            hwaro new [path]
+            hwaro new <path> [options]
             ```
 
             Creates a new Markdown file with front matter template.

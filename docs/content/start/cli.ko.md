@@ -122,9 +122,13 @@ hwaro init my-site --scaffold https://github.com/user/repo/tree/main/docs
 ```
 
 원격 스캐폴드는 저장소에서 `config.toml`, `templates/`, `static/`,
-콘텐츠 구조를 가져옵니다. 콘텐츠 파일은 프론트 매터(메타데이터)만
-유지하므로 원본 본문 없이도 기대되는 페이지 구조를 확인할 수 있습니다.
-API 요청 제한을 피하려면 `GITHUB_TOKEN` 환경 변수를 설정합니다.
+`data/`, `i18n/`, `archetypes/`, 콘텐츠 구조를 가져옵니다. 콘텐츠 파일은
+프론트 매터(메타데이터)만 유지하므로 원본 본문 없이도 기대되는 페이지
+구조를 확인할 수 있습니다. `/tree/<branch>/` URL은 해당 브랜치를
+가져오고, 그 외에는 저장소의 기본 브랜치를 사용합니다. 파일 하나라도
+내려받지 못하면 아무것도 쓰지 않고 `HWARO_E_NETWORK`로 종료합니다.
+API 요청 제한을 피하거나 비공개 저장소에서 가져오려면 `GITHUB_TOKEN`
+환경 변수를 설정합니다.
 
 **옵션:**
 
@@ -134,13 +138,13 @@ API 요청 제한을 피하려면 `GITHUB_TOKEN` 환경 변수를 설정합니�
 | --wizard | 대화형 위저드 실행 (TTY 전용) |
 | --agents MODE | AGENTS.md 콘텐츠 모드: `remote`(가벼움, 기본값) 또는 `local`(전체 레퍼런스 내장) |
 | -f, --force | 디렉터리가 비어 있지 않아도 강제로 생성 (기존 파일은 유지) |
-| --clean | 스캐폴드 전에 대상의 기존 파일을 삭제 (`--force` 포함, 대상에 `.git/`이 있으면 거부) |
+| --clean | 스캐폴드 전에 대상의 기존 파일을 삭제 (`--force` 포함, 대상에 `.git` 디렉터리나 파일이 있거나 대상이 `/` 또는 홈 디렉터리면 거부) |
 | --skip-agents-md | AGENTS.md 파일 생성 생략 |
-| --skip-sample-content | 샘플 콘텐츠 파일 생성 생략 |
+| --skip-sample-content | 샘플 콘텐츠 생략. 스캐폴드 내비게이션이 가리키는 페이지(홈, 섹션 인덱스, About 등)는 프론트 매터만 있는 스텁으로 생성 |
 | --skip-taxonomies | 택소노미 설정과 템플릿 생략 |
 | --include-multilingual LANGS | 다국어 지원 활성화 (예: `en,ko,ja`). 중복 코드는 경고와 함께 제거됩니다 |
-| --minimal-config | 주석과 선택 섹션 없는 최소 `config.toml` 생성 |
-| --full-config | 모든 주석과 선택 섹션을 포함한 전체 `config.toml` 생성 (탐색성 최대) |
+| --minimal-config | 주석과 선택 섹션 없는 최소 `config.toml` 생성 (`--full-config`와 함께 쓸 수 없음) |
+| --full-config | 모든 주석과 선택 섹션을 포함한 전체 `config.toml` 생성 (탐색성 최대). `--force`로 유지되는 기존 `config.toml`은 수정하지 않음 |
 | --list-scaffolds | 사용 가능한 내장 스캐폴드 목록 출력 후 종료 |
 | -q, --quiet | 정보 출력과 배너 숨김 (오류는 stderr로 계속 출력) |
 | -j, --json | 기계가 읽을 수 있는 JSON 출력: `--list-scaffolds`와 함께면 스캐폴드 목록, 그 외에는 `{"status","path","scaffold","files_created"}` 결과 |
