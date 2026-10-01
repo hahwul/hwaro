@@ -18,10 +18,11 @@ module Hwaro
             !!(url =~ /\A[a-z][a-z0-9+.\-]*:/i)
           end
 
-          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, oracle : Utils::BuildOutput::Oracle = Utils::BuildOutput.oracle("public", tool: "check-links")) : Array(Result)
+          private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, oracle : Utils::BuildOutput::Oracle = Utils::BuildOutput.oracle("public", tool: "check-links"), config : Models::Config? = nil) : Array(Result)
             results = [] of Result
             project_root = Utils::PathUtils.find_project_root(content_dir)
             link_index : Services::InternalLinkIndex? = nil
+            page_routes : Services::PageRouteIndex? = nil
 
             links.each do |link|
               # `@/` page links resolve exactly as the build resolves them:
@@ -48,16 +49,18 @@ module Hwaro
               end
 
               base_dir = File.dirname(link.file)
+              routes = page_routes ||= Services::PageRouteIndex.new(content_dir, config || route_config(language_codes))
 
               # Resolve the URL exactly as written FIRST. A leading segment
               # that happens to match a language code may be a real section
               # (`content/ko/posts/`), and that section outranks any
               # translation reading — stripping unconditionally reported such
               # links dead even though the build publishes them.
-              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, oracle) ||
+              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, oracle, routes) ||
                        generated_routes.matches?(resolved_url) ||
                        feed_route?(resolved_url, generated_routes, content_dir, base_dir, language_codes) ||
-                       paginated_route?(resolved_url, link, content_dir, base_dir, taxonomy_names)
+                       paginated_route?(resolved_url, link, content_dir, base_dir, taxonomy_names) ||
+                       published_route?(resolved_url, routes)
 
               # Only when the literal path fails do we read the URL as a
               # translation route (`/ko/about/` ← `content/about.ko.md`), and
@@ -67,12 +70,13 @@ module Hwaro
               if !exists && (code = translatable_language_prefix(resolved_url, language_codes))
                 stripped = resolved_url[(code.size + 1)..]
                 stripped = "/" if stripped.empty?
-                exists = translated_source?(stripped, code, link, content_dir, base_dir, taxonomy_names)
+                exists = translated_source?(stripped, code, link, content_dir, base_dir, taxonomy_names, routes, resolved_url)
               end
 
               unless exists
-                kind_label = link.kind == :image ? "Image not found" : "Internal link target not found"
-                results << Result.new(link: link, status: -1, error: kind_label)
+                error = unpublished_page_error(resolved_url, content_dir, base_dir, language_codes, routes)
+                error ||= link.kind == :image ? "Image not found" : "Internal link target not found"
+                results << Result.new(link: link, status: -1, error: error)
               end
             rescue ex : ArgumentError
               # A destination whose percent-encoding decodes to a byte no path
@@ -379,7 +383,8 @@ module Hwaro
           # checker has always performed.
           private def resolves?(url : String, link : Link, content_dir : String, base_dir : String,
                                 project_root : String, taxonomy_names : Array(String),
-                                oracle : Utils::BuildOutput::Oracle) : Bool
+                                oracle : Utils::BuildOutput::Oracle,
+                                routes : Services::PageRouteIndex) : Bool
             target = content_target(url, content_dir, base_dir)
 
             # Most internal URLs are written with a trailing slash (`/about/`,
@@ -389,11 +394,16 @@ module Hwaro
             # The directory candidates work either way.
             target_no_slash = target.rstrip("/")
 
-            return true if File.exists?(target) ||
-                           markdown_source?(target_no_slash) ||
-                           markdown_source?(File.join(target_no_slash, "_index")) ||
-                           markdown_source?(File.join(target_no_slash, "index")) ||
-                           (link.kind != :image && taxonomy_url?(url, taxonomy_names))
+            sources = page_sources(target_no_slash)
+            if sources.empty?
+              # A Markdown source is published as a page, never under its own
+              # name, so `/posts/a.md` is not a route even though the file
+              # exists.
+              return true if File.exists?(target) && !Services::ContentWalk.markdown?(target_no_slash)
+            elsif serves_page?(sources, url, routes)
+              return true
+            end
+            return true if link.kind != :image && taxonomy_url?(url, taxonomy_names)
 
             # Also accept assets that live in static/ (source) or the build
             # output (after build): images under static/images/, resized/LQIP
@@ -414,36 +424,102 @@ module Hwaro
           # or a taxonomy route counts, never the default-language file.
           private def translated_source?(url : String, code : String, link : Link,
                                          content_dir : String, base_dir : String,
-                                         taxonomy_names : Array(String)) : Bool
-            target_no_slash = content_target(url, content_dir, base_dir).rstrip("/")
-
-            markdown_source?("#{target_no_slash}.#{code}") ||
-              markdown_source?(File.join(target_no_slash, "_index.#{code}")) ||
-              markdown_source?(File.join(target_no_slash, "index.#{code}")) ||
-              (link.kind != :image && taxonomy_url?(url, taxonomy_names))
+                                         taxonomy_names : Array(String),
+                                         routes : Services::PageRouteIndex, full_url : String) : Bool
+            sources = translated_page_sources(url, code, content_dir, base_dir)
+            return true if !sources.empty? && serves_page?(sources, full_url, routes)
+            link.kind != :image && taxonomy_url?(url, taxonomy_names)
           end
 
-          # True when `stem` plus a Markdown extension names a content file,
-          # the extension matched case-insensitively as ReadContent does:
+          private def translated_page_sources(url : String, code : String, content_dir : String, base_dir : String) : Array(String)
+            target_no_slash = content_target(url, content_dir, base_dir).rstrip("/")
+            markdown_files_for("#{target_no_slash}.#{code}") +
+              markdown_files_for(File.join(target_no_slash, "_index.#{code}")) +
+              markdown_files_for(File.join(target_no_slash, "index.#{code}"))
+          end
+
+          # The Markdown sources a page-shaped path names: `<path>.md`,
+          # `<path>/_index.md` and `<path>/index.md`, extensions in any case.
+          private def page_sources(target_no_slash : String) : Array(String)
+            markdown_files_for(target_no_slash) +
+              markdown_files_for(File.join(target_no_slash, "_index")) +
+              markdown_files_for(File.join(target_no_slash, "index"))
+          end
+
+          # A link that names page sources is live only where the build
+          # actually publishes one of them: a draft, future-dated, expired or
+          # `render = false` page writes nothing, and a `slug`/`path` moves
+          # the page away from its source path. A source the route index
+          # could not read keeps the plain existence test.
+          private def serves_page?(sources : Array(String), url : String, routes : Services::PageRouteIndex) : Bool
+            sources.any? { |source| routes.state_for(source).nil? } || routes.published?(url)
+          end
+
+          # Page URLs, aliases and bundle files the build writes away from
+          # their source path (`slug`, `path`, `[permalinks]`, a translated
+          # bundle's `/ko/…/img.png`), known before any build has run.
+          private def published_route?(url : String, routes : Services::PageRouteIndex) : Bool
+            return false unless url.starts_with?("/")
+            routes.published?(url) || routes.bundle_asset?(url)
+          end
+
+          # Why a link that names real page sources is still dead: the pages
+          # it names publish nothing, or publish somewhere else.
+          private def unpublished_page_error(url : String, content_dir : String, base_dir : String,
+                                             language_codes : Array(String),
+                                             routes : Services::PageRouteIndex) : String?
+            sources = page_sources(content_target(url, content_dir, base_dir).rstrip("/"))
+            if sources.empty? && (code = translatable_language_prefix(url, language_codes))
+              stripped = url[(code.size + 1)..]
+              sources = translated_page_sources(stripped.empty? ? "/" : stripped, code, content_dir, base_dir)
+            end
+            return if sources.empty?
+
+            states = sources.compact_map { |source| routes.state_for(source) }
+            return if states.size < sources.size
+            if published = sources.find { |source| routes.state_for(source) == Services::PublishState::Published.label }
+              return "Internal link target not found: the page is published at #{routes.url_for(published)}"
+            end
+            state = states.first
+            reason = state == Services::PageRouteIndex::NOT_RENDERED ? "target sets render = false" : Services::InternalLinkIndex.describe(state)
+            "Internal link not resolved by the build: #{reason}"
+          end
+
+          # Without a loaded config (unit callers pass only the language
+          # codes), the route index still needs the codes to place
+          # `about.ko.md` at `/ko/about/`.
+          private def route_config(language_codes : Array(String)) : Models::Config?
+            return if language_codes.empty?
+            config = Models::Config.new
+            languages = {} of String => Models::LanguageConfig
+            language_codes.each { |code| languages[code] = Models::LanguageConfig.new(code) }
+            config.default_language = "" if language_codes.includes?(config.default_language)
+            config.languages = languages
+            config
+          end
+
+          # The content files `stem` plus a Markdown extension names, the
+          # extension matched case-insensitively as ReadContent does:
           # `content/leaf.MD` and `content/b/index.MARKDOWN` publish `/leaf/`
-          # and `/b/` like their lowercase twins. A directory's stems are
+          # and `/b/` like their lowercase twins. A directory's sources are
           # listed once per run (see @markdown_stems).
-          private def markdown_source?(stem : String) : Bool
+          private def markdown_files_for(stem : String) : Array(String)
             dir = File.dirname(stem)
-            stems = @markdown_stems.fetch(dir) do
-              found = Set(String).new
+            by_stem = @markdown_stems.fetch(dir) do
+              found = {} of String => Array(String)
               if Dir.exists?(dir)
                 Dir.each_child(dir) do |child|
                   next unless Services::ContentWalk.markdown?(child)
-                  next unless File.exists?(File.join(dir, child))
-                  found << child[0, child.size - File.extname(child).size]
+                  path = File.join(dir, child)
+                  next unless File.exists?(path)
+                  (found[child[0, child.size - File.extname(child).size]] ||= [] of String) << path
                 end
               end
               @markdown_stems[dir] = found
             end
-            stems.includes?(File.basename(stem))
+            by_stem[File.basename(stem)]? || [] of String
           rescue File::Error
-            false
+            [] of String
           end
 
           # Map a link destination onto a path under the content directory.

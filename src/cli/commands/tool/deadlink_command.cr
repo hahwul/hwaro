@@ -11,6 +11,7 @@ require "yaml"
 require "../../../models/config"
 require "../../../services/content_lister"
 require "../../../services/internal_link_index"
+require "../../../services/page_route_index"
 require "../../../utils/frontmatter_scanner"
 require "../../../utils/text_utils"
 require "../../../utils/errors"
@@ -258,7 +259,7 @@ module Hwaro
               sources: [target_dir] + %w[config.toml templates static data themes].map { |d| File.join(project_root, d) },
               tool: "check-links",
             )
-            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, oracle)
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, oracle, config)
             # Say it only where it changes how the result should be read: an
             # unusable tree explains dead internal links, a stale one explains
             # links it just accepted.
@@ -368,9 +369,9 @@ module Hwaro
           # invocation for the same reason (an unfollowable symlink warns once).
           @markdown_files = {} of String => Array(String)
 
-          # Directory → the stems of its Markdown sources (`leaf` for
-          # `leaf.MD`), so route probes list each directory once per run.
-          @markdown_stems = {} of String => Set(String)
+          # Directory → its Markdown sources keyed by stem (`leaf` →
+          # `[dir/leaf.MD]`), so route probes list each directory once per run.
+          @markdown_stems = {} of String => Hash(String, Array(String))
 
           # Memoized per run: the same host used to be resolved synchronously
           # on every occurrence and every redirect hop, stalling all workers
