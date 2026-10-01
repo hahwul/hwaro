@@ -265,26 +265,26 @@ module Hwaro
           )}
         end
 
+        # RFC 9110 `tchar`s besides ALPHA / DIGIT — the only characters a
+        # header name may contain.
+        HEADER_TCHARS = "!#$%&'*+-.^_`|~"
+
         # Parse "Name: Value" or "Name=Value" or "Name Value" into {name, value}.
         # Header names are case-insensitive per HTTP spec; we preserve the
         # casing the user gave us (common convention is Title-Case).
         private def parse_header(raw : String) : {String, String}
           s = raw.strip
-          # Try "key: value", "key = value", "key value"
-          if s.includes?(":")
-            key, value = s.split(":", 2)
-          elsif s.includes?("=")
-            key, value = s.split("=", 2)
-          elsif s =~ /\s/
-            # Only treat as "key value" if there actually is whitespace.
-            parts = s.split(/\s+/, 2)
-            key = parts[0]? || ""
-            value = parts[1]? || ""
+          # Split at whichever separator comes FIRST: ":", "=" or whitespace.
+          # Checking ":" before "=" split `X-Url=http://a` at the URL's colon
+          # and sent the invalid header line `X-Url=http: //a`.
+          #
+          # A bare token with no separator at all (e.g. --header "Foo") gets
+          # the same friendly error as other malformed inputs.
+          # Whitespace around ":"/"=" belongs to the separator ("X-Foo : bar").
+          if m = s.match(/\s*[:=]\s*|\s+/)
+            key = s[0, m.begin(0)]
+            value = s[m.end(0)..]
           else
-            # Bare token with no separator at all (e.g. --header "Foo").
-            # This used to cause an IndexError on parallel assignment before the
-            # safe split. Now we give the user the same friendly error as other
-            # malformed inputs (addresses Copilot review feedback on #556).
             key = ""
             value = ""
           end
@@ -301,11 +301,14 @@ module Hwaro
 
           # Prevent HTTP response splitting / header injection attacks.
           # Control characters (especially CR/LF) in names or values are dangerous.
-          if key.each_char.any? { |c| c.ascii_control? || c == ':' } || value.each_char.any?(&.ascii_control?)
+          # The name must also be an RFC 9110 token: anything else (`=`,
+          # spaces, quotes, non-ASCII) went out on the wire as a header line
+          # no client parses.
+          if !key.each_char.all? { |c| HEADER_TCHARS.includes?(c) || c.ascii_alphanumeric? } || value.each_char.any?(&.ascii_control?)
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
               message: "Invalid characters in --header: #{raw.inspect}",
-              hint: "Header names and values must not contain control characters, newlines, or colons in the name.",
+              hint: "Header names may use only letters, digits and !#$%&'*+-.^_`|~; values must not contain control characters or newlines.",
             )
           end
 

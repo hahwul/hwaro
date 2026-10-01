@@ -722,8 +722,14 @@ describe Hwaro::Config::Options::ServeOptions do
 
     it "leaves IPv4 and hostnames alone" do
       Hwaro::Config::Options::ServeOptions.url_host("127.0.0.1").should eq("127.0.0.1")
-      Hwaro::Config::Options::ServeOptions.url_host("0.0.0.0").should eq("0.0.0.0")
+      Hwaro::Config::Options::ServeOptions.url_host("192.168.1.5").should eq("192.168.1.5")
       Hwaro::Config::Options::ServeOptions.url_host("localhost").should eq("localhost")
+    end
+
+    it "stands localhost in for a wildcard bind" do
+      Hwaro::Config::Options::ServeOptions.url_host("0.0.0.0").should eq("localhost")
+      Hwaro::Config::Options::ServeOptions.url_host("::").should eq("localhost")
+      Hwaro::Config::Options::ServeOptions.url_host("[::]").should eq("localhost")
     end
 
     it "does not double-bracket" do
@@ -793,6 +799,13 @@ describe Hwaro::Services::Server do
       server = Hwaro::Services::Server.new
       server.dev_fixes_base_path_for("http://127.0.0.1:3000/myblog/").should eq("/myblog")
       server.dev_fixes_base_path_for("http://127.0.0.1:3000/a/b/").should eq("/a/b")
+    end
+
+    it "percent-encodes a non-ASCII mount point, the form requests arrive in" do
+      server = Hwaro::Services::Server.new
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000/문서/").should eq("/%EB%AC%B8%EC%84%9C")
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000/%EB%AC%B8%EC%84%9C/").should eq("/%EB%AC%B8%EC%84%9C")
+      server.dev_fixes_base_path_for("http://127.0.0.1:3000/my%20blog/").should eq("/my%20blog")
     end
 
     it "yields an empty prefix for a domain-root or missing base_url" do

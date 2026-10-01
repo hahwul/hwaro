@@ -761,4 +761,30 @@ describe Hwaro::Logger do
       Hwaro::Logger.color_enabled = nil
     end
   end
+
+  describe Hwaro::Logger::GuardedIO do
+    it "swallows writes to a closed stream instead of failing the caller" do
+      reader, writer = IO.pipe
+      reader.close
+      guarded = Hwaro::Logger::GuardedIO.new(writer)
+      previous = Hwaro::Logger.io
+      Hwaro::Logger.io = guarded
+      begin
+        # Larger than any pipe buffer, so the write reaches the closed reader.
+        Hwaro::Logger.info("x" * 200_000)
+        Hwaro::Logger.warn("still alive")
+        guarded.flush
+      ensure
+        Hwaro::Logger.io = previous
+        writer.close rescue nil
+      end
+    end
+
+    it "passes writes through while the stream is healthy" do
+      io = IO::Memory.new
+      guarded = Hwaro::Logger::GuardedIO.new(io)
+      guarded.puts "hello"
+      io.to_s.should eq("hello\n")
+    end
+  end
 end

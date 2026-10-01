@@ -84,9 +84,16 @@ describe Hwaro::Config::Options::ServeOptions do
     end
 
     it "derives base_url from host and port when not explicitly set" do
-      serve = Hwaro::Config::Options::ServeOptions.new(host: "0.0.0.0", port: 8080)
+      serve = Hwaro::Config::Options::ServeOptions.new(host: "192.168.1.5", port: 8080)
       build = serve.to_build_options
-      build.base_url.should eq("http://0.0.0.0:8080")
+      build.base_url.should eq("http://192.168.1.5:8080")
+    end
+
+    it "derives a localhost base_url from a wildcard bind (0.0.0.0, ::)" do
+      {"0.0.0.0", "::"}.each do |wildcard|
+        serve = Hwaro::Config::Options::ServeOptions.new(host: wildcard, port: 8080)
+        serve.to_build_options.base_url.should eq("http://localhost:8080")
+      end
     end
 
     it "uses default host:port for base_url when no options provided" do

@@ -208,6 +208,30 @@ end
       end
     end
 
+    it "sends no body for HEAD of a static file, with or without live reload" do
+      [true, false].each do |live_reload|
+        with_dev_server(base_path: mount || "", live_reload: live_reload) do |port, _|
+          socket = TCPSocket.new("127.0.0.1", port)
+          socket.read_timeout = 5.seconds
+          begin
+            socket << "HEAD #{at.call("/large.txt")} HTTP/1.1\r\nHost: h\r\n\r\n"
+            socket << "HEAD #{at.call("/guide/")} HTTP/1.1\r\nHost: h\r\n\r\n"
+            socket << "GET #{at.call("/missing")} HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n"
+            socket.flush
+            raw = socket.gets_to_end
+          ensure
+            socket.close
+          end
+
+          raw.scan(/^HTTP\/1\.1 /m).size.should eq(3)
+          raw.should contain("Content-Length: 40000")
+          raw.should_not contain("aaaa")
+          raw.should_not contain("GUIDE")
+          raw.scan(/NOT FOUND PAGE/).size.should eq(1)
+        end
+      end
+    end
+
     it "reports the same Content-Length for HEAD and GET" do
       with_dev_server(base_path: mount || "") do |port, _|
         head_length = dev_client(port, &.head(at.call("/"))).headers["Content-Length"]

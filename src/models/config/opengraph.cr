@@ -243,7 +243,10 @@ module Hwaro
           # cosmetic: og_image.cr replaces anything <= 48 with a style default.
           config.og.auto_image.font_size = int_value(ai["font_size"]?, config.og.auto_image.font_size).clamp(8, 630)
           config.og.auto_image.logo = ai["logo"]?.try(&.as_s?)
-          config.og.auto_image.output_dir = ai["output_dir"]?.try(&.as_s?) || config.og.auto_image.output_dir
+          # Joined into URLs as "/#{output_dir}/x.png": a trailing slash gave
+          # `/og//x.png` (which lazy generation never matched) and a leading
+          # one the protocol-relative `//og/x.png`.
+          config.og.auto_image.output_dir = ai["output_dir"]?.try(&.as_s?).try(&.strip.strip('/').presence) || config.og.auto_image.output_dir
           config.og.auto_image.show_title = bool_value(ai["show_title"]?, config.og.auto_image.show_title)
           config.og.auto_image.style = ai["style"]?.try(&.as_s?) || config.og.auto_image.style
           # Opacity-style floats share pattern_scale's hazard below: TOML

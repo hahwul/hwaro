@@ -188,6 +188,9 @@ module Hwaro
       end
 
       def run(options : Config::Options::ServeOptions)
+        if options.base_url.nil? && Config::Options::ServeOptions.wildcard_host?(options.host)
+          Logger.info "Listening on all interfaces; links use localhost. To preview from another device, pass --base-url http://<this-machine's-ip>:#{options.port}"
+        end
         run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, serve_build_options(options), options.json, options.headers)
       end
 
@@ -572,7 +575,14 @@ module Hwaro
         # that would break every route, so only "/"-rooted paths count.
         return "" unless path.starts_with?("/")
         path = path.rstrip("/")
-        path == "/" ? "" : path
+        return "" if path.empty?
+        # Percent-encoded, the form browsers put on the request line, which is
+        # what BasePathHandler compares against and what the Location / ready
+        # URLs must carry. `URI.parse` keeps the path exactly as written, so a
+        # `--base-url http://host/문서/` mount matched no request at all and
+        # redirected `/` to raw UTF-8 bytes. Decoding first keeps an
+        # already-encoded `/my%20blog` unchanged.
+        URI.encode_path(URI.decode(path))
       end
 
       # Assemble the dev server's handler chain. Extracted from
@@ -647,6 +657,7 @@ module Hwaro
         # on first request, then lets StaticFileHandler serve it from disk.
         # A no-op unless [og.auto_image] lazy_generate is enabled.
         handlers << OgLazyImageHandler.new(@builder, output_dir)
+        handlers << HeadBodyHandler.new
         handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
         handlers << not_found
         handlers
