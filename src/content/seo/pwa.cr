@@ -9,6 +9,13 @@ module Hwaro
   module Content
     module Seo
       class Pwa
+        # The files `generate` writes under the current config (none when
+        # disabled).
+        def self.published_outputs(config : Models::Config, output_dir : String) : Array(String)
+          return [] of String unless config.pwa.enabled
+          [File.join(output_dir, "manifest.json"), File.join(output_dir, "sw.js")]
+        end
+
         def self.generate(site : Models::Site, output_dir : String, verbose : Bool = false)
           return unless site.config.pwa.enabled
 

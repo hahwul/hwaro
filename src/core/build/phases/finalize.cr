@@ -18,6 +18,8 @@ module Hwaro::Core::Build::Phases::Finalize
       else
         prune_unclaimed_generated_outputs(ctx)
       end
+      # Files a failed serve pass relocated away from (a no-op otherwise).
+      settle_page_outputs(ctx.options.output_dir)
     end
     profiler.end_phase
     result

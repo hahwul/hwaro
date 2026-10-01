@@ -98,9 +98,9 @@ The development server (`hwaro serve`) uses a more targeted incremental strategy
 | Change Type | Strategy |
 |-------------|----------|
 | Content files only | Re-parse and re-render only affected pages + neighbors, plus any listing page the edit changed (see below) |
-| Template files only | Re-render only pages whose template closure includes an edited template (all pages when tracking is off, the graph has dynamic references, or the edited file is under `templates/hooks/`) |
+| Template files only | Re-render only pages whose template closure includes an edited template (all pages when tracking is off, the graph has dynamic references, or the edited file is under `templates/hooks/`); a full rebuild when the edited file is a `[[content.generate]]` `body_template` or a partial it includes |
 | Config file | Full rebuild |
-| Static files only | Copy only changed files |
+| Static files only | Copy only changed files; a full rebuild when a file lands where the build writes a page or a generated file (`robots.txt`, a feed, a taxonomy page, an alias stub, …), feeds a cache-busting `?v=` hash, or is read by a literal `load_data()` path in a template |
 
 A **listing page** is one whose template closure renders a global set — the
 homepage's "latest posts" loop over `site.pages`, an archive, a paginated

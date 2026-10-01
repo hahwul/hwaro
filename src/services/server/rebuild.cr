@@ -45,7 +45,6 @@ module Hwaro
                     copy_static(changeset, build_options)
                   when :content_files
                     copy_content_files(changeset, build_options)
-                    true
                   else
                     true
                   end
@@ -87,7 +86,11 @@ module Hwaro
         # templates-only, and static-only strategies, the watcher has to do
         # it explicitly or the served bytes stay stale (issue #530).
         if strategy != :content_files && strategy != :full && !changeset.modified_content_files.empty?
-          copy_content_files(changeset, build_options)
+          unless copy_content_files(changeset, build_options)
+            @rebuild_failed = true
+            push_build_error("Build failed — check the terminal for details.")
+            return
+          end
         end
 
         # The stale list was mapped through the PRE-rebuild site, but a
@@ -128,8 +131,9 @@ module Hwaro
         # bundle pipeline below — handing them to copy_changed_static would
         # compute a `../`-relative destination and log a warning for every save.
         static_sources = changeset.modified_static.select(&.starts_with?("static/"))
-        # True when a copy landed on a file a page renders: the static-only
-        # strategy re-renders nothing, so the page's URL would serve the
+        # True when a copy landed on a file a page renders or a generator
+        # writes (robots.txt, a feed, a taxonomy page, an alias stub): the
+        # static-only strategy re-renders nothing, so that URL would serve the
         # static bytes for the rest of the session. Escalated below, with the
         # bundle-fingerprint case, to a full rebuild.
         static_shadowed_page = @builder.copy_changed_static(static_sources, output_dir, build_options.verbose)
@@ -174,14 +178,30 @@ module Hwaro
           Logger.info "  Asset bundle fingerprints changed — rebuilding pages to update references."
           return run_full_build(build_options)
         end
+        # Highlight and `[auto_includes]` asset tags carry a `?v=` digest of
+        # these very files, printed into every page that references them;
+        # the copy alone left every page on the old hash (and browsers on
+        # the cached bytes). Same reasoning as the fingerprint case above.
+        if build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
+          Logger.info "  A cache-busted asset changed — rebuilding pages to update its ?v= hash."
+          return run_full_build(build_options)
+        end
+        # A template reads one of the files through `load_data()`: the
+        # pages printing it must re-render, which the copy alone never does.
+        if @builder.load_data_source_changed?(static_sources)
+          Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
+          return run_full_build(build_options)
+        end
         if static_shadowed_page
-          Logger.info "  A static file publishes where a page renders — rebuilding so the page wins that path."
+          Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
           return run_full_build(build_options)
         end
         true
       end
 
-      private def copy_content_files(changeset : ChangeSet, build_options : Config::Options::BuildOptions)
+      # Returns false when the escalated full rebuild (a `load_data()`
+      # source changed) failed; true otherwise.
+      private def copy_content_files(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
         @builder.copy_changed_content_files(changeset.modified_content_files, output_dir, build_options.verbose)
         # Mirror copy_static: modified image bytes under content/ (published
@@ -196,6 +216,12 @@ module Hwaro
             Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changed, config, output_dir, pages: pages)
           end
         end
+        # Same as copy_static: a template reading the file via load_data().
+        if @builder.load_data_source_changed?(changeset.modified_content_files)
+          Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
+          return run_full_build(build_options)
+        end
+        true
       end
 
       # Run a full build — the only strategy that executes `build.hooks` —

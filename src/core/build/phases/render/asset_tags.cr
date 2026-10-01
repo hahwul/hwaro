@@ -73,12 +73,33 @@ module Hwaro::Core::Build::Phases::Render
     return "" unless has_local_highlight || has_auto_includes
 
     digest = Digest::MD5.new
+    cache_bust_inputs(config).each { |file| digest_file(digest, file) }
+    digest.hexfinal[0, 8]
+  end
+
+  # True when one of `paths` (watcher paths, `static/css/site.css`) is a file
+  # the cache-bust digest reads. Its `?v=` is printed into every page that
+  # references a highlight or auto-include asset, so the serve static lane —
+  # which only copies the file — must re-render the site when one changes.
+  def cache_bust_input_changed?(paths : Array(String)) : Bool
+    config = @config
+    return false if config.nil? || paths.empty?
+    inputs = cache_bust_inputs(config).map { |file| Path[file].normalize.to_s }.to_set
+    return false if inputs.empty?
+    paths.any? { |path| inputs.includes?(Path[path].normalize.to_s) }
+  end
+
+  # The files `compute_cache_bust` digests, in digest order.
+  private def cache_bust_inputs(config : Models::Config) : Array(String)
+    files = [] of String
+    has_local_highlight = config.highlight.enabled && !config.highlight.use_cdn
+    has_auto_includes = config.auto_includes.enabled && config.auto_includes.dirs.present?
 
     if has_local_highlight
       css_path = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
-      digest_file(digest, css_path) if File.exists?(css_path)
+      files << css_path if File.exists?(css_path)
       js_path = File.join("static", "assets", "js", "highlight.min.js")
-      digest_file(digest, js_path) if File.exists?(js_path)
+      files << js_path if File.exists?(js_path)
     end
 
     if has_auto_includes
@@ -90,9 +111,7 @@ module Hwaro::Core::Build::Phases::Render
       config.auto_includes.dirs.each do |dir|
         static_dir = File.join("static", dir)
         next unless Dir.exists?(static_dir)
-        Dir.glob(File.join(static_dir, "**", pattern)).sort.each do |file|
-          digest_file(digest, file)
-        end
+        files.concat(Dir.glob(File.join(static_dir, "**", pattern)).sort)
       end
       # Also digest SCSS outside auto_includes dirs (e.g. static/lib/_theme.scss
       # pulled in via @use from static/css/style.scss). Without this, a
@@ -103,12 +122,12 @@ module Hwaro::Core::Build::Phases::Render
           next if config.auto_includes.dirs.any? { |dir|
                     relative == dir || relative.starts_with?("#{dir}/")
                   }
-          digest_file(digest, file)
+          files << file
         end
       end
     end
 
-    digest.hexfinal[0, 8]
+    files
   end
 
   # Stream file contents into digest to avoid loading entire file into memory
