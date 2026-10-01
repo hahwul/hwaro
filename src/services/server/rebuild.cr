@@ -175,6 +175,14 @@ module Hwaro
           Logger.info "  Asset bundle fingerprints changed — rebuilding pages to update references."
           return run_full_build(build_options)
         end
+        # Highlight and `[auto_includes]` asset tags carry a `?v=` digest of
+        # these very files, printed into every page that references them;
+        # the copy alone left every page on the old hash (and browsers on
+        # the cached bytes). Same reasoning as the fingerprint case above.
+        if build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
+          Logger.info "  A cache-busted asset changed — rebuilding pages to update its ?v= hash."
+          return run_full_build(build_options)
+        end
         if static_shadowed_page
           Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
           return run_full_build(build_options)

@@ -319,3 +319,64 @@ describe "serve watch parity: static edits over generated outputs" do
     end
   end
 end
+
+private def write_auto_includes_site
+  File.write("config.toml", <<-TOML
+    title = "Bust"
+    base_url = "https://example.com"
+
+    [auto_includes]
+    enabled = true
+    dirs = ["inc/css"]
+    TOML
+  )
+  FileUtils.mkdir_p("content")
+  FileUtils.mkdir_p("templates")
+  FileUtils.mkdir_p("static/inc/css")
+  File.write("templates/page.html", "<html><head>{{ auto_includes }}</head><body>{{ page.title }}</body></html>")
+  File.write("content/about.md", "+++\ntitle = \"About\"\n+++\nabout")
+  File.write("static/inc/css/01.css", "body { color: red; }")
+  File.write("static/other.css", "p { color: blue; }")
+end
+
+private def cache_bust_of(html : String) : String
+  html[/01\.css\?v=([0-9a-f]+)/, 1]
+end
+
+describe "serve watch parity: cache-busted assets" do
+  # The `?v=` digest of an auto-included (or self-hosted highlight) asset is
+  # printed into every page that references it; the static lane only copied
+  # the edited file, so every page kept the pre-edit hash.
+  it "re-renders the pages when an auto-included asset changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_auto_includes_site
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        before = cache_bust_of(File.read("public/about/index.html"))
+
+        File.write("static/inc/css/01.css", "body { color: green; }")
+        server.watch_parity_apply_changeset(watch_parity_changeset(static: ["static/inc/css/01.css"]), options)
+
+        after = cache_bust_of(File.read("public/about/index.html"))
+        after.should_not eq(before)
+        after.should eq(Digest::MD5.hexdigest("body { color: green; }")[0, 8])
+      end
+    end
+  end
+
+  it "only copies a static file the digest does not read" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_auto_includes_site
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+
+        builder.cache_bust_input_changed?(["static/other.css"]).should be_false
+        builder.cache_bust_input_changed?(["static/inc/css/01.css"]).should be_true
+      end
+    end
+  end
+end
