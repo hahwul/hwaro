@@ -465,7 +465,12 @@ module Hwaro
           # `render = false` page writes nothing, and a `slug`/`path` moves
           # the page away from its source path. A source the route index
           # could not read keeps the plain existence test.
+          #
+          # A URL still relative here comes from a page the index could not
+          # place (so it was resolved against the source directory); it has
+          # no site URL to look up, and keeps the plain existence test too.
           private def serves_page?(sources : Array(String), url : String, routes : Services::PageRouteIndex) : Bool
+            return true unless url.starts_with?("/")
             sources.any? { |source| routes.state_for(source).nil? } || routes.published?(url)
           end
 
