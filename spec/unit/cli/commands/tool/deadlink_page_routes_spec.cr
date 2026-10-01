@@ -108,3 +108,32 @@ describe "check-links page routes" do
     end
   end
 end
+
+class Hwaro::CLI::Commands::Tool::DeadlinkCommand
+  def resolve_page_routes_with_config_for_test(links : Array(Link), content_dir : String,
+                                               config : Hwaro::Models::Config) : Array(Result)
+    check_internal_links(links, content_dir, [] of String, "", [] of String, GeneratedRoutes.new,
+      Hwaro::Utils::BuildOutput.oracle("public", tool: "check-links"), config)
+  end
+end
+
+describe "check-links page routes for an unplaced linking page" do
+  # `[git] use_date` + a date-token permalink keeps a dateless page out of
+  # the route index, so its relative links stay relative (resolved against
+  # the source directory). They used to go through the published-URL lookup
+  # as `/../b/` and be reported "published at /b/" — a live link.
+  it "keeps the existence test for relative links from a page the index cannot place" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, "title = \"T\"\nbase_url = \"https://example.com\"\n[git]\nenabled = true\nuse_date = true\n[permalinks]\nposts = \"/:year/:slug/\"\n")
+      config = Hwaro::Models::Config.load(config_path)
+      content = File.join(dir, "content")
+      write_page(content, "b.md")
+      write_page(content, "posts/a.md")
+
+      link = route_link(content, "../b/", "posts/a.md")
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      cmd.resolve_page_routes_with_config_for_test([link], content, config).should be_empty
+    end
+  end
+end

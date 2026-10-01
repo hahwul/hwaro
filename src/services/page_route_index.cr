@@ -5,6 +5,7 @@ require "./content_lister"
 require "./generated_content"
 require "../models/config"
 require "../content/processors/markdown"
+require "../utils/path_utils"
 require "../utils/permalink_resolver"
 require "../utils/logger"
 
@@ -47,13 +48,23 @@ module Hwaro
       @index_dirs = Set(String).new
 
       def initialize(content_dir : String, config : Models::Config?)
-        lister = ContentLister.new(content_dir, GeneratedContent.infos(content_dir))
-        lister.list_all.each do |info|
-          if info.generated_from
-            add_generated(info, config)
-          else
-            add_authored(info, content_dir, config)
+        # Reading every page through the build's parsers replays the build's
+        # diagnostics (unknown front-matter keys, unparseable dates, skipped
+        # generate rules). Those belong to `hwaro build` / `tool validate`;
+        # here they would bury the link report, one line per page.
+        previous = Logger.level
+        Logger.level = Logger::Level::Error
+        begin
+          lister = ContentLister.new(content_dir, GeneratedContent.infos(content_dir))
+          lister.list_all.each do |info|
+            if info.generated_from
+              add_generated(info, config)
+            else
+              add_authored(info, content_dir, config)
+            end
           end
+        ensure
+          Logger.level = previous
         end
       end
 
@@ -162,7 +173,9 @@ module Hwaro
 
         @published << PageRouteIndex.normalize(url)
         data[:aliases].each do |alias_path|
-          next if alias_path.empty? || alias_path.includes?("://") || alias_path.starts_with?("//")
+          # The build's own rule: external URLs (`mailto:`, `https://`, `//`)
+          # and traversing segments (`../up`) never become redirect stubs.
+          next if alias_path.empty? || Utils::PathUtils.alias_refusal(alias_path)
           @published << PageRouteIndex.normalize(alias_path)
         end
       rescue ex

@@ -46,3 +46,34 @@ describe Hwaro::Services::PageRouteIndex do
     end
   end
 end
+
+describe Hwaro::Services::PageRouteIndex do
+  # The index reads every page through the build's front-matter parser,
+  # which warns about unknown keys and bad dates. Those warnings belong to
+  # `hwaro build`; replayed here they buried the check-links report.
+  it "does not replay the build's front-matter warnings" do
+    Dir.mktmpdir do |dir|
+      route_index_page(dir, "posts/typo.md", %(titel = "x"))
+
+      output = with_captured_log { Hwaro::Services::PageRouteIndex.new(dir, nil) }
+
+      output.should_not contain("titel")
+      Hwaro::Logger.level.should eq(Hwaro::Logger::Level::Info)
+    end
+  end
+
+  # Aliases the build refuses (external URLs, traversing segments) write no
+  # redirect stub, so they are not routes.
+  it "does not register aliases the build refuses" do
+    Dir.mktmpdir do |dir|
+      route_index_page(dir, "posts/a.md", %(aliases = ["mailto:x@example.com", "../up", "//cdn.example.com/x", "/kept/"]))
+
+      index = Hwaro::Services::PageRouteIndex.new(dir, nil)
+
+      index.published?("/kept/").should be_true
+      index.published?("mailto:x@example.com").should be_false
+      index.published?("../up").should be_false
+      index.published?("//cdn.example.com/x").should be_false
+    end
+  end
+end
