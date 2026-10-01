@@ -198,7 +198,16 @@ module Hwaro
         # `Utils::Nesting`. Callers already rescue conversion failures.
         private def process_table(yaml : YAML::Any, path : Array(String), print_header : Bool, depth : Int32 = 0)
           Nesting.check!(depth)
-          return unless hash = yaml.as_h?
+          return unless source = yaml.as_h?
+
+          # TOML has no null, and there is no TOML value that reads back the
+          # way a YAML/JSON null does: the build treats `title:` /
+          # `slug: ~` / `"image": null` as UNSET (default title, slug from the
+          # filename, no og:image), but any placeholder is a SET value —
+          # `slug = ""` collapsed a post's URL onto its section index and the
+          # page was dropped from the build. Omitting the key is the only
+          # spelling that means "unset" to the build.
+          hash = source.reject { |_, value| value.raw.nil? }
 
           # An empty table (`extra: {}`) has no values to force a header out,
           # but dropping the key entirely would silently lose it.
@@ -347,14 +356,18 @@ module Hwaro
             "[#{array_items(value, depth).join(", ")}]"
           when Hash
             # A hash reached from inside an array (mixed or nested) can't be
-            # a `[table]` section; emit it as an inline table.
-            pairs = value.as_h.map do |k, v|
+            # a `[table]` section; emit it as an inline table. Null members
+            # are omitted for the same reason as in `process_table`.
+            pairs = value.as_h.reject { |_, v| v.raw.nil? }.map do |k, v|
               "#{format_key(k.as_s? || k.to_s)} = #{to_toml_value(v, depth + 1)}"
             end
             "{#{pairs.join(", ")}}"
           when String
             "\"#{FrontmatterWriter.escape_toml_string(raw)}\""
           when Nil
+            # Only reachable for an array element (keys with a null value are
+            # omitted): the position must be kept, and the build drops a blank
+            # string from every list it reads as terms.
             "\"\""
           else
             "\"#{FrontmatterWriter.escape_toml_string(value.to_s)}\""

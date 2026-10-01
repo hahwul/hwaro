@@ -44,6 +44,11 @@ hwaro tool convert to-yaml --json
 "dropping N comment line(s)" 경고를 포함한 전체 파이프라인이 동일하게
 동작합니다.
 
+TOML에는 null이 없으므로 `to-toml`은 YAML/JSON 값이 null인 키
+(값 없이 끝나는 `description:`, `slug: ~`, `"image": null`)를 생략합니다.
+빌드는 null 값을 설정되지 않은 것으로 읽고, 생략된 키도 같은 의미입니다.
+대신 빈 문자열을 쓰면 제목이나 slug가 빈 값으로 설정됩니다.
+
 ## JSON 출력
 
 ```json

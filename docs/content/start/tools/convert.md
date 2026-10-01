@@ -44,6 +44,11 @@ so run `--dry-run` first on a tree you care about: it runs the full
 detection/conversion pipeline, including the per-file "dropping N comment
 line(s)" warnings, without writing anything back.
 
+TOML has no null, so `to-toml` omits a key whose YAML/JSON value is null
+(`description:` with nothing after it, `slug: ~`, `"image": null`). The build
+reads a null value as unset, and an omitted key means the same thing; writing
+an empty string instead would set an empty title or slug.
+
 ## JSON Output
 
 ```json
