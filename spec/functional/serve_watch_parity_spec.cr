@@ -162,3 +162,83 @@ describe "serve watch parity: content+template saves" do
     end
   end
 end
+
+private def write_generate_site
+  File.write("config.toml", <<-TOML
+    title = "Gen"
+    base_url = "https://example.com"
+
+    [[content.generate]]
+    source = "products"
+    section = "products"
+    slug = "sku"
+    title = "name"
+    body_template = "gen/product.md"
+    TOML
+  )
+  FileUtils.mkdir_p("data")
+  FileUtils.mkdir_p("templates/gen")
+  FileUtils.mkdir_p("templates/partials")
+  FileUtils.mkdir_p("content/products")
+  File.write("data/products.json", %([{"sku": "w1", "name": "Widget"}]))
+  File.write("templates/page.html", "<html><body>{{ content }}</body></html>")
+  File.write("templates/section.html", "<html><body>{{ section.title }}</body></html>")
+  File.write("templates/gen/product.md", "Body of {{ item.name }} v1. {% include \"partials/spec.html\" %}")
+  File.write("templates/partials/spec.html", "spec-v1")
+  File.write("templates/partials/other.html", "other")
+  File.write("content/products/_index.md", "+++\ntitle = \"Products\"\n+++\n")
+end
+
+describe "serve watch parity: [[content.generate]] body templates" do
+  # Bodies render while the pages are generated, which only a full build
+  # does; the re-render strategy re-rendered from the bodies it already held
+  # (and the `.md` body file isn't in the template snapshot at all, so the
+  # edit read as "contents are identical").
+  it "regenerates the pages when the body template changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_generate_site
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/products/w1/index.html").should contain("Body of Widget v1.")
+
+        File.write("templates/gen/product.md", "Body of {{ item.name }} v2. {% include \"partials/spec.html\" %}")
+        server.watch_parity_apply_changeset(watch_parity_changeset(templates: ["templates/gen/product.md"]), options)
+
+        File.read("public/products/w1/index.html").should contain("Body of Widget v2.")
+      end
+    end
+  end
+
+  it "regenerates the pages when a partial the body template includes changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_generate_site
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/products/w1/index.html").should contain("spec-v1")
+
+        File.write("templates/partials/spec.html", "spec-v2")
+        server.watch_parity_apply_changeset(watch_parity_changeset(templates: ["templates/partials/spec.html"]), options)
+
+        File.read("public/products/w1/index.html").should contain("spec-v2")
+      end
+    end
+  end
+
+  it "keeps the cheap strategy for a template the body never reads" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_generate_site
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+
+        changeset = watch_parity_changeset(templates: ["templates/partials/other.html"])
+        server.watch_parity_effective_strategy(changeset, "public").should eq(:templates)
+      end
+    end
+  end
+end
