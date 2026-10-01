@@ -32,6 +32,9 @@ module Hwaro
                 next unless external_url?(url)
                 links << Link.new(file: file, url: url, kind: :external)
               end
+              content.scan(AUTOLINK_RE) do |match|
+                links << Link.new(file: file, url: match[1], kind: :external)
+              end
               content.scan(HTML_TAG_RE) do |tag|
                 tag[2].scan(HTML_ATTR_RE) do |attr|
                   raw = attr[2]? || attr[3]? || attr[4]?
@@ -49,6 +52,12 @@ module Hwaro
             end
             links
           end
+
+          # A CommonMark autolink (`<https://example.com/x>`) renders as an
+          # `<a href>` just like `[text](url)`, but neither the inline-link
+          # pass nor the raw-HTML pass (which wants a tag name) saw it, so
+          # an autolinked URL was never checked.
+          AUTOLINK_RE = /<(https?:\/\/[^\s<>]*)>/
 
           private def external_url?(url : String) : Bool
             url.starts_with?("http://") || url.starts_with?("https://")

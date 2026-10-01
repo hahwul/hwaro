@@ -120,4 +120,17 @@ describe "check-links scan guards" do
       end
     end
   end
+
+  # `<https://…>` autolinks render as links but were never scanned.
+  describe "autolinks" do
+    it "checks an autolinked external URL, but not one inside code" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "a.md"), "+++\ntitle = \"A\"\n+++\nSee <https://example.com/auto?q=1> and `<https://example.com/code>`.\n")
+
+        urls = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.scan_guard_external_for_test(dir).map(&.url)
+
+        urls.should eq(["https://example.com/auto?q=1"])
+      end
+    end
+  end
 end
