@@ -430,3 +430,76 @@ describe "serve watch parity: failed incremental passes" do
     end
   end
 end
+
+private def write_load_data_site
+  File.write("config.toml", <<-TOML
+    title = "Loader"
+    base_url = "https://example.com"
+
+    [content.files]
+    allow_extensions = ["json"]
+    TOML
+  )
+  FileUtils.mkdir_p("content")
+  FileUtils.mkdir_p("templates")
+  FileUtils.mkdir_p("static")
+  File.write("templates/page.html", <<-HTML
+    <html><body>{% set s = load_data(path="static/prices.json") %}{% set c = load_data('content/stock.json') %}[{{ s.v }}|{{ c.v }}]</body></html>
+    HTML
+  )
+  File.write("content/about.md", "+++\ntitle = \"About\"\n+++\nabout")
+  File.write("static/prices.json", %({"v": "s1"}))
+  File.write("static/plain.json", %({"v": "p1"}))
+  File.write("content/stock.json", %({"v": "c1"}))
+end
+
+describe "serve watch parity: load_data() sources outside data/" do
+  # Only data/ edits took the full-rebuild lane; a file a template reads via
+  # load_data() from static/ or content/ was just copied, so every page
+  # printing it kept the pre-edit values for the rest of the session.
+  it "re-renders the pages when a static file read by load_data changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_load_data_site
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/about/index.html").should contain("[s1|c1]")
+
+        File.write("static/prices.json", %({"v": "s2"}))
+        File.touch("static/prices.json", Time.local + 2.seconds)
+        server.watch_parity_apply_changeset(watch_parity_changeset(static: ["static/prices.json"]), options)
+        File.read("public/about/index.html").should contain("[s2|c1]")
+      end
+    end
+  end
+
+  it "re-renders the pages when a content file read by load_data changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_load_data_site
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+
+        File.write("content/stock.json", %({"v": "c2"}))
+        File.touch("content/stock.json", Time.local + 2.seconds)
+        server.watch_parity_apply_changeset(watch_parity_changeset(content_files: ["content/stock.json"]), options)
+        File.read("public/about/index.html").should contain("[s1|c2]")
+      end
+    end
+  end
+
+  it "does not treat a file no template loads as a load_data source" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_load_data_site
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        builder.run(watch_parity_options).should be_true
+
+        builder.load_data_source_changed?(["static/plain.json"]).should be_false
+        builder.load_data_source_changed?(["static/prices.json"]).should be_true
+      end
+    end
+  end
+end

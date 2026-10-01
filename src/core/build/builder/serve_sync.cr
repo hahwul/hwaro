@@ -233,6 +233,30 @@ module Hwaro
           Logger.outcome("copied", "#{copied} content #{copied == 1 ? "file" : "files"}") if copied > 0
         end
 
+        # `load_data(path="static/prices.json")` / `load_data("…")` with a
+        # literal path — the only form a template scan can resolve.
+        LOAD_DATA_LITERAL_RE = /\bload_data\s*\(\s*(?:path\s*=\s*)?(?:"([^"]+)"|'([^']+)')/
+
+        # True when a template reads one of `paths` (watcher paths such as
+        # `static/prices.json`) through a literal `load_data()` path. Files
+        # under `data/` take the full-rebuild lane already; one anywhere else
+        # rides the static or content-asset lane, which only copies it, so
+        # every page printing the data kept the pre-edit values. A path built
+        # at render time (`load_data(path=page.extra.file)`) is not seen.
+        def load_data_source_changed?(paths : Array(String)) : Bool
+          templates = @templates
+          return false if templates.nil? || paths.empty?
+          changed = paths.map { |path| Path[path].normalize.to_s }.to_set
+          templates.each_value do |source|
+            next unless source.includes?("load_data")
+            source.scan(LOAD_DATA_LITERAL_RE) do |match|
+              literal = match[1]? || match[2]? || ""
+              return true if changed.includes?(Path[literal].normalize.to_s)
+            end
+          end
+          false
+        end
+
         # Map source paths that were removed from disk to the output files
         # they produced in the last build. A rebuild rewrites surviving pages
         # but never deletes what's gone, so the serve watcher captures this
