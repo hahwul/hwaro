@@ -205,8 +205,16 @@ module Hwaro
       # the classified error so silent-nil here avoids double-reporting.
       # The rescue is narrowed to `TOML::ParseException` so any other
       # unexpected error propagates rather than being silently swallowed.
+      #
+      # Environment placeholders are substituted first, as `Config.load`
+      # does: an unquoted `per_page = ${PER_PAGE:-10}` only becomes TOML
+      # after substitution, so parsing the bare text made `--fix`/`--approve`
+      # refuse a config the build accepts and dropped every missing-section
+      # advisory for it. Unset variables are not warned about again —
+      # `check_config` already did.
       private def parse_config_toml(raw_text : String) : TOML::Table?
-        TOML.parse(raw_text)
+        substituted, _missing = Utils::EnvSubstitutor.substitute_toml(raw_text)
+        TOML.parse(substituted)
       rescue ex : TOML::ParseException
         Logger.debug "Doctor: TOML parse error in #{@config_path}: #{ex.message}"
         nil

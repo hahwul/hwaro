@@ -618,6 +618,21 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # An unquoted placeholder is documented ("numbers and booleans work")
+      # and is only TOML once substituted, which `Config.load` does first.
+      it "handles unquoted environment placeholders like Config.load does" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config("[pagination]\nenabled = true\nper_page = ${HWARO_DOCTOR_SPEC_UNSET_PER_PAGE:-10}\n"))
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+          doctor.run.map(&.id).should contain("missing-config-og")
+          summary = doctor.fix_config(approve_sections: true)
+          summary.sections_added.should contain("og")
+          File.read(config_path).should contain("per_page = ${HWARO_DOCTOR_SPEC_UNSET_PER_PAGE:-10}\n")
+        end
+      end
+
       it "does not duplicate existing sections" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
