@@ -34,8 +34,10 @@ module Hwaro
               end
               # Inline-link and definition destinations may be written in
               # angle brackets too; those were already collected above.
-              content.gsub(link_regex, "").gsub(REFERENCE_DEFINITION_RE, "").scan(AUTOLINK_RE) do |match|
-                links << Link.new(file: file, url: match[1], kind: :external)
+              autolink_text(content.gsub(link_regex, "").gsub(REFERENCE_DEFINITION_RE, "")).scan(AUTOLINK_RE) do |match|
+                # The scheme is case-insensitive (`<HTTPS://…>` is a link);
+                # the HTTP client only speaks the lowercase form.
+                links << Link.new(file: file, url: "#{match[2].downcase}#{match[3]}", kind: :external)
               end
               content.scan(HTML_TAG_RE) do |tag|
                 tag[2].scan(HTML_ATTR_RE) do |attr|
@@ -59,7 +61,21 @@ module Hwaro
           # `<a href>` just like `[text](url)`, but neither the inline-link
           # pass nor the raw-HTML pass (which wants a tag name) saw it, so
           # an autolinked URL was never checked.
-          AUTOLINK_RE = /<(https?:\/\/[^\s<>]*)>/
+          #
+          # An escaped `\<https://…>` (odd run of backslashes) is literal text.
+          AUTOLINK_RE = /(?<!\\)(?:\\\\)*<((https?:\/\/)([^\s<>]*))>/i
+
+          # A raw HTML block (a block opening with a block-level tag, or with
+          # a line holding one complete tag) is passed through verbatim, so an
+          # autolink-shaped `<https://…>` inside it is not a link.
+          HTML_BLOCK_START_RE = /\A {0,3}(?:<\/?(?:address|article|aside|blockquote|body|center|details|dialog|dd|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|html|iframe|legend|li|main|menu|nav|ol|p|pre|script|section|style|summary|table|tbody|td|tfoot|th|thead|tr|ul)(?:[\s>\/]|\z)|<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>\s*$|<!--)/i
+
+          # `content` without its raw HTML blocks (blank-line separated).
+          private def autolink_text(content : String) : String
+            content.split(/\n[ \t]*\n/).reject do |block|
+              (first_line = block.lstrip('\n').each_line.first?) && first_line.chomp.matches?(HTML_BLOCK_START_RE)
+            end.join("\n\n")
+          end
 
           private def external_url?(url : String) : Bool
             url.starts_with?("http://") || url.starts_with?("https://")
