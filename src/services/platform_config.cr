@@ -5,6 +5,7 @@ require "../models/page"
 require "../content/processors/markdown"
 require "../utils/frontmatter_writer"
 require "../utils/logger"
+require "../utils/path_utils"
 require "./github_actions_workflow"
 
 module Hwaro
@@ -442,13 +443,25 @@ module Hwaro
         return unless target_url
 
         own_url = normalize_alias_url(target_url)
+        own_file_key = Utils::PathUtils.output_file_key(own_url)
         aliases.each do |alias_path|
+          # Aliases the build refuses (absolute or protocol-relative URLs,
+          # traversing paths) publish no redirect stub, so they get no host
+          # redirect either.
+          if reason = Utils::PathUtils.alias_refusal(alias_path)
+            Logger.warn "Skipping alias #{alias_path.inspect} on #{path}: #{reason}."
+            next
+          end
           # An alias naming the page's own URL is skipped by the build (it
           # would overwrite the page with a redirect to itself). Emitted
           # here as a forced 301 from the page to itself, it made the page
           # an endless redirect loop on Netlify/Vercel — including the
-          # `/moved` vs `/moved/` spelling, which those hosts match alike.
-          next if normalize_alias_url(alias_path) == own_url
+          # `/moved` vs `/moved/` spelling, which those hosts match alike,
+          # and spellings of the same output FILE (`/moved//`), which the
+          # build compares by `output_file_key`.
+          norm = normalize_alias_url(alias_path)
+          next if norm == own_url
+          next if own_file_key && Utils::PathUtils.output_file_key(norm) == own_file_key
           # Carry base_path so generated redirects match the build's own
           # redirect HTML (`url=/myrepo/moved/`) on subpath deploys. Ensure a
           # leading slash first since with_base_path only prefixes root-relative

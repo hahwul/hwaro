@@ -371,9 +371,11 @@ describe Hwaro::Services::PlatformConfig do
         end
       end
 
-      # An alias is arbitrary user frontmatter; a quote or backslash must be
-      # TOML-escaped or the emitted netlify.toml is unparseable, breaking the
-      # user's deploy. Exercise both gsub branches (quote and backslash).
+      # An alias is arbitrary user frontmatter; a quote must be TOML-escaped
+      # or the emitted netlify.toml is unparseable, breaking the user's
+      # deploy. A backslash alias is refused by the build (no redirect stub),
+      # so it is skipped here too; the backslash escape is exercised through
+      # `[build] output_dir` instead.
       it "escapes TOML-special characters in netlify redirect from/to so the block stays parseable" do
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
@@ -383,19 +385,22 @@ describe Hwaro::Services::PlatformConfig do
             File.write("content/posts/p.md", "---\ntitle: P\naliases:\n  - \"/we\\\"ird/\"\n  - \"/back\\\\slash/\"\n---\nContent here\n")
 
             config = Hwaro::Models::Config.new
+            config.build.output_dir = "pub\\lic"
             generator = Hwaro::Services::PlatformConfig.new(config)
-            result = generator.generate("netlify")
+            result = ""
+            with_captured_log { result = generator.generate("netlify") }
 
             # The quote is escaped as \" and the backslash as \\.
             result.should contain("from = \"/we\\\"ird/\"")
-            result.should contain("from = \"/back\\\\slash/\"")
+            result.should contain("publish = \"pub\\\\lic\"")
+            result.should_not contain("slash")
 
             # The emitted netlify.toml must parse as valid TOML, and the
-            # escaped values must round-trip back to the original aliases.
+            # escaped values must round-trip back to the original values.
             parsed = TOML.parse(result)
             froms = parsed["redirects"].as_a.map(&.["from"].as_s)
-            froms.should contain("/we\"ird/")
-            froms.should contain("/back\\slash/")
+            froms.should eq(["/we\"ird/"])
+            parsed["build"]["publish"].as_s.should eq("pub\\lic")
           end
         end
       end
