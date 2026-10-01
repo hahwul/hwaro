@@ -84,7 +84,7 @@ hwaro tool export hugo --verbose
 | updated | lastmod |
 | tags | tags |
 | series | series |
-| aliases | aliases |
+| aliases | aliases (상대 alias에는 앞에 `/`를 붙임) |
 | image | images (배열) |
 | expires | expiryDate |
 | weight | weight |

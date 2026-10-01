@@ -478,3 +478,24 @@ describe "Hugo export: index.md with pages below it" do
     end
   end
 end
+
+# Regression: hwaro roots every alias at the site, but Hugo resolves an alias
+# without a leading slash against the page's section, so `legacy` on
+# `posts/x.md` redirected from `/posts/legacy/` instead of `/legacy/`.
+describe "Hugo export: aliases" do
+  it "roots relative aliases at the site and leaves absolute ones alone" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "x.md"),
+        "+++\ntitle = \"X\"\naliases = [\"legacy\", \"old/x/\", \"/kept/\", \"https://old.example/x\"]\n+++\nbody\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      File.read(File.join(output_dir, "content", "posts", "x.md"))
+        .should contain(%(aliases = ["/legacy", "/old/x/", "/kept/", "https://old.example/x"]))
+    end
+  end
+end

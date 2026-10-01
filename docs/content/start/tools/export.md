@@ -84,7 +84,7 @@ while the counts cover content documents only.
 | updated | lastmod |
 | tags | tags |
 | series | series |
-| aliases | aliases |
+| aliases | aliases (a relative alias gains a leading `/`) |
 | image | images (array) |
 | expires | expiryDate |
 | weight | weight |
