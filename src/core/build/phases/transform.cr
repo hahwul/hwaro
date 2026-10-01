@@ -759,7 +759,7 @@ module Hwaro::Core::Build::Phases::Transform
     # 3. Convert to Crinja Values and store in site.authors
     temp_authors.each do |id, data|
       # Sort pages by date descending
-      sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date", true)
+      sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date")
 
       page_values = sorted_pages.map do |p|
         # Expose the same common leaf fields a section/term page list provides,

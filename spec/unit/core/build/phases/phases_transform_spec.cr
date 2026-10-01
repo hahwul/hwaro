@@ -650,6 +650,27 @@ describe Hwaro::Core::Build::Phases::Transform do
       pages_raw = site.authors["alice"].raw.as(Hash(Crinja::Value, Crinja::Value))["pages"].raw.as(Array(Crinja::Value))
       pages_raw.size.should eq(1) # only the published page, not the draft
     end
+
+    # Regression: `sort_pages(…, "date", true)` reversed an already
+    # newest-first comparator, so `author.pages` listed the oldest post first.
+    it "lists an author's pages newest first" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      pages = {"p2021.md" => 2021, "p2023.md" => 2023, "p2022.md" => 2022}.map do |path, year|
+        p = make_page(path)
+        p.title = path
+        p.date = Time.utc(year, 1, 1)
+        p.authors = ["alice"]
+        p
+      end
+      site.pages = pages
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_aggregate_site_authors(site)
+
+      pages_raw = site.authors["alice"].raw.as(Hash(Crinja::Value, Crinja::Value))["pages"].raw.as(Array(Crinja::Value))
+      pages_raw.map { |v| v.raw.as(Hash(Crinja::Value, Crinja::Value))["title"].to_s }
+        .should eq(["p2023.md", "p2022.md", "p2021.md"])
+    end
   end
 
   describe "#update_taxonomies_incremental" do
