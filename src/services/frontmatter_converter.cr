@@ -78,6 +78,26 @@ module Hwaro
         NotFrontmatter
       end
 
+      # Top-level front-matter keys whose null is written to TOML by OMITTING
+      # the key. TOML has no null and the default spelling, `""`, is a SET
+      # value for these: the build reads a null `title`/`slug`/`image` as
+      # unset ("Untitled", slug from the filename, no og:image) but `slug =
+      # ""` collapsed the page onto its section index URL and dropped it.
+      # It is `Processors::Markdown::KNOWN_FRONT_MATTER_KEYS` minus the
+      # build's `ParseContent::CASCADABLE_KEYS`: for a cascadable key a null
+      # still DECLARES the key and blocks a section's `[cascade]` (`draft:
+      # ~` keeps a page out of a cascaded draft), which `""` preserves and
+      # omission would not. Custom/extra keys and nested members keep `""`
+      # too — the build turns their null into `""` with the key present.
+      # Pinned against both lists by frontmatter_converter_spec.
+      NULL_OMITTED_KEYS = Set{
+        "title", "description", "image", "date", "updated", "expires", "slug",
+        "path", "aliases", "transparent", "generate_feeds", "paginate",
+        "paginate_by", "pagination_enabled", "sort_by", "reverse",
+        "page_template", "paginate_path", "redirect_to", "weight", "categories",
+        "series", "series_weight", "cascade", "menus", "menu",
+      }
+
       # Content directory path
       @content_dir : String
 
@@ -489,7 +509,7 @@ module Hwaro
           json_data = JSON.parse(json_str)
           # Reuse the YAML→TOML builder by going through YAML::Any.
           yaml_any = json_to_yaml_any(json_data)
-          toml_body = Utils::FrontmatterWriter::TomlBuilder.new.build(yaml_any)
+          toml_body = Utils::FrontmatterWriter::TomlBuilder.new(NULL_OMITTED_KEYS).build(yaml_any)
           "#{TOML_DELIMITER}\n#{toml_body}#{TOML_DELIMITER}\n#{body}"
         rescue ex
           record_error(ex)
@@ -627,7 +647,7 @@ module Hwaro
       end
 
       private def convert_yaml_to_toml_string(yaml : YAML::Any, indent : Int32 = 0) : String
-        Utils::FrontmatterWriter::TomlBuilder.new.build(yaml)
+        Utils::FrontmatterWriter::TomlBuilder.new(NULL_OMITTED_KEYS).build(yaml)
       end
 
       private def convert_toml_to_yaml_string(toml : TOML::Table) : String

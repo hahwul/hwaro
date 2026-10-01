@@ -311,33 +311,20 @@ describe Hwaro::Utils::FrontmatterWriter do
       TOML.parse(doc)["big"].should eq(9999999999_i64)
     end
 
-    # TOML has no null, and every placeholder reads back as a SET value
-    # (`slug = ""` is an empty slug, not a missing one), so a null-valued key
-    # is omitted — the only spelling the build reads as "unset".
-    it "omits null-valued keys, since TOML has no null" do
-      doc = toml_build({"x" => YAML.parse("---\n"), "y" => YAML::Any.new("kept")})
-      parsed = TOML.parse(doc)
-      parsed.has_key?("x").should be_false
-      parsed["y"].should eq("kept")
+    it "emits nil as an empty string, since TOML has no null" do
+      doc = toml_build({"x" => YAML.parse("---\n")})
+      TOML.parse(doc)["x"].should eq("")
     end
 
-    it "omits null members of tables and inline tables but keeps array positions" do
-      doc = toml_build({
-        "extra" => YAML.parse("a: ~\nb: 1\n"),
-        "rows"  => YAML.parse("- - {k: ~, j: 2}\n"),
-        "list"  => YAML.parse("- a\n- ~\n"),
-      })
+    it "omits a null only for the named top-level keys" do
+      fields = {"slug" => YAML.parse("---\n"), "draft" => YAML.parse("---\n"), "extra" => YAML.parse("slug: ~\n")}
+      wrapped = {} of YAML::Any => YAML::Any
+      fields.each { |k, v| wrapped[YAML::Any.new(k)] = v }
+      doc = Hwaro::Utils::FrontmatterWriter::TomlBuilder.new(Set{"slug"}).build(YAML::Any.new(wrapped))
       parsed = TOML.parse(doc)
-      parsed["extra"].as_h.has_key?("a").should be_false
-      parsed["extra"]["b"].should eq(1)
-      doc.should contain("{j = 2}")
-      parsed["rows"].as_a.first.as_a.first["j"].should eq(2)
-      parsed["list"].as_a.size.should eq(2)
-    end
-
-    it "still writes a table whose members are all null as an empty table" do
-      doc = toml_build({"extra" => YAML.parse("a: ~\n")})
-      TOML.parse(doc)["extra"].as_h.should be_empty
+      parsed.has_key?("slug").should be_false
+      parsed["draft"].should eq("")
+      parsed["extra"]["slug"].should eq("")
     end
 
     # Crystal spells these "Infinity"/"NaN", which TOML cannot reparse.
