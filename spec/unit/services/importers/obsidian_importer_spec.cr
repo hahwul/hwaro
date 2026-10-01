@@ -497,3 +497,55 @@ describe Hwaro::Services::Importers::ObsidianImporter do
     end
   end
 end
+
+describe "Obsidian import: %% comments" do
+  it "drops inline and multi-line comments but keeps %% inside code" do
+    Dir.mktmpdir do |dir|
+      vault = File.join(dir, "vault")
+      FileUtils.mkdir_p(vault)
+      File.write(File.join(vault, "Note.md"), <<-MD)
+        ---
+        title: Note
+        ---
+        Visible start. %%private: call bob%% Still visible.
+
+        %%
+        multi-line
+        secret #hidden-tag
+        %%
+
+        Inline `100%% sure` and:
+
+        ```text
+        literal %% kept %%
+        ```
+
+        Visible end.
+        MD
+      output_dir = File.join(dir, "out")
+      Hwaro::Services::Importers::ObsidianImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "obsidian", path: vault, output_dir: output_dir))
+
+      content = File.read(File.join(output_dir, "posts", "note.md"))
+      content.should_not contain("call bob")
+      content.should_not contain("secret")
+      content.should_not contain("hidden-tag")
+      content.should contain("Visible start.  Still visible.")
+      content.should contain("`100%% sure`")
+      content.should contain("literal %% kept %%")
+      content.should contain("Visible end.")
+    end
+  end
+
+  it "leaves a note with an unterminated %% untouched" do
+    Dir.mktmpdir do |dir|
+      vault = File.join(dir, "vault")
+      FileUtils.mkdir_p(vault)
+      File.write(File.join(vault, "Odd.md"), "---\ntitle: Odd\n---\nA %%b%% c and 50%% more.\n")
+      output_dir = File.join(dir, "out")
+      Hwaro::Services::Importers::ObsidianImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "obsidian", path: vault, output_dir: output_dir))
+      File.read(File.join(output_dir, "posts", "odd.md")).should contain("A %%b%% c and 50%% more.")
+    end
+  end
+end

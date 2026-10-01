@@ -1,5 +1,6 @@
 require "yaml"
 require "./base"
+require "../../content/processors/fence_tracker"
 
 module Hwaro
   module Services
@@ -169,6 +170,7 @@ module Hwaro
         ) : Symbol
           raw = content_cache[file_path]? || read_text(file_path)
           frontmatter_yaml, body = split_yaml_frontmatter(raw)
+          body = strip_comments(body)
 
           fields = Hash(String, FieldValue).new
           tags = [] of String
@@ -283,6 +285,47 @@ module Hwaro
             result << s unless s.empty?
           end
           result
+        end
+
+        # Remove Obsidian comments (`%%hidden%%`, inline or spanning lines).
+        # Obsidian never renders them — they hold private notes and TODOs —
+        # so importing them verbatim published them on the site. `%%` inside
+        # fenced or inline code is literal. A note whose comments don't
+        # balance is left untouched rather than guessing where one ends.
+        private def strip_comments(body : String) : String
+          return body unless body.includes?("%%")
+          tracker = Content::Processors::FenceTracker.new
+          in_comment = false
+          result = String.build do |io|
+            body.each_line(chomp: false) do |line|
+              fenced = tracker.fence_line?(line)
+              if fenced && !in_comment
+                io << line
+                next
+              end
+              text = line.chomp
+              ranges = in_comment ? [] of Range(Int32, Int32) : inline_code_ranges(text)
+              chars = text.chars
+              had_comment = in_comment
+              kept = String.build do |buf|
+                i = 0
+                while i < chars.size
+                  if chars[i] == '%' && chars[i + 1]? == '%' && (in_comment || ranges.none?(&.includes?(i)))
+                    in_comment = !in_comment
+                    had_comment = true
+                    i += 2
+                  else
+                    buf << chars[i] unless in_comment
+                    i += 1
+                  end
+                end
+              end
+              # A line that held nothing but comment disappears entirely.
+              next if had_comment && kept.blank?
+              io << (had_comment ? kept.rstrip : kept) << line[text.size..]
+            end
+          end
+          in_comment ? body : result
         end
 
         private def inline_code_ranges(line : String) : Array(Range(Int32, Int32))
