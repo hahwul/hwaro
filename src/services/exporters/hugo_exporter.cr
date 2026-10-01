@@ -118,7 +118,11 @@ module Hwaro
                 hugo_fields[key] = value
               end
             when "aliases"
-              hugo_fields[key] = root_relative_aliases(value)
+              if aliases = publishable_aliases(value, file_path)
+                hugo_fields[key] = YAML::Any.new(aliases.map { |a| YAML::Any.new(root_relative_alias(a)) }) unless aliases.empty?
+              else
+                hugo_fields[key] = value
+              end
             when "image"
               if authored?(flattened, "images")
                 hugo_fields[key] = value
@@ -200,22 +204,10 @@ module Hwaro
         # but Hugo resolves an alias without a leading slash against the
         # page's own section, so `legacy` on `posts/x.md` moved to
         # `/posts/legacy/` and the old URL stopped redirecting. Give such
-        # aliases the slash the build implies; anything that is not a plain
-        # relative path (`https://…`, `//host/…`, non-strings) is untouched.
-        private def root_relative_aliases(value : YAML::Any) : YAML::Any
-          case raw = value.raw
-          when String
-            YAML::Any.new(root_relative_alias(raw))
-          when Array
-            YAML::Any.new(value.as_a.map { |item| (str = item.as_s?) ? YAML::Any.new(root_relative_alias(str)) : item })
-          else
-            value
-          end
-        end
-
+        # aliases the slash the build implies. Aliases the build refuses
+        # never reach here (see `publishable_aliases`).
         private def root_relative_alias(path : String) : String
-          return path if path.empty? || path.starts_with?('/') || path.matches?(/\A[a-zA-Z][a-zA-Z0-9+.\-]*:/)
-          "/#{path}"
+          path.starts_with?('/') ? path : "/#{path}"
         end
 
         # An authored, non-null value for `key` exists in the source fields.

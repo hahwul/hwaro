@@ -422,6 +422,22 @@ module Hwaro
 
         INTERNAL_LINK_RE = /\[([^\]]*)\]\(@\/([^\)]+)\)/
 
+        # The `aliases` the build would actually publish, as strings, or nil
+        # when the value is not an alias list at all. An absolute URL, a
+        # protocol-relative `//host/…` or a traversing path is dropped with
+        # the build's own warning — the build skips those, and passed through
+        # they broke the target (Hugo refuses to build a site with an
+        # `http*` alias; `../up` became a local redirect the source never had).
+        protected def publishable_aliases(value : YAML::Any?, source : String) : Array(String)?
+          aliases = string_list_field(value)
+          return unless aliases
+          aliases.reject do |a|
+            next false unless reason = Hwaro::Utils::PathUtils.alias_refusal(a)
+            Logger.warn "Skipping alias #{a.inspect} on #{source}: #{reason}."
+            true
+          end
+        end
+
         # Convert @/ internal links to relative paths.
         #
         # The build resolves `@/` only in rendered link hrefs, so an `@/` link

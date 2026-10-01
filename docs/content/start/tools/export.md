@@ -84,7 +84,7 @@ while the counts cover content documents only.
 | updated | lastmod |
 | tags | tags |
 | series | series |
-| aliases | aliases (a relative alias gains a leading `/`) |
+| aliases | aliases (a relative alias gains a leading `/`; absolute, `//host` and `..` aliases, which the build skips, are dropped) |
 | image | images (array) |
 | expires | expiryDate |
 | weight | weight |
@@ -112,7 +112,7 @@ keep their name.
 | image | image |
 | template | layout |
 | path | permalink (`/<path>/`) |
-| aliases | redirect_from (jekyll-redirect-from) |
+| aliases | redirect_from (jekyll-redirect-from; aliases the build skips are dropped) |
 | updated | last_modified_at |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 

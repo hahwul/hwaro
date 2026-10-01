@@ -483,19 +483,44 @@ end
 # without a leading slash against the page's section, so `legacy` on
 # `posts/x.md` redirected from `/posts/legacy/` instead of `/legacy/`.
 describe "Hugo export: aliases" do
-  it "roots relative aliases at the site and leaves absolute ones alone" do
+  it "roots relative aliases at the site" do
     Dir.mktmpdir do |dir|
       content_dir = File.join(dir, "content")
       output_dir = File.join(dir, "export")
       FileUtils.mkdir_p(File.join(content_dir, "posts"))
       File.write(File.join(content_dir, "posts", "x.md"),
-        "+++\ntitle = \"X\"\naliases = [\"legacy\", \"old/x/\", \"/kept/\", \"https://old.example/x\"]\n+++\nbody\n")
+        "+++\ntitle = \"X\"\naliases = [\"legacy\", \"old/x/\", \"/kept/\"]\n+++\nbody\n")
 
       options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
       Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
 
       File.read(File.join(output_dir, "content", "posts", "x.md"))
-        .should contain(%(aliases = ["/legacy", "/old/x/", "/kept/", "https://old.example/x"]))
+        .should contain(%(aliases = ["/legacy", "/old/x/", "/kept/"]))
+    end
+  end
+
+  # Regression: an `https://…` alias passed through made `hugo` refuse the
+  # whole site (`http* aliases not supported`), and `//host/…` / `../up`
+  # became local redirects. The build skips all three with a warning.
+  it "drops the aliases the build refuses, with a warning" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "x.md"),
+        "+++\ntitle = \"X\"\naliases = [\"https://old.example/x\", \"//cdn.example/x\", \"../up\", \"/kept/\"]\n+++\nbody\n")
+      File.write(File.join(content_dir, "posts", "y.md"),
+        "+++\ntitle = \"Y\"\naliases = [\"http://old.example/y\"]\n+++\nbody\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      log = with_captured_log do
+        Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+      end
+
+      File.read(File.join(output_dir, "content", "posts", "x.md")).should contain(%(aliases = ["/kept/"]))
+      File.read(File.join(output_dir, "content", "posts", "y.md")).should_not contain("aliases")
+      log.should contain("Skipping alias \"https://old.example/x\"")
+      log.should contain("Skipping alias \"../up\"")
     end
   end
 end

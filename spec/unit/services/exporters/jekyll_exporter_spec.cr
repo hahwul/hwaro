@@ -603,3 +603,32 @@ describe "Jekyll export: address and modification keys" do
     end
   end
 end
+
+# Regression: aliases the build refuses (absolute, protocol-relative,
+# traversing) were carried into `redirect_from`, creating redirects the
+# source site never had.
+describe "Jekyll export: refused aliases" do
+  it "drops the aliases the build refuses from redirect_from" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"),
+        "+++\ntitle = \"A\"\naliases = [\"https://old.example/a\", \"//cdn.example/a\", \"../up\", \"/kept/\"]\n+++\nbody\n")
+      File.write(File.join(content_dir, "b.md"), "+++\ntitle = \"B\"\naliases = [\"https://old.example/b\"]\n+++\nbody\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      with_captured_log do
+        Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+      end
+
+      a = File.read(File.join(output_dir, "a.md"))
+      a.should contain("redirect_from:\n  - \"/kept/\"\n")
+      a.should_not contain("example")
+      a.should_not contain("../up")
+      b = File.read(File.join(output_dir, "b.md"))
+      b.should_not contain("redirect_from")
+      b.should_not contain("aliases")
+    end
+  end
+end

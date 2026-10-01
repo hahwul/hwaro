@@ -195,9 +195,11 @@ module Hwaro
             handled << "path"
           end
 
-          if fields["redirect_from"]?.try(&.raw).nil? && (aliases = string_list_field(fields["aliases"]?))
-            yaml_lines << "redirect_from:"
-            aliases.each { |a| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(a)}" }
+          if fields["redirect_from"]?.try(&.raw).nil? && (aliases = publishable_aliases(fields["aliases"]?, file_path))
+            unless aliases.empty?
+              yaml_lines << "redirect_from:"
+              aliases.each { |a| yaml_lines << "  - #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(a)}" }
+            end
             handled << "aliases"
           end
 
