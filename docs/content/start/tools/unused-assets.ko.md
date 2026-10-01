@@ -49,7 +49,9 @@ hwaro tool unused-assets --delete --force --json
 - 템플릿 파일 (`.html`, `.j2`, `.jinja`, `.jinja2`, `.ecr`, 그리고 `.css`, `.js`, `.xml`, `.json`, `.webmanifest`, `.svg`, `.txt`)
 - 다른 정적 파일을 참조할 수 있는 정적 소스 (`.css`, `.scss`, `.sass`, `.js`, `.json`, `.webmanifest`, `.xml`, `.svg`, `.txt`, `.html`, `.htm`)
 - 데이터·번역 파일 (`data/`, `i18n/`의 `.yml`, `.yaml`, `.json`, `.toml`)
-- 파일을 지정하는 `config.toml` 값
+- 파일을 지정하는 `config.toml`과 환경별 덮어쓰기 파일(`config.production.toml`)의 값
+- 에셋 파이프라인의 `[assets] source_dir`(`static/`이 아닐 때) 아래 스타일시트와 스크립트
+- 빌드가 직접 연결하는 파일: `[highlight] use_cdn = false`일 때 자체 호스팅하는 highlight.js 테마와 스크립트
 
 템플릿이 `templates/` 밖에 있다면 `--templates-dir`로 스캔 위치를 알려주세요.
 그렇지 않으면 해당 템플릿의 에셋 참조가 보이지 않아, 실제로 쓰이는 에셋이

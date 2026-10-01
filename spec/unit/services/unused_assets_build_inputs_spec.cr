@@ -55,4 +55,31 @@ describe Hwaro::Services::UnusedAssets do
       end
     end
   end
+
+  describe "asset pipeline source dir" do
+    it "reads stylesheets under [assets] source_dir for references" do
+      Dir.mktmpdir do |dir|
+        build_input_project(dir, "[assets]\nenabled = true\nsource_dir = \"assets\"\n\n[[assets.bundles]]\nname = \"main.css\"\nfiles = [\"css/main.css\"]\n")
+        FileUtils.mkdir_p(File.join(dir, "assets", "css"))
+        File.write(File.join(dir, "assets", "css", "main.css"), "body{background:url(/images/bg.png)}")
+        write_static(dir, "images/bg.png")
+        write_static(dir, "images/orphan.png")
+
+        build_input_unused(dir).should eq(["static/images/orphan.png"])
+      end
+    end
+  end
+
+  describe "environment config overrides" do
+    it "reads config.<env>.toml for references" do
+      Dir.mktmpdir do |dir|
+        build_input_project(dir, "")
+        File.write(File.join(dir, "config.production.toml"), "[og]\ndefault_image = \"/images/prod-share.png\"\n")
+        write_static(dir, "images/prod-share.png")
+        write_static(dir, "images/orphan.png")
+
+        build_input_unused(dir).should eq(["static/images/orphan.png"])
+      end
+    end
+  end
 end

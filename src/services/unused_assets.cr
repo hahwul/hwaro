@@ -249,6 +249,19 @@ module Hwaro
           Dir.glob(File.join(@static_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
+        # The asset pipeline's own source dir (`[assets] source_dir =
+        # "assets"`): a bundled stylesheet's `url(/images/bg.png)` ships in
+        # the compiled bundle, yet the file was never read, so `bg.png` was
+        # reported unused and `--delete` removed it.
+        if source_dir = asset_source_dir
+          Dir.glob(File.join(source_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+        end
+
+        # Environment overrides (`config.production.toml`, merged by
+        # `hwaro build --env production`) are config too: an asset named only
+        # there — a production `og.default_image`, say — is still in use.
+        Dir.glob(File.join(@project_root, "config.*.toml")).sort.each { |f| scan_files << f }
+
         # `data/` and `i18n/` are build inputs too — templates read them as
         # `site.data.*` / translation strings, so an asset path that lives only
         # in a data or locale file is genuinely referenced. Neither directory
@@ -369,6 +382,17 @@ module Hwaro
         @site_config = File.exists?(config_path) ? Models::Config.load(config_path) : nil
       rescue Exception
         nil
+      end
+
+      # `[assets] source_dir` when the pipeline reads its bundles from
+      # somewhere other than the static dir: those stylesheets and scripts
+      # ship (bundled) and reference static files like any other.
+      private def asset_source_dir : String?
+        return unless config = site_config
+        return unless config.assets.enabled
+        dir = rooted(config.assets.source_dir)
+        return if File.expand_path(dir) == File.expand_path(@static_dir)
+        dir if Dir.exists?(dir)
       end
     end
   end
