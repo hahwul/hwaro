@@ -166,7 +166,12 @@ All of this relies on the cache remembering what it wrote. When it has no
 usable record of the output directory — no `.hwaro_cache.json` yet (the tree
 came from a plain `hwaro build`), a corrupt one, or one last used for a
 different `-o` — a `--cache` build clears the output directory first, exactly
-like a cold build (and under the same ownership rules), then records it.
+like a cold build (and under the same ownership rules), then records it. The
+cache remembers one output directory at a time, so alternating
+`hwaro build --cache` and `hwaro build --cache -o dist` rebuilds each tree from
+scratch on every switch. `hwaro serve --cache` keeps a separate cache (see
+below), so a serve session never costs the next `hwaro build --cache` its
+record of `public/`.
 
 A `--cache` build's output is therefore byte-identical to a clean build's, and
 `hwaro build --full` is not needed to clear anything. (`--full` only clears the
@@ -175,7 +180,10 @@ already rebuilds everything.)
 
 ## Cache File
 
-The cache is stored in `.hwaro_cache.json` at the project root. This file contains:
+The cache is stored in `.hwaro_cache.json` at the project root
+(`hwaro serve --cache` uses `.hwaro/serve_cache.json`, next to the
+`.hwaro/serve/` tree it describes; `.hwaro/` keeps itself out of version
+control). This file contains:
 
 - **Metadata** — template and config checksums from the last build
 - **Entries** — per-file records with path, mtime, content hash, and output path
