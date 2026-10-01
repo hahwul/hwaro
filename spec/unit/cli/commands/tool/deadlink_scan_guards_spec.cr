@@ -133,6 +133,25 @@ describe "check-links scan guards" do
       end
     end
 
+    it "skips escaped autolinks and raw HTML blocks, and reads the scheme case-insensitively" do
+      Dir.mktmpdir do |dir|
+        body = <<-MD
+          Escaped \\<https://example.com/escaped> but \\\\<https://example.com/after-backslash>.
+
+          <div>
+          <https://example.com/in-html-block>
+          </div>
+
+          <HTTPS://example.com/upper>
+          MD
+        File.write(File.join(dir, "a.md"), "+++\ntitle = \"A\"\n+++\n#{body}\n")
+
+        urls = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.scan_guard_external_for_test(dir).map(&.url)
+
+        urls.sort!.should eq(["https://example.com/after-backslash", "https://example.com/upper"])
+      end
+    end
+
     it "does not count an angle-bracket link destination twice" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "a.md"), "+++\ntitle = \"A\"\n+++\n[x](<https://example.com/inline>) and [d][].\n\n[d]: <https://example.com/ref>\n")
