@@ -303,6 +303,11 @@ module Hwaro
         # full build and per incremental/rerender pass (see
         # compute_output_url_winners). Nil until the first render pass.
         @output_url_winners : Hash(String, String)? = nil
+        # Output file key (`PathUtils.output_file_key`) → path of the page
+        # that publishes its own HTML there, from the same pass. Generated
+        # writers (paginator, taxonomy pages) consult it so they never
+        # overwrite an authored page — see `page_output_owner`.
+        @page_output_files : Hash(String, String) = {} of String => String
         # Unresolved `@/` internal links collected during the render fan-out
         # when `[links] broken_internal = "error"` (each entry is a formatted
         # "source.md → @/target (reason)" line). Guarded by

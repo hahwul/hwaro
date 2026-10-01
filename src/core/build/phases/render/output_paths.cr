@@ -133,6 +133,10 @@ module Hwaro::Core::Build::Phases::Render
       winners[url] = page.path
     end
 
+    # Snapshot before the alias pass: only a page's own HTML counts as
+    # authored output for the generated writers (see `page_output_owner`).
+    @page_output_files = by_file.dup
+
     writers.each do |page|
       page.aliases.each do |a|
         norm = normalize_alias_url(a)
@@ -174,6 +178,20 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     winners
+  end
+
+  # The page whose own HTML lands on `output_path` (inside `output_dir`),
+  # or nil. A generated page — a paginator's `/page/N/`, a taxonomy index or
+  # term page — whose path an authored page already publishes is not
+  # written: authored content wins a path (the `[[content.generate]]` rule),
+  # deterministically, where the generated write used to race the page's
+  # under parallel render or silently replace it after.
+  def page_output_owner(output_path : String, output_dir : String) : String?
+    return if @page_output_files.empty?
+    prefix = output_dir.rstrip("/") + "/"
+    return unless output_path.starts_with?(prefix)
+    key = output_path[prefix.size..].rchop("index.html").rstrip("/")
+    @page_output_files[key]?
   end
 
   # Shared by collision detection and alias writing so the suppression keys

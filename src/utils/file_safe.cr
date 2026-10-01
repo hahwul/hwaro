@@ -119,8 +119,24 @@ module Hwaro
           # Never leave the temp file behind — a failed write must look
           # exactly like the old non-atomic failure (target unchanged).
           File.delete(tmp) if File.exists?(tmp)
+          raise directory_in_the_way_error(target, ex) if Dir.exists?(target)
           raise ex
         end
+      end
+
+      # A directory where a FILE must go is almost always a content page
+      # whose slug/path names a generated file (`slug = "sitemap.xml"`
+      # publishes `sitemap.xml/index.html`, and the sitemap generator then
+      # cannot rename onto it). Raw, that surfaced as an internal error
+      # ("Error renaming file … Is a directory"); classify it and say why.
+      private def self.directory_in_the_way_error(target : String, cause : Exception) : Hwaro::HwaroError
+        name = File.basename(target)
+        Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Cannot write '#{target}': a directory already exists at that path",
+          hint: "A content page whose slug or path is '#{name}' publishes '#{target}/index.html' there. Rename that page so it does not shadow the generated '#{name}'.",
+          cause: cause
+        )
       end
 
       # Copy `src` onto `dest` atomically: copy into a same-directory temp

@@ -610,6 +610,14 @@ module Hwaro
           return
         end
 
+        # Authored content wins the path (Builder#page_output_owner): writing
+        # here silently replaced the page while sitemap/feeds/search still
+        # advertised it.
+        if owner = builder.try(&.page_output_owner(output_path, output_dir))
+          Logger.warn "Taxonomy page #{output_path} is not written: content page '#{owner}' publishes the same path. Rename that page (slug/path) or the taxonomy term."
+          return
+        end
+
         # No content file backs a taxonomy page, so nothing else records that
         # this build still wants it. Claiming it lets the Finalize phase
         # delete the term pages a previous `--cache` build left behind when
