@@ -94,13 +94,37 @@ is replaced with the real thing, and a symlink with no counterpart in the
 source is unlinked. Neither case reads or deletes through the link, so
 content living outside the destination is never touched.
 
+**What the sync leaves alone.** At the destination, hidden directories other
+than `.well-known/` are never scanned, so nothing in them is deleted, and a
+`.git` entry is always kept. A destination that is a `git worktree` or
+submodule checkout (the usual gh-pages setup) stays attached to its
+repository. On the source side every hidden directory the build wrote is
+deployed (`.well-known/`, `.domains`, …) except version-control metadata
+(`.git/`, `.svn/`, `.hg/`, `.bzr/`). Empty directories are removed only when
+the sync's own deletes emptied them; an empty directory it never selected
+(say, `uploads/` outside `include`) is kept.
+
+**File ↔ directory swaps.** Turning `strip_index_html` on or off flips each
+page between a file `foo` and a directory `foo/` holding `index.html`. When
+the entry in the way is stale (everything in it would be deleted anyway), the
+sync removes it before copying the new one, and the plan lists it as a
+delete. If it holds anything the sync keeps (a hidden directory, a path
+outside `include`/`exclude`), the deploy refuses before writing anything.
+
+**Command targets** run through `sh`. Their output streams as the tool runs,
+stderr included. On an interactive terminal the tool can read your input (a
+login or confirmation prompt); in pipes, CI and `--json` runs stdin is closed.
+The command also gets `HWARO_DEPLOY_TARGET`, `HWARO_DEPLOY_URL` and
+`HWARO_DEPLOY_SOURCE` in its environment. Write them as `$HWARO_DEPLOY_TARGET`:
+config.toml itself expands `${VAR}` when it is loaded.
+
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | name | string | — | Target identifier (must be unique; duplicates are warned about and only the first is used) |
 | url | string | — | Destination URL (`file://`, `s3://`, `gs://`, `az://`) |
 | path | string | — | Alias for `url` when deploying to a local directory (`path = "~/public"`; `~` is expanded) |
-| include | string | — | Glob pattern for files to include |
-| exclude | string | — | Glob pattern for files to exclude |
+| include | string | — | Glob pattern for files to include (see below) |
+| exclude | string | — | Glob pattern for files to exclude (see below) |
 | strip_index_html | bool | false | Remove `index.html` from URLs |
 | command | string | — | Custom command (overrides auto-generation) |
 
@@ -111,6 +135,17 @@ Custom commands support placeholders:
 | `{source}` | Source directory (default: `public`) |
 | `{url}` | Target URL |
 | `{target}` | Target name |
+
+Any other `{name}` token is rejected as a typo before the command runs. A
+`{` preceded by `$` is left to the shell.
+
+`include` and `exclude` are globs matched against the path relative to the
+source directory, e.g. `blog/post/index.html`. `*` does not cross `/`, so
+match any depth with `**/`: `exclude = "**/*.map"` drops source maps
+everywhere, while `*.map` only matches at the top level. With
+`strip_index_html`, a stripped page `blog/post` is also judged by its source
+name `blog/post/index.html`. If either spelling is excluded, the deployed page
+is never deleted as stale.
 
 ## Matchers
 
@@ -124,7 +159,7 @@ force = true
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| pattern | string | — | Regex pattern to match file paths |
+| pattern | string | — | Regex matched against the source-relative path and the destination name (they differ under `strip_index_html`) |
 | force | bool | false | Always copy matched files, even when identical at the destination |
 | cache_control | string | — | Reserved — not applied by the built-in sync (see below) |
 | content_type | string | — | Reserved — not applied by the built-in sync (see below) |
