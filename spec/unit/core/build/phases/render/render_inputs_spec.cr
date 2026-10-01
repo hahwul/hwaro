@@ -93,7 +93,7 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     end
   end
 
-  it "re-renders cached pages when a resize_image() source is replaced" do
+  it "re-renders cached pages and prunes the old variant when a resize_image() source is replaced" do
     config = "[image_processing]\nenabled = true\nwidths = [640, 1024]\n"
     head = %({% set im = resize_image(path="/img.png", width=1024) %}<img src="{{ im.url }}" width="{{ im.width }}">)
     with_render_inputs_site(config, head) do
@@ -107,6 +107,8 @@ describe "warm --cache builds and template inputs outside the tracked files" do
       html = File.read("public/a/index.html")
       html.should contain(%(src="http://localhost/img_1024w.png" width="1024"))
       File.exists?("public/img_1024w.png").should be_true
+      # A cold build never writes it; the warm one must not keep it.
+      File.exists?("public/img_900w.png").should be_false
     end
   end
 

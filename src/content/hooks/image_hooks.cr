@@ -219,6 +219,7 @@ module Hwaro
               @@source_map = source_map
             end
             @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+            claim_variants(ctx, jobs, new_map)
             Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
             return
           end
@@ -266,6 +267,7 @@ module Hwaro
             @@source_map = source_map
           end
           @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+          claim_variants(ctx, jobs, new_map)
           # Count variants (widths × successful jobs), matching the pre-#389
           # meaning. Counting source images instead would silently halve/third
           # the number users see and make the "Generated N" line less useful
@@ -278,6 +280,24 @@ module Hwaro
           if (p = ctx.profiler) && start
             elapsed = (Time.instant - start).total_milliseconds
             p.record_asset_generation("image:resize", resized_count, reused_count, elapsed)
+          end
+        end
+
+        # Claim every variant file this build publishes (reused ones too — an
+        # unclaimed file is pruned on the next build). Variants are named by
+        # width, and the width set follows the source image (no variant is
+        # upscaled), so replacing `hero.png` with a bigger image wrote
+        # `hero_1024w.png` and left the old `hero_900w.png` published forever
+        # on a `--cache` build, which keeps the output directory. Claimed, the
+        # Finalize phase prunes the one this build no longer writes.
+        private def claim_variants(ctx : Core::Lifecycle::BuildContext, jobs : Array(ImageJob),
+                                   width_maps : Hash(String, Hash(Int32, String))) : Nil
+          builder = ctx.builder
+          return unless builder
+          jobs.each do |job|
+            width_maps[job.original_url]?.try &.each_value do |url|
+              builder.claim_generated_output(File.join(job.dest_dir, File.basename(url)))
+            end
           end
         end
 
