@@ -515,12 +515,12 @@ hwaro doctor --full        # 둘 다 (--fix --approve와 동일)
 |---|---|
 | 문제 없음, 경고만, 또는 info 수준 발견 | `0` |
 | 설정 오류 (`config.toml` 누락/손상) | `3` (`HWARO_E_CONFIG`) |
-| 템플릿 오류 (필수 파일 누락, 닫히지 않은 태그) | `4` (`HWARO_E_TEMPLATE`) |
-| 콘텐츠 오류 (잘못된 프론트 매터, 해당 검사가 도입되면) | `5` (`HWARO_E_CONTENT`) |
+| 템플릿 오류 (`page.html` 누락, 닫히지 않은 태그) | `4` (`HWARO_E_TEMPLATE`) |
+| 콘텐츠 오류 (잘못된 프론트 매터, 읽을 수 없는 파일) | `5` (`HWARO_E_CONTENT`) |
 | 그 외 error 수준 문제 | `1` |
 
 경고(빈 `base_url`, 끝 슬래시, 중복 택소노미 이름 등)는 참고용이며
-종료 코드를 바꾸지 않습니다.
+`--strict`나 `--max-warnings N`을 주지 않는 한 종료 코드를 바꾸지 않습니다.
 
 콘텐츠 검증에는 `hwaro tool validate`를 사용합니다. 자세한 내용은 [doctor](/ko/start/tools/doctor/)를 참고합니다.
 
