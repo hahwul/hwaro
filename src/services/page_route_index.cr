@@ -5,6 +5,7 @@ require "./content_lister"
 require "./generated_content"
 require "../models/config"
 require "../content/processors/markdown"
+require "../utils/path_utils"
 require "../utils/permalink_resolver"
 require "../utils/logger"
 
@@ -172,7 +173,9 @@ module Hwaro
 
         @published << PageRouteIndex.normalize(url)
         data[:aliases].each do |alias_path|
-          next if alias_path.empty? || alias_path.includes?("://") || alias_path.starts_with?("//")
+          # The build's own rule: external URLs (`mailto:`, `https://`, `//`)
+          # and traversing segments (`../up`) never become redirect stubs.
+          next if alias_path.empty? || Utils::PathUtils.alias_refusal(alias_path)
           @published << PageRouteIndex.normalize(alias_path)
         end
       rescue ex
