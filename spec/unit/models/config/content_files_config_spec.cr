@@ -426,3 +426,18 @@ describe Hwaro::Models::HighlightConfig do
     end
   end
 end
+
+describe "Hwaro::Models::ContentFilesConfig#denied?" do
+  it "applies the deny rules without an allow-list entry" do
+    config = Hwaro::Models::ContentFilesConfig.new
+    config.disallow_extensions = [".xml"]
+    config.disallow_paths = ["drafts/**"]
+    config.denied?("drafts/secrets.json").should be_true
+    config.denied?("feed.xml").should be_true
+    config.denied?("data/public.json").should be_false
+  end
+
+  it "denies nothing by default" do
+    Hwaro::Models::ContentFilesConfig.new.denied?("drafts/secrets.json").should be_false
+  end
+end

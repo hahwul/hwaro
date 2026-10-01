@@ -82,6 +82,10 @@ module Hwaro::Core::Build::Phases::Render
     return unless url_path
     output_path = File.join(output_dir, url_path, paginate_path, page_number.to_s, "index.html")
     return unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
+    if owner = page_output_owner(output_path, output_dir)
+      Logger.warn "Pagination page #{page_number} of '#{page.path}' is not written: content page '#{owner}' publishes the same path (#{output_path}). Rename that page or set the section's `paginate_path`."
+      return
+    end
 
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)

@@ -17,7 +17,13 @@ module Hwaro::Core::Build::Phases::Write
 
       generate_404_page(site, templates, output_dir, minify, verbose, @render_global_vars)
 
-      # Process raw files (JSON, XML)
+      # Process raw files (JSON, XML). A file inside the bundle of a page
+      # the build withholds (draft, future-dated, expired) stays
+      # unpublished, exactly as its page-bundle asset copy does.
+      withheld = withheld_bundle_dirs
+      unless withheld.empty?
+        ctx.raw_files.reject! { |raw| withheld_content_file?(raw.relative_path, withheld) }
+      end
       written_raw = Set(String).new
       raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose, written_raw)
       ctx.stats.raw_files_processed = raw_count
@@ -64,6 +70,38 @@ module Hwaro::Core::Build::Phases::Write
     # the filesystem's mtime precision when a static 404.html was removed.
     claim_generated_output(output_path)
     Logger.action :create, output_path if verbose
+  end
+
+  # Bundle directories (see `@content_index_dirs`) none of whose index
+  # pages survived the build's publication filter — a draft without
+  # `--drafts`, a future-dated page without `--include-future`, an expired
+  # one without `--include-expired`, a parse failure. The page-bundle asset
+  # lane withholds their files by construction (only surviving pages copy
+  # assets); `[content.files]` and raw JSON/XML copies match paths only, so
+  # they consult this set. Empty — the common case — when nothing was
+  # filtered out.
+  def withheld_bundle_dirs : Set(String)
+    return Set(String).new if @content_index_dirs.empty?
+    live = Set(String).new
+    if site = @site
+      site.pages.each { |p| live << File.dirname(p.path) if p.is_index }
+      site.sections.each { |s| live << File.dirname(s.path) if s.is_index }
+    end
+    @content_index_dirs - live
+  end
+
+  # True when content-relative `relative` sits in a withheld bundle: its
+  # NEAREST enclosing bundle directory (the one whose page would own it as
+  # an asset) is in `withheld`. A live nested bundle inside a withheld one
+  # still publishes its own files.
+  def withheld_content_file?(relative : String, withheld : Set(String) = withheld_bundle_dirs) : Bool
+    return false if withheld.empty?
+    dir = File.dirname(relative)
+    until dir == "." || dir == "/" || dir.empty?
+      return withheld.includes?(dir) if @content_index_dirs.includes?(dir)
+      dir = File.dirname(dir)
+    end
+    false
   end
 
   # Process raw files (JSON, XML) with minification

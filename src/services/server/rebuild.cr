@@ -190,7 +190,10 @@ module Hwaro
         unless build_options.skip_image_processing
           if config = @builder.config
             pages = @builder.site.try { |s| (s.pages + s.sections).as(Array(Models::Page)) }
-            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changeset.modified_content_files, config, output_dir, pages: pages)
+            # A withheld (draft / future / expired) bundle's image publishes no
+            # variants either — same rule as copy_changed_content_files.
+            changed = @builder.reject_withheld_content_sources(changeset.modified_content_files)
+            Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changed, config, output_dir, pages: pages)
           end
         end
       end

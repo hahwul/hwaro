@@ -1,5 +1,6 @@
 require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
+require "../../../../support/build_helper"
 
 # Reopen Builder to expose private Write helpers for testing.
 module Hwaro::Core::Build
@@ -409,6 +410,92 @@ describe Hwaro::Core::Build::Phases::Write do
           Dir.exists?(target).should be_true
         end
       end
+    end
+  end
+end
+
+WITHHELD_BUNDLE_CONFIG = <<-TOML
+  title = "T"
+  base_url = "http://localhost"
+
+  [content.files]
+  allow_extensions = ["jpg", "png"]
+  TOML
+
+describe "Phases::Write withheld bundle files" do
+  it "does not publish [content.files] / raw files of draft or future-dated bundles" do
+    build_site(
+      WITHHELD_BUNDLE_CONFIG,
+      content_files: {
+        "posts/_index.md"              => "+++\ntitle = \"Posts\"\n+++\n",
+        "posts/secret/index.md"        => "+++\ntitle = \"S\"\ndraft = true\n+++\n![x](product.jpg)\n",
+        "posts/secret/product.jpg"     => "J",
+        "posts/secret/data.json"       => "{\"a\":1}",
+        "posts/secret/sub/deep.png"    => "D",
+        "posts/teaser/index.md"        => "+++\ntitle = \"T\"\ndate = 2099-01-01\n+++\nhi\n",
+        "posts/teaser/teaser.png"      => "P",
+        "posts/live/index.md"          => "+++\ntitle = \"L\"\n+++\nok\n",
+        "posts/live/photo.jpg"         => "L",
+        "posts/secret/nested/index.md" => "+++\ntitle = \"N\"\n+++\nok\n",
+        "posts/secret/nested/n.jpg"    => "N",
+        "posts/shared.png"             => "S",
+        "feed.json"                    => "{}",
+      },
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+    ) do
+      File.exists?("public/posts/secret/product.jpg").should be_false
+      File.exists?("public/posts/secret/data.json").should be_false
+      File.exists?("public/posts/secret/sub/deep.png").should be_false
+      File.exists?("public/posts/teaser/teaser.png").should be_false
+      # Live bundles, a live bundle nested in a withheld one, section-level
+      # files and root raw files are unaffected.
+      File.exists?("public/posts/live/photo.jpg").should be_true
+      File.exists?("public/posts/secret/nested/n.jpg").should be_true
+      File.exists?("public/posts/shared.png").should be_true
+      File.exists?("public/feed.json").should be_true
+    end
+  end
+
+  it "publishes a draft bundle's files under --drafts" do
+    build_site(
+      WITHHELD_BUNDLE_CONFIG,
+      content_files: {
+        "posts/secret/index.md"    => "+++\ntitle = \"S\"\ndraft = true\n+++\nx\n",
+        "posts/secret/product.jpg" => "J",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+      drafts: true,
+    ) do
+      File.exists?("public/posts/secret/product.jpg").should be_true
+    end
+  end
+
+  it "keeps a bundle published when any language variant of its index survives" do
+    build_site(
+      WITHHELD_BUNDLE_CONFIG + "\n\n[languages.ko]\ntitle = \"K\"\n",
+      content_files: {
+        "photos/index.md"    => "+++\ntitle = \"P\"\ndraft = true\n+++\nx\n",
+        "photos/index.ko.md" => "+++\ntitle = \"P\"\n+++\nx\n",
+        "photos/a.jpg"       => "A",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      File.exists?("public/photos/a.jpg").should be_true
+    end
+  end
+
+  it "applies [content.files] deny rules to raw .json/.xml files" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n\n[content.files]\nallow_extensions = [\"png\"]\ndisallow_extensions = [\"xml\"]\ndisallow_paths = [\"drafts/**\"]\n",
+      content_files: {
+        "drafts/secrets.json" => "{\"s\":1}",
+        "feed.xml"            => "<a/>",
+        "public.json"         => "{}",
+      },
+    ) do
+      File.exists?("public/drafts/secrets.json").should be_false
+      File.exists?("public/feed.xml").should be_false
+      File.exists?("public/public.json").should be_true
     end
   end
 end

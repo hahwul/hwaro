@@ -176,7 +176,7 @@ module Hwaro
           seen = Set(String).new
           collect_page_asset_jobs(ctx, output_dir, resolved_output, jobs, seen, fast_start_priority)
           if fast_start_priority.nil?
-            collect_content_file_jobs(config, output_dir, resolved_output, jobs, seen) if config.content_files.enabled?
+            collect_content_file_jobs(config, output_dir, resolved_output, jobs, seen, ctx.builder) if config.content_files.enabled?
             collect_static_jobs(config, output_dir, resolved_output, jobs, seen)
           end
 
@@ -437,13 +437,18 @@ module Hwaro
           resolved_output : String,
           jobs : Array(ImageJob),
           seen : Set(String),
+          builder : Core::Build::Builder? = nil,
         )
+          # Images of a withheld (draft / future / expired) bundle get no
+          # variants: the raw copy itself is withheld (Phases::Write).
+          withheld = builder.try(&.withheld_bundle_dirs) || Set(String).new
           Dir.glob(File.join("content", "**", "*")).each do |file|
             next unless File.file?(file)
             next unless Processors::ImageProcessor.image?(file)
             next unless safe_path?(file, "content")
             relative = Path[file].relative_to("content").to_s
             next unless config.content_files.publish?(relative)
+            next if builder && builder.withheld_content_file?(relative, withheld)
 
             original_url = "/" + relative
             next if seen.includes?(original_url)

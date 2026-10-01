@@ -82,13 +82,22 @@ module Hwaro
         return false if ext.empty?
         return false if ext == ".md"
         return false unless @allow_extensions.includes?(ext)
-        return false if @disallow_extensions.includes?(ext)
-        @disallow_paths.each do |pattern|
-          # A malformed glob is treated as non-matching by glob_match?, so a
-          # config typo can't crash the build; other patterns still apply.
-          return false if Utils::PathUtils.glob_match?(pattern, normalized_path)
-        end
-        true
+        !denied_normalized?(normalized_path)
+      end
+
+      # True when the deny rules (`disallow_extensions` / `disallow_paths`)
+      # exclude `relative_path`, regardless of `allow_extensions`. Raw
+      # `.json`/`.xml` files publish without an allow-list entry, but the deny
+      # rules still apply to them.
+      def denied?(relative_path : String) : Bool
+        denied_normalized?(ContentFilesConfig.normalize_path(relative_path))
+      end
+
+      private def denied_normalized?(normalized_path : String) : Bool
+        return true if @disallow_extensions.includes?(File.extname(normalized_path).downcase)
+        # A malformed glob is treated as non-matching by glob_match?, so a
+        # config typo can't crash the build; other patterns still apply.
+        @disallow_paths.any? { |pattern| Utils::PathUtils.glob_match?(pattern, normalized_path) }
       end
 
       def self.normalize_extensions(values : Array(String)) : Array(String)

@@ -303,6 +303,11 @@ module Hwaro
         # full build and per incremental/rerender pass (see
         # compute_output_url_winners). Nil until the first render pass.
         @output_url_winners : Hash(String, String)? = nil
+        # Output file key (`PathUtils.output_file_key`) → path of the page
+        # that publishes its own HTML there, from the same pass. Generated
+        # writers (paginator, taxonomy pages) consult it so they never
+        # overwrite an authored page — see `page_output_owner`.
+        @page_output_files : Hash(String, String) = {} of String => String
         # Unresolved `@/` internal links collected during the render fan-out
         # when `[links] broken_internal = "error"` (each entry is a formatted
         # "source.md → @/target (reason)" line). Guarded by
@@ -408,6 +413,12 @@ module Hwaro
         # @generated_claims_mutex.
         @last_feed_outputs : Set(String)? = nil
         @taxonomy_pass_outputs : Set(String)? = nil
+        # Content-relative directories that host a bundle index (`index.md` /
+        # `_index.md`, any language) as READ — before draft/future/expiry
+        # filtering. A directory here whose index pages all failed the filter
+        # is a withheld bundle: its files must not publish through the raw
+        # lane either (see Phases::Write#withheld_content_file?).
+        @content_index_dirs : Set(String) = Set(String).new
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -786,12 +797,17 @@ module Hwaro
             Logger.info "No content found. Add Markdown files under content/ before deploying, or run `hwaro new <path>.md` to scaffold one."
           end
 
+          # Human-readable reports (--profile, --debug) go to stderr under
+          # --json: stdout must carry exactly one JSON document, and these
+          # tables printed ahead of the build envelope made it unparseable.
+          report_io = CLI::Runner.json_mode? ? STDERR : STDOUT
+
           # Print profiling report if enabled
-          profiler.report
-          profiler.template_report
-          profiler.markdown_report
-          profiler.asset_report
-          profiler.hook_report
+          profiler.report(report_io)
+          profiler.template_report(report_io)
+          profiler.markdown_report(report_io)
+          profiler.asset_report(report_io)
+          profiler.hook_report(report_io)
 
           # Print cache stats
           report_cache_stats(options.verbose)
@@ -805,7 +821,7 @@ module Hwaro
 
           if options.debug
             if debug_site = @site
-              Utils::DebugPrinter.print(debug_site)
+              Utils::DebugPrinter.print(debug_site, report_io)
             end
           end
 

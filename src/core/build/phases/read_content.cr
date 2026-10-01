@@ -29,6 +29,7 @@ module Hwaro::Core::Build::Phases::ReadContent
     config = ctx.config
     content_files_enabled = config.try(&.content_files.enabled?) || false
     seen_raw = Set(String).new
+    @content_index_dirs = Set(String).new
 
     # Single pass over content directory for both markdown and raw files
     Dir.glob("content/**/*") do |file_path|
@@ -109,6 +110,10 @@ module Hwaro::Core::Build::Phases::ReadContent
           page.section = path_parts.size > 1 ? path_parts[0..-2].join("/") : ""
         end
         page.is_index = is_index
+        # The root directory is never a bundle (Page#collect_assets).
+        if is_index && path_parts.size > 1
+          @content_index_dirs << path_parts[0..-2].join("/")
+        end
         # Default-language content carries `nil` whether or not the file
         # spells the suffix out (`about.md` vs `about.en.md`): section
         # listings, per-language feeds and lookups compare `language`
@@ -121,9 +126,12 @@ module Hwaro::Core::Build::Phases::ReadContent
         # declares no versions.
         page.version = config.try(&.versions.for_path(relative_path))
       else
-        # Collect raw files (JSON, XML) and content files
+        # Collect raw files (JSON, XML) and content files. Raw JSON/XML is
+        # published without an `allow_extensions` opt-in, but the
+        # `[content.files]` deny rules still apply to it — `disallow_paths =
+        # ["drafts/**"]` must not leak `drafts/secrets.json`.
         next if seen_raw.includes?(relative_path)
-        is_raw = ext == ".json" || ext == ".xml"
+        is_raw = (ext == ".json" || ext == ".xml") && !config.try(&.content_files.denied?(relative_path))
         is_content_file = content_files_enabled && config && Content::Processors::ContentFiles.publish?(relative_path, config)
 
         if is_raw || is_content_file

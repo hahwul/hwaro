@@ -347,6 +347,27 @@ describe Hwaro::Core::Build::ParallelHelper do
       Hwaro::Core::Build::ParallelHelper.execute(tasks, parallel: true)
       counter.get.should eq(4)
     end
+
+    it "classifies a task's filesystem failure as HWARO_E_IO, not internal" do
+      tasks = [
+        -> { nil },
+        Proc(Nil).new { raise File::AccessDeniedError.new("Permission denied", file: "public/sitemap.xml") },
+      ] of Proc(Nil)
+
+      err = expect_raises(Hwaro::HwaroError) do
+        Hwaro::Core::Build::ParallelHelper.execute(tasks, parallel: true)
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+    end
+
+    it "keeps HWARO_E_INTERNAL for a non-I/O task failure" do
+      tasks = [Proc(Nil).new { raise "boom" }, -> { nil }] of Proc(Nil)
+
+      err = expect_raises(Hwaro::HwaroError) do
+        Hwaro::Core::Build::ParallelHelper.execute(tasks, parallel: true)
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_INTERNAL)
+    end
   end
 end
 

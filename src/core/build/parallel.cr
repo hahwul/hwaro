@@ -204,8 +204,11 @@ module Hwaro
           return unless raise_on_error
           if err = first_error
             raise err if err.is_a?(Hwaro::HwaroError)
+            # A generator that could not write its file (permission denied,
+            # disk full, a directory in the way) is an I/O failure, exit 6 —
+            # not the "unrecoverable bug" HWARO_E_INTERNAL stands for.
             raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_INTERNAL,
+              code: err.is_a?(IO::Error) ? Hwaro::Errors::HWARO_E_IO : Hwaro::Errors::HWARO_E_INTERNAL,
               message: "Parallel task failed: #{err.message}",
               cause: err,
             )
