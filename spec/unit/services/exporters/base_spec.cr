@@ -321,6 +321,15 @@ describe Hwaro::Services::Exporters::Base do
 
     # Regression: a link title stayed glued to the destination, hiding the
     # `.md` from the strip (`[x](/a.md "T")`).
+    # Regression: the build resolves a reference definition's `@/` target
+    # like an inline link, but the exporters left it as a dead `@/` URL.
+    it "rewrites reference-style link definitions outside code" do
+      input = "See [r1].\n\n[r1]: @/posts/b/index.md \"T\"\n  [r2]: @/a.md#x\n\n```\n[r3]: @/c.md\n```\n"
+      TestExporter.new.test_rewrite_internal_links(input).should eq(
+        "See [r1].\n\n[r1]: /posts/b/ \"T\"\n  [r2]: /a#x\n\n```\n[r3]: @/c.md\n```\n"
+      )
+    end
+
     it "keeps a link title while stripping the .md" do
       TestExporter.new.test_rewrite_internal_links(%([x](@/a.md "T"))).should eq(%([x](/a "T")))
     end
