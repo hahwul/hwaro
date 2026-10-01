@@ -231,10 +231,13 @@ module Hwaro
         # Entry files under static/ while [sass] is disabled: the raw
         # `.scss` publishes verbatim and any `<link>` to the compiled
         # `.css` 404s. Shipping raw sources can be deliberate (the bundles
-        # escape hatch), so this stays advisory.
+        # escape hatch), so this stays advisory. Sources `[static] exclude`
+        # filters out (e.g. `exclude = ["*.scss"]` beside an external Sass
+        # toolchain) never publish at all, so they are not "raw .scss" either.
         unless config.sass.enabled
           entries = Dir.glob(File.join(@static_dir, "**", "*.scss"), match: glob)
             .select { |p| File.file?(p) && !File.basename(p).starts_with?("_") }
+            .reject { |p| config.static.excluded?(Path[p].relative_to(@static_dir).to_s) }
           unless entries.empty?
             issues << Issue.new(
               id: "sass-disabled-with-sources",

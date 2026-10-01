@@ -1768,6 +1768,29 @@ describe "sass diagnostics" do
     end
   end
 
+  # `[static] exclude` keeps the sources out of the output entirely, so the
+  # "they publish as raw .scss" advisory would be false.
+  it "does not count SCSS entries that [static] exclude keeps out of the output" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n\n[static]\nexclude = ["vendor/**"]\n))
+      FileUtils.mkdir_p(File.join(dir, "static", "css"))
+      FileUtils.mkdir_p(File.join(dir, "static", "vendor"))
+      File.write(File.join(dir, "static", "vendor", "lib.scss"), ".a { color: red; }")
+
+      doctor = Hwaro::Services::Doctor.new(
+        content_dir: File.join(dir, "content"),
+        config_path: config_path,
+        static_dir: File.join(dir, "static"),
+      )
+      doctor.run.any? { |i| i.id == "sass-disabled-with-sources" }.should be_false
+
+      File.write(File.join(dir, "static", "css", "style.scss"), ".a { color: red; }")
+      issue = doctor.run.find! { |i| i.id == "sass-disabled-with-sources" }
+      issue.message.should contain("1 SCSS entry file(s)")
+    end
+  end
+
   it "stays quiet when [sass] is enabled for static/ SCSS entries" do
     Dir.mktmpdir do |dir|
       config_path = File.join(dir, "config.toml")
