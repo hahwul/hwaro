@@ -6,7 +6,7 @@ require "../../../spec_helper"
 #
 #   templates/page.html        -> "page"          applied
 #   templates/page.jinja       -> "page"          applied
-#   templates/page.html.jinja  -> "page.html"     NOT applied (built-in default)
+#   templates/page.html.jinja  -> "page.html"     NOT applied
 #   templates/partials/page.html -> "partials/page"  NOT applied
 #
 # Verified by putting a marker in each template body and grepping the built
@@ -58,7 +58,8 @@ describe Hwaro::Services::Doctor do
         File.write(File.join(dir, "templates", "index.html"), "home")
 
         ids = doctor_for(dir).run.map(&.id)
-        ids.count("template-required-missing").should eq(2)
+        ids.count("template-required-missing").should eq(1)
+        ids.count("template-section-missing").should eq(1)
       end
     end
 

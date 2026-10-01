@@ -92,6 +92,17 @@ module Hwaro
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              # `hwaro doctor content/blog` used to run a full check of the
+              # default `content/` and exit 0, as if the path had been
+              # honoured. Directories are passed with --content-dir.
+              parser.unknown_args do |before_dash, after_dash|
+                unknown = before_dash + after_dash
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "unexpected extra argument(s): '#{unknown.join("', '")}'",
+                  hint: "#{invocation} accepts options only; pass a content directory with --content-dir DIR.",
+                ) unless unknown.empty?
+              end
             end
 
             # Route through the shared JSON mode like every sibling command:
@@ -139,9 +150,13 @@ module Hwaro
                   "exit_code" => code,
                 }.to_json)
               else
-                render_fix_summary(summary, approve_sections: approve_mode, dry_run: dry_run_mode)
-                if code != Hwaro::Errors::EXIT_SUCCESS
-                  Logger.warn "#{remaining.count { |i| i.level != :info }} issue(s) remain — run '#{invocation}' for details."
+                outstanding = remaining.count { |i| i.level != :info }
+                render_fix_summary(summary, approve_sections: approve_mode, dry_run: dry_run_mode, outstanding: outstanding)
+                # Not only on a failing exit: a warning `--fix` cannot repair
+                # (an inline-table priority, a placeholder title) used to end
+                # the run on "Config is up to date" with nothing else said.
+                if outstanding > 0
+                  Logger.warn "#{outstanding} issue(s) remain — run '#{invocation}' for details."
                 end
               end
               exit(code)
@@ -378,11 +393,15 @@ module Hwaro
           # Human rendering of a completed fix run. JSON mode composes its own
           # payload in `run` so the fix result and the post-fix diagnosis ship
           # as one document.
-          private def render_fix_summary(summary : Services::Doctor::FixSummary, approve_sections : Bool, dry_run : Bool)
+          private def render_fix_summary(summary : Services::Doctor::FixSummary, approve_sections : Bool, dry_run : Bool, outstanding : Int32 = 0)
             plain = plain_output?
 
             if summary.empty?
-              Logger.info "#{ok_glyph(plain)} Config is up to date — no fixable issues."
+              if outstanding > 0
+                Logger.info "No automatic fixes apply to config.toml."
+              else
+                Logger.info "#{ok_glyph(plain)} Config is up to date — no fixable issues."
+              end
               return
             end
 

@@ -88,8 +88,14 @@ module Hwaro
       end
 
       private def check_sitemap_priority(issues : Array(Issue), config : Models::Config) : Nil
-        # sitemap priority range
-        unless 0.0 <= config.sitemap.priority <= 1.0
+        # sitemap priority range. `inf`/`nan` are valid TOML floats that the
+        # loader replaces with the default, so the parsed value is always in
+        # range and the typo went unreported — read the raw value for those.
+        raw = config.raw["sitemap"]?.try(&.as_h?).try(&.["priority"]?).try(&.as_f?)
+        if raw && !raw.finite?
+          issues << Issue.new(id: "sitemap-priority-range", level: :warning, category: "config", file: @config_path,
+            message: "sitemap.priority #{raw} is not a finite number — the build ignores it and uses #{config.sitemap.priority} (expected: 0.0–1.0)")
+        elsif !(0.0 <= config.sitemap.priority <= 1.0)
           issues << Issue.new(id: "sitemap-priority-range", level: :warning, category: "config", file: @config_path,
             message: "sitemap.priority #{config.sitemap.priority} is out of range (expected: 0.0–1.0)")
         end
@@ -117,12 +123,21 @@ module Hwaro
       end
 
       private def check_language_duplicates(issues : Array(Issue), config : Models::Config) : Nil
-        # duplicate language codes
-        lang_codes = config.languages.keys
-        lang_duplicates = lang_codes.tally.select { |_, count| count > 1 }.keys
-        lang_duplicates.each do |code|
+        # `[languages.*]` keys are table names, so TOML itself rejects an
+        # exact repeat and this check could never fire. What it can catch is
+        # one language declared twice in different case (`en` / `EN`):
+        # language tags are case-insensitive, yet the build treats the two as
+        # separate languages — duplicate hreflang alternates, and output
+        # directories that collide on a case-insensitive file system.
+        # `default_language` counts as a language of its own (`multilingual?`),
+        # so `default_language = "en"` beside `[languages.EN]` is the same
+        # collision.
+        codes = config.languages.keys
+        codes << config.default_language unless config.default_language.empty?
+        codes.uniq.group_by(&.downcase).each_value do |variants|
+          next if variants.size < 2
           issues << Issue.new(id: "language-duplicate", level: :warning, category: "config", file: @config_path,
-            message: "Duplicate language code: \"#{code}\"")
+            message: "Duplicate language code: #{variants.sort.map(&.inspect).join(", ")} differ only in case")
         end
       end
 
