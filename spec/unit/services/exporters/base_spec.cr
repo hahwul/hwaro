@@ -175,6 +175,22 @@ describe Hwaro::Services::Exporters::Base do
       body.should eq(raw)
     end
 
+    it "treats prose between two thematic breaks that is not valid YAML as body" do
+      # `*Note*` reads as an undefined YAML alias, so YAML.parse raises; the
+      # build renders this page, so the export must not fail it.
+      raw = "---\n*Note*: imported from the old blog.\n---\n\nRest of document."
+      fields, body = TestExporter.new.test_parse_content(raw)
+      fields.should be_empty
+      body.should eq(raw)
+    end
+
+    it "still raises on broken YAML frontmatter that carries a key line" do
+      raw = "---\ntitle: [unclosed\n---\n\nbody"
+      expect_raises(YAML::ParseException) do
+        TestExporter.new.test_parse_content(raw)
+      end
+    end
+
     it "preserves empty arrays in frontmatter" do
       raw = "+++\ntitle = \"X\"\ntags = []\n+++\n\nbody"
       fields, _ = TestExporter.new.test_parse_content(raw)

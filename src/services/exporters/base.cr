@@ -248,6 +248,10 @@ module Hwaro
             end
             return {fields, body}
           elsif match = content.match(YAML_FRONTMATTER_RE)
+            # A leading `---` pair around prose (a list, a scalar, text that
+            # is not valid YAML) is a thematic break the build renders as
+            # body — keep the whole document rather than failing the file.
+            return {fields, content} unless Utils::FrontmatterScanner.yaml_front_matter?(match[1])
             yaml_data = YAML.parse(match[1])
             if h = yaml_data.as_h?
               body = content.sub(YAML_FRONTMATTER_RE, "").lstrip('\n')
