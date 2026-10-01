@@ -82,7 +82,6 @@ module Hwaro
           old_taxonomies_snapshot = reparsed.old_taxonomies_snapshot
           old_series_names = reparsed.old_series_names
           old_output_paths = reparsed.old_output_paths
-          old_neighbors = reparsed.old_neighbors
 
           if changed_pages.empty?
             Logger.info "  No matching pages found – skipping."
@@ -180,69 +179,8 @@ module Hwaro
           end
 
           # --- 3. Determine the full set of pages that need re-rendering ---
-          pages_to_render = Set(Models::Page).new(changed_pages)
-          # Translations / other versions whose switcher (or canonical) moved.
-          relinked_counterparts.each { |p| pages_to_render << p }
-
-          # Section index pages whose content lists include the changed pages.
-          # Include every language variant of the section (multilingual sites
-          # have one `_index.<lang>.md` per language under the same path).
-          affected_sections.each do |section_name|
-            site.sections.each do |section|
-              pages_to_render << section if section.section == section_name
-            end
-          end
-
-          # When a SECTION `_index` itself changed, its own title/url can appear
-          # in every descendant page's breadcrumb (page.ancestors) and its sort
-          # settings reorder the section's listings — so re-render the whole
-          # subtree. Cover BOTH descendant content pages (site.pages) AND nested
-          # section index pages (site.sections — `_index.md` files never live in
-          # site.pages), or a nested subsection's breadcrumb stays stale. Bounded
-          # by the edited section's size, and only triggered by the rarer section
-          # edits.
-          changed_pages.each do |page|
-            next unless page.is_a?(Models::Section)
-            sec = page.section
-            prefix = "#{sec}/"
-            site.pages.each do |p|
-              pages_to_render << p if p.section == sec || p.section.starts_with?(prefix)
-            end
-            site.sections.each do |s|
-              pages_to_render << s if s.section == sec || s.section.starts_with?(prefix)
-            end
-          end
-
-          # Previous / next pages. `renav_pages` is every page whose lower/higher
-          # pointer changed in the global re-link (covers block reorders from a
-          # section weight/sort/reverse edit); the explicit old/new neighbors of
-          # each changed page are a subset but kept for clarity.
-          renav_pages.each { |p| pages_to_render << p }
-          changed_pages.each do |page|
-            # New neighbors (after re-link)
-            page.lower.try { |l| pages_to_render << l }
-            page.higher.try { |h| pages_to_render << h }
-
-            # Old neighbors (before re-link, may have shifted)
-            if old = old_neighbors[page.path]?
-              old[0].try { |l| pages_to_render << l }
-              old[1].try { |h| pages_to_render << h }
-            end
-          end
-
-          # Pages in affected series (their series_index may have changed)
-          unless affected_series.empty?
-            site.pages.each do |p|
-              pages_to_render << p if p.series && affected_series.includes?(p.series)
-            end
-          end
-
-          # Pages whose related_posts were recomputed
-          related_pages_updated.each do |path|
-            if p = pages_map[path]?
-              pages_to_render << p
-            end
-          end
+          pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
+            relinked_counterparts, renav_pages, affected_series, related_pages_updated)
 
           # Pages that render a listing derived from the GLOBAL page/section
           # set — the homepage's "latest posts", a paginated archive, a nav
@@ -359,13 +297,19 @@ module Hwaro
           invalidate_caches_for_pages(relinked_counterparts, Set(String).new) unless relinked_counterparts.empty?
 
           site.build_lookup_index
-          relink_navigation_for_sections(site, affected_sections)
-          recompute_series_for_pages(site, changed_pages, reparsed.old_series_names) if site.config.series.enabled
-          recompute_related_posts_for_pages(site, changed_pages, excluded_paths) if site.config.related.enabled
+          renav_pages = relink_navigation_for_sections(site, affected_sections)
+          affected_series = if site.config.series.enabled
+                              recompute_series_for_pages(site, changed_pages, reparsed.old_series_names)
+                            else
+                              Set(String).new
+                            end
+          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
 
           # Re-render with reloaded templates. The selective path inside
           # run_rerender only covers template-affected pages, so the content
-          # pages re-parsed above must be forced into the render set.
+          # pages re-parsed above — and every page whose neighbours, series
+          # or related posts they moved, exactly as run_incremental selects
+          # them — must be forced into the render set.
           #
           # membership_changed: a page whose draft/expired/future status just
           # flipped it OUT of the built set leaves changed_pages (so
@@ -375,8 +319,95 @@ module Hwaro
           # bare mtime touch). Flips INTO the set escalate to a full rebuild
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
-          run_rerender(options, force_pages: (changed_pages + relinked_counterparts).uniq, membership_changed: !excluded_pages.empty?,
+          force_pages = relationship_render_set(site, pages_map, reparsed, changed_pages,
+            relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+          run_rerender(options, force_pages: force_pages.to_a, membership_changed: !excluded_pages.empty?,
             listing_sets: listing_sets)
+        end
+
+        # The pages a content re-parse must re-render because a relationship
+        # moved: the changed pages, their translations/versions, the section
+        # indexes that list them (a changed `_index` takes its whole subtree),
+        # their old and new reading-order neighbours, every member of a series
+        # they joined or left, and every page whose related posts were
+        # recomputed. Shared by both content strategies — the content+template
+        # path used to force only the changed pages through its re-render, so
+        # a neighbour kept linking the old title and URL (a deleted file after
+        # a slug edit) for the rest of the session.
+        private def relationship_render_set(
+          site : Models::Site,
+          pages_map : Hash(String, Models::Page),
+          reparsed : ReparsedPages,
+          changed_pages : Array(Models::Page),
+          relinked_counterparts : Array(Models::Page),
+          renav_pages : Enumerable(Models::Page),
+          affected_series : Set(String),
+          related_pages_updated : Enumerable(String),
+        ) : Set(Models::Page)
+          pages_to_render = Set(Models::Page).new(changed_pages)
+          # Translations / other versions whose switcher (or canonical) moved.
+          relinked_counterparts.each { |p| pages_to_render << p }
+
+          # Section index pages whose content lists include the changed pages.
+          # Include every language variant of the section (multilingual sites
+          # have one `_index.<lang>.md` per language under the same path).
+          reparsed.affected_sections.each do |section_name|
+            site.sections.each do |section|
+              pages_to_render << section if section.section == section_name
+            end
+          end
+
+          # When a SECTION `_index` itself changed, its own title/url can appear
+          # in every descendant page's breadcrumb (page.ancestors) and its sort
+          # settings reorder the section's listings — so re-render the whole
+          # subtree. Cover BOTH descendant content pages (site.pages) AND nested
+          # section index pages (site.sections — `_index.md` files never live in
+          # site.pages), or a nested subsection's breadcrumb stays stale. Bounded
+          # by the edited section's size, and only triggered by the rarer section
+          # edits.
+          changed_pages.each do |page|
+            next unless page.is_a?(Models::Section)
+            sec = page.section
+            prefix = "#{sec}/"
+            site.pages.each do |p|
+              pages_to_render << p if p.section == sec || p.section.starts_with?(prefix)
+            end
+            site.sections.each do |s|
+              pages_to_render << s if s.section == sec || s.section.starts_with?(prefix)
+            end
+          end
+
+          # Previous / next pages. `renav_pages` is every page whose lower/higher
+          # pointer changed in the global re-link (covers block reorders from a
+          # section weight/sort/reverse edit); the explicit old/new neighbors of
+          # each changed page are a subset but kept for clarity.
+          renav_pages.each { |p| pages_to_render << p }
+          changed_pages.each do |page|
+            # New neighbors (after re-link)
+            page.lower.try { |l| pages_to_render << l }
+            page.higher.try { |h| pages_to_render << h }
+
+            # Old neighbors (before re-link, may have shifted)
+            if old = reparsed.old_neighbors[page.path]?
+              old[0].try { |l| pages_to_render << l }
+              old[1].try { |h| pages_to_render << h }
+            end
+          end
+
+          # Pages in affected series (their series_index may have changed)
+          unless affected_series.empty?
+            site.pages.each do |p|
+              pages_to_render << p if p.series && affected_series.includes?(p.series)
+            end
+          end
+
+          # Pages whose related_posts were recomputed
+          related_pages_updated.each do |path|
+            if p = pages_map[path]?
+              pages_to_render << p
+            end
+          end
+          pages_to_render
         end
 
         # Re-run the counterpart linkers — `Multilingual.link_translations!`
