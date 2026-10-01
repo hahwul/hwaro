@@ -484,9 +484,8 @@ module Hwaro
       # static handler's single-range 206) would otherwise go out as
       # `Content-Length: 0` instead of the length the GET carries.
       private class BodySink < IO
-        @dropped = 0_i64
-
         def initialize(@io : IO, @response : HTTP::Server::Response)
+          @dropped = 0_i64
         end
 
         def read(slice : Bytes) : Int32
