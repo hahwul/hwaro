@@ -114,6 +114,23 @@ module Hwaro
 
             Logger.heading("validate", content_dir)
 
+            if Logger.quiet?
+              # `Logger.item` is silenced by --quiet, which left a failing run
+              # with exit 5 and no output at all. Errors and warnings still
+              # reach stderr under --quiet: one line per finding.
+              issues.each do |issue|
+                line = "#{Utils::TextUtils.strip_control(issue.file || "(unknown)")}: " \
+                       "#{Utils::TextUtils.strip_control(issue.message)}"
+                case issue.level
+                when :error   then Logger.error line
+                when :warning then Logger.warn line
+                end
+              end
+              code = exit_code_for(issues, strict: strict_mode, max_warnings: max_warnings)
+              exit(code) if code != Hwaro::Errors::EXIT_SUCCESS
+              return
+            end
+
             if issues.empty?
               Logger.outcome("checked", "no issues found — content looks great")
               return

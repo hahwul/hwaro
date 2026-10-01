@@ -296,7 +296,19 @@ module Hwaro
             Logger.section("scan", scan_detail)
             links_noun = total == 1 ? "link" : "links"
 
-            if dead_total == 0 && skipped_external.empty?
+            if Logger.quiet?
+              # `Logger.item` is silenced by --quiet, which left a failing CI
+              # run with exit 1 and no output at all. Errors still reach
+              # stderr under --quiet: one line per dead link.
+              dead_external.each do |result|
+                detail = "#{sanitize_for_terminal(result.link.url)}  #{result.status}"
+                detail += " — #{sanitize_for_terminal(result.error.to_s)}" if result.error
+                Logger.error "#{sanitize_for_terminal(result.link.file)}: #{detail}"
+              end
+              dead_internal.each do |result|
+                Logger.error "#{sanitize_for_terminal(result.link.file)}: #{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}"
+              end
+            elsif dead_total == 0 && skipped_external.empty?
               Logger.info "" if Logger.color_enabled?
               Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
             else
