@@ -51,6 +51,16 @@ module Hwaro
               base_dir = File.dirname(link.file)
               routes = page_routes ||= Services::PageRouteIndex.new(content_dir, config || route_config(language_codes))
 
+              # The build leaves a relative destination untouched, so the
+              # BROWSER resolves it — against the page's URL, not the source
+              # file's directory. `[x](../about/)` in `content/posts/a.md`
+              # (served at `/posts/a/`) reaches `/posts/about/`, and a leaf
+              # page's `![](img.png)` asks for `/posts/a/img.png`. Only a page
+              # the route index cannot read keeps the source-relative reading.
+              if !resolved_url.starts_with?("/") && (page_url = routes.url_for(link.file))
+                resolved_url = resolve_against_page(page_url, resolved_url)
+              end
+
               # Resolve the URL exactly as written FIRST. A leading segment
               # that happens to match a language code may be a real section
               # (`content/ko/posts/`), and that section outranks any
@@ -483,6 +493,24 @@ module Hwaro
             state = states.first
             reason = state == Services::PageRouteIndex::NOT_RENDERED ? "target sets render = false" : Services::InternalLinkIndex.describe(state)
             "Internal link not resolved by the build: #{reason}"
+          end
+
+          # Resolve a relative destination against the URL of the page that
+          # holds it, the way a browser does (`..` stops at the root).
+          private def resolve_against_page(page_url : String, relative : String) : String
+            segments = page_url.split('/').reject(&.empty?)
+            parts = relative.split('/')
+            directory = {"", ".", ".."}.includes?(parts.last)
+            parts.each do |part|
+              case part
+              when "", "." then next
+              when ".."    then segments.pop?
+              else              segments << part
+              end
+            end
+            return "/" if segments.empty?
+            path = "/#{segments.join('/')}"
+            directory ? "#{path}/" : path
           end
 
           # Without a loaded config (unit callers pass only the language

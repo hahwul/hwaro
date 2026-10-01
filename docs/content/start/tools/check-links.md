@@ -84,6 +84,11 @@ so this also holds before the first build:
   its own name.
 - Files beside a page bundle or section index are live under that page's URL,
   including its translated copies (`/ko/posts/my-trip/photo.jpg`).
+- Relative links resolve against the page's URL, as a browser resolves them,
+  not against the source file's folder. From `content/posts/a.md` (served at
+  `/posts/a/`), `../b/` reaches `/posts/b/`, and `![](photo.png)` asks for
+  `/posts/a/photo.png`, so keep a page's images in a bundle
+  (`content/posts/a/index.md`).
 
 ### Generated routes
 
