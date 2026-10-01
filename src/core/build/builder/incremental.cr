@@ -452,7 +452,9 @@ module Hwaro
           page : String,
           section : String,
           menu : String,
-          taxonomy : String do
+          taxonomy : String,
+          lookup_targets : Array(String) = [] of String,
+          lookup : String = "" do
           def self.inert : ListingSetSnapshot
             new(false, false, false, false, "", "", "", "")
           end
@@ -468,7 +470,7 @@ module Hwaro
           blob = templates.values.join("\n")
           needs_page = Phases::Render::LISTING_PAGE_MARKERS.any? do |marker|
             marker == "get_taxonomy" ? Phases::Render::GET_TAXONOMY_RE.matches?(blob) : blob.includes?(marker)
-          end
+          end || dynamic_get_page?(blob)
           # A section index renders its own page list with no marker to scan
           # for (`{{ section.list }}`), so any site with sections can need the
           # page digest.
@@ -476,6 +478,10 @@ module Hwaro
           needs_section = Phases::Render::LISTING_SECTION_MARKERS.any? { |marker| blob.includes?(marker) }
           needs_menu = Phases::Render::MENU_SET_MARKERS.any? { |marker| blob.includes?(marker) }
           needs_taxonomy = blob.includes?(Phases::Render::TAXONOMY_URL_MARKER)
+          # The pages literal `get_page(path=...)` calls fetch: their own
+          # projection, so a footer printing the about page's title refreshes
+          # when the about page moves and not on every other edit.
+          lookup_targets = get_page_targets(blob)
 
           ListingSetSnapshot.new(
             needs_page: needs_page,
@@ -486,6 +492,8 @@ module Hwaro
             section: needs_section ? compute_section_set_fingerprint(site.sections) : "",
             menu: needs_menu ? compute_menu_set_fingerprint(site.pages, site.sections) : "",
             taxonomy: needs_taxonomy ? compute_taxonomy_slug_fingerprint(site) : "",
+            lookup_targets: lookup_targets,
+            lookup: compute_get_page_lookup_fingerprint(site, lookup_targets),
           )
         end
 
@@ -521,14 +529,18 @@ module Hwaro
                          compute_menu_set_fingerprint(site.pages, site.sections) != before.menu
           taxonomy_changed = before.needs_taxonomy &&
                              compute_taxonomy_slug_fingerprint(site) != before.taxonomy
+          lookup_changed = !before.lookup_targets.empty? &&
+                           compute_get_page_lookup_fingerprint(site, before.lookup_targets) != before.lookup
 
-          return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed
+          return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed || lookup_changed
 
-          deps_memo = {} of String => Phases::Render::ListingSetDeps
           all_pages.select do |page|
             next false unless page.render
-            entry = determine_template(page, templates, site)
-            deps = (deps_memo[entry]? || (deps_memo[entry] = listing_set_deps(entry, templates)))
+            # The page's whole render closure: entry template, the shortcodes
+            # its content calls (`{{ recent() }}` looping a section's pages
+            # is a listing too, and its output lives in the page CONTENT,
+            # which a re-render rebuilds) and its output-format templates.
+            deps = page_template_scan(page, templates, site).listing
             # Mirrors filter_changed_pages: a section index renders its
             # section's page list even via `{{ section.list }}`, which leaves
             # no marker in the template source to scan for.
@@ -536,7 +548,8 @@ module Hwaro
             (page_dep && page_changed) ||
               (deps.section && section_changed) ||
               (deps.menu && menu_changed) ||
-              (deps.taxonomy_slug && taxonomy_changed)
+              (deps.taxonomy_slug && taxonomy_changed) ||
+              (deps.lookup && lookup_changed)
           end
         end
 

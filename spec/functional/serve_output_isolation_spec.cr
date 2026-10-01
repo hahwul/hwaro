@@ -218,12 +218,16 @@ describe "serve output isolation (issue #756)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         write_isolation_site
-        FileUtils.mkdir_p("public")
+        options = isolation_build_options
+        options.cache = true
+        # A cache that describes `public/` first — without one, `--cache`
+        # takes the cold (wiping) path like a plain build.
+        with_captured_log do
+          isolation_production_builder.run(options).should be_true
+        end
         File.write("public/.hwaro-dev", Hwaro::Utils::DevMarker::CONTENT)
         File.write("public/keep.txt", "cached artifact")
 
-        options = isolation_build_options
-        options.cache = true
         log = with_captured_log do
           isolation_production_builder.run(options).should be_true
         end
