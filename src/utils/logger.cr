@@ -17,8 +17,47 @@ require "./text_utils"
 
 module Hwaro
   class Logger
-    @@io : IO = STDOUT
-    @@err_io : IO = STDERR
+    # Terminal stream that a vanished reader cannot turn into a failure.
+    #
+    # Crystal ignores SIGPIPE, so once whoever was reading hwaro's stdout goes
+    # away (a script that waited for `hwaro serve: ready` and closed the pipe,
+    # a closed terminal) every later write raises `IO::Error`. Raised from a
+    # log line, that aborted whatever was being logged — under `hwaro serve`
+    # every save failed with "Build failed: … Broken pipe" before a single
+    # page was rendered, for the rest of the session. Logging is never the
+    # point of the work: the first failed write marks the stream gone and
+    # every later one is dropped.
+    class GuardedIO < IO
+      @gone = false
+
+      def initialize(@io : IO)
+      end
+
+      def read(slice : Bytes) : Int32
+        raise IO::Error.new("GuardedIO is write-only")
+      end
+
+      def write(slice : Bytes) : Nil
+        return if @gone
+        @io.write(slice)
+      rescue IO::Error
+        @gone = true
+      end
+
+      def flush : Nil
+        return if @gone
+        @io.flush
+      rescue IO::Error
+        @gone = true
+      end
+
+      def tty? : Bool
+        @io.tty?
+      end
+    end
+
+    @@io : IO = GuardedIO.new(STDOUT)
+    @@err_io : IO = GuardedIO.new(STDERR)
 
     # Log levels for filtering
     enum Level
