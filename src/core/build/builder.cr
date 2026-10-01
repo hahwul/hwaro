@@ -797,12 +797,17 @@ module Hwaro
             Logger.info "No content found. Add Markdown files under content/ before deploying, or run `hwaro new <path>.md` to scaffold one."
           end
 
+          # Human-readable reports (--profile, --debug) go to stderr under
+          # --json: stdout must carry exactly one JSON document, and these
+          # tables printed ahead of the build envelope made it unparseable.
+          report_io = CLI::Runner.json_mode? ? STDERR : STDOUT
+
           # Print profiling report if enabled
-          profiler.report
-          profiler.template_report
-          profiler.markdown_report
-          profiler.asset_report
-          profiler.hook_report
+          profiler.report(report_io)
+          profiler.template_report(report_io)
+          profiler.markdown_report(report_io)
+          profiler.asset_report(report_io)
+          profiler.hook_report(report_io)
 
           # Print cache stats
           report_cache_stats(options.verbose)
@@ -816,7 +821,7 @@ module Hwaro
 
           if options.debug
             if debug_site = @site
-              Utils::DebugPrinter.print(debug_site)
+              Utils::DebugPrinter.print(debug_site, report_io)
             end
           end
 
