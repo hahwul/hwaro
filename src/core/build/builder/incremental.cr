@@ -615,6 +615,7 @@ module Hwaro
             old_neighbors[page.path] = {page.lower, page.higher}
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
             old_output_paths[page.path] = collect_page_output_paths(page, output_dir)
+            @unsettled_page_outputs.concat(old_output_paths[page.path])
 
             # Re-read, re-parse front-matter and recalculate URL
             parse_single_page(page)
@@ -697,6 +698,17 @@ module Hwaro
             relocated.concat(olds - collect_page_output_paths(page, output_dir))
           end
           prune_unclaimed_outputs(relocated, output_dir) unless relocated.empty?
+          settle_page_outputs(output_dir, except: old_output_paths.values.flatten)
+        end
+
+        # Prune what an earlier pass that raised after its re-parse left
+        # unsettled (see `@unsettled_page_outputs`) — less `except`, the
+        # paths the caller has just settled itself — and empty the set.
+        private def settle_page_outputs(output_dir : String, except : Array(String) = [] of String) : Nil
+          return if @unsettled_page_outputs.empty?
+          leftover = @unsettled_page_outputs.to_a - except
+          @unsettled_page_outputs.clear
+          prune_unclaimed_outputs(leftover.sort!, output_dir) unless leftover.empty?
         end
 
         # Re-render pages using reloaded templates without re-parsing content.

@@ -380,3 +380,53 @@ describe "serve watch parity: cache-busted assets" do
     end
   end
 end
+
+describe "serve watch parity: failed incremental passes" do
+  # The re-parse moves the page model to its new URL in place; a date-token
+  # permalink error then raised before the pass pruned the old file, and the
+  # recovering full build computes "what the previous site owned" from the
+  # moved model — so the old output was published for the rest of the
+  # session, through every later full rebuild.
+  it "prunes the old output of a page whose permalink failed mid-edit" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "Dated"
+          base_url = "https://example.com"
+
+          [permalinks]
+          posts = "/:year/:month/:title/"
+          TOML
+        )
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "<html><body>{{ page.title }}</body></html>")
+        File.write("templates/section.html", "<html><body>{{ section.title }}</body></html>")
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        post = "content/posts/hello.md"
+        File.write(post, "+++\ntitle = \"Hello\"\ndate = \"2024-01-01\"\n+++\nbody")
+
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+        File.exists?("public/2024/01/hello/index.html").should be_true
+
+        File.write(post, "+++\ntitle = \"Hello\"\ndate = \"2025-05-05\"\n+++\nbody")
+        builder.run_incremental([post], options).should be_true
+        File.exists?("public/2025/05/hello/index.html").should be_true
+        File.exists?("public/2024/01/hello/index.html").should be_false
+
+        # No date: the :year/:month tokens cannot resolve — the pass fails.
+        File.write(post, "+++\ntitle = \"Hello\"\n+++\nbody")
+        expect_raises(Hwaro::HwaroError) { builder.run_incremental([post], options) }
+
+        # The watcher recovers with a full rebuild.
+        File.write(post, "+++\ntitle = \"Hello\"\ndate = \"2024-01-01\"\n+++\nbody")
+        builder.run(options).should be_true
+
+        File.exists?("public/2024/01/hello/index.html").should be_true
+        File.exists?("public/2025/05/hello/index.html").should be_false
+      end
+    end
+  end
+end

@@ -350,6 +350,14 @@ module Hwaro
         # `path`, a permalink rule), drafted or turned `render = false` kept
         # its old file. Empty on a process's first build.
         @previous_page_outputs : Set(String) = Set(String).new
+        # Output files the pages an incremental serve pass re-parsed occupied
+        # BEFORE the re-parse, until that pass has pruned what they left. The
+        # re-parse moves the page model in place, so a pass that raises in
+        # between (a date-token permalink error) used to leave the old file
+        # behind for good: the recovering full build computes
+        # `@previous_page_outputs` from the MOVED model. Drained by the next
+        # pass that gets as far as pruning, or by the Finalize phase.
+        @unsettled_page_outputs : Set(String) = Set(String).new
         @generated_claims_mutex : Mutex = Mutex.new
         # Output files the static copy actually (re)wrote this build, in the
         # canonical absolute form `get_output_path` produces. `static/` is
