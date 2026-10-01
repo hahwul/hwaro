@@ -32,7 +32,9 @@ module Hwaro
                 next unless external_url?(url)
                 links << Link.new(file: file, url: url, kind: :external)
               end
-              content.scan(AUTOLINK_RE) do |match|
+              # Inline-link and definition destinations may be written in
+              # angle brackets too; those were already collected above.
+              content.gsub(link_regex, "").gsub(REFERENCE_DEFINITION_RE, "").scan(AUTOLINK_RE) do |match|
                 links << Link.new(file: file, url: match[1], kind: :external)
               end
               content.scan(HTML_TAG_RE) do |tag|
