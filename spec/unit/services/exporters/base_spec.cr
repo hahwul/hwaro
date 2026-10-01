@@ -294,6 +294,36 @@ describe Hwaro::Services::Exporters::Base do
       )
       out.should eq("[x](/page?ref=home)")
     end
+
+    # Regression: the build resolves `@/` only in rendered link hrefs, so
+    # code samples documenting the syntax must survive the export verbatim.
+    it "leaves @/ links inside fenced, indented and inline code untouched" do
+      input = "[a](@/a.md)\n\n```markdown\n[x](@/posts/x.md)\n```\n\n" \
+              "    [y](@/y.md)\n\nUse `[z](@/z.md)` or ``[w](@/w.md)`` but [b](@/b.md).\n"
+      TestExporter.new.test_rewrite_internal_links(input).should eq(
+        "[a](/a)\n\n```markdown\n[x](@/posts/x.md)\n```\n\n" \
+        "    [y](@/y.md)\n\nUse `[z](@/z.md)` or ``[w](@/w.md)`` but [b](/b).\n"
+      )
+    end
+
+    it "still rewrites a link whose text wraps across lines" do
+      TestExporter.new.test_rewrite_internal_links("[a long\nlink](@/a.md)").should eq("[a long\nlink](/a)")
+    end
+
+    # Regression: a page-bundle `index.md` publishes at its directory URL;
+    # `@/posts/b/index.md` exported as `/posts/b/index`, a 404.
+    it "maps a page-bundle index link to its directory URL" do
+      out = TestExporter.new.test_rewrite_internal_links(
+        "[b](@/posts/b/index.md#top) [home](@/index.md) [m](@/notes.markdown)"
+      )
+      out.should eq("[b](/posts/b/#top) [home](/) [m](/notes)")
+    end
+
+    # Regression: a link title stayed glued to the destination, hiding the
+    # `.md` from the strip (`[x](/a.md "T")`).
+    it "keeps a link title while stripping the .md" do
+      TestExporter.new.test_rewrite_internal_links(%([x](@/a.md "T"))).should eq(%([x](/a "T")))
+    end
   end
 
   # Regression: `tool export` stored `-o` verbatim, so `-o .` / `-o ""` /

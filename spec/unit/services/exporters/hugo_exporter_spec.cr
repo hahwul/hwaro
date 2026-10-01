@@ -414,3 +414,88 @@ describe "Hugo export: path" do
     end
   end
 end
+
+# Regression: Hugo reads `index.md` as a LEAF bundle, which has no descendant
+# pages — every other Markdown file under it becomes an inert resource. The
+# blog/docs/book scaffolds use `content/index.md` as the homepage, so the
+# verbatim export made `hugo` publish the homepage and nothing else.
+describe "Hugo export: index.md with pages below it" do
+  it "exports the site root index.md as Hugo's _index.md" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "index.md"), "+++\ntitle = \"Home\"\n+++\nhome\n")
+      File.write(File.join(content_dir, "index.ko.md"), "+++\ntitle = \"홈\"\n+++\nhome\n")
+      File.write(File.join(content_dir, "about.md"), "+++\ntitle = \"About\"\n+++\nabout\n")
+      File.write(File.join(content_dir, "posts", "a.md"), "+++\ntitle = \"A\"\n+++\na\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      File.read(File.join(output_dir, "content", "_index.md")).should contain(%(title = "Home"))
+      File.exists?(File.join(output_dir, "content", "_index.ko.md")).should be_true
+      File.exists?(File.join(output_dir, "content", "index.md")).should be_false
+      File.exists?(File.join(output_dir, "content", "index.ko.md")).should be_false
+    end
+  end
+
+  it "exports a nested index.md with sibling pages as a branch bundle, keeping its assets" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "guide", "deep"))
+      File.write(File.join(content_dir, "guide", "index.md"), "+++\ntitle = \"Guide\"\n+++\n![d](diagram.png)\n")
+      File.write(File.join(content_dir, "guide", "diagram.png"), "PNG")
+      File.write(File.join(content_dir, "guide", "deep", "page.md"), "+++\ntitle = \"Deep\"\n+++\ndeep\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      File.exists?(File.join(output_dir, "content", "guide", "_index.md")).should be_true
+      File.exists?(File.join(output_dir, "content", "guide", "index.md")).should be_false
+      File.exists?(File.join(output_dir, "content", "guide", "diagram.png")).should be_true
+    end
+  end
+
+  it "keeps a leaf bundle, and an index.md whose _index twin exists, as index.md" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts", "bundle"))
+      File.write(File.join(content_dir, "posts", "_index.md"), "+++\ntitle = \"Posts\"\n+++\n")
+      File.write(File.join(content_dir, "posts", "index.md"), "+++\ntitle = \"Also posts\"\n+++\n")
+      File.write(File.join(content_dir, "posts", "bundle", "index.md"), "+++\ntitle = \"Bundle\"\n+++\nb\n")
+      File.write(File.join(content_dir, "posts", "bundle", "index.ko.md"), "+++\ntitle = \"번들\"\n+++\nb\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      File.read(File.join(output_dir, "content", "posts", "_index.md")).should contain(%(title = "Posts"))
+      File.exists?(File.join(output_dir, "content", "posts", "index.md")).should be_true
+      File.exists?(File.join(output_dir, "content", "posts", "bundle", "index.md")).should be_true
+      File.exists?(File.join(output_dir, "content", "posts", "bundle", "index.ko.md")).should be_true
+    end
+  end
+end
+
+# Regression: hwaro roots every alias at the site, but Hugo resolves an alias
+# without a leading slash against the page's section, so `legacy` on
+# `posts/x.md` redirected from `/posts/legacy/` instead of `/legacy/`.
+describe "Hugo export: aliases" do
+  it "roots relative aliases at the site and leaves absolute ones alone" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "x.md"),
+        "+++\ntitle = \"X\"\naliases = [\"legacy\", \"old/x/\", \"/kept/\", \"https://old.example/x\"]\n+++\nbody\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      File.read(File.join(output_dir, "content", "posts", "x.md"))
+        .should contain(%(aliases = ["/legacy", "/old/x/", "/kept/", "https://old.example/x"]))
+    end
+  end
+end

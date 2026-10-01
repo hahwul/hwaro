@@ -46,7 +46,10 @@ hwaro tool platform vercel --stdout
 | -f, --force | 기존 파일을 경고 없이 덮어쓰기 |
 | -h, --help | 도움말 표시 |
 
-출력 파일이 이미 있으면 `--force`로 덮어씁니다.
+출력 파일이 이미 있으면 `--force`로 덮어씁니다. 프로젝트 안의 대상 경로가
+프로젝트 밖으로 이어지는 심볼릭 링크이거나 그런 링크 디렉터리 아래에 있으면
+`--force` 여부와 관계없이 거부합니다. 의도적으로 그곳에 쓰려면 `-o`로 실제
+경로를 지정하세요.
 
 ## 생성되는 설정
 
@@ -58,7 +61,7 @@ hwaro tool platform vercel --stdout
   `hwaro build`가 실제로 쓰는 디렉터리를 배포합니다. `gitlab-ci`는 기본값이
   아닐 때 `pages` 잡에 `publish:`도 함께 추가합니다.
 - **리다이렉트**: 프론트 매터에 정의한 페이지 [`aliases`](/ko/writing/pages/)에서 만든 301 리다이렉트 (예: `aliases: ["/old-url/"]`)
-- **캐시 헤더**: 정적 에셋의 장기 캐싱
+- **캐시 헤더**: `[assets]` 출력 디렉터리에 1년짜리 `immutable` 규칙. 에셋 파이프라인이 `fingerprint = true`로 활성화된 경우에만 생성됩니다(내용에 따라 파일 이름이 바뀌는 유일한 경우)
 
 ### Netlify 출력
 

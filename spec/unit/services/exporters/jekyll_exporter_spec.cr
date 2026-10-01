@@ -472,6 +472,28 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
+    it "maps a translated _index.ko.md to index.ko.md, not an underscore file Jekyll ignores" do
+      # Jekyll never reads underscore-prefixed files, so a verbatim
+      # `posts/_index.ko.md` dropped that language's section landing page.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
+
+        File.write(File.join(content_dir, "_index.ko.md"), "+++\ntitle = \"홈\"\n+++\n\n환영\n")
+        File.write(File.join(content_dir, "posts", "_index.ko.md"), "+++\ntitle = \"글\"\n+++\n\n목록\n")
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options).success.should be_true
+
+        File.read(File.join(output_dir, "index.ko.md")).should contain("title: \"홈\"")
+        File.read(File.join(output_dir, "posts", "index.ko.md")).should contain("title: \"글\"")
+        File.exists?(File.join(output_dir, "_index.ko.md")).should be_false
+        File.exists?(File.join(output_dir, "posts", "_index.ko.md")).should be_false
+      end
+    end
+
     it "quotes list items and images that YAML would reinterpret" do
       # `- beta: gamma` reparses as a mapping and `- NO` as boolean false
       # under Jekyll's YAML 1.1 loader.
