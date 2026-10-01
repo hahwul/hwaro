@@ -25,6 +25,11 @@ module Hwaro
           }
         end
 
+        # Pages the menus/nav link to (kept as stubs by --skip-sample-content).
+        protected def skeleton_page_paths : Array(String)
+          ["index.md", "about.md"]
+        end
+
         # `bare` ships no taxonomy templates by default — taxonomies are
         # opt-in here (see `config_content`), so the matching templates
         # would be dead files. Users who add `[[taxonomies]]` later can
@@ -119,6 +124,7 @@ module Hwaro
                   <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
                   <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
                 </nav>
+                #{lang_switcher_html}
               </header>
 
             HTML
