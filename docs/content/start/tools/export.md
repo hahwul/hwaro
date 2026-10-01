@@ -135,8 +135,12 @@ Internal links using the `@/` prefix are automatically converted to absolute pat
 [About](@/about/_index.md)
 
 <!-- Exported -->
-[About](/about)
+[About](/about/)
 ```
+
+A section `_index.md` and a page-bundle `index.md` both map to their directory
+URL. Links shown inside code blocks or inline code spans are left exactly as
+written, since the build does not resolve them there either.
 
 ## Example Output
 

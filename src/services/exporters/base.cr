@@ -3,6 +3,7 @@ require "yaml"
 require "json"
 require "toml"
 require "../file_action"
+require "../../content/processors/fence_tracker"
 require "../../config/options/export_options"
 require "../../utils/errors"
 require "../../utils/file_safe"
@@ -419,22 +420,103 @@ module Hwaro
           end
         end
 
-        # Convert @/ internal links to relative paths
+        INTERNAL_LINK_RE = /\[([^\]]*)\]\(@\/([^\)]+)\)/
+
+        # Convert @/ internal links to relative paths.
+        #
+        # The build resolves `@/` only in rendered link hrefs, so an `@/` link
+        # shown inside a fenced/indented code block or an inline code span is
+        # literal text there — and must stay literal here, or every exported
+        # code sample documenting the syntax is silently rewritten. The
+        # substitution still runs over the whole body (link text may wrap
+        # across lines); matches that START inside code are kept verbatim.
         protected def rewrite_internal_links(body : String) : String
-          body.gsub(/\[([^\]]*)\]\(@\/([^\)]+)\)/) do |_, match|
-            text = match[1]
-            target = match[2]
-            # Peel off any #anchor or ?query suffix *before* stripping the .md /
-            # _index, otherwise `.md$` no longer anchors and links like
-            # @/guide.md#sec or @/page.md?x=1 keep their .md and 404.
-            suffix = ""
-            if idx = target.index(/[#?]/)
-              suffix = target[idx..]
-              target = target[0...idx]
-            end
-            path = target.sub(/\.md$/, "").sub(/_index$/, "")
-            "[#{text}](/#{path}#{suffix})"
+          return body unless body.includes?("@/")
+
+          code = code_byte_ranges(body)
+          body.gsub(INTERNAL_LINK_RE) do |whole, match|
+            start = match.byte_begin(0)
+            next whole if code.any?(&.includes?(start))
+            rewrite_link_target(match[1], match[2])
           end
+        end
+
+        # Byte ranges of `body` that Markdown renders as code: fenced and
+        # indented code blocks (per the build's own FenceTracker) and inline
+        # code spans — a backtick run closed by a run of the same length on
+        # the same line.
+        private def code_byte_ranges(body : String) : Array(Range(Int32, Int32))
+          ranges = [] of Range(Int32, Int32)
+          tracker = Content::Processors::FenceTracker.new
+          offset = 0
+          body.each_line(chomp: false) do |line|
+            if tracker.fence_line?(line)
+              ranges << (offset...(offset + line.bytesize))
+            elsif line.includes?('`')
+              each_code_span(line) { |from, to| ranges << ((offset + from)...(offset + to)) }
+            end
+            offset += line.bytesize
+          end
+          ranges
+        end
+
+        # Yields the [from, to) byte range of every inline code span in `line`.
+        private def each_code_span(line : String, &) : Nil
+          bytes = line.to_slice
+          pos = 0
+          while pos < bytes.size
+            unless bytes[pos] == '`'.ord
+              pos += 1
+              next
+            end
+            run_start = pos
+            while pos < bytes.size && bytes[pos] == '`'.ord
+              pos += 1
+            end
+            run = pos - run_start
+            # Look for a closing run of exactly the same length; an unmatched
+            # run is literal backticks, and scanning resumes right after it.
+            scan = pos
+            while scan < bytes.size
+              unless bytes[scan] == '`'.ord
+                scan += 1
+                next
+              end
+              close_start = scan
+              while scan < bytes.size && bytes[scan] == '`'.ord
+                scan += 1
+              end
+              if scan - close_start == run
+                yield run_start, scan
+                pos = scan
+                break
+              end
+            end
+          end
+        end
+
+        private def rewrite_link_target(link_text : String, target : String) : String
+          # A link title (`[x](@/a.md "Title")`) follows the destination
+          # after whitespace; left attached, it hid the `.md` from the
+          # suffix strip below.
+          title = ""
+          if ws = target.index(/\s/)
+            title = target[ws..]
+            target = target[0...ws]
+          end
+          # Peel off any #anchor or ?query suffix *before* stripping the .md /
+          # _index, otherwise `.md$` no longer anchors and links like
+          # @/guide.md#sec or @/page.md?x=1 keep their .md and 404.
+          suffix = ""
+          if idx = target.index(/[#?]/)
+            suffix = target[idx..]
+            target = target[0...idx]
+          end
+          # A section `_index` and a page-bundle `index` both publish at
+          # their directory's URL (`@/posts/my-post/index.md` →
+          # `/posts/my-post/`), as the build resolves them.
+          path = target.sub(/\.(?:md|markdown)$/, "").sub(/(\A|\/)_?index$/, "\\1")
+          "[#{link_text}](/#{path}#{suffix}#{title})"
         end
       end
     end

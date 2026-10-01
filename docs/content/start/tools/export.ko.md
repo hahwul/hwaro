@@ -135,8 +135,12 @@ hwaro tool export hugo --verbose
 [About](@/about/_index.md)
 
 <!-- Exported -->
-[About](/about)
+[About](/about/)
 ```
+
+섹션 `_index.md`와 페이지 번들 `index.md`는 모두 해당 디렉터리 URL로 변환됩니다.
+코드 블록이나 인라인 코드 안의 링크는 빌드에서도 해석하지 않으므로 작성한
+그대로 유지됩니다.
 
 ## 출력 예시
 
