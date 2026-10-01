@@ -827,6 +827,42 @@ describe Hwaro::Models::Site do
     end
   end
 
+  # Regression: a headless (`render = false`) page or section is never
+  # written, but every listing (`section.pages`, `section_list`, pagination,
+  # `get_section().pages`) linked it — a 404.
+  describe "#pages_for_section (headless content)" do
+    [true, false].each do |indexed|
+      it "omits render = false pages and sections (#{indexed ? "with" : "without"} lookup index)" do
+        site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+
+        blog = Hwaro::Models::Section.new("blog/_index.md")
+        blog.section = "blog"
+        headless_sub = Hwaro::Models::Section.new("blog/notes/_index.md")
+        headless_sub.section = "blog/notes"
+        headless_sub.render = false
+        hidden_group = Hwaro::Models::Section.new("blog/group/_index.md")
+        hidden_group.section = "blog/group"
+        hidden_group.transparent = true
+        hidden_group.render = false
+
+        shown = Hwaro::Models::Page.new("blog/a.md")
+        shown.section = "blog"
+        hidden = Hwaro::Models::Page.new("blog/hidden.md")
+        hidden.section = "blog"
+        hidden.render = false
+        grouped = Hwaro::Models::Page.new("blog/group/g.md")
+        grouped.section = "blog/group"
+
+        site.sections.concat([blog, headless_sub, hidden_group])
+        site.pages.concat([shown, hidden, grouped])
+        site.build_lookup_index if indexed
+
+        # A headless transparent section still bubbles its rendered pages up.
+        site.pages_for_section("blog", nil).map(&.path).sort!.should eq(["blog/a.md", "blog/group/g.md"])
+      end
+    end
+  end
+
   describe "#taxonomy_terms" do
     it "returns sorted terms for a taxonomy" do
       config = Hwaro::Models::Config.new

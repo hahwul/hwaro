@@ -113,6 +113,12 @@ module Hwaro
         @lookup_index_built = true
       end
 
+      # Every listing (`section.pages`, `section_list`, pagination,
+      # `get_section().pages`) reads this, so headless (`render = false`)
+      # pages and non-transparent sections are left out here: they are never
+      # written, and listing them linked a 404. A headless transparent
+      # section still bubbles its rendered pages up — only its own index is
+      # unwritten. `get_page` is a lookup, not a listing, and still sees them.
       def pages_for_section(section_name : String, language : String?, items : Array(Page)? = nil, visited : Set(String)? = nil) : Array(Page)
         # Normalize section name: remove leading/trailing slashes and handle root
         normalized_name = section_name.strip.strip('/')
@@ -137,7 +143,7 @@ module Hwaro
           # 1. Add direct pages
           if pages = @pages_by_section[normalized_name]?
             pages.each do |p|
-              result << p if p.language == language
+              result << p if p.language == language && p.render
             end
           end
 
@@ -158,7 +164,7 @@ module Hwaro
 
                 seen ||= Set{normalized_name}
                 result.concat(pages_for_section(subsection_name, language, nil, seen))
-              else
+              elsif s.render
                 # Non-transparent sections are included as Section (Page) objects
                 result << s
               end
@@ -194,7 +200,7 @@ module Hwaro
                 # Recursive bubble up: get pages from this sub-section
                 seen ||= Set{normalized_name}
                 result.concat(pages_for_section(p_dirname, language, content_items, seen))
-              else
+              elsif p.render
                 # Non-transparent sections are included as Section (Page) objects
                 result << p
               end
@@ -202,7 +208,7 @@ module Hwaro
           else
             # Regular Page (not a Section)
             # p.section is already normalized by the builder (e.g., "blog" or "blog/archive")
-            if p.section == normalized_name
+            if p.section == normalized_name && p.render
               result << p
             end
           end
