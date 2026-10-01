@@ -319,6 +319,38 @@ describe "tool publication-state parity" do
         end
       end
     end
+
+    # A templated body may `{% include %}` from templates/, which the
+    # planner's environment cannot load; rendering it made list/stats skip a
+    # rule the build renders fine.
+    it "still lists rows of a rule whose templated body includes a partial" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("data")
+          FileUtils.mkdir_p("templates/partials")
+          File.write("templates/partials/p.html", "partial")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "name"
+            body = "{% include 'partials/p.html' %} {{ item.blurb }}"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "a", "name": "A", "blurb": "x"}, {"id": "b", "name": "B", "blurb": "y"}]))
+
+          infos = [] of Hwaro::Services::ContentInfo
+          log = with_captured_log { infos = Hwaro::Services::GeneratedContent.infos("content") }
+          infos.map(&.title).sort!.should eq(["A", "B"])
+          log.should_not contain("Skipping")
+        end
+      end
+    end
   end
 
   describe Hwaro::Services::ContentValidator do

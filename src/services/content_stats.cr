@@ -96,7 +96,9 @@ module Hwaro
           # A `[[content.generate]]` page has no file at its path: its tags
           # and date come from the planned source document instead (the
           # build publishes its term pages and dates like an authored
-          # file's). Bodies are not planned, so it adds no word count.
+          # file's). Its body is planned only for a plain `body` field spec
+          # (never a template), so word counts stay authored-only rather than
+          # mixing in a subset of generated pages.
           if generated = item.generated_source
             content = generated
           else

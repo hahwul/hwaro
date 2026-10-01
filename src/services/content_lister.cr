@@ -168,8 +168,8 @@ module Hwaro
       # consumers see no new key on authored entries.
       property generated_from : String?
 
-      # The planned source document (front matter only — bodies are not
-      # planned) of a `[[content.generate]]` page, which has no file at
+      # The planned source document (front matter, plus the body only for a
+      # plain `body` field spec) of a `[[content.generate]]` page, which has no file at
       # `path` for `tool stats` to read its taxonomies from. Never emitted.
       @[JSON::Field(ignore: true)]
       property generated_source : String? = nil
