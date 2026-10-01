@@ -23,6 +23,11 @@ jobs:
             platform: macos
     runs-on: ${{ matrix.os }}
     steps:
+      # install-crystal apt-installs deps from the image's cached index, which
+      # 404s once Ubuntu supersedes a package; refresh it first.
+      - name: Refresh apt index
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q
       - name: Install Crystal
         uses: crystal-lang/install-crystal@v1
       - name: Checkout source code

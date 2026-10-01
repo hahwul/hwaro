@@ -188,6 +188,11 @@ jobs:
         crystal-version: [1.21.0]
     steps:
       - uses: actions/checkout@v6
+      # install-crystal apt-installs its build deps with the image's cached
+      # package index; when Ubuntu supersedes a package (libevent, 2026-10)
+      # the cached URLs 404 until the runner image is rebuilt.
+      - name: Refresh apt index
+        run: sudo apt-get update -q
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: ${{ matrix.crystal-version }}
