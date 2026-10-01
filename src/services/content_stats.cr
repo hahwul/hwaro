@@ -11,6 +11,7 @@ require "./generated_content"
 require "../utils/errors"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
+require "../utils/text_utils"
 
 module Hwaro
   module Services
@@ -93,7 +94,10 @@ module Hwaro
 
         published_items.each do |item|
           content = begin
-            File.read(item.path)
+            # Like the build's front-matter reader (and the lister above): a
+            # BOM defeats every `\A`-anchored fence, so a BOM'd file lost its
+            # tags and had its front matter counted as body words.
+            Utils::TextUtils.strip_bom(File.read(item.path))
           rescue IO::Error
             next
           end
@@ -228,18 +232,27 @@ module Hwaro
         [] of String
       end
 
+      # Terms are stripped and blank ones dropped, as the build's
+      # `fm_string_array` / `extract_taxonomies` do: `"  crystal  "` is the
+      # build's `crystal` term, and a blank term never gets a page. Counting
+      # them raw split one tag into two rows and charted tags no build
+      # publishes.
       private def toml_string_array(value : TOML::Any?) : Array(String)
         raw = value.try(&.raw)
         return [] of String unless raw.is_a?(Array)
-        raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) }
+        normalize_terms(raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) })
       end
 
       private def yaml_string_array(value : YAML::Any?) : Array(String)
-        value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String
+        normalize_terms(value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String)
       end
 
       private def json_string_array(value : JSON::Any?) : Array(String)
-        value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String
+        normalize_terms(value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String)
+      end
+
+      private def normalize_terms(terms : Array(String)) : Array(String)
+        terms.map(&.strip).reject(&.empty?)
       end
 
       private def warn_unparsed_frontmatter(path : String, dialect : String, ex : Exception) : Nil

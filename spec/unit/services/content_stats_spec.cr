@@ -346,5 +346,38 @@ describe Hwaro::Services::ContentStats do
         result.words_total.should eq(1)
       end
     end
+
+    # The build strips a UTF-8 BOM before looking for front matter; stats did
+    # not, so a BOM'd post contributed no tags and its whole front matter was
+    # counted as body words.
+    it "reads a BOM'd file's tags and body like the build does" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "bom.md"), "\uFEFF+++\ntitle = \"BOM\"\ntags = [\"bom\"]\n+++\n\nOne two three\n")
+
+        result = Hwaro::Services::ContentStats.new(content_dir).run
+        result.tags.should eq({"bom" => 1})
+        result.words_total.should eq(3)
+      end
+    end
+
+    # Terms the build would strip (`"  crystal  "` is its `crystal`) or drop
+    # (blank) must not become rows of their own in the tag distribution.
+    it "normalizes tags the way the build does" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "a.md"), "---\ntitle: A\ntags:\n  - \"  crystal  \"\n  - \"\"\n  - \"   \"\n---\nBody\n")
+        File.write(File.join(content_dir, "b.md"), "+++\ntitle = \"B\"\ntags = [\"crystal\", \" \"]\n+++\nBody\n")
+        File.write(File.join(content_dir, "c.md"), %({"title": "C", "tags": [" web "]}\nBody\n))
+        # A top-level list that is blank after normalization falls back to
+        # the [taxonomies] table, as in the build.
+        File.write(File.join(content_dir, "d.md"), "+++\ntitle = \"D\"\ntags = [\"  \"]\n[taxonomies]\ntags = [\"web\"]\n+++\nBody\n")
+
+        result = Hwaro::Services::ContentStats.new(content_dir).run
+        result.tags.should eq({"crystal" => 2, "web" => 2})
+      end
+    end
   end
 end
