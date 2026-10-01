@@ -141,6 +141,12 @@ page-bundle assets, and the fingerprinted asset bundles — so editing a
 stylesheet replaces `main.<hash>.css` instead of leaving every past revision
 in `public/assets/`.
 
+All of this relies on the cache remembering what it wrote. When it has no
+usable record of the output directory — no `.hwaro_cache.json` yet (the tree
+came from a plain `hwaro build`), a corrupt one, or one last used for a
+different `-o` — a `--cache` build clears the output directory first, exactly
+like a cold build (and under the same ownership rules), then records it.
+
 A `--cache` build's output is therefore byte-identical to a clean build's, and
 `hwaro build --full` is not needed to clear anything. (`--full` only clears the
 cache, so it does nothing at all without `--cache`; a plain `hwaro build`

@@ -565,6 +565,55 @@ describe "warm --cache builds" do
     end
   end
 
+  describe "when the cache does not describe the output directory" do
+    it "removes a page deleted since a plain (uncached) build" do
+      with_cached_site do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, cache: false, highlight: false,
+        )).should be_true
+        File.exists?("public/posts/gone/index.html").should be_true
+
+        File.delete("content/posts/gone.md")
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/legacy/index.html").should be_false
+        File.exists?("public/tags/gone-tag/index.html").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
+    it "removes a deleted page when the cache file is corrupt" do
+      with_cached_site do
+        cached_build
+        File.write(".hwaro_cache.json", "{garbage")
+        File.delete("content/posts/gone.md")
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
+    it "removes a deleted page after the cache was used for another output directory" do
+      with_cached_site do
+        cached_build
+        File.delete("content/posts/gone.md")
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "other", parallel: false, cache: true, highlight: false,
+        )).should be_true
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+  end
+
   it "leaves an untouched page's output alone" do
     with_cached_site do
       cached_build

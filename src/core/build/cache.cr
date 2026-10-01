@@ -220,6 +220,11 @@ module Hwaro
         # @mutex wherever entries or metadata actually change.
         @dirty : Bool = false
 
+        # True once #load read a metadata-format cache file (see
+        # #tracks_output_dir?). A missing, empty, corrupt or legacy-array file
+        # leaves it false.
+        @loaded : Bool = false
+
         # Output files an entry recorded on the LAST build and no longer
         # records after this one — a page whose `slug`/`path`/permalink moved
         # keeps its source file (so it keeps its entry) but writes somewhere
@@ -294,6 +299,23 @@ module Hwaro
           @metadata.template_hash = template_hash
           @metadata.config_hash = config_hash
           @metadata.output_dir = output_key unless output_key.empty?
+        end
+
+        # Does this cache describe what is sitting in `output_dir` right now?
+        #
+        # A `--cache` build keeps the output directory and prunes only what
+        # the cache remembers writing there, so it is only as good as that
+        # memory. With no usable record — no cache file, a corrupt one (whose
+        # warning promises a rebuild from scratch), a legacy one, or one last
+        # written for a DIFFERENT output directory — a page deleted since the
+        # tree was written stayed published, with its alias stubs and tag
+        # pages, on every later warm build. The Initialize phase takes the
+        # cold path instead when this is false. Asked before
+        # `set_global_checksums`, which re-stamps `output_dir`.
+        def tracks_output_dir?(output_dir : String) : Bool
+          return false unless @enabled && @loaded
+          key = Cache.output_dir_key(output_dir)
+          !key.empty? && @metadata.output_dir == key
         end
 
         # Has the global page set (content page metadata that listings render —
@@ -664,6 +686,7 @@ module Hwaro
             data = CacheData.from_json(content)
             @metadata = data.metadata
             data.entries.each { |e| @entries[e.path] = e }
+            @loaded = true
           rescue JSON::ParseException | JSON::SerializableError
             # Fall back to legacy format (plain array of entries); mark dirty
             # so the next save upgrades the file to the metadata format even

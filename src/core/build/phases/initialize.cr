@@ -22,6 +22,8 @@ module Hwaro::Core::Build::Phases::Initialize
       build_cache = Cache.new(enabled: cache_enabled)
       @cache = build_cache
       ctx.cache = build_cache
+      # Before `--full` clears the metadata it reads.
+      cache_tracks_output = build_cache.tracks_output_dir?(output_dir)
       # Source-less generated outputs are re-claimed from scratch every build;
       # the Finalize phase diffs this build's claims against the last one's.
       reset_generated_output_claims
@@ -51,7 +53,14 @@ module Hwaro::Core::Build::Phases::Initialize
       # by `hwaro serve` watch rebuilds) so mtime-based skip logic in hooks
       # like image processing can actually short-circuit. For a cold build
       # we always wipe to guarantee a clean state.
-      keep_output = cache_enabled || ctx.options.preserve_output
+      #
+      # `--cache` keeps the tree only when the cache actually describes it
+      # (see Cache#tracks_output_dir?): the Finalize prune can only remove
+      # what the cache remembers writing, so a missing/corrupt cache or one
+      # written for another `-o` left deleted pages published for good. That
+      # build re-renders everything anyway, so the cold (ownership-checked)
+      # wipe costs nothing but the static copy.
+      keep_output = (cache_enabled && cache_tracks_output) || ctx.options.preserve_output
       # Read before setup_output_dir — the cold-build wipe would erase the
       # evidence that a serve session (an older hwaro shared the output dir)
       # had written here. `present?` matches the marker's content, so a user's
