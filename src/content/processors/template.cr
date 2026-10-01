@@ -600,6 +600,15 @@ module Hwaro
             # re-encoded below so the emitted .url is a valid href.
             normalized = URI.decode(path.starts_with?("/") ? path : "/#{path}")
 
+            # The variant set, width and LQIP colour all follow the SOURCE
+            # image's bytes. An image no resize job covered (a missing file)
+            # is recorded at its static/ location, so one that appears there
+            # later re-renders the page too.
+            if Content::Hooks::ImageHooks.processing_active?
+              source = Content::Hooks::ImageHooks.source_path_for(normalized) || File.join("static", normalized)
+              TemplateEngine.record_file_read(source)
+            end
+
             # Try to find a resized variant from the image hooks map
             variant = if width > 0
                         Content::Hooks::ImageHooks.find_closest_variant(normalized, width)
@@ -624,6 +633,44 @@ module Hwaro
               "lqip"           => Crinja::Value.new(lqip_value),
               "dominant_color" => Crinja::Value.new(dominant_color_value),
             })
+          end
+        end
+
+        # Inputs a render read from OUTSIDE the tracked tree, recorded so a
+        # `--cache` build can tell when they move: `env()` names, `load_data()`
+        # files and `resize_image()` source images. None of them is in any
+        # cache key (they are read mid-render, per call), so a cached page kept
+        # the old analytics ID / data row / image variant for as long as its
+        # own source stayed untouched. Keys are `"env:NAME"` and `"file:PATH"`;
+        # values are never stored here or anywhere — the build digests them.
+        # Shared across engine instances and mutex-guarded: every parallel
+        # render worker has its own env.
+        @@render_reads = Set(String).new
+        @@render_reads_mutex = Mutex.new
+
+        ENV_READ_PREFIX  = "env:"
+        FILE_READ_PREFIX = "file:"
+
+        def self.record_render_read(key : String) : Nil
+          @@render_reads_mutex.synchronize { @@render_reads << key }
+        end
+
+        # Record a file read by its project-relative path (the cache outlives
+        # the checkout path: CI restores it under a different directory). A
+        # path that escapes the project is not recorded — nothing reads it.
+        def self.record_file_read(path : String) : Nil
+          return if path.empty? || path.starts_with?("/")
+          normalized = Path.posix(path).normalize.to_s
+          return if normalized == ".." || normalized.starts_with?("../")
+          record_render_read(FILE_READ_PREFIX + normalized)
+        end
+
+        # Everything recorded since the last call, and start a new record.
+        def self.take_render_reads : Set(String)
+          @@render_reads_mutex.synchronize do
+            taken = @@render_reads
+            @@render_reads = Set(String).new
+            taken
           end
         end
 
@@ -676,6 +723,11 @@ module Hwaro
               # Resolve symlinks BEFORE boundary check to prevent TOCTOU attacks.
               project_root = File.realpath(Dir.current)
               resolved = File.expand_path(path, project_root)
+              # Recorded before the existence check: a page rendered while the
+              # file was missing changes once it appears.
+              if resolved.starts_with?(project_root + "/")
+                TemplateEngine.record_file_read(resolved[(project_root.size + 1)..])
+              end
               resolved = begin
                 File.realpath(resolved)
               rescue File::Error
@@ -788,6 +840,7 @@ module Hwaro
             has_default = !default_val.none?
 
             env_value = ENV[var_name]?
+            TemplateEngine.record_render_read(ENV_READ_PREFIX + var_name)
 
             if has_default
               # env("VAR", default="x") — use default when unset or empty

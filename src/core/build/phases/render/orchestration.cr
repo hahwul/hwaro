@@ -23,6 +23,17 @@ module Hwaro::Core::Build::Phases::Render
     # fingerprint of those sets into the rebuild decision.
     @unpublished_pages.set(0)
     @published_pages.set(0)
+    # What templates read outside the tracked files (see render_inputs.cr):
+    # compared BEFORE the filter, so a change re-renders every page.
+    render_globals = ""
+    render_input_values = {} of String => String
+    if cache_enabled
+      # Reads from before this render (a serve session's incremental passes)
+      # are not this build's.
+      Content::Processors::TemplateEngine.take_render_reads
+      render_globals = render_globals_digest(site.config, ctx.options.cache_busting)
+      build_cache.check_render_inputs(render_inputs_digest(render_globals, build_cache.render_input_keys, render_input_values))
+    end
     listing_fields = cache_enabled ? listing_page_fields(templates) : Builder::ListingPageFields.new(false, false)
     page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages, listing_fields) : ""
     section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
@@ -46,6 +57,7 @@ module Hwaro::Core::Build::Phases::Render
       # inline line.
       ctx.stats.cache_hits = all_pages.size - pages_to_build.size
     end
+    rendered_every_page = pages_to_build.size == all_pages.size
 
     # Determine if syntax highlighting should be used
     # Config setting takes precedence, but can be overridden by CLI flag
@@ -158,6 +170,16 @@ module Hwaro::Core::Build::Phases::Render
       ensure
         @crinja_caches_frozen = false
       end
+    end
+    # Persist this build's reads. When every page rendered they ARE the
+    # site's reads; otherwise the cached pages still depend on the last
+    # build's, so keep those too. Skipped under fast-start for the same
+    # reason as the set fingerprints: deferred pages render later.
+    if cache_enabled && !ctx.options.fast_start
+      reads = Content::Processors::TemplateEngine.take_render_reads
+      reads.concat(build_cache.render_input_keys) unless rendered_every_page
+      keys = reads.to_a.sort!
+      build_cache.record_render_inputs(render_inputs_digest(render_globals, keys, render_input_values), keys)
     end
     profiler.end_phase
     result
