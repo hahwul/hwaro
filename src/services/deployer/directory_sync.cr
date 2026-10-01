@@ -79,12 +79,9 @@ module Hwaro
             FileUtils.rm(File.join(dest_dir, rel))
             early << rel
           end
-          # A cleared directory now holds only empty directories (and Finder
-          # litter the sync ignores); `rm_r` unlinks symlinks without
-          # following them.
           sync.clear_first.each do |rel|
             full = File.join(dest_dir, rel)
-            FileUtils.rm_r(full) if File.info?(full, follow_symlinks: false).try(&.directory?)
+            remove_cleared_directory(full) if File.info?(full, follow_symlinks: false).try(&.directory?)
           end
           counts.deleted += early.size
         end
@@ -112,6 +109,25 @@ module Hwaro
 
         prune_emptied_directories(dest_dir, sync.to_delete)
         counts
+      end
+
+      # Remove a stale directory whose files the early deletes just took.
+      # What is left should be empty directories and Finder litter; only
+      # those are removed. Anything else — say, a file that appeared while a
+      # `--confirm` prompt waited — makes `Dir.delete` fail (reported as
+      # HWARO_E_IO) instead of being swept away unplanned, as `rm_r` would.
+      private def remove_cleared_directory(dir : String) : Nil
+        Dir.children(dir).each do |entry|
+          full = File.join(dir, entry)
+          info = File.info?(full, follow_symlinks: false)
+          next unless info
+          if info.directory?
+            remove_cleared_directory(full)
+          elsif entry == ".DS_Store"
+            File.delete(full)
+          end
+        end
+        Dir.delete(dir)
       end
 
       # Ask before writing when `--confirm` is on; false means the user
