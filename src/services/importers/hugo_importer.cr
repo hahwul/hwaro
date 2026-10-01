@@ -81,12 +81,12 @@ module Hwaro
             # date (falling back to Hugo's publishDate so a page dated only
             # via publishDate doesn't lose its date entirely)
             if parsed = time_value(data, "date") || time_value(data, "publishdate")
-              fields["date"] = format_date(parsed)
+              fields["date"] = format_hugo_time(parsed)
             end
 
             # updated (from lastmod)
             if parsed = time_value(data, "lastmod")
-              fields["updated"] = format_date(parsed)
+              fields["updated"] = format_hugo_time(parsed)
             end
 
             # draft
@@ -155,7 +155,7 @@ module Hwaro
 
             # expires (from expiryDate)
             if parsed = time_value(data, "expirydate")
-              fields["expires"] = format_date(parsed)
+              fields["expires"] = format_hugo_time(parsed)
             end
           end
 
@@ -374,6 +374,19 @@ module Hwaro
         # date (`date = 2024-05-02`, a local date) into a timestamp pinned to
         # the importing machine's zone (`2024-05-02T00:00:00+09:00`), so the
         # same source imported differently on every machine.
+        # A TOML local date-time (`date = 2024-05-02T10:00:00`, no offset) is
+        # parsed in the machine's zone; writing it back with that offset
+        # pinned the importing machine's zone into the file. hwaro reads a
+        # zone-less timestamp as local time too, so keep it zone-less.
+        # Everything else (including a bare local date) goes through
+        # `format_date`.
+        private def format_hugo_time(time : Time) : String
+          local = time.location == Time::Location.local && !time.location.utc?
+          midnight = time.hour == 0 && time.minute == 0 && time.second == 0 && time.nanosecond == 0
+          return time.to_s("%Y-%m-%dT%H:%M:%S") if local && !midnight && time.nanosecond == 0
+          format_date(time)
+        end
+
         private def time_value(data : Hash(String, TOML::Any), key : String) : Time?
           return unless val = data[key]?
           case raw = val.raw

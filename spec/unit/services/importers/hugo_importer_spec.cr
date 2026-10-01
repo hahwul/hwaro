@@ -548,6 +548,26 @@ describe "Hugo import: TOML local dates" do
       Time::Location.local = saved
     end
   end
+
+  it "keeps a TOML local date-time zone-less instead of adding the machine's offset" do
+    saved = Time::Location.local
+    Time::Location.local = Time::Location.fixed("KST", 9 * 3600)
+    begin
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = File.join(tmpdir, "hugo_site")
+        FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+        File.write(File.join(hugo_dir, "content", "p.md"), "+++\ntitle = \"P\"\ndate = 2024-05-02T10:00:00\nlastmod = 2024-05-03T10:00:00Z\n+++\nx\n")
+        output_dir = File.join(tmpdir, "out")
+        Hwaro::Services::Importers::HugoImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+        content = File.read(File.join(output_dir, "p.md"))
+        content.should contain(%(date = "2024-05-02T10:00:00"\n))
+        content.should contain(%(updated = "2024-05-03T10:00:00Z"\n))
+      end
+    ensure
+      Time::Location.local = saved
+    end
+  end
 end
 
 describe "Hugo import: url with query or fragment" do
