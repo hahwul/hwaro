@@ -46,20 +46,20 @@ series_weight = 1
 
 | 변수 | 타입 | 설명 |
 |----------|------|-------------|
-| series | string | 시리즈 이름 |
-| series_index | int | 시리즈 내 위치(1부터 시작) |
-| series_pages | array | 같은 시리즈의 모든 페이지(정렬됨) |
+| page.series | string | 시리즈 이름 |
+| page.series_index | int | 시리즈 내 위치(1부터 시작) |
+| page.series_pages | array | 같은 시리즈의 모든 페이지(정렬됨) |
 
 ## 템플릿에서 사용
 
 ### 시리즈 내비게이션
 
 ```jinja
-{% if series %}
+{% if page.series %}
 <nav class="series-nav">
-  <h3>{{ series }}</h3>
+  <h3>{{ page.series }}</h3>
   <ol>
-    {% for p in series_pages %}
+    {% for p in page.series_pages %}
     <li{% if p.url == page.url %} class="current"{% endif %}>
       <a href="{{ p.url }}">{{ p.title }}</a>
     </li>
@@ -72,14 +72,14 @@ series_weight = 1
 ### 이전 / 다음 링크
 
 ```jinja
-{% if series_pages | length > 1 %}
+{% if page.series_pages | length > 1 %}
 <div class="series-pager">
-  {% if series_index > 1 %}
-    <a href="{{ series_pages[series_index - 2].url }}">← Previous</a>
+  {% if page.series_index > 1 %}
+    <a href="{{ page.series_pages[page.series_index - 2].url }}">← Previous</a>
   {% endif %}
-  <span>Part {{ series_index }} of {{ series_pages | length }}</span>
-  {% if series_index < series_pages | length %}
-    <a href="{{ series_pages[series_index].url }}">Next →</a>
+  <span>Part {{ page.series_index }} of {{ page.series_pages | length }}</span>
+  {% if page.series_index < page.series_pages | length %}
+    <a href="{{ page.series_pages[page.series_index].url }}">Next →</a>
   {% endif %}
 </div>
 {% endif %}
@@ -97,7 +97,7 @@ content/
     cli-part3.md   # series = "CLI Tool", series_weight = 3
 ```
 
-각 글의 `series_pages`에는 세 글이 순서대로 모두 담기고, `series_index`는 각각 1, 2, 3이 됩니다.
+각 글의 `page.series_pages`에는 세 글이 순서대로 모두 담기고, `page.series_index`는 각각 1, 2, 3이 됩니다.
 
 ## 함께 보기
 

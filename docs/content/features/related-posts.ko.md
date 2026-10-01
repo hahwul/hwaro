@@ -35,24 +35,24 @@ taxonomies = ["tags"]
 
 ## 템플릿 변수
 
-각 페이지는 관련 페이지를 관련도 순으로 담은 `related_posts` 배열을 갖습니다.
+각 페이지는 관련 페이지를 관련도 순으로 담은 `page.related_posts` 배열을 갖습니다.
 
 | 변수 | 타입 | 설명 |
 |----------|------|-------------|
-| related_posts | array | 현재 페이지와 관련된 페이지들, 공유 항목 수 순 정렬 |
+| page.related_posts | array | 현재 페이지와 관련된 페이지들, 공유 항목 수 순 정렬 |
 
-`related_posts`의 각 항목은 완전한 페이지 객체이므로 모든 페이지 변수(`title`, `url`, `description`, `date`, `tags` 등)에 접근할 수 있습니다.
+`page.related_posts`의 각 항목은 완전한 페이지 객체이므로 모든 페이지 변수(`title`, `url`, `description`, `date`, `tags` 등)에 접근할 수 있습니다.
 
 ## 템플릿에서 사용
 
 ### 기본 관련 글
 
 ```jinja
-{% if related_posts | length > 0 %}
+{% if page.related_posts | length > 0 %}
 <section class="related-posts">
   <h2>Related Posts</h2>
   <ul>
-    {% for post in related_posts %}
+    {% for post in page.related_posts %}
     <li>
       <a href="{{ post.url }}">{{ post.title }}</a>
       {% if post.description %}
@@ -68,10 +68,10 @@ taxonomies = ["tags"]
 ### 태그와 함께 표시
 
 ```jinja
-{% if related_posts | length > 0 %}
+{% if page.related_posts | length > 0 %}
 <aside class="related">
   <h3>You might also like</h3>
-  {% for post in related_posts %}
+  {% for post in page.related_posts %}
   <article>
     <a href="{{ post.url }}">{{ post.title }}</a>
     <div class="tags">
