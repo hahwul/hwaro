@@ -25,7 +25,7 @@ describe "Render output paths: authored vs generated collisions" do
     log.should contain("content page 'blog/page/2.md' publishes the same path")
   end
 
-  it "keeps an authored page over a colliding taxonomy term page, with a warning" do
+  it "keeps the generated taxonomy term page over a colliding authored page, with a warning" do
     log = with_captured_log do
       build_site(
         "title = \"T\"\nbase_url = \"http://localhost\"\n\n[[taxonomies]]\nname = \"tags\"\n",
@@ -39,11 +39,29 @@ describe "Render output paths: authored vs generated collisions" do
           "taxonomy_term.html" => "TERM={{ taxonomy_term }}",
         },
       ) do
-        File.read("public/tags/c/index.html").should contain("AUTHORED-TAG")
+        File.read("public/tags/c/index.html").should contain("TERM=c")
         File.read("public/tags/index.html").should contain("TAXONOMY")
       end
     end
-    log.should contain("content page 'tc.md' publishes the same path")
+    log.should contain("replaces content page 'tc.md'")
+  end
+
+  it "keeps the generated taxonomy index over an authored tags/_index.md" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n\n[[taxonomies]]\nname = \"tags\"\n",
+      content_files: {
+        "post.md"        => "+++\ntitle = \"Post\"\ntags = [\"c\"]\n+++\nPost",
+        "tags/_index.md" => "+++\ntitle = \"All tags\"\n+++\nAUTHORED-INDEX",
+      },
+      template_files: {
+        "page.html"          => "{{ content }}",
+        "section.html"       => "{{ content }}",
+        "taxonomy.html"      => "TAXONOMY",
+        "taxonomy_term.html" => "TERM={{ taxonomy_term }}",
+      },
+    ) do
+      File.read("public/tags/index.html").should contain("TAXONOMY")
+    end
   end
 
   it "fails with a classified I/O error when a page's slug shadows sitemap.xml" do

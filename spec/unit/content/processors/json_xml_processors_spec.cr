@@ -528,6 +528,24 @@ describe Hwaro::Content::Processors::Xml do
       result.content.should eq("<doc><pre xml:space=\"preserve\">\n    <a>x</a>\n    <b>y</b>\n  </pre><c>z</c></doc>")
     end
 
+    it "lets xml:space=\"default\" end an inherited preserve" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<doc xml:space=\"preserve\"><c xml:space=\"default\">\n  <d/>\n</c></doc>"
+      result = processor.process(input, context)
+      result.content.should eq("<doc xml:space=\"preserve\"><c xml:space=\"default\"><d/></c></doc>")
+    end
+
+    it "reads a '>' inside a quoted attribute as part of the tag" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<g>text<p><x a=\"1>2\"/></p>\n<q>word</q></g>"
+      result = processor.process(input, context)
+      result.content.should eq(input)
+    end
+
     it "still removes indentation around comments in element-only content" do
       processor = Hwaro::Content::Processors::Xml.new
       context = Hwaro::Content::Processors::ProcessorContext.new

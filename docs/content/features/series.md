@@ -46,9 +46,9 @@ Each page in a series has the following variables:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| page.series | string | The page.series name |
-| page.series_index | int | 1-based position in the page.series |
-| page.series_pages | array | All pages in the same page.series (sorted) |
+| page.series | string | The series name |
+| page.series_index | int | 1-based position in the series |
+| page.series_pages | array | All pages in the same series (sorted) |
 
 ## Usage in Templates
 

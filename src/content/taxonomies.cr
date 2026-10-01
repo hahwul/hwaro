@@ -610,12 +610,13 @@ module Hwaro
           return
         end
 
-        # Authored content wins the path (Builder#page_output_owner): writing
-        # here silently replaced the page while sitemap/feeds/search still
-        # advertised it.
+        # The taxonomy page keeps the path it always took — sites put a
+        # `content/tags/_index.md` there to get the section into menus, and
+        # still expect the generated term index — but replacing an authored
+        # page (Builder#page_output_owner) is no longer silent: sitemap, feeds
+        # and search still advertise that page's URL.
         if owner = builder.try(&.page_output_owner(output_path, output_dir))
-          Logger.warn "Taxonomy page #{output_path} is not written: content page '#{owner}' publishes the same path. Rename that page (slug/path) or the taxonomy term."
-          return
+          Logger.warn "Taxonomy page #{output_path} replaces content page '#{owner}', which publishes the same path. Rename that page (slug/path) or the taxonomy term to keep both."
         end
 
         # No content file backs a taxonomy page, so nothing else records that

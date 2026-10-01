@@ -106,7 +106,7 @@ module Hwaro
           pos = 0
           size = work.bytesize
           while pos < size
-            if work.byte_at(pos) == '<'.ord && (close = work.byte_index('>'.ord, pos))
+            if work.byte_at(pos) == '<'.ord && (close = tag_end(work, pos))
               tokens << work.byte_slice(pos, close - pos + 1)
               pos = close + 1
             else
@@ -116,6 +116,29 @@ module Hwaro
             end
           end
           tokens
+        end
+
+        # Byte index of the `>` closing the tag that opens at `pos`, skipping
+        # any `>` inside a quoted attribute value (`<x a="1>2"/>` is one
+        # self-closing tag, not an open element that never closes). An
+        # unbalanced quote falls back to the first `>`, so malformed input
+        # never swallows the rest of the document.
+        private def tag_end(work : String, pos : Int32) : Int32?
+          quote = 0_u8
+          i = pos + 1
+          size = work.bytesize
+          while i < size
+            byte = work.byte_at(i)
+            if quote != 0
+              quote = 0_u8 if byte == quote
+            elsif byte == '"'.ord || byte == '\''.ord
+              quote = byte
+            elsif byte == '>'.ord
+              return i
+            end
+            i += 1
+          end
+          work.byte_index('>'.ord, pos)
         end
 
         # Indices of the cross-line whitespace-only text tokens that sit
@@ -138,7 +161,9 @@ module Hwaro
                 # declaration, processing instruction, empty element
               else
                 inherited = stack.empty? ? false : preserve[stack.last]
-                preserve << (token.match(XML_SPACE_RE).try { |m| m[1] == "preserve" } || inherited)
+                # An explicit `xml:space` wins either way: "default" resets an
+                # inherited preserve.
+                preserve << ((m = token.match(XML_SPACE_RE)) ? m[1] == "preserve" : inherited)
                 mixed << false
                 stack << mixed.size - 1
               end
