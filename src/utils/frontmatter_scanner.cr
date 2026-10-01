@@ -28,11 +28,32 @@ module Hwaro
           {:toml, match[1]}
         elsif match = content.match(YAML_FRONTMATTER_RE)
           {:yaml, match[1]}
-        elsif content.starts_with?('{') && (end_idx = find_json_end(content))
+        elsif json_start?(content) && (end_idx = find_json_end(content))
           # find_json_end returns a BYTE offset; byte_slice keeps multibyte
           # JSON front matter intact.
           {:json, content.byte_slice(0, end_idx)}
         end
+      end
+
+      # True when `content` opens the way JSON front matter does: a `{` at
+      # byte 0 followed (after optional whitespace) by `"` (the first key) or
+      # `}` (an empty object). This is the build's own test
+      # (`Processors::Markdown#json_front_matter_start?`): a `{` also opens
+      # shortcodes (`{{ … }}`), Jinja tags (`{% … %}`) and attribute lists
+      # (`{:.class}`), which the build renders as body text. Treating those
+      # as front matter made the read-only tools disagree with the build —
+      # `tool validate` failed such a page with a JSON parse error.
+      def json_start?(content : String) : Bool
+        return false unless content.starts_with?('{')
+        reader = Char::Reader.new(content)
+        reader.next_char # skip the leading '{'
+        while reader.has_next?
+          ch = reader.current_char
+          return true if ch == '"' || ch == '}'
+          return false unless ch.whitespace?
+          reader.next_char
+        end
+        false
       end
 
       # Strip front matter, if any. The TOML and YAML strips are mutually
@@ -41,7 +62,7 @@ module Hwaro
       # the TOML front matter had already been removed, silently dropping
       # the first block of the document.
       def strip_frontmatter(content : String) : String
-        if content.starts_with?('{') && (end_idx = find_json_end(content))
+        if json_start?(content) && (end_idx = find_json_end(content))
           content.byte_slice(end_idx)
         elsif content.matches?(TOML_FRONTMATTER_RE)
           content.sub(TOML_FRONTMATTER_RE, "")

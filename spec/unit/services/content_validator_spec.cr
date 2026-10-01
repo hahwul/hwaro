@@ -319,6 +319,22 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    # `hwaro build` renders these pages fine (a leading `{` is only JSON
+    # front matter when a key or `}` follows), so validate must not fail
+    # them with a JSON parse error and exit 5.
+    it "does not report a page opening with a shortcode as broken JSON front matter" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "shortcode.md"), %({{ youtube(id="abc") }}\n\nBody.\n))
+        File.write(File.join(content_dir, "brace.md"), %({ not json }\n\nBody.\n))
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        issues.select { |i| i.level == :error }.should be_empty
+        issues.count { |i| i.id == "content-title-missing" }.should eq(2)
+      end
+    end
+
     it "detects invalid date format" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

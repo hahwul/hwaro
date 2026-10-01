@@ -68,4 +68,23 @@ describe Hwaro::Utils::FrontmatterScanner do
       Hwaro::Utils::FrontmatterScanner.find_json_end(content).should be_nil
     end
   end
+
+  # The build only reads a leading `{` as JSON front matter when a key (`"`)
+  # or `}` follows it; a page opening with a shortcode, a Jinja tag or an
+  # attribute list has no front matter. The read-only tools must agree.
+  describe ".detect / .strip_frontmatter JSON intent" do
+    it "does not treat a leading shortcode or Jinja tag as JSON front matter" do
+      ["{{ youtube(id=\"abc\") }}\n\nBody.\n", "{% raw %}x{% endraw %}\n", "{:.lead}\nBody\n", "{ not json }\nBody\n"].each do |content|
+        Hwaro::Utils::FrontmatterScanner.json_start?(content).should be_false
+        Hwaro::Utils::FrontmatterScanner.detect(content).should be_nil
+        Hwaro::Utils::FrontmatterScanner.strip_frontmatter(content).should eq(content)
+      end
+    end
+
+    it "still detects JSON front matter opening with a key or an empty object" do
+      Hwaro::Utils::FrontmatterScanner.detect(%({\n  "title": "T"\n}\nBody)).should eq({:json, %({\n  "title": "T"\n})})
+      Hwaro::Utils::FrontmatterScanner.detect("{}\nBody").should eq({:json, "{}"})
+      Hwaro::Utils::FrontmatterScanner.strip_frontmatter(%({"title": "T"}\nBody)).should eq("\nBody")
+    end
+  end
 end

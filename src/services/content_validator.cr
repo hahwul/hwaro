@@ -200,7 +200,9 @@ module Hwaro
               message: "YAML frontmatter parse error: #{ex.message}")
             return
           end
-        elsif content.starts_with?('{')
+        elsif Utils::FrontmatterScanner.json_start?(content)
+          # Same JSON-intent test as the build: a page opening with a
+          # shortcode (`{{ … }}`) or a Jinja tag has no front matter at all.
           end_idx = Utils::FrontmatterScanner.find_json_end(content)
           unless end_idx
             issues << Issue.new(id: "content-frontmatter-json-error", level: :error, category: "content", file: file_path,
