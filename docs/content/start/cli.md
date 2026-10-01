@@ -122,7 +122,7 @@ hwaro init my-site --scaffold https://github.com/user/repo
 hwaro init my-site --scaffold https://github.com/user/repo/tree/main/docs
 ```
 
-Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content structure from the repository. Content files keep only front matter (metadata) so you can see the expected page structure without the original body text. Set `GITHUB_TOKEN` environment variable to avoid API rate limits.
+Remote scaffolds fetch `config.toml`, `templates/`, `static/`, `data/`, `i18n/`, `archetypes/`, and content structure from the repository. Content files keep only front matter (metadata) so you can see the expected page structure without the original body text. A `/tree/<branch>/` URL fetches that branch; otherwise the repository's default branch is used. If any file fails to download, nothing is written and init exits with `HWARO_E_NETWORK`. Set the `GITHUB_TOKEN` environment variable to avoid API rate limits or to fetch from a private repository.
 
 **Options:**
 
@@ -132,13 +132,13 @@ Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and content struc
 | --wizard | Run the interactive wizard (TTY only) |
 | --agents MODE | AGENTS.md content mode: `remote` (lightweight, default) or `local` (full embedded reference) |
 | -f, --force | Force creation even if directory is not empty (keeps existing files) |
-| --clean | Remove existing files in the target before scaffolding (implies `--force`; refuses if the target contains `.git/`) |
+| --clean | Remove existing files in the target before scaffolding (implies `--force`; refuses if the target contains a `.git` directory or file, or is `/` or your home directory) |
 | --skip-agents-md | Skip creating AGENTS.md file |
-| --skip-sample-content | Skip creating sample content files |
+| --skip-sample-content | Skip the sample content. The pages the scaffold's navigation links to (homepage, section indexes, About, …) are still created, as front-matter-only stubs |
 | --skip-taxonomies | Skip taxonomies configuration and templates |
 | --include-multilingual LANGS | Enable multilingual support (e.g., `en,ko,ja`). Repeated codes are dropped with a warning |
-| --minimal-config | Generate minimal `config.toml` without comments or optional sections |
-| --full-config | Generate full `config.toml` with every comment and optional section (maximum discoverability) |
+| --minimal-config | Generate minimal `config.toml` without comments or optional sections (cannot be combined with `--full-config`) |
+| --full-config | Generate full `config.toml` with every comment and optional section (maximum discoverability). An existing `config.toml` kept by `--force` is not modified |
 | --list-scaffolds | List available built-in scaffolds and exit |
 | -q, --quiet | Suppress info output and the banner (errors still go to stderr) |
 | -j, --json | Emit machine-readable JSON output: the scaffold list with `--list-scaffolds`, otherwise a `{"status","path","scaffold","files_created"}` result |
