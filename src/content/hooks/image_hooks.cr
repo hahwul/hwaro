@@ -25,6 +25,18 @@ module Hwaro
         @@lqip_map = {} of String => Hash(String, String)
         @@lqip_map_mutex = Mutex.new
 
+        # Class-level map: original_url => source image file the variants are
+        # cut from. Guarded by @@resize_map_mutex and replaced with it. Lets
+        # `resize_image()` report which file a page's output depends on, so a
+        # `--cache` build notices when that image is replaced (see
+        # `TemplateEngine.record_render_read`).
+        @@source_map = {} of String => String
+        # Whether the last `image:resize` run processed images at all. When it
+        # did not (`enabled = false`, no widths, `--skip-image-processing`),
+        # `resize_image()` returns the URL it was given whatever the bytes,
+        # so the source is not a render input. Guarded by @@resize_map_mutex.
+        @@processing_active = false
+
         # Max number of concurrent image processing fibers
         CONCURRENCY = 8
 
@@ -62,6 +74,16 @@ module Hwaro
           @@resize_map_mutex.synchronize do
             @@resize_map[url]?.try { |m| m[width]? }
           end
+        end
+
+        # Source file behind `url` as of the last `image:resize` run, or nil
+        # when no image job covered it.
+        def self.processing_active? : Bool
+          @@resize_map_mutex.synchronize { @@processing_active }
+        end
+
+        def self.source_path_for(url : String) : String?
+          @@resize_map_mutex.synchronize { @@source_map[url]? }
         end
 
         def self.lqip_map : Hash(String, Hash(String, String))
@@ -118,6 +140,7 @@ module Hwaro
           url_prefix : String
 
         private def process_images(ctx : Core::Lifecycle::BuildContext)
+          @@resize_map_mutex.synchronize { @@processing_active = false }
           config = ctx.config
           return unless config
           if ctx.options.skip_image_processing
@@ -126,6 +149,7 @@ module Hwaro
           end
           return unless config.image_processing.enabled
           return if config.image_processing.widths.empty?
+          @@resize_map_mutex.synchronize { @@processing_active = true }
 
           start = ctx.profiler ? Time.instant : nil
 
@@ -152,7 +176,7 @@ module Hwaro
           seen = Set(String).new
           collect_page_asset_jobs(ctx, output_dir, resolved_output, jobs, seen, fast_start_priority)
           if fast_start_priority.nil?
-            collect_content_file_jobs(config, output_dir, resolved_output, jobs, seen) if config.content_files.enabled?
+            collect_content_file_jobs(config, output_dir, resolved_output, jobs, seen, ctx.builder) if config.content_files.enabled?
             collect_static_jobs(config, output_dir, resolved_output, jobs, seen)
           end
 
@@ -187,9 +211,15 @@ module Hwaro
             end
           end
 
+          source_map = jobs.to_h { |job| {job.original_url, job.source_path} }
+
           if jobs_to_process.empty?
-            @@resize_map_mutex.synchronize { @@resize_map = new_map }
+            @@resize_map_mutex.synchronize do
+              @@resize_map = new_map
+              @@source_map = source_map
+            end
             @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+            claim_variants(ctx, jobs, new_map)
             Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
             return
           end
@@ -232,8 +262,12 @@ module Hwaro
           # Wait for all workers
           CONCURRENCY.times { done_channel.receive }
 
-          @@resize_map_mutex.synchronize { @@resize_map = new_map }
+          @@resize_map_mutex.synchronize do
+            @@resize_map = new_map
+            @@source_map = source_map
+          end
           @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+          claim_variants(ctx, jobs, new_map)
           # Count variants (widths × successful jobs), matching the pre-#389
           # meaning. Counting source images instead would silently halve/third
           # the number users see and make the "Generated N" line less useful
@@ -246,6 +280,24 @@ module Hwaro
           if (p = ctx.profiler) && start
             elapsed = (Time.instant - start).total_milliseconds
             p.record_asset_generation("image:resize", resized_count, reused_count, elapsed)
+          end
+        end
+
+        # Claim every `<name>_<width>w.<ext>` variant this build publishes,
+        # reused or freshly written (an unclaimed file is pruned on the next
+        # build). No cache entry covers them, so without the claim a warm
+        # `--cache` build kept them published after image processing was
+        # switched off (or `--skip-image-processing` passed), after a width
+        # left `widths`, after the source image was deleted, and after a
+        # bigger source image changed the width set (`hero_900w.png` stayed
+        # beside the new `hero_1024w.png`).
+        private def claim_variants(ctx : Core::Lifecycle::BuildContext, jobs : Array(ImageJob), map : Hash(String, Hash(Int32, String))) : Nil
+          builder = ctx.builder
+          return unless builder
+          jobs.each do |job|
+            map[job.original_url]?.try &.each_value do |url|
+              builder.claim_generated_output(File.join(job.dest_dir, File.basename(url)))
+            end
           end
         end
 
@@ -385,13 +437,18 @@ module Hwaro
           resolved_output : String,
           jobs : Array(ImageJob),
           seen : Set(String),
+          builder : Core::Build::Builder? = nil,
         )
+          # Images of a withheld (draft / future / expired) bundle get no
+          # variants: the raw copy itself is withheld (Phases::Write).
+          withheld = builder.try(&.withheld_bundle_dirs) || Set(String).new
           Dir.glob(File.join("content", "**", "*")).each do |file|
             next unless File.file?(file)
             next unless Processors::ImageProcessor.image?(file)
             next unless safe_path?(file, "content")
             relative = Path[file].relative_to("content").to_s
             next unless config.content_files.publish?(relative)
+            next if builder && builder.withheld_content_file?(relative, withheld)
 
             original_url = "/" + relative
             next if seen.includes?(original_url)

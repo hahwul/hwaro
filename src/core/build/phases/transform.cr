@@ -72,7 +72,7 @@ module Hwaro::Core::Build::Phases::Transform
       build_language_reading_order(
         sections_by_lang[key]? || [] of Models::Section,
         pages_by_lang[key]? || [] of Models::Page,
-        key[0], default_lang, versioned: !key[1].nil?)
+        key[0], default_lang)
     end
   end
 
@@ -81,7 +81,6 @@ module Hwaro::Core::Build::Phases::Transform
     pages : Array(Models::Page),
     lang : String,
     default_lang : String,
-    versioned : Bool = false,
   ) : Array(Models::Page)
     # Build sections lookup
     sections_by_path = {} of String => Models::Section
@@ -92,9 +91,12 @@ module Hwaro::Core::Build::Phases::Transform
     # in `sections` and are interleaved separately by
     # `flatten_section_tree`. Page bundles set `is_index = true` for URL
     # generation, but for navigation they're ordinary pages within their
-    # parent section.
+    # parent section. Headless (`render = false`) pages are never written,
+    # so they are no one's prev/next — the rule flatten_section_tree already
+    # applies to section indexes and Site#pages_for_section to listings.
     pages_by_section = {} of String => Array(Models::Page)
     pages.each do |page|
+      next unless page.render
       section = page.section
       pages_by_section[section] ||= [] of Models::Page
       pages_by_section[section] << page
@@ -112,19 +114,18 @@ module Hwaro::Core::Build::Phases::Transform
     # Find top-level sections (no parent) and sort by weight (path tiebreaker
     # so equal weights keep a stable, deterministic reading order).
     #
-    # A version partition's roots are nested (`docs/v2`), so its top level is
-    # every section whose parent directory is not itself a section of the
-    # partition — the version root, plus any subtree with a missing
-    # intermediate `_index`. Unversioned partitions keep the literal
-    # top-level rule (byte-identical reading order for existing sites).
-    top_sections = if versioned
-                     sections.select do |s|
-                       idx = s.section.rindex('/')
-                       idx.nil? || !sections_by_path.has_key?(s.section[0, idx])
-                     end
-                   else
-                     sections.select { |s| !s.section.includes?("/") }
-                   end
+    # The top level is every section whose parent directory is not itself a
+    # section of the partition: the literal top-level sections, a version
+    # root (`docs/v2`), plus any subtree with a missing intermediate `_index`
+    # (`guide/basics/_index.md` without `guide/_index.md`). Taking only the
+    # sections without a "/" left such a subtree unwalked — and
+    # append_orphan_pages skips a known section's pages — so it dropped out
+    # of prev/next entirely. With every parent present this is exactly the
+    # literal top-level set, so complete trees keep their reading order.
+    top_sections = sections.select do |s|
+      idx = s.section.rindex('/')
+      idx.nil? || !sections_by_path.has_key?(s.section[0, idx])
+    end
     top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     # Recursively flatten sections into reading order
@@ -758,7 +759,7 @@ module Hwaro::Core::Build::Phases::Transform
     # 3. Convert to Crinja Values and store in site.authors
     temp_authors.each do |id, data|
       # Sort pages by date descending
-      sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date", true)
+      sorted_pages = Utils::SortUtils.sort_pages(data[:pages], "date")
 
       page_values = sorted_pages.map do |p|
         # Expose the same common leaf fields a section/term page list provides,

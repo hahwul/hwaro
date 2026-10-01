@@ -47,6 +47,14 @@ content/
 
 Files are copied directly to the matching output path. The `content/` prefix is stripped automatically.
 
+### Unpublished bundles
+
+Files inside a page bundle whose page is not published are not copied either: a draft (unless you build with `--drafts`), a future-dated page (unless `--include-future`) or an expired page (unless `--include-expired`). In the example above, setting `draft = true` in `blog/my-post/index.md` also withholds `diagram.svg` and `screenshot.png`. A published bundle nested inside an unpublished one still publishes its own files.
+
+### JSON and XML files
+
+`.json` and `.xml` files under `content/` are published as raw files even without an `allow_extensions` entry (and minified with `--minify`). The deny rules below — `disallow_extensions` and `disallow_paths` — and the unpublished-bundle rule above still apply to them.
+
 ## Extension Matching
 
 ### Allow List

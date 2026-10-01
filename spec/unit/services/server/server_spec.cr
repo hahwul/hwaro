@@ -24,6 +24,14 @@ module Hwaro
         run_with_options(host, port, open_browser, access_log, live_reload, build_options, json_output)
       end
 
+      def test_acquire_output_lock(dir : String)
+        acquire_output_lock(dir)
+      end
+
+      def test_release_output_lock
+        release_output_lock
+      end
+
       def test_scan_mtimes
         scan_mtimes
       end
@@ -144,8 +152,14 @@ describe Hwaro::Services::Server do
 
     it "reflects the requested host and port" do
       server = Hwaro::Services::Server.new
+      line = server.test_ready_signal_line("192.168.1.5", 8080)
+      line.should contain("url=http://192.168.1.5:8080")
+    end
+
+    it "advertises localhost, not the wildcard, for a 0.0.0.0 bind" do
+      server = Hwaro::Services::Server.new
       line = server.test_ready_signal_line("0.0.0.0", 8080)
-      line.should contain("url=http://0.0.0.0:8080")
+      line.should contain("url=http://localhost:8080")
     end
   end
 
@@ -2100,6 +2114,41 @@ describe "Builder incremental methods" do
         end
       end
     end
+
+    it "does not republish an edited asset of a draft bundle" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content", "posts", "secret"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+
+        File.write(File.join(dir, "config.toml"), <<-TOML
+          title = "Test"
+          base_url = "http://localhost"
+
+          [content.files]
+          allow_extensions = ["jpg"]
+          TOML
+        )
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "posts", "secret", "index.md"),
+          "+++\ntitle = \"S\"\ndraft = true\n+++\nx\n")
+        File.write(File.join(dir, "content", "posts", "secret", "product.jpg"), "OLD")
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new)
+
+          published = File.join(dir, "public", "posts", "secret", "product.jpg")
+          File.exists?(published).should be_false
+
+          File.write(File.join(dir, "content", "posts", "secret", "product.jpg"), "NEW")
+          builder.copy_changed_content_files(["content/posts/secret/product.jpg"], File.join(dir, "public"), false)
+
+          File.exists?(published).should be_false
+          builder.reject_withheld_content_sources(["content/posts/secret/product.jpg"]).should be_empty
+        end
+      end
+    end
   end
 
   describe "#run_incremental" do
@@ -3075,6 +3124,58 @@ describe "watcher symlink and non-regular entry handling" do
 end
 
 describe "bind failure handling" do
+  it "leaves the existing output untouched when the port is taken" do
+    Dir.mktmpdir do |project_dir|
+      Dir.cd(project_dir) do
+        File.write("config.toml", "title = \"Test\"\nbase_url = \"http://localhost:3000\"\n")
+        FileUtils.mkdir_p("content")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHello")
+        # Stands in for the running session's served tree: the cold initial
+        # build would wipe it.
+        FileUtils.mkdir_p("public")
+        File.write("public/live-session.html", "LIVE")
+
+        occupied = TCPServer.new("127.0.0.1", 0)
+        port = occupied.local_address.port
+        previous_io = Hwaro::Logger.io
+        Hwaro::Logger.io = IO::Memory.new
+        begin
+          expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Server.new.test_run_with_options(
+              "127.0.0.1", port, false, false, true, Hwaro::Config::Options::BuildOptions.new, false,
+            )
+          end
+          File.read("public/live-session.html").should eq("LIVE")
+          File.exists?("public/index.html").should be_false
+        ensure
+          Hwaro::Logger.io = previous_io
+          occupied.close
+        end
+      end
+    end
+  end
+
+  it "refuses a second session on the same output dir until the first releases it" do
+    Dir.mktmpdir do |dir|
+      out_dir = File.join(dir, ".hwaro", "serve")
+      first = Hwaro::Services::Server.new
+      first.test_acquire_output_lock(out_dir)
+      begin
+        err = expect_raises(Hwaro::HwaroError) do
+          Hwaro::Services::Server.new.test_acquire_output_lock(out_dir)
+        end
+        err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+        (err.message || "").should contain("already running")
+      ensure
+        first.test_release_output_lock
+      end
+
+      second = Hwaro::Services::Server.new
+      second.test_acquire_output_lock(out_dir)
+      second.test_release_output_lock
+    end
+  end
+
   it "raises HwaroError(HWARO_E_IO) when the port is already in use" do
     Dir.mktmpdir do |project_dir|
       Dir.cd(project_dir) do

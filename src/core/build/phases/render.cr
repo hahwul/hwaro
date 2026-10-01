@@ -16,6 +16,7 @@ require "./render/template_masking"
 require "./render/crinja_values"
 require "./render/global_vars"
 require "./render/asset_tags"
+require "./render/render_inputs"
 require "./render/template_variables"
 require "./render/seo_vars"
 

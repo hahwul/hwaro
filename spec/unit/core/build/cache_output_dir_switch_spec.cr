@@ -53,6 +53,32 @@ describe Hwaro::Core::Build::Cache do
     end
   end
 
+  describe "#tracks_output_dir?" do
+    it "is true only for a loaded cache last saved for that output directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          # No cache file at all.
+          Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json").tracks_output_dir?("public").should be_false
+
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.set_global_checksums("t", "c", output_dir: "public")
+          cache.save
+
+          reloaded = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          reloaded.tracks_output_dir?("public").should be_true
+          reloaded.tracks_output_dir?("./public/").should be_true
+          reloaded.tracks_output_dir?("dist").should be_false
+
+          # Corrupt and legacy-array files describe no output directory.
+          File.write("c.json", "{garbage")
+          Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json").tracks_output_dir?("public").should be_false
+          File.write("c.json", "[]")
+          Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json").tracks_output_dir?("public").should be_false
+        end
+      end
+    end
+  end
+
   describe "#set_global_checksums output-directory tracking" do
     it "invalidates every entry when the output directory changes" do
       Dir.mktmpdir do |dir|

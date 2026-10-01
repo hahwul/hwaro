@@ -35,11 +35,35 @@ module Hwaro::Core::Build::Phases::Generate
   # when no surviving page re-rendered — otherwise the sitemap/search index
   # would keep the removed URL until an unrelated edit.
   #
+  # Nor when the static copy wrote over one of the skippable outputs:
+  # Initialize copies `static/` before Generate runs, so a changed
+  # `static/sitemap.xml` (or search.json, llms.txt, a feed) replaced the
+  # generated file, and skipping the generator left the user's bytes
+  # published where a cold build lets the generated file win. Any other
+  # static edit keeps the skip.
+  #
   # The render phase uses the same predicate to decide whether cache-hit pages
   # need their `content` hydrated for the generators (see
   # `hydrate_cached_page_content`), so the two decisions cannot drift.
   def generate_outputs_unchanged?(ctx : Lifecycle::BuildContext) : Bool
-    ctx.options.cache && ctx.stats.pages_rendered == 0 && !ctx.page_or_section_set_changed
+    ctx.options.cache && ctx.stats.pages_rendered == 0 && !ctx.page_or_section_set_changed &&
+      !static_copy_over_skippable_output?(ctx)
+  end
+
+  # Did this build's static copy land on a file one of the skippable
+  # generators (sitemap, feeds, llms, search) publishes?
+  private def static_copy_over_skippable_output?(ctx : Lifecycle::BuildContext) : Bool
+    return false unless static_copies_recorded?
+    site = @site
+    return true unless site
+    config = site.config
+    output_dir = ctx.options.output_dir
+    cwd = Dir.current
+    outputs = Content::Seo::Sitemap.published_outputs(config, output_dir) +
+              Content::Seo::Llms.published_outputs(config, output_dir) +
+              Content::Search.published_outputs(config, output_dir) +
+              Content::Seo::Feeds.published_outputs(ctx.all_pages, config, output_dir)
+    outputs.any? { |path| static_copied_output?(path, cwd) }
   end
 
   # Sitemap, feeds, robots.txt and llms.txt. Public so `SeoHooks` can route

@@ -273,6 +273,27 @@ module Hwaro
         # address serve the previous snapshot's union.
         @listing_source_union_memo : String? = nil
         @listing_source_union_memo_key : Hash(String, String)? = nil
+        # Memo for `page_template_scan` (see Phases::Render): what a page's
+        # template closure — entry template, the shortcodes its content calls,
+        # its output-format templates — reads from other pages. Keyed by the
+        # closure roots; reset when the templates Hash itself is replaced
+        # (same `same?` rule as the listing-union memo). Read from render
+        # worker fibers via record_page_cache_entry, hence the mutex.
+        @page_template_scan_memo : Hash(String, Phases::Render::PageTemplateScan) = {} of String => Phases::Render::PageTemplateScan
+        @page_template_scan_memo_key : Hash(String, String)? = nil
+        @page_template_scan_mutex : Mutex = Mutex.new
+        # Shortcode templates a page's content calls, keyed by page path and
+        # validated against the raw_content String it was scanned from (a
+        # re-parse replaces that String, and a template reload the graph, so
+        # the entry self-invalidates).
+        @page_shortcodes_memo : Hash(String, {String, TemplateDeps, Set(String)}) = {} of String => {String, TemplateDeps, Set(String)}
+        # Relations hashes `filter_changed_pages` compared, by page path, for
+        # `record_page_cache_entry` to store. The BeforeRender hooks run in
+        # between and fill in page fields (the auto OG image path), so a
+        # hash recomputed at record time never matched the next build's
+        # filter-time one. Cleared after the render fan-out; guarded by
+        # @page_template_hash_mutex.
+        @filter_relations_hashes : Hash(String, String) = {} of String => String
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve
@@ -303,6 +324,11 @@ module Hwaro
         # full build and per incremental/rerender pass (see
         # compute_output_url_winners). Nil until the first render pass.
         @output_url_winners : Hash(String, String)? = nil
+        # Output file key (`PathUtils.output_file_key`) → path of the page
+        # that publishes its own HTML there, from the same pass. Generated
+        # writers (paginator, taxonomy pages) consult it so they never
+        # overwrite an authored page — see `page_output_owner`.
+        @page_output_files : Hash(String, String) = {} of String => String
         # Unresolved `@/` internal links collected during the render fan-out
         # when `[links] broken_internal = "error"` (each entry is a formatted
         # "source.md → @/target (reason)" line). Guarded by
@@ -329,6 +355,14 @@ module Hwaro
         # publishes (a superseded `main.<hash>.css`, the `amp/` tree after
         # `[amp]` is switched off). Empty on a process's first build.
         @previous_generated_claims : Set(String) = Set(String).new
+        # The claims above that a GENERATOR made — every claimer but the
+        # static copy (404.html, feeds, sitemap, robots, llms, the search
+        # index, taxonomy pages, raw content files, bundles). On a cold build
+        # each of them is written after `static/` is copied, so a static file
+        # at one of these paths loses; the serve static lane needs to know
+        # when an edit lands on one (see `copy_changed_static`). Reset with
+        # the claims; guarded by @generated_claims_mutex.
+        @generator_output_claims : Set(String) = Set(String).new
         # True while @generated_output_claims is the running full build's own
         # set (reset by the Initialize phase); false once an incremental serve
         # pass starts, which re-claims nothing — so the set then still names
@@ -342,6 +376,14 @@ module Hwaro
         # `path`, a permalink rule), drafted or turned `render = false` kept
         # its old file. Empty on a process's first build.
         @previous_page_outputs : Set(String) = Set(String).new
+        # Output files the pages an incremental serve pass re-parsed occupied
+        # BEFORE the re-parse, until that pass has pruned what they left. The
+        # re-parse moves the page model in place, so a pass that raises in
+        # between (a date-token permalink error) used to leave the old file
+        # behind for good: the recovering full build computes
+        # `@previous_page_outputs` from the MOVED model. Drained by the next
+        # pass that gets as far as pruning, or by the Finalize phase.
+        @unsettled_page_outputs : Set(String) = Set(String).new
         @generated_claims_mutex : Mutex = Mutex.new
         # Output files the static copy actually (re)wrote this build, in the
         # canonical absolute form `get_output_path` produces. `static/` is
@@ -408,6 +450,12 @@ module Hwaro
         # @generated_claims_mutex.
         @last_feed_outputs : Set(String)? = nil
         @taxonomy_pass_outputs : Set(String)? = nil
+        # Content-relative directories that host a bundle index (`index.md` /
+        # `_index.md`, any language) as READ — before draft/future/expiry
+        # filtering. A directory here whose index pages all failed the filter
+        # is a withheld bundle: its files must not publish through the raw
+        # lane either (see Phases::Write#withheld_content_file?).
+        @content_index_dirs : Set(String) = Set(String).new
 
         def initialize
           @lifecycle = Lifecycle::Manager.new
@@ -417,9 +465,14 @@ module Hwaro
         # Record an output file this build produced that no cache entry
         # covers. Public: the taxonomy generator is a module that reaches the
         # builder through its `builder:` argument.
-        def claim_generated_output(path : String) : Nil
+        #
+        # `static_copy` marks the Initialize phase's copy of `static/`: it is
+        # a claim like any other, but not a generator's (see
+        # `@generator_output_claims`).
+        def claim_generated_output(path : String, static_copy : Bool = false) : Nil
           @generated_claims_mutex.synchronize do
             @generated_output_claims << path
+            @generator_output_claims << path unless static_copy
             @taxonomy_pass_outputs.try(&.<<(path))
           end
         end
@@ -433,6 +486,7 @@ module Hwaro
           @generated_claims_mutex.synchronize do
             @previous_generated_claims = @generated_output_claims
             @generated_output_claims = Set(String).new
+            @generator_output_claims = Set(String).new
           end
           @generated_claims_current = true
         end
@@ -786,12 +840,20 @@ module Hwaro
             Logger.info "No content found. Add Markdown files under content/ before deploying, or run `hwaro new <path>.md` to scaffold one."
           end
 
+          # Human-readable reports (--profile, --debug) go to stderr under
+          # --json: stdout must carry exactly one JSON document, and these
+          # tables printed ahead of the build envelope made it unparseable.
+          # Through Logger's guarded streams: on a closed stdout (a serve whose
+          # reader went away) a raw STDOUT write failed the rebuild here, after
+          # the pages were written but before the post-build hooks.
+          report_io = CLI::Runner.json_mode? ? Logger.err_io : Logger.io
+
           # Print profiling report if enabled
-          profiler.report
-          profiler.template_report
-          profiler.markdown_report
-          profiler.asset_report
-          profiler.hook_report
+          profiler.report(report_io)
+          profiler.template_report(report_io)
+          profiler.markdown_report(report_io)
+          profiler.asset_report(report_io)
+          profiler.hook_report(report_io)
 
           # Print cache stats
           report_cache_stats(options.verbose)
@@ -805,7 +867,7 @@ module Hwaro
 
           if options.debug
             if debug_site = @site
-              Utils::DebugPrinter.print(debug_site)
+              Utils::DebugPrinter.print(debug_site, report_io)
             end
           end
 

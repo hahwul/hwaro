@@ -59,6 +59,17 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
   template chain renders that partial.
 - **Cascade fingerprint** — the merged section `[cascade]` values applied to
   the page, so editing a parent `_index.md` cascade rebuilds its descendants.
+- **Other pages it renders** — the prev/next neighbours, series list, related
+  posts, translations and breadcrumb ancestors the page's templates read, the
+  pages it fetches with a literal `get_page(path="…")`, and the URLs its `@/`
+  links resolve to. Retitling a post re-renders the pages whose "next" link
+  names it; changing a page's `slug` re-renders every page linking to it with
+  `@/`.
+- **Listings** — a page whose template closure loops over the page or section
+  set (`site.pages`, `paginate`, `get_section`, a `get_page` with a computed
+  path, …) re-renders when that set changes. The closure includes the
+  shortcode templates the page's content calls and its output-format
+  templates, so a `{{ recent() }}` shortcode listing posts counts too.
 - **Config checksum** — a hash of the effective merged config. A config
   change invalidates **all** entries.
 - **Render hooks** — a fingerprint of every configured `templates/hooks/render-*`
@@ -66,6 +77,12 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
   page's template closure. Since a hook isn't reached via a page's
   `{% include %}`/`{% extends %}` graph, editing one re-renders **every**
   page rather than a narrowed set.
+- **Template inputs** — what templates read outside the tracked files: the
+  fingerprinted `asset()` bundle names, the `[auto_includes]` tags and their
+  `?v=` digest, `env()` values, `load_data()` files outside `data/`, and the
+  source images behind `resize_image()`. A change to any of them re-renders
+  **all** pages. Only the variable names, file paths and a digest are stored in
+  `.hwaro_cache.json` — never an environment variable's value.
 
 Template dependency tracking requires every template reference to be a string
 literal. If any template uses a dynamic reference (`{% include some_var %}`),
@@ -92,14 +109,15 @@ The development server (`hwaro serve`) uses a more targeted incremental strategy
 | Change Type | Strategy |
 |-------------|----------|
 | Content files only | Re-parse and re-render only affected pages + neighbors, plus any listing page the edit changed (see below) |
-| Template files only | Re-render only pages whose template closure includes an edited template (all pages when tracking is off, the graph has dynamic references, or the edited file is under `templates/hooks/`) |
+| Template files only | Re-render only pages whose template closure includes an edited template (all pages when tracking is off, the graph has dynamic references, or the edited file is under `templates/hooks/`); a full rebuild when the edited file is a `[[content.generate]]` `body_template` or a partial it includes |
 | Config file | Full rebuild |
-| Static files only | Copy only changed files |
+| Static files only | Copy only changed files; a full rebuild when a file lands where the build writes a page or a generated file (`robots.txt`, a feed, a taxonomy page, an alias stub, …), feeds a cache-busting `?v=` hash, or is read by a literal `load_data()` path in a template |
 
 A **listing page** is one whose template closure renders a global set — the
 homepage's "latest posts" loop over `site.pages`, an archive, a paginated
 index, a nav built from `site.menus`, a tag pill resolved through
-`get_taxonomy_url()`. It owns none of the page you edited, so the selections
+`get_taxonomy_url()`, a footer printing `get_page(path="about.md").title`, a
+shortcode the page's content calls to loop over a section's pages. It owns none of the page you edited, so the selections
 above never reach it. Serve therefore fingerprints those sets either side of
 the rebuild and re-renders the listing pages whose set moved.
 
@@ -131,8 +149,11 @@ set `render = false`.
 Everything a removed page brought with it goes too: its `aliases` redirect
 stubs, its AMP mirror, its auto-generated OG image, the taxonomy term page of
 a tag nobody uses any more (with that term's feed), and the pagination page a
-section no longer fills. Turning a whole feature off — `[amp] enabled = false`
-— removes what it used to publish on the next build for the same reason.
+section no longer fills. Turning a whole feature off — `[amp] enabled = false`,
+`[og.auto_image] enabled = false`, `[image_processing] enabled = false`, or
+the `--skip-og-image` / `--skip-image-processing` flags — removes what it used
+to publish on the next build for the same reason, as does dropping a width
+from `[image_processing] widths`.
 
 Files that have a source but no cache entry are covered the same way, by
 recording what each build publishes and deleting what the next one no longer
@@ -141,6 +162,17 @@ page-bundle assets, and the fingerprinted asset bundles — so editing a
 stylesheet replaces `main.<hash>.css` instead of leaving every past revision
 in `public/assets/`.
 
+All of this relies on the cache remembering what it wrote. When it has no
+usable record of the output directory — no `.hwaro_cache.json` yet (the tree
+came from a plain `hwaro build`), a corrupt one, or one last used for a
+different `-o` — a `--cache` build clears the output directory first, exactly
+like a cold build (and under the same ownership rules), then records it. The
+cache remembers one output directory at a time, so alternating
+`hwaro build --cache` and `hwaro build --cache -o dist` rebuilds each tree from
+scratch on every switch. `hwaro serve --cache` keeps a separate cache (see
+below), so a serve session never costs the next `hwaro build --cache` its
+record of `public/`.
+
 A `--cache` build's output is therefore byte-identical to a clean build's, and
 `hwaro build --full` is not needed to clear anything. (`--full` only clears the
 cache, so it does nothing at all without `--cache`; a plain `hwaro build`
@@ -148,7 +180,10 @@ already rebuilds everything.)
 
 ## Cache File
 
-The cache is stored in `.hwaro_cache.json` at the project root. This file contains:
+The cache is stored in `.hwaro_cache.json` at the project root
+(`hwaro serve --cache` uses `.hwaro/serve_cache.json`, next to the
+`.hwaro/serve/` tree it describes; `.hwaro/` keeps itself out of version
+control). This file contains:
 
 - **Metadata** — template and config checksums from the last build
 - **Entries** — per-file records with path, mtime, content hash, and output path

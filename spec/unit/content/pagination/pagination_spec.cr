@@ -207,6 +207,26 @@ describe Hwaro::Content::Pagination::Paginator do
     result.per_page.should eq(5)
     result.paginated_pages.size.should eq(2)
   end
+
+  # A non-positive `paginate` is not a page size (pagination_gaps_spec covers
+  # it disabling pagination). When `pagination_enabled = true` forces such a
+  # section on, the global size applies instead of one item per page.
+  it "uses the global page size when pagination_enabled = true forces a paginate = 0 section on" do
+    config = Hwaro::Models::Config.new
+    config.pagination.per_page = 2
+
+    section = Hwaro::Models::Section.new("wiki/_index.md")
+    section.section = "wiki"
+    section.paginate = 0
+    section.pagination_enabled = true
+
+    pages = (1..3).map { |i| Hwaro::Models::Page.new("wiki/#{i}.md") }
+
+    result = Hwaro::Content::Pagination::Paginator.new(config).paginate(section, pages)
+    result.enabled.should be_true
+    result.per_page.should eq(2)
+    result.paginated_pages.size.should eq(2)
+  end
 end
 
 describe Hwaro::Content::Pagination::Renderer do

@@ -2896,6 +2896,13 @@ describe "Hwaro::Models::Config" do
       load_config("[og.auto_image]\npattern_scale = -3.0").og.auto_image.pattern_scale.should eq(0.1)
     end
 
+    it "strips leading and trailing slashes from [og.auto_image] output_dir" do
+      load_config("[og.auto_image]\noutput_dir = \"og/\"").og.auto_image.output_dir.should eq("og")
+      load_config("[og.auto_image]\noutput_dir = \"/og\"").og.auto_image.output_dir.should eq("og")
+      default = Hwaro::Models::Config.new.og.auto_image.output_dir
+      load_config("[og.auto_image]\noutput_dir = \"/\"").og.auto_image.output_dir.should eq(default)
+    end
+
     it "falls back to defaults for non-finite [og.auto_image] opacity values" do
       # TOML accepts `nan`/`inf` literals. NaN survives the renderer's
       # clamp(0.0, 1.0) (NaN comparisons are all false) and crashes the

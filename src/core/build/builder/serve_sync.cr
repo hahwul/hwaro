@@ -46,18 +46,21 @@ module Hwaro
         # Used by serve mode when only static files have changed.
         #
         # Returns true when one of the copies landed on a file a PAGE owns
-        # (`static/about/index.html` beside a page whose url is `/about/`).
-        # The static-only rebuild strategy re-renders nothing, so the static
+        # (`static/about/index.html` beside a page whose url is `/about/`) or
+        # a generator writes (`static/robots.txt`, `static/404.html`, a
+        # taxonomy page, an alias stub — see `generated_output_paths`). The
+        # static-only rebuild strategy re-renders nothing, so the static
         # bytes would sit on that URL for the rest of the session; the caller
-        # escalates to a full rebuild, where the render runs after the copy
-        # and the page wins — exactly the cold-build outcome.
+        # escalates to a full rebuild, where the render and the generators
+        # run after the copy and win — exactly the cold-build outcome.
         def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false) : Bool
           static_config = static_publish_config
           config = @config
           sass_on = config.try(&.sass.enabled) || false
           copied = 0
           cwd = Dir.current
-          page_outputs = owned_output_paths(output_dir).map { |path| File.expand_path(path, cwd) }.to_set
+          build_outputs = owned_output_paths(output_dir).map { |path| File.expand_path(path, cwd) }.to_set
+          generated_output_paths(output_dir).each { |path| build_outputs << File.expand_path(path, cwd) }
           shadowed = false
           changed_files.each do |src_path|
             # Same eligibility rule as the full build's collect_static_files
@@ -99,11 +102,34 @@ module Hwaro
             # render must not skip the page whose output this just replaced.
             canonical_dest = File.expand_path(dest_path, cwd)
             note_static_copy(canonical_dest)
-            shadowed ||= page_outputs.includes?(canonical_dest)
+            shadowed ||= build_outputs.includes?(canonical_dest)
             copied += 1
           end
           Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
           shadowed
+        end
+
+        # Every output file something other than a page's own render or the
+        # static copy writes: the generators' claims (404.html, feeds,
+        # sitemap, robots, llms, the search index, taxonomy pages, raw content
+        # files, bundles), the feeds and taxonomy files the last serve pass
+        # wrote, the PWA files, and the alias stubs / `/page/N/` pages page
+        # renders derived. A cold build writes all of them after copying
+        # `static/`, so a static file at one of these paths never wins there.
+        private def generated_output_paths(output_dir : String) : Array(String)
+          paths = [] of String
+          @generated_claims_mutex.synchronize do
+            paths.concat(@generator_output_claims)
+            @last_feed_outputs.try { |feeds| paths.concat(feeds) }
+            @last_taxonomy_outputs.try(&.each { |relative| paths << File.join(output_dir, relative) })
+          end
+          @page_derived_mutex.synchronize do
+            {@rendered_derived_outputs, @derived_outputs_this_pass, @page_derived_outputs}.each do |recorded|
+              recorded.each_value { |derived| paths.concat(derived) }
+            end
+          end
+          @config.try { |cfg| paths.concat(Content::Seo::Pwa.published_outputs(cfg, output_dir)) }
+          paths
         end
 
         # Recompile all SCSS entries into the output directory. Used by
@@ -185,6 +211,7 @@ module Hwaro
           end
 
           copied = 0
+          withheld = withheld_bundle_dirs
           changed_files.each do |src_path|
             next unless File.exists?(src_path)
             next if File.directory?(src_path)
@@ -192,6 +219,9 @@ module Hwaro
             relative = path_relative_to(src_path, "content")
 
             next unless config.content_files.publish?(relative)
+            # Same rule as the full build's raw lane: an edited asset of a
+            # draft / future / expired bundle stays unpublished.
+            next if withheld_content_file?(relative, withheld)
 
             dest_path = File.join(output_dir, relative)
             unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
@@ -205,6 +235,38 @@ module Hwaro
             copied += 1
           end
           Logger.outcome("copied", "#{copied} content #{copied == 1 ? "file" : "files"}") if copied > 0
+        end
+
+        # `content/` source paths minus the files of withheld (draft / future /
+        # expired) bundles — see Phases::Write#withheld_content_file?.
+        def reject_withheld_content_sources(paths : Array(String)) : Array(String)
+          withheld = withheld_bundle_dirs
+          return paths if withheld.empty?
+          paths.reject { |path| withheld_content_file?(path_relative_to(path, "content"), withheld) }
+        end
+
+        # `load_data(path="static/prices.json")` / `load_data("…")` with a
+        # literal path — the only form a template scan can resolve.
+        LOAD_DATA_LITERAL_RE = /\bload_data\s*\(\s*(?:path\s*=\s*)?(?:"([^"]+)"|'([^']+)')/
+
+        # True when a template reads one of `paths` (watcher paths such as
+        # `static/prices.json`) through a literal `load_data()` path. Files
+        # under `data/` take the full-rebuild lane already; one anywhere else
+        # rides the static or content-asset lane, which only copies it, so
+        # every page printing the data kept the pre-edit values. A path built
+        # at render time (`load_data(path=page.extra.file)`) is not seen.
+        def load_data_source_changed?(paths : Array(String)) : Bool
+          templates = @templates
+          return false if templates.nil? || paths.empty?
+          changed = paths.map { |path| Path[path].normalize.to_s }.to_set
+          templates.each_value do |source|
+            next unless source.includes?("load_data")
+            source.scan(LOAD_DATA_LITERAL_RE) do |match|
+              literal = match[1]? || match[2]? || ""
+              return true if changed.includes?(Path[literal].normalize.to_s)
+            end
+          end
+          false
         end
 
         # Map source paths that were removed from disk to the output files
@@ -539,7 +601,8 @@ module Hwaro
         private def content_source_publishes?(relative : String) : Bool
           config = @config
           return false unless config && config.content_files.enabled?
-          File.file?(File.join("content", relative)) && config.content_files.publish?(relative)
+          File.file?(File.join("content", relative)) && config.content_files.publish?(relative) &&
+            !withheld_content_file?(relative)
         end
 
         # Rewrite the `[amp]` mirrors of pages an incremental strategy just

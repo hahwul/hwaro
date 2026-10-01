@@ -70,6 +70,15 @@ module Hwaro
         )
         end
 
+        # `-b 0.0.0.0` / `-b ::` listen on every interface but are not an
+        # address anything can connect TO: as the derived base_url they put
+        # `http://0.0.0.0:3000/…` into every link, stylesheet and canonical
+        # (unconnectable on Windows, meaningless from another device). Like an
+        # empty host, they stand for "localhost" in URLs.
+        def self.wildcard_host?(host : String) : Bool
+          {"0.0.0.0", "::", "[::]"}.includes?(host.strip)
+        end
+
         # Host as it must appear inside a URL. An IPv6 literal has to be
         # bracketed (RFC 3986) — without this `hwaro serve -b ::1` produced
         # `http://::1:3000`, which no browser can resolve, and baked that
@@ -84,7 +93,7 @@ module Hwaro
           # (`[::1]` on macOS), so a hard-coded 127.0.0.1 would point at an
           # address nothing is listening on. "localhost" follows the same
           # resolution the bind did.
-          return "localhost" if host.blank?
+          return "localhost" if host.blank? || wildcard_host?(host)
           return host unless host.includes?(':')
           return host if host.starts_with?('[')
           # RFC 6874: a zone id's "%" separator must be percent-encoded inside

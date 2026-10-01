@@ -85,6 +85,12 @@ module Hwaro
       # The config `serve_build_options` loaded, kept so the watcher's root
       # resolution doesn't pay (and re-warn through) another load.
       @startup_config : Models::Config? = nil
+
+      # Held for the whole session: an exclusive lock on `<output_dir>.lock`
+      # (see `acquire_output_lock`). Every serve of a project builds into the
+      # same `ServeOptions::DEV_OUTPUT_DIR`, so a second session would wipe and
+      # rewrite the first one's tree with its own base_url and flags.
+      @output_lock : File? = nil
       # The stamps our own most recent hook-running build left on the watched
       # config files it rewrote WITHOUT changing a byte. Empty for the
       # overwhelmingly common build that touches no config at all. See
@@ -182,6 +188,9 @@ module Hwaro
       end
 
       def run(options : Config::Options::ServeOptions)
+        if options.base_url.nil? && Config::Options::ServeOptions.wildcard_host?(options.host)
+          Logger.info "Listening on all interfaces; links use localhost. To preview from another device, pass --base-url http://<this-machine's-ip>:#{options.port}"
+        end
         run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, serve_build_options(options), options.json, options.headers)
       end
 
@@ -232,6 +241,42 @@ module Hwaro
         # the charset-bearing types up.
         Server.register_utf8_mime_types
 
+        output_dir = sanitize_output_dir(build_options.output_dir)
+        # Lock, then bind, and only THEN build. The initial build is a cold
+        # one that wipes the output dir: when it ran first, a serve that was
+        # about to fail on a taken port (or a second session on another port)
+        # had already replaced the running session's pages with its own
+        # base_url and flags before it exited.
+        acquire_output_lock(output_dir)
+
+        # The static handler needs an existing root even when the initial
+        # build fails before creating one.
+        Hwaro::Utils::FileSafe.mkdir_p(output_dir)
+
+        # Path component of base_url, when the user pointed --base-url at a
+        # subpath. "" for the normal host:port-derived base_url.
+        #
+        # Derived from the options, NOT from `@builder.config`: a startup build
+        # that fails to load config (a TOML syntax error, say) leaves config
+        # nil, and the handler chain is assembled exactly once — so reading it
+        # there dropped the mount point for the whole session, and a later
+        # successful rebuild emitting `/prefix/`-linked pages could never get it
+        # back without a restart.
+        base_path = base_path_for(build_options.base_url)
+
+        handlers = build_handlers(output_dir, host, access_log, live_reload, headers, base_path)
+
+        # DevHTTPServer, not HTTP::Server: see the class comment — a malformed
+        # Content-Length must answer 400 instead of killing the connection
+        # fiber with a raw backtrace on the developer's terminal.
+        server = DevHTTPServer.new(handlers)
+
+        # Bind BEFORE the initial build and before any "Serving site at …" /
+        # "Live reload enabled" / "Watching for changes …" banner. Connections
+        # that arrive while the build runs wait in the OS backlog until
+        # `listen` starts accepting below.
+        bind_dev_server(server, host, port)
+
         # The initial build prints its own receipt; no preamble needed.
         #
         # A broken site at startup (template syntax error, failing hook)
@@ -273,9 +318,7 @@ module Hwaro
         # optimisation.
         watch_options.fast_start = false
 
-        output_dir = sanitize_output_dir(build_options.output_dir)
-        # The static handler needs an existing root even when the initial
-        # build failed before creating one.
+        # A failed initial build may have wiped the root without recreating it.
         Hwaro::Utils::FileSafe.mkdir_p(output_dir)
         # Stamp the served root as dev output no matter how the initial build
         # went — a build that failed before its Initialize phase completed
@@ -292,37 +335,11 @@ module Hwaro
         # by the first successful config-changed rebuild in that case.
         @startup_serve_config = @builder.config.try(&.serve)
 
-        # Path component of base_url, when the user pointed --base-url at a
-        # subpath. "" for the normal host:port-derived base_url.
-        #
-        # Derived from the options, NOT from `@builder.config`: a startup build
-        # that fails to load config (a TOML syntax error, say) leaves config
-        # nil, and the handler chain is assembled exactly once — so reading it
-        # there dropped the mount point for the whole session, and a later
-        # successful rebuild emitting `/prefix/`-linked pages could never get it
-        # back without a restart.
-        base_path = base_path_for(build_options.base_url)
-
-        handlers = build_handlers(output_dir, host, access_log, live_reload, headers, base_path)
-
         # Replay a startup failure to the first live-reload client(s) so the
         # browser shows the overlay instead of a bare 404/stale page.
         if msg = initial_error
           push_build_error(msg)
         end
-
-        # DevHTTPServer, not HTTP::Server: see the class comment — a malformed
-        # Content-Length must answer 400 instead of killing the connection
-        # fiber with a raw backtrace on the developer's terminal.
-        server = DevHTTPServer.new(handlers)
-
-        # Bind BEFORE emitting any "Serving site at …" / "Live reload
-        # enabled" / "Watching for changes …" banners. Previously those
-        # lines printed first and the watcher fiber was already spawned,
-        # so a port-conflict error produced misleading output that looked
-        # like the server was running before the final `Error: Could not
-        # bind …` line.
-        bind_dev_server(server, host, port)
 
         url = serve_url(host, port, base_path)
         # Calm serve receipt: where it's live, reload state, what's watched,
@@ -459,6 +476,44 @@ module Hwaro
           )
           raise classified
         end
+      ensure
+        release_output_lock
+      end
+
+      # Take the session's exclusive lock on `<output_dir>.lock`, refusing to
+      # start when another serve of the same project holds it. The lock file
+      # sits beside the output dir, not inside it: the cold build wipes the
+      # dir. The OS drops the lock when the process dies, so a crashed or
+      # SIGKILLed session never leaves a stale one behind.
+      protected def acquire_output_lock(output_dir : String) : Nil
+        lock_path = "#{output_dir}.lock"
+        Hwaro::Utils::FileSafe.mkdir_p(File.dirname(lock_path))
+        # "a", not "w": truncating a file another process holds locked fails
+        # on Windows before the lock is even tried.
+        file = File.open(lock_path, "a")
+        begin
+          file.flock_exclusive(blocking: false)
+        rescue ex : IO::Error
+          file.close
+          # Only contention means another session. A filesystem without
+          # locking (NFS without lockd, some FUSE/shared-folder mounts) must
+          # not stop serve from starting — it just runs unguarded.
+          unless ex.os_error.in?(Errno::EAGAIN, Errno::EWOULDBLOCK)
+            Logger.warn "Could not lock #{lock_path} (#{ex.message}); running without the one-session guard."
+            return
+          end
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Another 'hwaro serve' is already running for this project (it builds into #{output_dir})",
+            hint: "Stop the other session first, or open the site it is already serving.",
+          )
+        end
+        @output_lock = file
+      end
+
+      protected def release_output_lock : Nil
+        @output_lock.try(&.close)
+        @output_lock = nil
       end
 
       # Bind the dev server's listening socket, classifying every way that can
@@ -529,8 +584,28 @@ module Hwaro
         # that would break every route, so only "/"-rooted paths count.
         return "" unless path.starts_with?("/")
         path = path.rstrip("/")
-        path == "/" ? "" : path
+        return "" if path.empty?
+        # Percent-encoded the way browsers put it on the request line, which
+        # is what BasePathHandler compares against and what the Location /
+        # ready URLs must carry. `URI.parse` keeps the path exactly as
+        # written, so a `--base-url http://host/문서/` mount matched no
+        # request at all and redirected `/` to raw UTF-8 bytes. RFC 3986
+        # path characters stay as they are — browsers send `/c++/` raw, and
+        # encoding the `+` would 404 that mount. Decoding first keeps an
+        # already-encoded `/my%20blog` unchanged.
+        String.build do |io|
+          URI.decode(path).each_byte do |byte|
+            if byte < 0x80 && (byte.unsafe_chr.ascii_alphanumeric? || MOUNT_PATH_CHARS.includes?(byte.unsafe_chr))
+              io << byte.unsafe_chr
+            else
+              io << '%' << byte.to_s(16, upcase: true).rjust(2, '0')
+            end
+          end
+        end
       end
+
+      # RFC 3986 `pchar`s besides ALPHA / DIGIT, plus the segment separator.
+      MOUNT_PATH_CHARS = "-._~!$&'()*+,;=:@/"
 
       # Assemble the dev server's handler chain. Extracted from
       # `run_with_options` so specs can drive the real chain over a fixture
@@ -560,7 +635,14 @@ module Hwaro
         cors_hosts << host unless host.empty? || host == "0.0.0.0" || host == "::"
 
         handlers = [] of HTTP::Handler
-        handlers << HTTP::LogHandler.new if access_log
+        if access_log
+          # Same stdout and format as stdlib's default backend, but through
+          # Logger's guarded stream: written straight to STDOUT, every request
+          # after the reader went away printed an "Unhandled exception in
+          # spawn … Broken pipe" backtrace.
+          backend = ::Log::IOBackend.new(Logger::GuardedIO.new(STDOUT))
+          handlers << HTTP::LogHandler.new(::Log.new("http.server", backend, :info))
+        end
         # Dev cache-busting (see NoCacheHandler). A user-supplied
         # Cache-Control from [serve.headers]/--header wins outright.
         handlers << NoCacheHandler.new unless headers.keys.any? { |k| k.downcase == "cache-control" }
@@ -597,6 +679,7 @@ module Hwaro
         # on first request, then lets StaticFileHandler serve it from disk.
         # A no-op unless [og.auto_image] lazy_generate is enabled.
         handlers << OgLazyImageHandler.new(@builder, output_dir)
+        handlers << HeadBodyHandler.new
         handlers << HTTP::StaticFileHandler.new(output_dir, directory_listing: false, fallthrough: true)
         handlers << not_found
         handlers

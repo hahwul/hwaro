@@ -279,6 +279,24 @@ describe Hwaro::CLI::Commands::ServeCommand do
       options.headers["CSP"].should eq("default-src https://a.com")
     end
 
+    it "splits Name=Value at the '=' when the value holds a colon" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([
+        "--header", "X-Url=http://a.b/c",
+        "--header", "X-Spaced : v",
+      ])
+      options.headers["X-Url"].should eq("http://a.b/c")
+      options.headers["X-Spaced"].should eq("v")
+    end
+
+    it "rejects a header name that is not an RFC 9110 token" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      err = expect_raises(Hwaro::HwaroError) do
+        cmd.test_parse_options(["--header", "X(Bad): v"])
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+    end
+
     it "raises on invalid --header (empty key)" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       err = expect_raises(Hwaro::HwaroError) do

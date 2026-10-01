@@ -509,6 +509,51 @@ describe Hwaro::Content::Processors::Xml do
       result.content.should contain("<title>Test Feed</title>")
       result.content.should contain("<title>Entry 1</title>")
     end
+
+    it "keeps word-separating whitespace in mixed content" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<feed>\n  <t>Hello <b>bold</b>\n  <i>italic</i></t>\n</feed>"
+      result = processor.process(input, context)
+      result.content.should eq("<feed><t>Hello <b>bold</b>\n  <i>italic</i></t></feed>")
+    end
+
+    it "keeps whitespace under xml:space=\"preserve\" (and its descendants)" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<doc>\n  <pre xml:space=\"preserve\">\n    <a>x</a>\n    <b>y</b>\n  </pre>\n  <c>z</c>\n</doc>"
+      result = processor.process(input, context)
+      result.content.should eq("<doc><pre xml:space=\"preserve\">\n    <a>x</a>\n    <b>y</b>\n  </pre><c>z</c></doc>")
+    end
+
+    it "lets xml:space=\"default\" end an inherited preserve" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<doc xml:space=\"preserve\"><c xml:space=\"default\">\n  <d/>\n</c></doc>"
+      result = processor.process(input, context)
+      result.content.should eq("<doc xml:space=\"preserve\"><c xml:space=\"default\"><d/></c></doc>")
+    end
+
+    it "reads a '>' inside a quoted attribute as part of the tag" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<g>text<p><x a=\"1>2\"/></p>\n<q>word</q></g>"
+      result = processor.process(input, context)
+      result.content.should eq(input)
+    end
+
+    it "still removes indentation around comments in element-only content" do
+      processor = Hwaro::Content::Processors::Xml.new
+      context = Hwaro::Content::Processors::ProcessorContext.new
+
+      input = "<root>\n  <!-- note -->\n  <a>1</a>\n  <b>2</b>\n</root>"
+      result = processor.process(input, context)
+      result.content.should eq("<root>\n  <!-- note -->\n  <a>1</a><b>2</b></root>")
+    end
   end
 
   describe "registration" do

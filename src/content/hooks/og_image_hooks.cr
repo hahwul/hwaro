@@ -63,6 +63,13 @@ module Hwaro
             elapsed = (Time.instant - start).total_milliseconds
             p.record_asset_generation("og_image:generate", stats[:generated], stats[:skipped], elapsed)
           end
+
+          # No cache entry covers these files; claiming them is what lets the
+          # Finalize prune remove them from a kept output directory once auto
+          # images are switched off or skipped (see OgImage.published_outputs).
+          if builder = ctx.builder
+            Content::Seo::OgImage.published_outputs(site.config, ctx.output_dir).each { |path| builder.claim_generated_output(path) }
+          end
         end
       end
     end

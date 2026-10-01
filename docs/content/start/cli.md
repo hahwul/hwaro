@@ -381,7 +381,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --live-reload | Enable browser live reload on file changes (default: enabled; kept for backwards compatibility) |
 | --no-live-reload | Disable browser live reload on file changes |
 | --header "NAME: VALUE" | Add custom response header (repeatable). Merged with `[serve.headers]` from `config.toml` (CLI wins). Only affects `hwaro serve`. |
-| --cache | Enable build caching (skip unchanged files) |
+| --cache | Enable build caching (skip unchanged files); kept in `.hwaro/serve_cache.json`, separate from `hwaro build --cache` |
 | --stream | Enable streaming build to reduce memory usage |
 | --memory-limit SIZE | Memory limit for streaming build (e.g. `2G`, `512M`) |
 | --fast-start | Render homepage + latest N pages first, then background-render the rest |

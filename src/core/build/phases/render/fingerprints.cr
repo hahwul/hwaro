@@ -34,41 +34,200 @@ module Hwaro::Core::Build::Phases::Render
   LISTING_PAGE_MARKERS    = PAGE_SET_MARKERS - MENU_SET_MARKERS
   LISTING_SECTION_MARKERS = SECTION_SET_MARKERS - MENU_SET_MARKERS
 
-  # Which page-set projections one entry template's closure reads.
+  # `get_page(path="about.md")` reads ONE other page. With a literal path
+  # that page is known up front, so a reader depends on it alone (the
+  # per-page relations hash on `--cache`, the lookup projection in serve)
+  # rather than on the whole page set — a footer printing the about page's
+  # title sits in every page's closure. A call whose argument is not a
+  # literal can read any page, and only that falls back to the page-set gate.
+  GET_PAGE_CALL_RE    = /\bget_page\s*\(/
+  GET_PAGE_LITERAL_RE = /\bget_page\s*\(\s*(?:path\s*=\s*)?(?:"([^"]*)"|'([^']*)')\s*\)/
+
+  # Which page-set projections one page's template closure reads.
   record ListingSetDeps,
     page : Bool,
     section : Bool,
     menu : Bool,
-    taxonomy_slug : Bool
+    taxonomy_slug : Bool,
+    lookup : Bool
 
-  # Per-entry-template projection scan for the serve fan-out. Same closure
-  # (and same tracking-off fallback) as `listing_template_deps`, split by
-  # projection — see the marker constants above.
-  private def listing_set_deps(entry_template : String, templates : Hash(String, String)) : ListingSetDeps
-    blob = listing_closure_blob(entry_template, templates)
+  # Projection scan of one closure source blob for the serve fan-out. Same
+  # closure (and same tracking-off fallback) as `listing_template_deps`,
+  # split by projection — see the marker constants above.
+  private def listing_set_deps_for(blob : String) : ListingSetDeps
     ListingSetDeps.new(
       page: LISTING_PAGE_MARKERS.any? do |marker|
         marker == "get_taxonomy" ? GET_TAXONOMY_RE.matches?(blob) : blob.includes?(marker)
-      end,
+      end || dynamic_get_page?(blob),
       section: LISTING_SECTION_MARKERS.any? { |marker| blob.includes?(marker) },
       menu: MENU_SET_MARKERS.any? { |marker| blob.includes?(marker) },
       taxonomy_slug: blob.includes?(TAXONOMY_URL_MARKER),
+      lookup: !get_page_targets(blob).empty?,
     )
   end
 
   private def listing_closure_blob(entry_template : String, templates : Hash(String, String)) : String
-    sources = if deps = @template_deps
-                deps.closure(entry_template).compact_map { |n| templates[n]? }
-              else
-                templates.values
-              end
-    sources.join("\n")
+    closure_blob([entry_template], templates)
+  end
+
+  # Source union of the closures of `roots`. With dependency tracking off,
+  # every template.
+  private def closure_blob(roots : Enumerable(String), templates : Hash(String, String)) : String
+    deps = @template_deps
+    return templates.values.join("\n") unless deps
+    names = Set(String).new
+    roots.each { |root| names.concat(deps.closure(root)) }
+    names.compact_map { |n| templates[n]? }.join("\n")
+  end
+
+  # A `get_page` call whose argument is not a string literal: it can read
+  # any page, so its template depends on the whole page set.
+  private def dynamic_get_page?(blob : String) : Bool
+    return false unless blob.includes?("get_page")
+    blob.scan(GET_PAGE_CALL_RE).size > blob.scan(GET_PAGE_LITERAL_RE).size
+  end
+
+  # The literal `get_page` paths in a closure blob, sorted and unique.
+  private def get_page_targets(blob : String) : Array(String)
+    return [] of String unless blob.includes?("get_page")
+    targets = [] of String
+    blob.scan(GET_PAGE_LITERAL_RE) { |m| targets << (m[1]? || m[2]? || "") }
+    targets.uniq!.sort!
+  end
+
+  # Template reads of a page's RELATIONS — values `build_template_variables`
+  # takes from OTHER pages for this one: prev/next (`page.lower`/`.higher`),
+  # the series list and position, related posts, the translation switcher
+  # (`page.translations`, and the hreflang tags built from it) and the
+  # breadcrumb (`page.ancestors`, and the JSON-LD breadcrumb built from it).
+  # `.lower` is matched as an attribute so the `| lower` filter is not one.
+  RELATION_NEIGHBOR_RE         = /\.(?:lower|higher)\b|\[\s*["'](?:lower|higher)["']\s*\]/
+  RELATION_SERIES_MARKERS      = ["series_pages", "series_index"]
+  RELATION_RELATED_MARKER      = "related_posts"
+  RELATION_TRANSLATION_MARKERS = ["translations", "hreflang"]
+  RELATION_ANCESTOR_MARKERS    = ["ancestors", "jsonld"]
+
+  # `@/path.md` internal links in raw content (Markdown destination, raw
+  # `href="@/…"`, reference definition). Stops where the resolver's own
+  # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters.
+  INTERNAL_LINK_TARGET_RE = /@\/([^\s()"'#?<>\[\]]+)/
+
+  # A content-derived field or `[extra]` read straight off a relation —
+  # `page.higher.summary`, `get_page(path="x").extra.badge` — where the
+  # receiver is an attribute or a call result, so the `<receiver>.<field>`
+  # patterns above (which need a bare word receiver) cannot see it.
+  CHAINED_CONTENT_DERIVED_RE = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*(?:summary(?:_truncated)?|word_count|reading_time)\b|\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["'])/
+  CHAINED_EXTRA_RE           = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*extra\b|\[\s*["']extra["'])/
+
+  # Which relations one page's template closure reads (see the markers above),
+  # and which optional page fields it reads off them (`fields`).
+  record RelationDeps,
+    neighbors : Bool,
+    series : Bool,
+    related : Bool,
+    translations : Bool,
+    ancestors : Bool,
+    get_page_targets : Array(String),
+    fields : Builder::ListingPageFields do
+    def reads_any? : Bool
+      neighbors || series || related || translations || ancestors || !get_page_targets.empty?
+    end
+  end
+
+  # Everything the cache and the serve fan-out want to know about what a
+  # page's templates read from other pages, from one closure scan.
+  record PageTemplateScan,
+    page_set : Bool,
+    section_set : Bool,
+    listing : ListingSetDeps,
+    relations : RelationDeps
+
+  # Scan the closure a page actually renders through: its entry template,
+  # the shortcode templates its content calls (a shortcode renders with the
+  # page's full context, so a `recent()` shortcode looping `site.pages` is a
+  # listing as much as a template loop is), and its output-format templates.
+  # Scanning the entry template alone missed both. Memoized by those roots.
+  protected def page_template_scan(page : Models::Page, templates : Hash(String, String), site : Models::Site) : PageTemplateScan
+    roots = [determine_template(page, templates, site)]
+    page_shortcode_templates(page).to_a.sort!.each { |sc| roots << sc }
+    effective_output_formats(page, site.config).each do |fmt|
+      roots << determine_format_template(page, fmt, templates, site)
+    end
+    key = roots.join('|')
+
+    @page_template_scan_mutex.synchronize do
+      unless @page_template_scan_memo_key.same?(templates)
+        @page_template_scan_memo.clear
+        @page_template_scan_memo_key = templates
+      end
+      if cached = @page_template_scan_memo[key]?
+        return cached
+      end
+    end
+
+    blob = closure_blob(roots, templates)
+    page_dep, section_dep = listing_set_flags(blob)
+    scan = PageTemplateScan.new(
+      page_set: page_dep,
+      section_set: section_dep,
+      listing: listing_set_deps_for(blob),
+      relations: RelationDeps.new(
+        neighbors: blob.matches?(RELATION_NEIGHBOR_RE),
+        series: RELATION_SERIES_MARKERS.any? { |m| blob.includes?(m) },
+        related: blob.includes?(RELATION_RELATED_MARKER),
+        translations: RELATION_TRANSLATION_MARKERS.any? { |m| blob.includes?(m) },
+        ancestors: RELATION_ANCESTOR_MARKERS.any? { |m| blob.includes?(m) },
+        get_page_targets: get_page_targets(blob),
+        fields: relation_page_fields(blob),
+      ),
+    )
+    @page_template_scan_mutex.synchronize do
+      @page_template_scan_memo[key] = scan if @page_template_scan_memo_key.same?(templates)
+    end
+    scan
+  end
+
+  # The optional page fields (`[extra]`, excerpt/word count/reading time) a
+  # closure reads off a page OTHER than the one it renders. Same receiver
+  # rules as the listing union (see `reads_other_page_field?`), plus the
+  # chained reads off a relation. Folding them unconditionally made a body
+  # edit — which moves only the content-derived fields — re-render every
+  # neighbour, and a section body edit every page under it.
+  private def relation_page_fields(blob : String) : Builder::ListingPageFields
+    rebound = blob.matches?(REBINDS_SELF_RE)
+    Builder::ListingPageFields.new(
+      extra: blob.matches?(CHAINED_EXTRA_RE) ||
+             reads_other_page_field?(blob, EXTRA_ATTR_RE, EXTRA_INDEX_RE, EXTRA_ARG_RE, rebound),
+      content_derived: blob.matches?(CHAINED_CONTENT_DERIVED_RE) ||
+                       reads_other_page_field?(blob, CONTENT_DERIVED_ATTR_RE,
+                         CONTENT_DERIVED_INDEX_RE, CONTENT_DERIVED_ARG_RE, rebound),
+    )
+  end
+
+  # Shortcode templates (`shortcodes/<name>`) the page's content calls.
+  # Empty without a dependency graph — the closure scan then reads every
+  # template anyway.
+  private def page_shortcode_templates(page : Models::Page) : Set(String)
+    deps = @template_deps
+    return Set(String).new unless deps
+    raw = page.raw_content
+    @page_template_hash_mutex.synchronize do
+      if (memo = @page_shortcodes_memo[page.path]?) && memo[0].same?(raw) && memo[1].same?(deps)
+        return memo[2]
+      end
+    end
+    used = deps.shortcodes_used_in(raw)
+    @page_template_hash_mutex.synchronize { @page_shortcodes_memo[page.path] = {raw, deps, used} }
+    used
   end
 
   private def filter_changed_pages(pages : Array(Models::Page), output_dir : String, cache : Cache, templates : Hash(String, String), site : Models::Site, page_set_fp : String = "", section_set_fp : String = "") : Array(Models::Page)
     page_set_changed = cache.page_set_changed?(page_set_fp)
     section_set_changed = cache.section_set_changed?(section_set_fp)
-    listing_memo = {} of String => Tuple(Bool, Bool)
+    # `@/` link targets resolve against every page and section, exactly as
+    # the render's InternalLinkResolver pass does.
+    link_targets = build_pages_by_path(site)
+    clear_filter_relations_hashes
     # Resolved once for the static-collision gate below; nil (the common warm
     # build, where no static file changed) skips the gate entirely.
     static_cwd = static_copies_recorded? ? Dir.current : nil
@@ -79,6 +238,9 @@ module Hwaro::Core::Build::Phases::Render
       next true if page.synthesized?
       source_path, output_path = cache_paths_for(page, output_dir)
       fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
+      # Taken for every page, including the ones a gate below re-renders
+      # regardless, so each recorded entry carries the comparison-time value.
+      relations_hash = filter_relations_hash(page, templates, site, link_targets)
       # The static copy in the Initialize phase wrote a file this page owns (a
       # `static/` path that collides with the page's URL). A cold build lets
       # the render overwrite it; skipping the page here left the static bytes
@@ -94,12 +256,12 @@ module Hwaro::Core::Build::Phases::Render
         next true if fmt_paths.any? { |path| static_copied_output?(path, cwd) }
         next true if cache.derived_paths_for(source_path).any? { |path| static_copied_output?(path, cwd) }
       end
-      next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page))
+      next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), relations_hash: relations_hash)
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
       next false unless page_set_changed || section_set_changed
-      entry = determine_template(page, templates, site)
-      pdep, sdep = (listing_memo[entry]? || (listing_memo[entry] = listing_template_deps(entry, templates)))
+      scan = page_template_scan(page, templates, site)
+      pdep, sdep = scan.page_set, scan.section_set
       # A section index renders its section's page list even via {{ section.list }}
       # (no template marker), so treat every Section as page-set dependent.
       # That list also carries its child SECTIONS (and `section.subsections`
@@ -115,8 +277,12 @@ module Hwaro::Core::Build::Phases::Render
   # Returns {depends_on_page_set, depends_on_section_set}. With dependency
   # tracking off, conservatively scans all templates.
   private def listing_template_deps(entry_template : String, templates : Hash(String, String)) : Tuple(Bool, Bool)
-    blob = listing_closure_blob(entry_template, templates)
-    {PAGE_SET_MARKERS.any? { |m| blob.includes?(m) }, SECTION_SET_MARKERS.any? { |m| blob.includes?(m) }}
+    listing_set_flags(listing_closure_blob(entry_template, templates))
+  end
+
+  private def listing_set_flags(blob : String) : Tuple(Bool, Bool)
+    {PAGE_SET_MARKERS.any? { |m| blob.includes?(m) } || dynamic_get_page?(blob),
+     SECTION_SET_MARKERS.any? { |m| blob.includes?(m) }}
   end
 
   # Receivers that name the CURRENT page (or site-level config), never
@@ -181,9 +347,8 @@ module Hwaro::Core::Build::Phases::Render
       # Tracking off: listing_template_deps already scans every template, so
       # a page-set marker anywhere makes the whole set the listing surface.
       blob = templates.values.join("\n")
-      relevant = PAGE_SET_MARKERS.any? { |m| blob.includes?(m) } ||
-                 SECTION_SET_MARKERS.any? { |m| blob.includes?(m) }
-      return relevant ? blob : ""
+      page_dep, section_dep = listing_set_flags(blob)
+      return (page_dep || section_dep) ? blob : ""
     end
 
     seen = Set(String).new
@@ -279,56 +444,60 @@ module Hwaro::Core::Build::Phases::Render
   # every listing.
   private def compute_page_set_fingerprint(pages : Array(Models::Page), fields : Builder::ListingPageFields) : String
     digest = Digest::MD5.new
-    pages.each do |p|
-      fp_value(digest, p.path)
-      fp_value(digest, p.url)
-      fp_value(digest, p.title)
-      fp_value(digest, p.description || "")
-      fp_value(digest, (p.date.try(&.to_unix) || 0_i64).to_s)
-      fp_value(digest, (p.updated.try(&.to_unix) || 0_i64).to_s)
-      fp_value(digest, p.weight.to_s)
-      fp_value(digest, p.draft ? "1" : "0")
-      # `render` decides whether the page writes a file at all, and a page
-      # turning `render = false` renders NOTHING — so `pages_rendered` stays 0
-      # and `generate_outputs_unchanged?` skipped the SEO pass, leaving the
-      # page in sitemap.xml / rss.xml / search.json / llms.txt until an
-      # unrelated edit. It belongs to the set's identity for the same reason
-      # `draft` does.
-      fp_value(digest, p.render ? "1" : "0")
-      fp_value(digest, p.toc ? "1" : "0")
-      fp_value(digest, p.section)
-      fp_value(digest, p.image || "")
-      fp_value(digest, p.series || "")
-      fp_list(digest, p.authors)
-      fp_list(digest, p.tags)
-      fp_list(digest, p.assets.sort)
-      # Listings can read `p.git.*` directly (not only the `updated` it feeds),
-      # so a new commit must move the set fingerprint; folded only when
-      # present so disabled sites keep their pre-feature digest.
-      fp_value(digest, page_git_hash(p)) if p.git
-      fp_value(digest, "t#{p.taxonomies.size}")
-      p.taxonomies.keys.sort!.each do |k|
-        fp_value(digest, k)
-        fp_list(digest, p.taxonomies[k])
-      end
-      fp_menus(digest, p.menus)
-      # Version membership drives `version_links` on OTHER pages (a new
-      # counterpart flips `exists`), so it is part of the set identity.
-      # Only emitted on versioned sites — unversioned fingerprints stay
-      # byte-identical to previous releases.
-      if version = p.version
-        fp_value(digest, "v:#{version.name}")
-      end
-      fp_value(digest, extra_fp(p.extra)) if fields.extra
-      if fields.content_derived
-        fp_value(digest, p.summary || "")
-        fp_value(digest, p.auto_summary || "")
-        fp_value(digest, p.summary_truncated ? "1" : "0")
-        fp_value(digest, p.word_count.to_s)
-        fp_value(digest, p.reading_time.to_s)
-      end
-    end
+    pages.each { |p| fp_page(digest, p, fields) }
     digest.final.hexstring
+  end
+
+  # One page's contribution to the page-set fingerprint — also how the
+  # relations hash folds each page another page renders a piece of.
+  private def fp_page(digest : ::Digest, p : Models::Page, fields : Builder::ListingPageFields) : Nil
+    fp_value(digest, p.path)
+    fp_value(digest, p.url)
+    fp_value(digest, p.title)
+    fp_value(digest, p.description || "")
+    fp_value(digest, (p.date.try(&.to_unix) || 0_i64).to_s)
+    fp_value(digest, (p.updated.try(&.to_unix) || 0_i64).to_s)
+    fp_value(digest, p.weight.to_s)
+    fp_value(digest, p.draft ? "1" : "0")
+    # `render` decides whether the page writes a file at all, and a page
+    # turning `render = false` renders NOTHING — so `pages_rendered` stays 0
+    # and `generate_outputs_unchanged?` skipped the SEO pass, leaving the
+    # page in sitemap.xml / rss.xml / search.json / llms.txt until an
+    # unrelated edit. It belongs to the set's identity for the same reason
+    # `draft` does.
+    fp_value(digest, p.render ? "1" : "0")
+    fp_value(digest, p.toc ? "1" : "0")
+    fp_value(digest, p.section)
+    fp_value(digest, p.image || "")
+    fp_value(digest, p.series || "")
+    fp_list(digest, p.authors)
+    fp_list(digest, p.tags)
+    fp_list(digest, p.assets.sort)
+    # Listings can read `p.git.*` directly (not only the `updated` it feeds),
+    # so a new commit must move the set fingerprint; folded only when
+    # present so disabled sites keep their pre-feature digest.
+    fp_value(digest, page_git_hash(p)) if p.git
+    fp_value(digest, "t#{p.taxonomies.size}")
+    p.taxonomies.keys.sort!.each do |k|
+      fp_value(digest, k)
+      fp_list(digest, p.taxonomies[k])
+    end
+    fp_menus(digest, p.menus)
+    # Version membership drives `version_links` on OTHER pages (a new
+    # counterpart flips `exists`), so it is part of the set identity.
+    # Only emitted on versioned sites — unversioned fingerprints stay
+    # byte-identical to previous releases.
+    if version = p.version
+      fp_value(digest, "v:#{version.name}")
+    end
+    fp_value(digest, extra_fp(p.extra)) if fields.extra
+    if fields.content_derived
+      fp_value(digest, p.summary || "")
+      fp_value(digest, p.auto_summary || "")
+      fp_value(digest, p.summary_truncated ? "1" : "0")
+      fp_value(digest, p.word_count.to_s)
+      fp_value(digest, p.reading_time.to_s)
+    end
   end
 
   # Fingerprint the section set — the metadata nav/menus and section-set
@@ -461,7 +630,7 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     entry_template = determine_template(page, templates, site)
-    hash = deps.closure_hash(entry_template, deps.shortcodes_used_in(page.raw_content))
+    hash = deps.closure_hash(entry_template, page_shortcode_templates(page))
 
     # Fold each enabled output format's own template closure into the hash so
     # editing e.g. templates/page.json.jinja invalidates the pages that
@@ -520,7 +689,137 @@ module Hwaro::Core::Build::Phases::Render
     # up-to-date would let filter_changed_pages skip it forever.
     return unless output_path
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
-    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), derived_paths: derived)
+    relations_hash = @page_template_hash_mutex.synchronize { @filter_relations_hashes.delete(page.path) } ||
+                     page_relations_hash(page, templates, site, @pages_by_path || build_pages_by_path(site))
+    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), derived_paths: derived, relations_hash: relations_hash)
+  end
+
+  # `page_relations_hash` as of the cache comparison, remembered so the
+  # entry recorded after the render stores the same value the next build's
+  # comparison computes (see @filter_relations_hashes).
+  private def filter_relations_hash(page : Models::Page, templates : Hash(String, String), site : Models::Site, link_targets : Hash(String, Models::Page)) : String
+    hash = page_relations_hash(page, templates, site, link_targets)
+    @page_template_hash_mutex.synchronize { @filter_relations_hashes[page.path] = hash }
+    hash
+  end
+
+  # Drop the hashes of pages the render skipped, so a later serve rebuild
+  # of one cannot record a value from this earlier pass.
+  private def clear_filter_relations_hashes : Nil
+    @page_template_hash_mutex.synchronize { @filter_relations_hashes.clear }
+  end
+
+  # Fingerprint of what this page renders from OTHER pages (see
+  # CacheEntry#relations_hash). "" when it renders nothing of them, so such
+  # pages compare equal to legacy entries.
+  #
+  # Only the relations the page's template closure actually reads are
+  # folded, and of each related page only what the closure can print: the
+  # page-set fields, plus `[extra]`/excerpts when the closure reads them off
+  # another page (RelationDeps#fields), and for ancestors just the title and
+  # URL a breadcrumb shows. A template without `page.lower` must not
+  # re-render because a neighbour was retitled, and one printing only
+  # neighbour titles must not re-render because a neighbour's body changed. `@/` links are folded from the content itself,
+  # target path plus the URL it resolves to ("" while unresolved, so the
+  # page also re-renders once the missing target appears).
+  protected def page_relations_hash(page : Models::Page, templates : Hash(String, String), site : Models::Site, link_targets : Hash(String, Models::Page)) : String
+    rel = page_template_scan(page, templates, site).relations
+    links = internal_link_targets(page)
+    return "" if !rel.reads_any? && links.empty?
+
+    digest = Digest::MD5.new
+    if rel.neighbors
+      fp_value(digest, "n")
+      fp_relation(digest, page.lower, rel.fields)
+      fp_relation(digest, page.higher, rel.fields)
+    end
+    if rel.series
+      fp_value(digest, "s#{page.series_index}")
+      fp_value(digest, "a#{page.series_pages.size}")
+      page.series_pages.each { |p| fp_relation(digest, p, rel.fields) }
+    end
+    if rel.related
+      fp_value(digest, "r#{page.related_posts.size}")
+      page.related_posts.each { |p| fp_relation(digest, p, rel.fields) }
+    end
+    if rel.translations
+      fp_value(digest, "t#{page.translations.size}")
+      page.translations.each do |t|
+        fp_value(digest, t.code)
+        fp_value(digest, t.url)
+        fp_value(digest, t.title)
+        fp_value(digest, t.is_current ? "1" : "0")
+        fp_value(digest, t.is_default ? "1" : "0")
+      end
+    end
+    if rel.ancestors
+      fp_value(digest, "c#{page.ancestors.size}")
+      # `page.ancestors` and the JSON-LD breadcrumb expose nothing but each
+      # ancestor's title and URL (build_ancestors_crinja).
+      page.ancestors.each do |a|
+        fp_value(digest, a.path)
+        fp_value(digest, a.url)
+        fp_value(digest, a.title)
+      end
+    end
+    unless rel.get_page_targets.empty?
+      fp_value(digest, "g#{rel.get_page_targets.size}")
+      rel.get_page_targets.each do |target|
+        fp_value(digest, target)
+        fp_relation(digest, resolve_get_page_target(target, site), rel.fields)
+      end
+    end
+    unless links.empty?
+      fp_value(digest, "l#{links.size}")
+      links.each do |target|
+        fp_value(digest, target)
+        fp_value(digest, link_targets[target]?.try(&.url) || "")
+      end
+    end
+    digest.final.hexstring
+  end
+
+  # Fingerprint the LOOKUP projection for the serve fan-out: the pages the
+  # site's literal `get_page(path=...)` calls return (see GET_PAGE_LITERAL_RE).
+  # "" when no template makes one. `fields` as for the relations hash.
+  private def compute_get_page_lookup_fingerprint(site : Models::Site, targets : Array(String), fields : Builder::ListingPageFields) : String
+    return "" if targets.empty?
+    digest = Digest::MD5.new
+    targets.each do |target|
+      fp_value(digest, target)
+      fp_relation(digest, resolve_get_page_target(target, site), fields)
+    end
+    digest.final.hexstring
+  end
+
+  private def fp_relation(digest : ::Digest, page : Models::Page?, fields : Builder::ListingPageFields) : Nil
+    unless page
+      fp_value(digest, "-")
+      return
+    end
+    fp_value(digest, "+")
+    fp_page(digest, page, fields)
+    fp_value(digest, page.language || "")
+  end
+
+  # The page `get_page(path: target)` returns — same lookup order as the
+  # template function (content path, URL, URL without its trailing slash,
+  # then `/<path minus .md>/`), over `site.pages` only.
+  private def resolve_get_page_target(target : String, site : Models::Site) : Models::Page?
+    site.pages.find { |p| p.path == target || p.url == target || (p.url.size > 1 && p.url.ends_with?('/') && p.url.rstrip('/') == target) } ||
+      begin
+        alt = "/#{target.chomp(".markdown").chomp(".md")}/"
+        site.pages.find { |p| p.path == alt || p.url == alt }
+      end
+  end
+
+  # The `@/` link targets in a page's raw content, sorted and unique.
+  private def internal_link_targets(page : Models::Page) : Array(String)
+    raw = page.raw_content
+    return [] of String unless Utils::ByteScan.includes?(raw, "@/")
+    targets = [] of String
+    raw.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << m[1] }
+    targets.uniq!.sort!
   end
 
   # Fingerprint of the page's `[git]` metadata (see CacheEntry#git_hash):

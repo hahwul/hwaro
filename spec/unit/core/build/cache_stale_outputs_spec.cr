@@ -47,6 +47,15 @@ private def cached_build
   builder
 end
 
+private def stale_flag_build(skip_og_image : Bool = false, skip_image_processing : Bool = false)
+  builder = Hwaro::Core::Build::Builder.new
+  Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+  builder.run(Hwaro::Config::Options::BuildOptions.new(
+    output_dir: "public", parallel: false, cache: true, highlight: false,
+    skip_og_image: skip_og_image, skip_image_processing: skip_image_processing,
+  )).should be_true
+end
+
 class Hwaro::Core::Build::Builder
   def run_delete_orphaned_outputs(paths : Array(String), output_dir : String)
     delete_orphaned_outputs(paths, output_dir)
@@ -154,6 +163,22 @@ describe "warm --cache builds" do
     end
   end
 
+  it "regenerates a deleted alias stub and pagination page" do
+    with_cached_site do
+      File.write("config.toml", File.read("config.toml") + "\n[pagination]\nenabled = true\nper_page = 1\n")
+      cached_build
+      File.exists?("public/legacy/index.html").should be_true
+      File.exists?("public/posts/page/2/index.html").should be_true
+
+      FileUtils.rm_rf("public/legacy")
+      FileUtils.rm_rf("public/posts/page/2")
+      cached_build
+
+      File.exists?("public/legacy/index.html").should be_true
+      File.exists?("public/posts/page/2/index.html").should be_true
+    end
+  end
+
   it "removes the AMP mirror of a deleted page" do
     with_cached_site do
       File.write("config.toml", File.read("config.toml") + "\n[amp]\nenabled = true\n")
@@ -221,6 +246,58 @@ describe "warm --cache builds" do
 
       Dir.glob("public/og-images/posts-gone.*").should be_empty
       Dir.glob("public/og-images/posts-keep.*").should_not be_empty
+    end
+  end
+
+  # Switching a generator off (or skipping it by flag) never reaches its own
+  # manifest prune, so the claims diff in Finalize has to remove its files.
+  describe "generated images once the feature stops running" do
+    it "removes auto-generated OG images when auto images are disabled" do
+      with_cached_site do
+        base = File.read("config.toml")
+        File.write("config.toml", base + "\n[og.auto_image]\nenabled = true\n")
+        cached_build
+        Dir.glob("public/og-images/*").should_not be_empty
+
+        File.write("config.toml", base + "\n[og.auto_image]\nenabled = false\n")
+        cached_build
+        Dir.glob("public/og-images/{*,.*}").should be_empty
+      end
+    end
+
+    it "removes auto-generated OG images under --skip-og-image" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") + "\n[og.auto_image]\nenabled = true\n")
+        cached_build
+        Dir.glob("public/og-images/*").should_not be_empty
+
+        stale_flag_build(skip_og_image: true)
+        Dir.glob("public/og-images/{*,.*}").should be_empty
+      end
+    end
+
+    it "removes responsive image variants when processing is disabled or skipped" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        pixels = Bytes.new(64 * 64 * 3, 128_u8)
+        LibStb.stbi_write_png("static/pic.png", 64, 64, 3, pixels.to_unsafe.as(Void*), 64 * 3)
+        base = File.read("config.toml")
+        File.write("config.toml", base + "\n[image_processing]\nenabled = true\nwidths = [16, 32]\n")
+        cached_build
+        File.exists?("public/pic_16w.png").should be_true
+        File.exists?("public/pic_32w.png").should be_true
+
+        # A width that left `widths` goes on its own…
+        File.write("config.toml", base + "\n[image_processing]\nenabled = true\nwidths = [16]\n")
+        cached_build
+        File.exists?("public/pic_16w.png").should be_true
+        File.exists?("public/pic_32w.png").should be_false
+
+        # …and so does everything once processing is skipped.
+        stale_flag_build(skip_image_processing: true)
+        File.exists?("public/pic_16w.png").should be_false
+        File.exists?("public/pic.png").should be_true
+      end
     end
   end
 
@@ -366,6 +443,40 @@ describe "warm --cache builds" do
     # are written ONLY by a render, and the cache entry is the only record of
     # them — so a `static/` file publishing to one of those paths replaced it
     # outright on every warm build, the owning page being a cache hit.
+    # The generators run after the static copy; on an all-hit warm build they
+    # used to be skipped as unchanged, leaving the static bytes published.
+    it "lets the generated sitemap win over an edited static file at its path" do
+      with_cached_site do
+        cached_build
+        FileUtils.mkdir_p("static")
+        File.write("static/sitemap.xml", "user v1")
+        cached_build
+        File.read("public/sitemap.xml").should contain("<urlset")
+
+        File.write("static/sitemap.xml", "user v2")
+        cached_build
+        File.read("public/sitemap.xml").should contain("<urlset")
+        File.read("public/sitemap.xml").should_not contain("user v2")
+      end
+    end
+
+    # ...while a static edit anywhere else keeps the skip: regenerating the
+    # SEO outputs also hydrates every cached page, which nearly doubled an
+    # all-hit warm build of the docs site for a changed image.
+    it "keeps skipping the SEO generators for a static edit elsewhere" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        File.write("static/logo.svg", "<svg/>")
+        cached_build
+        File.write("public/sitemap.xml", "SENTINEL")
+
+        File.write("static/logo.svg", "<svg>v2</svg>")
+        cached_build
+        File.read("public/logo.svg").should eq("<svg>v2</svg>")
+        File.read("public/sitemap.xml").should eq("SENTINEL")
+      end
+    end
+
     it "re-renders a page whose alias stub the static copy overwrote" do
       with_cached_site do
         FileUtils.mkdir_p("static/legacy")
@@ -546,6 +657,78 @@ describe "warm --cache builds" do
       File.write("config.toml", base + "\n[llms]\nenabled = false\n")
       cached_build
       File.exists?("public/llms.txt").should be_false
+    end
+  end
+
+  describe "when the cache does not describe the output directory" do
+    it "removes a page deleted since a plain (uncached) build" do
+      with_cached_site do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "public", parallel: false, cache: false, highlight: false,
+        )).should be_true
+        File.exists?("public/posts/gone/index.html").should be_true
+
+        File.delete("content/posts/gone.md")
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/legacy/index.html").should be_false
+        File.exists?("public/tags/gone-tag/index.html").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
+    it "removes a deleted page when the cache file is corrupt" do
+      with_cached_site do
+        cached_build
+        File.write(".hwaro_cache.json", "{garbage")
+        File.delete("content/posts/gone.md")
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
+    # Serve keeps its own cache file, so a `serve --cache` session in between
+    # does not make the next `build --cache` forget `public/` (and wipe it,
+    # regenerating every image).
+    it "keeps public/ across a serve --cache session" do
+      with_cached_site do
+        cached_build
+        File.write("public/sentinel.txt", "kept")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        serve_options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: ".hwaro/serve", parallel: false, cache: true, highlight: false,
+        )
+        serve_options.serve_mode = true
+        builder.run(serve_options).should be_true
+        File.exists?(".hwaro/serve_cache.json").should be_true
+
+        cached_build
+        File.read("public/sentinel.txt").should eq("kept")
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
+    it "removes a deleted page after the cache was used for another output directory" do
+      with_cached_site do
+        cached_build
+        File.delete("content/posts/gone.md")
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "other", parallel: false, cache: true, highlight: false,
+        )).should be_true
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
     end
   end
 

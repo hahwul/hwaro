@@ -18,6 +18,8 @@ module Hwaro::Core::Build::Phases::Finalize
       else
         prune_unclaimed_generated_outputs(ctx)
       end
+      # Files a failed serve pass relocated away from (a no-op otherwise).
+      settle_page_outputs(ctx.options.output_dir)
     end
     profiler.end_phase
     result
@@ -54,8 +56,10 @@ module Hwaro::Core::Build::Phases::Finalize
   # bundle assets, and the fingerprinted asset bundles — none of which any
   # page's entry records, so before this a deleted `static/` file and every
   # historical `main.<hash>.css` stayed published forever on a `--cache`
-  # build. Auto-generated OG images prune themselves against their own
-  # manifest, in the generator that writes them.
+  # build. Auto-generated OG images prune a removed page's image against their
+  # own manifest, in the generator that writes them; they and the responsive
+  # image variants are also claimed, so switching either feature off (or
+  # skipping it by flag) removes what it published.
   private def prune_orphaned_cached_outputs(ctx : Lifecycle::BuildContext, build_cache : Cache) : Nil
     return unless build_cache.enabled?
     output_dir = ctx.options.output_dir

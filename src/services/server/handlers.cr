@@ -464,6 +464,55 @@ module Hwaro
       end
     end
 
+    # HEAD answered by `HTTP::StaticFileHandler` carries the whole file:
+    # stdlib copies it to the response regardless of the method, and Crystal
+    # never suppresses a handler-written body. Like the 404 body (see
+    # NotFoundHandler), that desynced keep-alive clients, which read the bytes
+    # as the start of the next response. For HEAD this swaps the response
+    # output for a sink that drops the body; the Content-Length the static
+    # handler already set stays, and closing the sink writes the headers.
+    class HeadBodyHandler
+      include HTTP::Handler
+
+      def call(context)
+        return call_next(context) unless context.request.method == "HEAD"
+        context.response.output = BodySink.new(context.response.output, context.response)
+        call_next(context)
+      end
+
+      # Counts what it drops: a response that set no Content-Length (the
+      # static handler's single-range 206) would otherwise go out as
+      # `Content-Length: 0` instead of the length the GET carries.
+      private class BodySink < IO
+        def initialize(@io : IO, @response : HTTP::Server::Response)
+          @dropped = 0_i64
+        end
+
+        def read(slice : Bytes) : Int32
+          raise IO::Error.new("Can't read from HTTP::Server::Response")
+        end
+
+        def write(slice : Bytes) : Nil
+          @dropped += slice.size
+        end
+
+        def flush : Nil
+        end
+
+        def close : Nil
+          headers = @response.headers
+          if @dropped > 0 && !headers.has_key?("Content-Length") && !headers.has_key?("Transfer-Encoding")
+            @response.content_length = @dropped
+          end
+          @io.close
+        end
+
+        def closed? : Bool
+          @io.closed?
+        end
+      end
+    end
+
     # Dev-only on-demand OG image generation for `[og.auto_image]
     # lazy_generate = true` under `hwaro serve`.
     #

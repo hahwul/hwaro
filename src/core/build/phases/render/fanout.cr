@@ -88,6 +88,11 @@ module Hwaro::Core::Build::Phases::Render
               classified_error ||= ex
               failures << {page_path: page.path, message: ex.message.to_s}
             end
+          rescue ex : IO::Error
+            error_mutex.synchronize do
+              classified_error ||= output_write_error(page, ex)
+              failures << {page_path: page.path, message: ex.message.to_s}
+            end
           rescue ex
             error_mutex.synchronize do
               failures << {page_path: page.path, message: ex.message.to_s}
@@ -148,6 +153,20 @@ module Hwaro::Core::Build::Phases::Render
         message: "Render failed for #{failures.size} page(s); first failure on #{first[:page_path]}: #{Utils::TextUtils.truncate_error(first[:message])}",
       )
     end
+  end
+
+  # A filesystem failure while building a page — most often its output
+  # cannot be written (a read-only output directory, a full disk, a
+  # directory squatting on the file name) — is an environment problem, not
+  # a template bug: classify it HWARO_E_IO (exit 6) instead of letting it
+  # fall through to the HWARO_E_TEMPLATE promotion below. Template errors
+  # never surface as IO::Error (templates are rendered from memory).
+  private def output_write_error(page : Models::Page, ex : IO::Error) : Hwaro::HwaroError
+    Hwaro::HwaroError.new(
+      code: Hwaro::Errors::HWARO_E_IO,
+      message: "I/O error while building #{page.path}: #{Utils::TextUtils.truncate_error(ex.message.to_s)}",
+      cause: ex,
+    )
   end
 
   # Collapse identical errors raised across many pages (typical of a
@@ -248,6 +267,9 @@ module Hwaro::Core::Build::Phases::Render
       record_page_cache_entry(page, cache, templates, site, output_dir)
     rescue ex : Hwaro::HwaroError
       classified_error ||= ex
+      failures << {page_path: page.path, message: ex.message.to_s}
+    rescue ex : IO::Error
+      classified_error ||= output_write_error(page, ex)
       failures << {page_path: page.path, message: ex.message.to_s}
     rescue ex
       failures << {page_path: page.path, message: ex.message.to_s}

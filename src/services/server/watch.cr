@@ -228,6 +228,9 @@ module Hwaro
       #   rebuild on the save AFTER that recovered.
       # - Previous failure: the pages a failed rebuild left stale are not
       #   re-selected when the next event touches an unrelated file.
+      # - A `[[content.generate]]` body template (or a partial it includes):
+      #   bodies render when the pages are generated, which only a full build
+      #   does — the re-render strategies left generated pages on the old body.
       private def effective_strategy(changeset : ChangeSet, output_dir : String) : Symbol
         strategy = changeset.rebuild_strategy
         return strategy if strategy == :full
@@ -239,6 +242,12 @@ module Hwaro
 
         if @rebuild_failed
           Logger.info "  Previous rebuild failed — running a full rebuild to recover."
+          return :full
+        end
+
+        if !changeset.modified_templates.empty? &&
+           @builder.generate_body_template_changed?(changeset.modified_templates)
+          Logger.info "  A [[content.generate]] body template changed — running a full rebuild to regenerate the pages."
           return :full
         end
 

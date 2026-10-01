@@ -38,7 +38,10 @@ end
 
 describe Hwaro::Content::Pagination::Paginator do
   describe "per_page clamping" do
-    it "clamps a per_page of 0 up to 1 (avoids divide-by-zero)" do
+    # Regression: a section `paginate = 0` (or negative) was truthy, so it
+    # enabled pagination one item per page (/page/2/, /page/3/, …). It
+    # disables pagination — the same rule as a taxonomy's `paginate_by`.
+    it "treats a section per_page of 0 as pagination disabled" do
       config = Hwaro::Models::Config.new
       config.pagination.enabled = true
       section = make_section(per_page: 0)
@@ -47,11 +50,12 @@ describe Hwaro::Content::Pagination::Paginator do
       paginator = Hwaro::Content::Pagination::Paginator.new(config)
       result = paginator.paginate(section, pages)
 
-      result.per_page.should eq(1)
-      result.paginated_pages.size.should eq(3)
+      result.enabled.should be_false
+      result.per_page.should eq(3)
+      result.paginated_pages.size.should eq(1)
     end
 
-    it "clamps a negative per_page up to 1" do
+    it "treats a negative section per_page as pagination disabled" do
       config = Hwaro::Models::Config.new
       config.pagination.enabled = true
       section = make_section(per_page: -5)
@@ -60,8 +64,22 @@ describe Hwaro::Content::Pagination::Paginator do
       paginator = Hwaro::Content::Pagination::Paginator.new(config)
       result = paginator.paginate(section, pages)
 
+      result.enabled.should be_false
+      result.paginated_pages.size.should eq(1)
+    end
+
+    it "clamps a global per_page of 0 up to 1 (avoids divide-by-zero)" do
+      config = Hwaro::Models::Config.new
+      config.pagination.enabled = true
+      config.pagination.per_page = 0
+      section = make_section
+      pages = make_pages(3) { |i, p| p.title = "P#{i}" }
+
+      paginator = Hwaro::Content::Pagination::Paginator.new(config)
+      result = paginator.paginate(section, pages)
+
       result.per_page.should eq(1)
-      result.paginated_pages.size.should eq(2)
+      result.paginated_pages.size.should eq(3)
     end
   end
 
