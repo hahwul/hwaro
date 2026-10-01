@@ -173,13 +173,18 @@ module Hwaro
       end
 
       # Whether every file under the asset output dir is content-hashed, so a
-      # year-long `immutable` cache rule is safe. Only the asset pipeline
-      # with fingerprinting names its output by content: with the pipeline
-      # off (the default) `/assets/` is just whatever `static/assets/` holds,
-      # and marking those unhashed files immutable kept browsers on the old
-      # CSS/JS for a year after every deploy.
+      # year-long `immutable` cache rule is safe. Only fingerprinted
+      # `[[assets.bundles]]` outputs are named by content. With the pipeline
+      # off (the default), fingerprinting off, or no bundles, nothing there is
+      # hashed; and `static/<output_dir>/` is copied into the same URL space
+      # verbatim (`static/assets/css/…` → `/assets/css/…`, the docs site's
+      # shape), so its presence leaves unhashed files under the rule too.
+      # Marking such files immutable kept browsers on the old CSS/JS for a
+      # year after every deploy.
       private def immutable_assets? : Bool
-        @config.assets.enabled && @config.assets.fingerprint
+        assets = @config.assets
+        return false unless assets.enabled && assets.fingerprint && !assets.bundles.empty?
+        !Dir.exists?(File.join("static", assets_url_dir))
       end
 
       # URL path segment where the asset pipeline emits fingerprinted files,

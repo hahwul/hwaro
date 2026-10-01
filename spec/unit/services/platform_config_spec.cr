@@ -44,6 +44,7 @@ describe Hwaro::Services::PlatformConfig do
       it "includes cache headers for fingerprinted pipeline assets" do
         config = Hwaro::Models::Config.new
         config.assets.enabled = true
+        config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
         generator = Hwaro::Services::PlatformConfig.new(config)
         result = generator.generate("netlify")
 
@@ -62,6 +63,26 @@ describe Hwaro::Services::PlatformConfig do
         config.assets.enabled = true
         config.assets.fingerprint = false
         Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("[[headers]]")
+      end
+
+      # Regression: `fingerprint` defaults to true but only bundle outputs are
+      # hashed — with no bundles, or with `static/assets/` copied verbatim
+      # into the same URL space, unhashed files were still marked immutable.
+      it "omits the immutable cache rule when unhashed files share the asset dir" do
+        config = Hwaro::Models::Config.new
+        config.assets.enabled = true
+        Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("immutable")
+
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
+            Hwaro::Services::PlatformConfig.new(config).generate("netlify").should contain("immutable")
+
+            FileUtils.mkdir_p("static/assets/css")
+            Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("immutable")
+            JSON.parse(Hwaro::Services::PlatformConfig.new(config).generate("vercel"))["headers"]?.should be_nil
+          end
+        end
       end
 
       # Regression for gh#528 (D): the example HWARO_VERSION pin had
@@ -92,6 +113,7 @@ describe Hwaro::Services::PlatformConfig do
       it "includes cache headers for fingerprinted pipeline assets" do
         config = Hwaro::Models::Config.new
         config.assets.enabled = true
+        config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
         generator = Hwaro::Services::PlatformConfig.new(config)
         result = generator.generate("vercel")
 
@@ -356,6 +378,7 @@ describe Hwaro::Services::PlatformConfig do
             config = Hwaro::Models::Config.new
             config.base_url = "https://example.com/myrepo/"
             config.assets.enabled = true
+            config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
             generator = Hwaro::Services::PlatformConfig.new(config)
 
             netlify = generator.generate("netlify")
