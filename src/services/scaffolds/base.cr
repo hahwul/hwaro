@@ -62,6 +62,60 @@ module Hwaro
           result
         end
 
+        # Content paths the scaffold's own menus and templates link to.
+        # `--skip-sample-content` still writes these, as front-matter-only
+        # stubs: skipping them left a site with no homepage whose every nav
+        # link 404'd.
+        protected def skeleton_page_paths : Array(String)
+          ["index.md"]
+        end
+
+        # The `--skip-sample-content` content set: the skeleton pages (and
+        # their translations) with the sample body dropped, so no sample
+        # prose or links to skipped sample pages remain.
+        def skeleton_content_files(
+          languages : Array(String) = [] of String,
+          skip_taxonomies : Bool = false,
+        ) : Hash(String, String)
+          keep = skeleton_page_paths
+          return {} of String => String if keep.empty?
+
+          files = languages.size > 1 ? multilingual_content_files(languages, skip_taxonomies) : content_files(skip_taxonomies)
+          suffixes = languages.size > 1 ? languages[1..].map { |lang| ".#{lang}.md" } : [] of String
+          result = {} of String => String
+          files.each do |path, body|
+            base_path = suffixes.find { |suffix| path.ends_with?(suffix) }.try { |suffix| path.rchop(suffix) + ".md" } || path
+            result[path] = extract_front_matter(body) if keep.includes?(base_path)
+          end
+          result
+        end
+
+        # Extract front matter from markdown content, discarding the body.
+        # Keeps the +++ delimited TOML front matter block and adds a placeholder.
+        protected def extract_front_matter(content : String) : String
+          lines = content.lines
+          return content if lines.empty?
+
+          # Detect front matter delimiter (+++ for TOML, --- for YAML)
+          delimiter = lines[0].strip
+          return content unless delimiter == "+++" || delimiter == "---"
+
+          # Find the closing delimiter
+          close_index = nil
+          lines.each_with_index do |line, i|
+            next if i == 0
+            if line.strip == delimiter
+              close_index = i
+              break
+            end
+          end
+
+          return content unless close_index
+
+          front_matter = lines[0..close_index].join("\n")
+          "#{front_matter}\n"
+        end
+
         # Rewrite Markdown links that point at the default-language URL
         # space so they resolve to the translated locale's URL space
         # instead. Without this, `index.ko.md`'s body keeps
@@ -335,6 +389,14 @@ module Hwaro
           }
         end
 
+        # Files outside content/templates/static/archetypes, keyed by their
+        # path relative to the project root (e.g. `data/sidebar.yml`).
+        # Built-in scaffolds ship none; a remote scaffold carries its
+        # `data/` and `i18n/` over.
+        def extra_files : Hash(String, String)
+          {} of String => String
+        end
+
         # Built-in default archetype content (TOML front matter).
         # `Services::Creator` substitutes `{{ title }}`, `{{ date }}`,
         # `{{ draft }}`, `{{ tags }}`, and `{{ description }}`. An unset
@@ -381,7 +443,9 @@ module Hwaro
             str << search_config
             str << pagination_config
             str << series_config
-            str << related_config
+            # `[related]` points at `tags`; without a `[[taxonomies]]` block
+            # for it, ship the commented form so doctor stays quiet.
+            str << (!skip_taxonomies && ships_taxonomies? ? related_config : ConfigSnippets.related(commented: true))
             str << taxonomies_config if !skip_taxonomies && ships_taxonomies?
             str << menus_config(multilingual_languages)
 
@@ -649,6 +713,7 @@ module Hwaro
                   <a href="{{ base_url }}{{ lang_prefix }}/" class="site-logo">{{ site.title | e }}</a>
                   <div class="site-header-right">
                     #{navigation}
+                    #{lang_switcher_html}
                     #{theme_toggle_html}
                   </div>
                 </div>
@@ -791,6 +856,8 @@ module Hwaro
               .site-logo::before { content: ""; width: 9px; height: 9px; flex: none; border-radius: 2px; transform: rotate(45deg); background: var(--spark); }
               .site-logo:hover { color: var(--primary); }
               .site-header-right { display: flex; align-items: center; gap: 1.4rem; }
+              .lang-switcher { display: flex; gap: 0.6rem; }
+              .lang-switcher a[aria-current="true"] { color: var(--text); font-weight: 600; }
               .site-header nav { display: flex; gap: 1.4rem; }
               .site-header nav a { color: var(--text-muted); text-decoration: none; font-size: var(--step--1); letter-spacing: 0.01em; padding-bottom: 2px; border-bottom: 2px solid transparent; transition: color var(--transition), border-color var(--transition); }
               .site-header nav a:hover { color: var(--primary); }
@@ -903,6 +970,20 @@ module Hwaro
               }
             </style>
             CSS
+        end
+
+        # Links to the current page's translations (rendered only on a
+        # multilingual site). Blog and docs carry their own styled copy;
+        # simple, bare and book share this one, so `--include-multilingual`
+        # never builds translated pages a reader has no way to reach.
+        protected def lang_switcher_html : String
+          <<-HTML
+            {% if page.translations | length > 0 %}
+            <nav class="lang-switcher" aria-label="Language">
+              {% for t in page.translations %}<a href="{{ base_url }}{{ t.url }}" hreflang="{{ t.code }}"{% if t.is_current %} aria-current="true"{% endif %}>{{ t.code | upper }}</a>{% endfor %}
+            </nav>
+            {% endif %}
+            HTML
         end
 
         # Override in subclasses to customize navigation (Jinja2 syntax)
@@ -1233,7 +1314,7 @@ module Hwaro
 
               function highlightMatch(text, query) {
                 if (!query) return escapeHtml(text);
-                var escaped = query.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+                var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 var re = new RegExp('(' + escaped + ')', 'gi');
                 return escapeHtml(text).replace(re, '<mark>$1</mark>');
               }
@@ -1243,7 +1324,7 @@ module Hwaro
                 var idx = lower.indexOf(query.toLowerCase());
                 var start = Math.max(0, idx - 60);
                 var end = Math.min(content.length, idx + query.length + 100);
-                var snippet = content.substring(start, end).replace(/\\s+/g, ' ').trim();
+                var snippet = content.substring(start, end).replace(/\s+/g, ' ').trim();
                 if (start > 0) snippet = '...' + snippet;
                 if (end < content.length) snippet = snippet + '...';
                 return snippet;

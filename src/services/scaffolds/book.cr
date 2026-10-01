@@ -238,6 +238,11 @@ module Hwaro
               gap: var(--space-1);
             }
 
+            .lang-switcher { display: flex; gap: 0.25rem; margin-right: var(--space-1); font-size: var(--step--1); }
+            .lang-switcher a { color: var(--text-muted); text-decoration: none; padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); }
+            .lang-switcher a:hover { color: var(--text); background: var(--bg-subtle); }
+            .lang-switcher a[aria-current="true"] { color: var(--text); font-weight: 600; }
+
             /* ── Icon Button (shared by toggle, search, fullscreen) ── */
             .icon-btn {
               display: flex;
@@ -1295,6 +1300,7 @@ module Hwaro
                 <a href="{{ base_url }}{{ lang_prefix }}/" class="logo">{{ site.title | e }}</a>
               </div>
               <div class="header-right">
+                #{lang_switcher_html}
                 <button class="icon-btn" onclick="openSearch()" title="Search (⌘K)" aria-label="Search">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </button>

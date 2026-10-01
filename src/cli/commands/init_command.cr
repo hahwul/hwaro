@@ -24,7 +24,7 @@ module Hwaro
         FLAGS = [
           # Project setup
           FlagInfo.new(short: "-f", long: "--force", description: "Allow init even if directory is not empty (keeps existing files, adds missing scaffold files)"),
-          FlagInfo.new(short: nil, long: "--clean", description: "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git/)"),
+          FlagInfo.new(short: nil, long: "--clean", description: "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git or is / or the home directory)"),
           FlagInfo.new(short: nil, long: "--scaffold", description: "Scaffold type or remote source (e.g., blog, github:user/repo)", takes_value: true, value_hint: "TYPE"),
           FlagInfo.new(short: nil, long: "--include-multilingual", description: "Enable multilingual support (e.g., en,ko)", takes_value: true, value_hint: "LANGS"),
           FlagInfo.new(short: nil, long: "--minimal-config", description: "Generate minimal config.toml without comments and optional sections"),
@@ -78,7 +78,9 @@ module Hwaro
           # JSON mode until after the parse let human text share stdout with
           # the machine payload. Detected from the raw argv the same way
           # `Runner.emit_hwaro_error` does.
-          if args.includes?("--json") || args.includes?("-j")
+          # Only flags before `--`: `hwaro init -- --json` names a directory.
+          flag_args = Runner.flag_args(args)
+          if flag_args.includes?("--json") || flag_args.includes?("-j")
             @json_output = true
             Runner.enable_json_mode!
           end
@@ -196,7 +198,7 @@ module Hwaro
 
             # Project setup
             parser.on("-f", "--force", "Allow init even if directory is not empty (keeps existing files)") { force = true }
-            parser.on("--clean", "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git/)") { clean = true }
+            parser.on("--clean", "Remove existing files in target before scaffolding (implies --force; refuses if target contains .git or is / or the home directory)") { clean = true }
             parser.on("--scaffold TYPE", "Scaffold type or remote source (e.g., blog, github:user/repo)") do |type|
               @scaffold_given = true
               if Services::Scaffolds::Remote.remote?(type)
@@ -306,7 +308,10 @@ module Hwaro
               # `My`, so reject instead. Flag-looking leftovers are not
               # positionals — leave them for OptionParser's invalid-option
               # error, which names the actual offending flag.
-              positionals = before_dash.reject(&.starts_with?('-')) + after_dash
+              # A bare `-` is not a flag either: dropping it silently fell
+              # back to `.` (so `hwaro init - --clean` emptied the current
+              # directory). Keep it as a positional; it is rejected below.
+              positionals = before_dash.reject { |arg| arg.starts_with?('-') && arg != "-" } + after_dash
               if positionals.size > 1
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,
@@ -315,10 +320,25 @@ module Hwaro
                 )
               end
               if first = positionals.first?
+                if first.strip.empty? || (first == "-" && after_dash.empty?)
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: first.strip.empty? ? "project path must not be empty" : "'-' is not a project path",
+                    hint: "Omit the path to initialize the current directory, or use `hwaro init -- -` for a directory literally named '-'.",
+                  )
+                end
                 path = first
                 @path_given = true
               end
             end
+          end
+
+          if minimal_config && full_config
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "--minimal-config and --full-config cannot be used together",
+              hint: "Pick one; omit both for the balanced default config.",
+            )
           end
 
           Config::Options::InitOptions.new(

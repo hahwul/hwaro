@@ -191,13 +191,48 @@ describe Hwaro::Services::Initializer do
           File.write(File.join(target, ".git", "HEAD"), "ref: refs/heads/main")
           File.write(File.join(target, "README.md"), "# repo")
 
-          expect_raises(Hwaro::HwaroError, /contains a \.git directory/) do
+          expect_raises(Hwaro::HwaroError, /contains a \.git entry/) do
             Hwaro::Services::Initializer.new.run(target, clean: true)
           end
 
           # Original files stay in place.
           File.exists?(File.join(target, ".git", "HEAD")).should be_true
           File.exists?(File.join(target, "README.md")).should be_true
+        end
+      end
+
+      it "refuses to clean a git worktree / submodule checkout (.git is a file)" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "worktree")
+          Dir.mkdir_p(target)
+          File.write(File.join(target, ".git"), "gitdir: /elsewhere/.git/worktrees/wt\n")
+          File.write(File.join(target, "work.txt"), "uncommitted")
+
+          expect_raises(Hwaro::HwaroError, /contains a \.git entry/) do
+            Hwaro::Services::Initializer.new.run(target, clean: true)
+          end
+
+          File.read(File.join(target, ".git")).should contain("gitdir:")
+          File.exists?(File.join(target, "work.txt")).should be_true
+        end
+      end
+
+      it "refuses to clean the home directory" do
+        Dir.mktmpdir do |dir|
+          home = File.join(dir, "home")
+          Dir.mkdir_p(home)
+          File.write(File.join(home, "notes.txt"), "keep")
+          original = ENV["HOME"]?
+          begin
+            ENV["HOME"] = home
+            err = expect_raises(Hwaro::HwaroError, /home directory/) do
+              Hwaro::Services::Initializer.new.run(home, clean: true)
+            end
+            err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          ensure
+            original ? (ENV["HOME"] = original) : ENV.delete("HOME")
+          end
+          File.exists?(File.join(home, "notes.txt")).should be_true
         end
       end
 
@@ -254,6 +289,35 @@ describe Hwaro::Services::Initializer do
           Dir.exists?(File.join(target, "content")).should be_true
           # Templates should still be created
           Dir.exists?(File.join(target, "templates")).should be_true
+        end
+      end
+
+      it "keeps front-matter-only stubs for the pages the nav links to" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(target, skip_sample_content: true,
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog)
+
+          content = File.join(target, "content")
+          files = Dir.glob(File.join(content, "**", "*.md")).map { |f| Path[f].relative_to(content).to_s }.sort!
+          files.should eq(["about.md", "archives.md", "index.md", "posts/_index.md"])
+          # No sample posts, and the stubs carry no sample body.
+          about = File.read(File.join(content, "about.md"))
+          about.should start_with("+++")
+          about.rstrip.should end_with("+++")
+        end
+      end
+
+      it "keeps the translated stubs of a multilingual skeleton" do
+        Dir.mktmpdir do |dir|
+          target = File.join(dir, "site")
+          Hwaro::Services::Initializer.new.run(target, skip_sample_content: true,
+            multilingual_languages: ["en", "ko"],
+            scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs)
+
+          File.exists?(File.join(target, "content", "guide", "_index.md")).should be_true
+          File.exists?(File.join(target, "content", "guide", "_index.ko.md")).should be_true
+          File.exists?(File.join(target, "content", "guide", "templates.md")).should be_false
         end
       end
     end
@@ -648,6 +712,87 @@ describe Hwaro::Services::Initializer do
           config.should contain(%(title = "My Hwaro Site"))
         end
       end
+    end
+  end
+end
+
+describe "Hwaro::Services::Initializer --init audit regressions" do
+  it "--force --full-config leaves an existing config.toml untouched" do
+    Dir.mktmpdir do |dir|
+      target = File.join(dir, "site")
+      Dir.mkdir_p(target)
+      original = "title = \"Mine\"\nbase_url = \"https://example.com\"\n"
+      File.write(File.join(target, "config.toml"), original)
+
+      Hwaro::Services::Initializer.new.run(target, force: true, full_config: true)
+
+      File.read(File.join(target, "config.toml")).should eq(original)
+    end
+  end
+
+  it "--force --full-config does not fail on an existing unparseable config.toml" do
+    Dir.mktmpdir do |dir|
+      target = File.join(dir, "site")
+      Dir.mkdir_p(target)
+      File.write(File.join(target, "config.toml"), "title = \n")
+
+      Hwaro::Services::Initializer.new.run(target, force: true, full_config: true)
+
+      File.read(File.join(target, "config.toml")).should eq("title = \n")
+    end
+  end
+
+  it "writes a wizard site title with backslashes and control characters as valid TOML" do
+    Dir.mktmpdir do |dir|
+      target = File.join(dir, "site")
+      title = "C:\\Users\\me \"quoted\" \\0 tab\tend"
+      options = Hwaro::Config::Options::InitOptions.new(path: target, site_title: title)
+      Hwaro::Services::Initializer.new.run(options)
+
+      TOML.parse(File.read(File.join(target, "config.toml")))["title"].as_s.should eq(title)
+    end
+  end
+end
+
+# A scaffold carrying root-relative extras, the way a remote scaffold carries
+# its `data/` and `i18n/`.
+class InitAuditExtrasScaffold < Hwaro::Services::Scaffolds::Simple
+  def extra_files : Hash(String, String)
+    {"data/sidebar.yml" => "- title: Intro\n", "i18n/ko.toml" => "hello = \"안녕\"\n"}
+  end
+end
+
+describe "Hwaro::Services::Initializer extra_files" do
+  it "writes a scaffold's root-relative extra files" do
+    Dir.mktmpdir do |dir|
+      target = File.join(dir, "site")
+      initializer = Hwaro::Services::Initializer.new
+      initializer.test_run_with_scaffold(target, InitAuditExtrasScaffold.new)
+
+      File.read(File.join(target, "data", "sidebar.yml")).should eq("- title: Intro\n")
+      File.read(File.join(target, "i18n", "ko.toml")).should contain("안녕")
+    end
+  end
+end
+
+class Hwaro::Services::Initializer
+  def test_run_with_scaffold(target : String, scaffold : Hwaro::Services::Scaffolds::Base)
+    run_with_scaffold(target, false, false, false, false, [] of String, scaffold)
+  end
+end
+
+describe "Hwaro::Services::Initializer instance reuse" do
+  it "does not carry a previous run's config.toml creation into --force --full-config" do
+    Dir.mktmpdir do |dir|
+      target = File.join(dir, "site")
+      initializer = Hwaro::Services::Initializer.new
+      initializer.run(target)
+      before = File.read(File.join(target, "config.toml"))
+
+      initializer.run(target, force: true, full_config: true)
+
+      File.read(File.join(target, "config.toml")).should eq(before)
+      initializer.created_count.should eq(0)
     end
   end
 end
