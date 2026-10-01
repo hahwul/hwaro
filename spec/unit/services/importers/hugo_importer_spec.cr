@@ -500,6 +500,33 @@ describe "Hugo import: index.html url" do
   end
 end
 
+describe "Hugo import: front matter key case" do
+  it "reads capitalised and lowercase keys the way Hugo does" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      posts = File.join(hugo_dir, "content", "posts")
+      FileUtils.mkdir_p(posts)
+      File.write(File.join(posts, "caps.md"), %(+++\nTitle = "Capital Keys"\nDate = 2024-02-01T10:00:00+09:00\nTags = ["go"]\nexpirydate = "2030-01-01"\n+++\nBody.\n))
+      File.write(File.join(posts, "pub.md"), "---\ntitle: Pub\npublishdate: 2024-04-04\n---\nPub.\n")
+      File.write(File.join(posts, "hidden.md"), "---\ntitle: Hidden\nDraft: true\n---\nSecret.\n")
+      output_dir = File.join(tmpdir, "out")
+
+      result = Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+
+      caps = File.read(File.join(output_dir, "posts", "caps.md"))
+      caps.should contain(%(title = "Capital Keys"))
+      caps.should contain(%(date = "2024-02-01T10:00:00+09:00"))
+      caps.should contain(%(tags = ["go"]))
+      caps.should contain(%(expires = "2030-01-01"))
+      File.read(File.join(output_dir, "posts", "pub.md")).should contain(%(date = "2024-04-04"))
+      # A `Draft: true` page must stay unpublished, not leak onto the site.
+      File.exists?(File.join(output_dir, "posts", "hidden.md")).should be_false
+      result.skipped_count.should eq(1)
+    end
+  end
+end
+
 describe "Hugo import: url with query or fragment" do
   # `?q=1#top` is not part of the page path; kept, it became a literal
   # directory name.

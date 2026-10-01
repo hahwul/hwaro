@@ -52,6 +52,7 @@ module Hwaro
         ) : Symbol
           raw = read_text(file_path)
           fm_data, body = extract_frontmatter(raw)
+          fm_data = fm_data.try { |data| downcase_keys(data) }
 
           # Check draft status (only if frontmatter exists)
           is_draft = fm_data.try { |d| d["draft"]?.try { |v| truthy?(v) } } || false
@@ -79,7 +80,7 @@ module Hwaro
 
             # date (falling back to Hugo's publishDate so a page dated only
             # via publishDate doesn't lose its date entirely)
-            if date_str = string_value(data, "date") || string_value(data, "publishDate")
+            if date_str = string_value(data, "date") || string_value(data, "publishdate")
               parsed = parse_date(date_str)
               fields["date"] = format_date(parsed) if parsed
             end
@@ -155,7 +156,7 @@ module Hwaro
             fields["image"] = image if image
 
             # expires (from expiryDate)
-            if expires_str = string_value(data, "expiryDate")
+            if expires_str = string_value(data, "expirydate")
               parsed = parse_date(expires_str)
               fields["expires"] = format_date(parsed) if parsed
             end
@@ -223,6 +224,21 @@ module Hwaro
 
           return :skipped unless written
           has_shortcodes ? :imported_wrapped : :imported
+        end
+
+        # Hugo front matter keys are case-insensitive (`Title`, `Draft`,
+        # `publishDate`/`publishdate` all work), and sites migrated from
+        # other generators often capitalise them. Exact-case lookups dropped
+        # every such field, and a `Draft = true` page was imported as
+        # published. Lookups use the lowercase key; when a file spells a key
+        # twice, the all-lowercase spelling wins.
+        private def downcase_keys(data : Hash(String, TOML::Any)) : Hash(String, TOML::Any)
+          result = {} of String => TOML::Any
+          data.each do |key, value|
+            lower = key.downcase
+            result[lower] = value if key == lower || !data.has_key?(lower)
+          end
+          result
         end
 
         # Regex for TOML frontmatter: +++ on first line, +++ on its own line.
