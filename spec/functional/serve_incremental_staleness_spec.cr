@@ -510,3 +510,75 @@ describe "serve incremental: root listing follows a top-level section edit" do
     end
   end
 end
+
+# Two readers the fan-out never selected: a page fetching another through
+# `get_page(path=...)` (here in the shared footer, so in every page's
+# closure), and a page whose CONTENT calls a listing shortcode — the closure
+# scan only ever looked at the entry template.
+private def write_lookup_site
+  File.write("config.toml", "title = \"S\"\nbase_url = \"https://example.com\"\n")
+  FileUtils.mkdir_p("content/posts")
+  FileUtils.mkdir_p("templates/shortcodes")
+  File.write("templates/page.html",
+    %(<h1>{{ page.title }}</h1>{{ content }}<footer>{{ get_page(path="about.md").title }}</footer>))
+  File.write("templates/shortcodes/recent.html",
+    %({% for p in get_section(path="posts/_index.md").pages %}[{{ p.title }}]{% endfor %}))
+  File.write("content/about.md", "+++\ntitle = \"About Me\"\n+++\n{{ recent() }}")
+  File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\nsort_by = \"weight\"\n+++\n")
+  6.times do |i|
+    File.write("content/posts/p#{i}.md", "+++\ntitle = \"Post #{i}\"\nweight = #{10 + i}\n+++\nbody #{i}")
+  end
+end
+
+describe "serve incremental: get_page and shortcode readers" do
+  it "re-renders every get_page reader when the fetched page is retitled" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_lookup_site
+        server = Hwaro::Services::Server.new
+        options = staleness_options
+        server.staleness_builder.run(options).should be_true
+        File.read("public/posts/p4/index.html").should contain("<footer>About Me</footer>")
+
+        File.write("content/about.md", "+++\ntitle = \"About Us\"\n+++\n{{ recent() }}")
+        server.staleness_builder.run_incremental(["content/about.md"], options).should be_true
+
+        File.read("public/posts/p4/index.html").should contain("<footer>About Us</footer>")
+      end
+    end
+  end
+
+  it "does not re-render get_page readers when another page is edited" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_lookup_site
+        server = Hwaro::Services::Server.new
+        options = staleness_options
+        server.staleness_builder.run(options).should be_true
+        File.write("public/posts/p4/index.html", "SENTINEL")
+
+        File.write("content/posts/p0.md", "+++\ntitle = \"Post 0 RETITLED\"\nweight = 10\n+++\nbody 0")
+        server.staleness_builder.run_incremental(["content/posts/p0.md"], options).should be_true
+
+        File.read("public/posts/p4/index.html").should eq("SENTINEL")
+      end
+    end
+  end
+
+  it "re-renders a page whose content calls a listing shortcode" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_lookup_site
+        server = Hwaro::Services::Server.new
+        options = staleness_options
+        server.staleness_builder.run(options).should be_true
+        File.read("public/about/index.html").should contain("[Post 3]")
+
+        File.write("content/posts/p3.md", "+++\ntitle = \"Post 3 RETITLED\"\nweight = 13\n+++\nbody 3")
+        server.staleness_builder.run_incremental(["content/posts/p3.md"], options).should be_true
+
+        File.read("public/about/index.html").should contain("[Post 3 RETITLED]")
+      end
+    end
+  end
+end

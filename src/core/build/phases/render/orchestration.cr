@@ -122,6 +122,7 @@ module Hwaro::Core::Build::Phases::Render
         # `count` is already the number of pages that wrote a file (see
         # process_files_*); the refusals are surfaced separately.
         ctx.stats.pages_rendered = count
+        clear_filter_relations_hashes
         ctx.stats.pages_unpublished = @unpublished_pages.get
         # Pages the cache skipped still feed the Generate phase (search index,
         # feeds read `page.content`), so give them the content a real render

@@ -56,6 +56,19 @@ module Hwaro
         @[JSON::Field(key: "git_hash", emit_null: false)]
         property git_hash : String
 
+        # Fingerprint of what this page renders from OTHER pages, one by one:
+        # its prev/next neighbours, series, related posts, translations and
+        # ancestors (when its templates read them), the pages it fetches with
+        # a literal `get_page(path=...)`, and the URLs its `@/` links resolve
+        # to. None of those move this page's own source, and none of them are
+        # a listing the global page-set fingerprint gates, so retitling a post
+        # left its neighbours' "next: …" link — and every `@/` link to a
+        # renamed page — stale on warm builds. "" when the page reads none of
+        # them, and for legacy entries — so such pages never rebuild because
+        # of this field.
+        @[JSON::Field(key: "relations_hash", emit_null: false)]
+        property relations_hash : String
+
         # Secondary sibling output files this page emitted beyond
         # `output_path` (e.g. `index.json`, `index.xml` — see `[outputs]`).
         # Empty for pages with no extra formats and for every entry written
@@ -86,6 +99,7 @@ module Hwaro
           @assets_hash : String = "",
           @git_hash : String = "",
           @derived_paths : Array(String) = [] of String,
+          @relations_hash : String = "",
         )
         end
 
@@ -100,20 +114,22 @@ module Hwaro
           cascade_hash = ""
           assets_hash = ""
           git_hash = ""
+          relations_hash = ""
           output_paths = [] of String
           derived_paths = [] of String
 
           pull.read_object do |key|
             case key
-            when "path"          then path = pull.read_string
-            when "mtime"         then mtime = pull.read_int.to_i64
-            when "hash"          then hash = pull.read_string
-            when "output_path"   then output_path = pull.read_string
-            when "template_hash" then template_hash = pull.read_string
-            when "config_hash"   then config_hash = pull.read_string
-            when "cascade_hash"  then cascade_hash = pull.read_string
-            when "assets_hash"   then assets_hash = pull.read_string
-            when "git_hash"      then git_hash = pull.read_string
+            when "path"           then path = pull.read_string
+            when "mtime"          then mtime = pull.read_int.to_i64
+            when "hash"           then hash = pull.read_string
+            when "output_path"    then output_path = pull.read_string
+            when "template_hash"  then template_hash = pull.read_string
+            when "config_hash"    then config_hash = pull.read_string
+            when "cascade_hash"   then cascade_hash = pull.read_string
+            when "assets_hash"    then assets_hash = pull.read_string
+            when "git_hash"       then git_hash = pull.read_string
+            when "relations_hash" then relations_hash = pull.read_string
             when "output_paths"
               output_paths = [] of String
               pull.read_array { output_paths << pull.read_string }
@@ -127,7 +143,7 @@ module Hwaro
           new(path: path, mtime: mtime, hash: hash, output_path: output_path,
             template_hash: template_hash, config_hash: config_hash, cascade_hash: cascade_hash,
             output_paths: output_paths, assets_hash: assets_hash, git_hash: git_hash,
-            derived_paths: derived_paths)
+            derived_paths: derived_paths, relations_hash: relations_hash)
         end
       end
 
@@ -346,7 +362,7 @@ module Hwaro
         # `extra_outputs` are secondary sibling output files (see `[outputs]`)
         # that must also still exist on disk — a manually deleted `index.json`
         # forces a rebuild just like a deleted `index.html` does.
-        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, extra_outputs : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "") : Bool
+        def changed?(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, extra_outputs : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "", relations_hash : String = "") : Bool
           return true unless @enabled
           return true unless File.exists?(file_path)
 
@@ -389,6 +405,11 @@ module Hwaro
           # `[git]` enabled the page's lastmod/commit fields render differently
           # though the source bytes are byte-for-byte the same.
           return true if entry.git_hash != git_hash
+
+          # A page this one renders something of (a neighbour's title, a
+          # translation, an `@/` link target's URL) changed — see
+          # CacheEntry#relations_hash.
+          return true if entry.relations_hash != relations_hash
 
           # A template in this page's dependency closure changed.
           if template_hash && entry.template_hash != template_hash
@@ -515,7 +536,7 @@ module Hwaro
         # `output_paths` are the secondary sibling output files this page
         # emitted (see `[outputs]`); empty when the feature isn't in use.
         # Thread-safe: protected by mutex for concurrent parallel builds.
-        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "", derived_paths : Array(String) = [] of String)
+        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "", derived_paths : Array(String) = [] of String, relations_hash : String = "")
           return unless @enabled
           return unless File.exists?(file_path)
 
@@ -530,7 +551,8 @@ module Hwaro
               if existing && existing.mtime == mtime && existing.output_path == output_path &&
                  existing.cascade_hash == cascade_hash && existing.template_hash == effective_template_hash &&
                  existing.output_paths == output_paths && existing.assets_hash == assets_hash &&
-                 existing.git_hash == git_hash && existing.derived_paths == derived_paths
+                 existing.git_hash == git_hash && existing.derived_paths == derived_paths &&
+                 existing.relations_hash == relations_hash
                 return
               end
             end
@@ -550,6 +572,7 @@ module Hwaro
               assets_hash: assets_hash,
               git_hash: git_hash,
               derived_paths: derived_paths,
+              relations_hash: relations_hash,
             )
 
             @mutex.synchronize do

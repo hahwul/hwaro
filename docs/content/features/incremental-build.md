@@ -59,6 +59,17 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
   template chain renders that partial.
 - **Cascade fingerprint** — the merged section `[cascade]` values applied to
   the page, so editing a parent `_index.md` cascade rebuilds its descendants.
+- **Other pages it renders** — the prev/next neighbours, series list, related
+  posts, translations and breadcrumb ancestors the page's templates read, the
+  pages it fetches with a literal `get_page(path="…")`, and the URLs its `@/`
+  links resolve to. Retitling a post re-renders the pages whose "next" link
+  names it; changing a page's `slug` re-renders every page linking to it with
+  `@/`.
+- **Listings** — a page whose template closure loops over the page or section
+  set (`site.pages`, `paginate`, `get_section`, a `get_page` with a computed
+  path, …) re-renders when that set changes. The closure includes the
+  shortcode templates the page's content calls and its output-format
+  templates, so a `{{ recent() }}` shortcode listing posts counts too.
 - **Config checksum** — a hash of the effective merged config. A config
   change invalidates **all** entries.
 - **Render hooks** — a fingerprint of every configured `templates/hooks/render-*`
@@ -99,7 +110,8 @@ The development server (`hwaro serve`) uses a more targeted incremental strategy
 A **listing page** is one whose template closure renders a global set — the
 homepage's "latest posts" loop over `site.pages`, an archive, a paginated
 index, a nav built from `site.menus`, a tag pill resolved through
-`get_taxonomy_url()`. It owns none of the page you edited, so the selections
+`get_taxonomy_url()`, a footer printing `get_page(path="about.md").title`, a
+shortcode the page's content calls to loop over a section's pages. It owns none of the page you edited, so the selections
 above never reach it. Serve therefore fingerprints those sets either side of
 the rebuild and re-renders the listing pages whose set moved.
 

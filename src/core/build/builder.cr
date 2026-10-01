@@ -273,6 +273,27 @@ module Hwaro
         # address serve the previous snapshot's union.
         @listing_source_union_memo : String? = nil
         @listing_source_union_memo_key : Hash(String, String)? = nil
+        # Memo for `page_template_scan` (see Phases::Render): what a page's
+        # template closure — entry template, the shortcodes its content calls,
+        # its output-format templates — reads from other pages. Keyed by the
+        # closure roots; reset when the templates Hash itself is replaced
+        # (same `same?` rule as the listing-union memo). Read from render
+        # worker fibers via record_page_cache_entry, hence the mutex.
+        @page_template_scan_memo : Hash(String, Phases::Render::PageTemplateScan) = {} of String => Phases::Render::PageTemplateScan
+        @page_template_scan_memo_key : Hash(String, String)? = nil
+        @page_template_scan_mutex : Mutex = Mutex.new
+        # Shortcode templates a page's content calls, keyed by page path and
+        # validated against the raw_content String it was scanned from (a
+        # re-parse replaces that String, and a template reload the graph, so
+        # the entry self-invalidates).
+        @page_shortcodes_memo : Hash(String, {String, TemplateDeps, Set(String)}) = {} of String => {String, TemplateDeps, Set(String)}
+        # Relations hashes `filter_changed_pages` compared, by page path, for
+        # `record_page_cache_entry` to store. The BeforeRender hooks run in
+        # between and fill in page fields (the auto OG image path), so a
+        # hash recomputed at record time never matched the next build's
+        # filter-time one. Cleared after the render fan-out; guarded by
+        # @page_template_hash_mutex.
+        @filter_relations_hashes : Hash(String, String) = {} of String => String
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve
