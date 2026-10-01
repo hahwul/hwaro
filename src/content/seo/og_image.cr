@@ -1569,6 +1569,30 @@ module Hwaro
           Logger.info "  Removed #{removed} stale OG image(s)" if removed > 0
         end
 
+        # The files the last `generate` call left published: every image its
+        # manifest records (PNG or the SVG fallback, whichever is on disk) and
+        # the manifest itself. The hook claims them with the builder, so the
+        # Finalize prune removes them once a build stops generating — the
+        # generator's own manifest prune never runs when auto images are
+        # switched off or `--skip-og-image` is passed, and a warm `--cache`
+        # build then kept publishing every image a cold build no longer has.
+        def self.published_outputs(config : Models::Config, output_dir : String) : Array(String)
+          ai = config.og.auto_image
+          return [] of String if output_dir_escapes?(ai, output_dir)
+          img_dir = File.join(output_dir, ai.output_dir)
+          manifest_path = File.join(img_dir, ".og_manifest.json")
+          return [] of String unless File.file?(manifest_path)
+          outputs = [manifest_path]
+          _, entries = load_manifest(manifest_path)
+          entries.each_key do |slug|
+            {"#{slug}.png", "#{slug}.svg"}.each do |filename|
+              path = File.join(img_dir, filename)
+              outputs << path if File.file?(path)
+            end
+          end
+          outputs
+        end
+
         # Load the OG manifest file. Returns {config_hash, entries}.
         def self.load_manifest(manifest_path : String) : Tuple(String, Hash(String, String))
           return {"", {} of String => String} unless File.exists?(manifest_path)

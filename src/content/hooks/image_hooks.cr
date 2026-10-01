@@ -190,6 +190,7 @@ module Hwaro
           if jobs_to_process.empty?
             @@resize_map_mutex.synchronize { @@resize_map = new_map }
             @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+            claim_variants(ctx, jobs, new_map)
             Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
             return
           end
@@ -234,6 +235,7 @@ module Hwaro
 
           @@resize_map_mutex.synchronize { @@resize_map = new_map }
           @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
+          claim_variants(ctx, jobs, new_map)
           # Count variants (widths × successful jobs), matching the pre-#389
           # meaning. Counting source images instead would silently halve/third
           # the number users see and make the "Generated N" line less useful
@@ -246,6 +248,21 @@ module Hwaro
           if (p = ctx.profiler) && start
             elapsed = (Time.instant - start).total_milliseconds
             p.record_asset_generation("image:resize", resized_count, reused_count, elapsed)
+          end
+        end
+
+        # Claim every `<name>_<width>w.<ext>` variant this build publishes,
+        # reused or freshly written. No cache entry covers them, so without
+        # the claim a warm `--cache` build kept them published after image
+        # processing was switched off (or `--skip-image-processing` passed),
+        # after a width left `widths`, and after the source image was deleted.
+        private def claim_variants(ctx : Core::Lifecycle::BuildContext, jobs : Array(ImageJob), map : Hash(String, Hash(Int32, String))) : Nil
+          builder = ctx.builder
+          return unless builder
+          jobs.each do |job|
+            map[job.original_url]?.try &.each_value do |url|
+              builder.claim_generated_output(File.join(job.dest_dir, File.basename(url)))
+            end
           end
         end
 

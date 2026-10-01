@@ -143,8 +143,11 @@ set `render = false`.
 Everything a removed page brought with it goes too: its `aliases` redirect
 stubs, its AMP mirror, its auto-generated OG image, the taxonomy term page of
 a tag nobody uses any more (with that term's feed), and the pagination page a
-section no longer fills. Turning a whole feature off — `[amp] enabled = false`
-— removes what it used to publish on the next build for the same reason.
+section no longer fills. Turning a whole feature off — `[amp] enabled = false`,
+`[og.auto_image] enabled = false`, `[image_processing] enabled = false`, or
+the `--skip-og-image` / `--skip-image-processing` flags — removes what it used
+to publish on the next build for the same reason, as does dropping a width
+from `[image_processing] widths`.
 
 Files that have a source but no cache entry are covered the same way, by
 recording what each build publishes and deleting what the next one no longer
