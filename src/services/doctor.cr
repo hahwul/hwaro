@@ -14,6 +14,7 @@ require "../utils/build_output"
 require "../content/processors/markdown"
 require "../content/processors/internal_link_resolver"
 require "../core/build/parallel"
+require "../core/build/shortcode_processor"
 require "./config_snippets"
 require "./content_lister"
 require "./scaffolds/registry"
@@ -97,9 +98,9 @@ module Hwaro
       def run : Array(Issue)
         issues = [] of Issue
         config = check_config(issues)
-        check_templates(issues)
+        template_names = check_templates(issues)
         check_directory_structure(issues, config)
-        check_content_frontmatter(issues, config)
+        check_content_frontmatter(issues, config, template_names)
         if config
           check_referenced_paths(issues, config)
           check_sass(issues, config)

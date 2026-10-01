@@ -1,4 +1,11 @@
 require "../../spec_helper"
+require "../../support/build_helper"
+require "../../../src/core/build/builder"
+require "../../../src/content/hooks"
+
+private def converter_build_tree(root : String) : Hash(String, String)
+  Dir.glob(File.join(root, "**", "*")).select { |f| File.file?(f) }.to_h { |f| {f.lchop(root), File.read(f)} }
+end
 
 describe Hwaro::Services::FrontmatterConverter do
   describe "#detect_format" do
@@ -466,6 +473,65 @@ describe Hwaro::Services::FrontmatterConverter do
         converted.should contain(%(title = "Hi"))
         converted.should contain("draft = true")
         converted.should contain("# Body")
+      end
+    end
+
+    # TOML has no null. The oracle is the build itself: converting must not
+    # change what `hwaro build` produces. A null `slug`/`title`/`image`
+    # written as `""` became a SET value (`slug = ""` collided with the
+    # section index and dropped the page), while a null CASCADABLE key
+    # (`draft: ~`) still declares the key and blocks a section's
+    # `[cascade]`, and a null extra/custom value is `""` to the build.
+    it "keeps the build output identical when YAML/JSON nulls are converted to TOML" do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n),
+        content_files: {
+          "notes/_index.md" => "+++\ntitle = \"Notes\"\n[cascade]\ndraft = true\n[cascade.extra]\ncolor = \"red\"\n+++\n",
+          "notes/kept.md"   => "---\ntitle:\ndescription: ~\nslug:\nimage: ~\ndraft: ~\ndate: 2024-05-01T10:00:00Z\nextra:\n  color: ~\n  only: ~\n  links:\n    - name: one\n      url: ~\n---\nBody.\n",
+          "notes/json.md"   => %({"title": null, "slug": null, "draft": null, "date": "2024-05-02T10:00:00Z", "extra": {"color": null}}\nJSON body.\n),
+        },
+        template_files: {
+          "page.html"    => "{{ page.title }}|{{ page.description }}|{{ page.image }}|{{ page.draft }}|{{ page.extra.color }}|{{ page.extra.only }}|{{ page.extra.links | tojson }}",
+          "section.html" => "{% for p in section.pages %}{{ p.url }}={{ p.title }};{% endfor %}",
+          "index.html"   => "home",
+        },
+      ) do |dir|
+        before = converter_build_tree(File.join(dir, "public"))
+        before.keys.should contain("/notes/kept/index.html")
+
+        result = Hwaro::Services::FrontmatterConverter.new("content").convert_to_toml
+        result.error_count.should eq(0)
+        File.read("content/notes/kept.md").should start_with("+++\n")
+        File.read("content/notes/kept.md").should_not contain("slug")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(output_dir: "public-after", drafts: false, minify: false, parallel: false,
+          cache: false, highlight: false, verbose: false, profile: false, stream: false)
+
+        converter_build_tree(File.join(dir, "public-after")).should eq(before)
+      end
+    end
+
+    it "omits nulls only for non-cascadable known front-matter keys" do
+      known = Hwaro::Content::Processors::Markdown::KNOWN_FRONT_MATTER_KEYS
+      cascadable = Hwaro::Core::Build::Phases::ParseContent::CASCADABLE_KEYS
+      Hwaro::Services::FrontmatterConverter::NULL_OMITTED_KEYS.should eq(known - cascadable)
+    end
+
+    # Same build decision for convert: prose between two thematic breaks is
+    # not front matter, so it is left alone instead of failing the run.
+    it "skips prose between thematic breaks instead of failing the run" do
+      Dir.mktmpdir do |dir|
+        file_path = File.join(dir, "hr-note.md")
+        content = "---\n\n*Note*: imported from an old blog.\n\n---\n\nBody text here.\n"
+        File.write(file_path, content)
+
+        result = Hwaro::Services::FrontmatterConverter.new(dir).convert_to_toml
+        result.success.should be_true
+        result.error_count.should eq(0)
+        result.skipped_count.should eq(1)
+        File.read(file_path).should eq(content)
       end
     end
 

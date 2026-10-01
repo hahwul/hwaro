@@ -67,8 +67,18 @@ module Hwaro
 
           # Rule-by-rule so one bad rule cannot take down the rows of the
           # healthy ones (matching the build, which names the bad rule).
+          #
+          # A plain `body` FIELD spec is evaluated too: a record missing that
+          # field fails every build ("missing field 'body'"), and skipping
+          # bodies listed those rows as publishable. A templated body (`{{ …
+          # }}` / `{% … %}`) and `body_template` stay unevaluated — they may
+          # `{% include %}` from templates/, and this planner's environment
+          # has no template loader, so rendering them here failed rules the
+          # build renders fine.
+          plan_bodies = rule.body_template.nil? &&
+                        (body = rule.body) && !Core::Build::ContentGenerate.template_spec?(body)
           plans = begin
-            Core::Build::ContentGenerate.plan([rule], disk_data, env, include_bodies: false)
+            Core::Build::ContentGenerate.plan([rule], disk_data, env, include_bodies: !!plan_bodies)
           rescue ex : Hwaro::HwaroError
             Logger.warn "  Skipping [[content.generate]] \"#{rule.source}\" rows: #{ex.message}"
             next
@@ -88,6 +98,7 @@ module Hwaro
               date: date,
               state: state,
               generated_from: plan.origin,
+              generated_source: plan.markdown,
             )
           end
         end

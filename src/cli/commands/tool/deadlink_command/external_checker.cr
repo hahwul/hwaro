@@ -95,7 +95,12 @@ module Hwaro
               deadline = Time.instant + (timeout_seconds.to_i64 * 3).seconds
 
               loop do
-                host = current_uri.host
+                # `hostname`, not `host`: an IPv6 literal's `host` keeps its
+                # brackets (`[::1]`), which no resolver accepts — the lookup
+                # failed, read as "not private", and the client then
+                # connected to the loopback address the guard exists to keep
+                # out of reach.
+                host = current_uri.hostname
                 # Non-ASCII (IDN) hosts are punycoded for DNS/connection;
                 # the original URL is kept for reporting.
                 connect_host = host ? ascii_host(host) : nil

@@ -104,9 +104,11 @@ module Hwaro
 
       # Quick "is there content under here?" check used to filter out
       # plain attachment directories. Returns on the first hit so we
-      # don't enumerate the entire subtree.
+      # don't enumerate the entire subtree. Extensions compare
+      # case-insensitively, like `ReadContent`: a `*.{md,markdown}` glob
+      # missed `Post.MD`, which the build publishes.
       private def dir_contains_markdown?(dir : String) : Bool
-        Dir.glob(File.join(dir, "**", "*.{md,markdown}")) { |_| return true }
+        Dir.glob(File.join(dir, "**", "*")) { |path| return true if ContentWalk.markdown?(path) }
         false
       end
 
@@ -117,10 +119,11 @@ module Hwaro
       # bundles rather than true sections.
       private def dir_has_markdown_in_subdirs?(dir : String, index_names : Set(String)) : Bool
         # Any markdown deeper than direct children of this dir?
-        Dir.glob(File.join(dir, "*/*.{md,markdown}")) { |_| return true }
+        Dir.glob(File.join(dir, "*", "*")) { |path| return true if ContentWalk.markdown?(path) }
 
         # Any direct markdown file that is *not* an index page?
-        Dir.glob(File.join(dir, "*.{md,markdown}")) do |path|
+        Dir.glob(File.join(dir, "*")) do |path|
+          next unless ContentWalk.markdown?(path)
           return true unless index_names.includes?(markdown_stem(File.basename(path)))
         end
 
@@ -144,7 +147,9 @@ module Hwaro
 
       # `index.ko.md` -> "index.ko". Only the markdown extension is
       # stripped; the language suffix is left on so the caller can match it
-      # against the declared codes.
+      # against the declared codes. An upper-case extension is left on too:
+      # `ReadContent` compares the basename against `index.md` verbatim, so
+      # `index.MD` is an ordinary page, not an index.
       private def markdown_stem(basename : String) : String
         if basename.ends_with?(".markdown")
           basename[0, basename.size - ".markdown".size]
@@ -170,42 +175,81 @@ module Hwaro
       # actually runs concurrently across cores. Each worker returns
       # the file's issue list (size 0 or 1) so we never share a
       # mutable issues array across fibers.
-      private def check_content_frontmatter(issues : Array(Issue), config : Models::Config?)
+      #
+      # `templates` is the loader-name set from `check_templates`, nil when
+      # there is no templates/ to check against — that is reported (as an
+      # error) by the templates group already.
+      private def check_content_frontmatter(issues : Array(Issue), config : Models::Config?, templates : Set(String)?)
         return unless Dir.exists?(@content_dir)
 
-        files = [] of String
-        Dir.glob(File.join(@content_dir, "**", "*.{md,markdown}")) do |path|
-          # Skip things that aren't regular files (symlink to nowhere,
-          # directory matching the glob, etc.). `File.file?` FOLLOWS
-          # symlinks, so a link cycle (`ln -s loop.md content/loop.md`)
-          # raised File::Error (ELOOP) out of the whole doctor run —
-          # zero diagnostics, and no JSON payload under --json.
-          # `ContentWalk.readable_file?` stats lstat-first, exactly like
-          # the sibling `tool validate` walk.
-          files << path if ContentWalk.readable_file?(path)
-        end
+        # The same walk `tool validate`/`list`/`stats` use: extensions
+        # compared case-insensitively like `ReadContent` (a lowercase-only
+        # glob skipped `Post.MD`, so doctor reported a clean site the build
+        # then failed on), and lstat-first so a symlink cycle
+        # (`ln -s loop.md content/loop.md`) can't raise ELOOP out of the run.
+        files = ContentWalk.find_content_files(@content_dir)
         return if files.empty?
 
-        # Only front matter `menus`/`menu` names get cross-checked against
-        # `config.menus` — and only when the config declares at least one
-        # menu at all. A site with NO `[[menus.*]]` anywhere is legitimately
-        # using front-matter-only, fully ad-hoc menus (Content::Menus builds
-        # them regardless of whether config declares that name), so nagging
-        # about "undeclared" menus there would be a false positive on a
-        # supported, legal setup.
-        known_menu_names = config.try(&.menus.keys) || [] of String
+        menus = MenuScope.new(config)
 
         per_file = Hwaro::Core::Build::ParallelHelper.map(files) do |path|
-          scan_content_file_for_frontmatter(path, known_menu_names)
+          scan_content_file_for_frontmatter(path, menus, templates)
         end
         per_file.each { |arr| arr.each { |i| issues << i } }
       end
 
+      # The `[[menus.*]]` names a page may register into, resolved per
+      # language exactly like `Content::Menus.build_for_language`: a
+      # `[languages.<code>]` block with its own `menus` table REPLACES the
+      # global set for that language, one without inherits it. Checking every
+      # page against the global names alone flagged a Korean page that
+      # registers into `[[languages.ko.menus.footer]]` as undeclared, and let
+      # a Korean page register into a global-only menu ko never renders.
+      #
+      # A language whose resolved set is empty is using front-matter-only,
+      # ad-hoc menus (`Content::Menus` builds those regardless), so nothing
+      # is checked for it.
+      record MenuScope, config : Models::Config? do
+        def default_language : String
+          config.try(&.default_language) || ""
+        end
+
+        # The language code a file name carries, mirroring
+        # `ReadContent#extract_language_from_filename`: only on a
+        # multilingual site, and only a declared code (or the default).
+        # nil otherwise — then the suffix is part of an ordinary page name.
+        def filename_language(path : String) : String?
+          cfg = config
+          return unless cfg && cfg.multilingual?
+          basename = File.basename(path)
+          stem = basename[0, basename.size - File.extname(basename).size]
+          idx = stem.rindex('.')
+          return unless idx && idx > 0
+          code = stem[(idx + 1)..]
+          code if cfg.languages.has_key?(code) || code == default_language
+        end
+
+        # The language a page renders in.
+        def language_for(path : String) : String
+          filename_language(path) || default_language
+        end
+
+        # {names, the table spelling to cite in the message}.
+        def names_for(language : String) : {Array(String), String}
+          cfg = config
+          return {[] of String, "menus"} unless cfg
+          if lang_menus = cfg.language(language).try(&.menus)
+            {lang_menus.keys, "languages.#{language}.menus"}
+          else
+            {cfg.menus.keys, "menus"}
+          end
+        end
+      end
+
       # Pure function: read + parse one markdown file, return any issue
       # produced as a small array. Fiber-safe because it touches no
-      # shared state. `known_menu_names` is empty when config declares no
-      # `[[menus.*]]` at all — see `check_content_frontmatter`.
-      private def scan_content_file_for_frontmatter(path : String, known_menu_names : Array(String)) : Array(Issue)
+      # shared state (`menus` and `templates` are read-only).
+      private def scan_content_file_for_frontmatter(path : String, menus : MenuScope, templates : Set(String)?) : Array(Issue)
         raw = begin
           File.read(path)
         rescue ex : IO::Error | File::Error
@@ -232,14 +276,52 @@ module Hwaro
         end
 
         issues = [] of Issue
-        unless known_menu_names.empty?
-          data[:menus].each_key do |menu_name|
-            next if known_menu_names.includes?(menu_name)
-            issues << Issue.new(id: "menu-undeclared", level: :warning, category: "content", file: path,
-              message: "Front matter registers menu \"#{menu_name}\" but no [[menus.#{menu_name}]] is declared in config.toml (defined: #{known_menu_names.sort.join(", ")})")
+        unless data[:menus].empty?
+          language = menus.language_for(path)
+          known, table = menus.names_for(language)
+          unless known.empty?
+            data[:menus].each_key do |menu_name|
+              next if known.includes?(menu_name)
+              issues << Issue.new(id: "menu-undeclared", level: :warning, category: "content", file: path,
+                message: "Front matter registers menu \"#{menu_name}\" but no [[#{table}.#{menu_name}]] is declared in config.toml (defined: #{known.sort.join(", ")})")
+            end
+          end
+        end
+
+        if templates
+          check_template_reference(issues, path, "template", data[:template], templates,
+            "the page renders with the default template instead")
+          # `page_template` and `[cascade]` only mean something on a section
+          # index; the build ignores them anywhere else.
+          if section_index_file?(path, menus)
+            check_template_reference(issues, path, "page_template", data[:page_template], templates,
+              "pages in this section render with the page template instead")
+            check_template_reference(issues, path, "cascade.template", data[:cascade]["template"]?.try(&.as?(String)), templates,
+              "pages below this section render with the default template instead")
           end
         end
         issues
+      end
+
+      # A front matter template name with no matching file. The build
+      # normalizes the extension away (`post.html` -> "post") and, on a miss,
+      # falls back to the default with only a build-log warning — or, for
+      # `page_template`, with no message at all.
+      private def check_template_reference(issues : Array(Issue), path : String, key : String, value : String?, templates : Set(String), consequence : String)
+        return unless value
+        # An empty name (`template = ".html"`) is a miss for the build too.
+        return if templates.includes?(value.sub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, ""))
+        issues << Issue.new(id: "content-template-missing", level: :warning, category: "content", file: path,
+          message: "Front matter #{key} \"#{value}\" matches no file in #{@templates_dir}/ — #{consequence}")
+      end
+
+      # `_index.md` / `_index.<lang>.md`, as `ReadContent` classifies it
+      # (the extension compared case-sensitively, like its basename check).
+      private def section_index_file?(path : String, menus : MenuScope) : Bool
+        stem = markdown_stem(File.basename(path))
+        return true if stem == "_index"
+        code = menus.filename_language(path)
+        !code.nil? && stem == "_index.#{code}"
       end
     end
   end

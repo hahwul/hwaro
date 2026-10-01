@@ -77,7 +77,7 @@ describe Hwaro::Services::Importers::HexoImporter do
       end
     end
 
-    it "removes <!-- more --> excerpt separator" do
+    it "keeps the <!-- more --> excerpt separator (hwaro's own summary marker)" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "source", "_posts")
         FileUtils.mkdir_p(posts_dir)
@@ -106,7 +106,7 @@ describe Hwaro::Services::Importers::HexoImporter do
         importer.run(options)
 
         content = File.read(File.join(output_dir, "posts", "excerpt-post.md"))
-        content.should_not contain("<!-- more -->")
+        content.should contain("This is the excerpt.\n\n<!-- more -->\n\nThis is the rest")
         content.should contain("This is the excerpt.")
         content.should contain("This is the rest of the content.")
       end

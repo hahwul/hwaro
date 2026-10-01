@@ -725,7 +725,8 @@ module Hwaro::Core::Build::Phases::ParseContent
   # at write time so `compute_output_url_winners` and `generate_aliases` see
   # the same list — a value filtered in only one of them would still claim an
   # output URL, or warn about colliding with a stub nothing ever writes.
-  ALIAS_SCHEME_RE = /\A[a-z][a-z0-9+.\-]*:/i
+  # The predicate lives in Utils::PathUtils so the tools that mirror the
+  # build's alias handling (`tool export`, `tool platform`) cannot drift.
 
   private def site_relative_aliases(aliases : Array(String), page_path : String) : Array(String)
     return aliases unless aliases.any? { |a| external_alias?(a) }
@@ -737,12 +738,7 @@ module Hwaro::Core::Build::Phases::ParseContent
   end
 
   private def external_alias?(value : String) : Bool
-    # `.scrub` before the regex: PCRE2 runs in UTF mode and raises on an
-    # invalid-UTF-8 subject, which a latin-1 byte in a hand-edited front
-    # matter file would produce — one bad alias must not abort the build.
-    # No-op (returns `self`) for valid UTF-8, so nothing else changes.
-    trimmed = value.strip
-    trimmed.starts_with?("//") || ALIAS_SCHEME_RE.matches?(trimmed.scrub)
+    Utils::PathUtils.external_alias?(value)
   end
 
   # Cascade values arrive as ExtraValue; tags/taxonomies/authors need plain

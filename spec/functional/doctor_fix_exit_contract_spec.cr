@@ -67,7 +67,9 @@ describe "hwaro doctor --fix exit contract" do
         code.should eq(Hwaro::Errors::EXIT_TEMPLATE)
         payload = JSON.parse(stdout)
         payload["exit_code"].as_i.should eq(Hwaro::Errors::EXIT_TEMPLATE)
-        payload["summary"]["errors"].as_i.should eq(2)
+        # page.html (error); section.html is a warning since sections can
+        # render through page.
+        payload["summary"]["errors"].as_i.should eq(1)
         payload["issues"].as_a.map(&.["id"].as_s).should contain("template-required-missing")
         # Pre-existing fix-mode fields must survive.
         payload["sections_added"].as_a.should be_empty
@@ -111,6 +113,35 @@ describe "hwaro doctor --fix exit contract" do
         payload["sections_added"].as_a.should_not be_empty
         payload["exit_code"].as_i.should eq(0)
       end
+    end
+  end
+end
+
+describe "hwaro doctor argument contract" do
+  # `hwaro doctor content/blog` ran a full check of the default `content/`
+  # and exited 0, as if the path had been honoured.
+  it "rejects a stray positional argument with a usage error" do
+    Dir.mktmpdir do |dir|
+      fix_project(dir, templates: true)
+      {["doctor", "content/blog"], ["tool", "doctor", "content/blog"]}.each do |args|
+        code, _, err = doctor_run(dir, args)
+        code.should eq(Hwaro::Errors::EXIT_USAGE)
+        err.should contain("unexpected extra argument(s): 'content/blog'")
+      end
+    end
+  end
+
+  # A warning `--fix` cannot repair used to end the run on "Config is up to
+  # date" with nothing else said, because the remaining-issues line was tied
+  # to a failing exit code.
+  it "says what remains after a --fix that exits zero" do
+    Dir.mktmpdir do |dir|
+      fix_project(dir, templates: true, title: "Hwaro Site")
+      code, stdout, err = doctor_run(dir, ["doctor", "--fix"])
+
+      code.should eq(Hwaro::Errors::EXIT_SUCCESS)
+      stdout.should_not contain("Config is up to date")
+      err.should contain("1 issue(s) remain")
     end
   end
 end

@@ -15,6 +15,7 @@ module Hwaro
       def missing_config_sections : Array(String)
         raw_text = readable_config_toml
         return [] of String unless raw_text
+        raw_text = Utils::TextUtils.strip_bom(raw_text)
 
         raw = parse_config_toml(raw_text)
         return [] of String unless raw
@@ -198,13 +199,22 @@ module Hwaro
         nil
       end
 
-      # Parse the raw `config.toml` text. Returns nil on TOML parse
+      # Parse the raw `config.toml` text (BOM already stripped — see
+      # `fix_config`). Returns nil on TOML parse
       # failure; callers already downstream of `check_config` have seen
       # the classified error so silent-nil here avoids double-reporting.
       # The rescue is narrowed to `TOML::ParseException` so any other
       # unexpected error propagates rather than being silently swallowed.
+      #
+      # Environment placeholders are substituted first, as `Config.load`
+      # does: an unquoted `per_page = ${PER_PAGE:-10}` only becomes TOML
+      # after substitution, so parsing the bare text made `--fix`/`--approve`
+      # refuse a config the build accepts and dropped every missing-section
+      # advisory for it. Unset variables are not warned about again —
+      # `check_config` already did.
       private def parse_config_toml(raw_text : String) : TOML::Table?
-        TOML.parse(raw_text)
+        substituted, _missing = Utils::EnvSubstitutor.substitute_toml(raw_text)
+        TOML.parse(substituted)
       rescue ex : TOML::ParseException
         Logger.debug "Doctor: TOML parse error in #{@config_path}: #{ex.message}"
         nil

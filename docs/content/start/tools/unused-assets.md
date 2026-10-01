@@ -49,7 +49,9 @@ hwaro tool unused-assets --delete --force --json
 - Template files (`.html`, `.j2`, `.jinja`, `.jinja2`, `.ecr`, plus `.css`, `.js`, `.xml`, `.json`, `.webmanifest`, `.svg`, `.txt`)
 - Static sources that can reference other static files (`.css`, `.scss`, `.sass`, `.js`, `.json`, `.webmanifest`, `.xml`, `.svg`, `.txt`, `.html`, `.htm`)
 - Data and translation files (`.yml`, `.yaml`, `.json`, `.toml` under `data/` and `i18n/`)
-- `config.toml` values that name files
+- `config.toml` and environment overrides (`config.production.toml`) values that name files
+- Stylesheets and scripts under the asset pipeline's `[assets] source_dir`, when it is not `static/`
+- Files the build links on its own: the self-hosted highlight.js theme and script when `[highlight] use_cdn = false`
 
 If your templates live outside `templates/`, point the scan at them with
 `--templates-dir` — otherwise their asset references are invisible and the

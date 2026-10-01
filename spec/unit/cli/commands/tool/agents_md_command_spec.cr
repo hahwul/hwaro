@@ -154,3 +154,39 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
     end
   end
 end
+
+# Regression: `hwaro tool agents-md AGENTS.md` printed to stdout, wrote
+# nothing, and exited 0.
+describe "tool agents-md positional argument validation" do
+  it "rejects positional arguments" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        ex = expect_raises(Hwaro::HwaroError) do
+          Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["AGENTS.md"])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        ex.message.to_s.should contain("unexpected extra argument(s): 'AGENTS.md'")
+
+        ex = expect_raises(Hwaro::HwaroError) do
+          Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--", "extra"])
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        File.exists?("AGENTS.md").should be_false
+      end
+    end
+  end
+end
+
+# Regression: an unknown flag reached unknown_args and was reported as an
+# "unexpected extra argument", blaming the valid positional instead.
+describe "tool agents-md unknown flags" do
+  it "reports an unknown flag as an invalid option" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        expect_raises(OptionParser::InvalidOption, "Invalid option: --bogus") do
+          Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--bogus"])
+        end
+      end
+    end
+  end
+end

@@ -41,13 +41,48 @@ describe Hwaro::Services::PlatformConfig do
         result.should contain("[build.environment]")
       end
 
-      it "includes cache headers" do
+      it "includes cache headers for fingerprinted pipeline assets" do
         config = Hwaro::Models::Config.new
+        config.assets.enabled = true
+        config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
         generator = Hwaro::Services::PlatformConfig.new(config)
         result = generator.generate("netlify")
 
         result.should contain("[[headers]]")
         result.should contain("Cache-Control")
+      end
+
+      # Regression: `/assets/*` was marked `immutable` for a year even when
+      # nothing there is content-hashed (asset pipeline off — the default —
+      # or fingerprint = false), so browsers kept stale CSS/JS after deploys.
+      it "omits the immutable cache rule when assets are not fingerprinted" do
+        config = Hwaro::Models::Config.new
+        Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("immutable")
+
+        config = Hwaro::Models::Config.new
+        config.assets.enabled = true
+        config.assets.fingerprint = false
+        Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("[[headers]]")
+      end
+
+      # Regression: `fingerprint` defaults to true but only bundle outputs are
+      # hashed — with no bundles, or with `static/assets/` copied verbatim
+      # into the same URL space, unhashed files were still marked immutable.
+      it "omits the immutable cache rule when unhashed files share the asset dir" do
+        config = Hwaro::Models::Config.new
+        config.assets.enabled = true
+        Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("immutable")
+
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
+            Hwaro::Services::PlatformConfig.new(config).generate("netlify").should contain("immutable")
+
+            FileUtils.mkdir_p("static/assets/css")
+            Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("immutable")
+            JSON.parse(Hwaro::Services::PlatformConfig.new(config).generate("vercel"))["headers"]?.should be_nil
+          end
+        end
       end
 
       # Regression for gh#528 (D): the example HWARO_VERSION pin had
@@ -75,13 +110,22 @@ describe Hwaro::Services::PlatformConfig do
         parsed["outputDirectory"].as_s.should eq("public")
       end
 
-      it "includes cache headers" do
+      it "includes cache headers for fingerprinted pipeline assets" do
         config = Hwaro::Models::Config.new
+        config.assets.enabled = true
+        config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
         generator = Hwaro::Services::PlatformConfig.new(config)
         result = generator.generate("vercel")
 
         parsed = JSON.parse(result)
         parsed["headers"].as_a.should_not be_empty
+      end
+
+      it "omits the immutable cache rule when assets are not fingerprinted" do
+        config = Hwaro::Models::Config.new
+        parsed = JSON.parse(Hwaro::Services::PlatformConfig.new(config).generate("vercel"))
+        parsed["headers"]?.should be_nil
+        parsed["outputDirectory"].as_s.should eq("public")
       end
     end
 
@@ -333,6 +377,8 @@ describe Hwaro::Services::PlatformConfig do
 
             config = Hwaro::Models::Config.new
             config.base_url = "https://example.com/myrepo/"
+            config.assets.enabled = true
+            config.assets.bundles << Hwaro::Models::AssetBundleConfig.new("main.css", ["css/main.css"])
             generator = Hwaro::Services::PlatformConfig.new(config)
 
             netlify = generator.generate("netlify")
@@ -348,9 +394,11 @@ describe Hwaro::Services::PlatformConfig do
         end
       end
 
-      # An alias is arbitrary user frontmatter; a quote or backslash must be
-      # TOML-escaped or the emitted netlify.toml is unparseable, breaking the
-      # user's deploy. Exercise both gsub branches (quote and backslash).
+      # An alias is arbitrary user frontmatter; a quote must be TOML-escaped
+      # or the emitted netlify.toml is unparseable, breaking the user's
+      # deploy. A backslash alias is refused by the build (no redirect stub),
+      # so it is skipped here too; the backslash escape is exercised through
+      # `[build] output_dir` instead.
       it "escapes TOML-special characters in netlify redirect from/to so the block stays parseable" do
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
@@ -360,19 +408,22 @@ describe Hwaro::Services::PlatformConfig do
             File.write("content/posts/p.md", "---\ntitle: P\naliases:\n  - \"/we\\\"ird/\"\n  - \"/back\\\\slash/\"\n---\nContent here\n")
 
             config = Hwaro::Models::Config.new
+            config.build.output_dir = "pub\\lic"
             generator = Hwaro::Services::PlatformConfig.new(config)
-            result = generator.generate("netlify")
+            result = ""
+            with_captured_log { result = generator.generate("netlify") }
 
             # The quote is escaped as \" and the backslash as \\.
             result.should contain("from = \"/we\\\"ird/\"")
-            result.should contain("from = \"/back\\\\slash/\"")
+            result.should contain("publish = \"pub\\\\lic\"")
+            result.should_not contain("slash")
 
             # The emitted netlify.toml must parse as valid TOML, and the
-            # escaped values must round-trip back to the original aliases.
+            # escaped values must round-trip back to the original values.
             parsed = TOML.parse(result)
             froms = parsed["redirects"].as_a.map(&.["from"].as_s)
-            froms.should contain("/we\"ird/")
-            froms.should contain("/back\\slash/")
+            froms.should eq(["/we\"ird/"])
+            parsed["build"]["publish"].as_s.should eq("pub\\lic")
           end
         end
       end

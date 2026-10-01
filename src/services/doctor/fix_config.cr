@@ -55,6 +55,14 @@ module Hwaro
           )
         end
 
+        # `Config.load` strips the byte order mark a Windows editor writes,
+        # so such a config builds and `doctor` checks it clean. Every scan
+        # here kept it: TOML rejected the text, so the missing-section report
+        # came back empty and `--fix` refused a file doctor had just called
+        # valid. Work on the text without it and put it back on write.
+        had_bom = raw_text.starts_with?('\uFEFF')
+        raw_text = Utils::TextUtils.strip_bom(raw_text)
+
         raw = parse_config_toml(raw_text)
         unless raw
           raise Hwaro::HwaroError.new(
@@ -126,6 +134,7 @@ module Hwaro
         begin
           original_permissions = File.info(target_path).permissions
           File.open(tmp_path, "w") do |f|
+            f.print('\uFEFF') if had_bom
             f.print(current_text)
             f.print("\n") unless current_text.ends_with?("\n")
             snippets.each { |s| f.print(s) }
@@ -240,7 +249,10 @@ module Hwaro
         in_string = multiline_string_line_states(lines)
         in_sitemap = false
         top_level = true
-        number = /[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/
+        # `inf`/`nan` are TOML floats too; doctor reports them (the loader
+        # silently swaps in the default), so `--fix` must be able to clear
+        # them as well.
+        number = /[+-]?(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|inf|nan)/
         lines.each_with_index do |line, idx|
           # Lines inside a TOML multi-line string are string CONTENT: a
           # priority-looking line there must never be clamped, and a
@@ -267,7 +279,11 @@ module Hwaro
           val = m[4].to_f?
           next unless val
           next if 0.0 <= val <= 1.0
-          clamped = val.clamp(0.0, 1.0)
+          # A non-finite value is not clamped: the loader replaces it with
+          # the default, so that is what the site has been built with and
+          # what `--fix` writes — `inf` -> 1.0 would silently change every
+          # sitemap entry.
+          clamped = val.finite? ? val.clamp(0.0, 1.0) : Models::SitemapConfig.new.priority
           # Render the clamped value with at least one fractional digit
           # so it stays a TOML float (mirrors how the scaffolded snippet
           # writes it: `priority = 0.5`).

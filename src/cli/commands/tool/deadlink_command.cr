@@ -11,6 +11,7 @@ require "yaml"
 require "../../../models/config"
 require "../../../services/content_lister"
 require "../../../services/internal_link_index"
+require "../../../services/page_route_index"
 require "../../../utils/frontmatter_scanner"
 require "../../../utils/text_utils"
 require "../../../utils/errors"
@@ -258,7 +259,7 @@ module Hwaro
               sources: [target_dir] + %w[config.toml templates static data themes].map { |d| File.join(project_root, d) },
               tool: "check-links",
             )
-            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, oracle)
+            dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, oracle, config)
             # Say it only where it changes how the result should be read: an
             # unusable tree explains dead internal links, a stale one explains
             # links it just accepted.
@@ -295,7 +296,19 @@ module Hwaro
             Logger.section("scan", scan_detail)
             links_noun = total == 1 ? "link" : "links"
 
-            if dead_total == 0 && skipped_external.empty?
+            if Logger.quiet?
+              # `Logger.item` is silenced by --quiet, which left a failing CI
+              # run with exit 1 and no output at all. Errors still reach
+              # stderr under --quiet: one line per dead link.
+              dead_external.each do |result|
+                detail = "#{sanitize_for_terminal(result.link.url)}  #{result.status}"
+                detail += " — #{sanitize_for_terminal(result.error.to_s)}" if result.error
+                Logger.error "#{sanitize_for_terminal(result.link.file)}: #{detail}"
+              end
+              dead_internal.each do |result|
+                Logger.error "#{sanitize_for_terminal(result.link.file)}: #{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}"
+              end
+            elsif dead_total == 0 && skipped_external.empty?
               Logger.info "" if Logger.color_enabled?
               Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
             else
@@ -368,9 +381,9 @@ module Hwaro
           # invocation for the same reason (an unfollowable symlink warns once).
           @markdown_files = {} of String => Array(String)
 
-          # Directory → the stems of its Markdown sources (`leaf` for
-          # `leaf.MD`), so route probes list each directory once per run.
-          @markdown_stems = {} of String => Set(String)
+          # Directory → its Markdown sources keyed by stem (`leaf` →
+          # `[dir/leaf.MD]`), so route probes list each directory once per run.
+          @markdown_stems = {} of String => Hash(String, Array(String))
 
           # Memoized per run: the same host used to be resolved synchronously
           # on every occurrence and every redirect hop, stalling all workers

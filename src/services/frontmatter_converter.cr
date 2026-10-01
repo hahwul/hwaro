@@ -78,6 +78,26 @@ module Hwaro
         NotFrontmatter
       end
 
+      # Top-level front-matter keys whose null is written to TOML by OMITTING
+      # the key. TOML has no null and the default spelling, `""`, is a SET
+      # value for these: the build reads a null `title`/`slug`/`image` as
+      # unset ("Untitled", slug from the filename, no og:image) but `slug =
+      # ""` collapsed the page onto its section index URL and dropped it.
+      # It is `Processors::Markdown::KNOWN_FRONT_MATTER_KEYS` minus the
+      # build's `ParseContent::CASCADABLE_KEYS`: for a cascadable key a null
+      # still DECLARES the key and blocks a section's `[cascade]` (`draft:
+      # ~` keeps a page out of a cascaded draft), which `""` preserves and
+      # omission would not. Custom/extra keys and nested members keep `""`
+      # too — the build turns their null into `""` with the key present.
+      # Pinned against both lists by frontmatter_converter_spec.
+      NULL_OMITTED_KEYS = Set{
+        "title", "description", "image", "date", "updated", "expires", "slug",
+        "path", "aliases", "transparent", "generate_feeds", "paginate",
+        "paginate_by", "pagination_enabled", "sort_by", "reverse",
+        "page_template", "paginate_path", "redirect_to", "weight", "categories",
+        "series", "series_weight", "cascade", "menus", "menu",
+      }
+
       # Content directory path
       @content_dir : String
 
@@ -322,15 +342,14 @@ module Hwaro
         case format
         when FrontmatterFormat::YAML
           return false unless match = content.match(YAML_FRONTMATTER_RE)
-          begin
-            parsed = YAML.parse(match[1])
-            # An empty block (`---\n---\n`) parses to nil; that is empty
-            # front matter, not body text — it must convert, not be skipped
-            # as "not front matter".
-            parsed.raw.nil? || parsed.as_h? ? true : false
-          rescue YAML::ParseException
-            true
-          end
+          # The build's own decision: a mapping or an empty/comment-only
+          # block is front matter (an empty one must convert, not be skipped
+          # as "not front matter"); a block that fails to parse is front
+          # matter only when it carries a `key:` line. Prose between two
+          # thematic breaks that is not valid YAML (`*Note*: …`) used to be
+          # reported as a conversion failure — failing the whole run — for
+          # a page the build renders fine.
+          Utils::FrontmatterScanner.yaml_front_matter?(match[1])
         when FrontmatterFormat::TOML
           # TOML.parse always yields a table; just require a closing delimiter.
           content.matches?(TOML_FRONTMATTER_RE)
@@ -490,7 +509,7 @@ module Hwaro
           json_data = JSON.parse(json_str)
           # Reuse the YAML→TOML builder by going through YAML::Any.
           yaml_any = json_to_yaml_any(json_data)
-          toml_body = Utils::FrontmatterWriter::TomlBuilder.new.build(yaml_any)
+          toml_body = Utils::FrontmatterWriter::TomlBuilder.new(NULL_OMITTED_KEYS).build(yaml_any)
           "#{TOML_DELIMITER}\n#{toml_body}#{TOML_DELIMITER}\n#{body}"
         rescue ex
           record_error(ex)
@@ -628,7 +647,7 @@ module Hwaro
       end
 
       private def convert_yaml_to_toml_string(yaml : YAML::Any, indent : Int32 = 0) : String
-        Utils::FrontmatterWriter::TomlBuilder.new.build(yaml)
+        Utils::FrontmatterWriter::TomlBuilder.new(NULL_OMITTED_KEYS).build(yaml)
       end
 
       private def convert_toml_to_yaml_string(toml : TOML::Table) : String

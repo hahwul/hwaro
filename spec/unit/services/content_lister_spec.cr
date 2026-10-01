@@ -567,6 +567,27 @@ describe Hwaro::Services::ContentInfo do
       end
     end
 
+    # The build's front-matter parser defines what a date is. The lenient
+    # importer parser matched a prefix of `"2099-01-01 10:00"` and listed the
+    # page as future, while the build ignores the unrecognised date and
+    # publishes it; zone-less values are local time to the build, not UTC.
+    it "parses dates exactly like the build does" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "nosec.md"), "+++\ntitle = \"NoSec\"\ndate = \"2099-01-01 10:00\"\n+++\n")
+        File.write(File.join(content_dir, "local.md"), "+++\ntitle = \"Local\"\ndate = \"2024-01-01T10:00:00\"\n+++\n")
+
+        by_title = Hwaro::Services::ContentLister.new(content_dir).list_all.to_h { |i| {i.title, i} }
+        builder = Hwaro::Content::Processors::Markdown.new
+        {"NoSec" => "nosec.md", "Local" => "local.md"}.each do |title, file|
+          expected = builder.parse(File.read(File.join(content_dir, file)))[:date]
+          by_title[title].date.should eq(expected)
+        end
+        by_title["NoSec"].status.should eq("published")
+      end
+    end
+
     it "sorts tie-breaker paths ascending (A-Z) (regression)" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

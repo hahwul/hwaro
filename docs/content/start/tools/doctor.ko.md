@@ -11,8 +11,8 @@ Hwaro 사이트의 설정, 템플릿, 구조 문제를 진단합니다.
 ```bash
 hwaro doctor
 
-# 특정 콘텐츠 디렉터리만 검사
-hwaro doctor -c posts
+# ./content가 아닌 콘텐츠 디렉터리 검사
+hwaro doctor -c src/content
 
 # 설정 값 정규화 (base_url 끝 슬래시, sitemap priority 등)
 hwaro doctor --fix
@@ -54,29 +54,45 @@ hwaro doctor --json
 - `base_url`이 설정되지 않았거나 끝 슬래시가 있음
 - `title`이 아직 자리표시자(`Hwaro Site`, `My Hwaro Site`)임
 - `sitemap.changefreq` 값이 유효하지 않음
-- `sitemap.priority`가 범위(0.0~1.0)를 벗어남
-- 택소노미 이름 또는 언어 코드 중복
+- `sitemap.priority`가 범위(0.0~1.0)를 벗어나거나 유한한 수가 아님 (`inf`, `nan`)
+- 택소노미 이름 중복, 또는 대소문자만 다른 언어 코드 (`en` / `EN`)
 - `search.format`, `markdown.math_engine`, `pwa.cache_strategy` 값이 유효하지 않음
 - `default_language`에 대응하는 `[languages.<code>]` 블록이 없음
 - `deployment.target` / `[related] taxonomies`가 정의되지 않은 대상을 참조함
 - `[[menus.*]]` 항목의 `parent`가 같은 메뉴의 어떤 identifier와도 맞지 않음
+- `[[versions.list]]` 항목의 콘텐츠 경로가 존재하지 않음
 - 참조한 파일·디렉터리가 존재하지 않음 (`[og] default_image`, `[pwa] icons`,
   `[auto_includes] dirs`, `[[assets.bundles]] files` 등). 자체 origin을 가진 값
   (`https://…`, `//cdn…`, `data:…`)은 원격 URL이라 검증할 수 없으므로 건너뜁니다.
+  - `[og] default_image`와 `[pwa] icons`는 URL 경로이므로 사이트가 실제로
+    게시하는 파일, 즉 `static/`(사이트 루트로 복사됨) 아래의 파일,
+    `[content.files]`가 게시하는 `content/` 파일, 또는 마지막 빌드 출력의 파일을
+    가리켜야 합니다. `default_image`에 `static/` 접두사를 붙이면 파일이
+    접두사 없이 게시되므로 이를 보고합니다.
+  - `[auto_includes] dirs`는 빌드와 마찬가지로 `static/` 아래에서 찾습니다.
+- 빌드가 컴파일하지 않는 SCSS 소스 (루트 `sass/` 디렉터리, 또는 `[sass]`가
+  꺼진 상태의 `static/` 아래 엔트리 파일)
 - 라우트 검사를 뒷받침할 수 없는 빌드 출력 (아래 [빌드 출력을 근거로 사용하기](#빌드-출력을-근거로-사용하기) 참고)
 
 **템플릿 진단:**
 
 - 템플릿 디렉터리를 찾을 수 없음
-- 필수 템플릿 누락 (`page.html`, `section.html`)
+- `page.html` 누락 (error: 페이지가 레이아웃 없는 원본 콘텐츠로 렌더링됨).
+  빌드가 `page.html` 대신 `default.html`을 사용하므로 `default.html`도 인정합니다.
+- `section.html` 누락 (warning: 섹션 페이지가 `page.html`로 렌더링됨)
 - 빌드와 동일한 Crinja 파서로 검사한 템플릿 문법 오류
-  (프로젝트 전용 숏코드 태그는 오류로 보지 않습니다)
+  (빌드가 파싱 전에 펼치는 `{% alert(type="info") %}…{% end %}` 같은 블록 숏코드는
+  오류로 보지 않지만, `{% includ %}`처럼 철자가 틀린 알 수 없는 태그는 오류입니다)
 
 **콘텐츠 진단:**
 
 - 콘텐츠 디렉터리를 찾을 수 없음 (빌드해도 페이지가 생성되지 않음)
 - 파싱에 실패하는 front matter (TOML/YAML)
-- `[[menus.*]]`에 선언되지 않은 메뉴 이름을 front matter가 등록함
+- `[[menus.*]]`에 선언되지 않은 메뉴 이름을 front matter가 등록함. 다른 언어의
+  페이지는 그 언어가 자체 메뉴를 선언했다면 `[[languages.<code>.menus.*]]`
+  기준으로 검사합니다.
+- front matter의 `template`(또는 섹션의 `page_template`, `[cascade] template`)이
+  존재하지 않는 템플릿을 가리킴. 빌드는 이를 조용히 기본 템플릿으로 대체합니다.
 
 **구조 진단:**
 
@@ -94,6 +110,7 @@ hwaro: doctor
     [ok]   taxonomies (duplicates)
     [ok]   search (format)
     [ok]   languages (default_language resolves)
+    [ok]   versions (content paths exist)
     [ok]   markdown / pwa (valid enums)
     [ok]   image processing (widths set)
     [ok]   deployment / related (refs resolve)
@@ -110,6 +127,7 @@ hwaro: doctor
     [ok]   directory present
     [ok]   front matter (TOML/YAML parse)
     [ok]   front matter menus (declared in config)
+    [ok]   front matter templates (exist)
     [info] section index files (_index.md)
 
 Config:
@@ -196,19 +214,24 @@ ignore = [
 | `deployment-target-undefined` | config | deployment.target에 대응하는 `[[deployment.targets]]` 없음 |
 | `related-taxonomy-undefined` | config | `[related]`가 정의되지 않은 택소노미를 참조 |
 | `menu-parent-undefined` | config | 메뉴 항목의 `parent`가 같은 메뉴의 identifier와 맞지 않음 |
+| `version-path-missing` | config | `[[versions.list]]` 경로가 `content/` 아래에 없음 |
 | `config-path-missing` | config | 참조한 파일이 존재하지 않음 |
 | `config-dir-missing` | config | 참조한 디렉터리가 존재하지 않음 |
 | `build-output-unusable` | config | `[build] output_dir`로 라우트를 검증할 수 없음 (없거나 `hwaro serve` 출력) |
 | `build-output-stale` | config | 소스보다 오래된 빌드 출력으로 라우트를 통과시킴 |
+| `sass-dir-not-scanned` | config | 빌드가 스캔하지 않는 루트 `sass/` 디렉터리에 SCSS 파일이 있음 |
+| `sass-disabled-with-sources` | config | `[sass]`가 꺼진 상태에서 `static/` 아래에 SCSS 엔트리 파일이 있음 |
 | `missing-config-*` | config_missing | 설정 섹션 누락 (예: `missing-config-pwa`) |
 | `template-dir-missing` | template | 템플릿 디렉터리를 찾을 수 없음 ✗ |
-| `template-required-missing` | template | 필수 템플릿 누락 ✗ |
+| `template-required-missing` | template | `page.html`(또는 `default.html`) 누락 ✗ |
+| `template-section-missing` | template | `section.html` 누락, 섹션은 `page.html`로 렌더링됨 |
 | `template-syntax-error` | template | 템플릿 파싱 실패 ✗ |
 | `template-read-error` | template | 템플릿 읽기 실패 ✗ |
 | `content-dir-missing` | content | 콘텐츠 디렉터리를 찾을 수 없음 |
 | `content-frontmatter-invalid` | content | front matter 파싱 실패 ✗ |
 | `content-read-error` | content | 콘텐츠 파일 읽기 실패 ✗ |
 | `menu-undeclared` | content | front matter의 메뉴 이름이 설정에 선언되지 않음 |
+| `content-template-missing` | content | front matter의 `template` / `page_template` / `[cascade] template`이 없는 템플릿을 가리킴 |
 | `structure-missing-index` | structure | `_index.md`가 없는 섹션 |
 
 어떤 규칙 ID와도 맞지 않는 항목은 "효과 없음" 경고로 알려주므로, 오타가 조용히

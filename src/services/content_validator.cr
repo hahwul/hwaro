@@ -196,11 +196,17 @@ module Hwaro
             # which already reaches them via its `{}` result.
             return ParsedFrontmatter.new({} of String => FrontmatterValue)
           rescue ex
+            # Prose between two thematic breaks (`---`, `*Note*: …`, `---`)
+            # is not front matter to the build, which renders it; only a
+            # block that looks like front matter is reported as broken.
+            return unless Utils::FrontmatterScanner.yaml_front_matter_like?(match[1])
             issues << Issue.new(id: "content-frontmatter-yaml-error", level: :error, category: "content", file: file_path,
               message: "YAML frontmatter parse error: #{ex.message}")
             return
           end
-        elsif content.starts_with?('{')
+        elsif Utils::FrontmatterScanner.json_start?(content)
+          # Same JSON-intent test as the build: a page opening with a
+          # shortcode (`{{ … }}`) or a Jinja tag has no front matter at all.
           end_idx = Utils::FrontmatterScanner.find_json_end(content)
           unless end_idx
             issues << Issue.new(id: "content-frontmatter-json-error", level: :error, category: "content", file: file_path,
@@ -256,7 +262,11 @@ module Hwaro
       end
 
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))
-        unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
+        # Fractional seconds (`10:00:00.123Z`, what JavaScript's
+        # `toISOString` and most exporters write) are RFC 3339 and the build
+        # parses them; without `(\.\d+)?` every such date was flagged, which
+        # failed `--strict` / `--max-warnings` on content that builds.
+        unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
           issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
             message: "Date format may be invalid: \"#{date_str}\"")
           return

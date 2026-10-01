@@ -8,29 +8,45 @@ module Hwaro
     class Doctor
       # Check templates directory for required files.
       #
-      # All template-level problems here are build-blocking — Crinja
-      # refuses to render if templates are missing or have syntax
-      # errors — so they're emitted at `:error` level so CI gates on
-      # `doctor`'s exit code catch them before `hwaro build` runs.
-      private def check_templates(issues : Array(Issue))
+      # A missing `page` template or a syntax error ships a broken site
+      # (raw fragments, or a render failure), so those are `:error` level
+      # and CI gates on `doctor`'s exit code catch them before `hwaro build`
+      # runs.
+      #
+      # Returns the loader names found (see `template_names`) so the
+      # front-matter scan can check template references without walking
+      # `templates/` a second time; nil when there is no `templates/`.
+      private def check_templates(issues : Array(Issue)) : Set(String)?
         unless Dir.exists?(@templates_dir)
           issues << Issue.new(id: "template-dir-missing", level: :error, category: "template", file: nil,
             message: "Templates directory not found: #{@templates_dir}")
           return
         end
 
-        %w[page.html section.html].each do |required|
-          path = File.join(@templates_dir, required)
-          unless template_present?(required)
-            issues << Issue.new(id: "template-required-missing", level: :error, category: "template", file: path,
-              message: "Required template file missing: #{required}")
-          end
+        files = template_files
+        names = template_names(files)
+
+        # `page` is the one template every page renders through; without it
+        # (or the `default` the loader aliases into its slot) the build
+        # writes raw, layout-less HTML fragments. `section` is not in
+        # the same class: a section with no `section` template renders
+        # through `page` (`determine_template`), so the build is fine and
+        # only the section listing is lost. Reporting that as an error made
+        # a site with no sections at all fail CI with no way to ignore it.
+        unless names.includes?("page")
+          issues << Issue.new(id: "template-required-missing", level: :error, category: "template", file: File.join(@templates_dir, "page.html"),
+            message: "Required template file missing: page.html")
+        end
+        unless names.includes?("section")
+          issues << Issue.new(id: "template-section-missing", level: :warning, category: "template", file: File.join(@templates_dir, "section.html"),
+            message: "Template file missing: section.html — section pages (_index.md) render with the page template instead")
         end
 
         # Check template files for basic syntax errors
-        template_files.each do |tpl_path|
+        files.each do |tpl_path|
           check_template_syntax(tpl_path, issues)
         end
+        names
       end
 
       # Every file the template loader would pick up. `.html` alone missed
@@ -58,32 +74,31 @@ module Hwaro
         end
       end
 
-      # A required template is present when some file in `templates/` loads
-      # under its NAME, exactly as `Phases::Initialize` computes it:
+      # The loader key for a template file: path relative to `@templates_dir`,
+      # minus one trailing template extension — exactly as
+      # `Phases::Initialize#load_templates` computes it:
       #
       #   name = Path[path].relative_to("templates").gsub(TEMPLATE_EXTENSION_REGEX, "")
       #
-      # Two consequences the previous version got wrong, both verified against
-      # the build with a marker in the template body:
+      # Two consequences, both verified against the build with a marker in
+      # the template body:
       #
-      #   * `page.jinja` / `page.j2` load as "page" and ARE applied; only
-      #     comparing against the required name with its extension still
-      #     attached (`"page.html"`) rejected them. `page.html.jinja` loads as
-      #     "page.html", is NOT applied (the build silently falls back to the
-      #     built-in default), and must therefore NOT satisfy the requirement.
+      #   * `page.jinja` / `page.j2` load as "page" and ARE applied, while
+      #     `page.html.jinja` loads as "page.html" and is NOT.
       #   * The name is the path RELATIVE to `templates/`, so
       #     `partials/page.html` loads as "partials/page" and cannot satisfy a
-      #     root requirement. Matching on `File.basename` hid a build-blocking
-      #     error for a project whose only templates live in a subdirectory.
-      private def template_present?(required : String) : Bool
-        wanted = required.gsub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, "")
-        template_files.any? { |path| template_name(path) == wanted }
-      end
-
-      # The loader key for a template file: path relative to `@templates_dir`,
-      # minus one trailing template extension.
+      #     root requirement.
       private def template_name(path : String) : String
         Path[path].relative_to(@templates_dir).to_s.gsub(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX, "")
+      end
+
+      # Every name a page can render through. The loader copies `default`
+      # into an absent `page` slot, so `default.html` alone renders every
+      # page — and is what `template = "page"` resolves to.
+      private def template_names(files : Array(String)) : Set(String)
+        names = files.map { |path| template_name(path) }.to_set
+        names << "page" if names.includes?("default")
+        names
       end
 
       # Template syntax check, delegated to the actual Crinja parser used
@@ -115,18 +130,44 @@ module Hwaro
           )
         end
       rescue ex
-        msg = ex.message.to_s
-        # Custom shortcodes (e.g. {% details %}, {% gallery %}) used inside
-        # template files for documentation/demo purposes are expected to be
-        # unknown to the bare Crinja parser used by doctor. These are not
-        # real template syntax errors — the project provides the shortcode
-        # implementation at build time via templates/shortcodes/*.html.
-        if msg.includes?("no tag with name") && msg.includes?("registered")
+        # Block shortcodes (`{% alert(type="info") %}…{% end %}`) are unknown
+        # to the bare Crinja parser used here, but the build expands them in
+        # its shortcode pass before Crinja ever sees the template, so they
+        # are not syntax errors. Only that shape is tolerated: any unknown
+        # tag used to be, so a typo such as `{% includ "footer.html" %}`
+        # passed doctor while `hwaro build` failed with the very same
+        # "no tag with name" error.
+        if (tag = UNKNOWN_TAG_RE.match(ex.message.to_s).try(&.[1])) &&
+           content && shortcode_block?(content, tag)
           return
         end
 
-        issues << Issue.new(id: "template-read-error", level: :error, category: "template", file: file_path,
-          message: "Failed to read template: #{ex.message}")
+        if ex.is_a?(Crinja::Error)
+          issues << Issue.new(id: "template-syntax-error", level: :error, category: "template", file: file_path,
+            message: format_crinja_error(ex))
+        else
+          issues << Issue.new(id: "template-read-error", level: :error, category: "template", file: file_path,
+            message: "Failed to read template: #{ex.message}")
+        end
+      end
+
+      # Crinja's `FeatureLibrary::UnknownFeatureError` message for a tag.
+      UNKNOWN_TAG_RE = /\Ano tag with name "([^"]+)" registered/
+
+      # True when `source` uses `name` as a block shortcode the build's
+      # shortcode pass consumes: an opener the pass recognizes
+      # (`ShortcodeProcessor::BLOCK_OPEN_RE`) followed by a shortcode closer
+      # (`{% end %}`, `{% end name %}` or `{% endname %}`). An unclosed
+      # opener is left in place by that pass ("never closed") and then fails
+      # in Crinja exactly as it does here.
+      private def shortcode_block?(source : String, name : String) : Bool
+        closer = /\{\%\s*end(?:\s*#{Regex.escape(name)})?\s*\%\}/i
+        pos = 0
+        while m = Core::Build::ShortcodeProcessor::BLOCK_OPEN_RE.match_at_byte_index(source, pos)
+          pos = m.byte_end(0)
+          return true if m[1] == name && closer.match_at_byte_index(source, pos)
+        end
+        false
       end
 
       private def template_parse_env : Crinja

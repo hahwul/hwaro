@@ -155,6 +155,34 @@ module Hwaro
         {segments, refused}
       end
 
+      # A URL scheme prefix (`https:`, `mailto:`, …) on an alias.
+      ALIAS_SCHEME_RE = /\A[a-z][a-z0-9+.\-]*:/i
+
+      # An alias names an incoming path ON THIS SITE, so one carrying a URL
+      # scheme or an authority (`//host/path`) is not something a build can
+      # publish. The single predicate the build's alias filter
+      # (Phases::ParseContent) and the tools that mirror it (`tool export`,
+      # `tool platform`) share.
+      def external_alias?(value : String) : Bool
+        # `.scrub` before the regex: PCRE2 runs in UTF mode and raises on an
+        # invalid-UTF-8 subject, which a latin-1 byte in a hand-edited front
+        # matter file would produce — one bad alias must not abort the build.
+        trimmed = value.strip
+        trimmed.starts_with?("//") || ALIAS_SCHEME_RE.matches?(trimmed.scrub)
+      end
+
+      # Why a build would not publish `value` as an alias, or nil when it
+      # would: external URLs are dropped at parse time, and a path segment
+      # that would traverse (`..`, `.`) is refused when the redirect stub is
+      # written (`url_output_path` in the render phase).
+      def alias_refusal(value : String) : String?
+        if external_alias?(value)
+          return "an alias is a path on this site, not an absolute or protocol-relative URL"
+        end
+        _, refused = split_safe_segments(value.lchop("/"))
+        "a path segment would escape the output directory" if refused
+      end
+
       # The output FILE a site-relative URL will be written to, normalized so
       # that two different URL strings landing on one file share a key.
       # `nil` when the URL cannot be published at all (a refused segment) —

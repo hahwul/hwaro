@@ -38,6 +38,52 @@ module Hwaro
         )
       end
 
+      # Report a URL-path config value (`/images/og.png`, `og.png`) that no
+      # published file backs: nothing under `static/` (copied to the site
+      # root), no `content/` file the build copies to the same path, and
+      # nothing in a trustworthy build output (which also covers page-bundle
+      # assets, published at their page's URL rather than their content
+      # path). `strip_static` mirrors writers that drop a leading `static/`
+      # themselves. Returns true when it reported, so route accounting can
+      # decide whether the build-output advisory is relevant.
+      #
+      # The `static/` literal is the build's (`normalize_icon_path`, the
+      # static copy root), not `@static_dir`.
+      private def emit_unpublished(issues : Array(Issue), config : Models::Config, label : String, value : String, oracle : Utils::BuildOutput::Oracle, *, strip_static : Bool) : Bool
+        return false if Content::Processors::InternalLinkResolver.has_own_origin?(value)
+        stripped = strip_query_hash(value)
+        stripped = stripped.lchop("static/") if strip_static
+        url_path = stripped.lchop("/")
+        return false if url_path.empty?
+        return false if File.file?(File.join(@static_dir, url_path)) ||
+                        published_content_file?(config, url_path) ||
+                        oracle.exists?(url_path)
+
+        # A `static/` prefix on a file that exists is a spelling mistake, not
+        # a missing build: say how to fix it, and keep the build-output
+        # advisory out of it (the return value).
+        if url_path.starts_with?("static/") && File.file?(File.join(@static_dir, url_path.lchop("static/")))
+          issues << Issue.new(id: "config-path-missing", level: :warning, category: "config", file: @config_path,
+            message: "#{label}: #{value} — the value is a URL path, so it points at /#{url_path}; the file publishes at /#{url_path.lchop("static/")} (drop the static/ prefix)")
+          return false
+        end
+
+        issues << Issue.new(id: "config-path-missing", level: :warning, category: "config", file: @config_path,
+          message: "#{label}: #{value} — no file under #{@static_dir}/ or #{@content_dir}/ publishes at /#{url_path}")
+        true
+      end
+
+      # A non-markdown file under `content/` is copied to the same relative
+      # path only as a raw file (`.json`/`.xml`) or when `[content.files]`
+      # publishes it — `ReadContent`'s rule. Anything else under `content/`
+      # never reaches the site at that path.
+      private def published_content_file?(config : Models::Config, url_path : String) : Bool
+        return false unless File.file?(File.join(@content_dir, url_path))
+        ext = File.extname(url_path).downcase
+        return true if ext == ".json" || ext == ".xml"
+        config.content_files.enabled? && config.content_files.publish?(url_path)
+      end
+
       private def check_referenced_paths(issues : Array(Issue), config : Models::Config)
         # A prior build's output is the only evidence doctor has for a route
         # no source file explains (a pipeline-emitted asset, a generated
@@ -72,7 +118,17 @@ module Hwaro
           unresolved_routes += 1 if issues.size > before
         end
 
-        config.og.default_image.try { |v| emit_file.call("[og] default_image", v) }
+        # URL-valued fields: the build writes these into the page as
+        # `base_url + "/" + value`, so what matters is whether a file is
+        # PUBLISHED at that path — not whether the string names some file in
+        # the repository. `static/og.png` exists on disk but publishes as
+        # `/og.png`, so the generated `og:image` URL `/static/og.png` 404s;
+        # an image at the project root is never published at all.
+        emit_published = ->(label : String, value : String, strip_static : Bool) do
+          unresolved_routes += 1 if emit_unpublished(issues, config, label, value, oracle, strip_static: strip_static)
+        end
+
+        config.og.default_image.try { |v| emit_published.call("[og] default_image", v, false) }
         config.og.auto_image.logo.try { |v| emit_file.call("[og.auto_image] logo", v) }
         config.og.auto_image.background_image.try { |v| emit_file.call("[og.auto_image] background_image", v) }
         config.pwa.offline_page.try { |v| emit_route.call("[pwa] offline_page", v) }
@@ -84,15 +140,25 @@ module Hwaro
           emit_route.call("[pwa] precache_urls[#{idx}]", url)
         end
         config.pwa.icons.each_with_index do |icon, idx|
-          emit_file.call("[pwa] icons[#{idx}]", icon)
+          # The manifest writer drops a leading `static/` (normalize_icon_path).
+          emit_published.call("[pwa] icons[#{idx}]", icon, true)
         end
 
-        # auto_includes.dirs are directory paths the build globs at runtime;
-        # a missing entry produces no link tags and silently ships an
-        # incomplete page.
+        # auto_includes.dirs are globbed under `static/` at build time
+        # (`File.join("static", dir)`); a missing entry produces no link
+        # tags and silently ships an incomplete page. Only that location
+        # counts: `dirs = ["assets/css"]` with a root-level `assets/css/`
+        # resolved for doctor and included nothing in the build.
         if config.auto_includes.enabled
           config.auto_includes.dirs.each_with_index do |dir, idx|
-            emit_dir.call("[auto_includes] dirs[#{idx}]", dir)
+            next if dir.empty? || Dir.exists?(File.join(@static_dir, dir))
+            issues << Issue.new(
+              id: "config-dir-missing",
+              level: :warning,
+              category: "config",
+              file: @config_path,
+              message: "[auto_includes] dirs[#{idx}]: #{dir} — directory not found under #{@static_dir}/",
+            )
           end
         end
 
@@ -165,10 +231,13 @@ module Hwaro
         # Entry files under static/ while [sass] is disabled: the raw
         # `.scss` publishes verbatim and any `<link>` to the compiled
         # `.css` 404s. Shipping raw sources can be deliberate (the bundles
-        # escape hatch), so this stays advisory.
+        # escape hatch), so this stays advisory. Sources `[static] exclude`
+        # filters out (e.g. `exclude = ["*.scss"]` beside an external Sass
+        # toolchain) never publish at all, so they are not "raw .scss" either.
         unless config.sass.enabled
           entries = Dir.glob(File.join(@static_dir, "**", "*.scss"), match: glob)
             .select { |p| File.file?(p) && !File.basename(p).starts_with?("_") }
+            .reject { |p| config.static.excluded?(Path[p].relative_to(@static_dir).to_s) }
           unless entries.empty?
             issues << Issue.new(
               id: "sass-disabled-with-sources",
@@ -217,7 +286,9 @@ module Hwaro
         # and remove a trailing `index.html` so `/about/` and
         # `/about/index.html` resolve the same way.
         slug = path.lchop("/")
-        slug = slug.rchop("index.html") if slug.ends_with?("index.html")
+        # Only a whole `index.html` segment: `/myindex.html` is its own file,
+        # and chopping the suffix resolved it against `content/my.md`.
+        slug = slug.rchop("index.html") if slug == "index.html" || slug.ends_with?("/index.html")
         slug = slug.rstrip("/")
 
         # Content sources that would render to this route.

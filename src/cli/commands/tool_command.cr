@@ -90,9 +90,16 @@ module Hwaro
         end
 
         def run(args : Array(String))
+          # A missing subcommand is a usage error like any other: the bare
+          # `exit(1)` gave scripts the generic exit code and no
+          # `HWARO_E_USAGE` line (the same fix `hwaro completion` got).
           if args.empty?
             print_help
-            exit(1)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_USAGE,
+              message: "missing <subcommand> argument",
+              hint: "Usage: hwaro tool <subcommand> — run 'hwaro tool --help' to see all subcommands.",
+            )
           end
 
           subcommand = args.shift

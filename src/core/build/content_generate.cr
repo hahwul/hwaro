@@ -284,7 +284,9 @@ module Hwaro
           end
         end
 
-        private def template_spec?(spec : String) : Bool
+        # Public for `Services::GeneratedContent`, which only evaluates plain
+        # field specs (a template may need the site's template loader).
+        def template_spec?(spec : String) : Bool
           spec.includes?("{{") || spec.includes?("{%")
         end
 

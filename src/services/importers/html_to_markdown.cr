@@ -127,6 +127,9 @@ module Hwaro
           # decode) would otherwise run INSIDE the code sample, converting or
           # stripping the HTML it demonstrates and double-decoding entities.
           code_stash = [] of String
+          # Indices of the stash entries that are inline code spans (the rest
+          # are fenced blocks), for the table pass's pipe escaping.
+          inline_code = Set(Int32).new
           result = result.gsub(/<pre[^>]*>\s*<code[^>]*>(.{0,#{MAX_CODE_BODY_CHARS}}?)<\/code>\s*<\/pre>/mi) do
             code = decode_html_entities($1)
             code_stash << "```\n#{code.strip}\n```\n\n"
@@ -142,12 +145,53 @@ module Hwaro
             code_placeholder(code_stash.size - 1)
           end
 
-          # Blockquotes
+          # Inline code is stashed too, for the same reason: its text is
+          # literal, so it is entity-decoded exactly once here and must not
+          # be touched by the prose escaping in `decode_prose_entities`
+          # (Markdown shows `&lt;` inside a code span verbatim).
+          result = result.gsub(/<code\b[^>]*>(.*?)<\/code>/mi) do
+            code_stash << "`#{decode_html_entities(strip_tags($1))}`"
+            inline_code << code_stash.size - 1
+            code_placeholder(code_stash.size - 1)
+          end
+
+          # WordPress's "Read more" tag (`<!--more-->`, optionally with custom
+          # link text) is the post's excerpt separator. hwaro reads the same
+          # marker as `<!-- more -->`, so keep it instead of letting
+          # `strip_tags` delete it with every other comment. Only that tag:
+          # an author's `<!-- more of the same -->` is just a comment.
+          result = result.gsub(MORE_TAG_RE, MORE_PLACEHOLDER)
+
+          # `[caption]` shortcode (classic-editor images): unwrap it, putting
+          # the caption text in its own paragraph under the image. Left as
+          # is, the shortcode rendered as literal `[caption id=…]` text.
+          # Pre-3.4 exports carry the text in a `caption="…"` attribute instead.
+          result = result.gsub(/\[caption\b([^\]]*)\](.*?)\[\/caption\]/mi) do
+            attrs = $1
+            inner = $2.strip
+            if m = inner.match(/\A((?:<a\b[^>]*>\s*)?<img\b[^>]*>(?:\s*<\/a>)?)\s*(.*)\z/mi)
+              caption = m[2].strip
+              caption = attrs.match(/\bcaption=["']([^"']*)["']/i).try(&.[1].strip) || "" if caption.empty?
+              caption.empty? ? "#{m[1]}\n\n" : "#{m[1]}\n\n#{caption}\n\n"
+            else
+              "#{inner}\n\n"
+            end
+          end
+
+          # Blockquotes. Paragraph boundaries inside the quote (and a
+          # Gutenberg `<cite>`) become quoted blank lines — deleting the
+          # `<p>` tags outright glued every paragraph into one run-on line.
           result = result.gsub(/<blockquote[^>]*>(.*?)<\/blockquote>/mi) do
+            # An excerpt marker can't split a quote (nor, below, a list
+            # item or a table cell) without breaking it apart; drop it there.
             inner = $1.strip
-            # Strip inner <p> tags
-            inner = inner.gsub(/<\/?p[^>]*>/i, "")
-            lines = inner.split("\n").map { |l| "> #{l.strip}" }
+              .gsub(MORE_PLACEHOLDER, "")
+              .gsub(/<\/p\s*>/i, "\n\n")
+              .gsub(/<p\b[^>]*>/i, "")
+              .gsub(/<cite\b[^>]*>/i, "\n\n")
+              .strip
+              .gsub(/\n[ \t]*(?:\n[ \t]*)+/, "\n\n")
+            lines = inner.split("\n").map { |l| l.strip.empty? ? ">" : "> #{l.strip}" }
             lines.join("\n") + "\n\n"
           end
 
@@ -168,7 +212,11 @@ module Hwaro
               items = $2.scan(/<li[^>]*>(.*?)<\/li>/mi)
               lines = items.map_with_index do |m, i|
                 marker = kind == "ol" ? "#{i + 1}. " : "- "
-                "#{marker}#{indent_continuation(strip_tags(m[1]).strip, marker.size)}"
+                # Inline markup first: a bare `strip_tags` here ran before
+                # the document-wide inline passes, so every link, image and
+                # emphasis inside a list item was flattened to plain text.
+                item = strip_tags(convert_inline(m[1])).gsub(MORE_PLACEHOLDER, "").strip
+                "#{marker}#{indent_continuation(item, marker.size)}"
               end
               "\n" + lines.join("\n") + "\n\n"
             end
@@ -184,7 +232,16 @@ module Hwaro
             inner = $1
             rows = inner.scan(/<tr[^>]*>(.*?)<\/tr>/mi).map do |m|
               m[1].scan(/<(?:th|td)[^>]*>(.*?)<\/(?:th|td)>/mi).map do |cell|
-                strip_tags(cell[1]).strip.gsub(/\s+/, " ").gsub("|", "\\|")
+                # Same as list items: convert inline markup before stripping.
+                text = strip_tags(convert_inline(cell[1])).gsub(MORE_PLACEHOLDER, "").strip.gsub(/\s+/, " ").gsub("|", "\\|")
+                # A stashed code span sits in the cell as a placeholder, so
+                # its pipes have to be escaped in the stash itself. Only a
+                # span's: in a fenced block `\|` is literal text.
+                text.scan(CODE_PLACEHOLDER_RE) do |pm|
+                  idx = pm[1].to_i
+                  code_stash[idx] = code_stash[idx].gsub("|", "\\|") if inline_code.includes?(idx)
+                end
+                text
               end
             end
             rows.reject!(&.empty?)
@@ -216,6 +273,31 @@ module Hwaro
           result = result.gsub(/<br\b[^>]*>/i, "  \n")
 
           # Inline elements
+          result = convert_inline(result)
+
+          # Strip remaining HTML tags
+          result = strip_tags(result)
+
+          # Decode HTML entities
+          result = decode_prose_entities(result)
+
+          # Restore stashed code (already entity-decoded exactly once) and
+          # the excerpt marker.
+          code_stash.each_with_index do |block, i|
+            result = result.sub(code_placeholder(i), block)
+          end
+          result = result.gsub(MORE_PLACEHOLDER, "\n\n<!-- more -->\n\n")
+
+          # Clean up whitespace
+          result = result.gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
+          result.strip
+        end
+
+        # The inline passes (images, links, emphasis, strikethrough). Run on
+        # the whole document and, before their own `strip_tags`, on list
+        # items and table cells.
+        private def self.convert_inline(html : String) : String
+          result = html
 
           # Images (before links to avoid nested match issues).
           # Drop the URL (keep the alt text) when the scheme is unsafe so an
@@ -254,38 +336,65 @@ module Hwaro
           end
 
           # Bold
-          result = result.gsub(/<(?:strong|b)>(.*?)<\/(?:strong|b)>/mi) { "**#{$1}**" }
+          result = result.gsub(/<(?:strong|b)>(.*?)<\/(?:strong|b)>/mi) { emphasize($1, "**") }
 
           # Italic
-          result = result.gsub(/<(?:em|i)>(.*?)<\/(?:em|i)>/mi) { "*#{$1}*" }
-
-          # Inline code
-          result = result.gsub(/<code>(.*?)<\/code>/mi) { "`#{$1}`" }
+          result = result.gsub(/<(?:em|i)>(.*?)<\/(?:em|i)>/mi) { emphasize($1, "*") }
 
           # Strikethrough
-          result = result.gsub(/<(?:del|s|strike)>(.*?)<\/(?:del|s|strike)>/mi) { "~~#{$1}~~" }
+          result = result.gsub(/<(?:del|s|strike)>(.*?)<\/(?:del|s|strike)>/mi) { emphasize($1, "~~") }
 
-          # Strip remaining HTML tags
-          result = strip_tags(result)
-
-          # Decode HTML entities
-          result = decode_html_entities(result)
-
-          # Restore stashed code fences (already entity-decoded exactly once).
-          code_stash.each_with_index do |block, i|
-            result = result.sub(code_placeholder(i), block)
-          end
-
-          # Clean up whitespace
-          result = result.gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
-          result.strip
+          result
         end
+
+        # Wrap `inner` in an emphasis delimiter, moving its edge whitespace
+        # outside: WordPress's visual editor routinely leaves the space
+        # inside the tag (`<strong>bold </strong>text`), and `**bold **text`
+        # is not emphasis in Markdown — the asterisks render literally.
+        # A no-break space (`&nbsp;`, `&#160;`, U+00A0) counts as edge
+        # whitespace too — the editor inserts it just as often.
+        private def self.emphasize(inner : String, delim : String) : String
+          lead = inner[EDGE_SPACE_LEAD_RE]? || ""
+          rest = inner[lead.size..]
+          trail = rest[EDGE_SPACE_TRAIL_RE]? || ""
+          core = rest[0, rest.size - trail.size]
+          return inner if core.empty?
+          "#{lead}#{delim}#{core}#{delim}#{trail}"
+        end
+
+        EDGE_SPACE          = "(?:\\s|\\x{A0}|&nbsp;|&#0*160;|&#x0*a0;)"
+        EDGE_SPACE_LEAD_RE  = Regex.new("\\A#{EDGE_SPACE}+", Regex::Options::IGNORE_CASE)
+        EDGE_SPACE_TRAIL_RE = Regex.new("#{EDGE_SPACE}+\\z", Regex::Options::IGNORE_CASE)
 
         # NUL-delimited placeholder: survives every regex pass (no `<>`, no
         # `&…;`) and can't occur in real exported content (XML forbids NUL).
         private def self.code_placeholder(index : Int32) : String
           "\u0000hwaro-code-#{index}\u0000"
         end
+
+        CODE_PLACEHOLDER_RE = /\x{0}hwaro-code-(\d+)\x{0}/
+        MORE_PLACEHOLDER    = "\u0000hwaro-more\u0000"
+        MORE_TAG_RE         = /<!--more(?:\s.*?)?-->|<!--\s*more\s*-->/mi
+
+        # Entity-decode prose for Markdown. Decoding is what makes the output
+        # readable, but a decoded `&lt;script&gt;` — text the author wrote to
+        # be SHOWN — turned into a live `<script>` tag that swallowed the
+        # rest of the page. Re-escape exactly the characters Markdown would
+        # read as markup: a `<` that could open an HTML tag, comment or
+        # declaration, and an `&amp;` whose decoded `&` would start an entity
+        # reference (`&amp;copy;` is the literal text "&copy;"). Named
+        # entities this decoder doesn't know stay encoded; Markdown decodes
+        # those itself.
+        private def self.decode_prose_entities(text : String) : String
+          decode_html_entities(text.gsub(/#{AMP_ENTITY}(?=#?[A-Za-z0-9]+;)/i, AMP_PLACEHOLDER))
+            .gsub(/<(?=[A-Za-z\/!?])/, "&lt;")
+            .gsub(AMP_PLACEHOLDER, "&amp;")
+        end
+
+        AMP_PLACEHOLDER = "\u0000hwaro-amp\u0000"
+
+        # Every spelling of an encoded `&`: WordPress writes `&#038;` often.
+        AMP_ENTITY = /&(?:amp|#0*38|#x0*26);/i
 
         private def self.strip_tags(html : String) : String
           html.gsub(/<[^>]*>/, "")
@@ -334,8 +443,11 @@ module Hwaro
               # import. The range check below already rejects it, but to_i
               # would raise before we ever get there.
               code = $1.to_i?
-              # Validate Unicode range (exclude surrogates 0xD800..0xDFFF)
-              if code && code > 0 && code <= 0x10FFFF && !(0xD800 <= code <= 0xDFFF)
+              # Validate Unicode range (exclude surrogates 0xD800..0xDFFF).
+              # An encoded `&` (38) is left for the final AMP_ENTITY pass.
+              if code == 38
+                $~[0]
+              elsif code && code > 0 && code <= 0x10FFFF && !(0xD800 <= code <= 0xDFFF)
                 code.chr.to_s
               else
                 ""
@@ -343,16 +455,18 @@ module Hwaro
             end
             .gsub(/&#[xX]([0-9a-fA-F]+);/) do
               code = $1.to_i?(16)
-              if code && code > 0 && code <= 0x10FFFF && !(0xD800 <= code <= 0xDFFF)
+              if code == 0x26
+                $~[0]
+              elsif code && code > 0 && code <= 0x10FFFF && !(0xD800 <= code <= 0xDFFF)
                 code.chr.to_s
               else
                 ""
               end
             end
-            .gsub("&amp;", "&")
-          # `&amp;` LAST: decoding it first turned `&amp;lt;` (a literal
-          # "&lt;" in the source text) into a real `<` — the classic
-          # double-unescape.
+            .gsub(AMP_ENTITY, "&")
+          # An encoded `&` (`&amp;`, `&#038;`, `&#x26;`) LAST: decoding it
+          # first turned `&amp;lt;` (a literal "&lt;" in the source text)
+          # into a real `<` — the classic double-unescape.
         end
       end
     end
