@@ -1093,7 +1093,7 @@ module Hwaro
             # command = "aws s3 sync {source}/ {url} --delete"
 
             # [[deployment.matchers]]
-            # pattern = "^.+\\.html$"
+            # pattern = '^.+\\.html$'   # TOML literal string: backslashes stay as typed
             # force = true          # always re-copy matches, even when identical
 
             TOML

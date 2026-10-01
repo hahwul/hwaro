@@ -38,6 +38,11 @@ module Hwaro
           super.merge(font_files)
         end
 
+        # Pages the menus/nav link to (kept as stubs by --skip-sample-content).
+        protected def skeleton_page_paths : Array(String)
+          ["index.md", "about.md"]
+        end
+
         def template_files(skip_taxonomies : Bool = false) : Hash(String, String)
           files = {
             "header.html"  => header_template,

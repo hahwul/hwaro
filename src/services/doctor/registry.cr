@@ -117,7 +117,7 @@ module Hwaro
         default_heading: "templates/",
         checks: [
           CheckSpec.new("required files (page.html, section.html)",
-            ["template-dir-missing", "template-required-missing"]),
+            ["template-dir-missing", "template-required-missing", "template-section-missing"]),
           CheckSpec.new("template syntax",
             ["template-syntax-error", "template-read-error"]),
         ],
@@ -133,6 +133,8 @@ module Hwaro
             ["content-frontmatter-invalid", "content-read-error"]),
           CheckSpec.new("front matter menus (declared in config)",
             ["menu-undeclared"], blocked_by: CONFIG_BLOCKING_IDS),
+          CheckSpec.new("front matter templates (exist)",
+            ["content-template-missing"], blocked_by: ["template-dir-missing"]),
           CheckSpec.new("section index files (_index.md)",
             ["structure-missing-index"], blocked_by: CONFIG_BLOCKING_IDS),
         ],

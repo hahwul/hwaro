@@ -283,3 +283,30 @@ describe "hwaro init classified usage errors" do
     end
   end
 end
+
+describe "hwaro init path and config-mode usage errors" do
+  it "rejects a bare '-' path instead of falling back to the current directory" do
+    err = expect_raises(Hwaro::HwaroError) do
+      Hwaro::CLI::Commands::InitCommand.new.parse_options(["-", "--clean"])
+    end
+    err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+  end
+
+  it "still accepts '-' as a literal directory name after --" do
+    Hwaro::CLI::Commands::InitCommand.new.parse_options(["--", "-"]).path.should eq("-")
+  end
+
+  it "rejects an empty path as a usage error" do
+    err = expect_raises(Hwaro::HwaroError) do
+      Hwaro::CLI::Commands::InitCommand.new.parse_options([""])
+    end
+    err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+  end
+
+  it "rejects --minimal-config together with --full-config" do
+    err = expect_raises(Hwaro::HwaroError, /cannot be used together/) do
+      Hwaro::CLI::Commands::InitCommand.new.parse_options(["--minimal-config", "--full-config"])
+    end
+    err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+  end
+end

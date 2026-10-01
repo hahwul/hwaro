@@ -8,6 +8,7 @@ require "toml"
 require "../config/options/init_options"
 require "../utils/errors"
 require "../utils/file_safe"
+require "../utils/frontmatter_writer"
 require "../utils/logger"
 require "../utils/path_utils"
 require "../services/scaffolds/registry"
@@ -108,6 +109,10 @@ module Hwaro
         @target_path = target_path
         @planned.clear
         @planned_dirs.clear
+        # Per-run state: `config_created` below reads @entries, so a reused
+        # instance must not see the previous run's `:create` entries.
+        @entries.clear
+        @created_count = 0
 
         if clean && Dir.exists?(target_path) && !Dir.empty?(target_path)
           clean_target(target_path)
@@ -161,12 +166,15 @@ module Hwaro
         # Create content structure
         create_directory(File.join(target_path, "content"))
 
-        unless skip_sample_content
-          if is_multilingual
-            create_multilingual_content(target_path, multilingual_languages, skip_taxonomies, scaffold)
-          else
-            create_scaffold_content(target_path, scaffold, skip_taxonomies)
-          end
+        if skip_sample_content
+          # Still write the pages the scaffold's menus and templates link to
+          # (front matter only), or the homepage and every nav link 404.
+          languages = is_multilingual ? multilingual_languages : [] of String
+          write_files(File.join(target_path, "content"), scaffold.skeleton_content_files(languages, skip_taxonomies))
+        elsif is_multilingual
+          create_multilingual_content(target_path, multilingual_languages, skip_taxonomies, scaffold)
+        else
+          create_scaffold_content(target_path, scaffold, skip_taxonomies)
         end
 
         # Create templates
@@ -181,6 +189,9 @@ module Hwaro
         # Create archetype files so `hwaro new` has templates to match
         # against and the archetype convention is discoverable.
         create_scaffold_archetypes(target_path, scaffold)
+
+        # Root-relative extras (a remote scaffold's data/ and i18n/).
+        write_files(target_path, scaffold.extra_files)
 
         # Create config.toml
         # Hybrid philosophy (C):
@@ -218,8 +229,11 @@ module Hwaro
         # of the generated config. Built-in scaffolds only — a remote
         # scaffold's config is used verbatim.
         if (title = site_title) && !title.empty? && !scaffold.is_a?(Scaffolds::Remote)
-          escaped = title.gsub("\\", "\\\\").gsub("\"", "\\\"")
-          config_content = config_content.sub(/^title\s*=\s*"[^"\n]*"/m, "title = \"#{escaped}\"")
+          # Block form: a String replacement is itself parsed for back-references
+          # (`\0`, `\\`), which collapsed the escaped `C:\\Users` back into the
+          # invalid TOML escape `C:\Users`.
+          escaped = Hwaro::Utils::FrontmatterWriter.escape_toml_string(title)
+          config_content = config_content.sub(/^title\s*=\s*"[^"\n]*"/m) { "title = \"#{escaped}\"" }
         end
 
         create_file(File.join(target_path, "config.toml"), config_content)
@@ -249,8 +263,12 @@ module Hwaro
 
         # Auto-add missing optional config sections (commented out).
         # Only for built-in scaffolds + full_config (remote provides its own config).
-        if full_config && !scaffold.is_a?(Scaffolds::Remote)
-          config_path = File.join(target_path, "config.toml")
+        # Only into a config.toml this run created: `--force` keeps an
+        # existing one as-is, and appending ~300 lines to it (or failing on
+        # it when it does not parse) broke that promise.
+        config_path = File.join(target_path, "config.toml")
+        config_created = @entries.any? { |entry| entry.action == :create && entry.path == config_path }
+        if full_config && config_created && !scaffold.is_a?(Scaffolds::Remote)
           doctor = Services::Doctor.new(
             content_dir: File.join(target_path, "content"),
             config_path: config_path
@@ -454,11 +472,22 @@ module Hwaro
       end
 
       private def clean_target(target_path : String)
-        if Dir.exists?(File.join(target_path, ".git"))
+        # Any `.git` entry, not only a directory: a git worktree or submodule
+        # checkout has a `.git` FILE (a gitlink), and wiping one destroyed
+        # the uncommitted work and the checkout's link to its repository.
+        if File.info?(File.join(target_path, ".git"), follow_symlinks: false)
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_USAGE,
-            message: "Refusing to --clean '#{target_path}': target contains a .git directory.",
+            message: "Refusing to --clean '#{target_path}': target contains a .git entry (repository, worktree or submodule).",
             hint: "Delete .git manually if you really want to wipe this directory.",
+          )
+        end
+
+        if protected_clean_root?(target_path)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_USAGE,
+            message: "Refusing to --clean '#{target_path}': it is the filesystem root or your home directory.",
+            hint: "Point hwaro init at a dedicated project directory, e.g. hwaro init my-site --clean.",
           )
         end
 
@@ -471,6 +500,17 @@ module Hwaro
           FileUtils.rm_rf(full)
           Logger.action :remove, full, Logger::Role::Warn
         end
+      end
+
+      # `/` and `$HOME` are never a project directory; `hwaro init --clean`
+      # typed in the wrong terminal tab would otherwise empty them.
+      private def protected_clean_root?(target_path : String) : Bool
+        real = File.realpath(target_path)
+        return true if Path[real].root == Path[real]
+        home = ENV["HOME"]?
+        !!(home && !home.empty? && Dir.exists?(home) && File.realpath(home) == real)
+      rescue File::Error
+        false
       end
 
       private def create_directory(path : String)

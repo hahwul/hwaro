@@ -122,9 +122,13 @@ hwaro init my-site --scaffold https://github.com/user/repo/tree/main/docs
 ```
 
 원격 스캐폴드는 저장소에서 `config.toml`, `templates/`, `static/`,
-콘텐츠 구조를 가져옵니다. 콘텐츠 파일은 프론트 매터(메타데이터)만
-유지하므로 원본 본문 없이도 기대되는 페이지 구조를 확인할 수 있습니다.
-API 요청 제한을 피하려면 `GITHUB_TOKEN` 환경 변수를 설정합니다.
+`data/`, `i18n/`, `archetypes/`, 콘텐츠 구조를 가져옵니다. 콘텐츠 파일은
+프론트 매터(메타데이터)만 유지하므로 원본 본문 없이도 기대되는 페이지
+구조를 확인할 수 있습니다. `/tree/<branch>/` URL은 해당 브랜치를
+가져오고, 그 외에는 저장소의 기본 브랜치를 사용합니다. 파일 하나라도
+내려받지 못하면 아무것도 쓰지 않고 `HWARO_E_NETWORK`로 종료합니다.
+API 요청 제한을 피하거나 비공개 저장소에서 가져오려면 `GITHUB_TOKEN`
+환경 변수를 설정합니다.
 
 **옵션:**
 
@@ -134,13 +138,13 @@ API 요청 제한을 피하려면 `GITHUB_TOKEN` 환경 변수를 설정합니�
 | --wizard | 대화형 위저드 실행 (TTY 전용) |
 | --agents MODE | AGENTS.md 콘텐츠 모드: `remote`(가벼움, 기본값) 또는 `local`(전체 레퍼런스 내장) |
 | -f, --force | 디렉터리가 비어 있지 않아도 강제로 생성 (기존 파일은 유지) |
-| --clean | 스캐폴드 전에 대상의 기존 파일을 삭제 (`--force` 포함, 대상에 `.git/`이 있으면 거부) |
+| --clean | 스캐폴드 전에 대상의 기존 파일을 삭제 (`--force` 포함, 대상에 `.git` 디렉터리나 파일이 있거나 대상이 `/` 또는 홈 디렉터리면 거부) |
 | --skip-agents-md | AGENTS.md 파일 생성 생략 |
-| --skip-sample-content | 샘플 콘텐츠 파일 생성 생략 |
+| --skip-sample-content | 샘플 콘텐츠 생략. 스캐폴드 내비게이션이 가리키는 페이지(홈, 섹션 인덱스, About 등)는 프론트 매터만 있는 스텁으로 생성 |
 | --skip-taxonomies | 택소노미 설정과 템플릿 생략 |
 | --include-multilingual LANGS | 다국어 지원 활성화 (예: `en,ko,ja`). 중복 코드는 경고와 함께 제거됩니다 |
-| --minimal-config | 주석과 선택 섹션 없는 최소 `config.toml` 생성 |
-| --full-config | 모든 주석과 선택 섹션을 포함한 전체 `config.toml` 생성 (탐색성 최대) |
+| --minimal-config | 주석과 선택 섹션 없는 최소 `config.toml` 생성 (`--full-config`와 함께 쓸 수 없음) |
+| --full-config | 모든 주석과 선택 섹션을 포함한 전체 `config.toml` 생성 (탐색성 최대). `--force`로 유지되는 기존 `config.toml`은 수정하지 않음 |
 | --list-scaffolds | 사용 가능한 내장 스캐폴드 목록 출력 후 종료 |
 | -q, --quiet | 정보 출력과 배너 숨김 (오류는 stderr로 계속 출력) |
 | -j, --json | 기계가 읽을 수 있는 JSON 출력: `--list-scaffolds`와 함께면 스캐폴드 목록, 그 외에는 `{"status","path","scaffold","files_created"}` 결과 |
@@ -515,12 +519,12 @@ hwaro doctor --full        # 둘 다 (--fix --approve와 동일)
 |---|---|
 | 문제 없음, 경고만, 또는 info 수준 발견 | `0` |
 | 설정 오류 (`config.toml` 누락/손상) | `3` (`HWARO_E_CONFIG`) |
-| 템플릿 오류 (필수 파일 누락, 닫히지 않은 태그) | `4` (`HWARO_E_TEMPLATE`) |
-| 콘텐츠 오류 (잘못된 프론트 매터, 해당 검사가 도입되면) | `5` (`HWARO_E_CONTENT`) |
+| 템플릿 오류 (`page.html` 누락, 닫히지 않은 태그) | `4` (`HWARO_E_TEMPLATE`) |
+| 콘텐츠 오류 (잘못된 프론트 매터, 읽을 수 없는 파일) | `5` (`HWARO_E_CONTENT`) |
 | 그 외 error 수준 문제 | `1` |
 
 경고(빈 `base_url`, 끝 슬래시, 중복 택소노미 이름 등)는 참고용이며
-종료 코드를 바꾸지 않습니다.
+`--strict`나 `--max-warnings N`을 주지 않는 한 종료 코드를 바꾸지 않습니다.
 
 콘텐츠 검증에는 `hwaro tool validate`를 사용합니다. 자세한 내용은 [doctor](/ko/start/tools/doctor/)를 참고합니다.
 

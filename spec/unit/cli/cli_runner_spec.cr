@@ -69,6 +69,23 @@ describe Hwaro::CLI::Runner do
       Hwaro::Logger.quiet = false
     end
 
+    it "leaves -q after -- alone (a positional, e.g. a directory named -q)" do
+      argv = ["init", "--clean", "--", "-q"]
+      Hwaro::Logger.quiet = false
+      Hwaro::CLI::Runner.apply_global_quiet!(argv)
+      argv.should eq(["init", "--clean", "--", "-q"])
+      Hwaro::Logger.quiet?.should be_false
+    end
+
+    it "still strips -q before --" do
+      argv = ["init", "-q", "--", "-q"]
+      Hwaro::Logger.quiet = false
+      Hwaro::CLI::Runner.apply_global_quiet!(argv)
+      argv.should eq(["init", "--", "-q"])
+      Hwaro::Logger.quiet?.should be_true
+      Hwaro::Logger.quiet = false
+    end
+
     it "is a no-op when neither flag is present" do
       argv = ["build", "--verbose"]
       Hwaro::Logger.quiet = false
@@ -238,5 +255,12 @@ describe Hwaro::CLI::Runner do
         end
       end
     end
+  end
+end
+
+describe "Hwaro::CLI::Runner.flag_args" do
+  it "stops at the -- separator" do
+    Hwaro::CLI::Runner.flag_args(["init", "-j", "--", "--json"]).should eq(["init", "-j"])
+    Hwaro::CLI::Runner.flag_args(["init", "--json"]).should eq(["init", "--json"])
   end
 end

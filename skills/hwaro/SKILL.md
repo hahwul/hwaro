@@ -108,8 +108,10 @@ hwaro init --list-scaffolds --json       # discover built-ins programmatically
 
 Useful flags: `--agents remote|local` (AGENTS.md mode), `--include-multilingual en,ko,ja`,
 `--minimal-config`, `--skip-sample-content`, `--skip-taxonomies`, `-f/--force`.
-Remote scaffolds fetch `config.toml`, `templates/`, `static/`, and the content
-*structure* (front matter only). Set `GITHUB_TOKEN` to avoid rate limits.
+Remote scaffolds fetch `config.toml`, `templates/`, `static/`, `data/`, `i18n/`,
+`archetypes/`, and the content *structure* (front matter only); a
+`/tree/<branch>/` URL selects the branch. Set `GITHUB_TOKEN` to avoid rate
+limits or to read a private repository.
 
 ### B. Create content — `hwaro new`
 

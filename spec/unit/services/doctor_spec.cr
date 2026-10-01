@@ -324,20 +324,36 @@ describe Hwaro::Services::Doctor do
         end
       end
 
-      it "reports missing required template files as errors (build-blocking)" do
+      it "reports a missing page.html as an error" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, base_config)
           templates_dir = File.join(dir, "templates")
           FileUtils.mkdir_p(templates_dir)
-          # Only create page.html, not section.html
-          File.write(File.join(templates_dir, "page.html"), "<html>{{ content }}</html>")
+          # Only create section.html, not page.html
+          File.write(File.join(templates_dir, "section.html"), "<html>{{ content }}</html>")
 
           doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
           issues = doctor.run
           tpl_issues = issues.select { |i| i.category == "template" }
-          tpl_issues.any? { |i| i.message.includes?("section.html") && i.level == :error }.should be_true
-          tpl_issues.any?(&.message.includes?("page.html")).should be_false
+          tpl_issues.any? { |i| i.message.includes?("page.html") && i.level == :error }.should be_true
+          tpl_issues.any?(&.message.includes?("section.html")).should be_false
+        end
+      end
+
+      # Sections render through `page` when `section` is absent — the build
+      # does not fail, so this is advisory.
+      it "reports a missing section.html as a warning" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, base_config)
+          templates_dir = File.join(dir, "templates")
+          FileUtils.mkdir_p(templates_dir)
+          File.write(File.join(templates_dir, "page.html"), "<html>{{ content }}</html>")
+
+          doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path, templates_dir: templates_dir)
+          tpl_issues = doctor.run.select { |i| i.category == "template" }
+          tpl_issues.map { |i| {i.id, i.level} }.should eq([{"template-section-missing", :warning}])
         end
       end
 
