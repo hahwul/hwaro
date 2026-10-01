@@ -80,15 +80,13 @@ module Hwaro
 
             # date (falling back to Hugo's publishDate so a page dated only
             # via publishDate doesn't lose its date entirely)
-            if date_str = string_value(data, "date") || string_value(data, "publishdate")
-              parsed = parse_date(date_str)
-              fields["date"] = format_date(parsed) if parsed
+            if parsed = time_value(data, "date") || time_value(data, "publishdate")
+              fields["date"] = format_date(parsed)
             end
 
             # updated (from lastmod)
-            if lastmod_str = string_value(data, "lastmod")
-              parsed = parse_date(lastmod_str)
-              fields["updated"] = format_date(parsed) if parsed
+            if parsed = time_value(data, "lastmod")
+              fields["updated"] = format_date(parsed)
             end
 
             # draft
@@ -156,9 +154,8 @@ module Hwaro
             fields["image"] = image if image
 
             # expires (from expiryDate)
-            if expires_str = string_value(data, "expirydate")
-              parsed = parse_date(expires_str)
-              fields["expires"] = format_date(parsed) if parsed
+            if parsed = time_value(data, "expirydate")
+              fields["expires"] = format_date(parsed)
             end
           end
 
@@ -370,6 +367,21 @@ module Hwaro
             end
           end
           nil
+        end
+
+        # A date-valued field. A TOML/YAML date or datetime is used as
+        # parsed: rendering it to an offset string first turned a bare TOML
+        # date (`date = 2024-05-02`, a local date) into a timestamp pinned to
+        # the importing machine's zone (`2024-05-02T00:00:00+09:00`), so the
+        # same source imported differently on every machine.
+        private def time_value(data : Hash(String, TOML::Any), key : String) : Time?
+          return unless val = data[key]?
+          case raw = val.raw
+          when Time
+            raw
+          when String
+            parse_date(raw) unless raw.empty?
+          end
         end
 
         private def array_string_value(data : Hash(String, TOML::Any), key : String) : Array(String)

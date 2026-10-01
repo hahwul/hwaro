@@ -527,6 +527,29 @@ describe "Hugo import: front matter key case" do
   end
 end
 
+describe "Hugo import: TOML local dates" do
+  it "keeps a bare TOML date bare instead of pinning it to the machine's zone" do
+    saved = Time::Location.local
+    Time::Location.local = Time::Location.fixed("KST", 9 * 3600)
+    begin
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = File.join(tmpdir, "hugo_site")
+        FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+        File.write(File.join(hugo_dir, "content", "p.md"), "+++\ntitle = \"P\"\ndate = 2024-05-02\nlastmod = 2024-06-01\nexpiryDate = 2030-01-01\n+++\nx\n")
+        output_dir = File.join(tmpdir, "out")
+        Hwaro::Services::Importers::HugoImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+        content = File.read(File.join(output_dir, "p.md"))
+        content.should contain(%(date = "2024-05-02"\n))
+        content.should contain(%(updated = "2024-06-01"\n))
+        content.should contain(%(expires = "2030-01-01"\n))
+      end
+    ensure
+      Time::Location.local = saved
+    end
+  end
+end
+
 describe "Hugo import: url with query or fragment" do
   # `?q=1#top` is not part of the page path; kept, it became a literal
   # directory name.
