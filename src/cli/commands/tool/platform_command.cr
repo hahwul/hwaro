@@ -53,6 +53,11 @@ module Hwaro
                 exit
               end
               parser.unknown_args do |before_dash, after_dash|
+                # An unknown flag lands here too; report it as the parser
+                # would rather than blaming the (valid) positional.
+                if flag = before_dash.find { |arg| arg.starts_with?('-') && arg != "-" }
+                  raise OptionParser::InvalidOption.new(flag)
+                end
                 unknown = before_dash + after_dash
                 # A second positional is usually an attempted output path or
                 # a second platform; silently dropping it wrote one default

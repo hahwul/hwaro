@@ -70,6 +70,11 @@ module Hwaro
               # `hwaro tool agents-md AGENTS.md` printed to stdout and wrote
               # nothing; the destination is fixed and writing needs --write.
               parser.unknown_args do |before_dash, after_dash|
+                # An unknown flag lands here too; report it as the parser
+                # would rather than blaming the (valid) positional.
+                if flag = before_dash.find { |arg| arg.starts_with?('-') && arg != "-" }
+                  raise OptionParser::InvalidOption.new(flag)
+                end
                 unknown = before_dash + after_dash
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,

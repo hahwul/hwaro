@@ -176,3 +176,17 @@ describe "tool agents-md positional argument validation" do
     end
   end
 end
+
+# Regression: an unknown flag reached unknown_args and was reported as an
+# "unexpected extra argument", blaming the valid positional instead.
+describe "tool agents-md unknown flags" do
+  it "reports an unknown flag as an invalid option" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        expect_raises(OptionParser::InvalidOption, "Invalid option: --bogus") do
+          Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--bogus"])
+        end
+      end
+    end
+  end
+end
