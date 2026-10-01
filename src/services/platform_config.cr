@@ -183,7 +183,7 @@ module Hwaro
       # year after every deploy.
       private def immutable_assets? : Bool
         assets = @config.assets
-        return false unless assets.enabled && assets.fingerprint && !assets.bundles.empty?
+        return false if !assets.enabled || !assets.fingerprint || assets.bundles.empty?
         !Dir.exists?(File.join("static", assets_url_dir))
       end
 
