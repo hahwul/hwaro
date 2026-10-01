@@ -549,23 +549,31 @@ describe "Hugo import: TOML local dates" do
     end
   end
 
-  it "keeps a TOML local date-time zone-less instead of adding the machine's offset" do
-    saved = Time::Location.local
-    Time::Location.local = Time::Location.fixed("KST", 9 * 3600)
-    begin
-      Dir.mktmpdir do |tmpdir|
-        hugo_dir = File.join(tmpdir, "hugo_site")
-        FileUtils.mkdir_p(File.join(hugo_dir, "content"))
-        File.write(File.join(hugo_dir, "content", "p.md"), "+++\ntitle = \"P\"\ndate = 2024-05-02T10:00:00\nlastmod = 2024-05-03T10:00:00Z\n+++\nx\n")
-        output_dir = File.join(tmpdir, "out")
-        Hwaro::Services::Importers::HugoImporter.new.run(
-          Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
-        content = File.read(File.join(output_dir, "p.md"))
-        content.should contain(%(date = "2024-05-02T10:00:00"\n))
-        content.should contain(%(updated = "2024-05-03T10:00:00Z"\n))
+  # The same source must import identically on a UTC machine (CI, Docker)
+  # and a +09:00 laptop: a TOML local date-time stays zone-less, an offset
+  # or `Z` date-time keeps its zone.
+  [Time::Location::UTC, Time::Location.fixed("KST", 9 * 3600)].each do |zone|
+    it "keeps a TOML local date-time zone-less (machine zone #{zone})" do
+      saved = Time::Location.local
+      Time::Location.local = zone
+      begin
+        Dir.mktmpdir do |tmpdir|
+          hugo_dir = File.join(tmpdir, "hugo_site")
+          FileUtils.mkdir_p(File.join(hugo_dir, "content"))
+          File.write(File.join(hugo_dir, "content", "p.md"),
+            "+++\ntitle = \"P\"\ndate = 2024-05-02T10:00:00 # local\nlastmod = 2024-05-03T10:00:00Z\n" \
+            "expiryDate = 2030-01-01 12:30:00\n[params]\nother = 2024-01-01T00:00:00\n+++\nx\n")
+          output_dir = File.join(tmpdir, "out")
+          Hwaro::Services::Importers::HugoImporter.new.run(
+            Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+          content = File.read(File.join(output_dir, "p.md"))
+          content.should contain(%(date = "2024-05-02T10:00:00"\n))
+          content.should contain(%(updated = "2024-05-03T10:00:00Z"\n))
+          content.should contain(%(expires = "2030-01-01T12:30:00"\n))
+        end
+      ensure
+        Time::Location.local = saved
       end
-    ensure
-      Time::Location.local = saved
     end
   end
 end
