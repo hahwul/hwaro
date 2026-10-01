@@ -133,6 +133,8 @@ checked: 50 links, 3 dead
 `→ url status` 상세 줄로 표시되고, 마지막에 `✦ checked` 결과 줄이 붙습니다(모든
 링크가 정상이면 `checked: 50 links · all healthy`). 깨진 링크가 발견되면 명령이
 0이 아닌 종료 코드를 반환하므로 CI 게이트로 쓸 수 있습니다.
+`-q`/`--quiet`를 주면 보고서는 출력되지 않지만, 깨진 링크는 각각
+`파일: url  상태` 한 줄로 stderr에 계속 출력됩니다.
 
 ## JSON 출력
 

@@ -141,6 +141,8 @@ In a color terminal each dead link renders as a `✗ file` item with a `→ url
 status` detail line under an `hwaro check-links` heading, closed by a `✦ checked`
 outcome (`checked: 50 links · all healthy` when everything resolves). The
 command exits non-zero when dead links are found, so it can gate CI.
+With `-q`/`--quiet` the report is suppressed, but each dead link is still
+printed to stderr as one `file: url  status` line.
 
 ## JSON Output
 
