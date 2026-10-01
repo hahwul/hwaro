@@ -93,25 +93,32 @@ module Hwaro
         monthly = {} of String => Int32
 
         published_items.each do |item|
-          content = begin
-            # Like the build's front-matter reader (and the lister above): a
-            # BOM defeats every `\A`-anchored fence, so a BOM'd file lost its
-            # tags and had its front matter counted as body words.
-            Utils::TextUtils.strip_bom(File.read(item.path))
-          rescue IO::Error
-            next
-          end
+          # A `[[content.generate]]` page has no file at its path: its tags
+          # and date come from the planned source document instead (the
+          # build publishes its term pages and dates like an authored
+          # file's). Bodies are not planned, so it adds no word count.
+          if generated = item.generated_source
+            content = generated
+          else
+            content = begin
+              # Like the build's front-matter reader (and the lister above): a
+              # BOM defeats every `\A`-anchored fence, so a BOM'd file lost its
+              # tags and had its front matter counted as body words.
+              Utils::TextUtils.strip_bom(File.read(item.path))
+            rescue IO::Error
+              next
+            end
 
-          # PCRE2 raises ArgumentError on invalid UTF-8 — the same escape
-          # extract_tags guards against; one bad file must not kill the
-          # whole report.
-          body = begin
-            extract_body(content)
-          rescue ArgumentError
-            next
+            # PCRE2 raises ArgumentError on invalid UTF-8 — the same escape
+            # extract_tags guards against; one bad file must not kill the
+            # whole report.
+            body = begin
+              extract_body(content)
+            rescue ArgumentError
+              next
+            end
+            word_counts << count_words(body)
           end
-          wc = count_words(body)
-          word_counts << wc
 
           # Extract tags
           extract_tags(content, item.path).each do |tag|

@@ -255,6 +255,38 @@ describe "tool publication-state parity" do
         Hwaro::Services::ContentStats.new(content_dir).run.tags.keys.should eq(["json"])
       end
     end
+    # A `[[content.generate]]` page has no file at its listed path, so stats
+    # counted it as published but silently dropped its tags and month — the
+    # build writes /tags/<term>/ pages for it like for any authored post.
+    it "counts the tags and month of a [[content.generate]] page" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content/products")
+          FileUtils.mkdir_p("data")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "name"
+            date = "date"
+            [content.generate.taxonomies]
+            tags = "tags"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "alpha", "name": "Alpha", "date": "2024-02-03", "tags": ["gen", "alpha"]}]))
+          File.write("content/products/_index.md", "+++\ntitle = \"Products\"\n+++\n")
+
+          result = Hwaro::Services::ContentStats.new("content").run
+          result.published.should eq(2)
+          result.tags.should eq({"gen" => 1, "alpha" => 1})
+          result.monthly.should eq({"2024-02" => 1})
+        end
+      end
+    end
   end
 
   describe Hwaro::Services::ContentValidator do

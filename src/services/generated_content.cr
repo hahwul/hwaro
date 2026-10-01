@@ -88,6 +88,7 @@ module Hwaro
               date: date,
               state: state,
               generated_from: plan.origin,
+              generated_source: plan.markdown,
             )
           end
         end

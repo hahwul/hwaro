@@ -168,6 +168,12 @@ module Hwaro
       # consumers see no new key on authored entries.
       property generated_from : String?
 
+      # The planned source document (front matter only — bodies are not
+      # planned) of a `[[content.generate]]` page, which has no file at
+      # `path` for `tool stats` to read its taxonomies from. Never emitted.
+      @[JSON::Field(ignore: true)]
+      property generated_source : String? = nil
+
       def initialize(
         @path : String,
         @title : String = "Untitled",
@@ -187,6 +193,7 @@ module Hwaro
         state : PublishState,
         @expires : Time? = nil,
         @generated_from : String? = nil,
+        @generated_source : String? = nil,
       )
         @status = state.label
       end
