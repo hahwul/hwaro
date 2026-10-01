@@ -35,24 +35,24 @@ Draft pages, index pages, and generated pages are excluded from related post com
 
 ## Template Variable
 
-Each page has a `related_posts` array containing the related pages sorted by relevance:
+Each page exposes `page.related_posts`, an array of the related pages sorted by relevance:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| related_posts | array | Pages related to the current page, sorted by shared term count |
+| page.related_posts | array | Pages related to the current page, sorted by shared term count |
 
-Each item in `related_posts` is a full page object with access to all page variables (`title`, `url`, `description`, `date`, `tags`, etc.).
+Each item in `page.related_posts` is a full page object with access to all page variables (`title`, `url`, `description`, `date`, `tags`, etc.).
 
 ## Usage in Templates
 
 ### Basic Related Posts
 
 ```jinja
-{% if related_posts | length > 0 %}
+{% if page.related_posts | length > 0 %}
 <section class="related-posts">
   <h2>Related Posts</h2>
   <ul>
-    {% for post in related_posts %}
+    {% for post in page.related_posts %}
     <li>
       <a href="{{ post.url }}">{{ post.title }}</a>
       {% if post.description %}
@@ -68,10 +68,10 @@ Each item in `related_posts` is a full page object with access to all page varia
 ### With Tags Display
 
 ```jinja
-{% if related_posts | length > 0 %}
+{% if page.related_posts | length > 0 %}
 <aside class="related">
   <h3>You might also like</h3>
-  {% for post in related_posts %}
+  {% for post in page.related_posts %}
   <article>
     <a href="{{ post.url }}">{{ post.title }}</a>
     <div class="tags">

@@ -37,7 +37,7 @@ paginate_path = "page"
 
 | 필드 | 타입 | 기본값 | 설명 |
 |-------|------|---------|-------------|
-| paginate | int | — | 페이지당 항목 수 |
+| paginate | int | — | 페이지당 항목 수. `0` 이하면 이 섹션의 페이지네이션을 끕니다 |
 | paginate_path | string | "page" | 페이지 URL 패턴 |
 
 ### 생성되는 URL

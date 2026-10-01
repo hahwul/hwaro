@@ -211,6 +211,84 @@ describe Hwaro::Core::Build::Phases::Transform do
       page_b.higher.should be_nil
     end
 
+    # Regression: a headless (`render = false`) page is never written, but it
+    # sat in the reading order, so its neighbours linked to a 404.
+    it "leaves headless (render = false) pages out of the reading order" do
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+
+      section = make_section("blog/_index.md", "blog")
+      section.sort_by = "weight"
+      a = make_page("blog/a.md", "blog")
+      a.weight = 1
+      hidden = make_page("blog/hidden.md", "blog")
+      hidden.weight = 2
+      hidden.render = false
+      c = make_page("blog/c.md", "blog")
+      c.weight = 3
+      ctx.sections = [section]
+      ctx.pages = [a, hidden, c]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_link_page_navigation(ctx)
+
+      a.higher.should eq(c)
+      c.lower.should eq(a)
+      hidden.lower.should be_nil
+      hidden.higher.should be_nil
+
+      # The serve relink must agree with the cold build.
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      site.sections = [section]
+      site.pages = [c, hidden, a]
+      builder.test_relink_navigation_for_sections(site).should be_empty
+    end
+
+    # Regression: a section whose parent directory has no `_index.md`
+    # (`guide/basics/_index.md`, no `guide/_index.md`) was neither a
+    # top-level section nor anyone's subsection, and append_orphan_pages skips
+    # a known section's pages — the whole subtree had no prev/next at all.
+    it "walks a section whose parent directory has no _index.md" do
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+
+      root = make_section("_index.md", "")
+      top = make_section("top/_index.md", "top")
+      top.weight = 1
+      t1 = make_page("top/t1.md", "top")
+      basics = make_section("guide/basics/_index.md", "guide/basics")
+      basics.weight = 2
+      basics.sort_by = "weight"
+      b1 = make_page("guide/basics/b1.md", "guide/basics")
+      b1.weight = 1
+      b2 = make_page("guide/basics/b2.md", "guide/basics")
+      b2.weight = 2
+      ctx.sections = [root, top, basics]
+      ctx.pages = [t1, b1, b2]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_build_subsections(ctx)
+      builder.test_link_page_navigation(ctx)
+
+      chain = [] of String
+      page = root.as(Hwaro::Models::Page?)
+      while page
+        chain << page.path
+        page = page.higher
+      end
+      chain.should eq(["_index.md", "top/_index.md", "top/t1.md",
+                       "guide/basics/_index.md", "guide/basics/b1.md", "guide/basics/b2.md"])
+      b1.lower.should eq(basics)
+      b2.lower.should eq(b1)
+
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      site.sections = [basics, root, top]
+      site.pages = [b2, t1, b1]
+      builder.test_relink_navigation_for_sections(site).should be_empty
+    end
+
     it "links page bundles alongside single-file pages (issue #539)" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -571,6 +649,27 @@ describe Hwaro::Core::Build::Phases::Transform do
       site.authors.has_key?("alice").should be_true
       pages_raw = site.authors["alice"].raw.as(Hash(Crinja::Value, Crinja::Value))["pages"].raw.as(Array(Crinja::Value))
       pages_raw.size.should eq(1) # only the published page, not the draft
+    end
+
+    # Regression: `sort_pages(…, "date", true)` reversed an already
+    # newest-first comparator, so `author.pages` listed the oldest post first.
+    it "lists an author's pages newest first" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      pages = {"p2021.md" => 2021, "p2023.md" => 2023, "p2022.md" => 2022}.map do |path, year|
+        p = make_page(path)
+        p.title = path
+        p.date = Time.utc(year, 1, 1)
+        p.authors = ["alice"]
+        p
+      end
+      site.pages = pages
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_aggregate_site_authors(site)
+
+      pages_raw = site.authors["alice"].raw.as(Hash(Crinja::Value, Crinja::Value))["pages"].raw.as(Array(Crinja::Value))
+      pages_raw.map { |v| v.raw.as(Hash(Crinja::Value, Crinja::Value))["title"].to_s }
+        .should eq(["p2023.md", "p2022.md", "p2021.md"])
     end
   end
 
