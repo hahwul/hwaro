@@ -426,6 +426,26 @@ module Hwaro
 
         INTERNAL_LINK_RE = /\[([^\]]*)\]\(@\/([^\)]+)\)/
 
+        # A reference-style link definition (`[ref]: @/posts/a.md "Title"`),
+        # which the build resolves exactly like an inline link.
+        REFERENCE_DEF_RE = /^( {0,3}\[[^\]]+\]:[ \t]*)@\/(\S+)/m
+
+        # The `aliases` the build would actually publish, as strings, or nil
+        # when the value is not an alias list at all. An absolute URL, a
+        # protocol-relative `//host/…` or a traversing path is dropped with
+        # the build's own warning — the build skips those, and passed through
+        # they broke the target (Hugo refuses to build a site with an
+        # `http*` alias; `../up` became a local redirect the source never had).
+        protected def publishable_aliases(value : YAML::Any?, source : String) : Array(String)?
+          aliases = string_list_field(value)
+          return unless aliases
+          aliases.reject do |a|
+            next false unless reason = Hwaro::Utils::PathUtils.alias_refusal(a)
+            Logger.warn "Skipping alias #{a.inspect} on #{source}: #{reason}."
+            true
+          end
+        end
+
         # Convert @/ internal links to relative paths.
         #
         # The build resolves `@/` only in rendered link hrefs, so an `@/` link
@@ -438,10 +458,18 @@ module Hwaro
           return body unless body.includes?("@/")
 
           code = code_byte_ranges(body)
-          body.gsub(INTERNAL_LINK_RE) do |whole, match|
+          body = body.gsub(INTERNAL_LINK_RE) do |whole, match|
             start = match.byte_begin(0)
             next whole if code.any?(&.includes?(start))
-            rewrite_link_target(match[1], match[2])
+            "[#{match[1]}](#{rewrite_link_target(match[2])})"
+          end
+          return body unless body.includes?("@/")
+
+          # Offsets moved with the inline rewrites, so re-measure the code.
+          code = code_byte_ranges(body)
+          body.gsub(REFERENCE_DEF_RE) do |whole, match|
+            next whole if code.any?(&.includes?(match.byte_begin(0)))
+            "#{match[1]}#{rewrite_link_target(match[2])}"
           end
         end
 
@@ -499,7 +527,8 @@ module Hwaro
           end
         end
 
-        private def rewrite_link_target(link_text : String, target : String) : String
+        # The exported destination (plus any title) for an `@/` target.
+        private def rewrite_link_target(target : String) : String
           # A link title (`[x](@/a.md "Title")`) follows the destination
           # after whitespace; left attached, it hid the `.md` from the
           # suffix strip below.
@@ -520,7 +549,7 @@ module Hwaro
           # their directory's URL (`@/posts/my-post/index.md` →
           # `/posts/my-post/`), as the build resolves them.
           path = target.sub(/\.(?:md|markdown)$/, "").sub(/(\A|\/)_?index$/, "\\1")
-          "[#{link_text}](/#{path}#{suffix}#{title})"
+          "/#{path}#{suffix}#{title}"
         end
       end
     end

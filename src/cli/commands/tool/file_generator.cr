@@ -66,7 +66,7 @@ module Hwaro
             # `netlify.toml -> ~/.bashrc` link was written straight through,
             # with no prompt when the link dangled and under `--force`
             # otherwise. An explicit `-o` outside the project is honoured.
-            if inside_project_lexically?(filename) && !link_target_within_project?(filename)
+            if names_project_path?(filename) && !link_target_within_project?(filename)
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_IO,
                 message: "Cannot write #{filename} through a symlink that resolves outside the project.",
@@ -121,10 +121,24 @@ module Hwaro
             resolved == root || resolved.starts_with?(root + File::SEPARATOR)
           end
 
-          private def inside_project_lexically?(path : String) : Bool
-            root = File.expand_path(Dir.current)
+          # Whether `path` names a location in the project — the case where a
+          # symlink must not redirect the write out of it. Judged by the
+          # spelling against both spellings of the project root (`Dir.current`
+          # may be reached through a symlink such as /tmp -> /private/tmp, so
+          # `/private/tmp/…/proj/x` is as much "in the project" as
+          # `/tmp/…/proj/x`), and by the resolved parent directory. A
+          # symlinked parent that leaves the project (`.github -> /elsewhere`)
+          # still counts through its in-project spelling.
+          private def names_project_path?(path : String) : Bool
             expanded = File.expand_path(path)
-            expanded == root || expanded.starts_with?(root + File::SEPARATOR)
+            lexical_root = File.expand_path(Dir.current)
+            real_root = Hwaro::Utils::PathUtils.resolved_real_path(Dir.current)
+            real_parent = Hwaro::Utils::PathUtils.resolved_real_path(File.dirname(expanded))
+            within?(expanded, lexical_root) || within?(expanded, real_root) || within?(real_parent, real_root)
+          end
+
+          private def within?(path : String, root : String) : Bool
+            path == root || path.starts_with?(root + File::SEPARATOR)
           end
         end
       end

@@ -84,7 +84,7 @@ hwaro tool export hugo --verbose
 | updated | lastmod |
 | tags | tags |
 | series | series |
-| aliases | aliases (상대 alias에는 앞에 `/`를 붙임) |
+| aliases | aliases (상대 alias에는 앞에 `/`를 붙임. 빌드가 건너뛰는 절대 URL, `//host`, `..` alias는 제외) |
 | image | images (배열) |
 | expires | expiryDate |
 | weight | weight |
@@ -112,7 +112,7 @@ hwaro tool export hugo --verbose
 | image | image |
 | template | layout |
 | path | permalink (`/<path>/`) |
-| aliases | redirect_from (jekyll-redirect-from) |
+| aliases | redirect_from (jekyll-redirect-from. 빌드가 건너뛰는 alias는 제외) |
 | updated | last_modified_at |
 | [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
 

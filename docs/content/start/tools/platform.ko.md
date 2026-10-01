@@ -61,7 +61,7 @@ hwaro tool platform vercel --stdout
   `hwaro build`가 실제로 쓰는 디렉터리를 배포합니다. `gitlab-ci`는 기본값이
   아닐 때 `pages` 잡에 `publish:`도 함께 추가합니다.
 - **리다이렉트**: 프론트 매터에 정의한 페이지 [`aliases`](/ko/writing/pages/)에서 만든 301 리다이렉트 (예: `aliases: ["/old-url/"]`)
-- **캐시 헤더**: `[assets]` 출력 디렉터리에 1년짜리 `immutable` 규칙. 에셋 파이프라인이 `fingerprint = true`로 활성화된 경우에만 생성됩니다(내용에 따라 파일 이름이 바뀌는 유일한 경우)
+- **캐시 헤더**: `[assets]` 출력 디렉터리에 1년짜리 `immutable` 규칙. 그 안의 모든 파일 이름이 내용 해시를 포함할 때만 생성됩니다. 즉 에셋 파이프라인이 `fingerprint = true`와 하나 이상의 `[[assets.bundles]]`로 활성화되어 있고, 같은 URL로 해시 없이 복사되는 `static/<output_dir>/` 디렉터리가 없어야 합니다
 
 ### Netlify 출력
 

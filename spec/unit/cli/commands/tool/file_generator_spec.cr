@@ -111,3 +111,40 @@ describe Hwaro::CLI::Commands::Tool::FileGenerator do
     end
   end
 end
+
+# Regression: "inside the project" compared unresolved spellings, so with the
+# project reached through a symlinked path (cwd /tmp/… while the user typed
+# /private/tmp/…), an absolute path to an in-project symlink pointing outside
+# was written straight through.
+describe "FileGenerator project membership through a symlinked cwd" do
+  it "refuses an in-project symlink named by the project's real path" do
+    Dir.mktmpdir do |outside|
+      Dir.mktmpdir do |outer|
+        real_proj = File.join(File.realpath(outer), "proj")
+        Dir.mkdir(real_proj)
+        linked_proj = File.join(outer, "projlink")
+        File.symlink(real_proj, linked_proj)
+        victim = File.join(outside, "victim.toml")
+        File.symlink(victim, File.join(real_proj, "link2.toml"))
+
+        old_pwd = ENV["PWD"]?
+        begin
+          Dir.cd(linked_proj) do
+            ENV["PWD"] = linked_proj
+            Dir.current.should eq(linked_proj)
+            expect_raises(Hwaro::HwaroError, /symlink/) do
+              Hwaro::CLI::Commands::Tool::FileGenerator.emit(File.join(real_proj, "link2.toml"), "x", false, true)
+            end
+          end
+        ensure
+          if old_pwd
+            ENV["PWD"] = old_pwd
+          else
+            ENV.delete("PWD")
+          end
+        end
+        File.exists?(victim).should be_false
+      end
+    end
+  end
+end
