@@ -132,6 +132,24 @@ module Hwaro
           version: config.try(&.versions.for_path(relative)),
         )
 
+        # `[git] use_date` gives a dateless page its first-commit date during
+        # the build, and only a full `git log` knows it. When a date-token
+        # permalink makes the URL depend on that date, the page stays out of
+        # the index, so its links fall back to the plain existence test
+        # instead of being judged against a guessed URL.
+        if data[:date].nil? && (git = config.try(&.git)) && git.enabled && git.use_date
+          dated, _ = Utils::PermalinkResolver.resolve_url_lenient(
+            relative, config,
+            slug: data[:slug],
+            custom_path: data[:custom_path],
+            language: language,
+            date: Time.utc(2000, 1, 1),
+            title: data[:title],
+            version: config.try(&.versions.for_path(relative)),
+          )
+          return unless dated == url
+        end
+
         key = File.expand_path(source)
         @index_dirs << File.dirname(key) if index_source?(source)
         @urls[key] = url
