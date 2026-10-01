@@ -20,7 +20,12 @@ module Hwaro
       ) : Bool
         Logger.heading("deploy", target.name)
         warn_unapplied_target_options(target)
-        require_non_empty_source!(source_dir, effective) if command_reads_source?(command)
+        if command_reads_source?(command)
+          # The one filesystem read a command target does; classified here
+          # rather than around the whole run, so a closed stdout later on is
+          # not blamed on the source or destination.
+          classify_io_errors(target) { require_non_empty_source!(source_dir, effective) }
+        end
         expanded = expand_placeholders(command, source_dir, target)
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
@@ -38,12 +43,17 @@ module Hwaro
         Logger.info "  Command: #{expanded}"
 
         # Warn and require confirmation for commands with shell
-        # metacharacters. The *template* is what the author wrote; the
-        # placeholder values are single-quoted, so judging the expansion
-        # flagged a project living under `r&d/` or `$work/` and blocked every
-        # non-interactive s3/gs/az deploy from it.
+        # metacharacters. Judge the *template* the author wrote: placeholder
+        # values are single-quoted, so judging the expansion flagged a project
+        # living under `r&d/` or `$work/` and blocked every non-interactive
+        # s3/gs/az deploy from it. The quoting only holds where the
+        # placeholder stands as a bare word, though — inside `"…"` or `'…'`
+        # the template's own quotes undo it — so a quoted placeholder is
+        # still judged by its expanded value.
         needs_confirm = effective.confirm
-        if !effective.force && DANGEROUS_SHELL_PATTERNS.matches?(command)
+        risky = DANGEROUS_SHELL_PATTERNS.matches?(command) ||
+                (quoted_placeholder?(command) && DANGEROUS_SHELL_PATTERNS.matches?(expanded))
+        if !effective.force && risky
           Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
           needs_confirm = true
         end
@@ -87,38 +97,100 @@ module Hwaro
       # the command failed. stdout goes through `Logger.info` (so `--quiet`
       # and `--json` keep it off stdout), stderr to `Logger.err_io`.
       #
-      # stdin is handed to the child only on an interactive run, so a tool
-      # that asks to confirm or log in can be answered; pipes, CI and `--json`
-      # keep it closed so nothing blocks on input that will never come.
+      # stdin is handed to the child only on a visible interactive run, so a
+      # tool that asks to confirm or log in can be answered; pipes, CI,
+      # `--json` and `--quiet` (which hides the prompt) keep it closed so
+      # nothing blocks on input that will never come.
       #
-      # Returns the exit status and the captured stderr.
+      # Both pipes are always drained to EOF, even after echoing them fails
+      # (`hwaro deploy | head`, a closed stderr): a pipe nobody reads fills
+      # up and blocks the deploy tool forever. The output was only ever
+      # informational, so the deploy itself runs to completion either way.
+      #
+      # Returns the exit status and the stderr captured for a quiet run.
       private def run_deploy_command(command : String, env : Hash(String, String)) : {Process::Status, String}
-        input = CLI::Prompt.interactive? && !CLI::Runner.json_mode? ? Process::Redirect::Inherit : Process::Redirect::Close
+        quiet = Logger.quiet?
+        input = CLI::Prompt.interactive? && !quiet ? Process::Redirect::Inherit : Process::Redirect::Close
         process = Process.new(command, shell: true, env: env, input: input,
           output: Process::Redirect::Pipe, error: Process::Redirect::Pipe)
 
-        stderr = IO::Memory.new
-        # Both pipes are drained concurrently (one fills and blocks the
-        # child otherwise); the lock keeps their lines whole when the logger
-        # writes both streams to one IO.
-        lock = Mutex.new
-        drained = Channel(Nil).new
-        spawn do
-          process.error.each_line do |line|
-            lock.synchronize do
-              stderr.puts line
-              Logger.err_io.puts "  #{line}" unless Logger.quiet?
+        begin
+          captured = IO::Memory.new
+          # The lock keeps lines whole when the logger writes both streams to
+          # one IO (as specs do).
+          lock = Mutex.new
+          drained = Channel(Nil).new(1)
+          spawn do
+            echo = true
+            process.error.each_line do |line|
+              lock.synchronize do
+                if quiet
+                  captured.puts line
+                elsif echo
+                  begin
+                    Logger.err_io.puts "  #{line}"
+                  rescue IO::Error
+                    echo = false
+                  end
+                end
+              end
+            end
+          rescue IO::Error
+            # The pipe itself failed; the child sees EPIPE and exits.
+          ensure
+            drained.send(nil)
+          end
+
+          echo = true
+          process.output.each_line do |line|
+            next unless echo
+            begin
+              lock.synchronize { Logger.info "  #{line}" }
+            rescue IO::Error
+              echo = false
             end
           end
-        ensure
-          drained.send(nil)
+          drained.receive
+        rescue ex
+          # Never leave the deploy tool running behind an exception. Only
+          # reached before `wait`, so the pid is still ours to signal.
+          begin
+            process.terminate
+            process.wait
+          rescue
+          end
+          raise ex
         end
-        process.output.each_line do |line|
-          lock.synchronize { Logger.info "  #{line}" }
-        end
-        drained.receive
 
-        {process.wait, stderr.to_s}
+        {process.wait, captured.to_s}
+      end
+
+      # True when a known placeholder sits inside single or double quotes in
+      # the template, where its single-quoted expansion is no longer one
+      # inert word: `"{source}"` re-opens the value to `$(…)` expansion.
+      private def quoted_placeholder?(command : String) : Bool
+        quote = nil.as(Char?)
+        escaped = false
+        command.each_char_with_index do |char, idx|
+          if escaped
+            escaped = false
+            next
+          end
+          case char
+          when '\\'
+            escaped = quote != '\''
+          when '\'', '"'
+            if quote.nil?
+              quote = char
+            elsif quote == char
+              quote = nil
+            end
+          when '{'
+            next if quote.nil?
+            return true if COMMAND_PLACEHOLDERS.any? { |name| command[idx + 1, name.size + 1] == "#{name}}" }
+          end
+        end
+        false
       end
 
       # A command target only reads the deploy source if its template
@@ -133,10 +205,8 @@ module Hwaro
       # name, etc.) instead of sending the literal to the shell.
       COMMAND_PLACEHOLDERS = {"source", "url", "target"}
 
-      # Pattern for `{name}` placeholder tokens in command templates. A `$`
-      # in front makes it shell parameter expansion (`${HWARO_DEPLOY_TARGET}`),
-      # which is passed through untouched instead of rejected as unknown.
-      private COMMAND_PLACEHOLDER_RE = /(?<!\$)\{([a-zA-Z_][\w-]*)\}/
+      # Pattern for `{name}` placeholder tokens in command templates.
+      private COMMAND_PLACEHOLDER_RE = /\{([a-zA-Z_][\w-]*)\}/
 
       private def expand_placeholders(command : String, source_dir : String, target : Models::DeploymentTarget) : String
         # Validate the ORIGINAL template, then substitute in a single pass:
@@ -166,7 +236,11 @@ module Hwaro
         command : String,
         target : Models::DeploymentTarget,
       ) : Nil
+        # `${NAME}` with an unknown NAME is shell parameter expansion
+        # (`${HWARO_DEPLOY_TARGET}`), not a misspelt placeholder; it is left
+        # to the shell. `${source}` still expands like `{source}`.
         unresolved = command.scan(COMMAND_PLACEHOLDER_RE)
+          .reject { |m| m.begin(0) > 0 && command[m.begin(0) - 1] == '$' && !COMMAND_PLACEHOLDERS.includes?(m[1]) }
           .map { |m| m[1] }
           .uniq!
           .reject { |name| COMMAND_PLACEHOLDERS.includes?(name) }

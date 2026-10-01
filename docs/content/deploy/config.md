@@ -99,7 +99,7 @@ than `.well-known/` are never scanned, so nothing in them is deleted, and a
 `.git` entry is always kept. A destination that is a `git worktree` or
 submodule checkout (the usual gh-pages setup) stays attached to its
 repository. On the source side every hidden directory the build wrote is
-deployed (`.well-known/`, `.domains`, …) except version-control metadata
+deployed (`.well-known/`, `.circleci/`, …) except version-control metadata
 (`.git/`, `.svn/`, `.hg/`, `.bzr/`). Empty directories are removed only when
 the sync's own deletes emptied them; an empty directory it never selected
 (say, `uploads/` outside `include`) is kept.
@@ -113,10 +113,17 @@ outside `include`/`exclude`), the deploy refuses before writing anything.
 
 **Command targets** run through `sh`. Their output streams as the tool runs,
 stderr included. On an interactive terminal the tool can read your input (a
-login or confirmation prompt); in pipes, CI and `--json` runs stdin is closed.
-The command also gets `HWARO_DEPLOY_TARGET`, `HWARO_DEPLOY_URL` and
-`HWARO_DEPLOY_SOURCE` in its environment. Write them as `$HWARO_DEPLOY_TARGET`:
-config.toml itself expands `${VAR}` when it is loaded.
+login or confirmation prompt); in pipes, CI, `--quiet` and `--json` runs stdin
+is closed. The command also gets `HWARO_DEPLOY_TARGET`, `HWARO_DEPLOY_URL` and
+`HWARO_DEPLOY_SOURCE` in its environment. Read them from a script the command
+runs: config.toml expands `$VAR` and `${VAR}` itself when it is loaded, and
+warns about every one that is unset at that point.
+
+Placeholder values are single-quoted, which keeps them one inert word where
+the placeholder stands on its own (`rsync -a {source}/ host:`). Do not wrap a
+placeholder in quotes of your own (`"{source}"`). That undoes the quoting, so
+hwaro checks the expanded value for shell metacharacters and asks for
+confirmation when it finds any.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

@@ -497,8 +497,10 @@ cannot reconcile:
   writing a prompt into the JSON document.
 - A command whose template contains shell metacharacters (`|`, `;`, `&`,
   `` ` ``, `$`, `sudo`, `rm -rf`) asks for confirmation first; `--force` skips
-  that prompt. Only the template you wrote is checked, never the expanded
-  `{source}`/`{url}` values, which are always single-quoted.
+  that prompt. The template you wrote is what gets checked: `{source}`/`{url}`
+  values are single-quoted, so a path like `r&d/` does not trigger it. A
+  placeholder you wrap in quotes yourself (`"{source}"`) loses that
+  protection, and then its expanded value is checked too.
 - `--dry-run` writes nothing: a missing destination directory is not created.
 
 ### doctor

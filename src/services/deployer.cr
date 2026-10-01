@@ -58,8 +58,9 @@ module Hwaro
 
       # Counts collected while deploying a single target. Command-based
       # targets report zeros since we can't introspect what the external
-      # tool did.
-      private struct TargetCounts
+      # tool did. A class, so the counts filled in before a mid-sync failure
+      # still reach the `deploy --json` error result.
+      private class TargetCounts
         property created : Int32
         property updated : Int32
         property deleted : Int32
@@ -219,7 +220,7 @@ module Hwaro
         error : Hwaro::HwaroError? = nil
 
         begin
-          ok, counts = deploy_target_with_counts(target, source_dir, effective, deployment)
+          ok, counts = deploy_target_with_counts(target, source_dir, effective, deployment, counts: counts)
         rescue ex : Hwaro::HwaroError
           error = ex
         rescue ex
@@ -295,9 +296,10 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
         structured : Bool = true,
+        counts : TargetCounts = TargetCounts.new,
       ) : {Bool, TargetCounts}
         if command = target.command
-          ok = classify_io_errors(target) { deploy_via_command(target, source_dir, command, effective) }
+          ok = deploy_via_command(target, source_dir, command, effective)
           return {ok, TargetCounts.new}
         end
 
@@ -307,7 +309,7 @@ module Hwaro
         if directory_destination = local_directory_destination(url)
           outcome = classify_io_errors(target) do
             if structured
-              deploy_to_directory_with_counts(target, source_dir, directory_destination, effective, deployment)
+              deploy_to_directory_with_counts(target, source_dir, directory_destination, effective, deployment, counts)
             else
               {deploy_to_directory(target, source_dir, directory_destination, effective, deployment), TargetCounts.new}
             end
@@ -317,7 +319,7 @@ module Hwaro
 
         if auto_command = auto_command_for_url(url, source_dir)
           Logger.debug "  Auto-generated command for #{url}"
-          ok = classify_io_errors(target) { deploy_via_command(target, source_dir, auto_command, effective) }
+          ok = deploy_via_command(target, source_dir, auto_command, effective)
           return {ok, TargetCounts.new}
         end
 

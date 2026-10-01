@@ -61,8 +61,10 @@ module Hwaro
       # empty directories. Returns the per-action counts (a link or stale
       # directory replaced by a real file is a create, not an update —
       # `existed_before` is sampled after the obstacle is cleared).
-      private def write_directory_sync(sync : DirectorySync) : TargetCounts
-        counts = TargetCounts.new
+      #
+      # `counts` is filled in as the sync goes, so a caller still holds what
+      # was already written when a later copy or delete raises.
+      private def write_directory_sync(sync : DirectorySync, counts : TargetCounts = TargetCounts.new) : TargetCounts
         dest_dir = sync.dest_dir
 
         Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
@@ -74,16 +76,17 @@ module Hwaro
         # or the reverse — which has to go first or the copy cannot happen.
         early = Set(String).new
         unless sync.clear_first.empty?
+          clear_set = sync.clear_first.to_set
           sync.to_delete.each do |rel|
-            next unless sync.clear_first.any? { |c| rel == c || rel.starts_with?("#{c}/") }
+            next unless at_or_under?(rel, clear_set)
             FileUtils.rm(File.join(dest_dir, rel))
             early << rel
+            counts.deleted += 1
           end
           sync.clear_first.each do |rel|
             full = File.join(dest_dir, rel)
             remove_cleared_directory(full) if File.info?(full, follow_symlinks: false).try(&.directory?)
           end
-          counts.deleted += early.size
         end
 
         sync.to_copy.each_with_index do |(dest_rel, src_path), idx|
@@ -109,6 +112,17 @@ module Hwaro
 
         prune_emptied_directories(dest_dir, sync.to_delete)
         counts
+      end
+
+      # True when `rel` or one of its ancestor directories is in `set`.
+      private def at_or_under?(rel : String, set : Set(String)) : Bool
+        return true if set.includes?(rel)
+        idx = rel.size
+        while idx = rel.rindex('/', idx - 1)
+          return true if set.includes?(rel[0, idx])
+          break if idx == 0
+        end
+        false
       end
 
       # Remove a stale directory whose files the early deletes just took.
@@ -147,14 +161,15 @@ module Hwaro
         dest_dir : String,
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
+        counts : TargetCounts = TargetCounts.new,
       ) : {Bool, TargetCounts}
         Logger.heading("deploy", target.name)
         sync = prepare_directory_sync(target, source_dir, dest_dir, effective, deployment)
 
-        return {true, TargetCounts.new} if effective.dry_run
-        return {true, TargetCounts.new} unless sync_confirmed?(sync.dest_dir, effective)
+        return {true, counts} if effective.dry_run
+        return {true, counts} unless sync_confirmed?(sync.dest_dir, effective)
 
-        counts = write_directory_sync(sync)
+        write_directory_sync(sync, counts)
         Logger.info "" if Logger.color_enabled?
         Logger.outcome("deployed", "#{sync.dest_dir} · #{counts.created} created · #{counts.updated} updated · #{counts.deleted} deleted")
         {true, counts}
@@ -329,13 +344,19 @@ module Hwaro
       end
 
       private def delete_candidate?(rel : String, target : Models::DeploymentTarget) : Bool
-        return included_by_target?(rel, target) unless target.strip_index_html
         # With strip_index_html the on-disk name for `foo/index.html` is just
         # `foo`, and include/exclude globs are written against source paths.
         # Judge both spellings: either may be what `include` names (else
         # stale pages survive every sync), and *neither* may be excluded —
         # `exclude = "foo/index.html"` never matched the stored `foo`, so the
         # remote page the author excluded was deleted as stale.
+        #
+        # Only an extensionless name can be a stripped page. Reading
+        # `img/logo.png` as `img/logo.png/index.html` made
+        # `include = "**/index.html"` delete every stale asset outside it.
+        unless target.strip_index_html && File.extname(rel).empty?
+          return included_by_target?(rel, target)
+        end
         unstripped = "#{rel}/index.html"
         (target_include_match?(rel, target) || target_include_match?(unstripped, target)) &&
           !target_exclude_match?(rel, target) && !target_exclude_match?(unstripped, target)

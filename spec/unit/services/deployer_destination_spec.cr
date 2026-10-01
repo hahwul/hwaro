@@ -355,4 +355,126 @@ describe Hwaro::Services::Deployer do
       end
     end
   end
+
+  describe "review follow-ups" do
+    it "checks a placeholder the template quotes by its expanded value" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(File.join(dir, "x$(touch #{dir}/PWNED)"))
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"])
+        ["ls \"{source}\"", "ls '{source}/'"].each do |template|
+          err = expect_raises(Hwaro::HwaroError) do
+            Hwaro::Services::Deployer.new.run(options, dest_spec_command_config(template))
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          File.exists?(File.join(dir, "PWNED")).should be_false
+        end
+      end
+    end
+
+    it "still expands ${source} like {source}" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"], dry_run: true)
+        ops = Hwaro::Services::Deployer.new.plan(options, dest_spec_command_config("echo ${source}/"))
+        ops.first.path.should eq("echo $'#{src}'/")
+      end
+    end
+
+    it "never clears a stale directory behind a symlinked parent" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "src")
+        FileUtils.mkdir_p(File.join(src, "sub"))
+        File.write(File.join(src, "sub", "foo"), "page")
+        outside = File.join(dir, "outside", "sub", "foo")
+        FileUtils.mkdir_p(File.join(outside, "x"))
+        File.write(File.join(outside, ".DS_Store"), "finder")
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(dest)
+        File.symlink(File.join(dir, "outside", "sub"), File.join(dest, "sub"))
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, dest_spec_config(dest))
+
+        Dir.exists?(File.join(outside, "x")).should be_true
+        File.exists?(File.join(outside, ".DS_Store")).should be_true
+        File.symlink?(File.join(dest, "sub")).should be_false
+        File.read(File.join(dest, "sub", "foo")).should eq("page")
+      end
+    end
+
+    it "does not read a stale asset as a stripped page" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(File.join(dest, "img"))
+        File.write(File.join(dest, "img", "logo.png"), "png")
+        config = dest_spec_config(dest, strip: true)
+        config.deployment.targets.first.include = "**/index.html"
+
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+        Hwaro::Services::Deployer.new.plan(options, config).none? { |op| op.action == "delete" }.should be_true
+      end
+    end
+
+    it "reports what was already written when a later copy fails" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        unreadable = File.join(src, "zz.html")
+        File.write(unreadable, "z")
+        File.chmod(unreadable, 0o000)
+        begin
+          readable = begin
+            File.read(unreadable)
+            true
+          rescue File::Error
+            false
+          end
+          next if readable
+          dest = File.join(dir, "out")
+          FileUtils.mkdir_p(dest)
+          File.write(File.join(dest, "foo"), "stripped page")
+
+          options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+          result = Hwaro::Services::Deployer.new.deploy_structured(options, dest_spec_config(dest)).first
+          result.status.should eq("error")
+          result.error.not_nil!["code"].should eq(Hwaro::Errors::HWARO_E_IO)
+          result.deleted.should eq(1)
+          result.created.should eq(2)
+        ensure
+          File.chmod(unreadable, 0o644)
+        end
+      end
+    end
+
+    it "keeps draining a command whose stderr can no longer be echoed" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        sentinel = File.join(dir, "finished")
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"], force: true)
+        # ~400 KB on stderr: far past a pipe buffer, so a reader that stops
+        # draining blocks the child.
+        config = dest_spec_command_config("i=0; while [ $i -lt 4000 ]; do printf '%0100d\\n' 0 >&2; i=$((i+1)); done; touch #{sentinel}")
+        closed = IO::Memory.new
+        closed.close
+        previous = Hwaro::Logger.err_io
+        Hwaro::Logger.err_io = closed
+        begin
+          done = Channel(Nil).new(1)
+          spawn do
+            Hwaro::Services::Deployer.new.run(options, config)
+          ensure
+            done.send(nil)
+          end
+          select
+          when done.receive
+          when timeout(20.seconds)
+            fail "deploy command hung after its stderr echo failed"
+          end
+        ensure
+          Hwaro::Logger.err_io = previous
+        end
+        File.exists?(sentinel).should be_true
+      end
+    end
+  end
 end

@@ -331,37 +331,27 @@ module Hwaro
             end
           end
 
-          full_path = File.join(dest_dir, rel)
-          # A *symlink* to a directory is replaced with a real file by the
-          # copy pass (see `unlink_destination_symlinks!`), so only a real
-          # directory can be a conflict here.
-          if Dir.exists?(full_path) && !File.symlink?(full_path)
-            unless stale_tree?(full_path, rel, delete_set)
-              raise Hwaro::HwaroError.new(
-                code: Hwaro::Errors::HWARO_E_IO,
-                message: "Destination path is a directory but needs a file: #{rel}",
-                hint: "Remove the existing directory at #{full_path} or rename the source file.",
-              )
-            end
-            clear_first << rel
-          end
-
+          # Parents first, with lstat: a symlink standing where a directory
+          # belongs is replaced by the copy pass (`unlink_destination_symlinks!`),
+          # so it is no conflict — and nothing behind it may be inspected or
+          # cleared, or the deploy would delete through the link.
           current = dest_dir
           current_rel = ""
+          behind_link = false
+          blocked_by_file = false
           parts[0...-1].each do |part|
             current = File.join(current, part)
             current_rel = current_rel.empty? ? part : "#{current_rel}/#{part}"
-            # lstat, matching the leaf check above: a symlink standing where a
-            # directory belongs is replaced by the copy pass, so reporting it
-            # as an unresolvable conflict was a dead end for exactly the case
-            # `unlink_destination_symlinks!` handles.
             info = begin
               File.info?(current, follow_symlinks: false)
             rescue File::Error | IO::Error
               nil
             end
-            next unless info
-            next if info.symlink?
+            break unless info
+            if info.symlink?
+              behind_link = true
+              break
+            end
             if info.file?
               unless delete_set.includes?(current_rel)
                 raise Hwaro::HwaroError.new(
@@ -371,10 +361,31 @@ module Hwaro
                 )
               end
               clear_first << current_rel
+              blocked_by_file = true
               # Nothing exists below a file, so the deeper components cannot
               # conflict.
               break
             end
+          end
+          next if behind_link || blocked_by_file
+
+          full_path = File.join(dest_dir, rel)
+          # A *symlink* to a directory is replaced with a real file by the
+          # copy pass, so only a real directory can be a conflict here.
+          leaf = begin
+            File.info?(full_path, follow_symlinks: false)
+          rescue File::Error | IO::Error
+            nil
+          end
+          if leaf && leaf.directory?
+            unless stale_tree?(full_path, rel, delete_set)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: "Destination path is a directory but needs a file: #{rel}",
+                hint: "Remove the existing directory at #{full_path} or rename the source file.",
+              )
+            end
+            clear_first << rel
           end
         end
 
