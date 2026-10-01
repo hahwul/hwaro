@@ -366,6 +366,23 @@ describe "warm --cache builds" do
     # are written ONLY by a render, and the cache entry is the only record of
     # them — so a `static/` file publishing to one of those paths replaced it
     # outright on every warm build, the owning page being a cache hit.
+    # The generators run after the static copy; on an all-hit warm build they
+    # used to be skipped as unchanged, leaving the static bytes published.
+    it "lets the generated sitemap win over an edited static file at its path" do
+      with_cached_site do
+        cached_build
+        FileUtils.mkdir_p("static")
+        File.write("static/sitemap.xml", "user v1")
+        cached_build
+        File.read("public/sitemap.xml").should contain("<urlset")
+
+        File.write("static/sitemap.xml", "user v2")
+        cached_build
+        File.read("public/sitemap.xml").should contain("<urlset")
+        File.read("public/sitemap.xml").should_not contain("user v2")
+      end
+    end
+
     it "re-renders a page whose alias stub the static copy overwrote" do
       with_cached_site do
         FileUtils.mkdir_p("static/legacy")

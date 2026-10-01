@@ -35,11 +35,18 @@ module Hwaro::Core::Build::Phases::Generate
   # when no surviving page re-rendered — otherwise the sitemap/search index
   # would keep the removed URL until an unrelated edit.
   #
+  # Nor when the static copy wrote anything: Initialize copies `static/`
+  # before Generate runs, so a static file at a generator's path
+  # (`static/sitemap.xml`, `static/search.json`) replaced the generated file,
+  # and skipping the generator left the user's bytes published where a cold
+  # build lets the generated file win.
+  #
   # The render phase uses the same predicate to decide whether cache-hit pages
   # need their `content` hydrated for the generators (see
   # `hydrate_cached_page_content`), so the two decisions cannot drift.
   def generate_outputs_unchanged?(ctx : Lifecycle::BuildContext) : Bool
-    ctx.options.cache && ctx.stats.pages_rendered == 0 && !ctx.page_or_section_set_changed
+    ctx.options.cache && ctx.stats.pages_rendered == 0 && !ctx.page_or_section_set_changed &&
+      !static_copies_recorded?
   end
 
   # Sitemap, feeds, robots.txt and llms.txt. Public so `SeoHooks` can route
