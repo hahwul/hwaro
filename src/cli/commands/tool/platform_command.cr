@@ -52,7 +52,18 @@ module Hwaro
                 end
                 exit
               end
-              parser.unknown_args do |unknown|
+              parser.unknown_args do |before_dash, after_dash|
+                unknown = before_dash + after_dash
+                # A second positional is usually an attempted output path or
+                # a second platform; silently dropping it wrote one default
+                # file and exited 0.
+                unless unknown.size <= 1
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "unexpected extra argument(s): '#{unknown[1..].join("', '")}'",
+                    hint: "hwaro tool platform takes a single <platform>. To choose the output file, pass -o/--output PATH.",
+                  )
+                end
                 platform = unknown.first? if unknown.present?
               end
             end

@@ -67,6 +67,16 @@ module Hwaro
                 Logger.info parser.to_s
                 exit
               end
+              # `hwaro tool agents-md AGENTS.md` printed to stdout and wrote
+              # nothing; the destination is fixed and writing needs --write.
+              parser.unknown_args do |before_dash, after_dash|
+                unknown = before_dash + after_dash
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "unexpected extra argument(s): '#{unknown.join("', '")}'",
+                  hint: "hwaro tool agents-md accepts options only. Pass --write to write AGENTS.md.",
+                ) unless unknown.empty?
+              end
             end
 
             content = if remote

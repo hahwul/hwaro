@@ -54,3 +54,21 @@ describe Hwaro::CLI::Commands::Tool::CICommand do
     end
   end
 end
+
+# Regression: a second positional was silently dropped.
+describe "tool ci positional argument validation" do
+  it "rejects extra positional arguments before writing anything" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        ex = expect_raises(Hwaro::HwaroError) do
+          with_captured_log do
+            Hwaro::CLI::Commands::Tool::CICommand.new.run(["github-actions", "ci.yml"])
+          end
+        end
+        ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+        ex.message.to_s.should contain("unexpected extra argument(s): 'ci.yml'")
+        File.exists?(File.join(".github", "workflows", "deploy.yml")).should be_false
+      end
+    end
+  end
+end
