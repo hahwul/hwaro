@@ -44,10 +44,13 @@ hwaro tool convert to-yaml --json
 "dropping N comment line(s)" 경고를 포함한 전체 파이프라인이 동일하게
 동작합니다.
 
-TOML에는 null이 없으므로 `to-toml`은 YAML/JSON 값이 null인 키
-(값 없이 끝나는 `description:`, `slug: ~`, `"image": null`)를 생략합니다.
-빌드는 null 값을 설정되지 않은 것으로 읽고, 생략된 키도 같은 의미입니다.
-대신 빈 문자열을 쓰면 제목이나 slug가 빈 값으로 설정됩니다.
+TOML에는 null이 없으므로 `to-toml`은 YAML/JSON의 null 값을 빌드가 같은 의미로
+읽는 형태로 씁니다. `title`, `description`, `slug`, `image`, `date` 같은 기본 키
+(값 없이 끝나는 `description:`, `slug: ~`, `"image": null`)는 키를 생략합니다.
+빈 문자열을 쓰면 제목이나 slug가 빈 값으로 설정되기 때문입니다. 섹션의
+`[cascade]`가 설정할 수 있는 키(`draft`, `tags`, `template` 등), `extra` 값,
+사용자 정의 키는 `""`가 됩니다. 이런 키는 null이어도 선언된 것으로 취급되어
+캐스케이드를 계속 막고, 빌드는 null 사용자 정의 값을 이미 빈 문자열로 읽습니다.
 
 ## JSON 출력
 
