@@ -46,7 +46,10 @@ hwaro tool platform vercel --stdout
 | -f, --force | Overwrite existing file without warning |
 | -h, --help | Show help |
 
-If the output file already exists, use `--force` to overwrite.
+If the output file already exists, use `--force` to overwrite. A destination
+inside the project that is a symlink (or sits under a symlinked directory)
+resolving outside the project is refused, `--force` or not; pass `-o` with the
+real path to write there deliberately.
 
 ## Generated Config
 
