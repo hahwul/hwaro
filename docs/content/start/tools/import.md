@@ -85,14 +85,17 @@ appear in the counts but have no row.
 ## Behavior
 
 - Front matter is converted to hwaro's default TOML format (`+++`). Hwaro also supports YAML front matter (`---`): run `hwaro tool convert to-yaml` afterwards, or set `[content.new].front_matter_format = "yaml"` in `config.toml` to change what `hwaro new` scaffolds from then on. Note that `front_matter_format` only applies to the built-in template. An archetype supplies its own front matter verbatim, and every scaffold ships `archetypes/default.md`, so delete it (or the matching archetype) if you want the config setting to take effect. See [Archetypes](/writing/archetypes/).
-- HTML content (e.g. WordPress) is converted to Markdown.
+- HTML content (e.g. WordPress) is converted to Markdown. Links, emphasis and code inside list items and table cells are kept, `[caption]` shortcodes become the image followed by its caption, and entity-encoded markup such as `&lt;script&gt;` stays visible text.
+- WordPress's "Read more" tag and Hexo's `more` comment are kept as hwaro's excerpt marker, so a post's [summary](/writing/pages/) still ends where its author put it.
+- Dates are read in the shapes the source generators accept: RFC 3339, `2024-01-15 10:30:00 +0900`, minute precision (`2024-01-15 10:30`), slash dates (`2024/01/15 10:30:00`, with or without an offset), and prose dates (`July 8, 2022`, or `Jul 08 2022` from Astro's blog template).
 - Existing files at the destination path are **skipped**, not overwritten. Remove or rename them first if you want to re-import, or pass `--force`.
 - When two source files resolve to the **same** destination (a duplicate slug, two same-titled notes, a stripped `YYYY-MM-DD-` date prefix, two collection subfolders flattened into one section), the second and later ones are written alongside the first as `slug-1.md`, `slug-2.md`, … instead of one silently overwriting the other. The number of renamed destinations is reported once at the end of the run rather than one line per file.
 - `--force` means "overwrite files that pre-dated this import". It never lets one imported file clobber another that the *same run* just wrote; those still get the `-1` / `-2` suffix above. Re-running an import is therefore idempotent: every source resolves to the destination it picked the first time and is skipped (or overwritten with `--force`), instead of accumulating `-1` copies on each run.
 - Only known post types are imported (e.g. WordPress `post` and `page`).
 - A page keeps its published address. Hugo `url` and a literal Jekyll `permalink` (not a `:placeholder` pattern) become `path`. A `.html` address becomes an extensionless `path` plus an alias at the old address, and a trailing `index.html` maps to its directory with no alias. A query or fragment is dropped. A URL naming another kind of file (`/feed.xml`) is left unmapped, with a warning. Jekyll `redirect_from` entries become `aliases`.
-- Hugo: JSON front matter is read like TOML and YAML, and a leaf bundle with a `slug` is written as a bundle under the slugged directory (`posts/<slug>/index.md`). If that directory already holds another bundle, the page stays in its own directory, with a warning.
+- Hugo: front matter keys are case-insensitive, as in Hugo (`Title`, `Draft` and `publishdate` all work). JSON front matter is read like TOML and YAML, and a leaf bundle with a `slug` is written as a bundle under the slugged directory (`posts/<slug>/index.md`). If that directory already holds another bundle, the page stays in its own directory, with a warning.
 - Jekyll: `last_modified_at` becomes `updated`, and the `image: {path: …}` form becomes `image`.
+- Obsidian: `%%comments%%` (inline or spanning lines) are removed, since Obsidian never shows them. `%%` inside code is kept.
 
 ## Example Output
 

@@ -53,6 +53,7 @@ module Hwaro
           raw = read_text(file_path)
           fm_data, body = extract_frontmatter(raw)
           fm_data = fm_data.try { |data| downcase_keys(data) }
+          local_keys = toml_local_datetime_keys(raw)
 
           # Check draft status (only if frontmatter exists)
           is_draft = fm_data.try { |d| d["draft"]?.try { |v| truthy?(v) } } || false
@@ -80,13 +81,13 @@ module Hwaro
 
             # date (falling back to Hugo's publishDate so a page dated only
             # via publishDate doesn't lose its date entirely)
-            if parsed = time_value(data, "date") || time_value(data, "publishdate")
-              fields["date"] = format_hugo_time(parsed)
+            if date = date_string(data, "date", local_keys) || date_string(data, "publishdate", local_keys)
+              fields["date"] = date
             end
 
             # updated (from lastmod)
-            if parsed = time_value(data, "lastmod")
-              fields["updated"] = format_hugo_time(parsed)
+            if updated = date_string(data, "lastmod", local_keys)
+              fields["updated"] = updated
             end
 
             # draft
@@ -154,8 +155,8 @@ module Hwaro
             fields["image"] = image if image
 
             # expires (from expiryDate)
-            if parsed = time_value(data, "expirydate")
-              fields["expires"] = format_hugo_time(parsed)
+            if expires = date_string(data, "expirydate", local_keys)
+              fields["expires"] = expires
             end
           end
 
@@ -369,22 +370,48 @@ module Hwaro
           nil
         end
 
-        # A date-valued field. A TOML/YAML date or datetime is used as
-        # parsed: rendering it to an offset string first turned a bare TOML
-        # date (`date = 2024-05-02`, a local date) into a timestamp pinned to
-        # the importing machine's zone (`2024-05-02T00:00:00+09:00`), so the
-        # same source imported differently on every machine.
-        # A TOML local date-time (`date = 2024-05-02T10:00:00`, no offset) is
-        # parsed in the machine's zone; writing it back with that offset
-        # pinned the importing machine's zone into the file. hwaro reads a
-        # zone-less timestamp as local time too, so keep it zone-less.
-        # Everything else (including a bare local date) goes through
-        # `format_date`.
-        private def format_hugo_time(time : Time) : String
-          local = time.location == Time::Location.local && !time.location.utc?
-          midnight = time.hour == 0 && time.minute == 0 && time.second == 0 && time.nanosecond == 0
-          return time.to_s("%Y-%m-%dT%H:%M:%S") if local && !midnight && time.nanosecond == 0
-          format_date(time)
+        # A date-valued field, rendered for hwaro's front matter, or nil.
+        #
+        # A parsed TOML/YAML time is used as is: rendering it to an offset
+        # string first turned a bare TOML date (`date = 2024-05-02`, a local
+        # date) into a timestamp pinned to the importing machine's zone
+        # (`2024-05-02T00:00:00+09:00`).
+        #
+        # A TOML local date-time (`date = 2024-05-02T10:00:00`, no offset)
+        # is lexed in the machine's zone too, and its offset is not in the
+        # source — writing one pinned the importing machine's zone into the
+        # file. Whether a value was local can't be told from the parsed Time
+        # (on a UTC machine it looks exactly like `…Z`), so `local_keys`
+        # comes from the source text (`toml_local_datetime_keys`); those
+        # values are written zone-less, which hwaro reads as local time just
+        # as Hugo does.
+        private def date_string(data : Hash(String, TOML::Any), key : String, local_keys : Set(String)) : String?
+          return unless time = time_value(data, key)
+          if local_keys.includes?(key)
+            time.to_s(time.nanosecond == 0 ? "%Y-%m-%dT%H:%M:%S" : "%Y-%m-%dT%H:%M:%S.%N")
+          else
+            format_date(time)
+          end
+        end
+
+        # A top-level TOML key assigned a local date-time: date and time,
+        # no `Z` or offset (optionally followed by a comment).
+        LOCAL_DATETIME_LINE_RE = /\A[ \t]*([A-Za-z0-9_-]+)[ \t]*=[ \t]*\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2}(?:\.\d+)?[ \t]*(?:#.*)?\z/
+
+        # The (lowercased) top-level keys of a TOML front matter block whose
+        # value is a local date-time. Empty for YAML/JSON front matter, whose
+        # zone-less timestamps already parse as UTC on every machine.
+        private def toml_local_datetime_keys(raw : String) : Set(String)
+          keys = Set(String).new
+          return keys unless raw.starts_with?("+++") && (match = TOML_FM_REGEX.match(raw))
+          match[1].each_line do |line|
+            # Keys after the first `[table]` header aren't top-level fields.
+            break if line.lstrip.starts_with?('[')
+            if m = LOCAL_DATETIME_LINE_RE.match(line)
+              keys << m[1].downcase
+            end
+          end
+          keys
         end
 
         private def time_value(data : Hash(String, TOML::Any), key : String) : Time?
