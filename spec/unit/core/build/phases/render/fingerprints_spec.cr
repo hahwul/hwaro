@@ -173,3 +173,71 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 end
+
+# The relations hash folds only what a closure can print of each related
+# page. A breadcrumb (`page.ancestors`, the JSON-LD breadcrumb behind
+# `{{ jsonld }}`) shows an ancestor's title and URL, and a template printing
+# `page.lower.title` shows no excerpt — so a body edit, which moves only the
+# content-derived fields, must not re-render the pages around it.
+private def write_body_site(neighbour_expr : String)
+  File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+  FileUtils.mkdir_p("templates")
+  File.write("templates/page.html",
+    "{{ jsonld }}{% for a in page.ancestors %}<{{ a.title }}>{% endfor %}" \
+    "LOWER={% if page.lower %}{{ #{neighbour_expr} }}{% endif %}{{ content }}")
+  File.write("templates/section.html", "<h1>{{ section.title }}</h1>{{ content }}")
+  FileUtils.mkdir_p("content/posts")
+  File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\nsort_by = \"date\"\n+++\nSection body.")
+  %w[a b c].each_with_index do |x, i|
+    File.write("content/posts/#{x}.md", "+++\ntitle = \"Post #{x}\"\ndate = 2024-01-0#{i + 1}\n+++\nBody #{x}")
+  end
+end
+
+private def with_body_site(neighbour_expr : String, &)
+  Dir.mktmpdir do |dir|
+    Dir.cd(dir) do
+      write_body_site(neighbour_expr)
+      relations_cached_build
+      yield
+    end
+  end
+end
+
+private def plant_post_sentinels : Array(String)
+  pages = Dir.glob("public/posts/*/index.html")
+  pages.size.should eq(3)
+  pages.each { |f| File.write(f, "SENTINEL") }
+  pages
+end
+
+describe "warm --cache: body edits next to relation readers" do
+  it "re-renders only the section index when its body changes" do
+    with_body_site("page.lower.title") do
+      pages = plant_post_sentinels
+      File.write("content/posts/_index.md", File.read("content/posts/_index.md") + "\nMore.")
+      relations_cached_build
+      pages.each { |f| File.read(f).should eq("SENTINEL") }
+      File.read("public/posts/index.html").should contain("More.")
+    end
+  end
+
+  it "does not re-render a neighbour that prints only the edited page's title" do
+    with_body_site("page.lower.title") do
+      pages = plant_post_sentinels
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + "\nMore words here.")
+      relations_cached_build
+      (pages - ["public/posts/b/index.html"]).each { |f| File.read(f).should eq("SENTINEL") }
+      File.read("public/posts/b/index.html").should contain("More words here.")
+    end
+  end
+
+  it "re-renders a neighbour that prints the edited page's word count" do
+    with_body_site(%(page.lower.title ~ ":" ~ page.lower.word_count)) do
+      # Whichever post has `b` as its lower neighbour prints b's word count.
+      reader = Dir.glob("public/posts/*/index.html").find! { |f| File.read(f).includes?("LOWER=Post b:2<") }
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + "\nMore words here.")
+      relations_cached_build
+      File.read(reader).should contain("LOWER=Post b:5<")
+    end
+  end
+end

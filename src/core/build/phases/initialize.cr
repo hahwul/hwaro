@@ -19,7 +19,7 @@ module Hwaro::Core::Build::Phases::Initialize
       verbose = ctx.options.verbose
       cache_enabled = ctx.options.cache
 
-      build_cache = Cache.new(enabled: cache_enabled)
+      build_cache = Cache.new(enabled: cache_enabled, cache_path: Cache.path_for(ctx.options.serve_mode))
       @cache = build_cache
       ctx.cache = build_cache
       # Before `--full` clears the metadata it reads.

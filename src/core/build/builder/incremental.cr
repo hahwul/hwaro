@@ -454,6 +454,7 @@ module Hwaro
           menu : String,
           taxonomy : String,
           lookup_targets : Array(String) = [] of String,
+          lookup_fields : ListingPageFields = ListingPageFields.new(false, false),
           lookup : String = "" do
           def self.inert : ListingSetSnapshot
             new(false, false, false, false, "", "", "", "")
@@ -482,6 +483,7 @@ module Hwaro
           # projection, so a footer printing the about page's title refreshes
           # when the about page moves and not on every other edit.
           lookup_targets = get_page_targets(blob)
+          lookup_fields = relation_page_fields(blob)
 
           ListingSetSnapshot.new(
             needs_page: needs_page,
@@ -493,7 +495,8 @@ module Hwaro
             menu: needs_menu ? compute_menu_set_fingerprint(site.pages, site.sections) : "",
             taxonomy: needs_taxonomy ? compute_taxonomy_slug_fingerprint(site) : "",
             lookup_targets: lookup_targets,
-            lookup: compute_get_page_lookup_fingerprint(site, lookup_targets),
+            lookup_fields: lookup_fields,
+            lookup: compute_get_page_lookup_fingerprint(site, lookup_targets, lookup_fields),
           )
         end
 
@@ -530,7 +533,7 @@ module Hwaro
           taxonomy_changed = before.needs_taxonomy &&
                              compute_taxonomy_slug_fingerprint(site) != before.taxonomy
           lookup_changed = !before.lookup_targets.empty? &&
-                           compute_get_page_lookup_fingerprint(site, before.lookup_targets) != before.lookup
+                           compute_get_page_lookup_fingerprint(site, before.lookup_targets, before.lookup_fields) != before.lookup
 
           return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed || lookup_changed
 

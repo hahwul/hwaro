@@ -7,6 +7,7 @@
 require "digest/md5"
 require "json"
 require "../../utils/digest_utils"
+require "../../utils/file_safe"
 require "../../utils/logger"
 require "../../models/config"
 require "../../config/options/build_options"
@@ -64,8 +65,10 @@ module Hwaro
         # a listing the global page-set fingerprint gates, so retitling a post
         # left its neighbours' "next: …" link — and every `@/` link to a
         # renamed page — stale on warm builds. "" when the page reads none of
-        # them, and for legacy entries — so such pages never rebuild because
-        # of this field.
+        # them, and for legacy entries: a page that reads none never rebuilds
+        # because of this field, while every page that does re-renders once
+        # on the first warm build after upgrading (its legacy "" no longer
+        # matches).
         @[JSON::Field(key: "relations_hash", emit_null: false)]
         property relations_hash : String
 
@@ -232,6 +235,19 @@ module Hwaro
         # Default cache filename - uses dot prefix to hide from directory listings
         # and 'hwaro_' prefix to identify it as project-specific cache
         CACHE_FILE = ".hwaro_cache.json"
+
+        # `hwaro serve --cache` keeps its own cache, inside the `.hwaro/`
+        # workspace next to the `.hwaro/serve` tree it describes. A cache
+        # remembers ONE output directory, and a `--cache` build whose cache
+        # names another one takes the cold path — so a shared file made every
+        # `hwaro build --cache` after a serve session wipe `public/` and
+        # regenerate every OG image and resized image variant.
+        SERVE_CACHE_FILE = ".hwaro/serve_cache.json"
+
+        # The cache file a build with these settings reads and writes.
+        def self.path_for(serve_mode : Bool) : String
+          serve_mode ? SERVE_CACHE_FILE : CACHE_FILE
+        end
 
         @entries : Hash(String, CacheEntry)
         @enabled : Bool
@@ -725,6 +741,9 @@ module Hwaro
               stamped.generator_version = Hwaro::VERSION
               CacheData.new(metadata: stamped, entries: @entries.values)
             end
+            # SERVE_CACHE_FILE lives under `.hwaro/`, which may not exist yet.
+            parent = File.dirname(@cache_path)
+            Utils::FileSafe.mkdir_p(parent) unless Dir.exists?(parent)
             File.write(tmp_path, data.to_json)
             File.rename(tmp_path, @cache_path)
             @dirty = false

@@ -14,8 +14,10 @@
 # `ensure_self_ignore` right after, so existing projects pick the ignore up
 # the first time serve or a remote-data build runs — no migration needed.
 #
-# Note `.hwaro_cache.json` lives NEXT TO `.hwaro/`, not inside it, and is not
-# covered here; the .gitignore scaffolded by `hwaro init` lists it.
+# Note `hwaro build --cache`'s `.hwaro_cache.json` lives NEXT TO `.hwaro/`,
+# not inside it, and is not covered here; the .gitignore scaffolded by
+# `hwaro init` lists it. `hwaro serve --cache` keeps its own cache inside, at
+# `.hwaro/serve_cache.json` (Cache::SERVE_CACHE_FILE).
 
 module Hwaro
   module Utils

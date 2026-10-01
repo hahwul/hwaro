@@ -387,7 +387,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --live-reload | 파일 변경 시 브라우저 라이브 리로드 켜기 (기본값: 활성화; 하위 호환용으로 유지) |
 | --no-live-reload | 파일 변경 시 브라우저 라이브 리로드 끄기 |
 | --header "NAME: VALUE" | 커스텀 응답 헤더 추가 (반복 가능). `config.toml`의 `[serve.headers]`와 병합 (CLI 우선). `hwaro serve`에만 적용 |
-| --cache | 빌드 캐시 사용 (변경 없는 파일 생략) |
+| --cache | 빌드 캐시 사용 (변경 없는 파일 생략). `hwaro build --cache`와 별도로 `.hwaro/serve_cache.json`에 저장 |
 | --stream | 메모리 사용을 줄이는 스트리밍 빌드 사용 |
 | --memory-limit SIZE | 스트리밍 빌드 메모리 제한 (예: `2G`, `512M`) |
 | --fast-start | 홈페이지 + 최신 N개 페이지를 먼저 렌더링하고 나머지는 백그라운드에서 렌더링 |

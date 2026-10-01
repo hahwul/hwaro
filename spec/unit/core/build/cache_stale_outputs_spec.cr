@@ -692,6 +692,29 @@ describe "warm --cache builds" do
       end
     end
 
+    # Serve keeps its own cache file, so a `serve --cache` session in between
+    # does not make the next `build --cache` forget `public/` (and wipe it,
+    # regenerating every image).
+    it "keeps public/ across a serve --cache session" do
+      with_cached_site do
+        cached_build
+        File.write("public/sentinel.txt", "kept")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        serve_options = Hwaro::Config::Options::BuildOptions.new(
+          output_dir: ".hwaro/serve", parallel: false, cache: true, highlight: false,
+        )
+        serve_options.serve_mode = true
+        builder.run(serve_options).should be_true
+        File.exists?(".hwaro/serve_cache.json").should be_true
+
+        cached_build
+        File.read("public/sentinel.txt").should eq("kept")
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+
     it "removes a deleted page after the cache was used for another output directory" do
       with_cached_site do
         cached_build
