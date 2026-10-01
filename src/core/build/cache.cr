@@ -345,6 +345,14 @@ module Hwaro
 
           return true if extra_outputs.any? { |p| !File.exists?(p) }
 
+          # Alias redirect stubs and `/page/N/` pagination pages are written
+          # only by this page's render, so a deleted one (`rm -rf
+          # public/posts/page/2`, a deploy step that cleaned `old/`) never came
+          # back: every warm build saw the page itself as up to date. Only
+          # files the render actually wrote are recorded, so a path missing
+          # here was removed by someone else.
+          return true if entry.derived_paths.any? { |p| !File.exists?(p) }
+
           # A parent section's [cascade] changed what this page inherits —
           # the source file is unchanged but the rendered output isn't.
           return true if entry.cascade_hash != cascade_hash

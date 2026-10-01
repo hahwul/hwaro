@@ -312,6 +312,26 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
+    it "returns true when a recorded derived path (alias stub, /page/N/) is missing" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        output_file = File.join(dir, "output.html")
+        stub_file = File.join(dir, "old", "index.html")
+        File.write(test_file, "content")
+        File.write(output_file, "<p>content</p>")
+        Dir.mkdir_p(File.dirname(stub_file))
+        File.write(stub_file, "redirect")
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, output_file, derived_paths: [stub_file])
+        cache.changed?(test_file, output_file).should be_false
+
+        File.delete(stub_file)
+        cache.changed?(test_file, output_file).should be_true
+      end
+    end
+
     it "ignores extra_outputs that were not recorded (default empty)" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")

@@ -154,6 +154,22 @@ describe "warm --cache builds" do
     end
   end
 
+  it "regenerates a deleted alias stub and pagination page" do
+    with_cached_site do
+      File.write("config.toml", File.read("config.toml") + "\n[pagination]\nenabled = true\nper_page = 1\n")
+      cached_build
+      File.exists?("public/legacy/index.html").should be_true
+      File.exists?("public/posts/page/2/index.html").should be_true
+
+      FileUtils.rm_rf("public/legacy")
+      FileUtils.rm_rf("public/posts/page/2")
+      cached_build
+
+      File.exists?("public/legacy/index.html").should be_true
+      File.exists?("public/posts/page/2/index.html").should be_true
+    end
+  end
+
   it "removes the AMP mirror of a deleted page" do
     with_cached_site do
       File.write("config.toml", File.read("config.toml") + "\n[amp]\nenabled = true\n")
