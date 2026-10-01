@@ -56,7 +56,8 @@ failing CI.
 2. Finds external URLs (http/https links) and internal links (relative/absolute paths)
 3. Sends concurrent HEAD requests to external URLs (falling back to GET when a
    host rejects HEAD with 405/403/501, following up to 5 redirects)
-4. Verifies internal link targets exist on disk (checks `.md`, `_index.md`, `index.md`)
+4. Resolves internal link targets to the pages a default build publishes (see
+   [Page links](#page-links))
 5. Accepts routes the build generates rather than reads from disk
 6. Accepts pipeline-emitted assets found in the last build's output (see
    [Build output as evidence](#build-output-as-evidence))
@@ -66,6 +67,28 @@ External links that resolve to private or internal addresses (localhost,
 RFC 1918 ranges, `.local`/`.internal` hosts) are never contacted. They are
 reported as skipped instead, both in the human output and under
 `skipped_external` in the JSON payload.
+
+### Page links
+
+A link to a page counts when a default `hwaro build` writes that page at that
+URL. URLs are worked out from the sources the way the build works them out,
+so this also holds before the first build:
+
+- `slug`, `path` and `[permalinks]` URLs and every `aliases` entry are live
+  (`/posts/renamed/`, not `/posts/original-name/`). A link to the source path
+  of a page that publishes elsewhere is reported with the URL it moved to.
+- A link to a draft, a future-dated or expired page, or a `render = false`
+  page is reported, since the build writes nothing there.
+- `/about/`, `/about` and `/about/index.html` all reach `content/about.md`,
+  but `/about.md` does not: the build never publishes a Markdown source under
+  its own name.
+- Files beside a page bundle or section index are live under that page's URL,
+  including its translated copies (`/ko/posts/my-trip/photo.jpg`).
+- Relative links resolve against the page's URL, as a browser resolves them,
+  not against the source file's folder. From `content/posts/a.md` (served at
+  `/posts/a/`), `../b/` reaches `/posts/b/`, and `![](photo.png)` asks for
+  `/posts/a/photo.png`, so keep a page's images in a bundle
+  (`content/posts/a/index.md`).
 
 ### Generated routes
 

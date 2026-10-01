@@ -71,6 +71,8 @@ module Hwaro
       @static_dir : String
       @templates_dir : String
       @project_root : String
+      @site_config : Models::Config? = nil
+      @site_config_loaded = false
 
       def initialize(
         @content_dir : String = "content",
@@ -247,6 +249,19 @@ module Hwaro
           Dir.glob(File.join(@static_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
+        # The asset pipeline's own source dir (`[assets] source_dir =
+        # "assets"`): a bundled stylesheet's `url(/images/bg.png)` ships in
+        # the compiled bundle, yet the file was never read, so `bg.png` was
+        # reported unused and `--delete` removed it.
+        if source_dir = asset_source_dir
+          Dir.glob(File.join(source_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+        end
+
+        # Environment overrides (`config.production.toml`, merged by
+        # `hwaro build --env production`) are config too: an asset named only
+        # there — a production `og.default_image`, say — is still in use.
+        Dir.glob(File.join(@project_root, "config.*.toml")).sort.each { |f| scan_files << f }
+
         # `data/` and `i18n/` are build inputs too — templates read them as
         # `site.data.*` / translation strings, so an asset path that lives only
         # in a data or locale file is genuinely referenced. Neither directory
@@ -322,9 +337,16 @@ module Hwaro
       end
 
       private def add_config_references(refs : Set(String)) : Nil
-        config_path = File.join(@project_root, "config.toml")
-        return unless File.exists?(config_path)
-        config = Models::Config.load(config_path)
+        return unless config = site_config
+        # `[highlight] use_cdn = false` makes the build itself link the
+        # self-hosted highlight.js files (`highlight_css` / `highlight_js`
+        # template variables, see `Render#missing_local_highlight_assets`).
+        # Their names appear in no scanned file, so they were reported unused
+        # and `--delete` broke syntax highlighting.
+        if config.highlight.enabled && !config.highlight.use_cdn
+          refs << "#{config.highlight.theme}.min.css"
+          refs << "highlight.min.js" unless config.highlight.server?
+        end
         config.assets.bundles.each do |bundle|
           bundle.files.each { |path| refs << File.basename(path) }
           # The compiled bundle name (e.g. `main.css`) is referenced
@@ -349,6 +371,28 @@ module Hwaro
         # Treat config-load failures as "no extra references" so the
         # tool stays best-effort rather than crashing on a partial
         # site.
+      end
+
+      # The project's `config.toml`, loaded once; nil when absent or
+      # unloadable (the scan stays best-effort on a partial site).
+      private def site_config : Models::Config?
+        return @site_config if @site_config_loaded
+        @site_config_loaded = true
+        config_path = File.join(@project_root, "config.toml")
+        @site_config = File.exists?(config_path) ? Models::Config.load(config_path) : nil
+      rescue Exception
+        nil
+      end
+
+      # `[assets] source_dir` when the pipeline reads its bundles from
+      # somewhere other than the static dir: those stylesheets and scripts
+      # ship (bundled) and reference static files like any other.
+      private def asset_source_dir : String?
+        return unless config = site_config
+        return unless config.assets.enabled
+        dir = rooted(config.assets.source_dir)
+        return if File.expand_path(dir) == File.expand_path(@static_dir)
+        dir if Dir.exists?(dir)
       end
     end
   end
