@@ -180,7 +180,8 @@ module Hwaro::Core::Build::Phases::Render
       reads = Content::Processors::TemplateEngine.take_render_reads
       reads.concat(build_cache.render_input_keys) unless rendered_every_page
       keys = reads.to_a.sort!
-      build_cache.record_render_inputs(render_inputs_digest(render_globals, keys, render_input_values), keys)
+      digest = render_inputs_digest(render_globals, keys, render_input_values)
+      build_cache.record_render_inputs(digest, stamped_render_input_keys(keys, render_input_values))
     end
     profiler.end_phase
     result

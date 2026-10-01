@@ -112,6 +112,57 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     end
   end
 
+  it "re-renders cached pages when a resize_image() source changes colour at the same size" do
+    config = "[image_processing]\nenabled = true\nwidths = [640]\n[image_processing.lqip]\nenabled = true\n"
+    head = %({% set im = resize_image(path="/img.png", width=640) %}<i data-c="{{ im.dominant_color }}"></i>)
+    with_render_inputs_site(config, head) do
+      write_solid_png("static/img.png", 900, 30, 255_u8, 0_u8, 0_u8)
+      render_inputs_build
+      File.read("public/a/index.html").should contain(%(data-c="#ff0000"))
+
+      write_solid_png("static/img.png", 900, 30, 0_u8, 0_u8, 255_u8)
+      render_inputs_build
+      File.read("public/a/index.html").should contain(%(data-c="#0000ff"))
+    end
+  end
+
+  # A warm build that changed nothing must not read every source image: the
+  # recorded stamp (mtime + size) stands in for the bytes, as it does for
+  # content files. An unreadable file is the oracle — re-hashing it would
+  # change the digest and re-render the page.
+  it "does not re-read an unchanged resize_image() source on a warm build" do
+    config = "[image_processing]\nenabled = true\nwidths = [640]\n"
+    head = %({% set im = resize_image(path="/img.png", width=640) %}<img src="{{ im.url }}">)
+    with_render_inputs_site(config, head) do
+      write_solid_png("static/img.png", 900, 30, 255_u8, 0_u8, 0_u8)
+      render_inputs_build
+      render_inputs_build
+      mark_outputs(["public/a/index.html"])
+      File.chmod("static/img.png", 0o000)
+      begin
+        render_inputs_build
+      ensure
+        File.chmod("static/img.png", 0o644)
+      end
+      cached?("public/a/index.html").should be_true
+    end
+  end
+
+  it "keeps pages cached when a resize_image() source is only touched" do
+    config = "[image_processing]\nenabled = true\nwidths = [640]\n"
+    head = %({% set im = resize_image(path="/img.png", width=640) %}<img src="{{ im.url }}">)
+    with_render_inputs_site(config, head) do
+      write_solid_png("static/img.png", 900, 30, 255_u8, 0_u8, 0_u8)
+      render_inputs_build
+      render_inputs_build
+      mark_outputs(["public/a/index.html"])
+      # A fresh checkout: new mtime, same bytes.
+      File.touch("static/img.png", Time.utc + 5.seconds)
+      render_inputs_build
+      cached?("public/a/index.html").should be_true
+    end
+  end
+
   it "re-renders cached pages when an env() value changes, without storing the value" do
     name = "HWARO_SPEC_RENDER_INPUT_ENV"
     ENV[name] = "UA-OLD"
