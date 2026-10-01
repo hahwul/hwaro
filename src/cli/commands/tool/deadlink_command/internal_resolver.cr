@@ -66,7 +66,11 @@ module Hwaro
               # (`content/ko/posts/`), and that section outranks any
               # translation reading — stripping unconditionally reported such
               # links dead even though the build publishes them.
-              exists = resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, oracle, routes) ||
+              # A link back to the page holding it (`./#intro`) lives exactly
+              # as long as that page does, so a draft or scheduled page is not
+              # reported for pointing at itself.
+              exists = own_page_link?(resolved_url, link, routes) ||
+                       resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, oracle, routes) ||
                        generated_routes.matches?(resolved_url) ||
                        feed_route?(resolved_url, generated_routes, content_dir, base_dir, language_codes) ||
                        paginated_route?(resolved_url, link, content_dir, base_dir, taxonomy_names) ||
@@ -493,6 +497,12 @@ module Hwaro
             state = states.first
             reason = state == Services::PageRouteIndex::NOT_RENDERED ? "target sets render = false" : Services::InternalLinkIndex.describe(state)
             "Internal link not resolved by the build: #{reason}"
+          end
+
+          private def own_page_link?(url : String, link : Link, routes : Services::PageRouteIndex) : Bool
+            return false if link.kind == :image || !url.starts_with?("/")
+            return false unless page_url = routes.url_for(link.file)
+            Services::PageRouteIndex.normalize(url) == Services::PageRouteIndex.normalize(page_url)
           end
 
           # Resolve a relative destination against the URL of the page that

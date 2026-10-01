@@ -136,10 +136,11 @@ module Hwaro
         @index_dirs << File.dirname(key) if index_source?(source)
         @urls[key] = url
         @states[key] = info.published? && !data[:render] ? NOT_RENDERED : info.status
-        return unless info.published?
-
+        # Registered whatever the page's state: a scheduled or draft bundle's
+        # own images are judged as if it published, so its links don't fail
+        # a CI gate before the page goes live.
         @bundle_dirs[url] = File.dirname(source) if index_source?(source) && File.dirname(relative) != "."
-        return unless data[:render]
+        return unless info.published? && data[:render]
 
         @published << PageRouteIndex.normalize(url)
         data[:aliases].each do |alias_path|

@@ -81,4 +81,25 @@ describe "check-links relative links" do
       dead_relative(dir, "posts/a.ko.md", ["../", "../b/"], language_codes: ["ko"]).should eq(["../b/"])
     end
   end
+
+  # A scheduled or draft page is checked as if it published: its own bundle
+  # images and links back to itself must not fail a CI gate before it goes
+  # live.
+  it "judges an unpublished page's own links as if it published" do
+    Dir.mktmpdir do |dir|
+      write_rel_page(dir, "index.md")
+      write_rel_page(dir, "posts/_index.md")
+      write_rel_page(dir, "posts/sched/index.md", %(date = 2999-01-01\nslug = "launch"))
+      File.write(File.join(dir, "posts", "sched", "photo.png"), "png")
+      write_rel_page(dir, "posts/wip/index.md", %(draft = true\nslug = "my-wip"))
+      File.write(File.join(dir, "posts", "wip", "photo.png"), "png")
+      write_rel_page(dir, "posts/wip2.md", "draft = true")
+
+      dead_relative(dir, "posts/sched/index.md", ["photo.png"], :image).should be_empty
+      dead_relative(dir, "posts/wip/index.md", ["photo.png"], :image).should be_empty
+      dead_relative(dir, "posts/wip/index.md", ["./", "."]).should be_empty
+      dead_relative(dir, "posts/wip2.md", ["./"]).should be_empty
+      dead_relative(dir, "posts/wip2.md", ["photo.png"], :image).should eq(["photo.png"])
+    end
+  end
 end
