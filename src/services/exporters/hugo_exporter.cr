@@ -18,7 +18,7 @@ module Hwaro
           verbose = options.verbose
 
           files = scan_content_files(content_dir)
-          @relative_files = files.map { |f| f.sub(content_dir, "").lstrip('/') }.to_set
+          @relative_files = files.map(&.sub(content_dir, "").lstrip('/')).to_set
 
           if files.empty?
             return ExportResult.new(
