@@ -443,7 +443,7 @@ describe "importer stability" do
 
       expected = "# Main Title\n\nIntro paragraph with **bold**, *italic*, `inline_code()` and ~~gone~~.\n\n" \
                  "## Section & Sub\n\nA link: [Example](https://example.com/a?b=1&c=2) and an image " \
-                 "![A pic](/img/pic.png) inline.\n\n> Quoted line one.Quoted line two.\n\n" \
+                 "![A pic](/img/pic.png) inline.\n\n> Quoted line one.\n>\n> Quoted line two.\n\n" \
                  "- alpha\n- beta\n  - beta-one\n  - beta-two\n- gamma\n\n" \
                  "1. first\n2. second\n   1. second-one\n\n" \
                  "```\ndef hello\n  puts \"hi <world>\"\nend\n```\n\n" \

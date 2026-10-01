@@ -29,9 +29,25 @@ module Hwaro
         "%Y-%m-%d",
       ]
 
-      # Importers additionally accept prose and RFC 822 dates.
-      IMPORT_FORMATS = CONTENT_FORMATS + [
+      # Importers additionally accept minute-precision, slash, prose and
+      # RFC 822 dates — what Jekyll, Hexo and Astro accept in front matter.
+      # The minute-precision formats must precede the bare `%Y-%m-%d` (the
+      # last CONTENT_FORMATS entry): it ignores trailing input, so it matched
+      # `2024-01-15 10:30` and silently dropped the time.
+      IMPORT_FORMATS = CONTENT_FORMATS[0...-1] + [
+        "%Y-%m-%dT%H:%M%:z",
+        "%Y-%m-%d %H:%M %:z",
+        "%Y-%m-%d %H:%M %z",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d %H:%M",
+        CONTENT_FORMATS.last,
+        # Hexo's `2024/01/20 14:00:00`
+        "%Y/%m/%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+        "%Y/%m/%d",
         "%B %d, %Y",
+        # `Jul 08 2022` — Astro's blog template (a JS Date string)
+        "%B %d %Y",
         # RFC 822 (WordPress <pubDate>, RSS feeds)
         "%a, %d %b %Y %H:%M:%S %z",
       ]

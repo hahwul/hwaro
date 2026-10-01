@@ -1,5 +1,6 @@
 require "yaml"
 require "./base"
+require "../../content/processors/fence_tracker"
 
 module Hwaro
   module Services
@@ -154,10 +155,7 @@ module Hwaro
           # can emit a single summary warning.
           has_mdx_components = false
           if file_path.ends_with?(".mdx")
-            # [^\n], not `.+`: Crystal's /m makes `.` match newlines, so `.+$`
-            # swallowed everything from the first import line to EOF —
-            # deleting the entire article body of any real MDX file.
-            body = body.gsub(/^import[ \t]+[^\n]+$\n?/m, "")
+            body = strip_mdx_imports(body)
             if body.matches?(/<[A-Z]/)
               Logger.warn "MDX components detected in #{file_path} — manual conversion needed."
               has_mdx_components = true
@@ -182,6 +180,29 @@ module Hwaro
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
           has_mdx_components ? :imported_wrapped : :imported
+        end
+
+        # Drop MDX's top-level ESM `import` statements. Only lines outside
+        # fenced code are statements: a JavaScript sample in a ``` block
+        # starting with `import …` is article content, and deleting it
+        # mangled every MDX post that shows how to import a module. A
+        # multi-line `import {` statement is dropped through its closing `}`.
+        private def strip_mdx_imports(body : String) : String
+          tracker = Content::Processors::FenceTracker.new
+          in_import = false
+          String.build do |io|
+            body.each_line(chomp: false) do |line|
+              if tracker.fence_line?(line)
+                io << line
+              elsif in_import
+                in_import = false if line.includes?('}')
+              elsif line.matches?(/\Aimport[ \t]/)
+                in_import = line.includes?('{') && !line.includes?('}')
+              else
+                io << line
+              end
+            end
+          end
         end
       end
     end
