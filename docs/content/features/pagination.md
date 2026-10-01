@@ -37,7 +37,7 @@ paginate_path = "page"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| paginate | int | — | Items per page |
+| paginate | int | — | Items per page; `0` (or less) turns pagination off for the section |
 | paginate_path | string | "page" | URL pattern for pages |
 
 ### Generated URLs
