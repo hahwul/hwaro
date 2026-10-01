@@ -560,7 +560,7 @@ module Hwaro
 
         # Parse a date string in common formats, returns nil on failure.
         protected def parse_date(date_str : String) : Time?
-          Utils::DateUtils.parse_lenient(date_str, Utils::DateUtils::IMPORT_FORMATS)
+          Utils::DateUtils.parse_import(date_str)
         end
 
         # Map a source page's literal URL (Hugo `url`, Jekyll `permalink`) onto

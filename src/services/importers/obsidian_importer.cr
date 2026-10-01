@@ -298,8 +298,11 @@ module Hwaro
           in_comment = false
           result = String.build do |io|
             body.each_line(chomp: false) do |line|
-              fenced = tracker.fence_line?(line)
-              if fenced && !in_comment
+              # Only text outside comments reaches the fence tracker: a
+              # ``` inside a comment would otherwise leave it "in a fence"
+              # and publish every comment after it.
+              started_in_comment = in_comment
+              if !in_comment && tracker.fence_line?(line)
                 io << line
                 next
               end
@@ -322,6 +325,8 @@ module Hwaro
               end
               # A line that held nothing but comment disappears entirely.
               next if had_comment && kept.blank?
+              # The visible tail of a line that closed a comment is fed now.
+              tracker.fence_line?(kept) if started_in_comment
               io << (had_comment ? kept.rstrip : kept) << line[text.size..]
             end
           end

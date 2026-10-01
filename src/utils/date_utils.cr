@@ -30,8 +30,8 @@ module Hwaro
         "%Y-%m-%d",
       ]
 
-      # Importers additionally accept minute-precision, slash, prose and
-      # RFC 822 dates — what Jekyll, Hexo and Astro accept in front matter.
+      # Importers additionally accept minute-precision, slash and RFC 822
+      # dates (and prose dates, see `parse_import`) — what Jekyll, Hexo and Astro accept in front matter.
       # The minute-precision formats must precede the bare `%Y-%m-%d` (the
       # last CONTENT_FORMATS entry): it ignores trailing input, so it matched
       # `2024-01-15 10:30` and silently dropped the time.
@@ -42,16 +42,32 @@ module Hwaro
         "%Y-%m-%dT%H:%M",
         "%Y-%m-%d %H:%M",
         CONTENT_FORMATS.last,
-        # Hexo's `2024/01/20 14:00:00`
+        # Hexo's `2024/01/20 14:00:00` — zone-bearing forms first, for the
+        # same trailing-input reason as above.
+        "%Y/%m/%d %H:%M:%S %:z",
+        "%Y/%m/%d %H:%M:%S %z",
+        "%Y/%m/%d %H:%M %:z",
+        "%Y/%m/%d %H:%M %z",
         "%Y/%m/%d %H:%M:%S",
         "%Y/%m/%d %H:%M",
         "%Y/%m/%d",
-        "%B %d, %Y",
-        # `Jul 08 2022` — Astro's blog template (a JS Date string)
-        "%B %d %Y",
         # RFC 822 (WordPress <pubDate>, RSS feeds)
         "%a, %d %b %Y %H:%M:%S %z",
       ]
+
+      # Prose dates (`July 8, 2022`, and `Jul 08 2022` from Astro's blog
+      # template, a JS Date string). Tried only on input shaped like
+      # `Month D YYYY`: unguarded, `%B %d %Y` read `May 2022` as day 20 of
+      # the year 22.
+      PROSE_DATE_RE      = /\A[A-Za-z]+\.? \d{1,2},? \d{4}\b/
+      PROSE_DATE_FORMATS = ["%B %d, %Y", "%B %d %Y"]
+
+      # The importers' parser: `parse_lenient` over IMPORT_FORMATS, then the
+      # guarded prose formats.
+      def parse_import(date_str : String) : Time?
+        parse_lenient(date_str, IMPORT_FORMATS) ||
+          (date_str.strip.matches?(PROSE_DATE_RE) ? parse_lenient(date_str, PROSE_DATE_FORMATS) : nil)
+      end
 
       # Parse a date string in common formats, returns nil on failure.
       # RFC 3339 is probed first, then the format table in UTC.

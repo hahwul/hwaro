@@ -565,3 +565,21 @@ describe "Obsidian import: hard line breaks" do
     end
   end
 end
+
+describe "Obsidian import: fence opener inside a %% comment" do
+  it "keeps stripping comments after a comment that holds a ``` line" do
+    Dir.mktmpdir do |dir|
+      vault = File.join(dir, "vault")
+      FileUtils.mkdir_p(vault)
+      File.write(File.join(vault, "Draft.md"), "---\ntitle: Draft\n---\nIntro\n%%\n```\ndraft code\n%%\nAfter %%secret%% end\n")
+      output_dir = File.join(dir, "out")
+      Hwaro::Services::Importers::ObsidianImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "obsidian", path: vault, output_dir: output_dir))
+      content = File.read(File.join(output_dir, "posts", "draft.md"))
+      content.should_not contain("draft code")
+      content.should_not contain("secret")
+      content.should contain("Intro")
+      content.should contain("After  end")
+    end
+  end
+end

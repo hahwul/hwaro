@@ -225,7 +225,7 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result.should eq("Write &amp;copy; for ©, or &mdash;")
     end
 
-    it "decodes inline code exactly once and leaves it unescaped" do
+    it "decodes inline code exactly once and leaves it unescaped (guard: prose escaping must not reach code spans)" do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>Wrap it in <code>&lt;div&gt;</code> &amp; done</p>")
       result.should eq("Wrap it in `<div>` & done")
     end
@@ -269,6 +269,37 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
     it "moves edge whitespace outside emphasis delimiters" do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>This is <strong>bold </strong>text and <em> spaced</em>.</p>")
       result.should eq("This is **bold** text and  *spaced*.")
+    end
+
+    it "moves a no-break space at the edge outside emphasis delimiters" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p><strong>important&nbsp;</strong>stuff and <em>&#160;x</em>y</p>")
+      result.should eq("**important** stuff and \u00A0*x*y")
+    end
+
+    it "keeps an author comment that merely starts with \"more\" out of the excerpt marker" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>text <!-- more of the same, todo --> rest</p>")
+      result.should_not contain("<!-- more -->")
+      result.should eq("text  rest")
+    end
+
+    it "drops a more tag inside a list item or table cell instead of splitting the block" do
+      list = Hwaro::Services::Importers::HtmlToMarkdown.convert("<ul><li>a<!--more-->b</li><li>c</li></ul>")
+      list.should eq("- ab\n- c")
+      table = Hwaro::Services::Importers::HtmlToMarkdown.convert("<table><tr><th>h</th></tr><tr><td>x<!--more-->y</td></tr></table>")
+      table.should eq("| h |\n| --- |\n| xy |")
+    end
+
+    it "does not escape pipes inside a fenced block in a table cell" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<table><tr><td>h</td></tr><tr><td><pre>a|b</pre></td></tr></table>")
+      result.should contain("a|b")
+      result.should_not contain(%q(a\|b))
+    end
+
+    it "decodes every spelling of an encoded ampersand exactly once" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>See &#38;copy; and &#x26;lt;b&#x26;gt; and &#038;amp; ok</p>")
+      result.should eq("See &amp;copy; and &amp;lt;b&amp;gt; and &amp;amp; ok")
+      code = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p><code>&#038;amp;</code></p>")
+      code.should eq("`&amp;`")
     end
   end
 end
