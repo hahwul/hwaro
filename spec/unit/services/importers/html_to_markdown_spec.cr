@@ -208,5 +208,61 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
       result.should contain(%q(| a | x \| y |))
     end
+
+    it "keeps entity-encoded markup in prose as text, not live HTML" do
+      # The author wrote `&lt;script&gt;` to SHOW the tag. Decoding it to a
+      # bare `<script>` made the Markdown renderer emit a live, unclosed
+      # script element that swallowed the rest of the page.
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>Use the &lt;script&gt; tag &amp; the &lt;!-- comment --&gt;.</p>")
+      result.should eq("Use the &lt;script> tag & the &lt;!-- comment -->.")
+      html = Hwaro::Content::Processors::Markdown.new.render(result)[0]
+      html.should_not contain("<script>")
+      html.should contain("&lt;script&gt;")
+    end
+
+    it "keeps a literal entity name in prose literal" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>Write &amp;copy; for ©, or &mdash;</p>")
+      result.should eq("Write &amp;copy; for ©, or &mdash;")
+    end
+
+    it "decodes inline code exactly once and leaves it unescaped" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>Wrap it in <code>&lt;div&gt;</code> &amp; done</p>")
+      result.should eq("Wrap it in `<div>` & done")
+    end
+
+    it "keeps links, emphasis and code inside list items" do
+      html = %(<ul><li><a href="https://crystal-lang.org">Crystal</a> is <strong>fast</strong></li><li>Read <code>docs</code> and <em>enjoy</em></li></ul>)
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("- [Crystal](https://crystal-lang.org) is **fast**\n- Read `docs` and *enjoy*")
+    end
+
+    it "keeps links and code inside table cells" do
+      html = %(<table><tr><th>Name</th><th>Link</th></tr><tr><td><code>a|b</code></td><td><a href="https://hwaro.dev">site</a></td></tr></table>)
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should contain(%q(| `a\|b` | [site](https://hwaro.dev) |))
+    end
+
+    it "keeps the paragraphs of a blockquote apart" do
+      html = %(<blockquote class="wp-block-quote"><p>First.</p><p>Second.</p><cite>Someone</cite></blockquote>)
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("> First.\n>\n> Second.\n>\n> Someone")
+    end
+
+    it "unwraps a [caption] shortcode into the image and its caption" do
+      html = %([caption id="attachment_12" align="aligncenter" width="300"]<img src="https://example.com/cat.jpg" alt="A cat" width="300" /> My lovely cat[/caption])
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("![A cat](https://example.com/cat.jpg)\n\nMy lovely cat")
+    end
+
+    it "reads a pre-3.4 [caption] whose text is an attribute" do
+      html = %([caption id="a" caption="Old caption"]<a href="https://example.com/big.jpg"><img src="https://example.com/cat.jpg" alt="" /></a>[/caption])
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("[![](https://example.com/cat.jpg)](https://example.com/big.jpg)\n\nOld caption")
+    end
+
+    it "moves edge whitespace outside emphasis delimiters" do
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>This is <strong>bold </strong>text and <em> spaced</em>.</p>")
+      result.should eq("This is **bold** text and  *spaced*.")
+    end
   end
 end

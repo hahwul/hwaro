@@ -142,12 +142,42 @@ module Hwaro
             code_placeholder(code_stash.size - 1)
           end
 
-          # Blockquotes
+          # Inline code is stashed too, for the same reason: its text is
+          # literal, so it is entity-decoded exactly once here and must not
+          # be touched by the prose escaping in `decode_prose_entities`
+          # (Markdown shows `&lt;` inside a code span verbatim).
+          result = result.gsub(/<code\b[^>]*>(.*?)<\/code>/mi) do
+            code_stash << "`#{decode_html_entities(strip_tags($1))}`"
+            code_placeholder(code_stash.size - 1)
+          end
+
+          # `[caption]` shortcode (classic-editor images): unwrap it, putting
+          # the caption text in its own paragraph under the image. Left as
+          # is, the shortcode rendered as literal `[caption id=…]` text.
+          # Pre-3.4 exports carry the text in a `caption="…"` attribute instead.
+          result = result.gsub(/\[caption\b([^\]]*)\](.*?)\[\/caption\]/mi) do
+            attrs = $1
+            inner = $2.strip
+            if m = inner.match(/\A((?:<a\b[^>]*>\s*)?<img\b[^>]*>(?:\s*<\/a>)?)\s*(.*)\z/mi)
+              caption = m[2].strip
+              caption = attrs.match(/\bcaption=["']([^"']*)["']/i).try(&.[1].strip) || "" if caption.empty?
+              caption.empty? ? "#{m[1]}\n\n" : "#{m[1]}\n\n#{caption}\n\n"
+            else
+              "#{inner}\n\n"
+            end
+          end
+
+          # Blockquotes. Paragraph boundaries inside the quote (and a
+          # Gutenberg `<cite>`) become quoted blank lines — deleting the
+          # `<p>` tags outright glued every paragraph into one run-on line.
           result = result.gsub(/<blockquote[^>]*>(.*?)<\/blockquote>/mi) do
             inner = $1.strip
-            # Strip inner <p> tags
-            inner = inner.gsub(/<\/?p[^>]*>/i, "")
-            lines = inner.split("\n").map { |l| "> #{l.strip}" }
+              .gsub(/<\/p\s*>/i, "\n\n")
+              .gsub(/<p\b[^>]*>/i, "")
+              .gsub(/<cite\b[^>]*>/i, "\n\n")
+              .strip
+              .gsub(/\n[ \t]*(?:\n[ \t]*)+/, "\n\n")
+            lines = inner.split("\n").map { |l| l.strip.empty? ? ">" : "> #{l.strip}" }
             lines.join("\n") + "\n\n"
           end
 
@@ -168,7 +198,10 @@ module Hwaro
               items = $2.scan(/<li[^>]*>(.*?)<\/li>/mi)
               lines = items.map_with_index do |m, i|
                 marker = kind == "ol" ? "#{i + 1}. " : "- "
-                "#{marker}#{indent_continuation(strip_tags(m[1]).strip, marker.size)}"
+                # Inline markup first: a bare `strip_tags` here ran before
+                # the document-wide inline passes, so every link, image and
+                # emphasis inside a list item was flattened to plain text.
+                "#{marker}#{indent_continuation(strip_tags(convert_inline(m[1])).strip, marker.size)}"
               end
               "\n" + lines.join("\n") + "\n\n"
             end
@@ -184,7 +217,15 @@ module Hwaro
             inner = $1
             rows = inner.scan(/<tr[^>]*>(.*?)<\/tr>/mi).map do |m|
               m[1].scan(/<(?:th|td)[^>]*>(.*?)<\/(?:th|td)>/mi).map do |cell|
-                strip_tags(cell[1]).strip.gsub(/\s+/, " ").gsub("|", "\\|")
+                # Same as list items: convert inline markup before stripping.
+                text = strip_tags(convert_inline(cell[1])).strip.gsub(/\s+/, " ").gsub("|", "\\|")
+                # A stashed code span sits in the cell as a placeholder, so
+                # its pipes have to be escaped in the stash itself.
+                text.scan(CODE_PLACEHOLDER_RE) do |pm|
+                  idx = pm[1].to_i
+                  code_stash[idx] = code_stash[idx].gsub("|", "\\|")
+                end
+                text
               end
             end
             rows.reject!(&.empty?)
@@ -216,6 +257,29 @@ module Hwaro
           result = result.gsub(/<br\b[^>]*>/i, "  \n")
 
           # Inline elements
+          result = convert_inline(result)
+
+          # Strip remaining HTML tags
+          result = strip_tags(result)
+
+          # Decode HTML entities
+          result = decode_prose_entities(result)
+
+          # Restore stashed code (already entity-decoded exactly once).
+          code_stash.each_with_index do |block, i|
+            result = result.sub(code_placeholder(i), block)
+          end
+
+          # Clean up whitespace
+          result = result.gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
+          result.strip
+        end
+
+        # The inline passes (images, links, emphasis, strikethrough). Run on
+        # the whole document and, before their own `strip_tags`, on list
+        # items and table cells.
+        private def self.convert_inline(html : String) : String
+          result = html
 
           # Images (before links to avoid nested match issues).
           # Drop the URL (keep the alt text) when the scheme is unsafe so an
@@ -254,31 +318,27 @@ module Hwaro
           end
 
           # Bold
-          result = result.gsub(/<(?:strong|b)>(.*?)<\/(?:strong|b)>/mi) { "**#{$1}**" }
+          result = result.gsub(/<(?:strong|b)>(.*?)<\/(?:strong|b)>/mi) { emphasize($1, "**") }
 
           # Italic
-          result = result.gsub(/<(?:em|i)>(.*?)<\/(?:em|i)>/mi) { "*#{$1}*" }
-
-          # Inline code
-          result = result.gsub(/<code>(.*?)<\/code>/mi) { "`#{$1}`" }
+          result = result.gsub(/<(?:em|i)>(.*?)<\/(?:em|i)>/mi) { emphasize($1, "*") }
 
           # Strikethrough
-          result = result.gsub(/<(?:del|s|strike)>(.*?)<\/(?:del|s|strike)>/mi) { "~~#{$1}~~" }
+          result = result.gsub(/<(?:del|s|strike)>(.*?)<\/(?:del|s|strike)>/mi) { emphasize($1, "~~") }
 
-          # Strip remaining HTML tags
-          result = strip_tags(result)
+          result
+        end
 
-          # Decode HTML entities
-          result = decode_html_entities(result)
-
-          # Restore stashed code fences (already entity-decoded exactly once).
-          code_stash.each_with_index do |block, i|
-            result = result.sub(code_placeholder(i), block)
-          end
-
-          # Clean up whitespace
-          result = result.gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
-          result.strip
+        # Wrap `inner` in an emphasis delimiter, moving its edge whitespace
+        # outside: WordPress's visual editor routinely leaves the space
+        # inside the tag (`<strong>bold </strong>text`), and `**bold **text`
+        # is not emphasis in Markdown — the asterisks render literally.
+        private def self.emphasize(inner : String, delim : String) : String
+          core = inner.strip
+          return inner if core.empty?
+          lead = inner[0, inner.size - inner.lstrip.size]
+          trail = inner[inner.rstrip.size..]
+          "#{lead}#{delim}#{core}#{delim}#{trail}"
         end
 
         # NUL-delimited placeholder: survives every regex pass (no `<>`, no
@@ -286,6 +346,25 @@ module Hwaro
         private def self.code_placeholder(index : Int32) : String
           "\u0000hwaro-code-#{index}\u0000"
         end
+
+        CODE_PLACEHOLDER_RE = /\x{0}hwaro-code-(\d+)\x{0}/
+
+        # Entity-decode prose for Markdown. Decoding is what makes the output
+        # readable, but a decoded `&lt;script&gt;` — text the author wrote to
+        # be SHOWN — turned into a live `<script>` tag that swallowed the
+        # rest of the page. Re-escape exactly the characters Markdown would
+        # read as markup: a `<` that could open an HTML tag, comment or
+        # declaration, and an `&amp;` whose decoded `&` would start an entity
+        # reference (`&amp;copy;` is the literal text "&copy;"). Named
+        # entities this decoder doesn't know stay encoded; Markdown decodes
+        # those itself.
+        private def self.decode_prose_entities(text : String) : String
+          decode_html_entities(text.gsub(/&amp;(?=#?[A-Za-z0-9]+;)/i, AMP_PLACEHOLDER))
+            .gsub(/<(?=[A-Za-z\/!?])/, "&lt;")
+            .gsub(AMP_PLACEHOLDER, "&amp;")
+        end
+
+        AMP_PLACEHOLDER = "\u0000hwaro-amp\u0000"
 
         private def self.strip_tags(html : String) : String
           html.gsub(/<[^>]*>/, "")
