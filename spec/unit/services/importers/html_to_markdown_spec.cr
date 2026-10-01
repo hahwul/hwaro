@@ -260,6 +260,12 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result.should eq("[![](https://example.com/cat.jpg)](https://example.com/big.jpg)\n\nOld caption")
     end
 
+    it "keeps WordPress's <!--more--> tag as hwaro's excerpt marker" do
+      html = "<!-- wp:paragraph -->\n<p>Teaser.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:more -->\n<!--more Keep reading-->\n<!-- /wp:more -->\n\n<p>Rest.</p>"
+      result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
+      result.should eq("Teaser.\n\n<!-- more -->\n\nRest.")
+    end
+
     it "moves edge whitespace outside emphasis delimiters" do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p>This is <strong>bold </strong>text and <em> spaced</em>.</p>")
       result.should eq("This is **bold** text and  *spaced*.")

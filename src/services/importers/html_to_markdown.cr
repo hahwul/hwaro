@@ -151,6 +151,12 @@ module Hwaro
             code_placeholder(code_stash.size - 1)
           end
 
+          # WordPress's "Read more" tag (`<!--more-->`, optionally with custom
+          # link text) is the post's excerpt separator. hwaro reads the same
+          # marker as `<!-- more -->`, so keep it instead of letting
+          # `strip_tags` delete it with every other comment.
+          result = result.gsub(/<!--\s*more\b.*?-->/mi, MORE_PLACEHOLDER)
+
           # `[caption]` shortcode (classic-editor images): unwrap it, putting
           # the caption text in its own paragraph under the image. Left as
           # is, the shortcode rendered as literal `[caption id=…]` text.
@@ -265,10 +271,12 @@ module Hwaro
           # Decode HTML entities
           result = decode_prose_entities(result)
 
-          # Restore stashed code (already entity-decoded exactly once).
+          # Restore stashed code (already entity-decoded exactly once) and
+          # the excerpt marker.
           code_stash.each_with_index do |block, i|
             result = result.sub(code_placeholder(i), block)
           end
+          result = result.gsub(MORE_PLACEHOLDER, "\n\n<!-- more -->\n\n")
 
           # Clean up whitespace
           result = result.gsub(/\n{3,}/, "\n\n") # Max 2 consecutive newlines
@@ -348,6 +356,7 @@ module Hwaro
         end
 
         CODE_PLACEHOLDER_RE = /\x{0}hwaro-code-(\d+)\x{0}/
+        MORE_PLACEHOLDER    = "\u0000hwaro-more\u0000"
 
         # Entity-decode prose for Markdown. Decoding is what makes the output
         # readable, but a decoded `&lt;script&gt;` — text the author wrote to
