@@ -78,8 +78,7 @@ module Hwaro
               rescue ex : Hwaro::HwaroError
                 Runner.exit_with_error_payload(ex)
               rescue ex
-                STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy plan failed"}}.to_json)
-                exit(1)
+                Runner.exit_with_error_payload(unexpected_error(ex, "deploy plan failed"))
               end
               return
             end
@@ -94,8 +93,7 @@ module Hwaro
             rescue ex : Hwaro::HwaroError
               Runner.exit_with_error_payload(ex)
             rescue ex
-              STDOUT.puts({"status" => "error", "error" => {"message" => ex.message || "deploy failed"}}.to_json)
-              exit(1)
+              Runner.exit_with_error_payload(unexpected_error(ex, "deploy failed"))
             end
 
             overall = results.all? { |r| r.status == "ok" } ? "ok" : "error"
@@ -109,6 +107,16 @@ module Hwaro
           # line with the right exit code. A successful return is a
           # no-op — the Runner exits 0 at the end of `run` automatically.
           Services::Deployer.new.run(options)
+        end
+
+        # An exception that escaped classification still goes out as the
+        # standard error payload (`code`/`category`/`message`/`hint`), not a
+        # bare `{"message"}` object agents could not branch on.
+        private def unexpected_error(ex : Exception, fallback : String) : Hwaro::HwaroError
+          Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_INTERNAL,
+            message: ex.message || fallback,
+          )
         end
 
         # Pick the most severe exit code across failing targets so CI can

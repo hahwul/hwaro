@@ -37,9 +37,13 @@ module Hwaro
         # Always show the command that will be executed
         Logger.info "  Command: #{expanded}"
 
-        # Warn and require confirmation for commands with shell metacharacters
+        # Warn and require confirmation for commands with shell
+        # metacharacters. The *template* is what the author wrote; the
+        # placeholder values are single-quoted, so judging the expansion
+        # flagged a project living under `r&d/` or `$work/` and blocked every
+        # non-interactive s3/gs/az deploy from it.
         needs_confirm = effective.confirm
-        if !effective.force && DANGEROUS_SHELL_PATTERNS.matches?(expanded)
+        if !effective.force && DANGEROUS_SHELL_PATTERNS.matches?(command)
           Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
           needs_confirm = true
         end
@@ -49,20 +53,24 @@ module Hwaro
           return true
         end
 
-        result = Utils::CommandRunner.run(expanded, env: env)
-        unless result.output.empty?
-          result.output.each_line { |line| Logger.info "  #{line}" }
-        end
-        unless result.success
-          # Surface stderr from the subprocess before raising so the user
-          # sees the tool-specific failure detail; the classified error
-          # itself carries only the summary exit-code info.
-          unless result.error.empty?
-            result.error.each_line { |line| Logger.error "  #{line}" }
+        status, stderr = run_deploy_command(expanded, env)
+        unless status.success?
+          # A quiet run streamed nothing, so surface the tool's stderr before
+          # raising; the classified error itself carries only the summary.
+          if Logger.quiet? && !stderr.empty?
+            stderr.each_line { |line| Logger.error "  #{line}" }
           end
+          # `exit_code` raises for a signal-terminated child (a killed
+          # `rsync`, an OOM-killed uploader), which crashed the deploy with
+          # an unclassified RuntimeError instead of reporting the failure.
+          how = if code = status.exit_code?
+                  "exit #{code}"
+                else
+                  "terminated by signal #{status.exit_signal?.try(&.to_s) || "?"}"
+                end
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
-            message: "Deploy command failed (exit #{result.exit_code}): #{expanded}",
+            message: "Deploy command failed (#{how}): #{expanded}",
             hint: "Inspect the stderr above for details from the deploy tool.",
           )
         end
@@ -70,6 +78,47 @@ module Hwaro
         Logger.info "" if Logger.color_enabled?
         Logger.outcome("deployed", target.name)
         true
+      end
+
+      # Run a deploy command, streaming its output as it arrives. Deploy tools
+      # run for minutes (`aws s3 sync`, `rsync` over a slow link); buffering
+      # until exit left the terminal silent the whole time, and stderr — where
+      # those tools print warnings and progress — was dropped entirely unless
+      # the command failed. stdout goes through `Logger.info` (so `--quiet`
+      # and `--json` keep it off stdout), stderr to `Logger.err_io`.
+      #
+      # stdin is handed to the child only on an interactive run, so a tool
+      # that asks to confirm or log in can be answered; pipes, CI and `--json`
+      # keep it closed so nothing blocks on input that will never come.
+      #
+      # Returns the exit status and the captured stderr.
+      private def run_deploy_command(command : String, env : Hash(String, String)) : {Process::Status, String}
+        input = CLI::Prompt.interactive? && !CLI::Runner.json_mode? ? Process::Redirect::Inherit : Process::Redirect::Close
+        process = Process.new(command, shell: true, env: env, input: input,
+          output: Process::Redirect::Pipe, error: Process::Redirect::Pipe)
+
+        stderr = IO::Memory.new
+        # Both pipes are drained concurrently (one fills and blocks the
+        # child otherwise); the lock keeps their lines whole when the logger
+        # writes both streams to one IO.
+        lock = Mutex.new
+        drained = Channel(Nil).new
+        spawn do
+          process.error.each_line do |line|
+            lock.synchronize do
+              stderr.puts line
+              Logger.err_io.puts "  #{line}" unless Logger.quiet?
+            end
+          end
+        ensure
+          drained.send(nil)
+        end
+        process.output.each_line do |line|
+          lock.synchronize { Logger.info "  #{line}" }
+        end
+        drained.receive
+
+        {process.wait, stderr.to_s}
       end
 
       # A command target only reads the deploy source if its template
@@ -84,8 +133,10 @@ module Hwaro
       # name, etc.) instead of sending the literal to the shell.
       COMMAND_PLACEHOLDERS = {"source", "url", "target"}
 
-      # Pattern for `{name}` placeholder tokens in command templates.
-      private COMMAND_PLACEHOLDER_RE = /\{([a-zA-Z_][\w-]*)\}/
+      # Pattern for `{name}` placeholder tokens in command templates. A `$`
+      # in front makes it shell parameter expansion (`${HWARO_DEPLOY_TARGET}`),
+      # which is passed through untouched instead of rejected as unknown.
+      private COMMAND_PLACEHOLDER_RE = /(?<!\$)\{([a-zA-Z_][\w-]*)\}/
 
       private def expand_placeholders(command : String, source_dir : String, target : Models::DeploymentTarget) : String
         # Validate the ORIGINAL template, then substitute in a single pass:
@@ -187,9 +238,12 @@ module Hwaro
           # For a relative form (file://./out, file://relative/path) URI puts the
           # first segment in `host`; prepend it so the path isn't silently
           # rooted at the filesystem root (file://./out must be ./out, not /out).
+          # `localhost` is the one host RFC 8089 defines: file://localhost/x
+          # is the absolute /x, not a directory named `localhost` under the
+          # project.
           path = uri.path
-          if host = uri.host
-            path = host + path unless host.empty?
+          if (host = uri.host) && !host.empty? && host.downcase != "localhost"
+            path = host + path
           end
           return if path.empty?
           # URI components stay percent-encoded (a space is `%20`); decode so

@@ -16,11 +16,13 @@ module Hwaro
         desired : Hash(String, String),
         to_copy : Array({String, String}),
         to_delete : Array(String),
-        skipped : Int32
+        skipped : Int32,
+        clear_first : Array(String)
 
       # Validate and select files for syncing `source_dir` into the local
-      # directory `dest_dir`. `create_dest: false` (the plan) leaves a missing
-      # destination uncreated — a dry run must not write anything.
+      # directory `dest_dir`. Nothing here writes: a missing destination is
+      # only created by `#write_directory_sync`, so a dry run — or a deploy the
+      # user then declines at the `--confirm` prompt — leaves no trace.
       #
       # `force_patterns` lets the plan compile (and warn about) the matcher
       # patterns once for the whole run; the deploy paths compile them per
@@ -31,37 +33,61 @@ module Hwaro
         dest_dir : String,
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
-        create_dest : Bool,
         force_patterns : Array(Regex)? = nil,
       ) : DirectorySync
         require_non_empty_source!(source_dir, effective)
         dest_dir = expand_local_path(dest_dir)
 
         check_overlap!(source_dir, dest_dir)
-
-        Hwaro::Utils::FileSafe.mkdir_p(dest_dir) if create_dest
+        require_directory_destination!(target, dest_dir)
 
         desired = build_desired_map(source_dir, target)
         existing = list_existing_files(dest_dir)
 
         validate_strip_index_html_for_filesystem(target, desired.keys)
-        validate_destination_paths(dest_dir, desired.keys)
 
-        to_delete = compute_deletes(existing, desired.keys, target)
+        to_delete = compute_deletes(existing, desired.keys, target, dest_dir)
+        clear_first = validate_destination_paths(dest_dir, desired.keys, to_delete.to_set)
         check_empty_selection!(desired, to_delete, target, effective)
         check_max_deletes!(to_delete.size, effective)
 
-        to_copy, skipped = compute_copies(desired, dest_dir, effective.force, force_patterns || force_matcher_patterns(deployment))
+        to_copy, skipped = compute_copies(desired, source_dir, dest_dir, effective.force, force_patterns || force_matcher_patterns(deployment))
 
-        DirectorySync.new(dest_dir, desired, to_copy, to_delete, skipped)
+        DirectorySync.new(dest_dir, desired, to_copy, to_delete, skipped, clear_first)
       end
 
-      # Apply a prepared sync: copy, delete, prune empty directories. Returns
-      # the per-action counts (a link replaced by a real file is a create,
-      # not an update — `existed_before` is sampled after the link is cleared).
+      # Apply a prepared sync: clear stale entries standing where the new
+      # tree needs the opposite kind of entry, copy, delete the rest, prune
+      # empty directories. Returns the per-action counts (a link or stale
+      # directory replaced by a real file is a create, not an update —
+      # `existed_before` is sampled after the obstacle is cleared).
       private def write_directory_sync(sync : DirectorySync) : TargetCounts
         counts = TargetCounts.new
         dest_dir = sync.dest_dir
+
+        Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
+
+        # Deletes normally run after the copies so a live destination never
+        # loses a page before its replacement lands. The exception is a stale
+        # entry in the way of a new one — `foo/` (a directory of old
+        # `foo/index.html`) where `strip_index_html` now writes a file `foo`,
+        # or the reverse — which has to go first or the copy cannot happen.
+        early = Set(String).new
+        unless sync.clear_first.empty?
+          sync.to_delete.each do |rel|
+            next unless sync.clear_first.any? { |c| rel == c || rel.starts_with?("#{c}/") }
+            FileUtils.rm(File.join(dest_dir, rel))
+            early << rel
+          end
+          # A cleared directory now holds only empty directories (and Finder
+          # litter the sync ignores); `rm_r` unlinks symlinks without
+          # following them.
+          sync.clear_first.each do |rel|
+            full = File.join(dest_dir, rel)
+            FileUtils.rm_r(full) if File.info?(full, follow_symlinks: false).try(&.directory?)
+          end
+          counts.deleted += early.size
+        end
 
         sync.to_copy.each_with_index do |(dest_rel, src_path), idx|
           Logger.progress(idx + 1, sync.to_copy.size, "Copying ")
@@ -77,13 +103,14 @@ module Hwaro
           end
         end
 
-        sync.to_delete.each_with_index do |rel, idx|
-          Logger.progress(idx + 1, sync.to_delete.size, "Deleting ")
+        remaining = early.empty? ? sync.to_delete : sync.to_delete.reject { |rel| early.includes?(rel) }
+        remaining.each_with_index do |rel, idx|
+          Logger.progress(idx + 1, remaining.size, "Deleting ")
           FileUtils.rm(File.join(dest_dir, rel))
           counts.deleted += 1
         end
 
-        remove_empty_directories(dest_dir)
+        prune_emptied_directories(dest_dir, sync.to_delete)
         counts
       end
 
@@ -106,7 +133,7 @@ module Hwaro
         deployment : Models::DeploymentConfig,
       ) : {Bool, TargetCounts}
         Logger.heading("deploy", target.name)
-        sync = prepare_directory_sync(target, source_dir, dest_dir, effective, deployment, create_dest: true)
+        sync = prepare_directory_sync(target, source_dir, dest_dir, effective, deployment)
 
         return {true, TargetCounts.new} if effective.dry_run
         return {true, TargetCounts.new} unless sync_confirmed?(sync.dest_dir, effective)
@@ -127,7 +154,7 @@ module Hwaro
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
       ) : Bool
-        sync = prepare_directory_sync(target, source_dir, dest_dir, effective, deployment, create_dest: true)
+        sync = prepare_directory_sync(target, source_dir, dest_dir, effective, deployment)
         dest_dir = sync.dest_dir
 
         Logger::Receipt.new("deploy", target.name)
@@ -169,6 +196,7 @@ module Hwaro
 
       private def compute_copies(
         desired : Hash(String, String),
+        source_dir : String,
         dest_dir : String,
         force : Bool,
         force_patterns : Array(Regex) = [] of Regex,
@@ -179,7 +207,13 @@ module Hwaro
 
         desired.each do |dest_rel, src_path|
           dest_path = File.join(dest_dir, dest_rel)
-          if !force && !force_match?(dest_rel, force_patterns) &&
+          # Matchers see the source path as well as the destination name, the
+          # way include/exclude do: under strip_index_html the documented
+          # `^.+\.html$` never matched the stripped `foo`, so every page but
+          # the root silently lost its `force`.
+          forced = force || force_match?(dest_rel, force_patterns) ||
+                   force_match?(relative_to(src_path, source_dir), force_patterns)
+          if !forced &&
              File.exists?(dest_path) &&
              !traverses_symlink?(dest_dir, dest_rel, symlink_memo) &&
              same_file?(src_path, dest_path)
@@ -225,6 +259,14 @@ module Hwaro
         false
       end
 
+      # True when copying `dest_rel` overwrites a regular file already at the
+      # destination — the "update" side of the plan and write counts. A path
+      # that crosses a destination symlink is a create (the link is cleared
+      # first), and so is one where a stale directory stands.
+      private def replaces_existing_file?(dest_dir : String, dest_rel : String, memo : Hash(String, Bool)) : Bool
+        !traverses_symlink?(dest_dir, dest_rel, memo) && File.file?(File.join(dest_dir, dest_rel))
+      end
+
       private def symlink?(path : String) : Bool
         File.symlink?(path)
       rescue File::Error | IO::Error
@@ -235,18 +277,22 @@ module Hwaro
         existing : Array(String),
         desired_paths : Array(String),
         target : Models::DeploymentTarget,
+        dest_dir : String,
       ) : Array(String)
         desired_set = desired_paths.to_set
-        # Directory prefixes of desired paths are never stale. A destination
-        # symlink is listed as a leaf entry (see `#list_existing_files`), so
-        # `out/sub -> …` with a desired `sub/index.html` looked like a stale
-        # `sub` — but the copy pass replaces that link with the real directory
-        # holding the new file, and deleting it afterwards failed with EPERM.
+        # A destination symlink at a directory prefix of a desired path is
+        # never stale. Links are listed as leaf entries (see
+        # `#list_existing_files`), so `out/sub -> …` with a desired
+        # `sub/index.html` looked like a stale `sub` — but the copy pass
+        # replaces that link with the real directory holding the new file, and
+        # deleting it afterwards failed with EPERM. A real *file* there (the
+        # `foo` a `strip_index_html` deploy wrote, now wanted as
+        # `foo/index.html`) is stale, and is cleared before the copy pass.
         ancestors = desired_ancestors(desired_paths)
 
         existing.select do |rel|
           next false if ignored_file?(rel)
-          next false if ancestors.includes?(rel)
+          next false if ancestors.includes?(rel) && symlink?(File.join(dest_dir, rel))
           next false unless delete_candidate?(rel, target)
           !desired_set.includes?(rel)
         end
@@ -267,12 +313,16 @@ module Hwaro
       end
 
       private def delete_candidate?(rel : String, target : Models::DeploymentTarget) : Bool
-        return true if included_by_target?(rel, target)
+        return included_by_target?(rel, target) unless target.strip_index_html
         # With strip_index_html the on-disk name for `foo/index.html` is just
-        # `foo`, so include/exclude globs written against source paths (e.g.
-        # include = "**/*.html") never match the stored name and stale pages
-        # would survive every sync. Consider the un-stripped form too.
-        target.strip_index_html && included_by_target?("#{rel}/index.html", target)
+        # `foo`, and include/exclude globs are written against source paths.
+        # Judge both spellings: either may be what `include` names (else
+        # stale pages survive every sync), and *neither* may be excluded —
+        # `exclude = "foo/index.html"` never matched the stored `foo`, so the
+        # remote page the author excluded was deleted as stale.
+        unstripped = "#{rel}/index.html"
+        (target_include_match?(rel, target) || target_include_match?(unstripped, target)) &&
+          !target_exclude_match?(rel, target) && !target_exclude_match?(unstripped, target)
       end
 
       private def list_existing_files(dest_dir : String) : Array(String)
@@ -285,7 +335,7 @@ module Hwaro
         # link let `hwaro deploy` unlink files outside the deploy root.
         # A link is now a leaf entry: stale ones are removed as links, and
         # their targets are never read or touched.
-        each_project_file(dest_dir, follow_symlinks: false) do |path|
+        each_project_file(dest_dir, follow_symlinks: false, dot_dirs: false) do |path|
           rel = relative_to(path, dest_dir)
           next if rel.empty?
           next if ignored_file?(rel)
@@ -313,23 +363,31 @@ module Hwaro
       end
 
       private def included_by_target?(rel : String, target : Models::DeploymentTarget) : Bool
-        normalized = rel.gsub('\\', '/')
-        # A malformed include/exclude glob raises File::BadPatternError. Treat a
-        # bad `include` as not-matching (file excluded) and a bad `exclude` as
-        # not-matching (file kept), so a config typo doesn't crash the deploy.
-        if inc = target.include
-          return false unless Utils::PathUtils.glob_match?(inc, normalized)
-        end
-        if exc = target.exclude
-          return false if Utils::PathUtils.glob_match?(exc, normalized)
-        end
-        true
+        target_include_match?(rel, target) && !target_exclude_match?(rel, target)
       end
 
+      # A malformed include/exclude glob raises File::BadPatternError. Treat a
+      # bad `include` as not-matching (file excluded) and a bad `exclude` as
+      # not-matching (file kept), so a config typo doesn't crash the deploy.
+      private def target_include_match?(rel : String, target : Models::DeploymentTarget) : Bool
+        return true unless inc = target.include
+        Utils::PathUtils.glob_match?(inc, rel.gsub('\\', '/'))
+      end
+
+      private def target_exclude_match?(rel : String, target : Models::DeploymentTarget) : Bool
+        return false unless exc = target.exclude
+        Utils::PathUtils.glob_match?(exc, rel.gsub('\\', '/'))
+      end
+
+      # Entries the sync neither copies nor deletes. `.git` covers the
+      # gh-pages shape: a destination that is a `git worktree` or submodule
+      # checkout holds a `.git` *file* (dot-directories are already skipped
+      # by the walk), and deleting it as "stale" silently detached the
+      # checkout from its repository.
       private def ignored_file?(rel : String) : Bool
         normalized = rel.gsub('\\', '/')
-        return true if normalized.ends_with?("/.DS_Store") || normalized == ".DS_Store"
-        false
+        name = normalized.rpartition('/')[2]
+        name == ".DS_Store" || name == ".git"
       end
 
       private def strip_index_html(rel : String) : String

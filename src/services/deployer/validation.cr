@@ -302,8 +302,17 @@ module Hwaro
         end
       end
 
-      private def validate_destination_paths(dest_dir : String, dest_paths : Array(String)) : Nil
+      # Check that every desired path can be written under `dest_dir`, and
+      # return the stale destination entries that have to be removed before
+      # the copy pass can write it. A real directory where a file belongs, or
+      # a real file where a directory belongs, is only an obstacle when the
+      # sync would delete it anyway — the shape toggling `strip_index_html`
+      # leaves behind (`foo/index.html` ↔ `foo`). Anything else the sync must
+      # not touch (a path outside include/exclude, a dot-directory, a `.git`
+      # entry) still refuses the deploy before a single byte is written.
+      private def validate_destination_paths(dest_dir : String, dest_paths : Array(String), delete_set : Set(String)) : Array(String)
         dest_set = dest_paths.to_set
+        clear_first = Set(String).new
 
         dest_paths.each do |rel|
           next if rel.empty?
@@ -325,18 +334,23 @@ module Hwaro
           full_path = File.join(dest_dir, rel)
           # A *symlink* to a directory is replaced with a real file by the
           # copy pass (see `unlink_destination_symlinks!`), so only a real
-          # directory is an unresolvable conflict here.
+          # directory can be a conflict here.
           if Dir.exists?(full_path) && !File.symlink?(full_path)
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_IO,
-              message: "Destination path is a directory but needs a file: #{rel}",
-              hint: "Remove the existing directory at #{full_path} or rename the source file.",
-            )
+            unless stale_tree?(full_path, rel, delete_set)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: "Destination path is a directory but needs a file: #{rel}",
+                hint: "Remove the existing directory at #{full_path} or rename the source file.",
+              )
+            end
+            clear_first << rel
           end
 
           current = dest_dir
+          current_rel = ""
           parts[0...-1].each do |part|
             current = File.join(current, part)
+            current_rel = current_rel.empty? ? part : "#{current_rel}/#{part}"
             # lstat, matching the leaf check above: a symlink standing where a
             # directory belongs is replaced by the copy pass, so reporting it
             # as an unresolvable conflict was a dead end for exactly the case
@@ -349,14 +363,69 @@ module Hwaro
             next unless info
             next if info.symlink?
             if info.file?
-              raise Hwaro::HwaroError.new(
-                code: Hwaro::Errors::HWARO_E_IO,
-                message: "Destination path is a file but needs a directory: #{current}",
-                hint: "Remove the existing file at #{current} or rename the source.",
-              )
+              unless delete_set.includes?(current_rel)
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "Destination path is a file but needs a directory: #{current}",
+                  hint: "Remove the existing file at #{current} or rename the source.",
+                )
+              end
+              clear_first << current_rel
+              # Nothing exists below a file, so the deeper components cannot
+              # conflict.
+              break
             end
           end
         end
+
+        clear_first.to_a.sort!
+      end
+
+      # True when everything under the real directory `dir` is something the
+      # sync deletes anyway (or Finder litter it ignores), so the directory
+      # can be removed to make room for a file of the same name. lstat
+      # throughout: a link inside is judged as the link, never followed.
+      private def stale_tree?(dir : String, rel : String, delete_set : Set(String)) : Bool
+        Dir.children(dir).all? do |entry|
+          full = File.join(dir, entry)
+          child_rel = "#{rel}/#{entry}"
+          info = File.info?(full, follow_symlinks: false)
+          next false unless info
+          if info.directory?
+            # Dot-directories are never walked (or pruned) by the sync, so
+            # nothing under one is known to be stale — keep them, and refuse.
+            !entry.starts_with?(".") && stale_tree?(full, child_rel, delete_set)
+          else
+            entry == ".DS_Store" || delete_set.includes?(child_rel)
+          end
+        end
+      end
+
+      # A local destination must be a directory (or not exist yet). A plain
+      # file there made the real deploy die on an unclassified `mkdir`
+      # error while `--dry-run` happily planned to "create" every page.
+      private def require_directory_destination!(target : Models::DeploymentTarget, dest_dir : String) : Nil
+        return unless File.exists?(dest_dir)
+        return if Dir.exists?(dest_dir)
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Deploy destination for target '#{target.name}' is not a directory: #{dest_dir}",
+          hint: "Point the target's 'path'/'url' at a directory, or remove the file at #{dest_dir}.",
+        )
+      end
+
+      # Filesystem failures during a local-directory sync (an unreadable
+      # directory, a read-only destination file, a full disk) are I/O
+      # problems, not defects: classify them so the plain CLI prints a coded
+      # error and `deploy --json` stops reporting them as HWARO_E_INTERNAL.
+      private def classify_io_errors(target : Models::DeploymentTarget, &)
+        yield
+      rescue ex : File::Error | IO::Error
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Deploy to target '#{target.name}' failed: #{ex.message}",
+          hint: "Check that the source is readable and the destination is writable.",
+        )
       end
 
       private def confirm?(prompt : String) : Bool

@@ -50,32 +50,27 @@ module Hwaro
         total
       end
 
-      # Prune directories the delete pass emptied. Walks depth-first with
-      # lstat instead of `Dir.glob`: glob expands `**` *through* symlinked
-      # directories, so the old sweep could delete empty directories that
-      # live outside the deploy root entirely. Dot-entries are left alone
-      # (glob skipped them too, and the deploy never creates them).
-      private def remove_empty_directories(root : String)
-        prune_empty_directories(root)
-      end
-
-      private def prune_empty_directories(dir : String) : Nil
-        # Children are collected before anything is deleted: unlinking during
-        # an active `readdir` is unspecified by POSIX, and on filesystems that
-        # compact the directory it can skip the siblings that follow.
-        children = begin
-          Dir.children(dir)
-        rescue File::Error | IO::Error
-          return
+      # Prune the directories the delete pass emptied: the parents of each
+      # deleted entry, deepest first, up to (never including) `root`. Only
+      # those — sweeping every empty directory under the destination removed
+      # ones the sync never selected (an empty `uploads/` outside `include`,
+      # a placeholder the server expects), without a line in the plan.
+      # lstat throughout, so a symlinked parent is never followed or removed.
+      private def prune_emptied_directories(root : String, deleted : Array(String)) : Nil
+        candidates = Set(String).new
+        deleted.each do |rel|
+          parent = File.dirname(rel)
+          until parent == "." || parent.empty? || parent == "/"
+            break unless candidates.add?(parent)
+            parent = File.dirname(parent)
+          end
         end
 
-        children.each do |entry|
-          next if entry.starts_with?(".")
-          full = File.join(dir, entry)
-          next if symlink?(full)
-          next unless Dir.exists?(full)
-          prune_empty_directories(full)
+        candidates.to_a.sort_by! { |rel| -rel.count('/') }.each do |rel|
+          full = File.join(root, rel)
           begin
+            info = File.info?(full, follow_symlinks: false)
+            next unless info && info.directory?
             Dir.delete(full) if Dir.empty?(full)
           rescue File::Error | IO::Error
             next
@@ -83,12 +78,23 @@ module Hwaro
         end
       end
 
-      private def each_project_file(root : String, follow_symlinks : Bool = true, &block : String ->)
+      # Version-control metadata directories. A source tree that is itself a
+      # checkout (`public/` as a gh-pages clone or submodule) must not ship
+      # its repository; every other dot-directory the build wrote is content.
+      private VCS_DIRS = {".git", ".svn", ".hg", ".bzr"}
+
+      # Walk the regular files under `root`. `dot_dirs` decides which hidden
+      # directories are entered: the source side (true) deploys every one but
+      # VCS metadata, because the build publishes `static/` dot-paths and the
+      # deploy docs promise to ship them; the destination side (false) enters
+      # only `.well-known`, so the delete pass never reaches into hidden state
+      # it did not create there.
+      private def each_project_file(root : String, follow_symlinks : Bool = true, dot_dirs : Bool = true, &block : String ->)
         visited = Set(String).new
         root_real = Hwaro::Utils::PathUtils.resolved_real_path(root)
         project_root_real = Hwaro::Utils::PathUtils.resolved_real_path(Dir.current)
         visited << root_real
-        walk_project_files(root, root_real, project_root_real, visited, follow_symlinks, &block)
+        walk_project_files(root, root_real, project_root_real, visited, follow_symlinks, dot_dirs, &block)
       end
 
       private def walk_project_files(
@@ -97,6 +103,7 @@ module Hwaro
         project_root_real : String,
         visited : Set(String),
         follow_symlinks : Bool,
+        dot_dirs : Bool,
         &block : String ->
       )
         Dir.each_child(dir) do |entry|
@@ -124,8 +131,9 @@ module Hwaro
             next
           end
           if info.directory?
-            if entry.starts_with?(".") && entry != ".well-known"
-              next
+            if entry.starts_with?(".")
+              next if VCS_DIRS.includes?(entry)
+              next unless dot_dirs || entry == ".well-known"
             end
             # Track resolved paths so symlink cycles (public/a → public) and
             # multiple links to the same directory are walked at most once.
@@ -136,7 +144,7 @@ module Hwaro
             end
             next if visited.includes?(real)
             visited << real
-            walk_project_files(full, source_root_real, project_root_real, visited, follow_symlinks, &block)
+            walk_project_files(full, source_root_real, project_root_real, visited, follow_symlinks, dot_dirs, &block)
           elsif info.file?
             block.call(full)
           end
@@ -174,14 +182,21 @@ module Hwaro
         rel.starts_with?("/") ? rel.lchop('/') : rel
       end
 
+      # True when `b` is `a` or lies under it. Both are absolute, resolved
+      # paths.
       private def nested_path?(a : String, b : String) : Bool
+        return false if a.empty? || b.empty?
         a = a.rstrip('/')
         b = b.rstrip('/')
-        return false if a.empty? || b.empty?
         # Identical directories also count as overlap — otherwise a
         # source == destination config slips past the overlap refusal and a
         # strip_index_html target can mutate/delete the source tree.
         return true if a == b
+        # `/` strips to "" and contains everything; it used to fall out as
+        # "no overlap", so `path = "/"` walked (and would sync over) the
+        # whole filesystem.
+        return true if a.empty?
+        return false if b.empty?
         b.starts_with?(a + "/")
       end
     end
