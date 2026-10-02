@@ -16,139 +16,10 @@ require "csv"
 require "crinja"
 require "./filters/*"
 require "../../utils/crinja_utils"
-require "../../utils/errors"
 
 module Hwaro
   module Content
     module Processors
-      # Context for template variable resolution
-      class TemplateContext
-        getter page : Models::Page
-        getter config : Models::Config
-        getter variables : Hash(String, Crinja::Value)
-
-        def initialize(@page : Models::Page, @config : Models::Config)
-          @variables = build_variables
-        end
-
-        # Add a pre-built Crinja::Value to the context
-        def add(name : String, value : Crinja::Value)
-          @variables[name] = value
-        end
-
-        # Add a scalar value (String, Bool, Int, Nil) to the context
-        def add(name : String, value : String | Bool | Int32 | Int64?)
-          @variables[name] = Crinja::Value.new(value)
-        end
-
-        # Add an array of strings to the context
-        def add(name : String, value : Array(String))
-          @variables[name] = Crinja::Value.new(value.map { |v| Crinja::Value.new(v) })
-        end
-
-        # Add a string-keyed hash to the context
-        def add(name : String, value : Hash(String, String))
-          hash = {} of Crinja::Value => Crinja::Value
-          value.each do |k, v|
-            hash[Crinja::Value.new(k)] = Crinja::Value.new(v)
-          end
-          @variables[name] = Crinja::Value.new(hash)
-        end
-
-        private def build_variables : Hash(String, Crinja::Value)
-          vars = {} of String => Crinja::Value
-
-          # Page variables
-          vars["page_title"] = Crinja::Value.new(@page.title)
-          vars["page_description"] = Crinja::Value.new(@page.description || @config.description || "")
-          vars["page_url"] = Crinja::Value.new(@page.url)
-          vars["page_section"] = Crinja::Value.new(@page.section)
-          vars["page_date"] = Crinja::Value.new(@page.date.try(&.to_s("%Y-%m-%d")) || "")
-          vars["page_image"] = Crinja::Value.new(@page.image || @config.og.default_image || "")
-          vars["taxonomy_name"] = Crinja::Value.new(@page.taxonomy_name || "")
-          vars["taxonomy_term"] = Crinja::Value.new(@page.taxonomy_term || "")
-
-          # Page object with boolean properties
-          page_obj = {
-            "title"       => Crinja::Value.new(@page.title),
-            "description" => Crinja::Value.new(@page.description || ""),
-            "url"         => Crinja::Value.new(@page.url),
-            "section"     => Crinja::Value.new(@page.section),
-            "date"        => Crinja::Value.new(@page.date.try(&.to_s("%Y-%m-%d")) || ""),
-            "image"       => Crinja::Value.new(@page.image || ""),
-            "draft"       => Crinja::Value.new(@page.draft),
-            "toc"         => Crinja::Value.new(@page.toc),
-            "render"      => Crinja::Value.new(@page.render),
-            "is_index"    => Crinja::Value.new(@page.is_index),
-            "generated"   => Crinja::Value.new(@page.generated),
-            "synthesized" => Crinja::Value.new(@page.synthesized?),
-            "in_sitemap"  => Crinja::Value.new(@page.in_sitemap),
-          }
-          vars["page"] = Crinja::Value.new(page_obj)
-
-          # Site variables
-          vars["site_title"] = Crinja::Value.new(@config.title)
-          vars["site_description"] = Crinja::Value.new(@config.description || "")
-          vars["base_url"] = Crinja::Value.new(@config.base_url)
-
-          # Site object (also available as "config" for advanced use)
-          site_obj = {
-            "title"       => Crinja::Value.new(@config.title),
-            "description" => Crinja::Value.new(@config.description || ""),
-            "base_url"    => Crinja::Value.new(@config.base_url),
-          }
-          site_value = Crinja::Value.new(site_obj)
-          vars["site"] = site_value
-          vars["config"] = site_value
-
-          # Section variables (basic, will be enriched by builder with actual section data)
-          vars["section_title"] = Crinja::Value.new("")
-          vars["section_description"] = Crinja::Value.new("")
-          vars["section_list"] = Crinja::Value.new("")
-          section_obj = {
-            "title"       => Crinja::Value.new(""),
-            "description" => Crinja::Value.new(""),
-            "pages"       => Crinja::Value.new([] of Crinja::Value),
-            "list"        => Crinja::Value.new(""),
-          }
-          vars["section"] = Crinja::Value.new(section_obj)
-
-          # TOC variables (basic, will be enriched by builder with actual TOC data)
-          vars["toc"] = Crinja::Value.new("")
-          toc_obj = {
-            "html"    => Crinja::Value.new(""),
-            "headers" => Crinja::Value.new([] of Crinja::Value),
-          }
-          vars["toc_obj"] = Crinja::Value.new(toc_obj)
-
-          # SEO variables (basic defaults, enriched by builder with page-specific data)
-          seo_obj = {
-            "canonical_url"   => Crinja::Value.new(""),
-            "og_type"         => Crinja::Value.new(""),
-            "og_image"        => Crinja::Value.new(""),
-            "twitter_card"    => Crinja::Value.new(""),
-            "twitter_site"    => Crinja::Value.new(""),
-            "twitter_creator" => Crinja::Value.new(""),
-            "fb_app_id"       => Crinja::Value.new(""),
-            "hreflang"        => Crinja::Value.new([] of Crinja::Value),
-          }
-          vars["seo"] = Crinja::Value.new(seo_obj)
-
-          # Time-related variables
-          now = Time.local
-          vars["current_year"] = Crinja::Value.new(now.year)
-          vars["current_date"] = Crinja::Value.new(now.to_s("%Y-%m-%d"))
-          vars["current_datetime"] = Crinja::Value.new(now.to_s("%Y-%m-%d %H:%M:%S"))
-
-          vars
-        end
-
-        # Convert to Crinja variables hash
-        def to_crinja_vars : Hash(String, Crinja::Value)
-          @variables
-        end
-      end
-
       # Template Engine wrapper for Crinja
       class TemplateEngine
         getter env : Crinja
@@ -162,61 +33,6 @@ module Hwaro
           register_custom_filters
           register_custom_tests
           register_custom_functions
-        end
-
-        # Set the template loader
-        def loader=(loader : Crinja::Loader)
-          @env.loader = loader
-        end
-
-        # Render a template string with the given context. Pass `name`/`filename`
-        # when the string came from a file so Crinja errors report file:line:col.
-        def render(template_string : String, context : TemplateContext, name : String = "", filename : String? = nil) : String
-          template = Crinja::Template.new(template_string, @env, name, filename)
-          template.render(context.to_crinja_vars)
-        rescue ex : Crinja::Error
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_TEMPLATE,
-            message: "Template error for #{context.page.path}: #{ex.message}",
-            cause: ex,
-          )
-        end
-
-        # Render a template string with raw hash. Pass `name`/`filename`
-        # when the string came from a file so Crinja errors report file:line:col.
-        def render(template_string : String, variables : Hash(String, Crinja::Value), name : String = "", filename : String? = nil) : String
-          template = Crinja::Template.new(template_string, @env, name, filename)
-          template.render(variables)
-        rescue ex : Crinja::Error
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_TEMPLATE,
-            message: "Template error: #{ex.message}",
-            cause: ex,
-          )
-        end
-
-        # Load and render a template by name
-        def render_template(template_name : String, context : TemplateContext) : String
-          template = @env.get_template(template_name)
-          template.render(context.to_crinja_vars)
-        rescue ex : Crinja::Error
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_TEMPLATE,
-            message: "Template error in '#{template_name}' for #{context.page.path}: #{ex.message}",
-            cause: ex,
-          )
-        end
-
-        # Load and render a template by name with raw hash
-        def render_template(template_name : String, variables : Hash(String, Crinja::Value)) : String
-          template = @env.get_template(template_name)
-          template.render(variables)
-        rescue ex : Crinja::Error
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_TEMPLATE,
-            message: "Template error in '#{template_name}': #{ex.message}",
-            cause: ex,
-          )
         end
 
         # Register custom filters specific to Hwaro
@@ -861,49 +677,13 @@ module Hwaro
         end
       end
 
-      # Template processor using Crinja
-      # This module provides a singleton-like interface for template processing
+      # Process-lifetime engine shared by builds (see Initialize#setup_crinja_env)
       module Template
         @@engine : TemplateEngine?
 
         # Get or create the template engine
         def self.engine : TemplateEngine
           @@engine ||= TemplateEngine.new
-        end
-
-        # Reset the engine (useful for testing or reconfiguration)
-        def self.reset_engine
-          @@engine = nil
-        end
-
-        # Set custom loader for the engine
-        def self.set_loader(loader : Crinja::Loader)
-          engine.loader = loader
-        end
-
-        # Set loader from templates directory path
-        def self.set_loader(templates_path : String)
-          engine.loader = Crinja::Loader::FileSystemLoader.new(templates_path)
-        end
-
-        # Process a template string with context
-        def self.process(content : String, context : TemplateContext) : String
-          engine.render(content, context)
-        end
-
-        # Process a template string with raw variables hash
-        def self.process(content : String, variables : Hash(String, Crinja::Value)) : String
-          engine.render(content, variables)
-        end
-
-        # Render a named template from the loader
-        def self.render_template(template_name : String, context : TemplateContext) : String
-          engine.render_template(template_name, context)
-        end
-
-        # Create a context for the given page and config
-        def self.create_context(page : Models::Page, config : Models::Config) : TemplateContext
-          TemplateContext.new(page, config)
         end
       end
     end

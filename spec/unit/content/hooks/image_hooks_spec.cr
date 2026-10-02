@@ -187,14 +187,9 @@ describe Hwaro::Content::Hooks::ImageHooks do
       with_image_hook_state do
         # A 10px-wide source: no variant is upscaled, so 640 resolves to 10.
         Hwaro::Content::Hooks::ImageHooks.set_resize_map({"/img/tiny.png" => {10 => "/img/tiny_10w.png"}})
-        page = Hwaro::Models::Page.new("test.md")
-        config = Hwaro::Models::Config.new
-        config.base_url = "https://example.com"
-        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-        out = Hwaro::Content::Processors::Template.process(
+        out = render_crinja(
           %({{ resize_image(path="/img/tiny.png", width=640).width }}|{{ resize_image(path="/img/tiny.png", width=640).url }}),
-          context
+          {"base_url" => "https://example.com"}
         ).strip
         out.should eq("10|https://example.com/img/tiny_10w.png")
       end
@@ -203,13 +198,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
     it "falls back to the requested width when no variant exists" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map({} of String => Hash(Int32, String))
-        page = Hwaro::Models::Page.new("test.md")
-        config = Hwaro::Models::Config.new
-        config.base_url = "https://example.com"
-        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-        Hwaro::Content::Processors::Template.process(
-          %({{ resize_image(path="/img/a.png", width=800).width }}), context
+        render_crinja(
+          %({{ resize_image(path="/img/a.png", width=800).width }}), {"base_url" => "https://example.com"}
         ).strip.should eq("800")
       end
     end

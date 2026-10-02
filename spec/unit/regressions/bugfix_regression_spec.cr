@@ -9,10 +9,6 @@ require "../../../src/utils/html_minifier"
 # Regression coverage for latent bugs fixed during the source-code audit.
 # Each block names the class of defect it guards against.
 
-private def render_filter(template_str : String, vars : Hash(String, Crinja::Value) = {} of String => Crinja::Value) : String
-  Hwaro::Content::Processors::TemplateEngine.new.render(template_str, vars)
-end
-
 describe "bugfix regressions" do
   describe "InlineMarkdown.safe_url? (XSS)" do
     it "blocks control-character-obfuscated script schemes" do
@@ -146,8 +142,8 @@ describe "bugfix regressions" do
 
   describe "jsonify filter" do
     it "serializes arrays/numbers/hashes as real JSON" do
-      render_filter(%({{ [1, 2, 3] | jsonify }})).should eq("[1,2,3]")
-      render_filter(%({{ 42 | jsonify }})).should eq("42")
+      render_crinja(%({{ [1, 2, 3] | jsonify }})).should eq("[1,2,3]")
+      render_crinja(%({{ 42 | jsonify }})).should eq("42")
     end
   end
 
@@ -159,7 +155,7 @@ describe "bugfix regressions" do
         Crinja::Value.new(h)
       end
       vars = {"items" => Crinja::Value.new(arr)}
-      result = render_filter("{% for item in items | sort_by(attribute='w') %}{{ item.w }},{% endfor %}", vars)
+      result = render_crinja("{% for item in items | sort_by(attribute='w') %}{{ item.w }},{% endfor %}", vars)
       result.should eq("1,2,10,20,100,")
     end
   end
@@ -167,7 +163,7 @@ describe "bugfix regressions" do
   describe "get_taxonomy_url (slug consistency)" do
     it "uses safe_slugify so symbol-only terms don't yield dead // links" do
       vars = {"base_url" => Crinja::Value.new("https://e.com")}
-      url = render_filter(%({{ get_taxonomy_url(kind="tags", term="🎉") }}), vars)
+      url = render_crinja(%({{ get_taxonomy_url(kind="tags", term="🎉") }}), vars)
       url.should_not contain("tags//")
       url.should contain("/tags/term-")
     end
@@ -185,8 +181,8 @@ describe "bugfix regressions" do
         "base_url"           => Crinja::Value.new("https://e.com"),
         "__taxonomy_slugs__" => slugs,
       }
-      render_filter(%({{ get_taxonomy_url(kind="tags", term="C++") }}), vars).should eq("https://e.com/tags/c/")
-      render_filter(%({{ get_taxonomy_url(kind="tags", term="C#") }}), vars).should eq("https://e.com/tags/c-2/")
+      render_crinja(%({{ get_taxonomy_url(kind="tags", term="C++") }}), vars).should eq("https://e.com/tags/c/")
+      render_crinja(%({{ get_taxonomy_url(kind="tags", term="C#") }}), vars).should eq("https://e.com/tags/c-2/")
     end
 
     it "falls back to safe_slugify when the term is absent from the map" do
@@ -194,7 +190,7 @@ describe "bugfix regressions" do
         "base_url"           => Crinja::Value.new("https://e.com"),
         "__taxonomy_slugs__" => Crinja::Value.new({"tags" => Crinja::Value.new({} of String => Crinja::Value)}),
       }
-      render_filter(%({{ get_taxonomy_url(kind="tags", term="Crystal") }}), vars).should eq("https://e.com/tags/crystal/")
+      render_crinja(%({{ get_taxonomy_url(kind="tags", term="Crystal") }}), vars).should eq("https://e.com/tags/crystal/")
     end
   end
 end
