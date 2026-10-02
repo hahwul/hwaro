@@ -704,16 +704,12 @@ module Hwaro::Core::Build::Phases::ParseContent
   # build's alias handling (`tool export`, `tool platform`) cannot drift.
 
   private def site_relative_aliases(aliases : Array(String), page_path : String) : Array(String)
-    return aliases unless aliases.any? { |a| external_alias?(a) }
+    return aliases unless aliases.any? { |a| Utils::PathUtils.external_alias?(a) }
     aliases.reject do |a|
-      next false unless external_alias?(a)
+      next false unless Utils::PathUtils.external_alias?(a)
       Logger.warn "Skipping alias #{a.inspect} on #{page_path}: an alias is a path on this site, not an absolute or protocol-relative URL."
       true
     end
-  end
-
-  private def external_alias?(value : String) : Bool
-    Utils::PathUtils.external_alias?(value)
   end
 
   # Cascade values arrive as ExtraValue; tags/taxonomies/authors need plain

@@ -296,7 +296,7 @@ module Hwaro::Core::Build::Phases::Render
       # scrubbing it only under --minify made the two build modes emit
       # different page bytes for the same source.
       final_html = Utils::HtmlMinifier.scrub_nul(final_html)
-      final_html = minify_html(final_html) if minify
+      final_html = Utils::HtmlMinifier.minify(final_html) if minify
 
       write_output(page, output_dir, final_html, verbose)
     end
@@ -382,10 +382,6 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     "page"
-  end
-
-  private def minify_html(html : String) : String
-    Utils::HtmlMinifier.minify(html)
   end
 
   # Hugo-style `{{< name >}}` shortcodes aren't a Hwaro syntax — they'd
