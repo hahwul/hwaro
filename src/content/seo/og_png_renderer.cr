@@ -1400,8 +1400,7 @@ module Hwaro
         # A quiet hairline color derived from the background: slightly
         # lighter on dark backgrounds, slightly darker on light ones.
         private def self.neutral_line(bg : UInt32) : UInt32
-          _, _, l = OgImage.hex_to_hsl("#%06x" % bg)
-          shifted_lightness(bg, l > 0.5 ? -0.30 : 0.32)
+          parse_hex_color(OgImage.neutral_line_hex("#%06x" % bg))
         end
 
         # Rotate a packed RGB color's hue by `degrees` (HSL round-trip).
