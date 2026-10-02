@@ -173,7 +173,7 @@ module Hwaro
             parent = File.basename(File.dirname(file_path))
             base = parent unless File.same?(File.dirname(file_path), content_dir)
           end
-          slug = slugify(base)
+          slug = Utils::TextUtils.slugify(base)
 
           frontmatter = generate_frontmatter(fields)
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))

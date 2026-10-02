@@ -155,7 +155,7 @@ module Hwaro
                   # Strip leading/trailing slashes and extensions, take last segment
                   normalized = ps.strip("/").sub(/\.\w+$/, "")
                   parts = normalized.split("/")
-                  slug = slugify(parts.last) unless parts.empty?
+                  slug = Utils::TextUtils.slugify(parts.last) unless parts.empty?
                 end
               end
             end
@@ -186,7 +186,7 @@ module Hwaro
 
           if slug.empty?
             if title = fields["title"]?.as?(String)
-              slug = slugify(title)
+              slug = Utils::TextUtils.slugify(title)
             else
               slug = "untitled"
             end
@@ -204,13 +204,13 @@ module Hwaro
             match[2]
           else
             name = File.basename(filename, File.extname(filename))
-            slugify(name)
+            Utils::TextUtils.slugify(name)
           end
         end
 
         private def extract_date_from_filename(filename : String) : Time?
           if match = FILENAME_PATTERN.match(filename)
-            parse_date(match[1])
+            Utils::DateUtils.parse_import(match[1])
           end
         end
       end

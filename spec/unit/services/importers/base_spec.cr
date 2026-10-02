@@ -11,14 +11,6 @@ class TestImporter < Hwaro::Services::Importers::Base
     generate_frontmatter(fields)
   end
 
-  def test_slugify(title)
-    slugify(title)
-  end
-
-  def test_parse_date(date_str)
-    parse_date(date_str)
-  end
-
   def test_format_date(time)
     format_date(time)
   end
@@ -95,17 +87,15 @@ describe Hwaro::Services::Importers::Base do
     end
   end
 
-  describe "#slugify" do
+  describe "slugs (TextUtils.slugify)" do
     it "converts title to slug" do
-      importer = TestImporter.new
-      importer.test_slugify("Hello World").should eq("hello-world")
+      Hwaro::Utils::TextUtils.slugify("Hello World").should eq("hello-world")
     end
   end
 
-  describe "#parse_date" do
+  describe "import dates (DateUtils.parse_import)" do
     it "parses ISO date" do
-      importer = TestImporter.new
-      time = importer.test_parse_date("2024-01-15")
+      time = Hwaro::Utils::DateUtils.parse_import("2024-01-15")
       time.should_not be_nil
       time.not_nil!.year.should eq(2024)
       time.not_nil!.month.should eq(1)
@@ -113,32 +103,27 @@ describe Hwaro::Services::Importers::Base do
     end
 
     it "parses datetime" do
-      importer = TestImporter.new
-      time = importer.test_parse_date("2024-01-15 10:30:00")
+      time = Hwaro::Utils::DateUtils.parse_import("2024-01-15 10:30:00")
       time.should_not be_nil
       time.not_nil!.hour.should eq(10)
     end
 
     it "returns nil for invalid date" do
-      importer = TestImporter.new
-      importer.test_parse_date("not-a-date").should be_nil
+      Hwaro::Utils::DateUtils.parse_import("not-a-date").should be_nil
     end
 
     it "does not misread a month-and-year string as a day of year 22" do
-      importer = TestImporter.new
-      importer.test_parse_date("May 2022").should be_nil
-      importer.test_parse_date("July 8 2022 10:00").should eq(Time.utc(2022, 7, 8))
+      Hwaro::Utils::DateUtils.parse_import("May 2022").should be_nil
+      Hwaro::Utils::DateUtils.parse_import("July 8 2022 10:00").should eq(Time.utc(2022, 7, 8))
     end
 
     it "keeps the offset of a zoned slash date" do
-      importer = TestImporter.new
-      importer.test_parse_date("2024/01/20 14:00:00 +0900").should eq(Time.utc(2024, 1, 20, 5))
-      importer.test_parse_date("2024/01/20 14:00 +09:00").should eq(Time.utc(2024, 1, 20, 5))
-      importer.test_parse_date("2024/01/20 14:00:00 +0900").not_nil!.offset.should eq(9 * 3600)
+      Hwaro::Utils::DateUtils.parse_import("2024/01/20 14:00:00 +0900").should eq(Time.utc(2024, 1, 20, 5))
+      Hwaro::Utils::DateUtils.parse_import("2024/01/20 14:00 +09:00").should eq(Time.utc(2024, 1, 20, 5))
+      Hwaro::Utils::DateUtils.parse_import("2024/01/20 14:00:00 +0900").not_nil!.offset.should eq(9 * 3600)
     end
 
     it "parses the date shapes Jekyll, Hexo and Astro front matter use" do
-      importer = TestImporter.new
       {
         # Astro's blog template (`pubDate: 'Jul 08 2022'`) — was dropped
         "Jul 08 2022"  => Time.utc(2022, 7, 8),
@@ -154,7 +139,7 @@ describe Hwaro::Services::Importers::Base do
         "2024-01-15 10:30:45" => Time.utc(2024, 1, 15, 10, 30, 45),
         "2024-01-15"          => Time.utc(2024, 1, 15),
       }.each do |input, expected|
-        importer.test_parse_date(input).should eq(expected), "#{input.inspect}"
+        Hwaro::Utils::DateUtils.parse_import(input).should eq(expected), "#{input.inspect}"
       end
     end
   end
@@ -216,7 +201,7 @@ describe Hwaro::Services::Importers::Base do
 
     it "round-trips through parse_date without changing the instant" do
       importer = TestImporter.new
-      parsed = importer.test_parse_date("2026-04-17 09:30:45").not_nil!
+      parsed = Hwaro::Utils::DateUtils.parse_import("2026-04-17 09:30:45").not_nil!
       importer.test_format_date(parsed).should eq("2026-04-17T09:30:45Z")
     end
 
@@ -229,14 +214,13 @@ describe Hwaro::Services::Importers::Base do
 
     it "parses an offset date without silently ignoring the zone" do
       importer = TestImporter.new
-      parsed = importer.test_parse_date("2026-07-01T10:00:00+09:00").not_nil!
+      parsed = Hwaro::Utils::DateUtils.parse_import("2026-07-01T10:00:00+09:00").not_nil!
       parsed.offset.should eq(9 * 3600)
       importer.test_format_date(parsed).should eq("2026-07-01T10:00:00+09:00")
     end
 
     it "parses Jekyll's space-separated offset format" do
-      importer = TestImporter.new
-      parsed = importer.test_parse_date("2024-01-15 10:00:00 +0900").not_nil!
+      parsed = Hwaro::Utils::DateUtils.parse_import("2024-01-15 10:00:00 +0900").not_nil!
       parsed.offset.should eq(9 * 3600)
     end
   end

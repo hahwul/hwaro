@@ -145,7 +145,7 @@ module Hwaro
 
         private def slug_from_notion_filename(file_path : String) : String
           title = title_from_filename(file_path)
-          slugify(title)
+          Utils::TextUtils.slugify(title)
         end
 
         private def clean_notion_content(body : String) : String
@@ -169,7 +169,7 @@ module Hwaro
               if /[0-9a-fA-F]{32}/.match(target_decoded)
                 filename = File.basename(target_decoded, ".md")
                 clean_name = filename.sub(/\s+[0-9a-f]{16,}$/i, "").strip
-                slug = slugify(clean_name)
+                slug = Utils::TextUtils.slugify(clean_name)
                 "[#{text}](/posts/#{slug}/)"
               else
                 match

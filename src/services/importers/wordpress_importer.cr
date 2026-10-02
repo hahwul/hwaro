@@ -220,7 +220,7 @@ module Hwaro
           # (`sanitize_title`); decode so the filename matches what servers
           # and browsers will show for the URL. Traversal is neutralized at
           # the write_content_file sink.
-          slug = post_name.empty? ? slugify(title) : URI.decode(post_name)
+          slug = post_name.empty? ? Utils::TextUtils.slugify(title) : URI.decode(post_name)
           return :skipped if slug.empty?
 
           # Determine section
@@ -229,9 +229,9 @@ module Hwaro
           # Parse and format date — prefer the precise `<wp:post_date>`
           # (local time, no TZ noise) and fall back to RFC 822 `<pubDate>`.
           date_str : String? = nil
-          if !post_date.empty? && (parsed = parse_date(post_date))
+          if !post_date.empty? && (parsed = Utils::DateUtils.parse_import(post_date))
             date_str = format_date(parsed)
-          elsif !pub_date.empty? && (parsed = parse_date(pub_date))
+          elsif !pub_date.empty? && (parsed = Utils::DateUtils.parse_import(pub_date))
             date_str = format_date(parsed)
           end
 

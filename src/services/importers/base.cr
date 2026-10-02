@@ -193,10 +193,6 @@ module Hwaro
         end
 
         # Convert title to a URL-safe slug
-        protected def slugify(title : String) : String
-          Utils::TextUtils.slugify(title)
-        end
-
         # If the imported body's first non-blank line is an H1 matching the
         # front-matter title, drop it. Hwaro page templates render
         # `<h1>{{ page.title }}</h1>` themselves, so keeping the body H1
@@ -559,10 +555,6 @@ module Hwaro
         end
 
         # Parse a date string in common formats, returns nil on failure.
-        protected def parse_date(date_str : String) : Time?
-          Utils::DateUtils.parse_import(date_str)
-        end
-
         # Map a source page's literal URL (Hugo `url`, Jekyll `permalink`) onto
         # hwaro's `path` front matter so the page keeps its published address.
         # hwaro publishes `path = "a/b"` at `/a/b/`, so:
@@ -623,7 +615,7 @@ module Hwaro
           when Time
             fields[key] = format_date(raw)
           when String
-            parsed = parse_date(raw)
+            parsed = Utils::DateUtils.parse_import(raw)
             fields[key] = format_date(parsed) if parsed
           end
         end
