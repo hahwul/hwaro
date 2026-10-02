@@ -222,14 +222,6 @@ module Hwaro
         broadcast("error:#{payload}")
       end
 
-      # Tell connected browsers to dismiss any error overlay — sent
-      # right before a successful reload so the UI clears even if the
-      # rebuild produced no other visible change.
-      def notify_clear_error
-        @sockets_mutex.synchronize { @current_error = nil }
-        broadcast("clear-error")
-      end
-
       private def broadcast(message : String)
         # Snapshot under the lock: a connection fiber may `<<`/`delete` from
         # @clients concurrently. Nothing below can wait on a socket — the
