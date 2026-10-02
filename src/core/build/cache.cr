@@ -837,17 +837,9 @@ module Hwaro
           @enabled
         end
 
-        # Compute MD5 checksum of a file's content (streaming to avoid
-        # loading large files entirely into memory)
+        # MD5 checksum of a file's content (streamed by Digest#file)
         def compute_file_hash(file_path : String) : String
-          digest = Digest::MD5.new
-          buffer = Bytes.new(8192)
-          File.open(file_path, "r") do |io|
-            while (bytes_read = io.read(buffer)) > 0
-              digest.update(buffer[0, bytes_read])
-            end
-          end
-          digest.final.hexstring
+          Digest::MD5.new.file(file_path).final.hexstring
         end
 
         # Compute a combined checksum for a set of template files.

@@ -539,14 +539,7 @@ module Hwaro
       # nil as "no proof of identity", so an error always falls back to the
       # pre-digest behavior — rebuild — and never silently drops a change.
       private def file_digest(path : String) : String?
-        digest = Digest::MD5.new
-        buffer = Bytes.new(8192)
-        File.open(path, "r") do |io|
-          while (bytes_read = io.read(buffer)) > 0
-            digest.update(buffer[0, bytes_read])
-          end
-        end
-        digest.final.hexstring
+        Digest::MD5.new.file(path).final.hexstring
       rescue ex
         Logger.debug "Failed to hash #{path}: #{ex.message}"
         nil
