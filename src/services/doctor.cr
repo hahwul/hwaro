@@ -36,10 +36,6 @@ module Hwaro
       # render math at runtime; other strings load nothing.
       VALID_MATH_ENGINES = %w[katex mathjax]
 
-      # Delegate to ConfigSnippets for the single source of truth
-      KNOWN_CONFIG_SECTIONS = ConfigSnippets::KNOWN_SECTIONS
-      KNOWN_SUB_SECTIONS    = ConfigSnippets::KNOWN_SUB_SECTIONS
-
       # The scaffolded placeholder titles. `Models::Config` falls back to
       # "Hwaro Site" when `title` is absent, and every site `hwaro init`
       # creates ships its scaffold's placeholder — so checking only the

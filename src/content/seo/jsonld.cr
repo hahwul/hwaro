@@ -22,7 +22,7 @@ module Hwaro
 
         # Generate Article JSON-LD for a page
         def article(page : Models::Page, config : Models::Config, site : Models::Site? = nil) : String
-          base = config.base_url_stripped
+          base = config.base_url
           url = page.permalink || abs_path(base, page.url)
 
           date_published = page.date.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
@@ -90,7 +90,7 @@ module Hwaro
         # instead of Article/`headline`, keeping JSON-LD consistent with the
         # og:type="website" emitted on the same page (gh#522 follow-up).
         def collection_page(page : Models::Page, config : Models::Config, url_override : String? = nil) : String
-          base = config.base_url_stripped
+          base = config.base_url
           url = if u = url_override
                   abs_path(base, u)
                 else
@@ -114,7 +114,7 @@ module Hwaro
 
         # Generate BreadcrumbList JSON-LD from page ancestors
         def breadcrumb(page : Models::Page, config : Models::Config) : String
-          base = config.base_url_stripped
+          base = config.base_url
 
           items = [] of Hash(String, String | Int32)
 
@@ -214,7 +214,7 @@ module Hwaro
           steps = extract_howto_steps(page)
           return "" if steps.empty?
 
-          base = config.base_url_stripped
+          base = config.base_url
           url = abs_path(base, page.url)
 
           json = JSON.build do |j|
@@ -249,7 +249,7 @@ module Hwaro
 
         # Generate WebSite JSON-LD with optional SearchAction (sitelinks search box)
         def website(config : Models::Config) : String
-          base = config.base_url_stripped
+          base = config.base_url
           return "" if base.empty?
 
           has_search = config.search.enabled
@@ -285,7 +285,7 @@ module Hwaro
 
         # Generate Person JSON-LD from author info
         def person(name : String, config : Models::Config, url : String? = nil, image : String? = nil) : String
-          base = config.base_url_stripped
+          base = config.base_url
 
           json = JSON.build do |j|
             j.object do
@@ -306,7 +306,7 @@ module Hwaro
 
         # Generate Organization JSON-LD from site config
         def organization(config : Models::Config, logo : String? = nil) : String
-          base = config.base_url_stripped
+          base = config.base_url
           return "" if base.empty?
 
           json = JSON.build do |j|

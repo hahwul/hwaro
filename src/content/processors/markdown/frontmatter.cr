@@ -1,12 +1,12 @@
 # Markdown processor — front matter detection, TOML/YAML/JSON extraction and typed field access.
 #
-# Reopens `Processors::Markdown`; the part require order and the processor
-# registration live in ../markdown.cr. Parts only reopen the class: no
+# Reopens `Processors::Markdown`; the part require order lives in
+# ../markdown.cr. Parts only reopen the class: no
 # requires, no load-time statements (scripts/check_no_toplevel_effects.sh).
 module Hwaro
   module Content
     module Processors
-      class Markdown < Base
+      class Markdown
         # Regex for TOML front matter
         TOML_FRONT_MATTER_REGEX = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m
 
@@ -42,7 +42,7 @@ module Hwaro
             best : String? = nil
             best_distance = Int32::MAX
             KNOWN_FRONT_MATTER_KEYS.each do |known|
-              dist = levenshtein(key, known)
+              dist = Levenshtein.distance(key, known)
               if dist < best_distance
                 best_distance = dist
                 best = known
@@ -52,25 +52,6 @@ module Hwaro
               Logger.warn "#{file_path}: unknown front-matter key '#{key}' — did you mean '#{suggestion}'?"
             end
           end
-        end
-
-        # Minimal Levenshtein distance (edit distance) for short strings.
-        private def levenshtein(a : String, b : String) : Int32
-          return b.size if a.empty?
-          return a.size if b.empty?
-          m = a.size
-          n = b.size
-          prev = Array(Int32).new(n + 1) { |i| i }
-          curr = Array(Int32).new(n + 1, 0)
-          m.times do |i|
-            curr[0] = i + 1
-            n.times do |j|
-              cost = a[i] == b[j] ? 0 : 1
-              curr[j + 1] = {curr[j] + 1, prev[j + 1] + 1, prev[j] + cost}.min
-            end
-            prev, curr = curr, prev
-          end
-          prev[n]
         end
 
         # Returns parsed metadata and content

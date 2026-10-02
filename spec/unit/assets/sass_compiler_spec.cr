@@ -25,7 +25,7 @@ end
 private def compile_in(dir : String, config = sass_config, static = static_config, &)
   Dir.cd(dir) do
     Dir.mkdir_p("public")
-    compiler = Hwaro::Assets::SassCompiler.new(config, static, "static")
+    compiler = Hwaro::Assets::SassCompiler.new(config, static)
     yield compiler, "public"
   end
 end

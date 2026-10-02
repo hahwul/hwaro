@@ -185,10 +185,6 @@ module Hwaro
         @bundle = false
       end
 
-      def toml? : Bool
-        @front_matter_format == FORMAT_TOML
-      end
-
       def yaml? : Bool
         @front_matter_format == FORMAT_YAML
       end

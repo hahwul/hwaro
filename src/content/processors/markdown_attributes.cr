@@ -119,29 +119,16 @@ module Hwaro
           str
         end
 
-        # Merges `id` (replace-or-append) and `classes`
-        # (merge-into-existing-or-add) into an existing heading tag's
-        # attribute string (e.g. ` class="foo"`, or `""` when the tag had
-        # no attributes), matching `postprocess_heading_ids`'s formatting
-        # byte-for-byte for the id case.
-        def apply_to_tag_attrs(existing_attrs : String, parsed : Parsed) : String
-          merge_attrs(existing_attrs, parsed)
-        end
-
-        # Merges `parsed` into an `<img ...` tag's opening portion (up to,
-        # but NOT including, its `/>`/`>` closer — the caller re-appends the
-        # original closer so self-closing style is preserved untouched).
-        def apply_to_img(img_open : String, parsed : Parsed) : String
-          merge_attrs(img_open, parsed)
-        end
-
         # `(?<![\w-])` guards keep `data-id=`/`data-class=` from counting
         # as the element's own id/class.
         ID_ATTR_RE    = /(?<![\w-])id\s*=\s*"[^"]*"/i
         ID_PRESENT_RE = /(?<![\w-])id\s*=/i
         CLASS_ATTR_RE = /(?<![\w-])class\s*=\s*"([^"]*)"/i
 
-        # Shared merge logic for both entry points above: id and classes get
+        # Merges `parsed` into a heading tag's attribute string (` class="foo"`,
+        # or `""` when it had none) or an `<img ...` tag's opening portion (up
+        # to, but NOT including, its `/>`/`>` closer — the caller re-appends
+        # the original closer). id and classes get
         # their own dedicated attribute; every other `key=value` pair is
         # replaced in place when the tag already carries that attribute, or
         # appended when it doesn't ("source-order replace-or-append").
@@ -156,7 +143,7 @@ module Hwaro
         # without the flag `{alt="use \1 here"}` silently loses the `\1` and
         # `{class="a\1"}`/`{k="a\0"}` splice a capture group — the tag's own
         # existing class, or the whole matched attribute — into the value.
-        private def merge_attrs(attrs : String, parsed : Parsed) : String
+        def merge_attrs(attrs : String, parsed : Parsed) : String
           result = attrs
 
           if id = parsed.id

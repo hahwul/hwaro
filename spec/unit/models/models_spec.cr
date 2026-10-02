@@ -267,65 +267,6 @@ describe Hwaro::Models::Site do
     end
   end
 
-  describe "#taxonomy_terms" do
-    it "returns empty array for non-existent taxonomy" do
-      config = Hwaro::Models::Config.new
-      site = Hwaro::Models::Site.new(config)
-      site.taxonomy_terms("tags").should eq([] of String)
-    end
-
-    it "returns sorted terms for existing taxonomy" do
-      config = Hwaro::Models::Config.new
-      site = Hwaro::Models::Site.new(config)
-
-      page1 = Hwaro::Models::Page.new("post1.md")
-      page2 = Hwaro::Models::Page.new("post2.md")
-
-      site.taxonomies["tags"] = {
-        "zebra"  => [page1],
-        "apple"  => [page2],
-        "banana" => [page1, page2],
-      }
-
-      terms = site.taxonomy_terms("tags")
-      terms.should eq(["apple", "banana", "zebra"])
-    end
-  end
-
-  describe "#taxonomy_pages" do
-    it "returns empty array for non-existent taxonomy" do
-      config = Hwaro::Models::Config.new
-      site = Hwaro::Models::Site.new(config)
-      site.taxonomy_pages("tags", "crystal").should eq([] of Hwaro::Models::Page)
-    end
-
-    it "returns empty array for non-existent term" do
-      config = Hwaro::Models::Config.new
-      site = Hwaro::Models::Site.new(config)
-      page = Hwaro::Models::Page.new("test.md")
-      site.taxonomies["tags"] = {"other" => [page]}
-      # Term "crystal" doesn't exist in tags taxonomy
-      site.taxonomy_pages("tags", "crystal").should eq([] of Hwaro::Models::Page)
-    end
-
-    it "returns pages for existing term" do
-      config = Hwaro::Models::Config.new
-      site = Hwaro::Models::Site.new(config)
-
-      page1 = Hwaro::Models::Page.new("post1.md")
-      page2 = Hwaro::Models::Page.new("post2.md")
-
-      site.taxonomies["tags"] = {
-        "crystal" => [page1, page2],
-      }
-
-      pages = site.taxonomy_pages("tags", "crystal")
-      pages.size.should eq(2)
-      pages.should contain(page1)
-      pages.should contain(page2)
-    end
-  end
-
   describe "collections" do
     it "can add pages" do
       config = Hwaro::Models::Config.new

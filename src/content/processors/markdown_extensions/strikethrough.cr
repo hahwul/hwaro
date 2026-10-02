@@ -37,18 +37,6 @@ module Hwaro
         # of attributes cannot exhaust the PCRE JIT stack.
         HTML_TAG_RE = /<[A-Za-z][A-Za-z0-9-]*+(?:\s++[a-zA-Z_:][a-zA-Z0-9:._-]*+(?:\s*+=\s*+(?:[^"'=<>`\x00-\x20]++|'[^']*+'|"[^"]*+"))?+)*+\s*+\/?>|<\/[A-Za-z][A-Za-z0-9-]*+\s*+>/
 
-        def preprocess_strikethrough(content : String) : String
-          return content unless content.includes?("~~")
-
-          process_lines_fence_aware(content) do |line, _in_fence|
-            if line.includes?("~~")
-              rewrite_strikethrough_line(line)
-            else
-              line
-            end
-          end
-        end
-
         private def rewrite_strikethrough_line(line : String) : String
           # Stash inline code spans so a `~~` inside backticks is not rewritten.
           transform_outside_code_spans(line) do |stashed|

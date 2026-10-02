@@ -64,7 +64,7 @@ module Hwaro::Core::Build::Phases::Render
       # scrubbing it only under --minify made the two build modes emit
       # different page bytes for the same source.
       final_html = Utils::HtmlMinifier.scrub_nul(final_html)
-      final_html = minify_html(final_html) if minify
+      final_html = Utils::HtmlMinifier.minify(final_html) if minify
 
       # Write output - first page uses section URL, subsequent pages use /page/N/
       if paginated_page.page_number == 1

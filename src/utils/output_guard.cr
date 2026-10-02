@@ -30,7 +30,7 @@ module Hwaro
         cwd = Dir.current
         canonical_output = canonical?(output_path, cwd)
         canonical_dir = canonical?(output_dir, cwd)
-        if canonical_output && canonical_dir && contains?(canonical_dir, canonical_output)
+        if canonical_output && canonical_dir && PathUtils.within?(canonical_output, canonical_dir)
           canonical_output
         else
           Logger.warn "Skipping output outside output directory: #{output_path}"
@@ -45,7 +45,7 @@ module Hwaro
         dir = canonical?(output_dir, cwd)
         target = canonical?(output_path, cwd)
         return false unless dir && target
-        contains?(dir, target)
+        PathUtils.within?(target, dir)
       end
 
       # Check an existing file before unlinking it. Lexical containment alone
@@ -79,23 +79,13 @@ module Hwaro
         false
       end
 
-      private def contains?(canonical_dir : String, canonical_output : String) : Bool
-        return true if canonical_output == canonical_dir
-        # Build the prefix from the canonical dir rather than always appending
-        # a separator: at the filesystem root `canonical` legitimately returns
-        # "/", and "/" + "/" would reintroduce the double-separator mismatch
-        # this method exists to avoid.
-        prefix = canonical_dir.ends_with?(File::SEPARATOR) ? canonical_dir : canonical_dir + File::SEPARATOR
-        canonical_output.starts_with?(prefix)
-      end
-
       # A path that cannot be canonicalized at all is, by definition, not
       # inside the output directory. `File.expand_path` builds a `Path`, whose
       # `check_no_null_byte` raises `ArgumentError` for an embedded NUL — so
       # these two SAFETY predicates used to abort the build with a bare
       # "String contains null byte" instead of answering "not safe", which is
       # exactly the outcome a guard exists to produce. Nil means "no canonical
-      # form"; `contains?` treats that as outside.
+      # form"; the callers treat that as outside.
       private def canonical?(path : String, base : String? = nil) : String?
         canonical(path, base)
       rescue ArgumentError

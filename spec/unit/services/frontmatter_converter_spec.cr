@@ -71,14 +71,14 @@ describe Hwaro::Services::FrontmatterConverter do
     end
   end
 
-  describe "#convert_file" do
+  describe "single-file conversion" do
     it "converts YAML file to TOML" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
         file_path = File.join(dir, "test.md")
         File.write(file_path, "---\ntitle: Hello World\ndraft: false\n---\n\n# Content")
 
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result = converter.convert_to_toml.converted_count == 1
         result.should be_true
 
         converted = File.read(file_path)
@@ -103,10 +103,7 @@ describe Hwaro::Services::FrontmatterConverter do
         link = File.join(content_dir, "leak.md")
         File.symlink(external_file, link)
 
-        result = Hwaro::Services::FrontmatterConverter.new(content_dir).convert_file(
-          link,
-          Hwaro::Services::FrontmatterFormat::TOML,
-        )
+        result = Hwaro::Services::FrontmatterConverter.new(content_dir).convert_to_toml.converted_count == 1
 
         result.should be_false
         File.read(external_file).should eq(original)
@@ -119,7 +116,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "+++\ntitle = \"Hello World\"\ndraft = false\n+++\n\n# Content")
 
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML)
+        result = converter.convert_to_yaml.converted_count == 1
         result.should be_true
 
         converted = File.read(file_path)
@@ -138,7 +135,7 @@ describe Hwaro::Services::FrontmatterConverter do
         original = "+++\ntitle = \"Already TOML\"\n+++\n\n# Content"
         File.write(file_path, original)
 
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result = converter.convert_to_toml.converted_count == 1
         result.should be_false
 
         # File should remain unchanged
@@ -153,7 +150,7 @@ describe Hwaro::Services::FrontmatterConverter do
         original = "---\ntitle: Already YAML\n---\n\n# Content"
         File.write(file_path, original)
 
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML)
+        result = converter.convert_to_yaml.converted_count == 1
         result.should be_false
 
         File.read(file_path).should eq(original)
@@ -167,7 +164,7 @@ describe Hwaro::Services::FrontmatterConverter do
         original = "# No frontmatter here\n\nJust content."
         File.write(file_path, original)
 
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result = converter.convert_to_toml.converted_count == 1
         result.should be_false
 
         File.read(file_path).should eq(original)
@@ -181,7 +178,7 @@ describe Hwaro::Services::FrontmatterConverter do
         body = "\n# My Post\n\nParagraph 1.\n\n## Section\n\nParagraph 2.\n"
         File.write(file_path, "---\ntitle: Test\n---\n#{body}")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        converter.convert_to_toml
 
         converted = File.read(file_path)
         converted.should contain(body)
@@ -195,7 +192,7 @@ describe Hwaro::Services::FrontmatterConverter do
         body = "\n# My Post\n\nParagraph 1.\n\n## Section\n\nParagraph 2.\n"
         File.write(file_path, "+++\ntitle = \"Test\"\n+++\n#{body}")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML)
+        converter.convert_to_yaml
 
         converted = File.read(file_path)
         converted.should contain(body)
@@ -208,7 +205,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "---\ntitle: Test\nweight: 10\n---\n\nContent")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        converter.convert_to_toml
 
         converted = File.read(file_path)
         converted.should contain("weight = 10")
@@ -221,7 +218,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "---\ntitle: Test\ndraft: true\n---\n\nContent")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        converter.convert_to_toml
 
         converted = File.read(file_path)
         converted.should contain("draft = true")
@@ -234,7 +231,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "---\ntitle: Test\ntags:\n  - crystal\n  - programming\n---\n\nContent")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        converter.convert_to_toml
 
         converted = File.read(file_path)
         converted.should contain("tags = [\"crystal\", \"programming\"]")
@@ -247,7 +244,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "+++\ntitle = \"Test\"\ntags = [\"crystal\", \"programming\"]\n+++\n\nContent")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML)
+        converter.convert_to_yaml
 
         converted = File.read(file_path)
         converted.should contain("crystal")
@@ -261,7 +258,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "---\ntitle: 'He said \"hello\"'\n---\n\nContent")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        converter.convert_to_toml
 
         converted = File.read(file_path)
         converted.should start_with("+++\n")
@@ -433,7 +430,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "---\ntitle: Hello\ndraft: false\ntags:\n  - a\n  - b\n---\n\n# Body")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+        converter.convert_to_json.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should start_with("{")
@@ -451,7 +448,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, "+++\ntitle = \"Hello\"\nweight = 5\n+++\n\n# Body")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+        converter.convert_to_json.converted_count.should eq(1)
 
         converted = File.read(file_path)
         parsed = JSON.parse(converted[0, converted.index!("}\n") + 1])
@@ -466,7 +463,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, %({"title": "Hi", "draft": true}\n\n# Body))
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should start_with("+++\n")
@@ -506,8 +503,8 @@ describe Hwaro::Services::FrontmatterConverter do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
-        builder.run(output_dir: "public-after", drafts: false, minify: false, parallel: false,
-          cache: false, highlight: false, verbose: false, profile: false, stream: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public-after", drafts: false, minify: false, parallel: false,
+          cache: false, highlight: false, verbose: false, profile: false, stream: false))
 
         converter_build_tree(File.join(dir, "public-after")).should eq(before)
       end
@@ -541,7 +538,7 @@ describe Hwaro::Services::FrontmatterConverter do
         file_path = File.join(dir, "test.md")
         File.write(file_path, %({"title": "Hi", "tags": ["x", "y"]}\n\n# Body))
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        converter.convert_to_yaml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should start_with("---\n")
@@ -558,7 +555,7 @@ describe Hwaro::Services::FrontmatterConverter do
         original = %({"title": "Hi"}\n\n# Body)
         File.write(file_path, original)
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_false
+        converter.convert_to_json.converted_count.should eq(0)
         File.read(file_path).should eq(original)
       end
     end
@@ -591,14 +588,14 @@ describe Hwaro::Services::FrontmatterConverter do
         File.write(file_path, "---\ntitle: Round Trip\ndraft: true\n---\n#{original_body}")
 
         # YAML -> TOML
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        converter.convert_to_toml
         intermediate = File.read(file_path)
         intermediate.should start_with("+++\n")
         intermediate.should contain("title = \"Round Trip\"")
         intermediate.should contain("draft = true")
 
         # TOML -> YAML
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML)
+        converter.convert_to_yaml
         final = File.read(file_path)
         final.should start_with("---\n")
         final.should contain("Round Trip")
@@ -618,13 +615,13 @@ describe Hwaro::Services::FrontmatterConverter do
         original = "+++\ntitle = \"Spaced\"\n+++\n\nFirst paragraph.\n"
         File.write(file_path, original)
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        converter.convert_to_yaml.converted_count.should eq(1)
         intermediate = File.read(file_path)
         # YAML auto-decides quoting; what matters is the blank line is preserved
         # between the closing `---` and the first body paragraph.
         intermediate.should contain("---\n\nFirst paragraph.\n")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
         File.read(file_path).should eq(original)
       end
     end
@@ -638,8 +635,8 @@ describe Hwaro::Services::FrontmatterConverter do
         original = "+++\ntitle = \"Tight\"\n+++\nFirst paragraph.\n"
         File.write(file_path, original)
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_yaml.converted_count.should eq(1)
+        converter.convert_to_toml.converted_count.should eq(1)
         File.read(file_path).should eq(original)
       end
     end
@@ -653,15 +650,15 @@ describe Hwaro::Services::FrontmatterConverter do
         File.write(file_path, %({"title": "Round Trip", "draft": true, "weight": 5, "tags": ["a", "b"]}\n#{original_body}))
 
         # JSON -> TOML
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
         File.read(file_path).should start_with("+++\n")
 
         # TOML -> YAML
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        converter.convert_to_yaml.converted_count.should eq(1)
         File.read(file_path).should start_with("---\n")
 
         # YAML -> JSON
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+        converter.convert_to_json.converted_count.should eq(1)
         final = File.read(file_path)
         final.should start_with("{")
 
@@ -677,17 +674,6 @@ describe Hwaro::Services::FrontmatterConverter do
   end
 
   describe "error handling" do
-    it "handles file read errors gracefully" do
-      Dir.mktmpdir do |dir|
-        converter = Hwaro::Services::FrontmatterConverter.new(dir)
-        file_path = File.join(dir, "non_existent.md")
-
-        # Should return false and not raise exception
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
-        result.should be_false
-      end
-    end
-
     it "handles file write errors gracefully" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
@@ -701,7 +687,7 @@ describe Hwaro::Services::FrontmatterConverter do
 
         begin
           # Attempt to convert to TOML
-          result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+          result = converter.convert_to_toml.converted_count == 1
           result.should be_false
         ensure
           # Restore permissions so it can be cleaned up
@@ -754,7 +740,7 @@ describe Hwaro::Services::FrontmatterConverter do
           YAML
         File.write(file_path, "---\n#{yaml_content}\n---\n\nContent")
 
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result = converter.convert_to_toml.converted_count == 1
         result.should be_true
 
         converted = File.read(file_path)
@@ -785,7 +771,7 @@ describe Hwaro::Services::FrontmatterConverter do
           YAML
         File.write(file_path, "---\n#{yaml_content}\n---\n\nContent")
 
-        result = converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML)
+        result = converter.convert_to_toml.converted_count == 1
         result.should be_true
 
         converted = File.read(file_path)
@@ -891,7 +877,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "post.md")
         File.write(file_path, "+++\ntitle = \"Post\"\ndate = 2026-05-20\n+++\n\n# Content")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        converter.convert_to_yaml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should contain("2026-05-20")
@@ -906,7 +892,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "post.md")
         File.write(file_path, "+++\ntitle = \"Post\"\ndate = 2026-05-20\n+++\n\n# Content")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::JSON).should be_true
+        converter.convert_to_json.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should contain("\"date\": \"2026-05-20\"")
@@ -922,7 +908,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "post.md")
         File.write(file_path, "---\ntitle: Post\ndate: 2026-07-01T08:00:00+09:00\n---\n\nContent")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should contain("2026-07-01T08:00:00+09:00")
@@ -943,7 +929,7 @@ describe Hwaro::Services::ConversionResult do
         original = "---\nIntro paragraph between two rules.\n---\n\nRest of document.\n"
         File.write(file_path, original)
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_false
+        converter.convert_to_toml.converted_count.should eq(0)
         File.read(file_path).should eq(original)
 
         result = converter.convert_to_toml
@@ -1006,7 +992,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "floats.md")
         File.write(file_path, "---\ntitle: F\nscore: .inf\npenalty: -.inf\nmiss: .nan\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should contain("score = inf")
@@ -1030,7 +1016,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "min.md")
         File.write(file_path, "---\ntitle: D\ndraft: true\noffset: -9223372036854775808\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
@@ -1046,7 +1032,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "promoted.md")
         File.write(file_path, "---\ntitle: P\nratio:\n  - 9223372036854775807\n  - 2.5\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
@@ -1061,7 +1047,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "mixed.md")
         File.write(file_path, "---\ntitle: M\nstuff:\n  - 1\n  - two\nratio:\n  - 1\n  - 2.5\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
@@ -1079,7 +1065,7 @@ describe Hwaro::Services::ConversionResult do
         # can keep inline-table form and still reparse.
         File.write(file_path, "---\ntitle: I\ngroups:\n  - - name: home\n      url: /\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         converted.should contain("{name = \"home\", url = \"/\"}")
@@ -1098,7 +1084,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "mixed_inline.md")
         File.write(file_path, "---\ntitle: I\nlinks:\n  - name: home\n    url: /\n  - plain\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         fm = File.read(file_path).match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
         links = TOML.parse(fm)["links"].as_a
@@ -1114,7 +1100,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "empty.md")
         File.write(file_path, "---\ntitle: E\nextra: {}\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
         File.read(file_path).should contain("[extra]")
       end
     end
@@ -1135,7 +1121,7 @@ describe Hwaro::Services::ConversionResult do
         previous = Hwaro::Logger.err_io
         Hwaro::Logger.err_io = captured
         begin
-          converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::YAML).should be_false
+          converter.convert_to_yaml.converted_count.should eq(0)
         ensure
           Hwaro::Logger.err_io = previous
         end
@@ -1153,7 +1139,7 @@ describe Hwaro::Services::ConversionResult do
         file_path = File.join(dir, "ctrl.md")
         File.write(file_path, "---\ntitle: \"ding\\a dong\"\n---\n\nBody")
 
-        converter.convert_file(file_path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]

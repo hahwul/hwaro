@@ -148,7 +148,7 @@ describe "[[content.generate]] build integration" do
         run_cached = -> {
           builder = Hwaro::Core::Build::Builder.new
           Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
-          builder.run(output_dir: "public", cache: true)
+          builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true))
         }
 
         run_cached.call.should be_true

@@ -92,13 +92,14 @@ in `ARCHITECTURE.md`.
 - Bounded substrings (`html[pos, n]`) instead of `html[pos..]` in loops.
 - Cache `Crinja::Value` arrays per section/page; clear them at every reset
   point (see `invalidate_caches_for_pages`).
-- Tartrazine is not thread-safe: syntax highlighting goes through
-  `ServerHighlighter`'s mutex.
+- Tartrazine is only thread-safe through `src/ext/tartrazine_mt_fix.cr`;
+  highlighting goes through `ServerHighlighter`, which bounds concurrent
+  tokenization (`TOKENIZE_SLOTS`) to keep the GC allocation lock calm.
 
 ### Logging
 - `Logger.action(label, message, role = Role::Success)` for file operations,
-  `Logger.progress(current, total)`, `Logger.outcome`, `Logger::Receipt`,
-  `Logger.timed(message, &block)`; levels `debug`/`info`/`warn`/`error`/`success`.
+  `Logger.progress(current, total)`, `Logger.outcome`, `Logger::Receipt`;
+  levels `debug`/`info`/`warn`/`error`/`success`.
 - Every command honours `--quiet`/`-q` (info/action/progress/success and the
   banner off; warn/error still on stderr) and `NO_COLOR`. A command that
   handles `--json` itself exits through `Runner.exit_with_error_payload`.

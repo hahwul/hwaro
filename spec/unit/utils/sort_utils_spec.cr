@@ -96,14 +96,14 @@ describe Hwaro::Utils::SortUtils do
     end
   end
 
-  describe ".sort_by_date" do
+  describe ".sort_pages (date)" do
     it "wraps sort_pages with 'date' criterion" do
       pages = [
         make_page("old.md", Time.utc(2020, 1, 1)),
         make_page("new.md", Time.utc(2024, 1, 1)),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_date(pages)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "date")
       sorted[0].path.should eq("new.md")
       sorted[1].path.should eq("old.md")
     end
@@ -114,19 +114,19 @@ describe Hwaro::Utils::SortUtils do
         make_page("new.md", Time.utc(2024, 1, 1)),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_date(pages, reverse: true)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "date", reverse: true)
       sorted[0].path.should eq("old.md")
     end
   end
 
-  describe ".sort_by_title" do
+  describe ".sort_pages (title)" do
     it "wraps sort_pages with 'title' criterion" do
       pages = [
         make_page("c.md", title: "Cherry"),
         make_page("a.md", title: "Apple"),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_title(pages)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "title")
       sorted[0].title.should eq("Apple")
       sorted[1].title.should eq("Cherry")
     end
@@ -137,19 +137,19 @@ describe Hwaro::Utils::SortUtils do
         make_page("c.md", title: "Cherry"),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_title(pages, reverse: true)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "title", reverse: true)
       sorted[0].title.should eq("Cherry")
     end
   end
 
-  describe ".sort_by_weight" do
+  describe ".sort_pages (weight)" do
     it "wraps sort_pages with 'weight' criterion" do
       pages = [
         make_page("heavy.md", weight: 10),
         make_page("light.md", weight: 1),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_weight(pages)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "weight")
       sorted[0].weight.should eq(1)
       sorted[1].weight.should eq(10)
     end
@@ -160,7 +160,7 @@ describe Hwaro::Utils::SortUtils do
         make_page("heavy.md", weight: 10),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_weight(pages, reverse: true)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "weight", reverse: true)
       sorted[0].weight.should eq(10)
     end
 
@@ -171,7 +171,7 @@ describe Hwaro::Utils::SortUtils do
         make_page("pos.md", weight: 5),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_weight(pages)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "weight")
       sorted.map(&.weight).should eq([-5, 0, 5])
     end
   end

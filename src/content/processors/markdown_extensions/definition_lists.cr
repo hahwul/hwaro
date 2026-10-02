@@ -12,17 +12,10 @@ module Hwaro
         # Converts Term\n: Definition syntax to <dl><dt><dd> HTML.
         # Fence-aware: `Term` / `: def` lines shown inside a ```/~~~ example
         # stay verbatim instead of becoming <dl> markup inside the code block.
-        # `math: true` keeps `$…$` spans in <dt>/<dd> bodies untransformed
-        # for the later math pass (see InlineMarkdown.render). Pre-F10
-        # signature — delegates to the `flags` overload (existing
-        # callers/specs keep calling this one directly).
-        def preprocess_definition_lists(content : String, *, math : Bool = false) : String
-          preprocess_definition_lists(content, flags: InlineMarkdown::Flags.new(math: math))
-        end
-
-        # `flags` also threads the F10 opt-in inline markup (ins/mark/sub/
-        # sup) into term/definition bodies, alongside the math flag.
-        def preprocess_definition_lists(content : String, *, flags : InlineMarkdown::Flags) : String
+        # `flags` threads math (keeps `$…$` spans in <dt>/<dd> bodies
+        # untransformed for the later math pass) and the F10 opt-in inline
+        # markup (ins/mark/sub/sup) into term/definition bodies.
+        def preprocess_definition_lists(content : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new) : String
           # Whole-content marker pre-check (memchr-fast): every definition line
           # must lstrip-start with ": " (see the loop conditions below), so a
           # content without ": " anywhere cannot contain a definition list and

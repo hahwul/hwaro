@@ -9,7 +9,7 @@ describe Hwaro::Services::Initializer do
       Dir.mktmpdir do |dir|
         target = File.join(dir, "mysite")
         initializer = Hwaro::Services::Initializer.new
-        initializer.run(target)
+        initializer.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
         Dir.exists?(File.join(target, "content")).should be_true
         Dir.exists?(File.join(target, "templates")).should be_true
@@ -25,7 +25,7 @@ describe Hwaro::Services::Initializer do
       # features existed.
       Dir.mktmpdir do |dir|
         target = File.join(dir, "mysite")
-        Hwaro::Services::Initializer.new.run(target)
+        Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
         config = File.read(File.join(target, "config.toml"))
         config.should contain("mermaid =")
@@ -38,7 +38,7 @@ describe Hwaro::Services::Initializer do
       Dir.mktmpdir do |dir|
         target = File.join(dir, "new", "nested", "site")
         initializer = Hwaro::Services::Initializer.new
-        initializer.run(target)
+        initializer.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
         Dir.exists?(target).should be_true
         File.exists?(File.join(target, "config.toml")).should be_true
@@ -54,12 +54,12 @@ describe Hwaro::Services::Initializer do
         File.symlink(outside, File.join(target, "templates"))
 
         expect_raises(Hwaro::HwaroError) do
-          Hwaro::Services::Initializer.new.run(
-            target,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
             force: true,
             skip_agents_md: true,
             skip_sample_content: true,
-          )
+          ))
         end
 
         File.exists?(File.join(outside, "page.html")).should be_false
@@ -70,12 +70,12 @@ describe Hwaro::Services::Initializer do
       Dir.mktmpdir do |dir|
         target = File.join(dir, "site")
         theme = File.join(dir, "theme")
-        Hwaro::Services::Initializer.new.run(target)
+        Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target))
         FileUtils.mv(File.join(target, "templates"), theme)
         File.symlink(theme, File.join(target, "templates"))
         before = Dir.glob(File.join(theme, "**", "*")).sort
 
-        Hwaro::Services::Initializer.new.run(target, force: true)
+        Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, force: true))
 
         Dir.glob(File.join(theme, "**", "*")).sort.should eq(before)
         File.symlink?(File.join(target, "templates")).should be_true
@@ -91,7 +91,7 @@ describe Hwaro::Services::Initializer do
         File.symlink(outside, File.join(target, "templates"))
 
         expect_raises(Hwaro::HwaroError) do
-          Hwaro::Services::Initializer.new.run(target, force: true)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, force: true))
         end
 
         Dir.children(target).should eq(["templates"])
@@ -103,7 +103,7 @@ describe Hwaro::Services::Initializer do
       it "scaffolds a .gitignore covering the output dir and hwaro caches" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "mysite")
-          Hwaro::Services::Initializer.new.run(target)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
           gitignore = File.read(File.join(target, ".gitignore"))
           gitignore.lines.should contain("/public/")
@@ -118,7 +118,7 @@ describe Hwaro::Services::Initializer do
           Dir.mkdir_p(target)
           File.write(File.join(target, ".gitignore"), "my-own-rules\n")
 
-          Hwaro::Services::Initializer.new.run(target, force: true)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, force: true))
 
           File.read(File.join(target, ".gitignore")).should eq("my-own-rules\n")
         end
@@ -133,7 +133,7 @@ describe Hwaro::Services::Initializer do
           File.write(File.join(target, "existing_file.txt"), "hello")
 
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, force: true)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, force: true))
 
           File.exists?(File.join(target, "config.toml")).should be_true
           File.exists?(File.join(target, "existing_file.txt")).should be_true
@@ -149,7 +149,7 @@ describe Hwaro::Services::Initializer do
           File.write(File.join(target, "stale-file.txt"), "old")
           File.write(File.join(target, "stale-subdir", "nested.txt"), "deep")
 
-          Hwaro::Services::Initializer.new.run(target, clean: true)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, clean: true))
 
           File.exists?(File.join(target, "stale-file.txt")).should be_false
           Dir.exists?(File.join(target, "stale-subdir")).should be_false
@@ -162,20 +162,20 @@ describe Hwaro::Services::Initializer do
           target = File.join(dir, "site")
 
           # First init with blog scaffold leaves posts/, archives.md etc.
-          Hwaro::Services::Initializer.new.run(
-            target,
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog,
-          )
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
+            scaffold: Hwaro::Config::Options::ScaffoldType::Blog,
+          ))
           Dir.exists?(File.join(target, "content", "posts")).should be_true
           File.exists?(File.join(target, "content", "archives.md")).should be_true
 
           # Re-init with simple scaffold + --clean should leave only the
           # simple scaffold's files behind.
-          Hwaro::Services::Initializer.new.run(
-            target,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
             clean: true,
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Simple,
-          )
+            scaffold: Hwaro::Config::Options::ScaffoldType::Simple,
+          ))
 
           Dir.exists?(File.join(target, "content", "posts")).should be_false
           File.exists?(File.join(target, "content", "archives.md")).should be_false
@@ -192,7 +192,7 @@ describe Hwaro::Services::Initializer do
           File.write(File.join(target, "README.md"), "# repo")
 
           expect_raises(Hwaro::HwaroError, /contains a \.git entry/) do
-            Hwaro::Services::Initializer.new.run(target, clean: true)
+            Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, clean: true))
           end
 
           # Original files stay in place.
@@ -209,7 +209,7 @@ describe Hwaro::Services::Initializer do
           File.write(File.join(target, "work.txt"), "uncommitted")
 
           expect_raises(Hwaro::HwaroError, /contains a \.git entry/) do
-            Hwaro::Services::Initializer.new.run(target, clean: true)
+            Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, clean: true))
           end
 
           File.read(File.join(target, ".git")).should contain("gitdir:")
@@ -226,7 +226,7 @@ describe Hwaro::Services::Initializer do
           begin
             ENV["HOME"] = home
             err = expect_raises(Hwaro::HwaroError, /home directory/) do
-              Hwaro::Services::Initializer.new.run(home, clean: true)
+              Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: home, clean: true))
             end
             err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
           ensure
@@ -239,7 +239,7 @@ describe Hwaro::Services::Initializer do
       it "is a no-op on a non-existent target" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "fresh")
-          Hwaro::Services::Initializer.new.run(target, clean: true)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, clean: true))
 
           File.exists?(File.join(target, "config.toml")).should be_true
         end
@@ -249,7 +249,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "empty")
           Dir.mkdir_p(target)
-          Hwaro::Services::Initializer.new.run(target, clean: true)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, clean: true))
 
           File.exists?(File.join(target, "config.toml")).should be_true
         end
@@ -261,7 +261,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, skip_agents_md: true)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, skip_agents_md: true))
 
           File.exists?(File.join(target, "AGENTS.md")).should be_false
           File.exists?(File.join(target, "config.toml")).should be_true
@@ -272,7 +272,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
           File.exists?(File.join(target, "AGENTS.md")).should be_true
         end
@@ -284,7 +284,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, skip_sample_content: true)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, skip_sample_content: true))
 
           Dir.exists?(File.join(target, "content")).should be_true
           # Templates should still be created
@@ -295,8 +295,8 @@ describe Hwaro::Services::Initializer do
       it "keeps front-matter-only stubs for the pages the nav links to" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(target, skip_sample_content: true,
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, skip_sample_content: true,
+            scaffold: Hwaro::Config::Options::ScaffoldType::Blog))
 
           content = File.join(target, "content")
           files = Dir.glob(File.join(content, "**", "*.md")).map { |f| Path[f].relative_to(content).to_s }.sort!
@@ -311,9 +311,9 @@ describe Hwaro::Services::Initializer do
       it "keeps the translated stubs of a multilingual skeleton" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(target, skip_sample_content: true,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, skip_sample_content: true,
             multilingual_languages: ["en", "ko"],
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs)
+            scaffold: Hwaro::Config::Options::ScaffoldType::Docs))
 
           File.exists?(File.join(target, "content", "guide", "_index.md")).should be_true
           File.exists?(File.join(target, "content", "guide", "_index.ko.md")).should be_true
@@ -327,7 +327,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, skip_taxonomies: true)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, skip_taxonomies: true))
 
           File.exists?(File.join(target, "config.toml")).should be_true
           Dir.exists?(File.join(target, "content")).should be_true
@@ -340,7 +340,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, scaffold_type: Hwaro::Config::Options::ScaffoldType::Simple)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, scaffold: Hwaro::Config::Options::ScaffoldType::Simple))
 
           File.exists?(File.join(target, "config.toml")).should be_true
           Dir.exists?(File.join(target, "content")).should be_true
@@ -351,7 +351,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, scaffold: Hwaro::Config::Options::ScaffoldType::Blog))
 
           File.exists?(File.join(target, "config.toml")).should be_true
           Dir.exists?(File.join(target, "content")).should be_true
@@ -363,7 +363,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, scaffold: Hwaro::Config::Options::ScaffoldType::Docs))
 
           File.exists?(File.join(target, "config.toml")).should be_true
           Dir.exists?(File.join(target, "content")).should be_true
@@ -376,7 +376,7 @@ describe Hwaro::Services::Initializer do
       it "creates archetypes/default.md for built-in scaffolds" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(target)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
           archetype_path = File.join(target, "archetypes", "default.md")
           File.exists?(archetype_path).should be_true
@@ -397,10 +397,10 @@ describe Hwaro::Services::Initializer do
       it "ships a posts archetype with the blog scaffold" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(
-            target,
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog,
-          )
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
+            scaffold: Hwaro::Config::Options::ScaffoldType::Blog,
+          ))
 
           posts_path = File.join(target, "archetypes", "posts.md")
           File.exists?(posts_path).should be_true
@@ -416,10 +416,10 @@ describe Hwaro::Services::Initializer do
       it "ships section archetypes with the docs scaffold" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(
-            target,
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs,
-          )
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
+            scaffold: Hwaro::Config::Options::ScaffoldType::Docs,
+          ))
 
           %w[getting-started guide reference].each do |name|
             File.exists?(File.join(target, "archetypes", "#{name}.md")).should be_true
@@ -443,7 +443,7 @@ describe Hwaro::Services::Initializer do
         # instead of the hardcoded built-in template.
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(target)
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
           Dir.cd(target) do
             options = Hwaro::Config::Options::NewOptions.new(path: "hello.md", title: "Hello")
@@ -465,7 +465,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, multilingual_languages: ["en", "ko"])
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, multilingual_languages: ["en", "ko"]))
 
           File.exists?(File.join(target, "config.toml")).should be_true
           config_content = File.read(File.join(target, "config.toml"))
@@ -487,7 +487,7 @@ describe Hwaro::Services::Initializer do
         # the generated file with the real config loader end-to-end.
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(target, multilingual_languages: ["en", "ko"])
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, multilingual_languages: ["en", "ko"]))
 
           config = Hwaro::Models::Config.load(File.join(target, "config.toml"))
           config.default_language.should eq("en")
@@ -499,11 +499,11 @@ describe Hwaro::Services::Initializer do
       it "enables languages in --full-config mode (regression: full config dropped multilingual)" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(
-            target,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
             multilingual_languages: ["en", "ko"],
             full_config: true
-          )
+          ))
 
           config_content = File.read(File.join(target, "config.toml"))
           # Must be the real, *uncommented* block — not the placeholder.
@@ -518,7 +518,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, multilingual_languages: ["en"])
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, multilingual_languages: ["en"]))
 
           File.exists?(File.join(target, "config.toml")).should be_true
           config_content = File.read(File.join(target, "config.toml"))
@@ -534,7 +534,7 @@ describe Hwaro::Services::Initializer do
           prev_io = Hwaro::Logger.io
           Hwaro::Logger.io = buffer
           begin
-            Hwaro::Services::Initializer.new.run(target, multilingual_languages: ["en"])
+            Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, multilingual_languages: ["en"]))
           ensure
             Hwaro::Logger.io = prev_io
           end
@@ -545,11 +545,11 @@ describe Hwaro::Services::Initializer do
       it "preserves scaffold content layout in multilingual mode (blog -> posts/)" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(
-            target,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
             multilingual_languages: ["en", "ja"],
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Blog,
-          )
+            scaffold: Hwaro::Config::Options::ScaffoldType::Blog,
+          ))
 
           # Default language uses scaffold's own posts/ dir
           File.exists?(File.join(target, "content", "posts", "_index.md")).should be_true
@@ -565,11 +565,11 @@ describe Hwaro::Services::Initializer do
       it "preserves scaffold content layout in multilingual mode (docs -> guide/, reference/)" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(
-            target,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
             multilingual_languages: ["en", "ko"],
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Docs,
-          )
+            scaffold: Hwaro::Config::Options::ScaffoldType::Docs,
+          ))
 
           %w[getting-started guide reference].each do |section|
             File.exists?(File.join(target, "content", section, "_index.md")).should be_true
@@ -581,11 +581,11 @@ describe Hwaro::Services::Initializer do
       it "preserves scaffold content layout in multilingual mode (book -> chapter-N)" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(
-            target,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
             multilingual_languages: ["en", "ko"],
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Book,
-          )
+            scaffold: Hwaro::Config::Options::ScaffoldType::Book,
+          ))
 
           %w[chapter-1 chapter-2 chapter-3].each do |chapter|
             File.exists?(File.join(target, "content", chapter, "_index.md")).should be_true
@@ -597,11 +597,11 @@ describe Hwaro::Services::Initializer do
       it "inserts a translate-me notice into non-default language files" do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
-          Hwaro::Services::Initializer.new.run(
-            target,
+          Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+            path: target,
             multilingual_languages: ["en", "ko"],
-            scaffold_type: Hwaro::Config::Options::ScaffoldType::Simple,
-          )
+            scaffold: Hwaro::Config::Options::ScaffoldType::Simple,
+          ))
 
           default_page = File.read(File.join(target, "content", "index.md"))
           translated = File.read(File.join(target, "content", "index.ko.md"))
@@ -627,7 +627,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target))
 
           agents_content = File.read(File.join(target, "AGENTS.md"))
           agents_content.should contain "hwaro.hahwul.com"
@@ -639,7 +639,7 @@ describe Hwaro::Services::Initializer do
         Dir.mktmpdir do |dir|
           target = File.join(dir, "site")
           initializer = Hwaro::Services::Initializer.new
-          initializer.run(target, agents_mode: Hwaro::Config::Options::AgentsMode::Local)
+          initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, agents_mode: Hwaro::Config::Options::AgentsMode::Local))
 
           agents_content = File.read(File.join(target, "AGENTS.md"))
           agents_content.should contain "## Content"
@@ -724,7 +724,7 @@ describe "Hwaro::Services::Initializer --init audit regressions" do
       original = "title = \"Mine\"\nbase_url = \"https://example.com\"\n"
       File.write(File.join(target, "config.toml"), original)
 
-      Hwaro::Services::Initializer.new.run(target, force: true, full_config: true)
+      Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, force: true, full_config: true))
 
       File.read(File.join(target, "config.toml")).should eq(original)
     end
@@ -736,7 +736,7 @@ describe "Hwaro::Services::Initializer --init audit regressions" do
       Dir.mkdir_p(target)
       File.write(File.join(target, "config.toml"), "title = \n")
 
-      Hwaro::Services::Initializer.new.run(target, force: true, full_config: true)
+      Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: target, force: true, full_config: true))
 
       File.read(File.join(target, "config.toml")).should eq("title = \n")
     end
@@ -786,10 +786,10 @@ describe "Hwaro::Services::Initializer instance reuse" do
     Dir.mktmpdir do |dir|
       target = File.join(dir, "site")
       initializer = Hwaro::Services::Initializer.new
-      initializer.run(target)
+      initializer.run(Hwaro::Config::Options::InitOptions.new(path: target))
       before = File.read(File.join(target, "config.toml"))
 
-      initializer.run(target, force: true, full_config: true)
+      initializer.run(Hwaro::Config::Options::InitOptions.new(path: target, force: true, full_config: true))
 
       File.read(File.join(target, "config.toml")).should eq(before)
       initializer.created_count.should eq(0)

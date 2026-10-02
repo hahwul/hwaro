@@ -783,7 +783,7 @@ module Hwaro
               # `$name: value` is a keyword argument; a bare `$var` is a
               # positional value. Peek past the identifier for the colon.
               offset = 1
-              while @s.ident_char?(@s.peek(offset))
+              while Scanner.ident_char?(@s.peek(offset))
                 offset += 1
               end
               while @s.peek(offset).try(&.ascii_whitespace?)

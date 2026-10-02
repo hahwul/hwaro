@@ -14,41 +14,29 @@ require "../utils/command_suggester"
 
 module Hwaro
   module CLI
-    # Command registry for dynamic command management
-    # Allows plugins to register new commands at runtime
+    # Command registry: the built-in commands, filled by
+    # Runner#register_default_commands at startup.
     class CommandRegistry
-      @@commands = {} of String => Proc(Array(String), Nil)
-      @@metadata = {} of String => CommandInfo
+      @@entries = {} of String => {CommandInfo, Proc(Array(String), Nil)}
 
       # Register a command with its handler and metadata
       def self.register(metadata : CommandInfo, &handler : Array(String) -> Nil)
-        @@commands[metadata.name] = handler
-        @@metadata[metadata.name] = metadata
+        @@entries[metadata.name] = {metadata, handler}
       end
 
       # Get a command handler by name
       def self.get(name : String) : Proc(Array(String), Nil)?
-        @@commands[name]?
-      end
-
-      # Get command metadata by name
-      def self.get_metadata(name : String) : CommandInfo?
-        @@metadata[name]?
-      end
-
-      # Check if a command exists
-      def self.has?(name : String) : Bool
-        @@commands.has_key?(name)
+        @@entries[name]?.try(&.[1])
       end
 
       # Get all registered command names
       def self.names : Array(String)
-        @@commands.keys.sort!
+        @@entries.keys.sort!
       end
 
       # Get command description
       def self.description(name : String) : String
-        @@metadata[name]?.try(&.description) || ""
+        @@entries[name]?.try(&.[0].description) || ""
       end
 
       # List all commands with descriptions
@@ -58,7 +46,7 @@ module Hwaro
 
       # Get all command metadata
       def self.all_metadata : Array(CommandInfo)
-        @@metadata.values
+        @@entries.values.map(&.[0])
       end
     end
 

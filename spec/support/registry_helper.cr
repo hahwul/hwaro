@@ -3,7 +3,7 @@
 #
 # `crystal spec` runs every file in ONE process, and the order the files load
 # in follows the filesystem glob, which differs between checkouts. A spec
-# that registers a test processor or a synthetic CLI command and leaves it
+# that registers a synthetic CLI command or scaffold and leaves it
 # behind therefore breaks registration_order_spec only when it happens to
 # load first — a failure that passes on rerun. Wrap such specs instead:
 #
@@ -17,12 +17,11 @@
 
 class Hwaro::CLI::CommandRegistry
   def self.__spec_snapshot
-    {@@commands.dup, @@metadata.dup}
+    @@entries.dup
   end
 
   def self.__spec_restore(snapshot) : Nil
-    @@commands = snapshot[0].dup
-    @@metadata = snapshot[1].dup
+    @@entries = snapshot.dup
   end
 end
 
@@ -47,20 +46,13 @@ class Hwaro::Services::Scaffolds::Registry
   end
 end
 
-# NOTE: snapshots hold references to the registered instances, not clones —
-# an example must not mutate a registered processor's internal state.
 def with_isolated_registries(&)
-  processors = Hwaro::Content::Processors::Registry.names.compact_map do |name|
-    Hwaro::Content::Processors::Registry.get(name)
-  end
   commands = Hwaro::CLI::CommandRegistry.__spec_snapshot
   tool_subcommands = Hwaro::CLI::Commands::ToolCommand.__spec_snapshot
   scaffolds = Hwaro::Services::Scaffolds::Registry.__spec_snapshot
   begin
     yield
   ensure
-    Hwaro::Content::Processors::Registry.clear
-    processors.each { |p| Hwaro::Content::Processors::Registry.register(p) }
     Hwaro::CLI::CommandRegistry.__spec_restore(commands)
     Hwaro::CLI::Commands::ToolCommand.__spec_restore(tool_subcommands)
     Hwaro::Services::Scaffolds::Registry.__spec_restore(scaffolds)

@@ -127,7 +127,7 @@ end
 #
 # That catch-all fires on ordinary template code, and because it raises a
 # bare `Exception` (not a `Crinja::Error`) it escapes
-# `TemplateEngine#render`'s rescue: the build dies with
+# the renderer's `Crinja::Error` rescue: the build dies with
 # `not implemented for Crinja::AST::CallExpression` and NO template
 # file:line. The `Avoid: Multiple lookups` snippet in
 # docs/content/templates/functions.md is exactly this shape:

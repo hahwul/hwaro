@@ -39,15 +39,8 @@ module Hwaro::Core::Build::Phases::Render
     worker_envs = env_pool || Array.new(worker_count) { create_fresh_crinja_env }
     worker_caches = template_cache_pool || Array.new(worker_count) { {} of UInt64 => Crinja::Template }
 
-    results = Channel(Bool).new(pages.size)
-    work_queue = Channel({Models::Page, Int32}).new(pages.size)
-
-    # Enqueue all work items
-    pages.each_with_index { |page, idx| work_queue.send({page, idx}) }
-    work_queue.close
-
     # Track the first classified error seen by any worker so the build
-    # can abort deterministically after draining the result channel.
+    # can abort deterministically once every page has been handled.
     published_before = @published_pages.get
     classified_error : Hwaro::HwaroError? = nil
     error_mutex = Mutex.new
@@ -59,63 +52,42 @@ module Hwaro::Core::Build::Phases::Render
     # one summary with the list of affected pages.
     failures = [] of NamedTuple(page_path: String, message: String)
 
-    # Spawn workers, each with its own Crinja env and template cache
-    worker_count.times do |worker_id|
-      env = worker_envs[worker_id]
-      tmpl_cache = worker_caches[worker_id]
-      spawn do
-        while work_item = work_queue.receive?
-          page, _idx = work_item
-          # `ensure` guarantees exactly one result per dequeued page even if a
-          # rescue handler itself raises. Without it, a dying worker fiber
-          # under-delivers and the `pages.size.times { results.receive }`
-          # collector below blocks forever — the build hangs instead of
-          # failing.
-          ok = false
-          begin
-            page_start = profiler ? Time.instant : nil
-            render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars,
-              crinja_env_override: env, template_cache_override: tmpl_cache, error_overlay: error_overlay, profiler: profiler)
-            if profiler && page_start
-              elapsed_ms = (Time.instant - page_start).total_milliseconds
-              template_name = determine_template(page, templates, site)
-              profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
-            end
-            record_page_cache_entry(page, cache, templates, site, output_dir)
-            ok = true
-          rescue ex : Hwaro::HwaroError
-            error_mutex.synchronize do
-              classified_error ||= ex
-              failures << {page_path: page.path, message: ex.message.to_s}
-            end
-          rescue ex : IO::Error
-            error_mutex.synchronize do
-              classified_error ||= output_write_error(page, ex)
-              failures << {page_path: page.path, message: ex.message.to_s}
-            end
-          rescue ex
-            error_mutex.synchronize do
-              failures << {page_path: page.path, message: ex.message.to_s}
-            end
-            # determine_template re-runs template resolution on the same
-            # inputs that just failed, so it may raise the same error; keep
-            # the diagnostic line from killing the worker.
-            template_name = begin
-              determine_template(page, templates, site)
-            rescue
-              "unknown"
-            end
-            Logger.debug "  Template: #{template_name}, Section: #{page.section}"
-            Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
-          ensure
-            results.send(ok)
-          end
-        end
+    # Each worker renders with its own Crinja env and template cache.
+    ParallelHelper.each_concurrently(pages, worker_count) do |page, worker_id|
+      page_start = profiler ? Time.instant : nil
+      render_page(page, site, templates, output_dir, minify, highlight, safe, verbose, global_vars,
+        crinja_env_override: worker_envs[worker_id], template_cache_override: worker_caches[worker_id], error_overlay: error_overlay, profiler: profiler)
+      if profiler && page_start
+        elapsed_ms = (Time.instant - page_start).total_milliseconds
+        template_name = determine_template(page, templates, site)
+        profiler.record_template(template_name, page.content.bytesize.to_i64, elapsed_ms)
       end
+      record_page_cache_entry(page, cache, templates, site, output_dir)
+    rescue ex : Hwaro::HwaroError
+      error_mutex.synchronize do
+        classified_error ||= ex
+        failures << {page_path: page.path, message: ex.message.to_s}
+      end
+    rescue ex : IO::Error
+      error_mutex.synchronize do
+        classified_error ||= output_write_error(page, ex)
+        failures << {page_path: page.path, message: ex.message.to_s}
+      end
+    rescue ex
+      error_mutex.synchronize do
+        failures << {page_path: page.path, message: ex.message.to_s}
+      end
+      # determine_template re-runs template resolution on the same
+      # inputs that just failed, so it may raise the same error; keep
+      # the diagnostic line from killing the worker.
+      template_name = begin
+        determine_template(page, templates, site)
+      rescue
+        "unknown"
+      end
+      Logger.debug "  Template: #{template_name}, Section: #{page.section}"
+      Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
     end
-
-    # Collect results
-    pages.size.times { results.receive }
 
     finalize_render_failures(failures, classified_error, verbose)
 

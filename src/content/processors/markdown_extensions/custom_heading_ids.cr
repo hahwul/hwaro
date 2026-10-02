@@ -58,8 +58,7 @@ module Hwaro
         #
         # The block is called for every line outside fenced code; fence
         # delimiters, fence content, and engine marker lines pass through
-        # verbatim. The second block argument is kept for call-site
-        # compatibility and is always false.
+        # verbatim.
         private def process_lines_fence_aware(content : String, &) : String
           String.build do |io|
             tracker = FenceTracker.new
@@ -67,35 +66,8 @@ module Hwaro
               if tracker.fence_line?(line) || line.starts_with?(ENGINE_MARKER_PREFIX)
                 io << line
               else
-                io << yield(line, false)
+                io << yield(line)
               end
-            end
-          end
-        end
-
-        # Walk lines and apply the heading-id transform only outside fenced
-        # code blocks, so `## ... {#id}` shown inside a ```` ``` ```` example
-        # in the docs renders verbatim.
-        #
-        # Under Markd's safe mode, inline HTML comments are replaced with the
-        # placeholder `<!-- raw HTML omitted -->`, which would both lose the id
-        # *and* leak that placeholder into the heading text. In that case we
-        # strip the `{#id}` syntax silently — custom heading IDs are not
-        # supported alongside `markdown.safe = true`.
-        def preprocess_heading_ids(content : String, *, safe : Bool = false) : String
-          return content unless content.includes?("{#")
-
-          process_lines_fence_aware(content) do |line, _in_fence|
-            if line.includes?("{#")
-              line.gsub(HEADING_ID_RE) do |_|
-                if safe
-                  "#{$1}#{$2} #{$3.rstrip}"
-                else
-                  "#{$1}#{$2} #{$3.rstrip} <!--HID:#{$4}-->"
-                end
-              end
-            else
-              line
             end
           end
         end

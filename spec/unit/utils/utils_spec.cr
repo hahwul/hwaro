@@ -252,7 +252,7 @@ describe Hwaro::Utils::SortUtils do
     end
   end
 
-  describe ".sort_by_date" do
+  describe ".sort_pages (date)" do
     it "sorts pages by date (newest first)" do
       pages = [
         create_test_page("Old", Time.utc(2024, 1, 1)),
@@ -260,7 +260,7 @@ describe Hwaro::Utils::SortUtils do
         create_test_page("Mid", Time.utc(2024, 3, 1)),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_date(pages)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "date")
       sorted.map(&.title).should eq(["New", "Mid", "Old"])
     end
 
@@ -270,12 +270,12 @@ describe Hwaro::Utils::SortUtils do
         create_test_page("New", Time.utc(2024, 6, 1)),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_date(pages, reverse: true)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "date", reverse: true)
       sorted.map(&.title).should eq(["Old", "New"])
     end
   end
 
-  describe ".sort_by_title" do
+  describe ".sort_pages (title)" do
     it "sorts pages alphabetically" do
       pages = [
         create_test_page("Cherry"),
@@ -283,7 +283,7 @@ describe Hwaro::Utils::SortUtils do
         create_test_page("Banana"),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_title(pages)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "title")
       sorted.map(&.title).should eq(["Apple", "Banana", "Cherry"])
     end
 
@@ -293,12 +293,12 @@ describe Hwaro::Utils::SortUtils do
         create_test_page("Cherry"),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_title(pages, reverse: true)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "title", reverse: true)
       sorted.map(&.title).should eq(["Cherry", "Apple"])
     end
   end
 
-  describe ".sort_by_weight" do
+  describe ".sort_pages (weight)" do
     it "sorts pages by weight (lower first)" do
       pages = [
         create_test_page("Heavy", nil, 10),
@@ -306,7 +306,7 @@ describe Hwaro::Utils::SortUtils do
         create_test_page("Medium", nil, 5),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_weight(pages)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "weight")
       sorted.map(&.title).should eq(["Light", "Medium", "Heavy"])
     end
 
@@ -316,7 +316,7 @@ describe Hwaro::Utils::SortUtils do
         create_test_page("Heavy", nil, 10),
       ]
 
-      sorted = Hwaro::Utils::SortUtils.sort_by_weight(pages, reverse: true)
+      sorted = Hwaro::Utils::SortUtils.sort_pages(pages, "weight", reverse: true)
       sorted.map(&.title).should eq(["Heavy", "Light"])
     end
   end

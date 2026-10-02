@@ -117,13 +117,6 @@ describe Hwaro::Services::LiveReloadHandler do
       handler.@current_error.should be_nil
     end
 
-    it "clears the error on notify_clear_error" do
-      handler = Hwaro::Services::LiveReloadHandler.new
-      handler.notify_build_error("boom")
-      handler.notify_clear_error
-      handler.@current_error.should be_nil
-    end
-
     it "overwrites the previous error so only the latest is replayed" do
       handler = Hwaro::Services::LiveReloadHandler.new
       handler.notify_build_error("first")

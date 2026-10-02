@@ -1,5 +1,9 @@
 require "../../../spec_helper"
 
+private def stats_for(mgr, name)
+  mgr.all_stats.find { |s| s[:name] == name }
+end
+
 describe Hwaro::Core::Build::CacheManager do
   # ===========================================================================
   # Registration
@@ -9,15 +13,14 @@ describe Hwaro::Core::Build::CacheManager do
       mgr = Hwaro::Core::Build::CacheManager.new
       cleared = false
       mgr.register("test", "Test cache", runtime: true) { cleared = true; nil }
-      mgr.size.should eq(1)
-      mgr.registered?("test").should be_true
+      mgr.all_stats.map(&.[:name]).should eq(["test"])
     end
 
     it "registers multiple layers" do
       mgr = Hwaro::Core::Build::CacheManager.new
       mgr.register("a", "Cache A", runtime: true) { nil }
       mgr.register("b", "Cache B", runtime: false) { nil }
-      mgr.size.should eq(2)
+      mgr.all_stats.size.should eq(2)
     end
   end
 
@@ -33,7 +36,7 @@ describe Hwaro::Core::Build::CacheManager do
       mgr.record_hit("test")
       mgr.record_miss("test")
 
-      stats = mgr.stats_for("test")
+      stats = stats_for(mgr, "test")
       stats.should_not be_nil
       stats = stats.not_nil!
       stats[:hits].should eq(2)
@@ -46,7 +49,7 @@ describe Hwaro::Core::Build::CacheManager do
       mgr = Hwaro::Core::Build::CacheManager.new
       mgr.record_hit("nonexistent")
       mgr.record_miss("nonexistent")
-      mgr.stats_for("nonexistent").should be_nil
+      stats_for(mgr, "nonexistent").should be_nil
     end
   end
 
@@ -80,43 +83,18 @@ describe Hwaro::Core::Build::CacheManager do
   # ===========================================================================
   # Clear Operations
   # ===========================================================================
-  describe "#clear_all" do
-    it "clears all layers" do
-      mgr = Hwaro::Core::Build::CacheManager.new
-      a_cleared = false
-      b_cleared = false
-      mgr.register("a", "Cache A", runtime: true) { a_cleared = true; nil }
-      mgr.register("b", "Cache B", runtime: false) { b_cleared = true; nil }
-
-      mgr.clear_all
-      a_cleared.should be_true
-      b_cleared.should be_true
-    end
-
+  describe "#clear stats" do
     it "resets stats on clear by default" do
       mgr = Hwaro::Core::Build::CacheManager.new
       mgr.register("test", "Test", runtime: true) { nil }
       mgr.record_hit("test")
       mgr.record_miss("test")
 
-      mgr.clear_all
+      mgr.clear("test")
 
-      stats = mgr.stats_for("test").not_nil!
+      stats = stats_for(mgr, "test").not_nil!
       stats[:hits].should eq(0)
       stats[:misses].should eq(0)
-    end
-
-    it "preserves stats when reset_stats: false" do
-      mgr = Hwaro::Core::Build::CacheManager.new
-      mgr.register("test", "Test", runtime: true) { nil }
-      mgr.record_hit("test")
-      mgr.record_miss("test")
-
-      mgr.clear_all(reset_stats: false)
-
-      stats = mgr.stats_for("test").not_nil!
-      stats[:hits].should eq(1)
-      stats[:misses].should eq(1)
     end
   end
 
@@ -140,7 +118,7 @@ describe Hwaro::Core::Build::CacheManager do
 
       mgr.clear_runtime(reset_stats: false)
 
-      mgr.stats_for("runtime").not_nil![:hits].should eq(1)
+      stats_for(mgr, "runtime").not_nil![:hits].should eq(1)
     end
   end
 
@@ -173,23 +151,7 @@ describe Hwaro::Core::Build::CacheManager do
 
       mgr.clear("a", reset_stats: false)
 
-      mgr.stats_for("a").not_nil![:hits].should eq(2)
-    end
-  end
-
-  # ===========================================================================
-  # Stats Reporting
-  # ===========================================================================
-  describe "#reset_stats" do
-    it "resets all stats without clearing caches" do
-      mgr = Hwaro::Core::Build::CacheManager.new
-      cleared = false
-      mgr.register("test", "Test", runtime: true) { cleared = true; nil }
-      mgr.record_hit("test")
-
-      mgr.reset_stats
-      cleared.should be_false # cache not cleared
-      mgr.stats_for("test").not_nil![:hits].should eq(0)
+      stats_for(mgr, "a").not_nil![:hits].should eq(2)
     end
   end
 
@@ -213,22 +175,6 @@ describe Hwaro::Core::Build::CacheManager do
       b_stats[:hits].should eq(0)
       b_stats[:misses].should eq(1)
       b_stats[:runtime].should be_false
-    end
-  end
-
-  describe "#stats_for" do
-    it "returns immutable snapshot" do
-      mgr = Hwaro::Core::Build::CacheManager.new
-      mgr.register("test", "Test", runtime: true) { nil }
-      mgr.record_hit("test")
-
-      snapshot = mgr.stats_for("test").not_nil!
-      snapshot[:hits].should eq(1)
-
-      # Further hits should not affect the already-returned snapshot
-      mgr.record_hit("test")
-      snapshot[:hits].should eq(1)                       # snapshot is frozen
-      mgr.stats_for("test").not_nil![:hits].should eq(2) # new snapshot reflects update
     end
   end
 

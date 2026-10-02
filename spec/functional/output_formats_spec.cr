@@ -153,14 +153,14 @@ describe "Output formats: cache staleness (--cache)" do
 
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/about/index.json").should be_true
         File.delete("public/about/index.json")
 
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/about/index.json").should be_true
       end
@@ -179,7 +179,7 @@ describe "Output formats: cache staleness (--cache)" do
 
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.read("public/about/index.json").should eq(%({"title": "About"}))
 
@@ -188,7 +188,7 @@ describe "Output formats: cache staleness (--cache)" do
 
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.read("public/about/index.json").should eq(%({"title": "About", "extra": true}))
       end

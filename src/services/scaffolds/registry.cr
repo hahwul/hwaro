@@ -32,23 +32,6 @@ module Hwaro
         def self.all : Array(Base)
           @@scaffolds.values
         end
-
-        # Check if a scaffold type is registered
-        def self.has?(type : Config::Options::ScaffoldType) : Bool
-          @@scaffolds.has_key?(type)
-        end
-
-        # List all available scaffold types with descriptions
-        def self.list : Array(Tuple(String, String))
-          @@scaffolds.map do |type, scaffold|
-            {type.to_s, scaffold.description}
-          end
-        end
-
-        # Get the default scaffold
-        def self.default : Base
-          get(Config::Options::ScaffoldType::Simple)
-        end
       end
 
       # Register built-in scaffolds

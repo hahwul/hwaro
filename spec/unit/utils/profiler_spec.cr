@@ -16,7 +16,6 @@ describe Hwaro::Profiler do
   describe "#start_phase and #end_phase" do
     it "records phase timing when enabled" do
       profiler = Hwaro::Profiler.new(enabled: true)
-      profiler.start
 
       profiler.start_phase("TestPhase")
       # Simulate some work
@@ -31,7 +30,6 @@ describe Hwaro::Profiler do
 
     it "does nothing when profiler is disabled" do
       profiler = Hwaro::Profiler.new(enabled: false)
-      profiler.start
 
       profiler.start_phase("TestPhase")
       sleep 10.milliseconds
@@ -47,7 +45,6 @@ describe Hwaro::Profiler do
   describe "#report" do
     it "outputs profile information when enabled and has phases" do
       profiler = Hwaro::Profiler.new(enabled: true)
-      profiler.start
 
       profiler.start_phase("Initialize")
       profiler.end_phase
@@ -152,20 +149,6 @@ describe Hwaro::Profiler do
       output = IO::Memory.new
       profiler.template_report(output)
       output.to_s.should eq("")
-    end
-  end
-
-  describe "#total_elapsed" do
-    it "returns 0 if not started" do
-      profiler = Hwaro::Profiler.new(enabled: true)
-      profiler.total_elapsed.should eq(0.0)
-    end
-
-    it "returns elapsed time after start" do
-      profiler = Hwaro::Profiler.new(enabled: true)
-      profiler.start
-      sleep 10.milliseconds
-      profiler.total_elapsed.should be > 0.0
     end
   end
 end

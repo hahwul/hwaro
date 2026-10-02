@@ -61,7 +61,7 @@ module Hwaro::Core::Build::Phases::Write
 
     final_html = apply_template(template, content, page, site, section_list, toc, templates, template_name: "404", global_vars: global_vars)
 
-    final_html = minify_html(final_html) if minify
+    final_html = Utils::HtmlMinifier.minify(final_html) if minify
 
     output_path = File.join(output_dir, "404.html")
     Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
@@ -126,23 +126,27 @@ module Hwaro::Core::Build::Phases::Write
         next
       end
 
-      # Get appropriate processor
-      processor = Content::Processors::Registry.for_file(raw_file.source_path).first?
+      ext = File.extname(raw_file.source_path).downcase
 
       Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
 
-      if processor && minify
+      # JSON and XML are minified; HTML is rewritten unchanged.
+      if minify && ext.in?(".json", ".xml", ".html", ".htm")
         content = File.read(raw_file.source_path)
-        context = Content::Processors::ProcessorContext.new(
-          file_path: raw_file.source_path,
-          output_path: output_path
-        )
-        result = processor.process(content, context)
-        if result.success
-          Hwaro::Utils::FileSafe.atomic_write(output_path, result.content)
-        else
-          Logger.warn "Failed to process #{raw_file.relative_path}: #{result.error}"
+        error = nil
+        begin
+          content = JSON.parse(content).to_json if ext == ".json"
+          content = Content::Processors::Xml.minify(content) if ext == ".xml"
+        rescue ex : JSON::ParseException
+          error = "JSON parsing failed: #{ex.message}"
+        rescue ex
+          error = "#{ext == ".json" ? "JSON" : "XML"} processing failed: #{ex.message}"
+        end
+        if error
+          Logger.warn "Failed to process #{raw_file.relative_path}: #{error}"
           Hwaro::Utils::FileSafe.atomic_copy(raw_file.source_path, output_path)
+        else
+          Hwaro::Utils::FileSafe.atomic_write(output_path, content)
         end
       else
         # Copy as-is (binary-safe) when not minifying or no processor exists.

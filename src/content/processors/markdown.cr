@@ -13,7 +13,7 @@ require "json"
 require "xml"
 require "html"
 require "digest/md5"
-require "./base"
+require "levenshtein"
 require "./table_parser"
 require "./syntax_highlighter"
 require "./markdown_extensions"
@@ -35,26 +35,7 @@ module Hwaro
   module Content
     module Processors
       # Markdown processor implementation
-      class Markdown < Base
-        def name : String
-          "markdown"
-        end
-
-        def extensions : Array(String)
-          [".md", ".markdown"]
-        end
-
-        def priority : Int32
-          100 # High priority as primary content processor
-        end
-
-        def process(content : String, context : ProcessorContext) : ProcessorResult
-          html, _toc = render(content)
-          ProcessorResult.new(content: html)
-        rescue ex
-          ProcessorResult.error("Markdown processing failed: #{ex.message}")
-        end
-
+      class Markdown
         # Renders Markdown to HTML and generates a Table of Contents
         # Returns {html_content, toc_headers}
         # @param highlight - whether to enable syntax highlighting for code blocks
@@ -86,9 +67,9 @@ module Hwaro
           end
 
           # Use SyntaxHighlighter for rendering with highlighting support.
-          # Tables were already converted above — skip the redundant re-scan.
+          # Tables were already converted above.
           smart = markdown_config.try(&.smart_punctuation) || false
-          html = SyntaxHighlighter.render(processed, highlight, safe, smart: smart, tables_preprocessed: true, hooks: hooks)
+          html = SyntaxHighlighter.render(processed, highlight, safe, smart: smart, hooks: hooks)
 
           # Post-process markdown extensions (footnotes section, mermaid)
           if md_cfg = markdown_config
@@ -113,21 +94,19 @@ module Hwaro
           {(html || ""), [] of Models::TocHeader}
         end
       end
-
-      # Register the markdown processor by default
-      Registry.register(Markdown.new)
     end
   end
 end
 
-# Backward compatibility module alias
+# Module-level Markdown entry points (shared processor + body render memo)
 module Hwaro
   module Processor
     module Markdown
       extend self
 
-      # Create shared instance for module-level access
+      # Module-level access to a shared (stateless) Markdown processor.
       @@instance = Content::Processors::Markdown.new
+      delegate render, render_with_anchors, parse, to: @@instance
 
       # The site's [markdown] config, published for template filters
       # (currently `markdownify`) that have no per-call config access.
@@ -135,18 +114,6 @@ module Hwaro
       # `SyntaxHighlighter.server_mode` — so `serve` config reloads
       # propagate; nil in library/spec contexts keeps the bare defaults.
       class_property filter_markdown_config : Models::MarkdownConfig? = nil
-
-      # Renders Markdown to HTML and generates a Table of Contents
-      # @param highlight - whether to enable syntax highlighting for code blocks
-      # @param safe - if true, raw HTML will not be passed through (replaced by comments)
-      # @param lazy_loading - if true, adds loading="lazy" to img tags
-      # @param emoji - if true, converts emoji shortcodes to emoji characters
-      # @param hooks - render-hook context; nil (the default) renders exactly
-      #   as before this parameter existed.
-      def render(content : String, highlight : Bool = true, safe : Bool = false, lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil,
-                 hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render(content, highlight, safe, lazy_loading, emoji, markdown_config, hooks: hooks)
-      end
 
       # Memoized body render for the Generate-phase fallbacks: on warm
       # --cache builds (and in streaming mode) feeds and search hit pages
@@ -202,17 +169,6 @@ module Hwaro
           end
         end
         html
-      end
-
-      # Returns parsed metadata and content
-      def parse(raw_content : String, file_path : String = "")
-        @@instance.parse(raw_content, file_path)
-      end
-
-      # Renders with anchor links injected into headings (delegates to shared instance)
-      def render_with_anchors(content : String, highlight : Bool = true, safe : Bool = false, anchor_style : String = "heading", lazy_loading : Bool = false, emoji : Bool = false, markdown_config : Models::MarkdownConfig? = nil,
-                              hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : Tuple(String, Array(Models::TocHeader))
-        @@instance.render_with_anchors(content, highlight, safe, anchor_style, lazy_loading, emoji, markdown_config, hooks: hooks)
       end
     end
   end

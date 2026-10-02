@@ -61,14 +61,6 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
         .should eq(outside)
     end
 
-    it "skips the anchor pass for a document with no closing anchor tag" do
-      # Cheap short-circuit, assertable without timing it.
-      Hwaro::Services::Importers::HtmlToMarkdown
-        .anchor_pass_applicable?(%(<a href="x">) * 100).should be_false
-      Hwaro::Services::Importers::HtmlToMarkdown
-        .anchor_pass_applicable?(%(<a href="x">t</A>)).should be_true
-    end
-
     it "converts a document full of unclosed anchors without quadratic blowup" do
       # Smoke half of the same regression, kept IN ADDITION to the deterministic
       # examples above (a timing assertion alone is a function of machine load).

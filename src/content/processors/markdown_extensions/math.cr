@@ -54,14 +54,6 @@ module Hwaro
         # collapse to the same characters, so output is byte-identical.
         MATH_BODY_MARKD_ACTIVE_RE = /[\\`*_\[\]\-."']/
 
-        # One-shot math transform (stash + immediate expand). `preprocess`
-        # itself uses the two phases separately so the combined pass runs in
-        # between — see the ordering comment there.
-        def preprocess_math(content : String) : String
-          stashed, store = stash_math(content)
-          expand_math(stashed, store)
-        end
-
         # Phase 1: replace `$$…$$` / `$…$` spans with opaque placeholders so
         # the passes running in between can't rewrite formula internals
         # (`$~~x~~$` must reach KaTeX verbatim, not as `$<del>x</del>$`).

@@ -30,7 +30,6 @@ describe Hwaro::Core::Build::Phases::Finalize do
 
           options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
           ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-          ctx.cache = cache
           # The page still exists, so the entry must survive the stale-output
           # prune that now runs before the save.
           page = Hwaro::Models::Page.new("dummy.md")
@@ -74,7 +73,6 @@ describe Hwaro::Core::Build::Phases::Finalize do
 
           options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
           ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-          ctx.cache = cache
           kept = Hwaro::Models::Page.new("kept.md")
           kept.url = "/kept/"
           ctx.pages = [kept]
@@ -112,7 +110,6 @@ describe Hwaro::Core::Build::Phases::Finalize do
 
           options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
           ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-          ctx.cache = cache
           page = Hwaro::Models::Page.new("post.md")
           page.url = "/new-slug/"
           ctx.pages = [page]
@@ -142,7 +139,6 @@ describe Hwaro::Core::Build::Phases::Finalize do
 
           options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
           ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-          ctx.cache = cache
           page = Hwaro::Models::Page.new("hidden.md")
           page.url = "/hidden/"
           page.render = false

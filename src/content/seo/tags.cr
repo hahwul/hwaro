@@ -27,9 +27,9 @@ module Hwaro
           # non-ASCII path (e.g. a Unicode taxonomy term) canonicalizes to
           # the exact same RFC 3986 URL those XML surfaces advertise.
           raw = if u = url_override
-                  "#{config.base_url_stripped}#{Utils::PathUtils.root_relative(u)}"
+                  "#{config.base_url}#{Utils::PathUtils.root_relative(u)}"
                 else
-                  page.permalink || "#{config.base_url_stripped}#{Utils::PathUtils.root_relative(page.url)}"
+                  page.permalink || "#{config.base_url}#{Utils::PathUtils.root_relative(page.url)}"
                 end
           Utils::TextUtils.encode_url_path(raw)
         end
@@ -45,7 +45,7 @@ module Hwaro
           return "" unless config.multilingual?
           return "" if page.translations.empty?
 
-          base = config.base_url_stripped
+          base = config.base_url
 
           String.build(page.translations.size * 80) do |str|
             # Add current page. URLs are percent-encoded to match the

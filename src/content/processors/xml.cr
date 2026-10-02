@@ -1,42 +1,11 @@
-# XML processor for minification
-#
-# This processor handles XML files, minifying them
-# by removing unnecessary whitespace while preserving content.
-
-require "./base"
+# XML minifier for raw `.xml` files published from content/ (see
+# Phases::Write#process_raw_files).
 
 module Hwaro
   module Content
     module Processors
-      # XML processor implementation
-      class Xml < Base
-        property minify : Bool
-
-        def initialize(@minify : Bool = true)
-        end
-
-        def name : String
-          "xml"
-        end
-
-        def extensions : Array(String)
-          [".xml"]
-        end
-
-        def priority : Int32
-          40 # Lower priority than HTML
-        end
-
-        def process(content : String, context : ProcessorContext) : ProcessorResult
-          result = if @minify
-                     minify_xml(content)
-                   else
-                     content
-                   end
-          ProcessorResult.new(content: result)
-        rescue ex
-          ProcessorResult.error("XML processing failed: #{ex.message}")
-        end
+      module Xml
+        extend self
 
         # CDATA sections and comments extracted as opaque placeholders
         # before minification. `\x00` is illegal in XML, so the token
@@ -57,7 +26,7 @@ module Hwaro
         # that whitespace is a word separator — removing it rendered
         # "bolditalic" — and under `xml:space="preserve"` it is content by
         # declaration, so both keep it verbatim.
-        private def minify_xml(xml : String) : String
+        def minify(xml : String) : String
           # CDATA sections and comments are raw character data — the
           # cross-line collapse below must never reach inside them (a
           # CDATA body containing `</a>\n<em>` is content, not markup).
@@ -198,9 +167,6 @@ module Hwaro
           !stripped.strip.empty?
         end
       end
-
-      # Register the XML processor
-      Registry.register(Xml.new)
     end
   end
 end

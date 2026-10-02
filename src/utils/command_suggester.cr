@@ -8,6 +8,8 @@
 # Keep the implementation tiny — the candidate list is always small
 # (a few dozen entries at most).
 
+require "levenshtein"
+
 module Hwaro
   module Utils
     module CommandSuggester
@@ -22,7 +24,7 @@ module Hwaro
         best_distance = Int32::MAX
 
         candidates.each do |candidate|
-          distance = levenshtein(input, candidate)
+          distance = Levenshtein.distance(input, candidate)
           if distance < best_distance
             best_distance = distance
             best = candidate
@@ -39,34 +41,6 @@ module Hwaro
               best_distance <= (input.size // 2 + 1)
           best
         end
-      end
-
-      # Simple iterative Levenshtein distance over UTF-8 chars.
-      def levenshtein(a : String, b : String) : Int32
-        return b.size if a.empty?
-        return a.size if b.empty?
-
-        a_chars = a.chars
-        b_chars = b.chars
-        m = a_chars.size
-        n = b_chars.size
-
-        prev = Array(Int32).new(n + 1) { |j| j }
-        curr = Array(Int32).new(n + 1, 0)
-
-        m.times do |i|
-          curr[0] = i + 1
-          n.times do |j|
-            cost = a_chars[i] == b_chars[j] ? 0 : 1
-            curr[j + 1] = Math.min(
-              Math.min(curr[j] + 1, prev[j + 1] + 1),
-              prev[j] + cost
-            )
-          end
-          prev, curr = curr, prev
-        end
-
-        prev[n]
       end
 
       private def shared_prefix_length(a : String, b : String) : Int32

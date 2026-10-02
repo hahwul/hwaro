@@ -334,11 +334,6 @@ module Hwaro
             !n.nil? && (n.ascii_letter? || n == '_' || n == '-' || n.ord > 0x7F)
           end
 
-          private def ident_char?(c : Char?) : Bool
-            return false unless c
-            c.ascii_alphanumeric? || c == '_' || c == '-' || c.ord > 0x7F
-          end
-
           private def lex_number : Nil
             start = @char_i
             while (c = peek) && c.ascii_number?
@@ -437,7 +432,7 @@ module Hwaro
           private def lex_ident : Nil
             start = @char_i
             advance
-            while ident_char?(peek)
+            while Scanner.ident_char?(peek)
               advance
             end
             name = text[start...@char_i]
@@ -462,7 +457,7 @@ module Hwaro
             # `ns.name` qualified identifier (function calls).
             if peek == '.' && (n = peek(1)) && (n.ascii_letter? || n == '_' || n.ord > 0x7F)
               advance # '.'
-              while ident_char?(peek)
+              while Scanner.ident_char?(peek)
                 advance
               end
               push(Tok.new(TokKind::QualIdent, text[start...@char_i], @space))
@@ -676,7 +671,7 @@ module Hwaro
               c = peek(offset + i)
               return false unless c && c.downcase == wc
             end
-            !ident_char?(peek(offset + word.size))
+            !Scanner.ident_char?(peek(offset + word.size))
           end
 
           private def prev_operand? : Bool

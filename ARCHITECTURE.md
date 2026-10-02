@@ -18,7 +18,7 @@ src/
   models/                 Page, Section, Site, Toc, Deployment, GitInfo, Config
     config/               one file per config.toml section family (class + loader)
   content/
-    processors/           Markdown/HTML/JSON/XML processors, template engine, syntax highlighting
+    processors/           Markdown processor, XML minifier, template engine, syntax highlighting
       markdown/           Markdown processor parts (front matter, taxonomy fields, html post)
       markdown_extensions/ one file per pre/post-processing pass (footnotes, math, …)
       filters/            Crinja filter modules (glob-required by template.cr)
@@ -38,7 +38,7 @@ src/
     server/               dev server: handlers, ChangeSet, watcher, rebuild dispatch, live reload
     scaffolds/            `hwaro init` scaffolds (Base + simple/bare/blog/docs/book + remote)
     importers/ exporters/ WordPress/Jekyll/Hugo/Notion/Obsidian/Hexo/Astro/Eleventy; Jekyll/Hugo
-    defaults/             sample config/content/templates/AGENTS.md for init
+    defaults/             AGENTS.md template for init
     content_lister / content_stats / content_validator, creator (`hwaro new`), frontmatter_converter, …
   assets/                 asset pipeline (bundling/fingerprinting) and the Sass compiler
     sass/                 scanner → parser → AST → evaluator (+ functions, color, extend, importer)
@@ -133,7 +133,6 @@ fails a test.
 
 | Registry | Where | Populated by |
 |---|---|---|
-| Content processors | `content/processors/base.cr` `Registry` | `Registry.register(X.new)` after each processor class (in the owner file) |
 | Lifecycle hooks | `content/hooks.cr` `Hooks.all` | literal array (run order is by hook priority; the array is the tie-break) |
 | CLI commands | `cli/runner.cr` `register_default_commands` | one `CommandRegistry.register` per command |
 | Tool subcommands | `cli/commands/tool_command.cr` | `register_sub` calls; `tool --help` groups them by `CATEGORIES` (`HIDDEN` hides deprecated ones) |
@@ -176,8 +175,9 @@ Also, every PR: bilingual docs (`.md` + `.ko.md`) when user-facing.
 - `serve` output carries a dev marker; `build`/`deploy` refuse to consume it.
 - `Utils::FileSafe.mkdir_p`, never `FileUtils.mkdir_p`, on the build paths
   (check-then-create races under parallel rendering).
-- Tartrazine (syntax highlighting) is not thread-safe: all calls go through
-  `ServerHighlighter`'s mutex.
+- Tartrazine (syntax highlighting) is only thread-safe through the patches in
+  `src/ext/tartrazine_mt_fix.cr`; all calls go through `ServerHighlighter`,
+  which bounds concurrent tokenization (`TOKENIZE_SLOTS`).
 - Shared state mutated from render fibers needs a `Mutex`
   (`@crinja_cache_mutex`, `@page_template_hash_mutex`, …).
 - Escaping: `TextUtils.escape_xml` / `HTML.escape` for markup, `</` → `<\/`

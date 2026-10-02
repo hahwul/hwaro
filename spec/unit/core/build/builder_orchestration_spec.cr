@@ -1,4 +1,5 @@
 require "../../../spec_helper"
+require "../../../support/build_helper"
 require "../../../../src/core/build/builder"
 
 # Reopen Builder to expose private orchestration helpers for testing.
@@ -53,7 +54,7 @@ private class CountingHook
   property counter : Int32 = 0
 
   def register_hooks(manager : Hwaro::Core::Lifecycle::Manager)
-    manager.before(Hwaro::Core::Lifecycle::Phase::Initialize, name: "counting") do |_ctx|
+    manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, name: "counting") do |_ctx|
       @counter += 1
       Hwaro::Core::Lifecycle::HookResult::Continue
     end
@@ -64,7 +65,7 @@ describe Hwaro::Core::Build::Builder do
   describe "#initialize" do
     it "creates an instance with a fresh lifecycle and cache_manager" do
       builder = Hwaro::Core::Build::Builder.new
-      builder.lifecycle.should be_a(Hwaro::Core::Lifecycle::Manager)
+      builder.test_lifecycle.should be_a(Hwaro::Core::Lifecycle::Manager)
       builder.cache_manager.should be_a(Hwaro::Core::Build::CacheManager)
     end
   end
@@ -86,7 +87,7 @@ describe Hwaro::Core::Build::Builder do
 
       # Trigger the lifecycle directly — focused on hook firing rather than
       # running the full build pipeline.
-      builder.lifecycle.trigger(
+      builder.test_lifecycle.trigger(
         Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, ctx
       )
 

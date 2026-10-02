@@ -68,12 +68,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
   end
 
-  describe ".available?" do
-    it "always returns true (bundled font fallback)" do
-      Hwaro::Content::Seo::OgPngRenderer.available?.should be_true
-    end
-  end
-
   describe ".load_fonts" do
     it "returns FontContext without arguments (bundled fallback)" do
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
@@ -145,8 +139,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
 
   describe ".render_png" do
     it "renders a PNG file when fonts are available" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         page = Hwaro::Models::Page.new("test.md")
         page.title = "Hello PNG World"
@@ -172,8 +164,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders with custom colors" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         page = Hwaro::Models::Page.new("test.md")
         page.title = "Colored"
@@ -191,8 +181,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders with dots style" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         page = Hwaro::Models::Page.new("test.md")
         page.title = "Dots Style"
@@ -207,8 +195,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders with minimal style (no accent bars)" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         page = Hwaro::Models::Page.new("test.md")
         page.title = "Minimal"
@@ -223,8 +209,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders geometric styles (split / band / brutalist)" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
       Dir.mktmpdir do |dir|
         %w[split band brutalist].each do |style|
@@ -245,8 +229,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders signature styles (terminal / bauhaus / halftone)" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
       Dir.mktmpdir do |dir|
         %w[terminal bauhaus halftone].each do |style|
@@ -267,8 +249,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders modern styles with generated backgrounds (gradient / glow / frame)" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
       Dir.mktmpdir do |dir|
         %w[editorial framed artistic hero surreal monument].each do |style|
@@ -289,8 +269,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders with an explicit secondary_color" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         page = Hwaro::Models::Page.new("test.md")
         page.title = "Two Tone"
@@ -308,8 +286,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders without site name when show_title is false" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         page = Hwaro::Models::Page.new("test.md")
         page.title = "No Title"
@@ -324,8 +300,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders with a logo image" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         # Create a small valid PNG (1x1 red pixel)
         logo_path = File.join(dir, "logo.png")
@@ -348,8 +322,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders with background image and overlay" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         # Create a small valid PNG for background
         bg_path = File.join(dir, "bg.png")
@@ -378,8 +350,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     # out-of-range opacities to pin that no OverflowError aborts the build.
     {1.8, -0.5}.each do |opacity|
       it "renders dots style with out-of-range pattern_opacity #{opacity} without OverflowError" do
-        next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
         Dir.mktmpdir do |dir|
           page = Hwaro::Models::Page.new("test.md")
           page.title = "Dots Opacity"
@@ -397,8 +367,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       end
 
       it "renders gradient style with out-of-range pattern_opacity #{opacity} without OverflowError" do
-        next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
         Dir.mktmpdir do |dir|
           page = Hwaro::Models::Page.new("test.md")
           page.title = "Gradient Opacity"
@@ -417,8 +385,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     end
 
     it "renders a background overlay with out-of-range overlay_opacity without OverflowError" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         bg_path = File.join(dir, "bg.png")
         pixel = Pointer(UInt8).malloc(4)
@@ -445,7 +411,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     # stbi_write_png. Writing into a read-only directory makes the write fail;
     # render_png must return false (not raise) and leave no file behind.
     it "returns false without raising when the png cannot be written" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
       next if LibC.getuid == 0 # root bypasses chmod-based unwritability
 
       Dir.mktmpdir do |dir|
@@ -476,8 +441,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       label = blank.empty? ? "empty" : "whitespace-only"
 
       it "renders terminal style with an #{label} title without raising" do
-        next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
         Dir.mktmpdir do |dir|
           page = Hwaro::Models::Page.new("test.md")
           page.title = blank
@@ -492,8 +455,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       end
 
       it "renders hero style with an #{label} title without raising" do
-        next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
         Dir.mktmpdir do |dir|
           page = Hwaro::Models::Page.new("test.md")
           page.title = blank
@@ -518,8 +479,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     # write cursor off the front of the buffer — silent heap corruption at a few
     # thousand characters, SIGSEGV in `fill_rect` at a few hundred thousand.
     it "survives a site title far wider than the canvas in every style" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
       Dir.mktmpdir do |dir|
         %w[monument framed default terminal minimal editorial band split].each do |style|
@@ -543,8 +502,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     # sequence's NOMINAL length, stepping the cursor past the string's NUL
     # terminator and reading heap memory until it happened to hit a zero byte.
     it "renders a title whose bytes end mid UTF-8 sequence" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
       truncated = String.new(Bytes[0x41_u8, 0x42_u8, 0xF0_u8])
       Dir.mktmpdir do |dir|
@@ -580,8 +537,6 @@ describe Hwaro::Content::Seo::OgPngRenderer do
 
   describe "integration with OgImage.generate" do
     it "generates PNG files directly when format is png" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
         config.title = "My Site"

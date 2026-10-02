@@ -420,7 +420,7 @@ module Hwaro
           when Time
             raw
           when String
-            parse_date(raw) unless raw.empty?
+            Utils::DateUtils.parse_import(raw) unless raw.empty?
           end
         end
 

@@ -1,5 +1,4 @@
 require "../../spec_helper"
-require "../../../src/services/defaults/config"
 
 # Helper to load a Config from a TOML string via a temp file.
 describe Hwaro::Models::Config do
@@ -152,7 +151,6 @@ describe Hwaro::Models::Config do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com/"
       config.base_url.should eq("https://example.com")
-      config.base_url_stripped.should eq("https://example.com")
     end
 
     it "strips a trailing slash from a subpath base_url" do
@@ -927,7 +925,6 @@ describe Hwaro::Models::Config do
       config = Hwaro::Models::Config.new
       config.content_new.front_matter_format.should eq("toml")
       config.content_new.default_fields.should eq(["description"])
-      config.content_new.toml?.should be_true
     end
 
     it "loads front_matter_format and default_fields from [content.new]" do
@@ -939,7 +936,6 @@ describe Hwaro::Models::Config do
 
       config.content_new.front_matter_format.should eq("yaml")
       config.content_new.default_fields.should eq(["description", "summary"])
-      config.content_new.toml?.should be_false
     end
 
     it "accepts flat keys on [content] as a shorthand" do
@@ -960,7 +956,6 @@ describe Hwaro::Models::Config do
 
       config.content_new.front_matter_format.should eq("json")
       config.content_new.json?.should be_true
-      config.content_new.toml?.should be_false
     end
 
     it "keeps the default format when the configured value is unknown" do
@@ -3332,16 +3327,20 @@ describe "Hwaro::Models::Config" do
       end
     end
 
-    # Drift guard: the scaffolded default configs must load without any
+    # Drift guard: every scaffold's generated config must load without any
     # unknown-key warning — they exercise the full documented key surface.
-    it "does not warn on the generated default configs" do
-      {
-        Hwaro::Services::Defaults::ConfigSamples.config,
-        Hwaro::Services::Defaults::ConfigSamples.config_without_taxonomies,
-        Hwaro::Services::Defaults::ConfigSamples.config_multilingual(["en", "ko"]),
-      }.each do |toml|
-        log = with_captured_log { load_config(toml) }
-        log.should_not contain("Unknown key")
+    it "does not warn on the scaffolded configs" do
+      Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+        {
+          scaffold.config_content,
+          scaffold.config_content(skip_taxonomies: true),
+          scaffold.config_content(multilingual_languages: ["en", "ko"]),
+          scaffold.minimal_config_content,
+          scaffold.minimal_config_content(skip_taxonomies: true, multilingual_languages: ["en", "ko"]),
+        }.each do |toml|
+          log = with_captured_log { load_config(toml) }
+          log.should_not contain("Unknown key")
+        end
       end
     end
   end

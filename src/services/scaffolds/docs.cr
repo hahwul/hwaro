@@ -896,40 +896,7 @@ module Hwaro
               display: flex;
             }
 
-            .search-modal {
-              width: 560px;
-              max-width: 90vw;
-              max-height: 70vh;
-              background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
-              backdrop-filter: saturate(180%) blur(24px);
-              -webkit-backdrop-filter: saturate(180%) blur(24px);
-              border: 1px solid var(--border-subtle);
-              border-radius: var(--radius);
-              box-shadow: var(--shadow-lg);
-              display: flex;
-              flex-direction: column;
-              overflow: hidden;
-              align-self: flex-start;
-            }
-            @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .search-modal { background: var(--bg-raised); } }
-
-            /* The palette settles into place when it opens. */
-            @media (prefers-reduced-motion: no-preference) {
-              .search-overlay.active { transition: opacity 0.15s var(--ease-out); }
-              .search-overlay.active .search-modal { transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
-              @starting-style {
-                .search-overlay.active { opacity: 0; }
-                .search-overlay.active .search-modal { opacity: 0; transform: translateY(-8px) scale(0.985); }
-              }
-            }
-
-            .search-input-wrap {
-              display: flex;
-              align-items: center;
-              gap: 0.6rem;
-              padding: 0.75rem 1rem;
-              border-bottom: 1px solid var(--border-subtle);
-            }
+            #{search_modal_css}
 
             .search-input-wrap svg {
               flex-shrink: 0;
@@ -1018,26 +985,7 @@ module Hwaro
               font-size: 0.9rem;
             }
 
-            .search-hint {
-              padding: 0.5rem 0.75rem;
-              display: flex;
-              gap: 1rem;
-              justify-content: center;
-              border-top: 1px solid var(--border-subtle);
-              color: var(--text-muted);
-              font-size: 0.7rem;
-            }
-
-            .search-hint kbd {
-              font-size: 0.65rem;
-              padding: 0 0.3rem;
-              border: 1px solid var(--border);
-              border-radius: 3px;
-              background: var(--bg-raised);
-              box-shadow: 0 1px 0 var(--border);
-              font-family: inherit;
-              line-height: 1.4;
-            }
+            #{search_hint_css}
 
             /* Search trigger press feedback */
             .search-trigger:active {

@@ -4,9 +4,7 @@ require "../../../../src/content/processors/template"
 
 # =============================================================================
 # Unit specs for ImageHooks. Covers:
-# - Class-level resize_map / lqip_map snapshot semantics
-# - find_resized exact / miss
-# - find_closest exact / round-up / fallback-to-largest / unknown URL
+# - find_closest_variant exact / round-up / fallback-to-largest / unknown URL
 # - find_lqip dup semantics (mutation isolation)
 # - register_hooks wiring (point, name, priority)
 # - process_images skip paths via the BeforeRender hook (no fixtures
@@ -38,76 +36,14 @@ private def with_image_hook_state(&)
 end
 
 describe Hwaro::Content::Hooks::ImageHooks do
-  describe ".resize_map" do
-    it "returns a duplicated snapshot (caller mutations don't leak back)" do
-      with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {"/img.png" => {320 => "/img-320.png"}}
-        )
-        snapshot = Hwaro::Content::Hooks::ImageHooks.resize_map
-        snapshot["/intruder.png"] = {1 => "/intruder-1.png"}
-
-        # Class state must be unchanged
-        Hwaro::Content::Hooks::ImageHooks.resize_map
-          .has_key?("/intruder.png").should be_false
-      end
-    end
-  end
-
-  describe ".set_resize_map" do
-    it "replaces the entire resize map" do
-      with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {"/a.png" => {1 => "/a-1.png"}}
-        )
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {"/b.png" => {2 => "/b-2.png"}}
-        )
-        Hwaro::Content::Hooks::ImageHooks.resize_map.keys.should eq(["/b.png"])
-      end
-    end
-  end
-
-  describe ".find_resized" do
-    it "returns the resized URL when both URL and width are present" do
-      with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {"/cat.png" => {320 => "/cat-320.png", 640 => "/cat-640.png"}}
-        )
-        Hwaro::Content::Hooks::ImageHooks.find_resized("/cat.png", 320)
-          .should eq("/cat-320.png")
-      end
-    end
-
-    it "returns nil when the URL is unknown" do
-      with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {} of String => Hash(Int32, String)
-        )
-        Hwaro::Content::Hooks::ImageHooks.find_resized("/missing.png", 320)
-          .should be_nil
-      end
-    end
-
-    it "returns nil when the URL is known but the requested width is not" do
-      with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_resize_map(
-          {"/cat.png" => {320 => "/cat-320.png"}}
-        )
-        Hwaro::Content::Hooks::ImageHooks.find_resized("/cat.png", 999)
-          .should be_nil
-      end
-    end
-  end
-
-  describe ".find_closest" do
+  describe ".find_closest_variant URL choice" do
     it "returns the exact width when it exists" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map(
           {"/p.png" => {320 => "/p-320.png", 640 => "/p-640.png", 1280 => "/p-1280.png"}}
         )
-        Hwaro::Content::Hooks::ImageHooks.find_closest("/p.png", 640)
-          .should eq("/p-640.png")
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/p.png", 640)
+          .try(&.[1]).should eq("/p-640.png")
       end
     end
 
@@ -117,8 +53,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
           {"/p.png" => {320 => "/p-320.png", 640 => "/p-640.png", 1280 => "/p-1280.png"}}
         )
         # 500 → next available is 640
-        Hwaro::Content::Hooks::ImageHooks.find_closest("/p.png", 500)
-          .should eq("/p-640.png")
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/p.png", 500)
+          .try(&.[1]).should eq("/p-640.png")
       end
     end
 
@@ -128,8 +64,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
           {"/p.png" => {320 => "/p-320.png", 640 => "/p-640.png"}}
         )
         # 9999 has nothing larger → largest available (640)
-        Hwaro::Content::Hooks::ImageHooks.find_closest("/p.png", 9999)
-          .should eq("/p-640.png")
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/p.png", 9999)
+          .try(&.[1]).should eq("/p-640.png")
       end
     end
 
@@ -138,7 +74,7 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map(
           {} of String => Hash(Int32, String)
         )
-        Hwaro::Content::Hooks::ImageHooks.find_closest("/missing.png", 320)
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/missing.png", 320)
           .should be_nil
       end
     end
@@ -148,7 +84,7 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map(
           {"/empty.png" => {} of Int32 => String}
         )
-        Hwaro::Content::Hooks::ImageHooks.find_closest("/empty.png", 320)
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/empty.png", 320)
           .should be_nil
       end
     end
@@ -187,14 +123,9 @@ describe Hwaro::Content::Hooks::ImageHooks do
       with_image_hook_state do
         # A 10px-wide source: no variant is upscaled, so 640 resolves to 10.
         Hwaro::Content::Hooks::ImageHooks.set_resize_map({"/img/tiny.png" => {10 => "/img/tiny_10w.png"}})
-        page = Hwaro::Models::Page.new("test.md")
-        config = Hwaro::Models::Config.new
-        config.base_url = "https://example.com"
-        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-        out = Hwaro::Content::Processors::Template.process(
+        out = render_crinja(
           %({{ resize_image(path="/img/tiny.png", width=640).width }}|{{ resize_image(path="/img/tiny.png", width=640).url }}),
-          context
+          {"base_url" => "https://example.com"}
         ).strip
         out.should eq("10|https://example.com/img/tiny_10w.png")
       end
@@ -203,19 +134,14 @@ describe Hwaro::Content::Hooks::ImageHooks do
     it "falls back to the requested width when no variant exists" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map({} of String => Hash(Int32, String))
-        page = Hwaro::Models::Page.new("test.md")
-        config = Hwaro::Models::Config.new
-        config.base_url = "https://example.com"
-        context = Hwaro::Content::Processors::TemplateContext.new(page, config)
-
-        Hwaro::Content::Processors::Template.process(
-          %({{ resize_image(path="/img/a.png", width=800).width }}), context
+        render_crinja(
+          %({{ resize_image(path="/img/a.png", width=800).width }}), {"base_url" => "https://example.com"}
         ).strip.should eq("800")
       end
     end
   end
 
-  describe ".lqip_map / .find_lqip" do
+  describe ".find_lqip" do
     it "returns nil for an unknown URL" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_lqip_map(
@@ -247,19 +173,6 @@ describe Hwaro::Content::Hooks::ImageHooks do
 
         Hwaro::Content::Hooks::ImageHooks.find_lqip("/p.png").not_nil!["lqip"]
           .should eq("x")
-      end
-    end
-
-    it ".lqip_map returns a duplicated snapshot" do
-      with_image_hook_state do
-        Hwaro::Content::Hooks::ImageHooks.set_lqip_map(
-          {"/p.png" => {"lqip" => "x", "dominant_color" => "#000"}}
-        )
-        snapshot = Hwaro::Content::Hooks::ImageHooks.lqip_map
-        snapshot["/intruder.png"] = {"lqip" => "y", "dominant_color" => "#fff"}
-
-        Hwaro::Content::Hooks::ImageHooks.lqip_map.has_key?("/intruder.png")
-          .should be_false
       end
     end
   end

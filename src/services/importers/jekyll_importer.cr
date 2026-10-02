@@ -239,7 +239,7 @@ module Hwaro
           # Use slug from filename, or slugify the title
           if slug.empty?
             if title = fields["title"]?.as?(String)
-              slug = slugify(title)
+              slug = Utils::TextUtils.slugify(title)
             else
               slug = "untitled"
             end
@@ -276,13 +276,13 @@ module Hwaro
           else
             # Strip extension and use as slug
             name = File.basename(filename, File.extname(filename))
-            slugify(name)
+            Utils::TextUtils.slugify(name)
           end
         end
 
         private def extract_date_from_filename(filename : String) : Time?
           if match = FILENAME_PATTERN.match(filename)
-            parse_date(match[1])
+            Utils::DateUtils.parse_import(match[1])
           end
         end
       end

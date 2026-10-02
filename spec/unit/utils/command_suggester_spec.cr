@@ -6,26 +6,6 @@ require "../../spec_helper"
 # =============================================================================
 
 describe Hwaro::Utils::CommandSuggester do
-  describe ".levenshtein" do
-    it "returns 0 for identical strings" do
-      Hwaro::Utils::CommandSuggester.levenshtein("build", "build").should eq(0)
-    end
-
-    it "returns edit distance for a single transposition-like typo" do
-      # "buidl" → "build" is 2 single-char edits (adjacent transposition).
-      Hwaro::Utils::CommandSuggester.levenshtein("buidl", "build").should eq(2)
-    end
-
-    it "returns the length when one string is empty" do
-      Hwaro::Utils::CommandSuggester.levenshtein("", "build").should eq(5)
-      Hwaro::Utils::CommandSuggester.levenshtein("build", "").should eq(5)
-    end
-
-    it "counts pure insertions" do
-      Hwaro::Utils::CommandSuggester.levenshtein("buid", "build").should eq(1)
-    end
-  end
-
   describe ".suggest" do
     it "returns the closest candidate within distance 2" do
       Hwaro::Utils::CommandSuggester.suggest(

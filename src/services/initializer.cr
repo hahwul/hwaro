@@ -74,23 +74,6 @@ module Hwaro
         )
       end
 
-      def run(
-        target_path : String,
-        force : Bool = false,
-        skip_agents_md : Bool = false,
-        skip_sample_content : Bool = false,
-        skip_taxonomies : Bool = false,
-        multilingual_languages : Array(String) = [] of String,
-        scaffold_type : Config::Options::ScaffoldType = Config::Options::ScaffoldType::Simple,
-        agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
-        minimal_config : Bool = false,
-        full_config : Bool = false,
-        clean : Bool = false,
-      )
-        scaffold = Scaffolds::Registry.get(scaffold_type)
-        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold, agents_mode, minimal_config, full_config, clean)
-      end
-
       private def run_with_scaffold(
         target_path : String,
         force : Bool,
@@ -204,15 +187,13 @@ module Hwaro
             # Remote scaffold had no config.toml (allowed for content/templates-only remotes).
             # Fall back to normal generation logic so we don't write an empty config.toml.
             Logger.warn "Remote scaffold did not include a config.toml; generating a default one."
-            if minimal_config
-              config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
-            elsif full_config
-              # For --full-config without upstream config, use the balanced discoverable default
-              # (we can't easily reconstruct a "full" from a non-remote scaffold here).
-              config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
-            else
-              config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
-            end
+            # --full-config without an upstream config also gets the balanced
+            # default (a "full" config can't be reconstructed for a remote).
+            config_content = if minimal_config
+                               scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
+                             else
+                               build_balanced_default_config(scaffold, skip_taxonomies, multilingual_languages)
+                             end
           else
             # Use the remote's config as-is (respecting its custom settings), ignore --min/--full.
             config_content = remote_config
@@ -222,7 +203,7 @@ module Hwaro
         elsif full_config
           config_content = scaffold.config_content(skip_taxonomies, multilingual_languages)
         else
-          config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
+          config_content = build_balanced_default_config(scaffold, skip_taxonomies, multilingual_languages)
         end
 
         # Wizard-collected site title: substitute the first `title = "…"` line
@@ -628,7 +609,6 @@ module Hwaro
       private def build_balanced_default_config(
         scaffold : Scaffolds::Base,
         skip_taxonomies : Bool,
-        is_multilingual : Bool,
         multilingual_languages : Array(String),
       ) : String
         # Start with the clean minimal content (which now includes multilingual

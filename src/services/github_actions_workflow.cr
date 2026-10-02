@@ -6,47 +6,46 @@ module Hwaro
     # `.github/workflows/deploy.yml`.
     module GithubActionsWorkflow
       def self.content : String
-        lines = [] of String
-        lines << "---"
-        lines << "name: Hwaro CI/CD"
-        lines << ""
-        lines << "on:"
-        lines << "  push:"
-        lines << "    branches: [main]"
-        lines << "  pull_request:"
-        lines << "    branches: [main]"
-        lines << "  workflow_dispatch:"
-        lines << ""
-        lines << "permissions:"
-        lines << "  contents: write"
-        lines << ""
-        lines << "jobs:"
-        lines << "  build:"
-        lines << "    runs-on: ubuntu-latest"
-        lines << "    if: github.event_name == 'pull_request'"
-        lines << "    steps:"
-        lines << "      - name: Checkout"
-        lines << "        uses: actions/checkout@v6"
-        lines << ""
-        lines << "      - name: Build Only"
-        lines << "        uses: hahwul/hwaro@main"
-        lines << "        with:"
-        lines << "          build_only: true"
-        lines << ""
-        lines << "  deploy:"
-        lines << "    runs-on: ubuntu-latest"
-        lines << "    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'"
-        lines << "    steps:"
-        lines << "      - name: Checkout"
-        lines << "        uses: actions/checkout@v6"
-        lines << ""
-        lines << "      - name: Build and Deploy"
-        lines << "        uses: hahwul/hwaro@main"
-        lines << "        with:"
-        lines << "          token: ${{ secrets.GITHUB_TOKEN }}"
-        lines << ""
+        <<-YAML
+          ---
+          name: Hwaro CI/CD
 
-        lines.join("\n")
+          on:
+            push:
+              branches: [main]
+            pull_request:
+              branches: [main]
+            workflow_dispatch:
+
+          permissions:
+            contents: write
+
+          jobs:
+            build:
+              runs-on: ubuntu-latest
+              if: github.event_name == 'pull_request'
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v6
+
+                - name: Build Only
+                  uses: hahwul/hwaro@main
+                  with:
+                    build_only: true
+
+            deploy:
+              runs-on: ubuntu-latest
+              if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v6
+
+                - name: Build and Deploy
+                  uses: hahwul/hwaro@main
+                  with:
+                    token: ${{ secrets.GITHUB_TOKEN }}
+
+          YAML
       end
     end
   end

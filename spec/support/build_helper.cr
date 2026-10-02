@@ -62,7 +62,7 @@ def build_site(
         builder.register(hookable)
       end
 
-      builder.run(
+      builder.run(Hwaro::Config::Options::BuildOptions.new(
         output_dir: output_dir,
         drafts: drafts,
         minify: minify,
@@ -72,10 +72,18 @@ def build_site(
         verbose: false,
         profile: false,
         stream: stream,
-      )
+      ))
 
       yield dir
     end
+  end
+end
+
+# Spec-only access to the builder's lifecycle so examples can register
+# ad-hoc hooks without a Hookable.
+class Hwaro::Core::Build::Builder
+  def test_lifecycle : Hwaro::Core::Lifecycle::Manager
+    @lifecycle
   end
 end
 

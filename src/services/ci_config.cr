@@ -7,23 +7,13 @@ module Hwaro
       SUPPORTED_PROVIDERS = ["github-actions"]
 
       def generate(provider : String) : String
-        case provider
-        when "github-actions"
-          generate_github_actions
-        else
-          raise "Unsupported CI provider: #{provider}. Supported: #{SUPPORTED_PROVIDERS.join(", ")}"
-        end
+        raise "Unsupported CI provider: #{provider}. Supported: #{SUPPORTED_PROVIDERS.join(", ")}" unless provider == "github-actions"
+        GithubActionsWorkflow.content
       end
 
       def output_path(provider : String) : String
-        case provider
-        when "github-actions" then ".github/workflows/deploy.yml"
-        else                       raise "Unsupported CI provider: #{provider}"
-        end
-      end
-
-      private def generate_github_actions : String
-        GithubActionsWorkflow.content
+        raise "Unsupported CI provider: #{provider}" unless provider == "github-actions"
+        ".github/workflows/deploy.yml"
       end
     end
   end

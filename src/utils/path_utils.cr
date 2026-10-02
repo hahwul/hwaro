@@ -264,11 +264,19 @@ module Hwaro
         rescue File::Error
           return false
         end
-        real_path == real_root || real_path.starts_with?(real_root + File::SEPARATOR)
+        within?(real_path, real_root)
+      end
+
+      # True when `path` is `root` or lies under it. Both must already be in
+      # comparable (expanded or resolved) form. A root that already ends in a
+      # separator — the filesystem root "/" — is not given a second one.
+      def within?(path : String, root : String) : Bool
+        return true if path == root
+        path.starts_with?(root.ends_with?(File::SEPARATOR) ? root : root + File::SEPARATOR)
       end
 
       # `path` with exactly one leading slash, for joining onto a base URL
-      # that has none (`base_url_stripped`). The idiom used to be spelled
+      # that has none (`base_url`). The idiom used to be spelled
       # inline at every URL-building site.
       def root_relative(path : String) : String
         path.starts_with?("/") ? path : "/#{path}"
@@ -330,6 +338,42 @@ module Hwaro
         File.match?(pattern, path)
       rescue File::BadPatternError
         false
+      end
+
+      # Collision key for an alias target: one spelling per published path.
+      #
+      # `/foo`, `/foo/`, `/foo/index.html` and `/foo/index.htm` all name the
+      # same file on disk, so they must collapse to ONE key or alias collision
+      # detection cannot see the conflict. `aliases = ["/index.html"]` kept
+      # its own key, never collided with the homepage's `/`, and its redirect
+      # stub was written straight over `public/index.html` — silently, and
+      # order-dependently under the parallel render. Shared by the render
+      # phase and platform redirect generation so the two never drift.
+      def normalize_alias_url(alias_path : String) : String
+        norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
+        {"index.html", "index.htm"}.each do |leaf|
+          if norm == "/#{leaf}"
+            return "/"
+          elsif norm.ends_with?("/#{leaf}")
+            return norm[0, norm.size - leaf.size]
+          end
+        end
+        return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+        "#{norm}/"
+      end
+
+      # The language code an extension-less content filename carries
+      # (`about.ko` → "ko", `_index.zh-tw` → "zh-tw"): the non-empty text
+      # after the last dot, provided a non-empty base name precedes it
+      # (".ko" is not a translation) and the block accepts the code. Callers
+      # pass the site's DECLARED codes (plus the default) — never a shape
+      # check, which read `setup.mac.md` as a translation. Shared by the
+      # build's ReadContent and the tools that must route files the same way.
+      def language_suffix(stem : String, & : String -> Bool) : String?
+        idx = stem.rindex('.')
+        return unless idx && idx > 0
+        code = stem[(idx + 1)..]
+        code if !code.empty? && yield(code)
       end
     end
   end

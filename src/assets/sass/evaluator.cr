@@ -646,7 +646,7 @@ module Hwaro
           @sink = at.children
           @current_at = at
           @env = Environment.new(saved_env)
-          if keyframes?(node.name)
+          if Extend.keyframes_name?(node.name)
             @current_rule = nil
             @current_rule_sink = nil
             @parent_selectors = nil
@@ -793,10 +793,6 @@ module Hwaro
           word = buf.to_s
           words << word unless word.empty?
           words
-        end
-
-        private def keyframes?(name : String) : Bool
-          name == "keyframes" || name.ends_with?("-keyframes")
         end
 
         # At-rules whose body is a descriptor block: the declarations belong
@@ -1528,7 +1524,7 @@ module Hwaro
             when Css::Rule
               extend_rule(node, matched)
             when Css::AtRule
-              extend_nodes(node.children, matched) unless keyframes?(node.name)
+              extend_nodes(node.children, matched) unless Extend.keyframes_name?(node.name)
             end
           end
         end

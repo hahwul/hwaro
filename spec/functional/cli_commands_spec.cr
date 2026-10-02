@@ -12,15 +12,15 @@ describe "CLI Tool Commands" do
     Hwaro::CLI::Runner.new
 
     it "has tool command registered" do
-      Hwaro::CLI::CommandRegistry.has?("tool").should be_true
+      Hwaro::CLI::CommandRegistry.names.includes?("tool").should be_true
     end
 
     it "has new command registered" do
-      Hwaro::CLI::CommandRegistry.has?("new").should be_true
+      Hwaro::CLI::CommandRegistry.names.includes?("new").should be_true
     end
 
     it "has completion command registered" do
-      Hwaro::CLI::CommandRegistry.has?("completion").should be_true
+      Hwaro::CLI::CommandRegistry.names.includes?("completion").should be_true
     end
   end
 

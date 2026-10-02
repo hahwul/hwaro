@@ -12,24 +12,10 @@ module Hwaro
       @[JSON::Field(converter: Hwaro::Services::Issue::SymbolConverter)]
       getter level : Symbol
 
-      # Issue is JSON-serialized for `hwaro doctor --json`. We don't currently
-      # consume that JSON back into Issue values, but the converter still needs
-      # a correct `from_json` so a future round-trip (or third-party tooling
-      # that reuses the schema) doesn't blow up. The previous implementation
-      # returned `String` from a `Symbol`-typed method.
+      # Issue is JSON-serialized (write-only) for `hwaro doctor --json`.
       module SymbolConverter
         def self.to_json(value : Symbol, json : JSON::Builder)
           json.string(value.to_s)
-        end
-
-        def self.from_json(pull : JSON::PullParser) : Symbol
-          case raw = pull.read_string
-          when "error"   then :error
-          when "warning" then :warning
-          when "info"    then :info
-          else
-            raise JSON::ParseException.new("Unknown issue level: #{raw.inspect}", *pull.location)
-          end
         end
       end
     end

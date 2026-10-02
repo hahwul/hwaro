@@ -116,7 +116,7 @@ module Hwaro
             # that aborted the whole build with a bare `Empty enumerable` /
             # `Index out of bounds` and no template file:line, because those
             # are plain Crystal errors rather than `Crinja::Error`s (see
-            # TemplateEngine#render). An empty section/collection is ordinary
+            # the render phase's rescue). An empty section/collection is ordinary
             # site state — `{{ section.pages | first }}` on a section with no
             # pages must not be fatal. Jinja2 yields `Undefined` there (which
             # renders as "" and is falsy), so do the same; every non-empty

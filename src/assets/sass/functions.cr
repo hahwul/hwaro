@@ -40,14 +40,6 @@ module Hwaro
         # Argument helpers
         # ---------------------------------------------------------------
 
-        private def self.ascii_upcase(text : String) : String
-          text.gsub { |c| c.ascii_lowercase? ? c.upcase : c }
-        end
-
-        private def self.ascii_downcase(text : String) : String
-          text.gsub { |c| c.ascii_uppercase? ? c.downcase : c }
-        end
-
         private def self.no_kwargs!(name : String, kwargs : Hash(String, Value)) : Nil
           return if kwargs.empty?
           raise SoftEvalError.new("#{name}() does not support keyword arguments")
@@ -615,13 +607,13 @@ module Hwaro
             arity!("to-upper-case", args, 1)
             s = string!("to-upper-case", args[0])
             # Sass maps ASCII only; Crystal's `upcase` is Unicode-aware.
-            Str.new(ascii_upcase(s.text), quoted: s.quoted, quote_char: s.quote_char)
+            Str.new(s.text.upcase(Unicode::CaseOptions::ASCII), quoted: s.quoted, quote_char: s.quote_char)
           end,
           "to-lower-case" => Fn.new do |args, kwargs|
             args = args_with_kwargs("string.to-lower-case", args, kwargs, %w[string])
             arity!("to-lower-case", args, 1)
             s = string!("to-lower-case", args[0])
-            Str.new(ascii_downcase(s.text), quoted: s.quoted, quote_char: s.quote_char)
+            Str.new(s.text.downcase(Unicode::CaseOptions::ASCII), quoted: s.quoted, quote_char: s.quote_char)
           end,
         }
 
@@ -1215,7 +1207,7 @@ module Hwaro
             when Str then channel_arg.text
             else          channel_arg.to_css
             end
-          case ascii_downcase(channel)
+          case channel.downcase(Unicode::CaseOptions::ASCII)
           when "red"        then Number.new(color.red8.to_f)
           when "green"      then Number.new(color.green8.to_f)
           when "blue"       then Number.new(color.blue8.to_f)
