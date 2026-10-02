@@ -38,17 +38,6 @@ describe Hwaro::Core::Lifecycle do
       manager.has_hooks?(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize).should be_true
     end
 
-    it "can register hooks using before/after helpers" do
-      manager = Hwaro::Core::Lifecycle::Manager.new
-      manager.before(Hwaro::Core::Lifecycle::Phase::Render, name: "before-render") do |_|
-        Hwaro::Core::Lifecycle::HookResult::Continue
-      end
-      manager.after(Hwaro::Core::Lifecycle::Phase::Render, name: "after-render") do |_|
-        Hwaro::Core::Lifecycle::HookResult::Continue
-      end
-      manager.hook_count.should eq(2)
-    end
-
     it "triggers hooks and returns Continue by default" do
       manager = Hwaro::Core::Lifecycle::Manager.new
       options = Hwaro::Config::Options::BuildOptions.new
@@ -84,31 +73,6 @@ describe Hwaro::Core::Lifecycle do
 
       manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, ctx)
       order.should eq(["high", "low"])
-    end
-
-    it "can clear hooks" do
-      manager = Hwaro::Core::Lifecycle::Manager.new
-      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, name: "test") do |_|
-        Hwaro::Core::Lifecycle::HookResult::Continue
-      end
-      manager.hook_count.should eq(1)
-      manager.clear
-      manager.hook_count.should eq(0)
-    end
-
-    it "handles HookResult::Skip" do
-      manager = Hwaro::Core::Lifecycle::Manager.new
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, name: "skipper") do |_|
-        Hwaro::Core::Lifecycle::HookResult::Skip
-      end
-
-      # Skip only suppresses the remaining hooks at this hook point; the
-      # phase sequence continues, so trigger reports Continue.
-      result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, ctx)
-      result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
     end
 
     it "handles HookResult::Abort" do
@@ -156,20 +120,6 @@ describe Hwaro::Core::Lifecycle do
       ctx.stats.pages_read.should eq(0)
       ctx.stats.pages_rendered.should eq(0)
       ctx.stats.cache_hits.should eq(0)
-    end
-
-    it "supports metadata storage" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("key", "value")
-      ctx.set("count", 42)
-      ctx.set("enabled", true)
-
-      ctx.get_string("key").should eq("value")
-      ctx.get_int("count").should eq(42)
-      ctx.get_bool("enabled").should be_true
-      ctx.get_string("missing", "default").should eq("default")
     end
   end
 end

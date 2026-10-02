@@ -1,4 +1,5 @@
 require "../../../spec_helper"
+require "../../../support/build_helper"
 require "../../../../src/core/build/builder"
 
 # Tests that exercise the full build pipeline on Builder — phase sequencing,
@@ -76,8 +77,8 @@ describe Hwaro::Core::Build::Builder do
         # The Before hook returning Abort short-circuits the ParseContent
         # phase (via Manager#trigger), which run_phase propagates back to
         # execute_phases, which then skips Render/Generate/Write/Finalize.
-        builder.lifecycle.before(
-          Hwaro::Core::Lifecycle::Phase::ParseContent, name: "force-abort"
+        builder.test_lifecycle.on(
+          Hwaro::Core::Lifecycle::HookPoint::BeforeParseContent, name: "force-abort"
         ) do |_ctx|
           Hwaro::Core::Lifecycle::HookResult::Abort
         end
@@ -100,8 +101,8 @@ describe Hwaro::Core::Build::Builder do
       with_minimal_site do
         builder = Hwaro::Core::Build::Builder.new
         captured = nil.as(Hwaro::Config::Options::BuildOptions?)
-        builder.lifecycle.before(
-          Hwaro::Core::Lifecycle::Phase::Initialize, name: "capture-options"
+        builder.test_lifecycle.on(
+          Hwaro::Core::Lifecycle::HookPoint::BeforeInitialize, name: "capture-options"
         ) do |ctx|
           captured = ctx.options
           Hwaro::Core::Lifecycle::HookResult::Continue
@@ -146,43 +147,6 @@ describe Hwaro::Core::Build::Builder do
         full_ctx = full.context.not_nil!
         full_ctx.stats.pages_rendered.should eq(1)
         full_ctx.stats.cache_hits.should eq(0)
-      end
-    end
-  end
-
-  describe "HookResult::Skip phase semantics" do
-    it "skips remaining hooks of the phase but completes the build" do
-      with_minimal_site do
-        builder = Hwaro::Core::Build::Builder.new
-        builder.test_set_orch_run_config(Hwaro::Models::Config.new)
-
-        # Transform has no hook-override semantics (unlike ParseContent/
-        # Generate, whose default body is replaced when before-hooks are
-        # registered), so the phase body still runs after the Skip.
-        second_ran = false
-        builder.lifecycle.before(
-          Hwaro::Core::Lifecycle::Phase::Transform, priority: 10, name: "skipper"
-        ) do |_ctx|
-          Hwaro::Core::Lifecycle::HookResult::Skip
-        end
-        builder.lifecycle.before(
-          Hwaro::Core::Lifecycle::Phase::Transform, priority: 0, name: "second"
-        ) do |_ctx|
-          second_ran = true
-          Hwaro::Core::Lifecycle::HookResult::Continue
-        end
-
-        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
-        ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-        profiler = Hwaro::Profiler.new(enabled: false)
-
-        result = builder.test_execute_phases(ctx, profiler)
-        # Skip is documented as "skip remaining hooks in current phase" —
-        # the phase body and every subsequent phase still run.
-        result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
-        second_ran.should be_false
-        File.exists?("public/about/index.html").should be_true
-        ctx.stats.pages_rendered.should eq(1)
       end
     end
   end

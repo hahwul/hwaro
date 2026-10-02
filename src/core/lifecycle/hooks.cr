@@ -12,7 +12,6 @@ module Hwaro
       # Result of hook execution
       enum HookResult
         Continue # Proceed to next hook/phase
-        Skip     # Skip remaining hooks in current phase
         Abort    # Stop the entire build
       end
 
@@ -32,31 +31,6 @@ module Hwaro
       # Interface for modules that register hooks
       module Hookable
         abstract def register_hooks(manager : Manager)
-      end
-
-      # Simple hook registration via block
-      module HookDSL
-        macro included
-          @@_pending_hooks = [] of Tuple(HookPoint, Int32, String, HookHandler)
-
-          def self.on(point : HookPoint, priority : Int32 = 0, name : String = "hook", &block : BuildContext -> HookResult)
-            @@_pending_hooks << {point, priority, name, block}
-          end
-
-          def self.before(phase : Phase, priority : Int32 = 0, name : String = "hook", &block : BuildContext -> HookResult)
-            before_point, _ = Lifecycle.hook_points_for(phase)
-            on(before_point, priority, name, &block)
-          end
-
-          def self.after(phase : Phase, priority : Int32 = 0, name : String = "hook", &block : BuildContext -> HookResult)
-            _, after_point = Lifecycle.hook_points_for(phase)
-            on(after_point, priority, name, &block)
-          end
-
-          def self.pending_hooks
-            @@_pending_hooks
-          end
-        end
       end
     end
   end
