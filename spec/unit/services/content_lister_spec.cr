@@ -529,7 +529,7 @@ describe Hwaro::Services::ContentInfo do
       Time.parse_rfc3339(json["date"].as_s).should eq(date)
       json["path"].should eq("post.md")
       json["title"].should eq("Pi Day")
-      json["draft"].should eq(false)
+      json["draft"].as_bool.should be_false
       json["status"].should eq("published")
     end
 
