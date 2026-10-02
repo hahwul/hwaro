@@ -187,15 +187,13 @@ module Hwaro
             # Remote scaffold had no config.toml (allowed for content/templates-only remotes).
             # Fall back to normal generation logic so we don't write an empty config.toml.
             Logger.warn "Remote scaffold did not include a config.toml; generating a default one."
-            if minimal_config
-              config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
-            elsif full_config
-              # For --full-config without upstream config, use the balanced discoverable default
-              # (we can't easily reconstruct a "full" from a non-remote scaffold here).
-              config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
-            else
-              config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
-            end
+            # --full-config without an upstream config also gets the balanced
+            # default (a "full" config can't be reconstructed for a remote).
+            config_content = if minimal_config
+                               scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
+                             else
+                               build_balanced_default_config(scaffold, skip_taxonomies, multilingual_languages)
+                             end
           else
             # Use the remote's config as-is (respecting its custom settings), ignore --min/--full.
             config_content = remote_config
@@ -205,7 +203,7 @@ module Hwaro
         elsif full_config
           config_content = scaffold.config_content(skip_taxonomies, multilingual_languages)
         else
-          config_content = build_balanced_default_config(scaffold, skip_taxonomies, is_multilingual, multilingual_languages)
+          config_content = build_balanced_default_config(scaffold, skip_taxonomies, multilingual_languages)
         end
 
         # Wizard-collected site title: substitute the first `title = "…"` line
@@ -611,7 +609,6 @@ module Hwaro
       private def build_balanced_default_config(
         scaffold : Scaffolds::Base,
         skip_taxonomies : Bool,
-        is_multilingual : Bool,
         multilingual_languages : Array(String),
       ) : String
         # Start with the clean minimal content (which now includes multilingual
