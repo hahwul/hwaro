@@ -98,22 +98,9 @@ module Hwaro::Core::Build::Phases::Render
       worker_count = render_worker_count(pages, site, templates, pages.size)
       worker_envs = Array.new(worker_count) { create_fresh_crinja_env }
       worker_caches = Array.new(worker_count) { {} of UInt64 => Crinja::Template }
-      work_queue = Channel(Models::Page).new(pages.size)
-      pages.each { |page| work_queue.send(page) }
-      work_queue.close
-      done = Channel(Nil).new(pages.size)
-      worker_count.times do |worker_id|
-        spawn do
-          while page = work_queue.receive?
-            begin
-              hydrate.call(page, worker_envs[worker_id], worker_caches[worker_id])
-            ensure
-              done.send(nil)
-            end
-          end
-        end
+      ParallelHelper.each_concurrently(pages, worker_count) do |page, worker_id|
+        hydrate.call(page, worker_envs[worker_id], worker_caches[worker_id])
       end
-      pages.size.times { done.receive }
     else
       pages.each { |page| hydrate.call(page, nil, nil) }
     end

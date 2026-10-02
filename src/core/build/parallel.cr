@@ -139,6 +139,30 @@ module Hwaro
           processor.map(items, &block)
         end
 
+        # Run `block` once per item on `workers` fibers pulling from a shared
+        # queue; the block also gets the worker's index (0...workers) so it
+        # can use per-worker state. Returns once every item has been handled.
+        # Callers rescue inside the block: an exception that escapes it still
+        # signals its item (from an `ensure`) but ends that worker fiber.
+        def each_concurrently(items : Array(T), workers : Int32, &block : T, Int32 ->) : Nil forall T
+          queue = Channel(T).new(items.size)
+          items.each { |item| queue.send(item) }
+          queue.close
+          done = Channel(Nil).new(items.size)
+          workers.times do |worker_id|
+            spawn do
+              while item = queue.receive?
+                begin
+                  block.call(item, worker_id)
+                ensure
+                  done.send(nil)
+                end
+              end
+            end
+          end
+          items.size.times { done.receive }
+        end
+
         # Execute multiple independent tasks in parallel.
         #
         # `raise_on_error: true` (default) surfaces the first task failure

@@ -229,6 +229,19 @@ describe Hwaro::Core::Build::Parallel do
 end
 
 describe Hwaro::Core::Build::ParallelHelper do
+  describe ".each_concurrently" do
+    it "handles every item once, on worker ids below the worker count" do
+      seen = [] of Int32
+      ids = Set(Int32).new
+      mutex = Mutex.new
+      Hwaro::Core::Build::ParallelHelper.each_concurrently((1..50).to_a, 4) do |item, worker_id|
+        mutex.synchronize { seen << item; ids << worker_id }
+      end
+      seen.sort.should eq((1..50).to_a)
+      ids.all? { |id| (0...4).includes?(id) }.should be_true
+    end
+  end
+
   describe ".map" do
     it "maps items with transformation" do
       items = [1, 2, 3]

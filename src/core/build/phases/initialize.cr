@@ -521,48 +521,32 @@ module Hwaro::Core::Build::Phases::Initialize
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(files_to_copy.size)
 
-    work_queue = Channel({String, String, Time}).new(files_to_copy.size)
-    done = Channel(Nil).new(worker_count)
-
-    files_to_copy.each { |pair| work_queue.send(pair) }
-    work_queue.close
-
-    worker_count.times do
-      spawn do
-        while pair = work_queue.receive?
-          src, dest, src_mtime = pair
-          begin
-            FileUtils.cp(src, dest)
-            # A page can render to this very path; the render runs after this
-            # copy and must win, which it only does if it is not skipped as a
-            # cache hit (see Builder#note_static_copy). Canonical form, so the
-            # comparison against `get_output_path` in filter_changed_pages
-            # needs no per-page expansion.
-            note_static_copy(File.expand_path(dest, cwd))
-            # Stamp the source mtime onto the copy so the incremental skip in
-            # collect_static_files can compare timestamps at all — that is what
-            # makes a source whose mtime moved BACKWARDS (git checkout, stash
-            # pop, rsync --times) still count as changed. `src_mtime` comes
-            # from the stat collect_static_files already did; re-stating here
-            # tripled the stat count over static/ on watch rebuilds.
-            begin
-              File.utime(Time.utc, src_mtime, dest)
-            rescue ex : File::Error
-              # Stamping is an optimization; a failure just means the next
-              # build recopies this file. It must NOT be reported as a copy
-              # failure — the copy above already succeeded — but it should be
-              # discoverable when someone is asking why nothing is cached.
-              Logger.debug "Could not stamp mtime on #{dest}: #{ex.message}"
-            end
-          rescue ex
-            Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
-          end
-        end
-      ensure
-        done.send(nil)
+    ParallelHelper.each_concurrently(files_to_copy, worker_count) do |(src, dest, src_mtime), _worker_id|
+      FileUtils.cp(src, dest)
+      # A page can render to this very path; the render runs after this
+      # copy and must win, which it only does if it is not skipped as a
+      # cache hit (see Builder#note_static_copy). Canonical form, so the
+      # comparison against `get_output_path` in filter_changed_pages
+      # needs no per-page expansion.
+      note_static_copy(File.expand_path(dest, cwd))
+      # Stamp the source mtime onto the copy so the incremental skip in
+      # collect_static_files can compare timestamps at all — that is what
+      # makes a source whose mtime moved BACKWARDS (git checkout, stash
+      # pop, rsync --times) still count as changed. `src_mtime` comes
+      # from the stat collect_static_files already did; re-stating here
+      # tripled the stat count over static/ on watch rebuilds.
+      begin
+        File.utime(Time.utc, src_mtime, dest)
+      rescue ex : File::Error
+        # Stamping is an optimization; a failure just means the next
+        # build recopies this file. It must NOT be reported as a copy
+        # failure — the copy above already succeeded — but it should be
+        # discoverable when someone is asking why nothing is cached.
+        Logger.debug "Could not stamp mtime on #{dest}: #{ex.message}"
       end
+    rescue ex
+      Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
     end
-    worker_count.times { done.receive }
   end
 
   private def load_templates : Hash(String, String)

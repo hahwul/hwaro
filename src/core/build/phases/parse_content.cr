@@ -510,44 +510,22 @@ module Hwaro::Core::Build::Phases::ParseContent
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(pages.size)
 
-    done = Channel(Nil).new(pages.size)
-    work_queue = Channel(Models::Page).new(pages.size)
-
-    # Enqueue all pages
-    pages.each { |page| work_queue.send(page) }
-    work_queue.close
-
     # Track the first classified frontmatter error seen by any worker so
     # the build can abort deterministically after draining the queue.
     classified_error : Hwaro::HwaroError? = nil
     error_mutex = Mutex.new
 
-    # Spawn workers
-    worker_count.times do
-      spawn do
-        while page = work_queue.receive?
-          begin
-            parse_single_page(page)
-          rescue ex : Hwaro::HwaroError
-            error_mutex.synchronize do
-              classified_error ||= ex
-            end
-            page.parse_failed = true
-          rescue ex
-            page.parse_failed = true
-            Logger.warn "Failed to parse #{page.path}: #{ex.message}"
-          ensure
-            # Must run even if a rescue handler raises: a missing send leaves
-            # the `pages.size.times { done.receive }` wait below one short and
-            # the build hangs instead of surfacing the error.
-            done.send(nil)
-          end
-        end
+    ParallelHelper.each_concurrently(pages, worker_count) do |page, _worker_id|
+      parse_single_page(page)
+    rescue ex : Hwaro::HwaroError
+      error_mutex.synchronize do
+        classified_error ||= ex
       end
+      page.parse_failed = true
+    rescue ex
+      page.parse_failed = true
+      Logger.warn "Failed to parse #{page.path}: #{ex.message}"
     end
-
-    # Wait for all pages to finish
-    pages.size.times { done.receive }
 
     # Surface the first classified frontmatter error now that all workers
     # have drained. We prefer this over re-raising inside the worker fiber
