@@ -31,7 +31,7 @@ module Hwaro
       # compile through the built-in compiler only when the feature is on;
       # otherwise they concatenate verbatim (pre-Sass behavior, and the
       # escape hatch for sources outside the supported subset).
-      def initialize(@config : Models::AssetsConfig, @base_url : String, @sass_enabled : Bool = false)
+      def initialize(@config : Models::AssetsConfig, @sass_enabled : Bool = false)
         @manifest = {} of String => String
         @written_paths = [] of String
       end

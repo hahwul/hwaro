@@ -38,10 +38,6 @@ module Hwaro
           def initialize(@selectors, @breaks = [] of Bool)
           end
 
-          def decls? : Bool
-            @items.any?(Decl)
-          end
-
           getter items = [] of Decl | Comment
         end
 

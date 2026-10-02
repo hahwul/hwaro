@@ -51,45 +51,16 @@ class Crinja::Evaluator
     Crinja::RuntimeError.new(nil, cause: ex).at(expression)
   end
 
-  def evaluate(expression : AST::FilterExpression)
-    previous_def
-  rescue ex : Crinja::Error
-    raise ex
-  rescue ex : Exception
-    raise locate_plain_error(ex, expression)
-  end
-
-  def evaluate(expression : AST::TestExpression)
-    previous_def
-  rescue ex : Crinja::Error
-    raise ex
-  rescue ex : Exception
-    raise locate_plain_error(ex, expression)
-  end
-
-  def evaluate(expression : AST::CallExpression)
-    previous_def
-  rescue ex : Crinja::Error
-    raise ex
-  rescue ex : Exception
-    raise locate_plain_error(ex, expression)
-  end
-
-  def evaluate(expression : AST::BinaryExpression | AST::ComparisonExpression)
-    previous_def
-  rescue ex : Crinja::Error
-    raise ex
-  rescue ex : Exception
-    raise locate_plain_error(ex, expression)
-  end
-
-  def evaluate(expression : AST::UnaryExpression)
-    previous_def
-  rescue ex : Crinja::Error
-    raise ex
-  rescue ex : Exception
-    raise locate_plain_error(ex, expression)
-  end
+  {% for type in ["AST::FilterExpression", "AST::TestExpression", "AST::CallExpression",
+                  "AST::BinaryExpression | AST::ComparisonExpression", "AST::UnaryExpression"] %}
+    def evaluate(expression : {{ type.id }})
+      previous_def
+    rescue ex : Crinja::Error
+      raise ex
+    rescue ex : Exception
+      raise locate_plain_error(ex, expression)
+    end
+  {% end %}
 end
 
 # `Crinja::TemplateNotFoundError` inherits `Exception`, not `Crinja::Error`,

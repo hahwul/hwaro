@@ -50,10 +50,6 @@ lib LibStb
   fun hwaro_font_has_glyph(info : HwaroFontInfo, codepoint : LibC::Int) : LibC::Int
   fun hwaro_font_scale_for_pixel_height(info : HwaroFontInfo, pixels : LibC::Float) : LibC::Float
   fun hwaro_font_get_vmetrics(info : HwaroFontInfo, ascent : LibC::Int*, descent : LibC::Int*, line_gap : LibC::Int*)
-  fun hwaro_font_get_codepoint_hmetrics(info : HwaroFontInfo, codepoint : LibC::Int, advance_width : LibC::Int*, left_side_bearing : LibC::Int*)
-  fun hwaro_font_get_codepoint_kern_advance(info : HwaroFontInfo, ch1 : LibC::Int, ch2 : LibC::Int) : LibC::Int
-  fun hwaro_font_get_codepoint_bitmap(info : HwaroFontInfo, scale_x : LibC::Float, scale_y : LibC::Float, codepoint : LibC::Int, width : LibC::Int*, height : LibC::Int*, xoff : LibC::Int*, yoff : LibC::Int*) : UInt8*
-  fun hwaro_font_free_bitmap(bitmap : UInt8*)
   fun hwaro_font_measure_text(info : HwaroFontInfo, text : LibC::Char*, scale : LibC::Float) : LibC::Float
   fun hwaro_font_render_text(info : HwaroFontInfo, pixels : UInt8*, buf_w : LibC::Int, buf_h : LibC::Int, x : LibC::Float, y : LibC::Float, scale : LibC::Float, text : LibC::Char*, color : LibC::UInt, opacity : LibC::Float) : LibC::Float
 end

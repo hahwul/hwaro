@@ -182,7 +182,7 @@ module Hwaro
           return false unless config && config.assets.enabled
 
           old_manifest = Content::Hooks::AssetHooks.manifest
-          pipeline = Assets::Pipeline.new(config.assets, config.base_url, config.sass.enabled)
+          pipeline = Assets::Pipeline.new(config.assets, config.sass.enabled)
           pipeline.process(output_dir)
           Content::Hooks::AssetHooks.replace_manifest(pipeline.manifest)
           if pipeline.manifest.size > 0

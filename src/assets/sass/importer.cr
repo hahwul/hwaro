@@ -13,49 +13,10 @@ require "../../utils/path_utils"
 module Hwaro
   module Assets
     module Sass
-      module Loader
-        abstract def read(path : String) : String?
-        abstract def exists?(path : String) : Bool
-      end
-
-      class FileLoader
-        include Loader
-
-        def read(path : String) : String?
-          return unless File.file?(path)
-          File.read(path)
-        end
-
-        def exists?(path : String) : Bool
-          File.file?(path)
-        end
-      end
-
-      # In-memory loader for specs; keys are expanded so relative paths in
-      # test sources resolve like real files.
-      class MemoryLoader
-        include Loader
-
-        def initialize(files : Hash(String, String), root : String = Dir.current)
-          @files = {} of String => String
-          files.each do |path, content|
-            @files[File.expand_path(path, root)] = content
-          end
-        end
-
-        def read(path : String) : String?
-          @files[path]?
-        end
-
-        def exists?(path : String) : Bool
-          @files.has_key?(path)
-        end
-      end
-
       class Importer
         getter root : String
 
-        def initialize(@loader : Loader, root : String = Dir.current)
+        def initialize(root : String = Dir.current)
           @root = File.expand_path(root)
         end
 
@@ -106,17 +67,13 @@ module Hwaro
                                  url : String, path : String, line : Int32, column : Int32) : {String, String}?
           partial_path = guard(File.expand_path(partial, base_dir), url, path, line, column)
           plain_path = guard(File.expand_path(plain, base_dir), url, path, line, column)
-          if @loader.exists?(partial_path) && @loader.exists?(plain_path)
+          if File.file?(partial_path) && File.file?(plain_path)
             raise SyntaxError.new(
               "ambiguous import \"#{url}\": both #{display_path(partial_path)} and #{display_path(plain_path)} exist",
               path, line, column)
           end
-          if src = @loader.read(partial_path)
-            return {partial_path, src}
-          end
-          if src = @loader.read(plain_path)
-            return {plain_path, src}
-          end
+          return {partial_path, File.read(partial_path)} if File.file?(partial_path)
+          return {plain_path, File.read(plain_path)} if File.file?(plain_path)
           nil
         end
 

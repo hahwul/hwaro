@@ -110,22 +110,6 @@ void hwaro_font_get_vmetrics(const stbtt_fontinfo *info, int *ascent, int *desce
     stbtt_GetFontVMetrics(info, ascent, descent, line_gap);
 }
 
-void hwaro_font_get_codepoint_hmetrics(const stbtt_fontinfo *info, int codepoint, int *advance_width, int *left_side_bearing) {
-    stbtt_GetCodepointHMetrics(info, codepoint, advance_width, left_side_bearing);
-}
-
-int hwaro_font_get_codepoint_kern_advance(const stbtt_fontinfo *info, int ch1, int ch2) {
-    return stbtt_GetCodepointKernAdvance(info, ch1, ch2);
-}
-
-unsigned char *hwaro_font_get_codepoint_bitmap(const stbtt_fontinfo *info, float scale_x, float scale_y, int codepoint, int *width, int *height, int *xoff, int *yoff) {
-    return stbtt_GetCodepointBitmap(info, scale_x, scale_y, codepoint, width, height, xoff, yoff);
-}
-
-void hwaro_font_free_bitmap(unsigned char *bitmap) {
-    stbtt_FreeBitmap(bitmap, NULL);
-}
-
 /* Decode one UTF-8 sequence at `p` (NUL-terminated), storing the codepoint in
  * `*out` and returning how many bytes were actually consumed — never more than
  * the string holds.

@@ -74,7 +74,8 @@ module Hwaro
           c.ascii_letter? || c == '_' || c == '-' || c.ord > 0x7F
         end
 
-        def ident_char?(c : Char?) : Bool
+        # Shared with Expr::Lexer.
+        def self.ident_char?(c : Char?) : Bool
           return false unless c
           c.ascii_alphanumeric? || c == '_' || c == '-' || c.ord > 0x7F
         end
@@ -82,7 +83,7 @@ module Hwaro
         # Reads an identifier (CSS ident charset; no escape support).
         def read_ident : String
           String.build do |io|
-            while ident_char?(peek)
+            while Scanner.ident_char?(peek)
               io << advance
             end
           end
