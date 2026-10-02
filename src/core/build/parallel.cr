@@ -1,7 +1,7 @@
 # Parallel processing utilities for concurrent page rendering
 #
 # Uses Crystal Fibers and Channels for efficient parallel processing.
-# Supports batch processing and worker pool patterns.
+# Supports worker pool patterns.
 
 require "../../utils/errors"
 require "../../utils/logger"
@@ -16,12 +16,10 @@ module Hwaro
       struct ParallelConfig
         property enabled : Bool
         property max_workers : Int32
-        property batch_size : Int32
 
         def initialize(
           @enabled : Bool = true,
           @max_workers : Int32 = 0, # 0 = auto-detect based on CPU count
-          @batch_size : Int32 = 10,
         )
         end
 
@@ -83,12 +81,6 @@ module Hwaro
           results.select(&.success).compact_map(&.value)
         end
 
-        # Process items in parallel, counting successes
-        def count_success(items : Array(T), &block : T, Int32 -> R) : Int32
-          results = process(items, &block)
-          results.count(&.success)
-        end
-
         private def process_sequential(items : Array(T), &block : T, Int32 -> R) : Array(WorkResult(R))
           results = [] of WorkResult(R)
           items.each_with_index do |item, idx|
@@ -140,18 +132,35 @@ module Hwaro
       module ParallelHelper
         extend self
 
-        # Process pages in parallel with automatic worker configuration
-        def process_pages(pages : Array(T), parallel : Bool = true, &block : T, Int32 -> Bool) : Int32 forall T
-          config = ParallelConfig.new(enabled: parallel)
-          processor = Parallel(T, Bool).new(config)
-          processor.count_success(pages, &block)
-        end
-
         # Parallel map with default configuration
         def map(items : Array(T), parallel : Bool = true, &block : T -> R) : Array(R) forall T, R
           config = ParallelConfig.new(enabled: parallel)
           processor = Parallel(T, R).new(config)
           processor.map(items, &block)
+        end
+
+        # Run `block` once per item on `workers` fibers pulling from a shared
+        # queue; the block also gets the worker's index (0...workers) so it
+        # can use per-worker state. Returns once every item has been handled.
+        # Callers rescue inside the block: an exception that escapes it still
+        # signals its item (from an `ensure`) but ends that worker fiber.
+        def each_concurrently(items : Array(T), workers : Int32, &block : T, Int32 ->) : Nil forall T
+          queue = Channel(T).new(items.size)
+          items.each { |item| queue.send(item) }
+          queue.close
+          done = Channel(Nil).new(items.size)
+          workers.times do |worker_id|
+            spawn do
+              while item = queue.receive?
+                begin
+                  block.call(item, worker_id)
+                ensure
+                  done.send(nil)
+                end
+              end
+            end
+          end
+          items.size.times { done.receive }
         end
 
         # Execute multiple independent tasks in parallel.

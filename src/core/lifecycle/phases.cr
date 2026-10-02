@@ -18,7 +18,8 @@ module Hwaro
         Finalize     # Cleanup, save cache, final operations
       end
 
-      # Hook points - before/after each phase
+      # Hook points - before/after each phase, in Phase order: phase N's
+      # Before/After are HookPoint values 2N and 2N+1 (hook_points_for).
       enum HookPoint
         BeforeInitialize
         AfterInitialize
@@ -40,26 +41,7 @@ module Hwaro
 
       # Maps Phase to its before/after HookPoints
       def self.hook_points_for(phase : Phase) : Tuple(HookPoint, HookPoint)
-        case phase
-        when Phase::Initialize
-          {HookPoint::BeforeInitialize, HookPoint::AfterInitialize}
-        when Phase::ReadContent
-          {HookPoint::BeforeReadContent, HookPoint::AfterReadContent}
-        when Phase::ParseContent
-          {HookPoint::BeforeParseContent, HookPoint::AfterParseContent}
-        when Phase::Transform
-          {HookPoint::BeforeTransform, HookPoint::AfterTransform}
-        when Phase::Render
-          {HookPoint::BeforeRender, HookPoint::AfterRender}
-        when Phase::Generate
-          {HookPoint::BeforeGenerate, HookPoint::AfterGenerate}
-        when Phase::Write
-          {HookPoint::BeforeWrite, HookPoint::AfterWrite}
-        when Phase::Finalize
-          {HookPoint::BeforeFinalize, HookPoint::AfterFinalize}
-        else
-          raise "Unknown phase: #{phase}"
-        end
+        {HookPoint.new(phase.value * 2), HookPoint.new(phase.value * 2 + 1)}
       end
     end
   end

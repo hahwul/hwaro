@@ -8,40 +8,6 @@ module Hwaro
   module Core
     module Build
       class Builder
-        # Copy `src_path` onto `dest_path` atomically: copy into a
-        # same-directory temp file first, then rename it into place.
-        #
-        # Both callers below run on the serve watcher while HTTP fibers stream
-        # the very same paths to the browser, and `FileUtils.cp` opens the
-        # destination with O_TRUNC and then streams — so the destination is
-        # observably 0 bytes and then every intermediate size, and a request
-        # landing in that window is answered with a truncated body (a 21 MB
-        # stylesheet was served at 0.5 MB, header and body agreeing on the short
-        # length) that nothing retries. `rename` is atomic within a filesystem,
-        # so a reader sees either the old bytes or the new ones. Same invariant
-        # — and the same pid+fiber temp naming, so parallel copies of sibling
-        # files cannot collide — as `FileSafe.atomic_write`.
-        private def atomic_copy(src_path : String, dest_path : String) : Nil
-          # `FileUtils.cp` copies INTO a directory of that name; there is no
-          # file to replace atomically then, so keep the old behaviour instead
-          # of failing the rename on it.
-          if Dir.exists?(dest_path)
-            FileUtils.cp(src_path, dest_path)
-            return
-          end
-
-          tmp = "#{dest_path}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
-          begin
-            File.copy(src_path, tmp)
-            File.rename(tmp, dest_path)
-          rescue ex
-            # Never leave the temp file behind — a failed copy must look
-            # exactly like the old non-atomic failure (destination unchanged).
-            File.delete(tmp) if File.exists?(tmp)
-            raise ex
-          end
-        end
-
         # Copy only the specified static files to the output directory.
         # Used by serve mode when only static files have changed.
         #
@@ -96,7 +62,7 @@ module Hwaro
             end
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-            atomic_copy(src_path, dest_path)
+            Hwaro::Utils::FileSafe.atomic_copy(src_path, dest_path)
             # Recorded for the same reason the full build records its copies
             # (see Builder#note_static_copy): a later `--cache`-filtered
             # render must not skip the page whose output this just replaced.
@@ -230,7 +196,7 @@ module Hwaro
             end
 
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-            atomic_copy(src_path, dest_path)
+            Hwaro::Utils::FileSafe.atomic_copy(src_path, dest_path)
             Logger.action :copy, dest_path, Logger::Role::Dim if verbose
             copied += 1
           end
@@ -503,7 +469,7 @@ module Hwaro
               # The stale file was sitting on top of a static copy — a cold
               # build publishes the static bytes there, so put them back.
               Hwaro::Utils::FileSafe.mkdir_p(File.dirname(path))
-              atomic_copy(source, path)
+              Hwaro::Utils::FileSafe.atomic_copy(source, path)
             elsif relative && content_source_publishes?(relative)
               # Same for a `[content.files]` copy; left as is rather than
               # re-copied, since raw files may be processed (minified) on the

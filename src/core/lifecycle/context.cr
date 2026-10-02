@@ -15,10 +15,8 @@ module Hwaro
       struct RawFile
         property source_path : String
         property relative_path : String
-        property extension : String
 
         def initialize(@source_path : String, @relative_path : String)
-          @extension = File.extname(@source_path).downcase
         end
       end
 
@@ -51,12 +49,6 @@ module Hwaro
 
         # Output
         property output_dir : String
-
-        # Cache reference
-        property cache : Build::Cache?
-
-        # Phase-specific metadata for inter-hook communication
-        property metadata : Hash(String, String | Bool | Int32 | Float64)
 
         # Track build statistics
         property stats : BuildStats
@@ -105,7 +97,6 @@ module Hwaro
           @excluded_cascade_sections = [] of Models::Section
           @templates = {} of String => String
           @output_dir = options.output_dir
-          @metadata = {} of String => String | Bool | Int32 | Float64
           @stats = BuildStats.new
         end
 
@@ -129,33 +120,6 @@ module Hwaro
         def invalidate_all_pages_cache
           @all_pages_cache = nil
         end
-
-        # Set metadata with type safety
-        def set(key : String, value : String | Bool | Int32 | Float64)
-          @metadata[key] = value
-        end
-
-        # Get metadata with default
-        def get_string(key : String, default : String = "") : String
-          @metadata[key]?.try(&.as?(String)) || default
-        end
-
-        def get_bool(key : String, default : Bool = false) : Bool
-          # NOTE: `value || default` is wrong here — a legitimately stored
-          # `false` is falsy and would collapse to `default`, inverting the
-          # flag a previous hook set. Distinguish "absent / wrong type" (nil)
-          # from a stored `false`.
-          val = @metadata[key]?.try(&.as?(Bool))
-          val.nil? ? default : val
-        end
-
-        def get_int(key : String, default : Int32 = 0) : Int32
-          # Same nil-vs-stored-value distinction as get_bool. `0 || default`
-          # happens to work (0 is truthy in Crystal) but the explicit form
-          # keeps the two getters consistent and intent-revealing.
-          val = @metadata[key]?.try(&.as?(Int32))
-          val.nil? ? default : val
-        end
       end
 
       # Build statistics tracking
@@ -167,8 +131,6 @@ module Hwaro
         # traverses, a refused alias). Distinct from `pages_skipped`, which
         # counts drafts/future/expired filtered out by design.
         property pages_unpublished : Int32 = 0
-        property pages_failed : Int32
-        property files_written : Int32
         property cache_hits : Int32
         property raw_files_processed : Int32
         property start_time : Time::Instant?
@@ -178,8 +140,6 @@ module Hwaro
           @pages_read = 0
           @pages_rendered = 0
           @pages_skipped = 0
-          @pages_failed = 0
-          @files_written = 0
           @cache_hits = 0
           @raw_files_processed = 0
         end

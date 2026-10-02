@@ -6,7 +6,7 @@
 #
 # Example usage:
 #   lifecycle = Hwaro::Core::Lifecycle::Manager.new
-#   lifecycle.before(Phase::Transform, name: "markdown") do |ctx|
+#   lifecycle.on(HookPoint::BeforeTransform, name: "markdown") do |ctx|
 #     # Transform markdown content
 #     HookResult::Continue
 #   end
@@ -15,11 +15,3 @@ require "./lifecycle/phases"
 require "./lifecycle/hooks"
 require "./lifecycle/context"
 require "./lifecycle/manager"
-
-module Hwaro
-  module Core
-    module Lifecycle
-      # Re-export for convenience
-    end
-  end
-end

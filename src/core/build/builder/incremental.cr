@@ -1085,7 +1085,6 @@ module Hwaro
           deferred_ctx.sections = site.sections
           deferred_ctx.templates = templates
           deferred_ctx.output_dir = output_dir
-          deferred_ctx.cache = @cache
           deferred_ctx.priority_pages = nil
           deferred_ctx.profiler = @profiler if @profiler.try(&.enabled?)
           # Still a partial pass — the priority pass just wrote OG

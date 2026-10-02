@@ -370,13 +370,13 @@ describe "Render hooks: --cache invalidation on a hook template edit" do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-        builder.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
         File.read("public/index.html").should contain(%(class="v1"))
 
         File.write("templates/hooks/render-link.html", %(<a class="v2" href="{{ destination }}">{{ text }}</a>))
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.read("public/index.html").should contain(%(class="v2"))
       end
@@ -395,13 +395,13 @@ describe "Render hooks: --cache invalidation on a hook template edit" do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-        builder.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
         File.read("public/index.html").should contain(%(class="v1"))
 
         File.write("templates/hooks/render-link.html", %(<a class="v2" href="{{ destination }}">{{ text }}</a>))
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.read("public/index.html").should contain(%(class="v2"))
       end

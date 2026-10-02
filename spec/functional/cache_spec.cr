@@ -46,14 +46,14 @@ describe "Cache: Rebuild with no changes" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?(".hwaro_cache.json").should be_true
 
         # Second build (no changes)
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         # Output should still be valid
         File.exists?("public/page/index.html").should be_true
@@ -77,7 +77,7 @@ describe "Cache: Rebuild after file change" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         html1 = File.read("public/page/index.html")
         html1.should contain("Original content")
@@ -89,7 +89,7 @@ describe "Cache: Rebuild after file change" do
         # Rebuild
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         html2 = File.read("public/page/index.html")
         html2.should contain("Updated content")
@@ -112,7 +112,7 @@ describe "Cache: Rebuild with new file added" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/page1/index.html").should be_true
         File.exists?("public/page2/index.html").should be_false
@@ -124,7 +124,7 @@ describe "Cache: Rebuild with new file added" do
         # Rebuild
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/page1/index.html").should be_true
         File.exists?("public/page2/index.html").should be_true
@@ -173,7 +173,7 @@ describe "Cache: i18n change invalidation" do
 
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
         File.read("public/page/index.html").should contain("Hello")
 
         sleep 100.milliseconds
@@ -181,7 +181,7 @@ describe "Cache: i18n change invalidation" do
 
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         html = File.read("public/page/index.html")
         html.should contain("Bonjour")
@@ -204,7 +204,7 @@ describe "Cache: Template change invalidation" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         html1 = File.read("public/page/index.html")
         html1.should contain("<div>")
@@ -216,7 +216,7 @@ describe "Cache: Template change invalidation" do
         # Rebuild — template hash change should force rebuild
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         html2 = File.read("public/page/index.html")
         html2.should contain("<section>")
@@ -239,7 +239,7 @@ describe "Cache: Config change invalidation" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/page/index.html").should be_true
 
@@ -251,7 +251,7 @@ describe "Cache: Config change invalidation" do
         # Rebuild — config hash change should force rebuild
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/page/index.html").should be_true
       end
@@ -272,7 +272,7 @@ describe "Cache: Full rebuild flag" do
         # First build with cache
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?(".hwaro_cache.json").should be_true
 
@@ -312,7 +312,7 @@ describe "Cache: Content checksum verification" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         html1 = File.read("public/page/index.html")
         html1.should contain("Original content")
@@ -324,7 +324,7 @@ describe "Cache: Content checksum verification" do
         # Rebuild
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         html2 = File.read("public/page/index.html")
         html2.should contain("Modified content")
@@ -371,7 +371,7 @@ describe "Cache: empty-site hint" do
 
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         # Capture the second (no-op) build's log.
         io = IO::Memory.new
@@ -380,7 +380,7 @@ describe "Cache: empty-site hint" do
         begin
           builder2 = Hwaro::Core::Build::Builder.new
           Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-          builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+          builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
         ensure
           Hwaro::Logger.io = prev
         end
@@ -406,7 +406,7 @@ describe "Cache: empty-site hint" do
         begin
           builder = Hwaro::Core::Build::Builder.new
           Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-          builder.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+          builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
         ensure
           Hwaro::Logger.io = prev
         end

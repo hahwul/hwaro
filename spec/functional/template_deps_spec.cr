@@ -17,7 +17,7 @@ private def make_builder
 end
 
 private def run_build(builder, cache : Bool = false)
-  builder.run(output_dir: "public", parallel: false, cache: cache, highlight: false, verbose: false, profile: false)
+  builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: cache, highlight: false, verbose: false, profile: false))
 end
 
 private def write_dep_site

@@ -11,7 +11,7 @@ describe "Asset Colocation" do
         File.write("content/blog/my-post/image.png", "dummy image content")
 
         # Build
-        Hwaro::Core::Build::Builder.new.run(output_dir: "public")
+        Hwaro::Core::Build::Builder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
 
         # Verify
         File.exists?("public/blog/my-post/index.html").should be_true
@@ -31,7 +31,7 @@ describe "Asset Colocation" do
         File.write("content/gallery/logo.png", "dummy logo content")
 
         # Build
-        Hwaro::Core::Build::Builder.new.run(output_dir: "public")
+        Hwaro::Core::Build::Builder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
 
         # Verify
         File.exists?("public/gallery/index.html").should be_true
@@ -52,7 +52,7 @@ describe "Asset Colocation" do
         File.write("content/project/assets/css/style.css", "body { color: red; }")
 
         # Build
-        Hwaro::Core::Build::Builder.new.run(output_dir: "public")
+        Hwaro::Core::Build::Builder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
 
         # Verify
         File.exists?("public/project/index.html").should be_true
@@ -74,7 +74,7 @@ describe "Asset Colocation" do
         File.write("content/sibling.txt", "sibling content")
 
         # Build
-        Hwaro::Core::Build::Builder.new.run(output_dir: "public")
+        Hwaro::Core::Build::Builder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
 
         # Verify page exists
         File.exists?("public/about/index.html").should be_true

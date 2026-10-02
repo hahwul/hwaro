@@ -1135,94 +1135,6 @@ describe Hwaro::Core::Build::Cache do
   end
 
   # ===========================================================================
-  # filter_changed
-  # ===========================================================================
-  describe "#filter_changed" do
-    it "returns all files when cache is disabled" do
-      cache = Hwaro::Core::Build::Cache.new(enabled: false)
-      files = ["a.md", "b.md", "c.md"]
-      cache.filter_changed(files).should eq(files)
-    end
-
-    it "returns only changed files" do
-      Dir.mktmpdir do |dir|
-        cache_path = File.join(dir, ".hwaro_cache.json")
-        file1 = File.join(dir, "unchanged.md")
-        file2 = File.join(dir, "changed.md")
-        file3 = File.join(dir, "new.md")
-
-        File.write(file1, "content1")
-        File.write(file2, "content2")
-        File.write(file3, "content3")
-
-        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.update(file1)
-        cache.update(file2)
-
-        sleep 10.milliseconds
-        File.write(file2, "modified content2")
-
-        changed = cache.filter_changed([file1, file2, file3])
-        changed.should contain(file2)
-        changed.should contain(file3)
-        changed.should_not contain(file1)
-      end
-    end
-
-    it "returns empty array when nothing changed" do
-      Dir.mktmpdir do |dir|
-        cache_path = File.join(dir, ".hwaro_cache.json")
-        file1 = File.join(dir, "a.md")
-        file2 = File.join(dir, "b.md")
-        File.write(file1, "a")
-        File.write(file2, "b")
-
-        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.update(file1)
-        cache.update(file2)
-
-        cache.filter_changed([file1, file2]).should be_empty
-      end
-    end
-
-    it "handles empty input array" do
-      Dir.mktmpdir do |dir|
-        cache_path = File.join(dir, ".hwaro_cache.json")
-        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.filter_changed([] of String).should be_empty
-      end
-    end
-
-    it "includes non-existent files as changed" do
-      Dir.mktmpdir do |dir|
-        cache_path = File.join(dir, ".hwaro_cache.json")
-        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        changed = cache.filter_changed(["ghost1.md", "ghost2.md"])
-        changed.size.should eq(2)
-      end
-    end
-
-    it "preserves order of changed files" do
-      Dir.mktmpdir do |dir|
-        cache_path = File.join(dir, ".hwaro_cache.json")
-        files = (1..5).map do |i|
-          path = File.join(dir, "f#{i}.md")
-          File.write(path, "c#{i}")
-          path
-        end
-
-        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        # Only cache f1 and f3
-        cache.update(files[0])
-        cache.update(files[2])
-
-        changed = cache.filter_changed(files)
-        changed.should eq([files[1], files[3], files[4]])
-      end
-    end
-  end
-
-  # ===========================================================================
   # output_paths_for
   # ===========================================================================
   describe "#output_paths_for" do
@@ -1737,44 +1649,7 @@ describe Hwaro::Core::Build::Cache, "compute helpers" do
     )
   end
 
-  it "computes config hash from file" do
-    Dir.mktmpdir do |dir|
-      config_path = File.join(dir, "config.toml")
-      File.write(config_path, "title = \"test\"")
-      hash = Hwaro::Core::Build::Cache.compute_config_hash(config_path)
-      hash.should_not be_empty
-    end
-  end
-
-  it "returns empty string for missing config" do
-    Hwaro::Core::Build::Cache.compute_config_hash("/nonexistent/config.toml").should eq("")
-  end
-
-  it "produces different hash for different config content" do
-    Dir.mktmpdir do |dir|
-      path1 = File.join(dir, "config1.toml")
-      path2 = File.join(dir, "config2.toml")
-      File.write(path1, "title = \"v1\"")
-      File.write(path2, "title = \"v2\"")
-
-      h1 = Hwaro::Core::Build::Cache.compute_config_hash(path1)
-      h2 = Hwaro::Core::Build::Cache.compute_config_hash(path2)
-      h1.should_not eq(h2)
-    end
-  end
-
-  it "computes consistent config hash" do
-    Dir.mktmpdir do |dir|
-      config_path = File.join(dir, "config.toml")
-      File.write(config_path, "title = \"test\"")
-
-      h1 = Hwaro::Core::Build::Cache.compute_config_hash(config_path)
-      h2 = Hwaro::Core::Build::Cache.compute_config_hash(config_path)
-      h1.should eq(h2)
-    end
-  end
-
-  # --- effective-config overload: compute_config_hash(config, env) ---------
+  # --- compute_config_hash(config, env) ---------------------------------------
   it "folds the active env into the effective config hash" do
     config = Hwaro::Models::Config.new
     prod = Hwaro::Core::Build::Cache.compute_config_hash(config, env: "prod")

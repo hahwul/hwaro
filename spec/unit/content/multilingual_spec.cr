@@ -99,7 +99,7 @@ describe Hwaro::Content::Multilingual do
           TOML
 
         builder = Hwaro::Core::Build::Builder.new
-        builder.run(output_dir: "public", drafts: false, minify: false, parallel: false, cache: false, highlight: true, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", drafts: false, minify: false, parallel: false, cache: false, highlight: true, verbose: false, profile: false))
 
         File.exists?("public/about/index.html").should be_true
         File.exists?("public/ko/about/index.html").should be_true

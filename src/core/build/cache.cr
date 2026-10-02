@@ -509,12 +509,6 @@ module Hwaro
           false
         end
 
-        # Check multiple files for changes (returns changed files)
-        def filter_changed(files : Array(String)) : Array(String)
-          return files unless @enabled
-          files.select { |f| changed?(f) }
-        end
-
         # Secondary output files (beyond the primary HTML output) recorded for
         # `file_path` on the last build, or `[]` when the entry has none (or
         # doesn't exist). Used to detect a manually deleted sibling format
@@ -837,17 +831,9 @@ module Hwaro
           @enabled
         end
 
-        # Compute MD5 checksum of a file's content (streaming to avoid
-        # loading large files entirely into memory)
+        # MD5 checksum of a file's content (streamed by Digest#file)
         def compute_file_hash(file_path : String) : String
-          digest = Digest::MD5.new
-          buffer = Bytes.new(8192)
-          File.open(file_path, "r") do |io|
-            while (bytes_read = io.read(buffer)) > 0
-              digest.update(buffer[0, bytes_read])
-            end
-          end
-          digest.final.hexstring
+          Digest::MD5.new.file(file_path).final.hexstring
         end
 
         # Compute a combined checksum for a set of template files.
@@ -876,15 +862,6 @@ module Hwaro
           root = File.expand_path(Dir.current)
           return expanded unless expanded.starts_with?(root + File::SEPARATOR)
           expanded[(root.size + 1)..]
-        end
-
-        # Compute a checksum for the config file
-        def self.compute_config_hash(config_path : String = "config.toml") : String
-          if File.exists?(config_path)
-            Digest::MD5.hexdigest(File.read(config_path))
-          else
-            ""
-          end
         end
 
         # Fingerprint the CLI options that change what a page RENDERS TO.

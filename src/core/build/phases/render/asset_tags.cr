@@ -73,7 +73,7 @@ module Hwaro::Core::Build::Phases::Render
     return "" unless has_local_highlight || has_auto_includes
 
     digest = Digest::MD5.new
-    cache_bust_inputs(config).each { |file| digest_file(digest, file) }
+    cache_bust_inputs(config).each { |file| digest.file(file) }
     digest.hexfinal[0, 8]
   end
 
@@ -128,15 +128,5 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     files
-  end
-
-  # Stream file contents into digest to avoid loading entire file into memory
-  private def digest_file(digest : Digest::MD5, path : String)
-    File.open(path, "r") do |io|
-      buffer = Bytes.new(8192)
-      while (n = io.read(buffer)) > 0
-        digest.update(buffer[0, n])
-      end
-    end
   end
 end

@@ -136,7 +136,7 @@ describe "Sass build integration" do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-        builder.run(output_dir: "public", verbose: false).should be_true
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", verbose: false)).should be_true
         File.read("public/css/style.css").should contain("#111111")
 
         File.write("static/css/_vars.scss", "$primary: #222222;")

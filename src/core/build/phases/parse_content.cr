@@ -10,10 +10,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     profiler.start_phase("ParseContent")
     result = @lifecycle.run_phase(Lifecycle::Phase::ParseContent, ctx) do
       Logger.status_phase("parse")
-      # Default parsing if no hooks registered
-      unless @lifecycle.has_hooks?(Lifecycle::HookPoint::BeforeParseContent)
-        parse_content_default(ctx)
-      end
+      parse_content_default(ctx)
     end
     profiler.end_phase
     return result if result != Lifecycle::HookResult::Continue
@@ -510,44 +507,22 @@ module Hwaro::Core::Build::Phases::ParseContent
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(pages.size)
 
-    done = Channel(Nil).new(pages.size)
-    work_queue = Channel(Models::Page).new(pages.size)
-
-    # Enqueue all pages
-    pages.each { |page| work_queue.send(page) }
-    work_queue.close
-
     # Track the first classified frontmatter error seen by any worker so
     # the build can abort deterministically after draining the queue.
     classified_error : Hwaro::HwaroError? = nil
     error_mutex = Mutex.new
 
-    # Spawn workers
-    worker_count.times do
-      spawn do
-        while page = work_queue.receive?
-          begin
-            parse_single_page(page)
-          rescue ex : Hwaro::HwaroError
-            error_mutex.synchronize do
-              classified_error ||= ex
-            end
-            page.parse_failed = true
-          rescue ex
-            page.parse_failed = true
-            Logger.warn "Failed to parse #{page.path}: #{ex.message}"
-          ensure
-            # Must run even if a rescue handler raises: a missing send leaves
-            # the `pages.size.times { done.receive }` wait below one short and
-            # the build hangs instead of surfacing the error.
-            done.send(nil)
-          end
-        end
+    ParallelHelper.each_concurrently(pages, worker_count) do |page, _worker_id|
+      parse_single_page(page)
+    rescue ex : Hwaro::HwaroError
+      error_mutex.synchronize do
+        classified_error ||= ex
       end
+      page.parse_failed = true
+    rescue ex
+      page.parse_failed = true
+      Logger.warn "Failed to parse #{page.path}: #{ex.message}"
     end
-
-    # Wait for all pages to finish
-    pages.size.times { done.receive }
 
     # Surface the first classified frontmatter error now that all workers
     # have drained. We prefer this over re-raising inside the worker fiber
@@ -729,16 +704,12 @@ module Hwaro::Core::Build::Phases::ParseContent
   # build's alias handling (`tool export`, `tool platform`) cannot drift.
 
   private def site_relative_aliases(aliases : Array(String), page_path : String) : Array(String)
-    return aliases unless aliases.any? { |a| external_alias?(a) }
+    return aliases unless aliases.any? { |a| Utils::PathUtils.external_alias?(a) }
     aliases.reject do |a|
-      next false unless external_alias?(a)
+      next false unless Utils::PathUtils.external_alias?(a)
       Logger.warn "Skipping alias #{a.inspect} on #{page_path}: an alias is a path on this site, not an absolute or protocol-relative URL."
       true
     end
-  end
-
-  private def external_alias?(value : String) : Bool
-    Utils::PathUtils.external_alias?(value)
   end
 
   # Cascade values arrive as ExtraValue; tags/taxonomies/authors need plain

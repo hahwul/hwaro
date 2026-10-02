@@ -1,6 +1,5 @@
 require "../../../spec_helper"
 require "../../../../src/core/lifecycle/context"
-require "../../../../src/core/build/cache"
 
 describe Hwaro::Core::Lifecycle::RawFile do
   describe "#initialize" do
@@ -8,38 +7,6 @@ describe Hwaro::Core::Lifecycle::RawFile do
       raw = Hwaro::Core::Lifecycle::RawFile.new("content/data.json", "data.json")
       raw.source_path.should eq("content/data.json")
       raw.relative_path.should eq("data.json")
-    end
-
-    it "extracts extension from source_path" do
-      raw = Hwaro::Core::Lifecycle::RawFile.new("content/data.json", "data.json")
-      raw.extension.should eq(".json")
-    end
-
-    it "normalizes extension to lowercase" do
-      raw = Hwaro::Core::Lifecycle::RawFile.new("content/data.JSON", "data.JSON")
-      raw.extension.should eq(".json")
-    end
-
-    it "handles xml extension" do
-      raw = Hwaro::Core::Lifecycle::RawFile.new("content/feed.xml", "feed.xml")
-      raw.extension.should eq(".xml")
-    end
-
-    it "handles files with no extension" do
-      raw = Hwaro::Core::Lifecycle::RawFile.new("content/Makefile", "Makefile")
-      raw.extension.should eq("")
-    end
-
-    it "handles nested paths" do
-      raw = Hwaro::Core::Lifecycle::RawFile.new("content/api/v1/data.json", "api/v1/data.json")
-      raw.source_path.should eq("content/api/v1/data.json")
-      raw.relative_path.should eq("api/v1/data.json")
-      raw.extension.should eq(".json")
-    end
-
-    it "handles files with multiple dots" do
-      raw = Hwaro::Core::Lifecycle::RawFile.new("content/file.test.json", "file.test.json")
-      raw.extension.should eq(".json")
     end
   end
 end
@@ -51,7 +18,6 @@ describe Hwaro::Core::Lifecycle::BuildStats do
       stats.pages_read.should eq(0)
       stats.pages_rendered.should eq(0)
       stats.pages_skipped.should eq(0)
-      stats.files_written.should eq(0)
       stats.cache_hits.should eq(0)
       stats.raw_files_processed.should eq(0)
     end
@@ -104,12 +70,6 @@ describe Hwaro::Core::Lifecycle::BuildStats do
       stats.pages_skipped.should eq(3)
     end
 
-    it "can increment files_written" do
-      stats = Hwaro::Core::Lifecycle::BuildStats.new
-      stats.files_written = 42
-      stats.files_written.should eq(42)
-    end
-
     it "can increment cache_hits" do
       stats = Hwaro::Core::Lifecycle::BuildStats.new
       stats.cache_hits = 7
@@ -156,12 +116,6 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.templates.should be_empty
     end
 
-    it "starts with empty metadata hash" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-      ctx.metadata.should be_empty
-    end
-
     it "uses output_dir from options" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "dist")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -186,17 +140,10 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.config.should be_nil
     end
 
-    it "starts with nil cache" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-      ctx.cache.should be_nil
-    end
-
     it "initializes BuildStats" do
       options = Hwaro::Config::Options::BuildOptions.new
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
       ctx.stats.pages_read.should eq(0)
-      ctx.stats.files_written.should eq(0)
     end
   end
 
@@ -241,102 +188,6 @@ describe Hwaro::Core::Lifecycle::BuildContext do
     end
   end
 
-  describe "#set and #get_string" do
-    it "stores and retrieves a string value" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("theme", "dark")
-      ctx.get_string("theme").should eq("dark")
-    end
-
-    it "returns default for missing string key" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.get_string("missing").should eq("")
-      ctx.get_string("missing", "fallback").should eq("fallback")
-    end
-
-    it "returns default when value is not a string" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("flag", true)
-      ctx.get_string("flag", "default").should eq("default")
-    end
-  end
-
-  describe "#set and #get_bool" do
-    it "stores and retrieves a bool value" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("debug", true)
-      ctx.get_bool("debug").should be_true
-    end
-
-    it "returns default for missing bool key" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.get_bool("missing").should be_false
-      ctx.get_bool("missing", true).should be_true
-    end
-
-    it "returns default when value is not a bool" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("count", 5)
-      ctx.get_bool("count", false).should be_false
-    end
-
-    it "returns a stored false even when the default is true" do
-      # Regression: `value || default` would collapse a stored false to the
-      # truthy default, inverting a flag a previous hook intentionally set.
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("flag", false)
-      ctx.get_bool("flag", true).should be_false
-    end
-  end
-
-  describe "#set and #get_int" do
-    it "stores and retrieves an int value" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("count", 42)
-      ctx.get_int("count").should eq(42)
-    end
-
-    it "returns default for missing int key" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.get_int("missing").should eq(0)
-      ctx.get_int("missing", 99).should eq(99)
-    end
-
-    it "returns a stored 0 even when the default is non-zero" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("n", 0)
-      ctx.get_int("n", 99).should eq(0)
-    end
-
-    it "returns default when value is not an int" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("name", "hello")
-      ctx.get_int("name", 0).should eq(0)
-    end
-  end
-
   describe "mutable collections" do
     it "can add pages" do
       options = Hwaro::Config::Options::BuildOptions.new
@@ -361,7 +212,7 @@ describe Hwaro::Core::Lifecycle::BuildContext do
 
       ctx.raw_files << Hwaro::Core::Lifecycle::RawFile.new("content/data.json", "data.json")
       ctx.raw_files.size.should eq(1)
-      ctx.raw_files.first.extension.should eq(".json")
+      ctx.raw_files.first.relative_path.should eq("data.json")
     end
 
     it "can add templates" do
@@ -392,15 +243,6 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.config.should_not be_nil
     end
 
-    it "can assign cache" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      cache = Hwaro::Core::Build::Cache.new(enabled: false)
-      ctx.cache = cache
-      ctx.cache.should_not be_nil
-    end
-
     it "can update output_dir" do
       options = Hwaro::Config::Options::BuildOptions.new
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -418,43 +260,14 @@ describe Hwaro::Core::Lifecycle::BuildContext do
       ctx.stats.pages_read = 10
       ctx.stats.pages_rendered = 8
       ctx.stats.pages_skipped = 2
-      ctx.stats.files_written = 15
       ctx.stats.cache_hits = 3
       ctx.stats.raw_files_processed = 4
 
       ctx.stats.pages_read.should eq(10)
       ctx.stats.pages_rendered.should eq(8)
       ctx.stats.pages_skipped.should eq(2)
-      ctx.stats.files_written.should eq(15)
       ctx.stats.cache_hits.should eq(3)
       ctx.stats.raw_files_processed.should eq(4)
-    end
-  end
-
-  describe "metadata overwrites" do
-    it "overwrites existing metadata key" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("key", "value1")
-      ctx.get_string("key").should eq("value1")
-
-      ctx.set("key", "value2")
-      ctx.get_string("key").should eq("value2")
-    end
-
-    it "allows different types for different keys" do
-      options = Hwaro::Config::Options::BuildOptions.new
-      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
-
-      ctx.set("name", "hwaro")
-      ctx.set("debug", true)
-      ctx.set("count", 42)
-      ctx.set("ratio", 3.14)
-
-      ctx.get_string("name").should eq("hwaro")
-      ctx.get_bool("debug").should be_true
-      ctx.get_int("count").should eq(42)
     end
   end
 

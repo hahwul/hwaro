@@ -654,81 +654,16 @@ module Hwaro
           end
         end
 
-        # Access lifecycle for external hook registration
-        def lifecycle : Lifecycle::Manager
-          @lifecycle
-        end
-
         # Register a Hookable module
         def register(hookable : Lifecycle::Hookable)
           @lifecycle.register(hookable)
           self
         end
 
-        # Keyword-argument convenience form of `run`: packs the arguments
-        # into a BuildOptions and delegates to the struct overload, which is
-        # the REAL implementation. Callers holding a BuildOptions (the build
-        # command, the serve watcher) must call that overload directly so
-        # fields this form doesn't expose — `full`, `serve_mode`, `workers`
-        # — reach the build context verbatim instead of being silently
-        # dropped in a re-pack.
-        def run(
-          output_dir : String = "public",
-          base_url : String? = nil,
-          drafts : Bool = false,
-          include_expired : Bool = false,
-          include_future : Bool = false,
-          minify : Bool = false,
-          parallel : Bool = true,
-          cache : Bool = false,
-          full : Bool = false,
-          highlight : Bool = true,
-          verbose : Bool = false,
-          profile : Bool = false,
-          debug : Bool = false,
-          error_overlay : Bool = false,
-          stream : Bool = false,
-          memory_limit : String? = nil,
-          env : String? = nil,
-          fast_start : Bool = false,
-          fast_start_count : Int32 = 20,
-          skip_og_image : Bool = false,
-          skip_image_processing : Bool = false,
-          preserve_output : Bool = false,
-          cache_busting : Bool = true,
-        ) : Bool
-          run(Config::Options::BuildOptions.new(
-            output_dir: output_dir,
-            base_url: base_url,
-            drafts: drafts,
-            include_expired: include_expired,
-            include_future: include_future,
-            minify: minify,
-            parallel: parallel,
-            cache: cache,
-            full: full,
-            highlight: highlight,
-            verbose: verbose,
-            profile: profile,
-            debug: debug,
-            error_overlay: error_overlay,
-            stream: stream,
-            memory_limit: memory_limit,
-            env: env,
-            fast_start: fast_start,
-            fast_start_count: fast_start_count,
-            skip_og_image: skip_og_image,
-            skip_image_processing: skip_image_processing,
-            preserve_output: preserve_output,
-            cache_busting: cache_busting,
-          ))
-        end
-
-        # Full build — the real implementation behind both `run` forms.
-        # The incoming struct is stored on the BuildContext verbatim, so
-        # fields the keyword form doesn't expose (`full`, `serve_mode`)
-        # survive to the phases and hooks that branch on them (`--full`
-        # cache clearing, `[og.image] lazy_generate` under serve).
+        # Full build. The incoming struct is stored on the BuildContext
+        # verbatim, so every field (`full`, `serve_mode`, …) reaches the
+        # phases and hooks that branch on them (`--full` cache clearing,
+        # `[og.image] lazy_generate` under serve).
         #
         # Returns false when the build failed without raising (pre-hook
         # failure or a phase abort) — the serve watcher branches on this to

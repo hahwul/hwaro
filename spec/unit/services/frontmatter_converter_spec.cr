@@ -503,8 +503,8 @@ describe Hwaro::Services::FrontmatterConverter do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
-        builder.run(output_dir: "public-after", drafts: false, minify: false, parallel: false,
-          cache: false, highlight: false, verbose: false, profile: false, stream: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public-after", drafts: false, minify: false, parallel: false,
+          cache: false, highlight: false, verbose: false, profile: false, stream: false))
 
         converter_build_tree(File.join(dir, "public-after")).should eq(before)
       end

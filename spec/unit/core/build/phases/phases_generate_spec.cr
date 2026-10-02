@@ -1,4 +1,5 @@
 require "../../../../spec_helper"
+require "../../../../support/build_helper"
 require "../../../../../src/core/build/builder"
 
 # Reopen Builder to expose private Generate phase entry point.
@@ -82,7 +83,7 @@ describe Hwaro::Core::Build::Phases::Generate do
           builder.test_set_generate_site(site)
 
           # Register a hook so the default SEO generation is skipped
-          builder.lifecycle.before(Hwaro::Core::Lifecycle::Phase::Generate, name: "test-skip") do |_ctx|
+          builder.test_lifecycle.on(Hwaro::Core::Lifecycle::HookPoint::BeforeGenerate, name: "test-skip") do |_ctx|
             Hwaro::Core::Lifecycle::HookResult::Continue
           end
 

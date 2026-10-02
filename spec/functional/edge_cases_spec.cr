@@ -167,7 +167,7 @@ describe "Edge Cases: Template changes on rebuild" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false))
 
         html1 = File.read("public/page/index.html")
         html1.should contain("V1=")
@@ -178,7 +178,7 @@ describe "Edge Cases: Template changes on rebuild" do
         # Rebuild
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false))
 
         html2 = File.read("public/page/index.html")
         html2.should contain("V2=")
@@ -204,7 +204,7 @@ describe "Edge Cases: Cache rebuild after file deletion" do
         # First build
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/page1/index.html").should be_true
         File.exists?("public/page2/index.html").should be_true
@@ -216,7 +216,7 @@ describe "Edge Cases: Cache rebuild after file deletion" do
         # Rebuild
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/page1/index.html").should be_true
         # page2 output should no longer exist after rebuild

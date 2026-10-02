@@ -2,7 +2,7 @@
 #
 # Provides a single entry point for all runtime caches used during builds.
 # Each cache registers with the manager, enabling:
-# - Bulk invalidation (clear all / clear runtime only)
+# - Bulk invalidation (clear runtime only)
 # - Selective invalidation for incremental builds
 # - Cache hit/miss tracking and stats reporting (lock-free via Atomic)
 # - Debug-friendly status inspection
@@ -107,18 +107,6 @@ module Hwaro
           end
         end
 
-        # Clear all registered caches (both runtime and persistent).
-        # Pass `reset_stats: false` to preserve hit/miss counters (e.g. for
-        # memory-management clears where you still want end-of-build reporting).
-        def clear_all(reset_stats : Bool = true)
-          @mutex.synchronize do
-            @layers.each_value do |layer|
-              layer.clear_proc.call
-              layer.stats.reset if reset_stats
-            end
-          end
-        end
-
         # Clear only runtime (in-memory) caches, preserving persistent caches.
         # Pass `reset_stats: false` to preserve hit/miss counters.
         def clear_runtime(reset_stats : Bool = true)
@@ -143,21 +131,6 @@ module Hwaro
                 layer.stats.reset if reset_stats
               end
             end
-          end
-        end
-
-        # Reset all hit/miss counters without clearing cache contents.
-        def reset_stats
-          @mutex.synchronize do
-            @layers.each_value(&.stats.reset)
-          end
-        end
-
-        # Get an immutable stats snapshot for a specific cache layer.
-        def stats_for(name : String) : {hits: Int64, misses: Int64, hit_rate: Float64}?
-          if layer = @layers[name]?
-            s = layer.stats
-            {hits: s.hits, misses: s.misses, hit_rate: s.hit_rate}
           end
         end
 
@@ -202,16 +175,6 @@ module Hwaro
               Logger.info "  [#{type_label}] #{s[:name]}: no activity — #{s[:description]}"
             end
           end
-        end
-
-        # Number of registered layers.
-        def size : Int32
-          @layers.size
-        end
-
-        # Check if a layer is registered.
-        def registered?(name : String) : Bool
-          @layers.has_key?(name)
         end
       end
     end

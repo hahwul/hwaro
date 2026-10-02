@@ -7,18 +7,15 @@ describe Hwaro::Core::Build::ParallelConfig do
       config = Hwaro::Core::Build::ParallelConfig.new
       config.enabled.should be_true
       config.max_workers.should eq(0)
-      config.batch_size.should eq(10)
     end
 
     it "accepts custom values" do
       config = Hwaro::Core::Build::ParallelConfig.new(
         enabled: false,
         max_workers: 4,
-        batch_size: 20
       )
       config.enabled.should be_false
       config.max_workers.should eq(4)
-      config.batch_size.should eq(20)
     end
   end
 
@@ -229,63 +226,19 @@ describe Hwaro::Core::Build::Parallel do
       results.should be_empty
     end
   end
-
-  describe "#count_success" do
-    it "counts successful items" do
-      config = Hwaro::Core::Build::ParallelConfig.new(enabled: false)
-      processor = Hwaro::Core::Build::Parallel(Int32, Bool).new(config)
-
-      items = [1, 2, 3, 4, 5]
-      count = processor.count_success(items) { |_, _| true }
-      count.should eq(5)
-    end
-
-    it "excludes failed items from count" do
-      config = Hwaro::Core::Build::ParallelConfig.new(enabled: false)
-      processor = Hwaro::Core::Build::Parallel(Int32, Bool).new(config)
-
-      items = [1, 2, 3, 4, 5]
-      count = processor.count_success(items) do |item, _|
-        raise "fail" if item % 2 == 0
-        true
-      end
-      count.should eq(3) # 1, 3, 5 succeed
-    end
-
-    it "returns 0 for empty input" do
-      config = Hwaro::Core::Build::ParallelConfig.new(enabled: true)
-      processor = Hwaro::Core::Build::Parallel(String, Bool).new(config)
-      count = processor.count_success([] of String) { |_, _| true }
-      count.should eq(0)
-    end
-  end
 end
 
 describe Hwaro::Core::Build::ParallelHelper do
-  describe ".process_pages" do
-    it "processes items and counts successes" do
-      items = ["a", "b", "c", "d"]
-      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |_, _|
-        true
+  describe ".each_concurrently" do
+    it "handles every item once, on worker ids below the worker count" do
+      seen = [] of Int32
+      ids = Set(Int32).new
+      mutex = Mutex.new
+      Hwaro::Core::Build::ParallelHelper.each_concurrently((1..50).to_a, 4) do |item, worker_id|
+        mutex.synchronize { seen << item; ids << worker_id }
       end
-      count.should eq(4)
-    end
-
-    it "counts only successful items" do
-      items = [1, 2, 3, 4, 5]
-      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |item, _|
-        raise "skip even" if item % 2 == 0
-        true
-      end
-      count.should eq(3)
-    end
-
-    it "handles empty array" do
-      items = [] of String
-      count = Hwaro::Core::Build::ParallelHelper.process_pages(items, parallel: false) do |_, _|
-        true
-      end
-      count.should eq(0)
+      seen.sort.should eq((1..50).to_a)
+      ids.all? { |id| (0...4).includes?(id) }.should be_true
     end
   end
 
