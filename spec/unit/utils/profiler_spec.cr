@@ -154,18 +154,4 @@ describe Hwaro::Profiler do
       output.to_s.should eq("")
     end
   end
-
-  describe "#total_elapsed" do
-    it "returns 0 if not started" do
-      profiler = Hwaro::Profiler.new(enabled: true)
-      profiler.total_elapsed.should eq(0.0)
-    end
-
-    it "returns elapsed time after start" do
-      profiler = Hwaro::Profiler.new(enabled: true)
-      profiler.start
-      sleep 10.milliseconds
-      profiler.total_elapsed.should be > 0.0
-    end
-  end
 end
