@@ -84,7 +84,7 @@ module Hwaro
                             (config.attributes && (result.includes?('{') || scan.includes?(result, "<!--HATTR:")))
 
           if markers_present
-            result = process_lines_fence_aware(result) do |line, _in_fence|
+            result = process_lines_fence_aware(result) do |line|
               transformed = line
 
               # Author-typed engine markers are neutralized before the
@@ -107,7 +107,7 @@ module Hwaro
                 end
               end
 
-              if do_task_lists && !_in_fence &&
+              if do_task_lists &&
                  (transformed.includes?("[ ]") || transformed.includes?("[x]") || transformed.includes?("[X]"))
                 transformed = preprocess_task_lists(transformed)
               end

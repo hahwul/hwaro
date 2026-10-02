@@ -119,7 +119,7 @@ module Hwaro
           # footnote get unique ids (fnref-KEY, fnref-KEY-2, …) instead of
           # emitting duplicate `id` attributes (invalid HTML, ambiguous backref).
           ref_occurrences = Hash(String, Int32).new(0)
-          result = process_lines_fence_aware(cleaned) do |line, _|
+          result = process_lines_fence_aware(cleaned) do |line|
             next line unless line.includes?("[^")
 
             transform_outside_code_spans(line) do |stashed|

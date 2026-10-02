@@ -168,14 +168,14 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   describe "math" do
     it "wraps display math in div" do
       content = "$$E = mc^2$$"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("math-display")
       result.should contain("\\[E = mc^2\\]")
     end
 
     it "wraps inline math in span" do
       content = "The formula $x^2$ is simple."
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("math-inline")
       # Doubled backslashes so Markd's inline parser yields `\(...\)` after rendering;
       # see "math (extended) keeps KaTeX delimiters" below.
@@ -184,13 +184,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "does not match dollar signs with spaces" do
       content = "Price is $ 5 or $ 10"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should_not contain("math-inline")
     end
 
     it "escapes HTML in math" do
       content = "$$a < b > c$$"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("&lt;")
       result.should contain("&gt;")
     end
@@ -376,40 +376,40 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   describe "math (extended)" do
     it "handles multiline display math" do
       content = "$$\na + b\n= c\n$$"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("math-display")
       result.should contain("a + b")
     end
 
     it "does not match escaped dollar signs" do
       content = "Price is \\$5 each"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should_not contain("math-inline")
     end
 
     it "does not match dollar amount like $100" do
       content = "It costs $100 to buy"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       # $100 ends with digit, should not match due to (?!\d) lookahead
       result.should_not contain("math-inline")
     end
 
     it "handles math with ampersand" do
       content = "$$a & b$$"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("&amp;")
     end
 
     it "handles multiple inline math expressions" do
       content = "Both $x$ and $y$ are variables."
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       matches = result.scan(/math-inline/)
       matches.size.should eq(2)
     end
 
     it "handles empty display math" do
       content = "$$$$"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("math-display")
     end
 
@@ -439,7 +439,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "keeps an escaped dollar inside inline math" do
       content = "The price $x = \\$5$ is fixed."
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.scan("math-inline").size.should eq(1)
       # The whole formula (including the escaped dollar) lands in the span;
       # nothing dangles after it.
@@ -449,13 +449,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "leaves a body ending in a lone backslash unmatched" do
       content = "literal $a\\$ text"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should_not contain("math-inline")
     end
 
     it "does not pair display math across a blank line" do
       content = "before $$ stray\n\nprose here\n\n$$x$$"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("$$ stray")
       result.should contain("prose here")
       result.scan("math-display").size.should eq(1)
@@ -463,7 +463,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "does not pair display math across a whitespace-only line" do
       content = "$$ stray\n \t\nprose"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should_not contain("math-display")
     end
 
@@ -512,7 +512,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "keeps a <code> span with a quoted '>' attribute opaque to math" do
       content = %(<code data-x="a>b">$x$</code> and $y$)
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("$x$")
       result.scan("math-inline").size.should eq(1)
     end
@@ -749,7 +749,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   describe "heading ids" do
     it "extracts id from `## Heading {#custom-id}`" do
       content = "## My Heading {#custom-id}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should eq("## My Heading <!--HID:custom-id-->")
     end
 
@@ -773,7 +773,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "extracts a digit-leading id (#792)" do
       content = "## 1. Fuzzer로 요청 보내기 {#1-send-a-request-to-the-fuzzer}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should end_with("<!--HID:1-send-a-request-to-the-fuzzer-->")
       result.should_not contain("{#")
     end
@@ -791,19 +791,19 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "accepts an underscore-leading custom id" do
       content = "## Heading {#_private}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should eq("## Heading <!--HID:_private-->")
     end
 
     it "leaves a `{#}` with no id characters literal" do
       content = "## Heading {#}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should eq(content)
     end
 
     it "preserves headings without an id marker" do
       content = "## Plain heading"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should eq(content)
     end
 
@@ -858,7 +858,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
     it "handles each heading level h1-h6" do
       (1..6).each do |level|
         content = "#{"#" * level} Heading {#h#{level}}"
-        result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+        result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
         result.should contain("<!--HID:h#{level}-->")
       end
     end
@@ -875,7 +875,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "leaves heading-id syntax inside fenced code blocks alone" do
       content = "```markdown\n## Example {#example}\n```\n\n## Real heading {#real}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       # Inside the code fence: untouched
       result.should contain("## Example {#example}")
       # Outside the code fence: marker injected
@@ -884,26 +884,26 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "supports tilde-fenced code blocks" do
       content = "~~~\n## Example {#x}\n~~~"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should contain("## Example {#x}")
       result.should_not contain("HID:")
     end
 
     it "matches headings indented up to 3 spaces (CommonMark)" do
       content = "   ## Indented heading {#deep}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should eq("   ## Indented heading <!--HID:deep-->")
     end
 
     it "does not match a heading-like line indented 4+ spaces (code block)" do
       content = "    ## Looks like heading {#nope}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true))
       result.should eq(content)
     end
 
     it "strips {#id} syntax under safe mode and skips marker injection" do
       content = "## Foo {#bar}"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_heading_ids(content, safe: true)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(heading_ids: true).tap(&.safe=(true)))
       result.should eq("## Foo")
       result.should_not contain("HID:")
       result.should_not contain("{#")
@@ -985,19 +985,19 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
   describe "strikethrough" do
     it "converts ~~text~~ to <del> in body text" do
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_strikethrough("Some ~~deleted~~ thing.")
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess("Some ~~deleted~~ thing.", make_config)
       result.should contain("<del>deleted</del>")
     end
 
     it "leaves ~~ inside fenced code blocks alone" do
       content = "```\n~~not strike~~\n```\n\n~~yes strike~~"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_strikethrough(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config)
       result.should contain("~~not strike~~")
       result.should contain("<del>yes strike</del>")
     end
 
     it "leaves ~~ inside inline code spans alone" do
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_strikethrough("inline `~~code~~` here, ~~real~~ there")
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess("inline `~~code~~` here, ~~real~~ there", make_config)
       result.should contain("`~~code~~`")
       result.should contain("<del>real</del>")
     end
@@ -1062,7 +1062,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "leaves $ and $$ alone inside a > ``` fence" do
       content = "> ```make\n> echo $$PATH $HOME\n> ```"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should eq(content)
     end
 
@@ -1690,19 +1690,19 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   describe "math fence and code-span awareness" do
     it "leaves $$ inside fenced code blocks verbatim" do
       content = "```make\nall:\n\techo $$PATH\n\techo $$HOME\n```"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should eq(content)
     end
 
     it "leaves $...$ inside inline code spans verbatim" do
       content = "Use `$HOME` and `$PATH` to read env vars."
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should eq(content)
     end
 
     it "still renders math on a line that also has inline code" do
       content = "The value `x` equals $y+1$ here."
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("math-inline")
       result.should contain("`x`")
       result.should_not contain("$y+1$")
@@ -1710,7 +1710,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "uses single-backslash delimiters inside raw HTML blocks" do
       content = "<td>$x+y$</td>"
-      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_math(content)
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
       result.should contain("\\(x+y\\)")
       result.should_not contain("\\\\(")
     end
