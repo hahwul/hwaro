@@ -240,10 +240,6 @@ module Hwaro
         # Inline-markdown renderer used by definition lists (and now footnote
         # bodies). Delegates to the shared `InlineMarkdown` module so the same
         # rules apply across table cells, `<dt>/<dd>`, and `<section.footnotes>`.
-        private def render_inline_md(text : String, math : Bool = false) : String
-          InlineMarkdown.render(text, math: math)
-        end
-
         private def render_inline_md(text : String, flags : InlineMarkdown::Flags) : String
           InlineMarkdown.render(text, flags: flags)
         end

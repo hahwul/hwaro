@@ -128,15 +128,13 @@ module Hwaro
         # raw text. Code spans are extracted first so their content survives
         # the other passes verbatim.
         #
-        # With `math: true`, `$…$`/`$$…$$` spans are stashed too and restored
+        # With `flags.math`, `$…$`/`$$…$$` spans are stashed too and restored
         # UNtransformed: emphasis/strikethrough/link passes must not rewrite
         # formula internals (`$~~x~~$`, `$f([x])(y)$`), and the math
         # preprocess wraps the still-raw span afterwards.
         #
-        # `flags` controls the F10 opt-in inline markup (ins/mark/sub/sup)
-        # in addition to math — see `render(text, *, math:)` below, which is
-        # the pre-F10 signature every existing caller/spec still uses.
-        def render(text : String, *, flags : Flags) : String
+        # `flags` also controls the F10 opt-in inline markup (ins/mark/sub/sup).
+        def render(text : String, *, flags : Flags = Flags.new) : String
           placeholders = [] of String
           if text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
             text = text.gsub(SHORTCODE_PLACEHOLDER_RE) do |comment|
@@ -275,13 +273,6 @@ module Hwaro
             comment = $1.to_i?.try { |idx| placeholders[idx]? }
             comment ? HTML.escape(comment) : token
           end
-        end
-
-        # Pre-F10 signature — delegates to the `Flags` overload with every
-        # new transform off, so every existing caller/spec keeps compiling
-        # and rendering exactly as before.
-        def render(text : String, *, math : Bool = false) : String
-          render(text, flags: Flags.new(math: math))
         end
 
         # Returns true for URLs we're willing to emit in a generated `href`/`src`.

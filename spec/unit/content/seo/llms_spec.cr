@@ -7,7 +7,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.enabled = false
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
         File.exists?(File.join(output_dir, "llms.txt")).should be_false
       end
     end
@@ -18,7 +18,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "This is a test site for AI crawlers."
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
 
         file_path = File.join(output_dir, "llms.txt")
         File.exists?(file_path).should be_true
@@ -34,7 +34,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "Instructions"
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
         File.exists?(File.join(output_dir, "llms.txt")).should be_true
       end
     end
@@ -46,7 +46,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "Custom instructions"
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
         File.exists?(File.join(output_dir, "custom-llms.txt")).should be_true
       end
     end
@@ -63,7 +63,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = ""
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
 
         content = File.read(File.join(output_dir, "llms.txt"))
         content.should start_with("# Site\n")
@@ -77,7 +77,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "No trailing newline"
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
 
         content = File.read(File.join(output_dir, "llms.txt"))
         content.should end_with("\n")
@@ -90,7 +90,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "Line 1\nLine 2\nLine 3"
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
 
         content = File.read(File.join(output_dir, "llms.txt"))
         content.should contain("Line 1")

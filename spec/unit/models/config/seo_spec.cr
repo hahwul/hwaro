@@ -329,7 +329,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.enabled = false
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
         File.exists?(File.join(output_dir, "llms.txt")).should be_false
       end
     end
@@ -340,7 +340,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "This is a test site."
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
 
         llms_path = File.join(output_dir, "llms.txt")
         File.exists?(llms_path).should be_true
@@ -357,7 +357,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "Custom AI instructions"
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
         File.exists?(File.join(output_dir, "ai-instructions.txt")).should be_true
       end
     end
@@ -396,7 +396,7 @@ describe Hwaro::Content::Seo::Llms do
       config.llms.instructions = "No newline"
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Llms.generate(config, output_dir)
+        Hwaro::Content::Seo::Llms.generate(config, [] of Hwaro::Models::Page, output_dir)
 
         content = File.read(File.join(output_dir, "llms.txt"))
         content.should contain("No newline")
