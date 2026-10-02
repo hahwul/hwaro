@@ -74,23 +74,6 @@ module Hwaro
         )
       end
 
-      def run(
-        target_path : String,
-        force : Bool = false,
-        skip_agents_md : Bool = false,
-        skip_sample_content : Bool = false,
-        skip_taxonomies : Bool = false,
-        multilingual_languages : Array(String) = [] of String,
-        scaffold_type : Config::Options::ScaffoldType = Config::Options::ScaffoldType::Simple,
-        agents_mode : Config::Options::AgentsMode = Config::Options::AgentsMode::Remote,
-        minimal_config : Bool = false,
-        full_config : Bool = false,
-        clean : Bool = false,
-      )
-        scaffold = Scaffolds::Registry.get(scaffold_type)
-        run_with_scaffold(target_path, force, skip_agents_md, skip_sample_content, skip_taxonomies, multilingual_languages, scaffold, agents_mode, minimal_config, full_config, clean)
-      end
-
       private def run_with_scaffold(
         target_path : String,
         force : Bool,
