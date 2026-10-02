@@ -41,10 +41,9 @@ module Hwaro
       # bounds import resolution to the project directory. Raises
       # `Sass::SyntaxError` — build-facing callers convert it to a
       # classified `HwaroError`.
-      def self.compile(source : String, path : String = "(inline)",
-                       loader : Loader = FileLoader.new, root : String = Dir.current) : String
+      def self.compile(source : String, path : String = "(inline)", root : String = Dir.current) : String
         sheet = Parser.parse(source, path)
-        importer = Importer.new(loader, root)
+        importer = Importer.new(root)
         evaluator = Evaluator.new(importer, path)
         evaluator.seed_load_stack(File.expand_path(path, importer.root)) unless path == "(inline)"
         nodes = evaluator.evaluate(sheet)

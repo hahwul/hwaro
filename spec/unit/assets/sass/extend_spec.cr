@@ -106,10 +106,10 @@ describe "Sass @extend" do
   end
 
   it "applies extends recorded in @use'd modules" do
-    loader = Hwaro::Assets::Sass::MemoryLoader.new({
+    css = compile_with({
       "_lib.scss" => "%base { margin: 0; }\n.card { @extend %base; }",
-    })
-    css = Hwaro::Assets::Sass.compile("@use \"lib\";", path: "main.scss", loader: loader)
+      "main.scss" => "@use \"lib\";",
+    }, "main.scss")
     css.should contain(".card {\n  margin: 0;")
     css.should_not contain("%base")
   end
