@@ -16,8 +16,9 @@ require "../models/config"
 module Hwaro
   module Assets
     class SassCompiler
-      def initialize(@config : Models::SassConfig, @static_config : Models::StaticConfig,
-                     @source_dir : String = "static")
+      SOURCE_DIR = "static"
+
+      def initialize(@config : Models::SassConfig, @static_config : Models::StaticConfig)
       end
 
       # Compiles every entry file and returns the compiled count. Partials
@@ -26,16 +27,16 @@ module Hwaro
       # (Models::Config#sass_source?).
       def compile_all(output_dir : String) : Int32
         return 0 unless @config.enabled
-        return 0 unless Dir.exists?(@source_dir)
+        return 0 unless Dir.exists?(SOURCE_DIR)
 
         count = 0
         glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
         project_root = Dir.current
-        Dir.glob(File.join(@source_dir, "**", "*.scss"), match: glob_match) do |src_path|
+        Dir.glob(File.join(SOURCE_DIR, "**", "*.scss"), match: glob_match) do |src_path|
           next unless File.file?(src_path)
           next if File.basename(src_path).starts_with?("_")
 
-          relative = Path[src_path].relative_to(@source_dir).to_s
+          relative = Path[src_path].relative_to(SOURCE_DIR).to_s
           next if @static_config.excluded?(relative)
 
           # Entry paths used to skip the outside-symlink guard imports already
