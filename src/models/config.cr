@@ -77,7 +77,6 @@ module Hwaro
       property content_generate : Array(ContentGenerateConfig)
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
-      @base_url_stripped : String? = nil
       @base_path : String? = nil
       @multilingual : Bool? = nil
 
@@ -131,13 +130,7 @@ module Hwaro
       # (previously only `doctor --fix` normalized this).
       def base_url=(value : String)
         @base_url = value.rstrip("/")
-        @base_url_stripped = nil
         @base_path = nil
-      end
-
-      # Cached base_url with trailing slash stripped (avoids repeated rstrip per page)
-      def base_url_stripped : String
-        @base_url_stripped ||= @base_url.rstrip("/")
       end
 
       # Path component of `base_url`, used to make root-relative links work when
@@ -148,7 +141,7 @@ module Hwaro
       # can build `base_path + page.url` without producing `//`.
       def base_path : String
         @base_path ||= begin
-          stripped = base_url_stripped
+          stripped = @base_url
           if stripped.empty?
             ""
           else

@@ -152,7 +152,6 @@ describe Hwaro::Models::Config do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com/"
       config.base_url.should eq("https://example.com")
-      config.base_url_stripped.should eq("https://example.com")
     end
 
     it "strips a trailing slash from a subpath base_url" do

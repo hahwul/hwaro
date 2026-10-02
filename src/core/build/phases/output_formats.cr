@@ -176,13 +176,13 @@ module Hwaro::Core::Build::Phases::OutputFormats
 
   # `<link rel="alternate" type="MIME" href="ABS">` tags for every enabled
   # format on `page`, one per line — empty string when no formats apply.
-  # `ABS` matches the same `base_url_stripped + page.url` pattern used by
+  # `ABS` matches the same `base_url + page.url` pattern used by
   # `canonical_tag`/`hreflang_tags` so subpath deployments resolve correctly.
   def alternate_output_tags(page : Models::Page, config : Models::Config) : String
     formats = effective_output_formats(page, config)
     return "" if formats.empty?
 
-    base = config.base_url_stripped
+    base = config.base_url
     url_path = page.url.starts_with?("/") ? page.url : "/#{page.url}"
     # The sibling file is written at `<url>/index.<fmt>` (a directory join),
     # so the advertised href needs the separating slash too — otherwise a

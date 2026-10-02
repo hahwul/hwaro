@@ -276,7 +276,7 @@ module Hwaro
       end
 
       # `path` with exactly one leading slash, for joining onto a base URL
-      # that has none (`base_url_stripped`). The idiom used to be spelled
+      # that has none (`base_url`). The idiom used to be spelled
       # inline at every URL-building site.
       def root_relative(path : String) : String
         path.starts_with?("/") ? path : "/#{path}"
