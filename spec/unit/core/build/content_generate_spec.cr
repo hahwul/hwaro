@@ -307,8 +307,8 @@ describe "ContentLister with generated entries" do
         lister = Hwaro::Services::ContentLister.new("content", generated)
 
         # The build drops these pages (cascade draft), so "published" must too.
-        lister.list_published.any?(&.generated_from).should be_false
-        drafts = lister.list_drafts
+        lister.list_content(Hwaro::Services::ContentFilter::Published).any?(&.generated_from).should be_false
+        drafts = lister.list_content(Hwaro::Services::ContentFilter::Drafts)
         drafts.any? { |info| info.generated_from == "data.products" }.should be_true
       end
     end

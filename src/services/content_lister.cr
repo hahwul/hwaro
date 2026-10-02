@@ -249,16 +249,6 @@ module Hwaro
         list_content(ContentFilter::All)
       end
 
-      # List only draft content files
-      def list_drafts : Array(ContentInfo)
-        list_content(ContentFilter::Drafts)
-      end
-
-      # List only published content files
-      def list_published : Array(ContentInfo)
-        list_content(ContentFilter::Published)
-      end
-
       # List content files based on filter. `sort` picks the ordering key,
       # `reverse` flips it, and `limit` caps the result AFTER sorting — so
       # `--sort date --limit 5` means "the 5 newest", not 5 arbitrary files.
@@ -482,8 +472,8 @@ module Hwaro
                   draft_declared = true
                   draft = declared.as_bool? || false
                 end
-                date = parse_time(json_fm["date"]?.try(&.as_s?))
-                expires = parse_time(json_fm["expires"]?.try(&.as_s?))
+                date = Utils::DateUtils.parse_content_date(json_fm["date"]?.try(&.as_s?))
+                expires = Utils::DateUtils.parse_content_date(json_fm["expires"]?.try(&.as_s?))
               end
             rescue ex
               Logger.debug "JSON front matter parsing failed for #{file_path}: #{ex.message}"
@@ -516,12 +506,18 @@ module Hwaro
         PublishState::Published
       end
 
+      # String dates go through the build's own front-matter date parser
+      # (zone-less values in the local zone, the same accepted shapes), so a
+      # status and a `date` in the JSON payload agree with what `hwaro build`
+      # does. The lenient importer parser accepted shapes the build rejects —
+      # `"2099-01-01 10:00"` listed as `future` while the build treated it as
+      # undated and published it — and read zone-less values as UTC.
       private def toml_date(value : TOML::Any?) : Time?
         return unless value
         raw = value.raw
         case raw
         when Time   then raw
-        when String then parse_time(raw)
+        when String then Utils::DateUtils.parse_content_date(raw)
         end
       end
 
@@ -530,7 +526,7 @@ module Hwaro
         if time_val = value.as_time?
           time_val
         elsif str_val = value.as_s?
-          parse_time(str_val)
+          Utils::DateUtils.parse_content_date(str_val)
         end
       end
 
@@ -692,16 +688,6 @@ module Hwaro
         all = codes.to_a
         all << default unless default.empty?
         LanguageSetup.new(default, codes, all.uniq.size > 1)
-      end
-
-      # The build's own front-matter date parser (zone-less values in the
-      # local zone, the same accepted shapes), so a status and a `date` in
-      # the JSON payload agree with what `hwaro build` does. The lenient
-      # importer parser accepted shapes the build rejects — `"2099-01-01
-      # 10:00"` listed as `future` while the build treated it as undated and
-      # published it — and read zone-less values as UTC.
-      private def parse_time(time_str : String?) : Time?
-        Utils::DateUtils.parse_content_date(time_str)
       end
 
       # Cap a cell at `max_length` terminal COLUMNS. Measuring in codepoints

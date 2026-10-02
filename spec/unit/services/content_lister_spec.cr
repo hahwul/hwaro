@@ -117,8 +117,8 @@ describe Hwaro::Services::ContentLister do
     end
   end
 
-  describe "#list_drafts" do
-    it "delegates to list_content with Drafts filter" do
+  describe "ContentFilter::Drafts" do
+    it "lists only drafts files" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(content_dir)
@@ -127,7 +127,7 @@ describe Hwaro::Services::ContentLister do
         File.write(File.join(content_dir, "draft.md"), "---\ntitle: Draft\ndraft: true\n---\n\n# Content")
 
         lister = Hwaro::Services::ContentLister.new(content_dir)
-        result = lister.list_drafts
+        result = lister.list_content(Hwaro::Services::ContentFilter::Drafts)
 
         result.size.should eq(1)
         result.first.title.should eq("Draft")
@@ -135,8 +135,8 @@ describe Hwaro::Services::ContentLister do
     end
   end
 
-  describe "#list_published" do
-    it "delegates to list_content with Published filter" do
+  describe "ContentFilter::Published" do
+    it "lists only published files" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         FileUtils.mkdir_p(content_dir)
@@ -145,7 +145,7 @@ describe Hwaro::Services::ContentLister do
         File.write(File.join(content_dir, "draft.md"), "---\ntitle: Draft\ndraft: true\n---\n\n# Content")
 
         lister = Hwaro::Services::ContentLister.new(content_dir)
-        result = lister.list_published
+        result = lister.list_content(Hwaro::Services::ContentFilter::Published)
 
         result.size.should eq(1)
         result.first.title.should eq("Published")
