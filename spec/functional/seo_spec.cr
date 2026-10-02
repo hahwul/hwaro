@@ -518,14 +518,14 @@ describe "SEO: Custom feed templates" do
         # Cold build (no hooks: exercises the Generate phase's default
         # skip-if-unchanged path, which the hook-based CLI flow bypasses).
         builder1 = Hwaro::Core::Build::Builder.new
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
         File.read("public/rss.xml").should eq("FEED-V1")
 
         # Template-only edit, then a warm build in a fresh process: every
         # page is a cache hit (0 rendered), but the feed must not skip.
         File.write("templates/rss.xml.jinja", "FEED-V2")
         builder2 = Hwaro::Core::Build::Builder.new
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
         File.read("public/rss.xml").should eq("FEED-V2")
       end
     end

@@ -29,7 +29,7 @@ describe "Site Variables Integration" do
       # Run Build
       Dir.cd(tmp_dir) do
         builder = Hwaro::Core::Build::Builder.new
-        builder.run(output_dir: "public")
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
       end
 
       # Assert
@@ -63,7 +63,7 @@ describe "Site Variables Integration" do
 
       Dir.cd(tmp_dir) do
         builder = Hwaro::Core::Build::Builder.new
-        builder.run(output_dir: "public")
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
       end
 
       output = File.read(File.join(tmp_dir, "public/index.html"))
@@ -86,7 +86,7 @@ describe "Site Variables Integration" do
 
       Dir.cd(tmp_dir) do
         builder = Hwaro::Core::Build::Builder.new
-        builder.run(output_dir: "public")
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public"))
       end
 
       output = File.read(File.join(tmp_dir, "public/index.html"))

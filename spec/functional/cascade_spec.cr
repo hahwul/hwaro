@@ -12,7 +12,7 @@ require "../support/build_helper"
 private def run_cached_build
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-  builder.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+  builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 end
 
 describe "Cascade: basic inheritance" do
@@ -353,7 +353,7 @@ describe "Cascade: review regressions" do
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
         options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
-        builder.run(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false))
         File.read("public/hidden/post/index.html").should contain("banner=from-draft-section.png")
 
         # Incremental re-parse must re-apply the draft section's cascade —
@@ -382,7 +382,7 @@ describe "Cascade: review regressions" do
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
         options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
-        builder.run(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: false, highlight: false, verbose: false, profile: false))
 
         # The draft _index isn't in the site model; editing its cascade must
         # trigger a full rebuild so descendants pick up the new value.

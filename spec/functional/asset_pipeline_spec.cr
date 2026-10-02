@@ -32,7 +32,7 @@ describe "Asset Pipeline: End-to-end build" do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-        builder.run(output_dir: "public", parallel: false, highlight: false, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false, verbose: false, profile: false))
 
         # Check that fingerprinted bundle exists
         assets_dir = File.join("public", "assets")
@@ -82,7 +82,7 @@ describe "Asset Pipeline: End-to-end build" do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-        builder.run(output_dir: "public", parallel: false, highlight: false, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false, verbose: false, profile: false))
 
         File.exists?("public/assets/bundle.js").should be_true
         File.read("public/assets/bundle.js").should contain("console.log('hello')")
@@ -105,7 +105,7 @@ describe "Asset Pipeline: End-to-end build" do
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-        builder.run(output_dir: "public", parallel: false, highlight: false, verbose: false, profile: false)
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false, verbose: false, profile: false))
 
         html = File.read("public/page/index.html")
         html.should contain("/unknown.css")

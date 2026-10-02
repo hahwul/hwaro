@@ -218,7 +218,7 @@ describe "Menus: --cache incremental rebuild" do
 
         builder1 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
-        builder1.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         a_html_before = File.read("public/a/index.html")
         a_html_before.should_not contain("data-url=\"/b/\"")
@@ -232,7 +232,7 @@ describe "Menus: --cache incremental rebuild" do
 
         builder2 = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
-        builder2.run(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder2.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false))
 
         a_html_after = File.read("public/a/index.html")
         a_html_after.should contain("data-url=\"/b/\"")

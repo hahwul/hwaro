@@ -62,7 +62,7 @@ def build_site(
         builder.register(hookable)
       end
 
-      builder.run(
+      builder.run(Hwaro::Config::Options::BuildOptions.new(
         output_dir: output_dir,
         drafts: drafts,
         minify: minify,
@@ -72,7 +72,7 @@ def build_site(
         verbose: false,
         profile: false,
         stream: stream,
-      )
+      ))
 
       yield dir
     end
