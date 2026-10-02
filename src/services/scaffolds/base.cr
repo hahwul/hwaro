@@ -1081,26 +1081,15 @@ module Hwaro
             HTML
         end
 
-        # Override in subclasses to customize navigation (Jinja2 syntax)
+        # Header nav for `header_template` (Jinja2): renders the "main" menu,
+        # so adding a nav item never requires editing this template.
+        # `item.name` defaults to the page title when a menu is registered
+        # from front matter, so it's escaped like any other author-controlled
+        # value.
         protected def navigation : String
           <<-NAV
             <nav>
-              <!-- Add links for new sections here (e.g. /notes/, /til/).
-                   Dynamic version (copy out and remove the hardcoded links
-                   below). It lists only the current language's sections;
-                   s.url already includes the language prefix, so do NOT add
-                   lang_prefix. For custom ordering, set `weight` in each
-                   section's front matter and use sort(attribute="weight").
-                   (The example below is wrapped in a raw block so it
-                   isn't executed here.)
-                   {% raw %}
-                   {% for s in site.sections | sort(attribute="title") %}
-                     {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title | e }}</a>{% endif %}
-                   {% endfor %}
-                   {% endraw %}
-              -->
-              <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
-              <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
+              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
             </nav>
             NAV
         end

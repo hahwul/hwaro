@@ -1221,17 +1221,6 @@ module Hwaro
             HTML
         end
 
-        # Override navigation (not used directly - kept for base class
-        # compatibility). Mirrors blog_nav_html's menu-driven nav so this
-        # stays in sync with the real header if anything ever calls it.
-        protected def navigation : String
-          <<-NAV
-            <nav>
-              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
-            </nav>
-            NAV
-        end
-
         # Generates a sample post date relative to today, so a freshly
         # scaffolded site never shows a stale "last post was in 2024" feel.
         private def sample_date(offset_days : Int32) : String

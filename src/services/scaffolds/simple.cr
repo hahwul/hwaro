@@ -53,7 +53,7 @@ module Hwaro
           files
         end
 
-        # `[[menus.main]]` entries backing the overridden `navigation` below
+        # `[[menus.main]]` entries backing `Base#navigation`
         # (`{% for item in get_menu(name="main") %}`) — matches the two
         # links the scaffold's own content creates (index.md, about.md).
         # Add a third entry here (or register a page/section into "main"
@@ -85,25 +85,11 @@ module Hwaro
 
         # `hwaro init`'s DEFAULT path (no `--full-config`) and
         # `--minimal-config` both build on `minimal_config_content`, NOT
-        # `config_content` — without this override, the overridden
-        # `navigation`'s `get_menu(name="main")` would resolve against a
-        # config with no `[[menus.*]]` at all, rendering an empty nav out
-        # of the box.
+        # `config_content` — without this override, `Base#navigation`'s
+        # `get_menu(name="main")` would resolve against a config with no
+        # `[[menus.*]]` at all, rendering an empty nav out of the box.
         def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           super + menu_entries_toml(multilingual_languages)
-        end
-
-        # Overrides Base#navigation: renders the "main" menu instead of two
-        # hardcoded links, so adding a nav item no longer requires editing
-        # this template. `item.name` defaults to the page title when a menu
-        # is registered from front matter, so it's escaped like any other
-        # author-controlled value.
-        protected def navigation : String
-          <<-NAV
-            <nav>
-              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
-            </nav>
-            NAV
         end
 
         # Content files. Bodies intentionally start at level 2 — `page.html`
