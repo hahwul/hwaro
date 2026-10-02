@@ -76,7 +76,7 @@ describe Hwaro::Services::ConfigSnippets do
     end
 
     it "feeds: commented version does not contain active section header" do
-      commented = Hwaro::Services::ConfigSnippets.feeds(commented: true)
+      commented = Hwaro::Services::ConfigSnippets.feeds
       commented.should contain("# [feeds]")
       commented.should_not contain("\n[feeds]\n")
     end
@@ -115,15 +115,9 @@ describe Hwaro::Services::ConfigSnippets do
     end
 
     it "menus: commented version has all values commented out" do
-      commented = Hwaro::Services::ConfigSnippets.menus(commented: true)
+      commented = Hwaro::Services::ConfigSnippets.menus
       commented.should contain("# [[menus.main]]")
       commented.should_not contain("\n[[menus.main]]\n")
-    end
-
-    it "menus: uncommented version has an active [[menus.main]] entry" do
-      uncommented = Hwaro::Services::ConfigSnippets.menus(commented: false)
-      uncommented.should contain("[[menus.main]]")
-      uncommented.should contain("name = \"Home\"")
     end
   end
 
@@ -149,15 +143,21 @@ describe Hwaro::Services::ConfigSnippets do
 
   describe "all snippets are non-empty strings" do
     {% for method in ["plugins", "highlight", "og", "sitemap", "robots", "llms",
-                      "feeds", "build", "links", "permalinks", "auto_includes", "series",
+                      "build", "permalinks", "auto_includes", "series",
                       "related", "search", "pagination", "markdown", "assets",
-                      "image_processing", "deployment", "pwa", "amp", "doctor", "menus"] %}
+                      "image_processing", "deployment", "pwa", "amp", "doctor"] %}
       it "{{ method.id }}(commented: true) is non-empty" do
         Hwaro::Services::ConfigSnippets.{{ method.id }}(commented: true).should_not be_empty
       end
 
       it "{{ method.id }}(commented: false) is non-empty" do
         Hwaro::Services::ConfigSnippets.{{ method.id }}(commented: false).should_not be_empty
+      end
+    {% end %}
+
+    {% for method in ["feeds", "links", "git", "sass", "serve", "menus"] %}
+      it "{{ method.id }} is non-empty" do
+        Hwaro::Services::ConfigSnippets.{{ method.id }}.should_not be_empty
       end
     {% end %}
   end

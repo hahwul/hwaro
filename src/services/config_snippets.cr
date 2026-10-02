@@ -22,27 +22,27 @@ module Hwaro
         "highlight"        => {description: "Syntax highlighting (Highlight.js)", snippet: -> { highlight(commented: true) }},
         "og"               => {description: "OpenGraph & Twitter Cards", snippet: -> { og(commented: true) }},
         "search"           => {description: "Client-side search index", snippet: -> { search(commented: true) }},
-        "serve"            => {description: "Development server options (custom response headers)", snippet: -> { serve(commented: true) }},
+        "serve"            => {description: "Development server options (custom response headers)", snippet: -> { serve }},
         "pagination"       => {description: "Pagination settings", snippet: -> { pagination(commented: true) }},
         "series"           => {description: "Series grouping", snippet: -> { series(commented: true) }},
         "related"          => {description: "Related posts", snippet: -> { related(commented: true) }},
-        "git"              => {description: "Git commit metadata (page.git, lastmod fallback)", snippet: -> { git(commented: true) }},
+        "git"              => {description: "Git commit metadata (page.git, lastmod fallback)", snippet: -> { git }},
         "markdown"         => {description: "Markdown parser options", snippet: -> { markdown(commented: true) }},
         "sitemap"          => {description: "Sitemap generation", snippet: -> { sitemap(commented: true) }},
         "robots"           => {description: "Robots.txt generation", snippet: -> { robots(commented: true) }},
         "llms"             => {description: "LLM crawler instructions (llms.txt)", snippet: -> { llms(commented: true) }},
-        "feeds"            => {description: "RSS/Atom feed generation", snippet: -> { feeds(commented: true) }},
+        "feeds"            => {description: "RSS/Atom feed generation", snippet: -> { feeds }},
         "build"            => {description: "Build hooks (pre/post commands)", snippet: -> { build(commented: true) }},
-        "links"            => {description: "Internal link checking (broken @/ links)", snippet: -> { links(commented: true) }},
+        "links"            => {description: "Internal link checking (broken @/ links)", snippet: -> { links }},
         "permalinks"       => {description: "URL path overrides", snippet: -> { permalinks(commented: true) }},
         "auto_includes"    => {description: "Automatic CSS/JS loading", snippet: -> { auto_includes(commented: true) }},
         "assets"           => {description: "Asset pipeline (bundling, minification)", snippet: -> { assets(commented: true) }},
-        "sass"             => {description: "Built-in Sass/SCSS compilation", snippet: -> { sass(commented: true) }},
+        "sass"             => {description: "Built-in Sass/SCSS compilation", snippet: -> { sass }},
         "deployment"       => {description: "Deployment targets", snippet: -> { deployment(commented: true) }},
         "image_processing" => {description: "Image resizing and LQIP placeholder generation", snippet: -> { image_processing(commented: true) }},
         "pwa"              => {description: "Progressive Web App (manifest.json, service worker)", snippet: -> { pwa(commented: true) }},
         "amp"              => {description: "AMP page generation", snippet: -> { amp(commented: true) }},
-        "menus"            => {description: "Navigation menus (Hugo-style [[menus.*]])", snippet: -> { menus(commented: true) }},
+        "menus"            => {description: "Navigation menus (Hugo-style [[menus.*]])", snippet: -> { menus }},
       } of String => SectionEntry
 
       # Same idea for sub-sections (parent table must already exist
@@ -446,44 +446,23 @@ module Hwaro
         end
       end
 
-      def self.feeds(commented : Bool = false) : String
-        if commented
-          <<-TOML
+      def self.feeds : String
+        <<-TOML
 
-            # =============================================================================
-            # RSS/Atom Feeds
-            # =============================================================================
-            # Generates RSS or Atom feed for content syndication
-            # (templates/rss.xml.jinja or atom.xml.jinja overrides the built-in markup)
+          # =============================================================================
+          # RSS/Atom Feeds
+          # =============================================================================
+          # Generates RSS or Atom feed for content syndication
+          # (templates/rss.xml.jinja or atom.xml.jinja overrides the built-in markup)
 
-            # [feeds]
-            # enabled = true
-            # type = "rss"
-            # limit = 10
-            # full_content = true
-            # sections = []
+          # [feeds]
+          # enabled = true
+          # type = "rss"
+          # limit = 10
+          # full_content = true
+          # sections = []
 
-            TOML
-        else
-          <<-TOML
-
-            # =============================================================================
-            # RSS/Atom Feeds
-            # =============================================================================
-            # Generates RSS or Atom feed for content syndication
-            # (templates/rss.xml.jinja or atom.xml.jinja overrides the built-in markup)
-
-            [feeds]
-            enabled = true
-            filename = ""             # Leave empty for default (rss.xml or atom.xml)
-            type = "rss"              # "rss" or "atom"
-            truncate = 0              # Truncate content to N characters (0 = full content)
-            full_content = true       # true = full HTML in feed, false = description/summary only
-            limit = 10                # Maximum number of items in feed
-            sections = []             # Limit to specific sections, e.g., ["posts"]
-
-            TOML
-        end
+          TOML
       end
 
       def self.build(commented : Bool = false) : String
@@ -516,34 +495,18 @@ module Hwaro
         end
       end
 
-      def self.links(commented : Bool = false) : String
-        if commented
-          <<-TOML
+      def self.links : String
+        <<-TOML
 
-            # =============================================================================
-            # Links (Optional)
-            # =============================================================================
-            # How unresolved @/ internal links are treated during the build
+          # =============================================================================
+          # Links (Optional)
+          # =============================================================================
+          # How unresolved @/ internal links are treated during the build
 
-            # [links]
-            # broken_internal = "warn" # "error" fails the build listing every offender
+          # [links]
+          # broken_internal = "warn" # "error" fails the build listing every offender
 
-            TOML
-        else
-          <<-TOML
-
-            # =============================================================================
-            # Links (Optional)
-            # =============================================================================
-            # How unresolved @/ internal links are treated during the build.
-            # "warn" (default) logs a warning and keeps the raw markup;
-            # "error" fails the build with an aggregated list of every offender.
-
-            # [links]
-            # broken_internal = "warn"
-
-            TOML
-        end
+          TOML
       end
 
       def self.permalinks(commented : Bool = false) : String
@@ -724,40 +687,22 @@ module Hwaro
         end
       end
 
-      def self.git(commented : Bool = false) : String
-        if commented
-          <<-TOML
+      def self.git : String
+        <<-TOML
 
-            # =============================================================================
-            # Git Metadata (Optional)
-            # =============================================================================
-            # Expose each page's commit history as page.git (hash, short_hash, lastmod,
-            # first_commit, author_name, author_email) and fill a missing `updated`
-            # from the latest commit. Needs a full-history checkout (fetch-depth: 0).
+          # =============================================================================
+          # Git Metadata (Optional)
+          # =============================================================================
+          # Expose each page's commit history as page.git (hash, short_hash, lastmod,
+          # first_commit, author_name, author_email) and fill a missing `updated`
+          # from the latest commit. Needs a full-history checkout (fetch-depth: 0).
 
-            # [git]
-            # enabled = true
-            # use_lastmod = true   # page.updated ← latest commit when front matter has none
-            # use_date = false     # page.date ← first commit when front matter has none
+          # [git]
+          # enabled = true
+          # use_lastmod = true   # page.updated ← latest commit when front matter has none
+          # use_date = false     # page.date ← first commit when front matter has none
 
-            TOML
-        else
-          <<-TOML
-
-            # =============================================================================
-            # Git Metadata
-            # =============================================================================
-            # Expose each page's commit history as page.git (hash, short_hash, lastmod,
-            # first_commit, author_name, author_email) and fill a missing `updated`
-            # from the latest commit. Needs a full-history checkout (fetch-depth: 0).
-
-            [git]
-            enabled = true
-            use_lastmod = true   # page.updated ← latest commit when front matter has none
-            use_date = false     # page.date ← first commit when front matter has none
-
-            TOML
-        end
+          TOML
       end
 
       def self.search(commented : Bool = false) : String
@@ -943,36 +888,18 @@ module Hwaro
         end
       end
 
-      def self.sass(commented : Bool = false) : String
-        if commented
-          <<-TOML
+      def self.sass : String
+        <<-TOML
 
-            # =============================================================================
-            # Sass/SCSS Compilation (Optional)
-            # =============================================================================
+          # =============================================================================
+          # Sass/SCSS Compilation (Optional)
+          # =============================================================================
 
-            # [sass]
-            # enabled = true
-            # minify = true
+          # [sass]
+          # enabled = true
+          # minify = true
 
-            TOML
-        else
-          <<-TOML
-
-            # =============================================================================
-            # Sass/SCSS Compilation (Optional)
-            # =============================================================================
-            # Compile static/**/*.scss to sibling .css files at build time.
-            # Pure Crystal — no external tools. Partials (_*.scss) are only
-            # reachable via @use/@import and never publish; raw .scss sources
-            # are excluded from the static copy while enabled.
-
-            # [sass]
-            # enabled = true
-            # minify = true
-
-            TOML
-        end
+          TOML
       end
 
       def self.image_processing(commented : Bool = false) : String
@@ -1100,101 +1027,63 @@ module Hwaro
         end
       end
 
-      def self.serve(commented : Bool = false) : String
-        if commented
-          <<-TOML
+      def self.serve : String
+        <<-TOML
 
-            # =============================================================================
-            # Serve (Development Server) (Optional)
-            # =============================================================================
-            # Custom response headers injected on every request while running
-            # `hwaro serve`. Extremely useful for reproducing production
-            # reverse-proxy, CDN, or security header behaviour locally.
+          # =============================================================================
+          # Serve (Development Server) (Optional)
+          # =============================================================================
+          # Custom response headers injected on every request while running
+          # `hwaro serve`. Extremely useful for reproducing production
+          # reverse-proxy, CDN, or security header behaviour locally.
 
-            # [serve]
-            # fast = true                    # Default to fast dev mode (skip heavy OG + image processing)
-            #
-            # (response headers live under the [serve.headers] table below)
+          # [serve]
+          # fast = true                    # Default to fast dev mode (skip heavy OG + image processing)
+          #
+          # (response headers live under the [serve.headers] table below)
 
-            # [serve.headers]
-            # X-Frame-Options = "SAMEORIGIN"
-            # X-Content-Type-Options = "nosniff"
-            # Referrer-Policy = "strict-origin-when-cross-origin"
-            # # Cache-Control = "public, max-age=3600"
+          # [serve.headers]
+          # X-Frame-Options = "SAMEORIGIN"
+          # X-Content-Type-Options = "nosniff"
+          # Referrer-Policy = "strict-origin-when-cross-origin"
+          # # Cache-Control = "public, max-age=3600"
 
-            TOML
-        else
-          <<-TOML
-
-            # =============================================================================
-            # Serve (Development Server) (Optional)
-            # =============================================================================
-            # Custom response headers injected on every request while running
-            # `hwaro serve`. Extremely useful for reproducing production
-            # reverse-proxy, CDN, or security header behaviour locally.
-
-            [serve.headers]
-            X-Frame-Options = "SAMEORIGIN"
-            X-Content-Type-Options = "nosniff"
-            Referrer-Policy = "strict-origin-when-cross-origin"
-            # Cache-Control = "public, max-age=3600"
-
-            TOML
-        end
+          TOML
       end
 
-      def self.menus(commented : Bool = false) : String
-        if commented
-          <<-TOML
+      def self.menus : String
+        <<-TOML
 
-            # =============================================================================
-            # Menus (Optional)
-            # =============================================================================
-            # Named navigation menus, resolved into a tree in templates via
-            # {% for item in get_menu(name="main") %} or site.menus.main.
-            # `name` is required; everything else defaults (weight = 0,
-            # identifier = name, parent = none, url = "").
-            # Pages/sections can also join a menu from their own front
-            # matter (`menus = ["main"]`) without touching this file.
+          # =============================================================================
+          # Menus (Optional)
+          # =============================================================================
+          # Named navigation menus, resolved into a tree in templates via
+          # {% for item in get_menu(name="main") %} or site.menus.main.
+          # `name` is required; everything else defaults (weight = 0,
+          # identifier = name, parent = none, url = "").
+          # Pages/sections can also join a menu from their own front
+          # matter (`menus = ["main"]`) without touching this file.
 
-            # [[menus.main]]
-            # name = "Home"
-            # url = "/"
-            # weight = 1
+          # [[menus.main]]
+          # name = "Home"
+          # url = "/"
+          # weight = 1
 
-            # [[menus.main]]
-            # name = "Posts"
-            # url = "/posts/"
-            # weight = 2
-            # identifier = "posts"
+          # [[menus.main]]
+          # name = "Posts"
+          # url = "/posts/"
+          # weight = 2
+          # identifier = "posts"
 
-            # Per-language overrides replace the whole menu for that language
-            # (a [languages.<code>] block with no [[languages.<code>.menus.*]]
-            # inherits this global set instead):
-            # [[languages.ko.menus.main]]
-            # name = "홈"
-            # url = "/ko/"
-            # weight = 1
+          # Per-language overrides replace the whole menu for that language
+          # (a [languages.<code>] block with no [[languages.<code>.menus.*]]
+          # inherits this global set instead):
+          # [[languages.ko.menus.main]]
+          # name = "홈"
+          # url = "/ko/"
+          # weight = 1
 
-            TOML
-        else
-          <<-TOML
-
-            # =============================================================================
-            # Menus
-            # =============================================================================
-            # Named navigation menus. Render with:
-            #   {% for item in get_menu(name="main") %}
-            #     <a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
-            #   {% endfor %}
-
-            [[menus.main]]
-            name = "Home"
-            url = "/"
-            weight = 1
-
-            TOML
-        end
+          TOML
       end
 
       # Resolve a snippet for the given section key, looking up the
