@@ -677,13 +677,12 @@ describe Hwaro::Core::Build::Phases::Render do
       site.sections << korean << english
       builder = Hwaro::Core::Build::Builder.new
       vars = builder.test_build_global_vars(site)
-      engine = Hwaro::Content::Processors::TemplateEngine.new
 
       vars["page_language"] = Crinja::Value.new("en")
-      engine.render("{{ get_section(path='blog').title }}", vars).should eq("English blog")
+      render_crinja("{{ get_section(path='blog').title }}", vars).should eq("English blog")
 
       vars["page_language"] = Crinja::Value.new("ko")
-      engine.render("{{ get_section(path='blog').title }}", vars).should eq("한국어 블로그")
+      render_crinja("{{ get_section(path='blog').title }}", vars).should eq("한국어 블로그")
     end
   end
 

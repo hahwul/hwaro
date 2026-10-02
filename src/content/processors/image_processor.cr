@@ -40,15 +40,6 @@ module Hwaro
           IMAGE_EXTENSIONS.includes?(ext)
         end
 
-        # Generate a resized filename: photo.jpg -> photo_800w.jpg
-        def resized_filename(original : String, width : Int32) : String
-          ext = File.extname(original)
-          base = File.basename(original, ext)
-          dir = File.dirname(original)
-          name = "#{base}_#{width}w#{ext}"
-          dir == "." ? name : File.join(dir, name)
-        end
-
         # Read the intrinsic {width, height} of an image from its file header
         # without decoding pixel data (pure Crystal, no stb round-trip).
         # Supports the formats `image?` accepts (PNG/JPEG/BMP); returns nil
@@ -68,139 +59,6 @@ module Hwaro
           nil
         end
 
-        # Resize a single image to the given width, preserving aspect ratio.
-        # Returns the output path on success, nil on failure.
-        def resize(source : String, dest : String, width : Int32, height : Int32 = 0, quality : Int32 = 85) : String?
-          return unless File.exists?(source)
-
-          # Clamp quality to valid range for stb_image_write (1-100)
-          quality = quality.clamp(1, 100)
-
-          # Load source image
-          src_w = uninitialized LibC::Int
-          src_h = uninitialized LibC::Int
-          channels = uninitialized LibC::Int
-          pixels = LibStb.stbi_load(source, pointerof(src_w), pointerof(src_h), pointerof(channels), 0)
-
-          if pixels.null?
-            reason = String.new(LibStb.stbi_failure_reason)
-            Logger.debug "Image load failed '#{source}': #{reason}"
-            return
-          end
-
-          begin
-            # Guard against degenerate images (0 or negative dimensions)
-            if src_w <= 0 || src_h <= 0 || channels <= 0
-              Logger.debug "Image has invalid dimensions '#{source}': #{src_w}x#{src_h}x#{channels}"
-              return
-            end
-
-            # Calculate output dimensions (preserve aspect ratio)
-            out_w, out_h = calculate_dimensions(src_w.to_i32, src_h.to_i32, width, height)
-            if out_w <= 0 || out_h <= 0
-              Logger.debug "Calculated invalid output dimensions for '#{source}': #{out_w}x#{out_h}"
-              return
-            end
-
-            # Skip resize if output would be larger than source
-            if out_w >= src_w && out_h >= src_h
-              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
-              # Atomic copy: variants are regenerated on serve rebuilds while
-              # HTTP fibers stream the same `_640w.jpg` to the browser, and a
-              # truncate-and-stream copy would answer those requests with a
-              # zero-length or half-written image that nothing retries.
-              Hwaro::Utils::FileSafe.atomic_copy(source, dest)
-              return dest
-            end
-
-            # Guard against excessive memory allocation
-            # Check pixel count before multiplying by channels to prevent Int64 overflow
-            pixel_count = out_w.to_i64 * out_h.to_i64
-            if pixel_count > MAX_PIXELS
-              Logger.debug "Output image too large '#{source}': #{out_w}x#{out_h} = #{pixel_count} pixels"
-              return
-            end
-            buf_size = pixel_count * channels.to_i64
-
-            # Allocate output buffer with LibC.malloc for deterministic C interop
-            out_pixels = LibC.malloc(buf_size).as(UInt8*)
-            if out_pixels.null?
-              Logger.debug "Failed to allocate #{buf_size} bytes for resize of '#{source}'"
-              return
-            end
-
-            begin
-              result = LibStb.stbir_resize_uint8_srgb(
-                pixels, src_w, src_h, 0,
-                out_pixels, out_w, out_h, 0,
-                stbir_layout(channels)
-              )
-
-              if result.null?
-                Logger.debug "Resize failed for '#{source}'"
-                return
-              end
-
-              # Write output
-              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
-              ext = File.extname(dest).downcase
-              ok = write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
-              unless ok
-                Logger.debug "Failed to write resized image '#{dest}'"
-              end
-              ok ? dest : nil
-            ensure
-              LibC.free(out_pixels.as(Void*)) unless out_pixels.null?
-            end
-          ensure
-            LibStb.stbi_image_free(pixels.as(Void*)) unless pixels.null?
-          end
-        end
-
-        # Process all images for configured widths.
-        # Returns array of {original_url, width, resized_url} tuples.
-        def process_configured_widths(
-          source_path : String,
-          output_base : String,
-          url_prefix : String,
-          widths : Array(Int32),
-          quality : Int32 = 85,
-        ) : Array({String, Int32, String})
-          results = [] of {String, Int32, String}
-          return results unless File.exists?(source_path)
-
-          widths.each do |width|
-            resized_name = resized_filename(File.basename(source_path), width)
-            dest_path = File.join(output_base, resized_name)
-            if resize(source_path, dest_path, width, 0, quality)
-              resized_url = url_prefix.rstrip("/") + "/" + resized_name
-              results << {source_path, width, resized_url}
-            end
-          end
-
-          results
-        end
-
-        # Resize a single source image to multiple widths with one decode pass.
-        # Returns a Hash mapping width => dest_path for successful resizes.
-        def resize_multi_widths(
-          source : String,
-          dest_dir : String,
-          widths : Array(Int32),
-          quality : Int32 = 85,
-        ) : Hash(Int32, String)
-          result_map, _, _ = resize_and_lqip(source, dest_dir, widths, quality, 0, 20)
-          result_map
-        end
-
-        # Generate a low-quality image placeholder as a base64 data URI.
-        # Operates on already-decoded pixel data (avoids a second stbi_load).
-        def generate_lqip(pixels : UInt8*, src_w : Int32, src_h : Int32, channels : Int32,
-                          lqip_width : Int32 = 32, quality : Int32 = 20) : String?
-          result = generate_lqip_with_color(pixels, src_w, src_h, channels, lqip_width, quality)
-          result.try(&.[0])
-        end
-
         # Generate LQIP data URI and dominant color from the thumbnail in one pass.
         # Returns {data_uri, dominant_color_hex} or nil on failure.
         def generate_lqip_with_color(pixels : UInt8*, src_w : Int32, src_h : Int32, channels : Int32,
@@ -210,7 +68,7 @@ module Hwaro
 
           # Don't upscale — cap thumbnail width to source width
           effective_width = Math.min(lqip_width, src_w)
-          out_w, out_h = calculate_dimensions(src_w, src_h, effective_width, 0)
+          out_w, out_h = calculate_dimensions(src_w, src_h, effective_width)
           return if out_w <= 0 || out_h <= 0
 
           pixel_count = out_w.to_i64 * out_h.to_i64
@@ -323,7 +181,7 @@ module Hwaro
             # Resize variants (sorted ascending so smallest is processed first)
             sorted_widths = widths.sort
             sorted_widths.each do |width|
-              out_w, out_h = calculate_dimensions(src_w.to_i32, src_h.to_i32, width, 0)
+              out_w, out_h = calculate_dimensions(src_w.to_i32, src_h.to_i32, width)
               next if out_w <= 0 || out_h <= 0
 
               if out_w >= src_w && out_h >= src_h
@@ -335,9 +193,8 @@ module Hwaro
                 actual = src_w.to_i32
                 unless result_map.has_key?(actual)
                   dest = File.join(dest_dir, "#{basename}_#{actual}w#{ext}")
-                  # Atomic for the same reason as `resize`: a serve rebuild
-                  # must never expose a truncated variant to an in-flight
-                  # request for that path.
+                  # Atomic: a serve rebuild must never expose a truncated
+                  # variant to an in-flight request for that path.
                   Hwaro::Utils::FileSafe.atomic_copy(source, dest)
                   result_map[actual] = dest
                 end
@@ -471,27 +328,14 @@ module Hwaro
           channels == 2 ? 9 : channels
         end
 
-        private def calculate_dimensions(src_w : Int32, src_h : Int32, target_w : Int32, target_h : Int32) : {Int32, Int32}
+        # Width-only proportional scaling (every caller passes a target width).
+        private def calculate_dimensions(src_w : Int32, src_h : Int32, target_w : Int32) : {Int32, Int32}
           # Guard against zero source dimensions (prevents division by zero)
           return {0, 0} if src_w <= 0 || src_h <= 0
+          return {src_w, src_h} unless target_w > 0
 
-          if target_w > 0 && target_h > 0
-            # Both specified: fit within the box
-            scale_w = target_w.to_f / src_w
-            scale_h = target_h.to_f / src_h
-            scale = Math.min(scale_w, scale_h)
-            {saturating_i32(src_w * scale), saturating_i32(src_h * scale)}
-          elsif target_w > 0
-            # Width only: scale proportionally
-            scale = target_w.to_f / src_w
-            {target_w, saturating_i32(src_h * scale)}
-          elsif target_h > 0
-            # Height only: scale proportionally
-            scale = target_h.to_f / src_h
-            {saturating_i32(src_w * scale), target_h}
-          else
-            {src_w, src_h}
-          end
+          scale = target_w.to_f / src_w
+          {target_w, saturating_i32(src_h * scale)}
         end
 
         # Round a scaled dimension to at least 1, SATURATING at Int32::MAX.

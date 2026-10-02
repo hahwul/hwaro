@@ -18,7 +18,6 @@ require "markd"
 require "tartrazine"
 require "../../ext/tartrazine_mt_fix"
 require "digest/md5"
-require "./table_parser"
 require "./markdown_extensions"
 require "./heading_ids"
 require "./render_hooks"
@@ -630,10 +629,10 @@ module Hwaro
           if @highlight_enabled && lang
             # Add classes for highlight.js
             code_tag_attrs ||= {} of String => String
-            code_tag_attrs["class"] = "language-#{escape_lang(lang)} hljs"
+            code_tag_attrs["class"] = "language-#{HTML.escape(lang)} hljs"
           elsif lang
             code_tag_attrs ||= {} of String => String
-            code_tag_attrs["class"] = "language-#{escape_lang(lang)}"
+            code_tag_attrs["class"] = "language-#{HTML.escape(lang)}"
           end
 
           if opts
@@ -676,7 +675,7 @@ module Hwaro
           label = opts.try(&.name)
 
           newline
-          literal(%(<div class="code-block"><div class="code-filename">#{escape_lang(label)}</div>)) if label
+          literal(%(<div class="code-block"><div class="code-filename">#{HTML.escape(label)}</div>)) if label
           tag("pre", pre_tag_attrs) do
             tag("code", code_tag_attrs) do
               code_block_body(node, lang)
@@ -684,11 +683,6 @@ module Hwaro
           end
           literal("</div>") if label
           newline
-        end
-
-        # Escape special HTML characters in language name
-        private def escape_lang(text : String) : String
-          HTML.escape(text)
         end
 
         # Resolves the language + fence-options for `node`, collapsing every
@@ -988,10 +982,6 @@ module Hwaro
           @@server_mode = value
         end
 
-        def server_mode? : Bool
-          @@server_mode
-        end
-
         # Global default for fence-level `linenos` (`[highlight]
         # line_numbers`), set from config when the build initializes.
         # Read-only during rendering, mirroring `@@server_mode`.
@@ -1036,65 +1026,18 @@ module Hwaro
         # @param hooks - render-hook context (nil when no `templates/hooks/render-*`
         #   template is configured); when nil the renderer construction below is
         #   byte-identical to the pre-hooks code path.
-        def render(content : String, highlight : Bool = true, safe : Bool = false, *, smart : Bool = false, tables_preprocessed : Bool = false,
+        def render(content : String, highlight : Bool = true, safe : Bool = false, *, smart : Bool = false,
                    hooks : Content::Processors::RenderHooks::HookRenderContext? = nil) : String
-          # Pre-process tables before passing to markd (markd doesn't support
-          # GFM tables). Markdown#render already converts tables before the
-          # extension passes and passes `tables_preprocessed: true` to skip the
-          # redundant per-page scan — the default stays for direct callers of
-          # SyntaxHighlighter.render.
-          processed_content = tables_preprocessed ? content : TableParser.process(content, hooks: hooks)
-
+          # GFM tables are NOT converted here (markd has no table support):
+          # Markdown#render runs TableParser before the extension passes.
           options = Markd::Options.new(safe: safe, smart: smart)
-          document = Markd::Parser.parse(processed_content, options)
+          document = Markd::Parser.parse(content, options)
           renderer = if hooks
                        HookedRenderer.new(options, highlight, @@server_mode, hooks)
                      else
                        HighlightingRenderer.new(options, highlight, @@server_mode)
                      end
           renderer.render(document)
-        end
-
-        # Check if content has code blocks that might benefit from highlighting
-        def has_code_blocks?(content : String) : Bool
-          content.includes?("```") || content.includes?("~~~")
-        end
-
-        # List of supported languages for highlight.js (common ones)
-        SUPPORTED_LANGUAGES = Set.new(%w[
-          bash c cpp csharp css crystal dart diff dockerfile elixir elm
-          erlang go graphql groovy haskell html http ini java javascript
-          json julia kotlin latex less lisp lua makefile markdown matlab
-          nginx nim nix objectivec ocaml perl php plaintext powershell
-          python r ruby rust scala scss shell sql swift toml typescript
-          vim xml yaml zig
-        ])
-
-        # Check if a language is supported
-        def language_supported?(lang : String) : Bool
-          SUPPORTED_LANGUAGES.includes?(lang.downcase)
-        end
-
-        # Get CSS themes available for highlight.js
-        THEMES = Set.new(%w[
-          default a11y-dark a11y-light agate androidstudio an-old-hope
-          arduino-light arta ascetic atom-one-dark atom-one-dark-reasonable
-          atom-one-light brown-paper codepen-embed color-brewer dark
-          devibeans docco far foundation github github-dark github-dark-dimmed
-          googlecode gradient-dark gradient-light grayscale hybrid idea
-          intellij-light ir-black isbl-editor-dark isbl-editor-light
-          kimbie-dark kimbie-light lightfair lioshi magula mono-blue monokai
-          monokai-sublime night-owl nnfx-dark nnfx-light nord obsidian ocean
-          paraiso-dark paraiso-light panda-syntax-dark panda-syntax-light
-          pojoaque purebasic qtcreator-dark qtcreator-light rainbow school-book
-          shades-of-purple srcery stackoverflow-dark stackoverflow-light sunburst
-          tokyo-night-dark tokyo-night-light tomorrow-night-blue
-          tomorrow-night-bright vs vs2015 xcode xt256 zenburn
-        ])
-
-        # Check if a theme is valid
-        def theme_valid?(theme : String) : Bool
-          THEMES.includes?(theme.downcase)
         end
       end
     end

@@ -119,7 +119,7 @@ module Hwaro
           # footnote get unique ids (fnref-KEY, fnref-KEY-2, …) instead of
           # emitting duplicate `id` attributes (invalid HTML, ambiguous backref).
           ref_occurrences = Hash(String, Int32).new(0)
-          result = process_lines_fence_aware(cleaned) do |line, _|
+          result = process_lines_fence_aware(cleaned) do |line|
             next line unless line.includes?("[^")
 
             transform_outside_code_spans(line) do |stashed|
@@ -161,18 +161,11 @@ module Hwaro
         end
 
         # Post-processing: convert footnote comments to HTML section.
-        # `math: true` keeps `$…$` spans in footnote bodies untransformed
+        # `flags.math` keeps `$…$` spans in footnote bodies untransformed
         # (math is not rendered in footnotes, but its internals must not be
-        # rewritten by emphasis/strikethrough either). Pre-F10 signature —
-        # delegates to the `flags` overload (existing callers/specs keep
-        # calling this one directly).
-        def postprocess_footnotes(html : String, *, math : Bool = false) : String
-          postprocess_footnotes(html, flags: InlineMarkdown::Flags.new(math: math))
-        end
-
-        # `flags` also threads the F10 opt-in inline markup (ins/mark/sub/
-        # sup) into footnote bodies, alongside the math flag.
-        def postprocess_footnotes(html : String, *, flags : InlineMarkdown::Flags) : String
+        # rewritten by emphasis/strikethrough either); `flags` also threads
+        # the F10 opt-in inline markup (ins/mark/sub/sup).
+        def postprocess_footnotes(html : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new) : String
           return html unless html.includes?("<!--HWARO-FOOTNOTES-START-->")
 
           # Extract footnote data from comments

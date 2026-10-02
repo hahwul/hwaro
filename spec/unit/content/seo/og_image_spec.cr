@@ -715,9 +715,9 @@ describe Hwaro::Content::Seo::OgImage do
     it "marks band title truncation with an ellipsis" do
       lines = ["One", "Two", "Three", "Four"]
       # 60px → capacity 2; the kept lines gain an ellipsis on the last one.
-      Hwaro::Content::Seo::OgImage.cap_band_title(lines, 60).should eq(["One", "Two…"])
+      Hwaro::Content::Seo::OgImage.cap_lines(lines, Hwaro::Content::Seo::OgImage.band_line_capacity(60)).should eq(["One", "Two…"])
       # Within capacity → untouched, no ellipsis.
-      Hwaro::Content::Seo::OgImage.cap_band_title(["Only"], 60).should eq(["Only"])
+      Hwaro::Content::Seo::OgImage.cap_lines(["Only"], Hwaro::Content::Seo::OgImage.band_line_capacity(60)).should eq(["Only"])
     end
   end
 
@@ -991,8 +991,6 @@ describe Hwaro::Content::Seo::OgImage do
     # and log a warning. Force the failure by pre-creating <slug>.png as a
     # directory so stbi_write_png returns 0.
     it "falls back to SVG and warns when PNG rendering fails" do
-      next unless Hwaro::Content::Seo::OgPngRenderer.available?
-
       Dir.mktmpdir do |dir|
         config = Hwaro::Models::Config.new
         config.og.auto_image.enabled = true

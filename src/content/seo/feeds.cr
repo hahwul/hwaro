@@ -791,19 +791,7 @@ module Hwaro
         # while preserving order so the feed mirrors how the post
         # advertises itself.
         private def self.feed_categories(page : Models::Page) : Array(String)
-          seen = Set(String).new
-          result = [] of String
-          page.tags.each do |tag|
-            next if tag.empty?
-            result << tag if seen.add?(tag)
-          end
-          page.taxonomies.each do |_, terms|
-            terms.each do |term|
-              next if term.empty?
-              result << term if seen.add?(term)
-            end
-          end
-          result
+          (page.tags + page.taxonomies.values.flatten).reject!(&.empty?).uniq!
         end
 
         # Escape `]]>` so a body containing it can't terminate the CDATA

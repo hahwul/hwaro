@@ -216,23 +216,6 @@ describe Hwaro::Content::Processors::SyntaxHighlighter do
     end
   end
 
-  describe "has_code_blocks?" do
-    it "returns true for fenced code blocks with triple backticks" do
-      content = "Some text\n```ruby\ncode\n```"
-      Hwaro::Content::Processors::SyntaxHighlighter.has_code_blocks?(content).should be_true
-    end
-
-    it "returns true for fenced code blocks with tildes" do
-      content = "Some text\n~~~python\ncode\n~~~"
-      Hwaro::Content::Processors::SyntaxHighlighter.has_code_blocks?(content).should be_true
-    end
-
-    it "returns false for content without code blocks" do
-      content = "Just some regular text"
-      Hwaro::Content::Processors::SyntaxHighlighter.has_code_blocks?(content).should be_false
-    end
-  end
-
   describe "table rendering integration" do
     it "renders markdown tables as HTML tables" do
       content = <<-MARKDOWN
@@ -245,7 +228,7 @@ describe Hwaro::Content::Processors::SyntaxHighlighter do
         Some text after.
         MARKDOWN
 
-      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content)
+      html, _ = Hwaro::Content::Processors::Markdown.new.render(content)
       html.should contain("<table>")
       html.should contain("<th>Name</th>")
       html.should contain("<th>Age</th>")
@@ -263,34 +246,9 @@ describe Hwaro::Content::Processors::SyntaxHighlighter do
         | A    | B      | C     |
         MARKDOWN
 
-      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content)
+      html, _ = Hwaro::Content::Processors::Markdown.new.render(content)
       html.should contain("text-align: center;")
       html.should contain("text-align: right;")
-    end
-  end
-
-  describe "language_supported?" do
-    it "returns true for supported languages" do
-      Hwaro::Content::Processors::SyntaxHighlighter.language_supported?("ruby").should be_true
-      Hwaro::Content::Processors::SyntaxHighlighter.language_supported?("python").should be_true
-      Hwaro::Content::Processors::SyntaxHighlighter.language_supported?("javascript").should be_true
-      Hwaro::Content::Processors::SyntaxHighlighter.language_supported?("crystal").should be_true
-    end
-
-    it "returns false for unsupported languages" do
-      Hwaro::Content::Processors::SyntaxHighlighter.language_supported?("unknown_lang").should be_false
-    end
-  end
-
-  describe "theme_valid?" do
-    it "returns true for valid themes" do
-      Hwaro::Content::Processors::SyntaxHighlighter.theme_valid?("github").should be_true
-      Hwaro::Content::Processors::SyntaxHighlighter.theme_valid?("monokai").should be_true
-      Hwaro::Content::Processors::SyntaxHighlighter.theme_valid?("atom-one-dark").should be_true
-    end
-
-    it "returns false for invalid themes" do
-      Hwaro::Content::Processors::SyntaxHighlighter.theme_valid?("invalid_theme").should be_false
     end
   end
 end
@@ -428,22 +386,6 @@ describe Hwaro::Config::Options::BuildOptions do
   it "accepts custom highlight value" do
     options = Hwaro::Config::Options::BuildOptions.new(highlight: false)
     options.highlight.should be_false
-  end
-end
-
-describe Hwaro::Content::Processors::Registry do
-  it "has markdown processor registered by default" do
-    Hwaro::Content::Processors::Registry.has?("markdown").should be_true
-  end
-
-  it "has html processor registered" do
-    Hwaro::Content::Processors::Registry.has?("html").should be_true
-  end
-
-  it "can list all processor names" do
-    names = Hwaro::Content::Processors::Registry.names
-    names.should contain("markdown")
-    names.should contain("html")
   end
 end
 

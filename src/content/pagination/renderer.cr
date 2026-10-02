@@ -110,14 +110,6 @@ module Hwaro
           pages << total
           pages
         end
-
-        # Render combined section list with pagination info
-        def render_paginated_section(paginated_page : PaginatedPage) : String
-          section_list = render_section_list(paginated_page)
-          pagination_nav = render_pagination_nav(paginated_page)
-
-          "#{section_list}#{pagination_nav}"
-        end
       end
     end
   end

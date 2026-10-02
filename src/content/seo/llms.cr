@@ -8,15 +8,6 @@ module Hwaro
   module Content
     module Seo
       class Llms
-        # Backward-compatible entry point for callers that don't have a
-        # page list handy. The current build pipeline always uses the
-        # 4-arg form below; this stub keeps any external caller working
-        # by emitting the title/description/instructions header without
-        # the page index.
-        def self.generate(config : Models::Config, output_dir : String, verbose : Bool = false)
-          generate(config, [] of Models::Page, output_dir, verbose)
-        end
-
         # The files the current config publishes — `llms.txt` and, when
         # enabled, `llms-full.txt` — claimed by the builder whether written or
         # skipped as unchanged (see Sitemap.published_outputs).

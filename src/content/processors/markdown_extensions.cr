@@ -84,7 +84,7 @@ module Hwaro
                             (config.attributes && (result.includes?('{') || scan.includes?(result, "<!--HATTR:")))
 
           if markers_present
-            result = process_lines_fence_aware(result) do |line, _in_fence|
+            result = process_lines_fence_aware(result) do |line|
               transformed = line
 
               # Author-typed engine markers are neutralized before the
@@ -107,7 +107,7 @@ module Hwaro
                 end
               end
 
-              if do_task_lists && !_in_fence &&
+              if do_task_lists &&
                  (transformed.includes?("[ ]") || transformed.includes?("[x]") || transformed.includes?("[X]"))
                 transformed = preprocess_task_lists(transformed)
               end
@@ -240,10 +240,6 @@ module Hwaro
         # Inline-markdown renderer used by definition lists (and now footnote
         # bodies). Delegates to the shared `InlineMarkdown` module so the same
         # rules apply across table cells, `<dt>/<dd>`, and `<section.footnotes>`.
-        private def render_inline_md(text : String, math : Bool = false) : String
-          InlineMarkdown.render(text, math: math)
-        end
-
         private def render_inline_md(text : String, flags : InlineMarkdown::Flags) : String
           InlineMarkdown.render(text, flags: flags)
         end

@@ -6,6 +6,7 @@ require "../../../../src/content/processors/markdown"
 
 private alias RenderHooks = Hwaro::Content::Processors::RenderHooks
 private alias SyntaxHighlighter = Hwaro::Content::Processors::SyntaxHighlighter
+private alias TableParser = Hwaro::Content::Processors::TableParser
 
 # Default-equivalent hook templates (also documented in
 # docs/content/templates/render-hooks.md) — used by the byte-parity test
@@ -246,7 +247,6 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
     end
 
     it "computes a non-empty highlighted body under server mode" do
-      previous = SyntaxHighlighter.server_mode?
       SyntaxHighlighter.server_mode = true
       begin
         hooks = make_hooks(codeblock: "H=<<<{{ highlighted }}>>>")
@@ -257,12 +257,11 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
         highlighted.should_not be_empty
         highlighted.should contain("hljs-")
       ensure
-        SyntaxHighlighter.server_mode = previous
+        SyntaxHighlighter.server_mode = false
       end
     end
 
     it "applies hide_lines to highlighted AND code under server mode" do
-      previous = SyntaxHighlighter.server_mode?
       SyntaxHighlighter.server_mode = true
       begin
         hooks = make_hooks(codeblock: "H=<<<{{ highlighted }}>>> C=<<<{{ code }}>>>")
@@ -273,7 +272,7 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
         html.should contain("keep_one")
         html.should contain("keep_two")
       ensure
-        SyntaxHighlighter.server_mode = previous
+        SyntaxHighlighter.server_mode = false
       end
     end
 
@@ -355,14 +354,14 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
   describe "table" do
     it "wraps the stock table html via the hook" do
       hooks = make_hooks(table: %(<div class="tbl">{{ html }}</div>))
-      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html = SyntaxHighlighter.render(TableParser.process(TABLE_MD, hooks: hooks), hooks: hooks)
       html.should contain(%(<div class="tbl"><table>))
       html.should contain("</table></div>")
     end
 
     it "exposes header_html and body_html separately" do
       hooks = make_hooks(table: "H[{{ header_html }}]B[{{ body_html }}]")
-      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html = SyntaxHighlighter.render(TableParser.process(TABLE_MD, hooks: hooks), hooks: hooks)
       html.should contain("H[<thead>")
       html.should contain("<th>A</th>")
       html.should contain("B[<tbody>")
@@ -371,7 +370,7 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
 
     it "collapses blank lines in the hook output (markd html-block safety)" do
       hooks = make_hooks(table: "<div>\n\n{{ html }}\n\n\n</div>")
-      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html = SyntaxHighlighter.render(TableParser.process(TABLE_MD, hooks: hooks), hooks: hooks)
       html.should_not match(/\n[ \t]*\n/)
       html.should contain("<table>")
       # No escaped leftovers — the whole table stayed one html block.
@@ -380,7 +379,7 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
 
     it "collapses blank lines in a CRLF-saved hook template too" do
       hooks = make_hooks(table: "<div>\r\n\r\n{{ html }}\r\n\r\n\r\n</div>")
-      html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      html = SyntaxHighlighter.render(TableParser.process(TABLE_MD, hooks: hooks), hooks: hooks)
       html.should_not match(/\r?\n[ \t\r]*\r?\n/)
       html.should contain("<table>")
       html.should_not contain("&lt;table&gt;")
@@ -390,7 +389,7 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
       hooks = make_hooks(table: "{{ html")
       html = ""
       log = with_captured_log do
-        html = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+        html = SyntaxHighlighter.render(TableParser.process(TABLE_MD, hooks: hooks), hooks: hooks)
       end
       html.should contain("<table>\n<thead>")
       log.should contain("Template error in render hook 'hooks/render-table'")
@@ -398,8 +397,8 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
 
     it "renders the stock table byte-identically when no table hook is configured" do
       hooks = make_hooks(link: "L[{{ text }}]") # some other hook active
-      stock = SyntaxHighlighter.render(TABLE_MD)
-      hooked = SyntaxHighlighter.render(TABLE_MD, hooks: hooks)
+      stock = SyntaxHighlighter.render(TableParser.process(TABLE_MD))
+      hooked = SyntaxHighlighter.render(TableParser.process(TABLE_MD, hooks: hooks), hooks: hooks)
       hooked.should eq(stock)
     end
   end

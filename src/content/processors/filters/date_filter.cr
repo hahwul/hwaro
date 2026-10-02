@@ -7,7 +7,7 @@ module Hwaro
         module DateFilters
           # `Time#to_s(format)` raises a bare Crystal `IndexError` on a
           # malformed format string (a trailing `%`, e.g. `date("%")`) — not a
-          # `Crinja::Error`, so it escapes TemplateEngine#render's rescue and
+          # `Crinja::Error`, so it escapes the render phase's rescue and
           # aborts the whole build with `Index out of bounds` and no template
           # file:line. Re-raise as a Crinja error so the failure names the bad
           # format AND points at the template line that wrote it.

@@ -138,14 +138,6 @@ module Hwaro
         @paragraph_depth = 0
         @paragraph_column = 0
 
-        # True while inside an open fence: after the opener line was fed,
-        # until (and excluding) the line after the closer. Lets callers
-        # that need to route in-fence lines differently branch before
-        # feeding the line.
-        def in_fence? : Bool
-          @in_fence
-        end
-
         # `raw_html_code: false` turns off raw-HTML code-block tracking and
         # generic HTML-block tracking.
         # Only the Markdown-extension walkers treat `<pre>`/`<script>`/

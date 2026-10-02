@@ -1,12 +1,12 @@
 # Markdown processor — front matter detection, TOML/YAML/JSON extraction and typed field access.
 #
-# Reopens `Processors::Markdown`; the part require order and the processor
-# registration live in ../markdown.cr. Parts only reopen the class: no
+# Reopens `Processors::Markdown`; the part require order lives in
+# ../markdown.cr. Parts only reopen the class: no
 # requires, no load-time statements (scripts/check_no_toplevel_effects.sh).
 module Hwaro
   module Content
     module Processors
-      class Markdown < Base
+      class Markdown
         # Regex for TOML front matter
         TOML_FRONT_MATTER_REGEX = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?(.*)\z/m
 

@@ -6,17 +6,11 @@ require "../spec_helper"
 # `register` calls, so its contents and ORDER are exactly what a bad merge or
 # a mis-ordered `require` would silently change. Pinning them here turns
 # "the split moved a require" into a failing example instead of a runtime
-# surprise (a processor that stops handling `.md`, a hook that runs before
-# the one it depends on, a CLI subcommand that vanishes from `--help`).
+# surprise (a hook that runs before the one it depends on, a CLI subcommand
+# that vanishes from `--help`).
 #
 # When you intentionally add or reorder an entry, update the matching list.
 describe "registration order" do
-  it "keeps the content processor registry" do
-    Hwaro::Content::Processors::Registry.all.map(&.name).should eq(
-      ["markdown", "json", "html", "xml"]
-    )
-  end
-
   it "keeps the lifecycle hook order" do
     Hwaro::Content::Hooks.all.map(&.class.name).should eq([
       "Hwaro::Content::Hooks::SeoHooks",
