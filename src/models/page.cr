@@ -461,13 +461,10 @@ module Hwaro
         @word_count
       end
 
-      # Calculate reading time in minutes (assuming ~200 words per minute)
-      def calculate_reading_time(words_per_minute : Int32 = 200) : Int32
-        calculate_word_count if @word_count == 0
-        wpm = words_per_minute < 1 ? 200 : words_per_minute
-        @reading_time = (@word_count.to_f / wpm).ceil.to_i
-        @reading_time = 1 if @reading_time < 1 && @word_count > 0
-        @reading_time
+      # Reading time in minutes at ~200 words per minute, from the
+      # `word_count` that `calculate_word_count` set.
+      def calculate_reading_time : Int32
+        @reading_time = (@word_count / 200.0).ceil.to_i
       end
 
       # Extract summary from content using <!-- more --> marker

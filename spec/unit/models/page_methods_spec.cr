@@ -104,6 +104,7 @@ describe Hwaro::Models::Page do
       page = Hwaro::Models::Page.new("test.md")
       # 400 words at 200 wpm = 2 minutes
       page.raw_content = (["word"] * 400).join(" ")
+      page.calculate_word_count
       time = page.calculate_reading_time
       time.should eq(2)
       page.reading_time.should eq(2)
@@ -113,6 +114,7 @@ describe Hwaro::Models::Page do
       page = Hwaro::Models::Page.new("test.md")
       # 250 words at 200 wpm = 1.25 -> ceil to 2
       page.raw_content = (["word"] * 250).join(" ")
+      page.calculate_word_count
       time = page.calculate_reading_time
       time.should eq(2)
     end
@@ -120,6 +122,7 @@ describe Hwaro::Models::Page do
     it "returns 1 for very short content" do
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = "Hello world"
+      page.calculate_word_count
       time = page.calculate_reading_time
       time.should eq(1)
     end
@@ -127,24 +130,9 @@ describe Hwaro::Models::Page do
     it "returns 0 for empty content" do
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = ""
+      page.calculate_word_count
       time = page.calculate_reading_time
       time.should eq(0)
-    end
-
-    it "accepts custom words per minute" do
-      page = Hwaro::Models::Page.new("test.md")
-      # 300 words at 100 wpm = 3 minutes
-      page.raw_content = (["word"] * 300).join(" ")
-      time = page.calculate_reading_time(words_per_minute: 100)
-      time.should eq(3)
-    end
-
-    it "recalculates word count if not yet calculated" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.word_count.should eq(0)
-      page.raw_content = (["word"] * 200).join(" ")
-      page.calculate_reading_time
-      page.word_count.should be > 0
     end
 
     it "uses existing word_count if already calculated" do
