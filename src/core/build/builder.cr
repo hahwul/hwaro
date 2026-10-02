@@ -709,7 +709,6 @@ module Hwaro
           # Initialize profiler
           profiler = Profiler.new(enabled: options.profile)
           @profiler = profiler
-          profiler.start
 
           if options.streaming?
             Logger.info "  Streaming mode enabled (batch size: #{options.batch_size})"

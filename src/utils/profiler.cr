@@ -92,11 +92,6 @@ module Hwaro
       @enabled
     end
 
-    # Start the overall profiling. Nothing to record up front (phases time
-    # themselves); kept as the builder's entry point.
-    def start
-    end
-
     # Start timing a phase. Phase-level timing is collected even when full
     # profiling is disabled — it costs two clock reads per phase and feeds
     # the per-row timings in the build receipt. The detailed per-template /
