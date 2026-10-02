@@ -927,7 +927,6 @@ describe Hwaro::Models::Config do
       config = Hwaro::Models::Config.new
       config.content_new.front_matter_format.should eq("toml")
       config.content_new.default_fields.should eq(["description"])
-      config.content_new.toml?.should be_true
     end
 
     it "loads front_matter_format and default_fields from [content.new]" do
@@ -939,7 +938,6 @@ describe Hwaro::Models::Config do
 
       config.content_new.front_matter_format.should eq("yaml")
       config.content_new.default_fields.should eq(["description", "summary"])
-      config.content_new.toml?.should be_false
     end
 
     it "accepts flat keys on [content] as a shorthand" do
@@ -960,7 +958,6 @@ describe Hwaro::Models::Config do
 
       config.content_new.front_matter_format.should eq("json")
       config.content_new.json?.should be_true
-      config.content_new.toml?.should be_false
     end
 
     it "keeps the default format when the configured value is unknown" do

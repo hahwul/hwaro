@@ -370,32 +370,6 @@ describe Hwaro::Models::Page do
     end
   end
 
-  describe "#has_summary?" do
-    it "returns true when summary is set" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.summary = "A summary"
-      page.has_summary?.should be_true
-    end
-
-    it "returns true when description is set" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.description = "A description"
-      page.has_summary?.should be_true
-    end
-
-    it "returns true when both summary and description are set" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.summary = "Summary"
-      page.description = "Description"
-      page.has_summary?.should be_true
-    end
-
-    it "returns false when neither summary nor description is set" do
-      page = Hwaro::Models::Page.new("test.md")
-      page.has_summary?.should be_false
-    end
-  end
-
   describe "#effective_summary" do
     it "returns summary when set" do
       page = Hwaro::Models::Page.new("test.md")

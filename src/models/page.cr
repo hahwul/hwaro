@@ -528,12 +528,6 @@ module Hwaro
         permalink
       end
 
-      # Check if page has a summary: `<!-- more -->` marker, description, or
-      # the automatic body excerpt (same precedence as `effective_summary`).
-      def has_summary? : Bool
-        !@summary.nil? || !@description.nil? || !@auto_summary.nil?
-      end
-
       # Get effective summary: `<!-- more -->` chunk > description > automatic
       # excerpt. The excerpt is returned as a single escaped `<p>` so
       # `{{ page.summary | safe }}` keeps working for every source.

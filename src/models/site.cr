@@ -58,16 +58,6 @@ module Hwaro
           @sections_by_name[{name, @config.default_language}]?
       end
 
-      def taxonomy_terms(name : String) : Array(String)
-        terms = @taxonomies[name]?
-        return [] of String unless terms
-        terms.keys.sort!
-      end
-
-      def taxonomy_pages(name : String, term : String) : Array(Page)
-        @taxonomies[name]?.try(&.[term]?) || [] of Page
-      end
-
       def all_content : Array(Page)
         @memo_mutex.synchronize do
           @all_content_cache ||= (pages + sections.map { |s| s.as(Page) }).sort_by!(&.path)
