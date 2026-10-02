@@ -331,6 +331,28 @@ module Hwaro
       rescue File::BadPatternError
         false
       end
+
+      # Collision key for an alias target: one spelling per published path.
+      #
+      # `/foo`, `/foo/`, `/foo/index.html` and `/foo/index.htm` all name the
+      # same file on disk, so they must collapse to ONE key or alias collision
+      # detection cannot see the conflict. `aliases = ["/index.html"]` kept
+      # its own key, never collided with the homepage's `/`, and its redirect
+      # stub was written straight over `public/index.html` — silently, and
+      # order-dependently under the parallel render. Shared by the render
+      # phase and platform redirect generation so the two never drift.
+      def normalize_alias_url(alias_path : String) : String
+        norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
+        {"index.html", "index.htm"}.each do |leaf|
+          if norm == "/#{leaf}"
+            return "/"
+          elsif norm.ends_with?("/#{leaf}")
+            return norm[0, norm.size - leaf.size]
+          end
+        end
+        return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
+        "#{norm}/"
+      end
     end
   end
 end

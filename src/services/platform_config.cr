@@ -447,7 +447,7 @@ module Hwaro
         target_url = calculate_page_url(relative_path, data[:slug], data[:custom_path], language, data[:date], data[:title])
         return unless target_url
 
-        own_url = normalize_alias_url(target_url)
+        own_url = Utils::PathUtils.normalize_alias_url(target_url)
         own_file_key = Utils::PathUtils.output_file_key(own_url)
         aliases.each do |alias_path|
           # Aliases the build refuses (absolute or protocol-relative URLs,
@@ -464,7 +464,7 @@ module Hwaro
           # `/moved` vs `/moved/` spelling, which those hosts match alike,
           # and spellings of the same output FILE (`/moved//`), which the
           # build compares by `output_file_key`.
-          norm = normalize_alias_url(alias_path)
+          norm = Utils::PathUtils.normalize_alias_url(alias_path)
           next if norm == own_url
           next if own_file_key && Utils::PathUtils.output_file_key(norm) == own_file_key
           # Carry base_path so generated redirects match the build's own
@@ -481,21 +481,6 @@ module Hwaro
         # must not abort ALL platform config generation — degrade per file,
         # matching how check-links skips unreadable Markdown.
         Logger.warn "Skipping #{path} while collecting aliases: #{ex.message}"
-      end
-
-      # Mirror of the render phase's `normalize_alias_url`: one spelling per
-      # published path (`/a`, `/a/` and `/a/index.html` all name `/a/`).
-      private def normalize_alias_url(alias_path : String) : String
-        norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
-        {"index.html", "index.htm"}.each do |leaf|
-          if norm == "/#{leaf}"
-            return "/"
-          elsif norm.ends_with?("/#{leaf}")
-            return norm[0, norm.size - leaf.size]
-          end
-        end
-        return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
-        "#{norm}/"
       end
 
       # Calculate the URL for a page through the same shared resolver as the

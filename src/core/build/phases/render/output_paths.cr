@@ -139,7 +139,7 @@ module Hwaro::Core::Build::Phases::Render
 
     writers.each do |page|
       page.aliases.each do |a|
-        norm = normalize_alias_url(a)
+        norm = Utils::PathUtils.normalize_alias_url(a)
         if prev_path = winners[norm]?
           # An alias duplicating its OWN page's URL is silently ignored at
           # write time (generate_aliases); only cross-page collisions warn.
@@ -194,29 +194,6 @@ module Hwaro::Core::Build::Phases::Render
     @page_output_files[key]?
   end
 
-  # Shared by collision detection and alias writing so the suppression keys
-  # can never drift from the written paths.
-  # Collision key for an alias target.
-  #
-  # `/foo/`, `/foo/index.html` and `/foo/index.htm` all name the same file on
-  # disk, so they must collapse to ONE key or `collision_suppressed?` cannot
-  # see the conflict. `aliases = ["/index.html"]` kept its own key, never
-  # collided with the homepage's `/`, and its redirect stub was written
-  # straight over `public/index.html` — silently, and order-dependently under
-  # the parallel render.
-  private def normalize_alias_url(alias_path : String) : String
-    norm = alias_path.starts_with?("/") ? alias_path : "/#{alias_path}"
-    {"index.html", "index.htm"}.each do |leaf|
-      if norm == "/#{leaf}"
-        return "/"
-      elsif norm.ends_with?("/#{leaf}")
-        return norm[0, norm.size - leaf.size]
-      end
-    end
-    return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
-    "#{norm}/"
-  end
-
   # True when this page is not the deterministic owner of `url_key` (see
   # compute_output_url_winners) and must not write it.
   private def collision_suppressed?(page : Models::Page, url_key : String) : Bool
@@ -267,7 +244,7 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)
-    own_url = normalize_alias_url(page.url)
+    own_url = Utils::PathUtils.normalize_alias_url(page.url)
     # The page's own output FILE, not just its URL string: `/about/`,
     # `/about//` and `/about/index.html` are three spellings of
     # `about/index.html`, and only the last one normalizes back to `own_url`.
@@ -280,7 +257,7 @@ module Hwaro::Core::Build::Phases::Render
     # for an alias to destroy and only the string compare applies.
     own_file_key = Utils::PathUtils.output_file_key(own_url)
     page.aliases.each do |alias_path|
-      norm = normalize_alias_url(alias_path)
+      norm = Utils::PathUtils.normalize_alias_url(alias_path)
       # An alias pointing at the page's own URL would overwrite the real
       # content with a redirect stub to itself.
       next if norm == own_url
