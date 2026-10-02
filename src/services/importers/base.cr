@@ -481,7 +481,7 @@ module Hwaro
         # an import that carries only the `.md` leaves every
         # `![](cover.png)` in the post 404ing. Symlinks are skipped for the
         # same reason `walk_files_into` skips them, and every destination is
-        # re-checked against `output_dir`.
+        # re-checked against `output_dir` (see BundleAssets.copy).
         protected def copy_bundle_assets(
           source_dir : String,
           dest_dir : String,
@@ -489,37 +489,10 @@ module Hwaro
           verbose : Bool = false,
           force : Bool = false,
         ) : Int32
-          return 0 unless Dir.exists?(source_dir)
-          return 0 unless Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
-          # `within_output_dir?` is lexical. If the destination directory —
-          # or any ancestor — is a symlink out of the tree, `Dir.exists?`
-          # follows it and `File.copy` would write straight through it.
-          # A dry run never created `dest_dir`, so it can only apply the
-          # resolved check to a directory that already exists — the same
-          # pre-existing-symlink case the real run refuses.
-          if @dry_run
-            return 0 if Dir.exists?(dest_dir) && !Utils::PathUtils.resolves_within?(dest_dir, output_dir)
-          else
-            return 0 unless Utils::PathUtils.resolves_within?(dest_dir, output_dir)
-          end
-
-          copied = 0
-          Dir.children(source_dir).sort!.each do |entry|
-            src = File.join(source_dir, entry)
-            next if File.directory?(src) || File.symlink?(src)
-            next if entry.ends_with?(".md") || entry.ends_with?(".markdown")
-
-            # `entry` is a single directory component — it can never contain
-            # `/`, `.` or `..`, so the guard below is the real protection.
-            # Running it through `safe_filename_component` only split on `\`,
-            # renaming a legitimate `C:\photo.png` to `photo.png` and leaving
-            # the `![](C:\photo.png)` reference this copy exists to repair
-            # still broken. The exporter twin does the same.
-            dest = File.join(dest_dir, entry)
-            next unless Utils::OutputGuard.within_output_dir?(dest, output_dir)
+          BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "copy") do |src, dest|
             if File.exists?(dest) && !force
               @file_actions << FileAction.new(dest, "skipped")
-              next
+              next false
             end
 
             action = File.exists?(dest) ? "overwritten" : "imported"
@@ -529,11 +502,8 @@ module Hwaro
             end
             @file_actions << FileAction.new(dest, action)
             Logger.debug "#{@dry_run ? "Would copy" : "Copied"} bundle asset: #{dest}" if verbose
-            copied += 1
-          rescue ex
-            Logger.warn "Could not copy bundle asset #{src}: #{ex.message}"
+            true
           end
-          copied
         end
 
         # Collapse an untrusted slug to a single safe filename component so it
