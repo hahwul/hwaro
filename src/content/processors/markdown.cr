@@ -66,9 +66,9 @@ module Hwaro
           end
 
           # Use SyntaxHighlighter for rendering with highlighting support.
-          # Tables were already converted above — skip the redundant re-scan.
+          # Tables were already converted above.
           smart = markdown_config.try(&.smart_punctuation) || false
-          html = SyntaxHighlighter.render(processed, highlight, safe, smart: smart, tables_preprocessed: true, hooks: hooks)
+          html = SyntaxHighlighter.render(processed, highlight, safe, smart: smart, hooks: hooks)
 
           # Post-process markdown extensions (footnotes section, mermaid)
           if md_cfg = markdown_config
