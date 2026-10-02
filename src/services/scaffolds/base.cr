@@ -310,6 +310,101 @@ module Hwaro
           DesignTokens.theme_toggle_css
         end
 
+        # The search palette shell (modal, open animation, input row) shared
+        # by the blog and docs stylesheets.
+        protected def search_modal_css : String
+          <<-CSS
+            .search-modal {
+              width: 560px;
+              max-width: 90vw;
+              max-height: 70vh;
+              background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+              backdrop-filter: saturate(180%) blur(24px);
+              -webkit-backdrop-filter: saturate(180%) blur(24px);
+              border: 1px solid var(--border-subtle);
+              border-radius: var(--radius);
+              box-shadow: var(--shadow-lg);
+              display: flex;
+              flex-direction: column;
+              overflow: hidden;
+              align-self: flex-start;
+            }
+            @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .search-modal { background: var(--bg-raised); } }
+
+            /* The palette settles into place when it opens. */
+            @media (prefers-reduced-motion: no-preference) {
+              .search-overlay.active { transition: opacity 0.15s var(--ease-out); }
+              .search-overlay.active .search-modal { transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+              @starting-style {
+                .search-overlay.active { opacity: 0; }
+                .search-overlay.active .search-modal { opacity: 0; transform: translateY(-8px) scale(0.985); }
+              }
+            }
+
+            .search-input-wrap {
+              display: flex;
+              align-items: center;
+              gap: 0.6rem;
+              padding: 0.75rem 1rem;
+              border-bottom: 1px solid var(--border-subtle);
+            }
+            CSS
+        end
+
+        # Keyboard-hint footer of the search palette (blog and docs).
+        protected def search_hint_css : String
+          <<-CSS
+            .search-hint {
+              padding: 0.5rem 0.75rem;
+              display: flex;
+              gap: 1rem;
+              justify-content: center;
+              border-top: 1px solid var(--border-subtle);
+              color: var(--text-muted);
+              font-size: 0.7rem;
+            }
+
+            .search-hint kbd {
+              font-size: 0.65rem;
+              padding: 0 0.3rem;
+              border: 1px solid var(--border);
+              border-radius: 3px;
+              background: var(--bg-raised);
+              box-shadow: 0 1px 0 var(--border);
+              font-family: inherit;
+              line-height: 1.4;
+            }
+            CSS
+        end
+
+        # Scroll-driven reading-progress bar (blog and book).
+        protected def reading_progress_css : String
+          <<-CSS
+            .reading-progress { display: none; }
+            @supports (animation-timeline: scroll()) {
+              @media (prefers-reduced-motion: no-preference) {
+                .reading-progress {
+                  display: block;
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  height: 2px;
+                  z-index: 110;
+                  transform-origin: 0 50%;
+                  background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
+                  animation: reading-progress linear both;
+                  animation-timeline: scroll(root);
+                }
+                @keyframes reading-progress {
+                  from { transform: scaleX(0); }
+                  to { transform: scaleX(1); }
+                }
+              }
+            }
+            CSS
+        end
+
         # Applied before first paint so a visitor's stored theme choice
         # doesn't flash the OS scheme first (`theme_toggle_script` is the
         # writer side). Inlined in every scaffold's <head>.
@@ -436,13 +531,13 @@ module Hwaro
 
             # Content & Processing
             str << multilingual_config(multilingual_languages, skip_taxonomies)
-            str << plugins_config
+            str << ConfigSnippets.plugins
             str << content_files_config
-            str << highlight_config
-            str << og_config
-            str << search_config
-            str << pagination_config
-            str << series_config
+            str << ConfigSnippets.highlight
+            str << ConfigSnippets.og
+            str << ConfigSnippets.search
+            str << ConfigSnippets.pagination
+            str << ConfigSnippets.series
             # `[related]` points at `tags`; without a `[[taxonomies]]` block
             # for it, ship the commented form so doctor stays quiet.
             str << (!skip_taxonomies && ships_taxonomies? ? related_config : ConfigSnippets.related(commented: true))
@@ -450,24 +545,24 @@ module Hwaro
             str << menus_config(multilingual_languages)
 
             # SEO & Feeds
-            str << sitemap_config
-            str << robots_config
-            str << llms_config
+            str << ConfigSnippets.sitemap
+            str << ConfigSnippets.robots
+            str << ConfigSnippets.llms
             str << feeds_config(feed_sections)
 
             # Optional features (commented out by default)
-            str << permalinks_config
-            str << auto_includes_config
-            str << assets_config
-            str << markdown_config
-            str << content_new_config
-            str << image_processing_config
-            str << build_hooks_config
-            str << pwa_config
-            str << amp_config
-            str << og_auto_image_config
-            str << doctor_config
-            str << deployment_config
+            str << ConfigSnippets.permalinks
+            str << ConfigSnippets.auto_includes
+            str << ConfigSnippets.assets
+            str << ConfigSnippets.markdown
+            str << ConfigSnippets.content_new
+            str << ConfigSnippets.image_processing
+            str << ConfigSnippets.build
+            str << ConfigSnippets.pwa
+            str << ConfigSnippets.amp
+            str << ConfigSnippets.og_auto_image
+            str << ConfigSnippets.doctor
+            str << ConfigSnippets.deployment
           end
         end
 
@@ -986,26 +1081,15 @@ module Hwaro
             HTML
         end
 
-        # Override in subclasses to customize navigation (Jinja2 syntax)
+        # Header nav for `header_template` (Jinja2): renders the "main" menu,
+        # so adding a nav item never requires editing this template.
+        # `item.name` defaults to the page title when a menu is registered
+        # from front matter, so it's escaped like any other author-controlled
+        # value.
         protected def navigation : String
           <<-NAV
             <nav>
-              <!-- Add links for new sections here (e.g. /notes/, /til/).
-                   Dynamic version (copy out and remove the hardcoded links
-                   below). It lists only the current language's sections;
-                   s.url already includes the language prefix, so do NOT add
-                   lang_prefix. For custom ordering, set `weight` in each
-                   section's front matter and use sort(attribute="weight").
-                   (The example below is wrapped in a raw block so it
-                   isn't executed here.)
-                   {% raw %}
-                   {% for s in site.sections | sort(attribute="title") %}
-                     {% if not s.transparent and s.name and s.language == page_language %}<a href="{{ base_url }}{{ s.url }}">{{ s.title | e }}</a>{% endif %}
-                   {% endfor %}
-                   {% endraw %}
-              -->
-              <a href="{{ base_url }}{{ lang_prefix }}/">Home</a>
-              <a href="{{ base_url }}{{ lang_prefix }}/about/">About</a>
+              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
             </nav>
             NAV
         end
@@ -1082,14 +1166,6 @@ module Hwaro
             TOML
         end
 
-        protected def plugins_config : String
-          ConfigSnippets.plugins
-        end
-
-        protected def pagination_config : String
-          ConfigSnippets.pagination
-        end
-
         protected def content_files_config : String
           <<-TOML
 
@@ -1107,10 +1183,6 @@ module Hwaro
             TOML
         end
 
-        protected def highlight_config : String
-          ConfigSnippets.highlight
-        end
-
         # Shared search overlay markup; only the input placeholder varies per
         # scaffold (e.g. "Search posts...", "Search documentation...").
         protected def search_overlay_html(placeholder : String) : String
@@ -1126,30 +1198,6 @@ module Hwaro
               </div>
             </div>
             HTML
-        end
-
-        protected def og_config : String
-          ConfigSnippets.og
-        end
-
-        protected def search_config : String
-          ConfigSnippets.search
-        end
-
-        protected def sitemap_config : String
-          ConfigSnippets.sitemap
-        end
-
-        protected def robots_config : String
-          ConfigSnippets.robots
-        end
-
-        protected def llms_config : String
-          ConfigSnippets.llms
-        end
-
-        protected def series_config : String
-          ConfigSnippets.series
         end
 
         protected def related_config : String
@@ -1200,54 +1248,6 @@ module Hwaro
             #                               #              false = main feed includes all languages
 
             TOML
-        end
-
-        protected def permalinks_config : String
-          ConfigSnippets.permalinks
-        end
-
-        protected def auto_includes_config : String
-          ConfigSnippets.auto_includes
-        end
-
-        protected def assets_config : String
-          ConfigSnippets.assets
-        end
-
-        protected def markdown_config : String
-          ConfigSnippets.markdown
-        end
-
-        protected def content_new_config : String
-          ConfigSnippets.content_new
-        end
-
-        protected def doctor_config : String
-          ConfigSnippets.doctor
-        end
-
-        protected def build_hooks_config : String
-          ConfigSnippets.build
-        end
-
-        protected def pwa_config : String
-          ConfigSnippets.pwa
-        end
-
-        protected def amp_config : String
-          ConfigSnippets.amp
-        end
-
-        protected def og_auto_image_config : String
-          ConfigSnippets.og_auto_image
-        end
-
-        protected def image_processing_config : String
-          ConfigSnippets.image_processing
-        end
-
-        protected def deployment_config : String
-          ConfigSnippets.deployment
         end
 
         # Search overlay JS shared by the blog and docs scaffolds.

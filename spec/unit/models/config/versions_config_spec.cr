@@ -1,5 +1,4 @@
 require "../../../spec_helper"
-require "../../../../src/services/defaults/config"
 require "../../../../src/utils/permalink_resolver"
 
 # Helper to load a Config from a TOML string via a temp file.

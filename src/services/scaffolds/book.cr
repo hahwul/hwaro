@@ -1112,28 +1112,7 @@ module Hwaro
                page, driven entirely by CSS scroll-driven animation. Browsers
                without animation-timeline (and reduced-motion readers) simply
                never see it. */
-            .reading-progress { display: none; }
-            @supports (animation-timeline: scroll()) {
-              @media (prefers-reduced-motion: no-preference) {
-                .reading-progress {
-                  display: block;
-                  position: fixed;
-                  top: 0;
-                  left: 0;
-                  right: 0;
-                  height: 2px;
-                  z-index: 110;
-                  transform-origin: 0 50%;
-                  background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
-                  animation: reading-progress linear both;
-                  animation-timeline: scroll(root);
-                }
-                @keyframes reading-progress {
-                  from { transform: scaleX(0); }
-                  to { transform: scaleX(1); }
-                }
-              }
-            }
+            #{reading_progress_css}
 
             @media (prefers-reduced-motion: reduce) {
               *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }

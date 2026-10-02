@@ -1,5 +1,4 @@
 require "../../spec_helper"
-require "../../../src/services/defaults/config"
 
 # Helper to load a Config from a TOML string via a temp file.
 describe Hwaro::Models::Config do
@@ -3328,16 +3327,20 @@ describe "Hwaro::Models::Config" do
       end
     end
 
-    # Drift guard: the scaffolded default configs must load without any
+    # Drift guard: every scaffold's generated config must load without any
     # unknown-key warning — they exercise the full documented key surface.
-    it "does not warn on the generated default configs" do
-      {
-        Hwaro::Services::Defaults::ConfigSamples.config,
-        Hwaro::Services::Defaults::ConfigSamples.config_without_taxonomies,
-        Hwaro::Services::Defaults::ConfigSamples.config_multilingual(["en", "ko"]),
-      }.each do |toml|
-        log = with_captured_log { load_config(toml) }
-        log.should_not contain("Unknown key")
+    it "does not warn on the scaffolded configs" do
+      Hwaro::Services::Scaffolds::Registry.all.each do |scaffold|
+        {
+          scaffold.config_content,
+          scaffold.config_content(skip_taxonomies: true),
+          scaffold.config_content(multilingual_languages: ["en", "ko"]),
+          scaffold.minimal_config_content,
+          scaffold.minimal_config_content(skip_taxonomies: true, multilingual_languages: ["en", "ko"]),
+        }.each do |toml|
+          log = with_captured_log { load_config(toml) }
+          log.should_not contain("Unknown key")
+        end
       end
     end
   end

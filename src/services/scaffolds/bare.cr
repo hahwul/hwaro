@@ -71,9 +71,9 @@ module Hwaro
             # Only the enabled block: the commented placeholder the other
             # scaffolds carry is a feature ad, which bare opts out of.
             str << multilingual_config(multilingual_languages, skip_taxonomies) if multilingual_languages.size > 1
-            str << plugins_config
+            str << ConfigSnippets.plugins
             str << content_files_config
-            str << sitemap_config
+            str << ConfigSnippets.sitemap
             str << feeds_config(feed_sections)
           end
           config

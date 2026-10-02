@@ -64,19 +64,12 @@ module Hwaro
         MAX_LIST_PASSES = 64
 
         # Cheap short-circuit for the anchor pass: a document with no closing
-        # anchor tag has no link to convert. Exposed so the skip is assertable
-        # without a wall-clock measurement.
+        # anchor tag has no link to convert.
         ANCHOR_CLOSE_RE = /<\/a>/i
         ANCHOR_RE       = Regex.new(
           "<a[^>]*\\bhref=[\"']([^\"']+)[\"'][^>]*>(.{0,#{MAX_INLINE_BODY_CHARS}}?)</a>",
           Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
         )
-
-        # True when `convert` will run the (bounded) anchor conversion pass on
-        # this document.
-        def self.anchor_pass_applicable?(html : String) : Bool
-          html.matches?(ANCHOR_CLOSE_RE)
-        end
 
         def self.convert(html : String) : String
           return "" if html.empty?

@@ -9,15 +9,15 @@ describe "base_url override" do
     begin
       project_dir = File.join(temp_dir, "site")
       initializer = Hwaro::Services::Initializer.new
-      initializer.run(
-        target_path: project_dir,
+      initializer.run(Hwaro::Config::Options::InitOptions.new(
+        path: project_dir,
         force: true,
         skip_agents_md: true,
         skip_sample_content: false,
         skip_taxonomies: true,
         multilingual_languages: [] of String,
-        scaffold_type: Hwaro::Config::Options::ScaffoldType::Simple
-      )
+        scaffold: Hwaro::Config::Options::ScaffoldType::Simple
+      ))
 
       Dir.cd(project_dir) do
         builder = Hwaro::Core::Build::Builder.new

@@ -38,7 +38,7 @@ src/
     server/               dev server: handlers, ChangeSet, watcher, rebuild dispatch, live reload
     scaffolds/            `hwaro init` scaffolds (Base + simple/bare/blog/docs/book + remote)
     importers/ exporters/ WordPress/Jekyll/Hugo/Notion/Obsidian/Hexo/Astro/Eleventy; Jekyll/Hugo
-    defaults/             sample config/content/templates/AGENTS.md for init
+    defaults/             AGENTS.md template for init
     content_lister / content_stats / content_validator, creator (`hwaro new`), frontmatter_converter, …
   assets/                 asset pipeline (bundling/fingerprinting) and the Sass compiler
     sass/                 scanner → parser → AST → evaluator (+ functions, color, extend, importer)

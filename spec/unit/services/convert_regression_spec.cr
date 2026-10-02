@@ -91,7 +91,7 @@ describe "convert regressions" do
         path = File.join(dir, "post.md")
         File.write(path, "{}\n\nBody.\n")
 
-        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        converter.convert_to_yaml.converted_count.should eq(1)
 
         content = File.read(path)
         content.should start_with("---\n---\n")
@@ -105,7 +105,7 @@ describe "convert regressions" do
         path = File.join(dir, "post.md")
         File.write(path, "+++\n+++\n\nBody.\n")
 
-        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::YAML).should be_true
+        converter.convert_to_yaml.converted_count.should eq(1)
 
         content = File.read(path)
         content.should eq("---\n---\n\nBody.\n")
@@ -120,7 +120,7 @@ describe "convert regressions" do
         path = File.join(dir, "post.md")
         File.write(path, "---\n---\n\nBody.\n")
 
-        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         File.read(path).should eq("+++\n+++\n\nBody.\n")
       end
@@ -144,7 +144,7 @@ describe "convert regressions" do
         path = File.join(dir, "post.md")
         File.write(path, "--- \ntitle: X\n---\n\nBody.\n")
 
-        converter.convert_file(path, Hwaro::Services::FrontmatterFormat::TOML).should be_true
+        converter.convert_to_toml.converted_count.should eq(1)
 
         content = File.read(path)
         content.should start_with("+++\n")

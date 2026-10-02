@@ -83,7 +83,7 @@ module Hwaro
             # Section mirrors `import_file`'s computation so the URL we
             # emit lands at the same path the file will be written to.
             section, _ = section_from_path(file_path, base_path, "posts")
-            section = section.split('/').reject(&.empty?).map { |s| slugify(s) }.join('/')
+            section = section.split('/').reject(&.empty?).map { |s| Utils::TextUtils.slugify(s) }.join('/')
 
             basename = File.basename(file_path, File.extname(file_path))
             title = basename
@@ -117,7 +117,7 @@ module Hwaro
             # stem that itself contains ".md" (`a.md.old.md` → `a.old.md`).
             relative_path_no_ext = relative_path.rchop(File.extname(relative_path))
 
-            slug = slugify(title)
+            slug = Utils::TextUtils.slugify(title)
             url = "/#{section}/#{slug}/"
 
             # Register every name a wiki-link could plausibly use.
@@ -149,13 +149,13 @@ module Hwaro
 
           key = name.strip.downcase
           if url = link_map[key]?
-            return anchor.empty? ? url : "#{url}##{slugify(anchor.lchop('#').lchop('^'))}"
+            return anchor.empty? ? url : "#{url}##{Utils::TextUtils.slugify(anchor.lchop('#').lchop('^'))}"
           end
           # Unknown target: fall back to a relative slug. This keeps behavior
           # backwards-compatible for vaults that link to pages outside the
           # import scope, and the user can fix up by hand.
-          slug = slugify(name)
-          anchor.empty? ? slug : "#{slug}##{slugify(anchor.lchop('#').lchop('^'))}"
+          slug = Utils::TextUtils.slugify(name)
+          anchor.empty? ? slug : "#{slug}##{Utils::TextUtils.slugify(anchor.lchop('#').lchop('^'))}"
         end
 
         private def import_file(
@@ -252,9 +252,9 @@ module Hwaro
 
           # Determine section from vault folder structure
           section, _ = section_from_path(file_path, base_path, "posts")
-          section = section.split('/').reject(&.empty?).map { |s| slugify(s) }.join('/')
+          section = section.split('/').reject(&.empty?).map { |s| Utils::TextUtils.slugify(s) }.join('/')
 
-          slug = slugify(fields["title"].as?(String) || File.basename(file_path, File.extname(file_path)))
+          slug = Utils::TextUtils.slugify(fields["title"].as?(String) || File.basename(file_path, File.extname(file_path)))
 
           frontmatter = generate_frontmatter(fields)
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))

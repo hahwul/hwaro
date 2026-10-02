@@ -178,39 +178,18 @@ module Hwaro
         # The exporter preserves the bundle layout, so without this every
         # `![](cover.png)` in the exported post points at a file that was
         # never written. Symlinks are skipped and every destination is
-        # re-checked against `output_dir`.
+        # re-checked against `output_dir` (see BundleAssets.copy).
         protected def copy_bundle_assets(source_dir : String, dest_dir : String, output_dir : String, verbose : Bool = false) : Int32
-          return 0 unless Dir.exists?(source_dir)
-          return 0 unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
-          # `within_output_dir?` is lexical. If the destination directory —
-          # or any ancestor — is a symlink out of the tree, `Dir.exists?`
-          # follows it and `File.copy` would write straight through it.
-          # A dry run never created `dest_dir`, so it can only apply the
-          # resolved check to a directory that already exists — the same
-          # pre-existing-symlink case the real run refuses.
-          if @dry_run
-            return 0 if Dir.exists?(dest_dir) && !Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
-          else
-            return 0 unless Hwaro::Utils::PathUtils.resolves_within?(dest_dir, output_dir)
-          end
-
-          copied = 0
-          Dir.children(source_dir).sort!.each do |entry|
-            src = File.join(source_dir, entry)
-            next if File.directory?(src) || File.symlink?(src)
-            next if entry.ends_with?(".md") || entry.ends_with?(".markdown")
-
-            dest = File.join(dest_dir, entry)
-            next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest, output_dir)
-            # The directory was resolve-checked above, but the destination
-            # FILE itself can be a pre-existing symlink leaf: File.copy
-            # follows it and would write through it to a path outside the
-            # tree. Same resolved re-check write_file applies.
+          BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "export") do |src, dest|
+            # The directory was resolve-checked, but the destination FILE
+            # itself can be a pre-existing symlink leaf: File.copy follows it
+            # and would write through it to a path outside the tree. Same
+            # resolved re-check write_file applies.
             resolved_dest = Hwaro::Utils::PathUtils.resolved_real_path(dest)
             resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
             unless resolved_dest.starts_with?(resolved_root + File::SEPARATOR)
               Logger.warn "Skipping bundle asset outside output directory (symlinked destination): #{dest}"
-              next
+              next false
             end
 
             action = File.exists?(dest) ? "overwritten" : "exported"
@@ -220,11 +199,8 @@ module Hwaro
             end
             @file_actions << FileAction.new(dest, action)
             Logger.debug "#{@dry_run ? "Would export" : "Exported"} bundle asset: #{dest}" if verbose
-            copied += 1
-          rescue ex
-            Logger.warn "Could not export bundle asset #{src}: #{ex.message}"
+            true
           end
-          copied
         end
 
         # Parse frontmatter from content, returns {fields_hash, body}.

@@ -77,19 +77,9 @@ module Hwaro
       # would instead of reporting an empty plan.
       def plan(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Array(PlannedOp)
         ops = [] of PlannedOp
-        config ||= Models::Config.load(env: options.env)
-        deployment = config.deployment
-
-        source_dir = resolve_source_dir(options, deployment)
-        require_source_dir!(source_dir)
-
-        target_names = resolve_target_names(options, deployment)
-        require_target_names!(target_names)
-
+        deployment, source_dir, target_names = load_deploy_inputs(options, config)
         targets = resolve_targets!(target_names, deployment)
-        warn_duplicate_targets(deployment)
-        warn_unapplied_matchers(deployment)
-        warn_unapplied_workers(deployment)
+        warn_deployment_config(deployment)
         effective = EffectiveOptions.new(deployment, options)
         force_patterns = force_matcher_patterns(deployment)
 
@@ -160,18 +150,8 @@ module Hwaro
       # caller can emit a top-level error payload (shape unchanged).
       def deploy_structured(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Array(DeployResult)
         results = [] of DeployResult
-        config ||= Models::Config.load(env: options.env)
-        deployment = config.deployment
-
-        source_dir = resolve_source_dir(options, deployment)
-        require_source_dir!(source_dir)
-
-        target_names = resolve_target_names(options, deployment)
-        require_target_names!(target_names)
-
-        warn_duplicate_targets(deployment)
-        warn_unapplied_matchers(deployment)
-        warn_unapplied_workers(deployment)
+        deployment, source_dir, target_names = load_deploy_inputs(options, config)
+        warn_deployment_config(deployment)
 
         targets = target_names.compact_map do |name|
           target = deployment.target_named(name)
@@ -179,19 +159,10 @@ module Hwaro
             target
           else
             available = deployment.targets.map(&.name).join(", ")
-            hint = available.empty? ? nil.as(String?) : "Configured targets: #{available}."
-            results << DeployResult.new(
-              name: name,
-              status: "error",
-              created: 0, updated: 0, deleted: 0,
-              duration_ms: 0.0,
-              error: {
-                "code"     => Hwaro::Errors::HWARO_E_USAGE,
-                "category" => Hwaro::Errors.category_for(Hwaro::Errors::HWARO_E_USAGE).to_s,
-                "message"  => "Unknown deploy target: #{name}",
-                "hint"     => hint,
-              } of String => String?,
-            )
+            hint = available.empty? ? nil : "Configured targets: #{available}."
+            code = Hwaro::Errors::HWARO_E_USAGE
+            results << deploy_result(name, TargetCounts.new, 0.0,
+              error_payload(code, Hwaro::Errors.category_for(code).to_s, "Unknown deploy target: #{name}", hint))
             nil
           end
         end
@@ -237,49 +208,53 @@ module Hwaro
 
         duration_ms = ((Time.instant - started).total_milliseconds * 100).round / 100
 
-        if err = error
-          return DeployResult.new(
-            name: target.name,
-            status: "error",
-            created: counts.created,
-            updated: counts.updated,
-            deleted: counts.deleted,
-            duration_ms: duration_ms,
-            error: {
-              "code"     => err.code,
-              "category" => err.category.to_s,
-              "message"  => err.message || "",
-              "hint"     => err.hint,
-            } of String => String?,
-          )
-        end
+        payload = if err = error
+                    error_payload(err.code, err.category.to_s, err.message || "", err.hint)
+                  elsif !ok
+                    code = Hwaro::Errors::HWARO_E_NETWORK
+                    error_payload(code, Hwaro::Errors.category_for(code).to_s, "Deploy target '#{target.name}' failed", nil)
+                  end
+        deploy_result(target.name, counts, duration_ms, payload)
+      end
 
-        unless ok
-          return DeployResult.new(
-            name: target.name,
-            status: "error",
-            created: counts.created,
-            updated: counts.updated,
-            deleted: counts.deleted,
-            duration_ms: duration_ms,
-            error: {
-              "code"     => Hwaro::Errors::HWARO_E_NETWORK,
-              "category" => Hwaro::Errors.category_for(Hwaro::Errors::HWARO_E_NETWORK).to_s,
-              "message"  => "Deploy target '#{target.name}' failed",
-              "hint"     => nil.as(String?),
-            } of String => String?,
-          )
-        end
-
+      # `status` is "error" exactly when an error payload is present.
+      private def deploy_result(name : String, counts : TargetCounts, duration_ms : Float64, error : Hash(String, String?)?) : DeployResult
         DeployResult.new(
-          name: target.name,
-          status: "ok",
+          name: name,
+          status: error ? "error" : "ok",
           created: counts.created,
           updated: counts.updated,
           deleted: counts.deleted,
           duration_ms: duration_ms,
-          error: nil,
+          error: error,
         )
+      end
+
+      # The classified-error shape `DeployResult.error` mirrors (key order is
+      # part of the JSON output).
+      private def error_payload(code : String, category : String, message : String, hint : String?) : Hash(String, String?)
+        {"code" => code, "category" => category, "message" => message, "hint" => hint} of String => String?
+      end
+
+      # Load the config and resolve the source directory and requested target
+      # names — the shared opening of `#plan`, `#run` and
+      # `#deploy_structured`, raising the same classified errors for each.
+      private def load_deploy_inputs(options : Config::Options::DeployOptions, config : Models::Config?) : {Models::DeploymentConfig, String, Array(String)}
+        config ||= Models::Config.load(env: options.env)
+        deployment = config.deployment
+
+        source_dir = resolve_source_dir(options, deployment)
+        require_source_dir!(source_dir)
+
+        target_names = resolve_target_names(options, deployment)
+        require_target_names!(target_names)
+        {deployment, source_dir, target_names}
+      end
+
+      private def warn_deployment_config(deployment : Models::DeploymentConfig) : Nil
+        warn_duplicate_targets(deployment)
+        warn_unapplied_matchers(deployment)
+        warn_unapplied_workers(deployment)
       end
 
       # Deploy a single target, returning both success and the collected
@@ -327,29 +302,20 @@ module Hwaro
       end
 
       def run(options : Config::Options::DeployOptions, config : Models::Config? = nil) : Bool
-        config ||= Models::Config.load(env: options.env)
-        deployment = config.deployment
-
-        source_dir = resolve_source_dir(options, deployment)
-        require_source_dir!(source_dir)
-
-        target_names = resolve_target_names(options, deployment)
-        require_target_names!(target_names)
-
+        deployment, source_dir, target_names = load_deploy_inputs(options, config)
         targets = resolve_targets!(target_names, deployment)
-        warn_duplicate_targets(deployment)
-        warn_unapplied_matchers(deployment)
-        warn_unapplied_workers(deployment)
+        warn_deployment_config(deployment)
 
         effective = EffectiveOptions.new(deployment, options)
 
-        # All failure paths inside deploy_target now raise HwaroError, so
-        # the loop body either completes or the error propagates up to
-        # the Runner which renders the classified error + exit code. The
-        # Bool return is kept for backwards compatibility with callers
-        # that only care about success/skip.
+        # All failure paths inside a target deploy raise HwaroError, so the
+        # loop body either completes or the error propagates up to the
+        # Runner which renders the classified error + exit code. The Bool
+        # return is kept for backwards compatibility with callers that only
+        # care about success/skip. `structured: false` picks the human
+        # reporting style.
         targets.each do |target|
-          deploy_target(target, source_dir, effective, deployment)
+          deploy_target_with_counts(target, source_dir, effective, deployment, structured: false)
         end
 
         true
@@ -367,17 +333,6 @@ module Hwaro
           @force = options.force.nil? ? deployment.force : options.force.as(Bool)
           @max_deletes = options.max_deletes || deployment.max_deletes
         end
-      end
-
-      # `#run`'s per-target step: the same dispatch as the structured path,
-      # with the human reporting style and only the success flag kept.
-      private def deploy_target(
-        target : Models::DeploymentTarget,
-        source_dir : String,
-        effective : EffectiveOptions,
-        deployment : Models::DeploymentConfig,
-      ) : Bool
-        deploy_target_with_counts(target, source_dir, effective, deployment, structured: false)[0]
       end
     end
   end

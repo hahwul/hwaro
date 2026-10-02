@@ -890,40 +890,7 @@ module Hwaro
 
             .search-overlay.active { display: flex; }
 
-            .search-modal {
-              width: 560px;
-              max-width: 90vw;
-              max-height: 70vh;
-              background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
-              backdrop-filter: saturate(180%) blur(24px);
-              -webkit-backdrop-filter: saturate(180%) blur(24px);
-              border: 1px solid var(--border-subtle);
-              border-radius: var(--radius);
-              box-shadow: var(--shadow-lg);
-              display: flex;
-              flex-direction: column;
-              overflow: hidden;
-              align-self: flex-start;
-            }
-            @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .search-modal { background: var(--bg-raised); } }
-
-            /* The palette settles into place when it opens. */
-            @media (prefers-reduced-motion: no-preference) {
-              .search-overlay.active { transition: opacity 0.15s var(--ease-out); }
-              .search-overlay.active .search-modal { transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
-              @starting-style {
-                .search-overlay.active { opacity: 0; }
-                .search-overlay.active .search-modal { opacity: 0; transform: translateY(-8px) scale(0.985); }
-              }
-            }
-
-            .search-input-wrap {
-              display: flex;
-              align-items: center;
-              gap: 0.6rem;
-              padding: 0.75rem 1rem;
-              border-bottom: 1px solid var(--border-subtle);
-            }
+            #{search_modal_css}
 
             .search-input-wrap svg { flex-shrink: 0; color: var(--text-muted); }
 
@@ -974,26 +941,7 @@ module Hwaro
             .search-result-item .search-result-snippet mark { background: color-mix(in srgb, var(--primary) 15%, transparent); color: var(--primary-strong); border-radius: 2px; padding: 0 1px; }
             .search-no-results { padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
 
-            .search-hint {
-              padding: 0.5rem 0.75rem;
-              display: flex;
-              gap: 1rem;
-              justify-content: center;
-              border-top: 1px solid var(--border-subtle);
-              color: var(--text-muted);
-              font-size: 0.7rem;
-            }
-
-            .search-hint kbd {
-              font-size: 0.65rem;
-              padding: 0 0.3rem;
-              border: 1px solid var(--border);
-              border-radius: 3px;
-              background: var(--bg-raised);
-              box-shadow: 0 1px 0 var(--border);
-              font-family: inherit;
-              line-height: 1.4;
-            }
+            #{search_hint_css}
 
             /* Search trigger press feedback */
             .search-trigger { transition: border-color var(--transition), color var(--transition), transform 0.1s var(--ease-out); }
@@ -1003,28 +951,7 @@ module Hwaro
                pages, driven entirely by CSS scroll-driven animation. Browsers
                without animation-timeline (and reduced-motion readers) simply
                never see it. */
-            .reading-progress { display: none; }
-            @supports (animation-timeline: scroll()) {
-              @media (prefers-reduced-motion: no-preference) {
-                .reading-progress {
-                  display: block;
-                  position: fixed;
-                  top: 0;
-                  left: 0;
-                  right: 0;
-                  height: 2px;
-                  z-index: 110;
-                  transform-origin: 0 50%;
-                  background: linear-gradient(90deg, var(--rule-from), var(--rule-to));
-                  animation: reading-progress linear both;
-                  animation-timeline: scroll(root);
-                }
-                @keyframes reading-progress {
-                  from { transform: scaleX(0); }
-                  to { transform: scaleX(1); }
-                }
-              }
-            }
+            #{reading_progress_css}
 
             /* Responsive — the type scale is fluid, so only the frame
                needs to adapt. The date rails stack above their entries. */
@@ -1292,17 +1219,6 @@ module Hwaro
                 {{ content }}
             {% include "footer.html" %}
             HTML
-        end
-
-        # Override navigation (not used directly - kept for base class
-        # compatibility). Mirrors blog_nav_html's menu-driven nav so this
-        # stays in sync with the real header if anything ever calls it.
-        protected def navigation : String
-          <<-NAV
-            <nav>
-              {% for item in get_menu(name="main") %}<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>{% endfor %}
-            </nav>
-            NAV
         end
 
         # Generates a sample post date relative to today, so a freshly

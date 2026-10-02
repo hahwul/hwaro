@@ -191,7 +191,7 @@ module Hwaro
                   date_str = date_val.as_s
                   # 11ty special date values
                   unless date_str == "Last Modified" || date_str == "Created" || date_str == "git Last Modified" || date_str == "git Created"
-                    parsed = parse_date(date_str)
+                    parsed = Utils::DateUtils.parse_import(date_str)
                     fields["date"] = format_date(parsed) if parsed
                   end
                 end
@@ -259,7 +259,7 @@ module Hwaro
             # Try to extract date from filename (YYYY-MM-DD-slug.md)
             filename = File.basename(file_path)
             if match = /^(\d{4}-\d{2}-\d{2})/.match(filename)
-              parsed = parse_date(match[1])
+              parsed = Utils::DateUtils.parse_import(match[1])
               fields["date"] = format_date(parsed) if parsed
             elsif info = File.info?(file_path)
               fields["date"] = format_date(info.modification_time)
@@ -284,9 +284,9 @@ module Hwaro
                    # structural filename, not a title.
                    "_index"
                  elsif basename == "index" && !is_site_root_index
-                   slugify(File.basename(File.dirname(file_path)))
+                   Utils::TextUtils.slugify(File.basename(File.dirname(file_path)))
                  else
-                   slugify(basename)
+                   Utils::TextUtils.slugify(basename)
                  end
 
           # Avoid collision on section/slug path

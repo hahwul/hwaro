@@ -399,24 +399,6 @@ describe Hwaro::Services::Scaffolds::Registry do
     end
   end
 
-  describe ".has?" do
-    it "returns true for Simple" do
-      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Simple).should be_true
-    end
-
-    it "returns true for Blog" do
-      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Blog).should be_true
-    end
-
-    it "returns true for Docs" do
-      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Docs).should be_true
-    end
-
-    it "returns true for Book" do
-      Hwaro::Services::Scaffolds::Registry.has?(Hwaro::Config::Options::ScaffoldType::Book).should be_true
-    end
-  end
-
   describe ".all" do
     it "returns all registered scaffolds" do
       all = Hwaro::Services::Scaffolds::Registry.all
@@ -430,44 +412,6 @@ describe Hwaro::Services::Scaffolds::Registry do
       types.should contain(Hwaro::Config::Options::ScaffoldType::Blog)
       types.should contain(Hwaro::Config::Options::ScaffoldType::Docs)
       types.should contain(Hwaro::Config::Options::ScaffoldType::Book)
-    end
-  end
-
-  describe ".list" do
-    it "returns list of tuples with name and description" do
-      list = Hwaro::Services::Scaffolds::Registry.list
-      list.should_not be_empty
-    end
-
-    it "each item has a non-empty name" do
-      list = Hwaro::Services::Scaffolds::Registry.list
-      list.each do |name, _desc|
-        name.should_not be_empty
-      end
-    end
-
-    it "each item has a non-empty description" do
-      list = Hwaro::Services::Scaffolds::Registry.list
-      list.each do |_name, desc|
-        desc.should_not be_empty
-      end
-    end
-
-    it "has at least 5 items" do
-      list = Hwaro::Services::Scaffolds::Registry.list
-      list.size.should be >= 5
-    end
-  end
-
-  describe ".default" do
-    it "returns the Simple scaffold" do
-      default = Hwaro::Services::Scaffolds::Registry.default
-      default.type.should eq(Hwaro::Config::Options::ScaffoldType::Simple)
-    end
-
-    it "is an instance of Simple" do
-      default = Hwaro::Services::Scaffolds::Registry.default
-      default.should be_a(Hwaro::Services::Scaffolds::Simple)
     end
   end
 
