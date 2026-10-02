@@ -124,14 +124,14 @@ module Hwaro
                     when "fuse_javascript"
                       generate_javascript(search_data)
                     when "fuse_json"
-                      generate_json(search_data)
+                      search_data.to_json
                     when "elasticlunr_json"
-                      generate_json(search_data)
+                      search_data.to_json
                     when "elasticlunr_javascript"
                       generate_javascript(search_data)
                     else
                       Logger.warn "Unknown search format '#{config.search.format}'. Defaulting to 'fuse_json'."
-                      generate_json(search_data)
+                      search_data.to_json
                     end
 
           # Write search file
@@ -350,10 +350,6 @@ module Hwaro
 
           data
         end
-      end
-
-      private def self.generate_json(search_data : Array(Entry)) : String
-        search_data.to_json
       end
 
       private def self.generate_javascript(search_data : Array(Entry)) : String

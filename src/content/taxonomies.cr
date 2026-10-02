@@ -278,7 +278,7 @@ module Hwaro
             name = taxonomy.name
             next if name.strip.empty?
 
-            values = extract_terms_for(page, taxonomy)
+            values = page.taxonomy_values(name)
             next if values.empty?
 
             values.each do |term|
@@ -467,10 +467,6 @@ module Hwaro
         page.taxonomy_name = taxonomy.name
         page.pagination_enabled = false
         page
-      end
-
-      private def self.extract_terms_for(page : Models::Page, taxonomy : Models::TaxonomyConfig) : Array(String)
-        page.taxonomy_values(taxonomy.name)
       end
 
       private def self.apply_template(

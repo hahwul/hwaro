@@ -61,7 +61,7 @@ module Hwaro
                                   inner.sub(hattr_match[0], "")
                                 end
                 cleaned_inner = cleaned_inner.rstrip
-                new_attrs = MarkdownAttributes.apply_to_tag_attrs(attrs, parsed)
+                new_attrs = MarkdownAttributes.merge_attrs(attrs, parsed)
                 "<#{tag}#{new_attrs}>#{cleaned_inner}</#{tag}>"
               else
                 match
@@ -77,7 +77,7 @@ module Hwaro
             wrapper = $3
             parsed = decode_and_parse_hattr($4)
             if parsed
-              "#{MarkdownAttributes.apply_to_img(img_open, parsed)}#{closer}#{wrapper}"
+              "#{MarkdownAttributes.merge_attrs(img_open, parsed)}#{closer}#{wrapper}"
             else
               match
             end
