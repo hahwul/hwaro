@@ -42,27 +42,6 @@ module Hwaro
       def add_subsection(section : Section)
         @subsections << section
       end
-
-      # Get all pages including from subsections (recursive)
-      def all_pages(include_drafts : Bool = false) : Array(Page)
-        result = include_drafts ? @pages.dup : @pages.reject(&.draft)
-
-        @subsections.each do |subsection|
-          result.concat(subsection.all_pages(include_drafts))
-        end
-
-        result
-      end
-
-      # Generate pagination URL for a specific page number
-      def pagination_url(page_number : Int32) : String
-        base = @url.rstrip("/")
-        if page_number == 1
-          "#{base}/"
-        else
-          "#{base}/#{@paginate_path}/#{page_number}/"
-        end
-      end
     end
   end
 end
