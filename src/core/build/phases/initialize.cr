@@ -363,9 +363,6 @@ module Hwaro::Core::Build::Phases::Initialize
   # Widest timestamp granularity a destination filesystem is likely to have
   # (FAT/exFAT store 2-second resolution).
   MTIME_SKIP_TOLERANCE = 2.seconds
-  # Read size for the byte comparison that resolves that window (see
-  # `same_contents?`).
-  CONTENT_COMPARE_CHUNK = 64 * 1024
 
   # The `File::Info` of a publishable file under `static/`, or nil (after
   # warning where a warning is due) when `src_path` must be skipped. One
@@ -487,20 +484,7 @@ module Hwaro::Core::Build::Phases::Initialize
   # never reads a byte. A read failure answers "not identical" so the caller
   # falls back to copying — the safe direction.
   private def same_contents?(src_path : String, dest_path : String) : Bool
-    buffer_src = Bytes.new(CONTENT_COMPARE_CHUNK)
-    buffer_dest = Bytes.new(CONTENT_COMPARE_CHUNK)
-    File.open(src_path, "rb") do |src_io|
-      File.open(dest_path, "rb") do |dest_io|
-        loop do
-          read = src_io.read(buffer_src)
-          break if read == 0
-          window = buffer_dest[0, read]
-          return false unless dest_io.read_fully?(window)
-          return false unless buffer_src[0, read] == window
-        end
-      end
-    end
-    true
+    File.same_content?(src_path, dest_path)
   rescue ex : File::Error | IO::Error
     Logger.debug "Static copy: failed to compare #{src_path} with #{dest_path}: #{ex.message}"
     false
