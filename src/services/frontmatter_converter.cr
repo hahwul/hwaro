@@ -152,17 +152,11 @@ module Hwaro
         false
       end
 
-      # Convert a single file's frontmatter
-      def convert_file(file_path : String, target_format : FrontmatterFormat) : Bool
-        status = convert_file_with_status(file_path, target_format, log_skipped: true)
-        status == ConversionStatus::Converted
-      end
-
+      # Convert one file's frontmatter, tallying skips by reason.
       private def convert_file_with_status(
         file_path : String,
         target_format : FrontmatterFormat,
-        log_skipped : Bool = true,
-        skips : Hash(SkipReason, Int32)? = nil,
+        skips : Hash(SkipReason, Int32),
       ) : ConversionStatus
         project_root = Utils::PathUtils.find_project_root(@content_dir)
         if File.symlink?(file_path) && !Utils::PathUtils.resolves_within?(file_path, project_root)
@@ -177,14 +171,12 @@ module Hwaro
 
         # Skip if already in target format or unknown format
         if current_format == target_format
-          Logger.item("skipped (already #{target_format}): #{file_path}", glyph: :bullet) if log_skipped
-          skips.try { |h| h[SkipReason::AlreadyTarget] = (h[SkipReason::AlreadyTarget]? || 0) + 1 }
+          skips[SkipReason::AlreadyTarget] = (skips[SkipReason::AlreadyTarget]? || 0) + 1
           return ConversionStatus::Skipped
         end
 
         if current_format == FrontmatterFormat::Unknown
-          Logger.item("skipped (no frontmatter): #{file_path}", glyph: :warn) if log_skipped
-          skips.try { |h| h[SkipReason::NoFrontmatter] = (h[SkipReason::NoFrontmatter]? || 0) + 1 }
+          skips[SkipReason::NoFrontmatter] = (skips[SkipReason::NoFrontmatter]? || 0) + 1
           return ConversionStatus::Skipped
         end
 
@@ -194,11 +186,11 @@ module Hwaro
         # empty frontmatter, silently deleting the author's content — skip
         # such files instead of writing anything.
         unless frontmatter_mapping?(content, current_format)
-          # Always named, bulk run or not: this is the skip that protects the
+          # Named, unlike the other skips: this is the skip that protects the
           # author's body text, and staying quiet about it reads as "nothing
           # to do here" for a file that may well have broken front matter.
           Logger.warn "#{file_path}: leading #{format_label(current_format)} block is not front matter — left unchanged."
-          skips.try { |h| h[SkipReason::NotFrontmatter] = (h[SkipReason::NotFrontmatter]? || 0) + 1 }
+          skips[SkipReason::NotFrontmatter] = (skips[SkipReason::NotFrontmatter]? || 0) + 1
           return ConversionStatus::Skipped
         end
 
@@ -250,7 +242,7 @@ module Hwaro
         format_name = format_label(target_format)
 
         find_content_files.each do |file_path|
-          status = convert_file_with_status(file_path, target_format, log_skipped: false, skips: skips)
+          status = convert_file_with_status(file_path, target_format, skips)
 
           case status
           when ConversionStatus::Converted
