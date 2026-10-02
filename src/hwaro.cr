@@ -65,7 +65,6 @@ require "./models/toc"
 
 # Load content processors
 require "./content/processors/markdown"
-require "./content/processors/content_files"
 require "./content/processors/xml"
 require "./content/processors/table_parser"
 require "./content/processors/internal_link_resolver"

@@ -132,7 +132,7 @@ module Hwaro::Core::Build::Phases::ReadContent
         # ["drafts/**"]` must not leak `drafts/secrets.json`.
         next if seen_raw.includes?(relative_path)
         is_raw = (ext == ".json" || ext == ".xml") && !config.try(&.content_files.denied?(relative_path))
-        is_content_file = content_files_enabled && config && Content::Processors::ContentFiles.publish?(relative_path, config)
+        is_content_file = content_files_enabled && config && config.content_files.publish?(relative_path)
 
         if is_raw || is_content_file
           ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
