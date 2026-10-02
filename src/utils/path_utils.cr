@@ -353,6 +353,20 @@ module Hwaro
         return norm if norm.ends_with?("/") || norm.ends_with?(".html") || norm.ends_with?(".htm")
         "#{norm}/"
       end
+
+      # The language code an extension-less content filename carries
+      # (`about.ko` → "ko", `_index.zh-tw` → "zh-tw"): the non-empty text
+      # after the last dot, provided a non-empty base name precedes it
+      # (".ko" is not a translation) and the block accepts the code. Callers
+      # pass the site's DECLARED codes (plus the default) — never a shape
+      # check, which read `setup.mac.md` as a translation. Shared by the
+      # build's ReadContent and the tools that must route files the same way.
+      def language_suffix(stem : String, & : String -> Bool) : String?
+        idx = stem.rindex('.')
+        return unless idx && idx > 0
+        code = stem[(idx + 1)..]
+        code if !code.empty? && yield(code)
+      end
     end
   end
 end

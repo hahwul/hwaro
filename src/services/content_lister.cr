@@ -621,12 +621,9 @@ module Hwaro
         return unless setup.multilingual
         ext = File.extname(basename)
         return if ext.empty?
-        stem = basename[0, basename.size - ext.size]
-        idx = stem.rindex('.')
-        return unless idx && idx > 0
-        code = stem[(idx + 1)..]
-        return if code.empty?
-        code if setup.codes.includes?(code) || code == setup.default
+        Utils::PathUtils.language_suffix(basename[0, basename.size - ext.size]) do |code|
+          setup.codes.includes?(code) || code == setup.default
+        end
       end
 
       # A section `_index` the way ReadContent decides it: the basename with

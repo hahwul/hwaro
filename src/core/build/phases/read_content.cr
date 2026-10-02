@@ -153,15 +153,9 @@ module Hwaro::Core::Build::Phases::ReadContent
     return unless config.multilingual?
     return unless basename.size > ext.size && basename[-ext.size..].downcase == ext
 
-    stem = basename[0, basename.size - ext.size]
-    idx = stem.rindex('.')
-    # idx > 0: a non-empty base name must remain (".ko.md" is not a translation)
-    return unless idx && idx > 0
-    lang_code = stem[(idx + 1)..]
-    return if lang_code.empty?
-    return lang_code if config.languages.has_key?(lang_code) || lang_code == config.default_language
-
-    nil
+    Utils::PathUtils.language_suffix(basename[0, basename.size - ext.size]) do |code|
+      config.languages.has_key?(code) || code == config.default_language
+    end
   end
 
   # `[[content.generate]]` — materialize planned data pages into the build's
