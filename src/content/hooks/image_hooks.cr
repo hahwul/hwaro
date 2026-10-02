@@ -50,11 +50,6 @@ module Hwaro
           end
         end
 
-        # Returns a snapshot copy of the resize map (safe to use outside mutex)
-        def self.resize_map : Hash(String, Hash(Int32, String))
-          @@resize_map_mutex.synchronize { @@resize_map.dup }
-        end
-
         # Read-only access to the resize map for the render phase. The map is
         # populated once by the BeforeRender `image:resize` hook and is never
         # mutated during rendering, so render workers can read it directly
@@ -63,17 +58,6 @@ module Hwaro
         # reads of the unmutated Hash under -Dpreview_mt are safe.
         def self.resize_map_readonly : Hash(String, Hash(Int32, String))
           @@resize_map_mutex.synchronize { @@resize_map }
-        end
-
-        # Replace the resize map (used by tests)
-        def self.set_resize_map(map : Hash(String, Hash(Int32, String)))
-          @@resize_map_mutex.synchronize { @@resize_map = map }
-        end
-
-        def self.find_resized(url : String, width : Int32) : String?
-          @@resize_map_mutex.synchronize do
-            @@resize_map[url]?.try { |m| m[width]? }
-          end
         end
 
         # Source file behind `url` as of the last `image:resize` run, or nil
@@ -86,20 +70,8 @@ module Hwaro
           @@resize_map_mutex.synchronize { @@source_map[url]? }
         end
 
-        def self.lqip_map : Hash(String, Hash(String, String))
-          @@lqip_map_mutex.synchronize { @@lqip_map.dup }
-        end
-
-        def self.set_lqip_map(map : Hash(String, Hash(String, String)))
-          @@lqip_map_mutex.synchronize { @@lqip_map = map }
-        end
-
         def self.find_lqip(url : String) : Hash(String, String)?
           @@lqip_map_mutex.synchronize { @@lqip_map[url]?.try(&.dup) }
-        end
-
-        def self.find_closest(url : String, width : Int32) : String?
-          find_closest_variant(url, width).try(&.[1])
         end
 
         # The chosen variant as `{actual_width, url}`.
@@ -117,17 +89,8 @@ module Hwaro
               return {width, exact}
             end
 
-            # Find the smallest width that is >= requested
-            best_key = nil
-            widths_map.each_key do |w|
-              if w >= width
-                if best_key.nil? || w < best_key
-                  best_key = w
-                end
-              end
-            end
-            # If nothing bigger, pick the largest available
-            best_key ||= widths_map.keys.max?
+            # The smallest width >= requested, else the largest available
+            best_key = widths_map.keys.select { |w| w >= width }.min? || widths_map.keys.max?
             best_key ? {best_key, widths_map[best_key]} : nil
           end
         end
