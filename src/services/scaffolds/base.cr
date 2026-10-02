@@ -531,13 +531,13 @@ module Hwaro
 
             # Content & Processing
             str << multilingual_config(multilingual_languages, skip_taxonomies)
-            str << plugins_config
+            str << ConfigSnippets.plugins
             str << content_files_config
-            str << highlight_config
-            str << og_config
-            str << search_config
-            str << pagination_config
-            str << series_config
+            str << ConfigSnippets.highlight
+            str << ConfigSnippets.og
+            str << ConfigSnippets.search
+            str << ConfigSnippets.pagination
+            str << ConfigSnippets.series
             # `[related]` points at `tags`; without a `[[taxonomies]]` block
             # for it, ship the commented form so doctor stays quiet.
             str << (!skip_taxonomies && ships_taxonomies? ? related_config : ConfigSnippets.related(commented: true))
@@ -545,24 +545,24 @@ module Hwaro
             str << menus_config(multilingual_languages)
 
             # SEO & Feeds
-            str << sitemap_config
-            str << robots_config
-            str << llms_config
+            str << ConfigSnippets.sitemap
+            str << ConfigSnippets.robots
+            str << ConfigSnippets.llms
             str << feeds_config(feed_sections)
 
             # Optional features (commented out by default)
-            str << permalinks_config
-            str << auto_includes_config
-            str << assets_config
-            str << markdown_config
-            str << content_new_config
-            str << image_processing_config
-            str << build_hooks_config
-            str << pwa_config
-            str << amp_config
-            str << og_auto_image_config
-            str << doctor_config
-            str << deployment_config
+            str << ConfigSnippets.permalinks
+            str << ConfigSnippets.auto_includes
+            str << ConfigSnippets.assets
+            str << ConfigSnippets.markdown
+            str << ConfigSnippets.content_new
+            str << ConfigSnippets.image_processing
+            str << ConfigSnippets.build
+            str << ConfigSnippets.pwa
+            str << ConfigSnippets.amp
+            str << ConfigSnippets.og_auto_image
+            str << ConfigSnippets.doctor
+            str << ConfigSnippets.deployment
           end
         end
 
@@ -1177,14 +1177,6 @@ module Hwaro
             TOML
         end
 
-        protected def plugins_config : String
-          ConfigSnippets.plugins
-        end
-
-        protected def pagination_config : String
-          ConfigSnippets.pagination
-        end
-
         protected def content_files_config : String
           <<-TOML
 
@@ -1202,10 +1194,6 @@ module Hwaro
             TOML
         end
 
-        protected def highlight_config : String
-          ConfigSnippets.highlight
-        end
-
         # Shared search overlay markup; only the input placeholder varies per
         # scaffold (e.g. "Search posts...", "Search documentation...").
         protected def search_overlay_html(placeholder : String) : String
@@ -1221,30 +1209,6 @@ module Hwaro
               </div>
             </div>
             HTML
-        end
-
-        protected def og_config : String
-          ConfigSnippets.og
-        end
-
-        protected def search_config : String
-          ConfigSnippets.search
-        end
-
-        protected def sitemap_config : String
-          ConfigSnippets.sitemap
-        end
-
-        protected def robots_config : String
-          ConfigSnippets.robots
-        end
-
-        protected def llms_config : String
-          ConfigSnippets.llms
-        end
-
-        protected def series_config : String
-          ConfigSnippets.series
         end
 
         protected def related_config : String
@@ -1295,54 +1259,6 @@ module Hwaro
             #                               #              false = main feed includes all languages
 
             TOML
-        end
-
-        protected def permalinks_config : String
-          ConfigSnippets.permalinks
-        end
-
-        protected def auto_includes_config : String
-          ConfigSnippets.auto_includes
-        end
-
-        protected def assets_config : String
-          ConfigSnippets.assets
-        end
-
-        protected def markdown_config : String
-          ConfigSnippets.markdown
-        end
-
-        protected def content_new_config : String
-          ConfigSnippets.content_new
-        end
-
-        protected def doctor_config : String
-          ConfigSnippets.doctor
-        end
-
-        protected def build_hooks_config : String
-          ConfigSnippets.build
-        end
-
-        protected def pwa_config : String
-          ConfigSnippets.pwa
-        end
-
-        protected def amp_config : String
-          ConfigSnippets.amp
-        end
-
-        protected def og_auto_image_config : String
-          ConfigSnippets.og_auto_image
-        end
-
-        protected def image_processing_config : String
-          ConfigSnippets.image_processing
-        end
-
-        protected def deployment_config : String
-          ConfigSnippets.deployment
         end
 
         # Search overlay JS shared by the blog and docs scaffolds.
