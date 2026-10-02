@@ -10,31 +10,12 @@ module Hwaro
         Book   # Book-focused with chapters, like mdBook
 
         def self.from_string(value : String) : ScaffoldType
-          case value.downcase
-          when "simple"
-            Simple
-          when "bare"
-            Bare
-          when "blog"
-            Blog
-          when "docs"
-            Docs
-          when "book"
-            Book
-          else
+          values.find(&.to_s.==(value.downcase)) ||
             raise ArgumentError.new("Unknown scaffold type: #{value}. Available types: simple, bare, blog, docs, book")
-          end
         end
 
         def to_s : String
-          case self
-          when Simple then "simple"
-          when Bare   then "bare"
-          when Blog   then "blog"
-          when Docs   then "docs"
-          when Book   then "book"
-          else             "simple"
-          end
+          super.downcase
         end
       end
 
@@ -44,22 +25,12 @@ module Hwaro
         Local  # Full embedded reference for offline use
 
         def self.from_string(value : String) : AgentsMode
-          case value.downcase
-          when "remote"
-            Remote
-          when "local"
-            Local
-          else
+          values.find(&.to_s.==(value.downcase)) ||
             raise ArgumentError.new("Unknown agents mode: #{value}. Available modes: remote, local")
-          end
         end
 
         def to_s : String
-          case self
-          when Remote then "remote"
-          when Local  then "local"
-          else             "remote"
-          end
+          super.downcase
         end
       end
 
