@@ -5,7 +5,7 @@
 # `resize_image()` template function.
 #
 # Performance:
-# - Each source image is decoded only once (resize_multi_widths)
+# - Each source image is decoded only once (resize_and_lqip)
 # - Images are processed in parallel using fibers
 
 require "../../core/lifecycle"
