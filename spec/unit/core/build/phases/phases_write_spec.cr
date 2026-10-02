@@ -201,6 +201,32 @@ describe Hwaro::Core::Build::Phases::Write do
       end
     end
 
+    it "minifies JSON and XML, passes HTML through, and copies a file that fails to minify" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("public")
+          File.write("content/data.JSON", %({\n  "a": 1,\n  "b": [true, null]\n}\n))
+          File.write("content/feed.xml", "<root>\n  <item>x</item>\n</root>\n")
+          File.write("content/page.html", "<p>\n  keep   me\n</p>\n")
+          File.write("content/broken.json", "{ nope")
+          raws = {"data.JSON", "feed.xml", "page.html", "broken.json"}.map do |name|
+            Hwaro::Core::Lifecycle::RawFile.new("content/#{name}", name)
+          end
+
+          log = with_captured_log do
+            Hwaro::Core::Build::Builder.new.test_process_raw_files(raws.to_a, "public", true, false).should eq(4)
+          end
+
+          File.read("public/data.JSON").should eq(%({"a":1,"b":[true,null]}))
+          File.read("public/feed.xml").should eq("<root><item>x</item></root>")
+          File.read("public/page.html").should eq("<p>\n  keep   me\n</p>\n")
+          File.read("public/broken.json").should eq("{ nope")
+          log.should contain("Failed to process broken.json: JSON parsing failed:")
+        end
+      end
+    end
+
     # Regression: a `.json`/`.xml` file inside a page bundle that
     # `[content.files]` also publishes is written twice — minified here, then
     # copied verbatim by process_assets. The asset copy ran last and silently

@@ -1,12 +1,12 @@
 # Markdown processor — post-render HTML passes (heading anchors, lazy images, emoji).
 #
-# Reopens `Processors::Markdown`; the part require order and the processor
-# registration live in ../markdown.cr. Parts only reopen the class: no
+# Reopens `Processors::Markdown`; the part require order lives in
+# ../markdown.cr. Parts only reopen the class: no
 # requires, no load-time statements (scripts/check_no_toplevel_effects.sh).
 module Hwaro
   module Content
     module Processors
-      class Markdown < Base
+      class Markdown
         # Regex for matching h1-h6 tags with IDs to insert anchor links.
         # Attribute scans here and below are quote-aware (a `>` inside a
         # quoted value, e.g. title="a > b", is legal HTML5 and must not end

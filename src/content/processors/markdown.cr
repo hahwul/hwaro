@@ -13,7 +13,6 @@ require "json"
 require "xml"
 require "html"
 require "digest/md5"
-require "./base"
 require "./table_parser"
 require "./syntax_highlighter"
 require "./markdown_extensions"
@@ -35,26 +34,7 @@ module Hwaro
   module Content
     module Processors
       # Markdown processor implementation
-      class Markdown < Base
-        def name : String
-          "markdown"
-        end
-
-        def extensions : Array(String)
-          [".md", ".markdown"]
-        end
-
-        def priority : Int32
-          100 # High priority as primary content processor
-        end
-
-        def process(content : String, context : ProcessorContext) : ProcessorResult
-          html, _toc = render(content)
-          ProcessorResult.new(content: html)
-        rescue ex
-          ProcessorResult.error("Markdown processing failed: #{ex.message}")
-        end
-
+      class Markdown
         # Renders Markdown to HTML and generates a Table of Contents
         # Returns {html_content, toc_headers}
         # @param highlight - whether to enable syntax highlighting for code blocks
@@ -113,9 +93,6 @@ module Hwaro
           {(html || ""), [] of Models::TocHeader}
         end
       end
-
-      # Register the markdown processor by default
-      Registry.register(Markdown.new)
     end
   end
 end

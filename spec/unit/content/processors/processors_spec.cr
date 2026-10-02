@@ -431,22 +431,6 @@ describe Hwaro::Config::Options::BuildOptions do
   end
 end
 
-describe Hwaro::Content::Processors::Registry do
-  it "has markdown processor registered by default" do
-    Hwaro::Content::Processors::Registry.has?("markdown").should be_true
-  end
-
-  it "has html processor registered" do
-    Hwaro::Content::Processors::Registry.has?("html").should be_true
-  end
-
-  it "can list all processor names" do
-    names = Hwaro::Content::Processors::Registry.names
-    names.should contain("markdown")
-    names.should contain("html")
-  end
-end
-
 describe Hwaro::Processor::Markdown do
   describe "parse" do
     it "captures front matter keys for taxonomy detection" do

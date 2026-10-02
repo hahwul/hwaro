@@ -64,11 +64,8 @@ require "./models/site"
 require "./models/toc"
 
 # Load content processors
-require "./content/processors/base"
 require "./content/processors/markdown"
 require "./content/processors/content_files"
-require "./content/processors/html"
-require "./content/processors/json"
 require "./content/processors/xml"
 require "./content/processors/table_parser"
 require "./content/processors/internal_link_resolver"

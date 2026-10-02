@@ -1,12 +1,12 @@
 # Markdown processor — date parsing, menu registrations and taxonomy terms from front matter.
 #
-# Reopens `Processors::Markdown`; the part require order and the processor
-# registration live in ../markdown.cr. Parts only reopen the class: no
+# Reopens `Processors::Markdown`; the part require order lives in
+# ../markdown.cr. Parts only reopen the class: no
 # requires, no load-time statements (scripts/check_no_toplevel_effects.sh).
 module Hwaro
   module Content
     module Processors
-      class Markdown < Base
+      class Markdown
         # Parse a TOML value that may be a native Time or a String
         private def parse_toml_time(val : TOML::Any?, key : String = "date", file_path : String = "") : Time?
           return unless val

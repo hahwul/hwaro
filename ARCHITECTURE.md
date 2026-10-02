@@ -18,7 +18,7 @@ src/
   models/                 Page, Section, Site, Toc, Deployment, GitInfo, Config
     config/               one file per config.toml section family (class + loader)
   content/
-    processors/           Markdown/HTML/JSON/XML processors, template engine, syntax highlighting
+    processors/           Markdown processor, XML minifier, template engine, syntax highlighting
       markdown/           Markdown processor parts (front matter, taxonomy fields, html post)
       markdown_extensions/ one file per pre/post-processing pass (footnotes, math, …)
       filters/            Crinja filter modules (glob-required by template.cr)
@@ -133,7 +133,6 @@ fails a test.
 
 | Registry | Where | Populated by |
 |---|---|---|
-| Content processors | `content/processors/base.cr` `Registry` | `Registry.register(X.new)` after each processor class (in the owner file) |
 | Lifecycle hooks | `content/hooks.cr` `Hooks.all` | literal array (run order is by hook priority; the array is the tie-break) |
 | CLI commands | `cli/runner.cr` `register_default_commands` | one `CommandRegistry.register` per command |
 | Tool subcommands | `cli/commands/tool_command.cr` | `register_sub` calls; `tool --help` groups them by `CATEGORIES` (`HIDDEN` hides deprecated ones) |
