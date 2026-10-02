@@ -117,6 +117,19 @@ describe Hwaro::Utils::PathUtils do
     end
   end
 
+  describe ".within?" do
+    it "accepts the root itself and paths under it, not sibling prefixes" do
+      Hwaro::Utils::PathUtils.within?("/a/b", "/a/b").should be_true
+      Hwaro::Utils::PathUtils.within?("/a/b/c", "/a/b").should be_true
+      Hwaro::Utils::PathUtils.within?("/a/bc", "/a/b").should be_false
+      Hwaro::Utils::PathUtils.within?("/a", "/a/b").should be_false
+    end
+
+    it "does not double the separator of the filesystem root" do
+      Hwaro::Utils::PathUtils.within?("/etc", "/").should be_true
+    end
+  end
+
   describe ".resolves_within?" do
     it "accepts a plain file inside the root" do
       Dir.mktmpdir do |root|

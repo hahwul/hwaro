@@ -118,7 +118,7 @@ module Hwaro
           private def within_project?(path : String) : Bool
             root = Hwaro::Utils::PathUtils.resolved_real_path(Dir.current)
             resolved = Hwaro::Utils::PathUtils.resolved_real_path(path)
-            resolved == root || resolved.starts_with?(root + File::SEPARATOR)
+            Hwaro::Utils::PathUtils.within?(resolved, root)
           end
 
           # Whether `path` names a location in the project — the case where a
@@ -134,11 +134,9 @@ module Hwaro
             lexical_root = File.expand_path(Dir.current)
             real_root = Hwaro::Utils::PathUtils.resolved_real_path(Dir.current)
             real_parent = Hwaro::Utils::PathUtils.resolved_real_path(File.dirname(expanded))
-            within?(expanded, lexical_root) || within?(expanded, real_root) || within?(real_parent, real_root)
-          end
-
-          private def within?(path : String, root : String) : Bool
-            path == root || path.starts_with?(root + File::SEPARATOR)
+            Hwaro::Utils::PathUtils.within?(expanded, lexical_root) ||
+              Hwaro::Utils::PathUtils.within?(expanded, real_root) ||
+              Hwaro::Utils::PathUtils.within?(real_parent, real_root)
           end
         end
       end

@@ -264,7 +264,15 @@ module Hwaro
         rescue File::Error
           return false
         end
-        real_path == real_root || real_path.starts_with?(real_root + File::SEPARATOR)
+        within?(real_path, real_root)
+      end
+
+      # True when `path` is `root` or lies under it. Both must already be in
+      # comparable (expanded or resolved) form. A root that already ends in a
+      # separator — the filesystem root "/" — is not given a second one.
+      def within?(path : String, root : String) : Bool
+        return true if path == root
+        path.starts_with?(root.ends_with?(File::SEPARATOR) ? root : root + File::SEPARATOR)
       end
 
       # `path` with exactly one leading slash, for joining onto a base URL
