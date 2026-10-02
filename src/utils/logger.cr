@@ -204,15 +204,6 @@ module Hwaro
       end
     end
 
-    # Performance timing helper
-    def self.timed(message : String, &)
-      start = Time.instant
-      result = yield
-      elapsed = Time.instant - start
-      info "#{message} (#{dur(elapsed.total_milliseconds)})"
-      result
-    end
-
     # Progress indicator for long operations.
     # In TTY mode: animated \r-overwriting bar.
     # In non-TTY mode (pipes, CI, agent capture, redirected files):
