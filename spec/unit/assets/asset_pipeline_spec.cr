@@ -36,7 +36,7 @@ describe Hwaro::Assets::Pipeline do
           name: "main.css", files: ["css/reset.css", "css/style.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "main.css"))
@@ -60,7 +60,7 @@ describe Hwaro::Assets::Pipeline do
           name: "app.js", files: ["js/util.js", "js/app.js"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "app.js"))
@@ -85,7 +85,7 @@ describe Hwaro::Assets::Pipeline do
           name: "all.css", files: ["a.css", "b.css", "c.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "all.css"))
@@ -112,7 +112,7 @@ describe Hwaro::Assets::Pipeline do
           name: "all.css", files: ["a.css", "b.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "all.css"))
@@ -135,7 +135,7 @@ describe Hwaro::Assets::Pipeline do
           name: "all.css", files: ["a.css", "b.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "all.css"))
@@ -162,7 +162,7 @@ describe Hwaro::Assets::Pipeline do
           name: "app.js", files: ["a.js", "b.js"]
         )
 
-        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+        Hwaro::Assets::Pipeline.new(config).process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "app.js"))
         content.should eq("const a = 1\n;\n(function(){ window.x = 1 })()\n")
@@ -186,7 +186,7 @@ describe Hwaro::Assets::Pipeline do
           name: "app.js", files: ["a.js", "b.js"]
         )
 
-        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+        Hwaro::Assets::Pipeline.new(config).process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "app.js"))
         content.lines[1].should eq(";")
@@ -210,7 +210,7 @@ describe Hwaro::Assets::Pipeline do
           name: "all.css", files: ["a.css", "b.css"]
         )
 
-        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+        Hwaro::Assets::Pipeline.new(config).process(output_dir)
 
         File.read(File.join(output_dir, "assets", "all.css")).should eq(".a{}\n.b{}")
       end
@@ -232,7 +232,7 @@ describe Hwaro::Assets::Pipeline do
           name: "app.js", files: ["missing.js", "b.js"]
         )
 
-        Hwaro::Assets::Pipeline.new(config, "").process(output_dir)
+        Hwaro::Assets::Pipeline.new(config).process(output_dir)
 
         File.read(File.join(output_dir, "assets", "app.js")).should eq("var b = 1;")
       end
@@ -252,7 +252,7 @@ describe Hwaro::Assets::Pipeline do
           name: "only.css", files: ["only.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         File.read(File.join(output_dir, "assets", "only.css")).should contain("color: blue")
@@ -273,7 +273,7 @@ describe Hwaro::Assets::Pipeline do
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["a.css"])
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "script.js", files: ["b.js"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         File.exists?(File.join(output_dir, "assets", "style.css")).should be_true
@@ -294,7 +294,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "i18n.css", files: ["i18n.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "i18n.css"))
@@ -315,7 +315,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "empty.css", files: ["empty.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         # Empty content → bundle not created
@@ -335,7 +335,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "ws.css", files: ["ws.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         # Whitespace-only content is still non-empty
@@ -360,7 +360,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(minify: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "style.css"))
@@ -381,7 +381,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(minify: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "app.js", files: ["app.js"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "app.js"))
@@ -402,7 +402,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(minify: false, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "style.css"))
@@ -423,7 +423,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(minify: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "data.txt", files: ["data.txt"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "data.txt"))
@@ -444,7 +444,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(minify: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "style.css"))
@@ -464,7 +464,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(minify: true, fingerprint: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         manifest_path = pipeline.manifest["style.css"]
@@ -493,7 +493,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(fingerprint: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         manifest_path = pipeline.manifest["style.css"]
@@ -514,10 +514,10 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(fingerprint: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "a.css", files: ["a.css"])
 
-        p1 = Hwaro::Assets::Pipeline.new(config, "")
+        p1 = Hwaro::Assets::Pipeline.new(config)
         p1.process(output_dir)
 
-        p2 = Hwaro::Assets::Pipeline.new(config, "")
+        p2 = Hwaro::Assets::Pipeline.new(config)
         p2.process(output_dir)
 
         p1.manifest["a.css"].should eq(p2.manifest["a.css"])
@@ -536,13 +536,13 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(fingerprint: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        p1 = Hwaro::Assets::Pipeline.new(config, "")
+        p1 = Hwaro::Assets::Pipeline.new(config)
         p1.process(output_dir)
         hash1 = p1.manifest["style.css"]
 
         File.write(File.join(static_dir, "style.css"), "body { color: blue; }")
 
-        p2 = Hwaro::Assets::Pipeline.new(config, "")
+        p2 = Hwaro::Assets::Pipeline.new(config)
         p2.process(output_dir)
         hash2 = p2.manifest["style.css"]
 
@@ -564,7 +564,7 @@ describe Hwaro::Assets::Pipeline do
           name: "css/main.css", files: ["css/a.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         manifest_path = pipeline.manifest["css/main.css"]
@@ -585,7 +585,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(fingerprint: false, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest["style.css"].should eq("/assets/style.css")
@@ -604,7 +604,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(fingerprint: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "x.css", files: ["x.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         # Extract hash part
@@ -628,7 +628,7 @@ describe Hwaro::Assets::Pipeline do
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "a.css", files: ["shared.css"])
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "b.css", files: ["shared.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         # Both should have same hash since content is identical
@@ -657,7 +657,7 @@ describe Hwaro::Assets::Pipeline do
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "a.css", files: ["a.css"])
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "b.js", files: ["b.js"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest["a.css"].should eq("/assets/a.css")
@@ -668,7 +668,7 @@ describe Hwaro::Assets::Pipeline do
     it "starts empty before processing" do
       config = Hwaro::Models::AssetsConfig.new
       config.enabled = true
-      pipeline = Hwaro::Assets::Pipeline.new(config, "")
+      pipeline = Hwaro::Assets::Pipeline.new(config)
       pipeline.manifest.empty?.should be_true
     end
 
@@ -682,7 +682,7 @@ describe Hwaro::Assets::Pipeline do
           name: "missing.css", files: ["nonexistent.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest.has_key?("missing.css").should be_false
@@ -701,7 +701,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(source_dir: static_dir, output_dir: "static/dist")
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest["style.css"].should eq("/static/dist/style.css")
@@ -718,7 +718,7 @@ describe Hwaro::Assets::Pipeline do
       config = Hwaro::Models::AssetsConfig.new
       config.enabled = false
 
-      pipeline = Hwaro::Assets::Pipeline.new(config, "")
+      pipeline = Hwaro::Assets::Pipeline.new(config)
       pipeline.process("/nonexistent")
       pipeline.manifest.empty?.should be_true
     end
@@ -737,7 +737,7 @@ describe Hwaro::Assets::Pipeline do
           name: "bundle.css", files: ["missing.css", "exists.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest.has_key?("bundle.css").should be_true
@@ -760,7 +760,7 @@ describe Hwaro::Assets::Pipeline do
           name: "out.css", files: ["first.css", "second.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest.has_key?("out.css").should be_true
@@ -777,7 +777,7 @@ describe Hwaro::Assets::Pipeline do
           name: "empty.css", files: ["a.css", "b.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest.has_key?("empty.css").should be_false
@@ -794,7 +794,7 @@ describe Hwaro::Assets::Pipeline do
           name: "empty.css", files: [] of String
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest.has_key?("empty.css").should be_false
@@ -808,7 +808,7 @@ describe Hwaro::Assets::Pipeline do
 
         config = make_config(source_dir: dir)
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest.empty?.should be_true
@@ -826,7 +826,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         File.exists?(File.join(output_dir, "assets", "style.css")).should be_true
@@ -847,7 +847,7 @@ describe Hwaro::Assets::Pipeline do
           name: "duped.css", files: ["dup.css", "dup.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         content = File.read(File.join(output_dir, "assets", "duped.css"))
@@ -869,7 +869,7 @@ describe Hwaro::Assets::Pipeline do
           name: "my-style_v2.css", files: ["my-style_v2.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest["my-style_v2.css"].should match(/my-style_v2\.[a-f0-9]{8}\.css/)
@@ -889,7 +889,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(minify: true, fingerprint: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "big.css", files: ["big.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         pipeline.manifest.has_key?("big.css").should be_true
@@ -908,10 +908,10 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(fingerprint: true, source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "style.css", files: ["style.css"])
 
-        p1 = Hwaro::Assets::Pipeline.new(config, "")
+        p1 = Hwaro::Assets::Pipeline.new(config)
         p1.process(output_dir)
 
-        p2 = Hwaro::Assets::Pipeline.new(config, "")
+        p2 = Hwaro::Assets::Pipeline.new(config)
         p2.process(output_dir)
 
         p1.manifest["style.css"].should eq(p2.manifest["style.css"])
@@ -932,7 +932,7 @@ describe Hwaro::Assets::Pipeline do
         config = make_config(source_dir: static_dir)
         config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "x.css", files: ["x.css"])
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         pipeline.process(output_dir)
 
         File.exists?(File.join(output_dir, "assets", "x.css")).should be_true
@@ -960,7 +960,7 @@ describe Hwaro::Assets::Pipeline do
           name: "b.css", files: ["css/a.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         log = with_captured_log do
           pipeline.process(output_dir)
         end
@@ -987,7 +987,7 @@ describe Hwaro::Assets::Pipeline do
           name: "../../evil.css", files: ["css/a.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         log = with_captured_log do
           pipeline.process(output_dir)
         end
@@ -1018,7 +1018,7 @@ describe Hwaro::Assets::Pipeline do
           name: "evil.css", files: ["../outside.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         log = with_captured_log do
           pipeline.process(output_dir)
         end
@@ -1045,7 +1045,7 @@ describe Hwaro::Assets::Pipeline do
           name: "mixed.css", files: ["../outside.css", "inside.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         log = with_captured_log do
           pipeline.process(output_dir)
         end
@@ -1072,7 +1072,7 @@ describe Hwaro::Assets::Pipeline do
           name: "nested.css", files: ["css/vendor/lib.css"]
         )
 
-        pipeline = Hwaro::Assets::Pipeline.new(config, "")
+        pipeline = Hwaro::Assets::Pipeline.new(config)
         log = with_captured_log do
           pipeline.process(output_dir)
         end
@@ -1104,7 +1104,7 @@ describe Hwaro::Assets::Pipeline do
 
           config = make_config
           config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
-          Hwaro::Assets::Pipeline.new(config, "").process("public")
+          Hwaro::Assets::Pipeline.new(config).process("public")
 
           css = File.read("public/assets/main.css")
           css.should contain("url(../css/img/x.png)")
@@ -1130,7 +1130,7 @@ describe Hwaro::Assets::Pipeline do
 
           config = make_config
           config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
-          Hwaro::Assets::Pipeline.new(config, "").process("public")
+          Hwaro::Assets::Pipeline.new(config).process("public")
 
           css = File.read("public/assets/main.css")
           css.should contain(%(content:"url(sp.png)"))
@@ -1151,7 +1151,7 @@ describe Hwaro::Assets::Pipeline do
 
           config = make_config(source_dir: "src")
           config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
-          Hwaro::Assets::Pipeline.new(config, "").process("public")
+          Hwaro::Assets::Pipeline.new(config).process("public")
 
           File.read("public/assets/main.css").should contain("url(img/x.png)")
         end

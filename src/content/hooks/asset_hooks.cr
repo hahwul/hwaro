@@ -39,7 +39,7 @@ module Hwaro
           config = ctx.config
           return unless config && config.assets.enabled
 
-          pipeline = Assets::Pipeline.new(config.assets, config.base_url, config.sass.enabled)
+          pipeline = Assets::Pipeline.new(config.assets, config.sass.enabled)
           pipeline.process(ctx.output_dir)
 
           AssetHooks.replace_manifest(pipeline.manifest)
