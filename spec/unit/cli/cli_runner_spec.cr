@@ -22,7 +22,7 @@ describe Hwaro::CLI::Runner do
   describe ".new" do
     it "registers every expected default command" do
       EXPECTED_DEFAULT_COMMANDS.each do |name|
-        Hwaro::CLI::CommandRegistry.has?(name).should(
+        Hwaro::CLI::CommandRegistry.names.includes?(name).should(
           be_true, "expected default command '#{name}' to be registered"
         )
       end
@@ -43,7 +43,7 @@ describe Hwaro::CLI::Runner do
 
     it "registers metadata for every command" do
       EXPECTED_DEFAULT_COMMANDS.each do |name|
-        Hwaro::CLI::CommandRegistry.get_metadata(name).should_not(
+        Hwaro::CLI::CommandRegistry.all_metadata.find(&.name.==(name)).should_not(
           be_nil, "expected metadata for command '#{name}'"
         )
       end

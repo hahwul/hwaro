@@ -42,7 +42,6 @@ module Hwaro
     @phases : Array(PhaseTime)
     @current_phase : String?
     @phase_start : Time::Instant?
-    @total_start : Time::Instant?
     @template_profiles : Hash(String, TemplateProfile)
     @template_mutex : Mutex
     @markdown_profiles : Hash(String, MarkdownProfile)
@@ -79,7 +78,6 @@ module Hwaro
       @phases = [] of PhaseTime
       @current_phase = nil
       @phase_start = nil
-      @total_start = nil
       @template_profiles = {} of String => TemplateProfile
       @template_mutex = Mutex.new
       @markdown_profiles = {} of String => MarkdownProfile
@@ -94,10 +92,9 @@ module Hwaro
       @enabled
     end
 
-    # Start the overall profiling
+    # Start the overall profiling. Nothing to record up front (phases time
+    # themselves); kept as the builder's entry point.
     def start
-      return unless @enabled
-      @total_start = Time.instant
     end
 
     # Start timing a phase. Phase-level timing is collected even when full
@@ -132,15 +129,6 @@ module Hwaro
         found = true
       end
       found ? total : nil
-    end
-
-    # Get total elapsed time
-    def total_elapsed : Float64
-      if start = @total_start
-        (Time.instant - start).total_milliseconds
-      else
-        0.0
-      end
     end
 
     # Print the profiling report

@@ -218,30 +218,6 @@ describe Hwaro::Logger do
     end
   end
 
-  describe ".timed" do
-    it "returns the block result" do
-      original_level = Hwaro::Logger.level
-      Hwaro::Logger.level = Hwaro::Logger::Level::Info
-      result = nil
-      capture_logger_output do
-        result = Hwaro::Logger.timed("operation") { 42 }
-      end
-      result.should eq(42)
-      Hwaro::Logger.level = original_level
-    end
-
-    it "outputs timing information" do
-      original_level = Hwaro::Logger.level
-      Hwaro::Logger.level = Hwaro::Logger::Level::Info
-      output = capture_logger_output do
-        Hwaro::Logger.timed("build step") { sleep(1.milliseconds) }
-      end
-      output.should contain("build step")
-      output.should contain("ms")
-      Hwaro::Logger.level = original_level
-    end
-  end
-
   describe ".progress" do
     it "outputs progress bar" do
       io = TtyMemory.new

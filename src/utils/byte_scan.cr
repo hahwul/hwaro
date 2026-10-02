@@ -26,11 +26,6 @@ module Hwaro
     module ByteScan
       extend self
 
-      # True when *byte* occurs anywhere in *str*.
-      def byte?(str : String, byte : UInt8) : Bool
-        !str.to_slice.index(byte).nil?
-      end
-
       # True when the bytes of *needle* occur anywhere in *haystack*.
       #
       # Equivalent to `haystack.includes?(needle)` for every needle hwaro

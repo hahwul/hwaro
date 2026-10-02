@@ -5,7 +5,7 @@ require "../../../../spec_helper"
 #
 # Precedence is `<!-- more -->` marker > `description` > automatic excerpt.
 # Every example that exercises the excerpt fails on the pre-feature code:
-# `auto_summary` did not exist, `has_summary?` was false without a marker
+# `auto_summary` did not exist, `effective_summary` was nil without a marker
 # or description, and `[content] summary_length` was an unknown key.
 # =============================================================================
 
@@ -20,12 +20,12 @@ end
 
 describe "Automatic summary" do
   describe Hwaro::Models::Page do
-    it "has_summary? is true for an automatic excerpt alone" do
+    it "effective_summary is set by an automatic excerpt alone" do
       page = auto_page
       page.summary.should be_nil
       page.description.should be_nil
-      page.has_summary?.should be_true
-      auto_page(nil).has_summary?.should be_false
+      page.effective_summary.should_not be_nil
+      auto_page(nil).effective_summary.should be_nil
     end
 
     it "effective_summary wraps the excerpt in one escaped paragraph" do

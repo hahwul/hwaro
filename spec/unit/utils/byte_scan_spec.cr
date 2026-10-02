@@ -78,20 +78,6 @@ describe Hwaro::Utils::ByteScan do
     end
   end
 
-  describe ".byte?" do
-    it "detects a byte anywhere in the string" do
-      scan.byte?("abc", 'b'.ord.to_u8).should be_true
-      scan.byte?("abc", 'z'.ord.to_u8).should be_false
-      scan.byte?("a\u0000b", 0_u8).should be_true
-      scan.byte?("ab", 0_u8).should be_false
-    end
-
-    it "sees bytes inside multi-byte characters" do
-      # "€" is E2 82 AC — byte?, unlike String#includes?(Char), works on bytes.
-      scan.byte?("€", 0x82_u8).should be_true
-    end
-  end
-
   describe "agreement with String#includes?" do
     it "matches on random haystack/needle pairs" do
       rng = Random.new(20260908)

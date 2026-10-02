@@ -98,8 +98,8 @@ in `ARCHITECTURE.md`.
 
 ### Logging
 - `Logger.action(label, message, role = Role::Success)` for file operations,
-  `Logger.progress(current, total)`, `Logger.outcome`, `Logger::Receipt`,
-  `Logger.timed(message, &block)`; levels `debug`/`info`/`warn`/`error`/`success`.
+  `Logger.progress(current, total)`, `Logger.outcome`, `Logger::Receipt`;
+  levels `debug`/`info`/`warn`/`error`/`success`.
 - Every command honours `--quiet`/`-q` (info/action/progress/success and the
   banner off; warn/error still on stderr) and `NO_COLOR`. A command that
   handles `--json` itself exits through `Runner.exit_with_error_payload`.

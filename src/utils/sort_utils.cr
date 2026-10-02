@@ -46,21 +46,6 @@ module Hwaro
         result == 0 ? (a.path <=> b.path) : result
       end
 
-      # Sort pages by date (newest first)
-      def sort_by_date(pages : Array(Models::Page), reverse : Bool = false) : Array(Models::Page)
-        sort_pages(pages, "date", reverse)
-      end
-
-      # Sort pages by title alphabetically
-      def sort_by_title(pages : Array(Models::Page), reverse : Bool = false) : Array(Models::Page)
-        sort_pages(pages, "title", reverse)
-      end
-
-      # Sort pages by weight
-      def sort_by_weight(pages : Array(Models::Page), reverse : Bool = false) : Array(Models::Page)
-        sort_pages(pages, "weight", reverse)
-      end
-
       # Generic page sorting with specified criteria
       #
       # Supported sort_by values: "date", "title", "weight"

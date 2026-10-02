@@ -148,8 +148,8 @@ describe Hwaro::Utils::CommandRunner do
 
     it "executes pre-build hooks" do
       Dir.mktmpdir do |dir|
-        commands = ["touch pre_hook_file.txt"]
-        result = Hwaro::Utils::CommandRunner.run_pre_hooks(commands, dir)
+        commands = ["touch #{Process.quote(File.join(dir, "pre_hook_file.txt"))}"]
+        result = Hwaro::Utils::CommandRunner.run_pre_hooks(commands)
         result.should be_true
         File.exists?(File.join(dir, "pre_hook_file.txt")).should be_true
       end
@@ -170,8 +170,8 @@ describe Hwaro::Utils::CommandRunner do
 
     it "executes post-build hooks" do
       Dir.mktmpdir do |dir|
-        commands = ["touch post_hook_file.txt"]
-        result = Hwaro::Utils::CommandRunner.run_post_hooks(commands, dir)
+        commands = ["touch #{Process.quote(File.join(dir, "post_hook_file.txt"))}"]
+        result = Hwaro::Utils::CommandRunner.run_post_hooks(commands)
         result.should be_true
         File.exists?(File.join(dir, "post_hook_file.txt")).should be_true
       end

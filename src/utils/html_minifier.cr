@@ -175,9 +175,10 @@ module Hwaro
       # to U+FFFD; NUL never appears inside a multi-byte sequence, so this is
       # safe.
       def scrub_nul(html : String) : String
-        # memchr, not `String#byte_index`, whose byte-at-a-time loop is ~15x
-        # slower — this probe runs over every rendered page.
-        return html unless ByteScan.byte?(html, 0_u8)
+        # memchr (via Slice#index), not `String#byte_index`, whose
+        # byte-at-a-time loop is ~15x slower — this probe runs over every
+        # rendered page.
+        return html unless html.to_slice.index(0_u8)
         String.build(html.bytesize) do |io|
           html.each_byte { |b| io.write_byte(b) unless b == 0 }
         end
