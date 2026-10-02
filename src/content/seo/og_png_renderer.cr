@@ -130,11 +130,6 @@ module Hwaro
           nil
         end
 
-        # Check if PNG rendering is available (always true thanks to bundled fonts)
-        def self.available? : Bool
-          true
-        end
-
         # Pre-decoded and resized RGBA image for reuse across render calls.
         class CachedImage
           getter data : Pointer(UInt8)

@@ -175,15 +175,6 @@ module Hwaro
           else                       Crinja::Value.new(Crinja::Undefined.new(attr.to_s))
           end
         end
-
-        def crinja_item(item : Crinja::Value) : Crinja::Value
-          raw = item.raw
-          if raw.is_a?(Number)
-            @items[raw.to_i]? || Crinja::Value.new(Crinja::Undefined.new(item.to_s))
-          else
-            crinja_attribute(item)
-          end
-        end
       end
     end
   end

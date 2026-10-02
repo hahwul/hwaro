@@ -1472,11 +1472,6 @@ module Hwaro
           capped
         end
 
-        # Cap a `band`-style title to the lines that fit the band.
-        def self.cap_band_title(lines : Array(String), font_size : Int32) : Array(String)
-          cap_lines(lines, band_line_capacity(font_size))
-        end
-
         # A quiet hairline color derived from the background: slightly
         # lighter on dark backgrounds, slightly darker on light ones.
         def self.neutral_line_hex(bg_hex : String) : String
