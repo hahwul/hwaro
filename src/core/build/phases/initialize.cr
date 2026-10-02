@@ -21,7 +21,6 @@ module Hwaro::Core::Build::Phases::Initialize
 
       build_cache = Cache.new(enabled: cache_enabled, cache_path: Cache.path_for(ctx.options.serve_mode))
       @cache = build_cache
-      ctx.cache = build_cache
       # Before `--full` clears the metadata it reads.
       cache_tracks_output = build_cache.tracks_output_dir?(output_dir)
       # Source-less generated outputs are re-claimed from scratch every build;
