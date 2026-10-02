@@ -497,55 +497,45 @@ describe Hwaro::Services::ContentFilter do
 end
 
 describe Hwaro::Services::ContentInfo do
-  it "has default values" do
-    info = Hwaro::Services::ContentInfo.new(path: "test.md")
-    info.path.should eq("test.md")
-    info.title.should eq("Untitled")
-    info.draft.should be_false
-    info.date.should be_nil
-  end
-
   it "accepts custom values" do
     date = Time.utc(2024, 6, 15)
     info = Hwaro::Services::ContentInfo.new(
       path: "blog/post.md",
       title: "My Post",
       draft: true,
-      date: date
+      date: date,
+      state: Hwaro::Services::PublishState::Draft,
     )
     info.path.should eq("blog/post.md")
     info.title.should eq("My Post")
     info.draft.should be_true
     info.date.should eq(date)
+    info.status.should eq("draft")
   end
 
   describe "JSON serialization" do
-    it "emits ISO-8601 date and preserves it on round-trip" do
+    it "emits an RFC 3339 date" do
       date = Time.utc(2024, 3, 14, 9, 26, 53)
       info = Hwaro::Services::ContentInfo.new(
         path: "post.md",
         title: "Pi Day",
         draft: false,
         date: date,
+        state: Hwaro::Services::PublishState::Published,
       )
 
-      json = info.to_json
-      json.should contain(%("date":"2024-03-14T09:26:53))
-
-      parsed = Hwaro::Services::ContentInfo.from_json(json)
-      parsed.path.should eq("post.md")
-      parsed.title.should eq("Pi Day")
-      parsed.draft.should be_false
-      parsed.date.should eq(date)
+      json = JSON.parse(info.to_json)
+      json["date"].should eq("2024-03-14T09:26:53+00:00")
+      Time.parse_rfc3339(json["date"].as_s).should eq(date)
+      json["path"].should eq("post.md")
+      json["title"].should eq("Pi Day")
+      json["draft"].should eq(false)
+      json["status"].should eq("published")
     end
 
-    it "emits null date when unset and round-trips to nil" do
-      info = Hwaro::Services::ContentInfo.new(path: "no-date.md", title: "t")
-      json = info.to_json
-      json.should contain(%("date":null))
-
-      parsed = Hwaro::Services::ContentInfo.from_json(json)
-      parsed.date.should be_nil
+    it "emits null date when unset" do
+      info = Hwaro::Services::ContentInfo.new(path: "no-date.md", title: "t", draft: false, date: nil, state: Hwaro::Services::PublishState::Published)
+      info.to_json.should contain(%("date":null))
     end
   end
 

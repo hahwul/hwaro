@@ -176,17 +176,6 @@ module Hwaro
 
       def initialize(
         @path : String,
-        @title : String = "Untitled",
-        @draft : Bool = false,
-        @date : Time? = nil,
-        @status : String = "published",
-        @expires : Time? = nil,
-        @generated_from : String? = nil,
-      )
-      end
-
-      def initialize(
-        @path : String,
         @title : String,
         @draft : Bool,
         @date : Time?,
@@ -210,11 +199,6 @@ module Hwaro
           else
             json.null
           end
-        end
-
-        def self.from_json(pull : JSON::PullParser) : Time?
-          str = pull.read_string_or_null
-          str ? Time.parse_rfc3339(str) : nil
         end
       end
     end

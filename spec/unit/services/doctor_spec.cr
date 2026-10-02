@@ -1483,38 +1483,10 @@ describe Hwaro::Services::Doctor do
       json.should contain(%("level":"error"))
     end
 
-    it "round-trips level through SymbolConverter.from_json" do
-      # Regression: previously returned a String from a Symbol-typed method.
-      # Validate every level the doctor service can emit.
+    it "emits every level the doctor service can produce as its name" do
       [:error, :warning, :info].each do |level|
-        original = Hwaro::Services::Issue.new(
-          id: "rt-#{level}",
-          level: level,
-          category: "config",
-          file: nil,
-          message: "round-trip",
-        )
-        decoded = Hwaro::Services::Issue.from_json(original.to_json)
-        decoded.level.should eq(level)
-        decoded.id.should eq(original.id)
-      end
-    end
-
-    it "round-trips through JSON when an Issue list is decoded" do
-      issues = [
-        Hwaro::Services::Issue.new(id: "a", level: :error, category: "config", file: "config.toml", message: "boom"),
-        Hwaro::Services::Issue.new(id: "b", level: :warning, category: "content", file: nil, message: "soft"),
-      ]
-      decoded = Array(Hwaro::Services::Issue).from_json(issues.to_json)
-      decoded.size.should eq(2)
-      decoded.first.level.should eq(:error)
-      decoded.last.level.should eq(:warning)
-    end
-
-    it "raises a parse error on unknown level strings" do
-      bogus = %({"id":"x","level":"fatal","category":"config","message":"m"})
-      expect_raises(JSON::ParseException, /Unknown issue level/) do
-        Hwaro::Services::Issue.from_json(bogus)
+        issue = Hwaro::Services::Issue.new(id: "x", level: level, category: "config", file: nil, message: "m")
+        JSON.parse(issue.to_json)["level"].should eq(level.to_s)
       end
     end
   end

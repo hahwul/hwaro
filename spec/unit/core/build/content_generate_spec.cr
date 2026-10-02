@@ -301,7 +301,7 @@ describe "ContentLister with generated entries" do
         generated = [
           Hwaro::Services::ContentInfo.new(
             path: "products/x.md", title: "X", draft: false, date: nil,
-            status: "published", generated_from: "data.products",
+            state: Hwaro::Services::PublishState::Published, generated_from: "data.products",
           ),
         ]
         lister = Hwaro::Services::ContentLister.new("content", generated)
