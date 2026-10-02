@@ -294,19 +294,19 @@ describe Hwaro do
     Hwaro::CLI::Runner.new
 
     it "has init command registered" do
-      Hwaro::CLI::CommandRegistry.has?("init").should be_true
+      Hwaro::CLI::CommandRegistry.names.includes?("init").should be_true
     end
 
     it "has build command registered" do
-      Hwaro::CLI::CommandRegistry.has?("build").should be_true
+      Hwaro::CLI::CommandRegistry.names.includes?("build").should be_true
     end
 
     it "has serve command registered" do
-      Hwaro::CLI::CommandRegistry.has?("serve").should be_true
+      Hwaro::CLI::CommandRegistry.names.includes?("serve").should be_true
     end
 
     it "has deploy command registered" do
-      Hwaro::CLI::CommandRegistry.has?("deploy").should be_true
+      Hwaro::CLI::CommandRegistry.names.includes?("deploy").should be_true
     end
   end
 

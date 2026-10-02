@@ -250,19 +250,8 @@ describe Hwaro::CLI::CommandRegistry do
     handler.should_not be_nil
   end
 
-  it "can check if command exists" do
-    Hwaro::CLI::CommandRegistry.has?("build").should be_true
-    Hwaro::CLI::CommandRegistry.has?("nonexistent").should be_false
-  end
-
   it "returns nil for unknown command" do
     Hwaro::CLI::CommandRegistry.get("nonexistent").should be_nil
-  end
-
-  it "can get command metadata" do
-    meta = Hwaro::CLI::CommandRegistry.get_metadata("build")
-    meta.should_not be_nil
-    meta.not_nil!.name.should eq("build")
   end
 
   it "all_metadata returns all command metadata" do

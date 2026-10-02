@@ -17,12 +17,11 @@
 
 class Hwaro::CLI::CommandRegistry
   def self.__spec_snapshot
-    {@@commands.dup, @@metadata.dup}
+    @@entries.dup
   end
 
   def self.__spec_restore(snapshot) : Nil
-    @@commands = snapshot[0].dup
-    @@metadata = snapshot[1].dup
+    @@entries = snapshot.dup
   end
 end
 
