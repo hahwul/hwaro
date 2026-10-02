@@ -13,7 +13,7 @@ module Hwaro
       # is each section called?". A SECTION_REGISTRY entry pairs the
       # human description with a proc that produces the commented TOML
       # snippet. Adding a new auto-fixable section requires touching
-      # exactly one entry (instead of updating both KNOWN_SECTIONS and
+      # exactly one entry (instead of updating both a section list and
       # the dispatch case in `doctor_snippet_for` and risking drift).
       alias SectionEntry = NamedTuple(description: String, snippet: -> String)
 
@@ -53,12 +53,6 @@ module Hwaro
         {"og", "auto_image"}         => {description: "Auto-generated OG images", snippet: -> { og_auto_image }},
         {"image_processing", "lqip"} => {description: "Low-Quality Image Placeholder (LQIP) generation", snippet: -> { image_processing_lqip }},
       } of Tuple(String, String) => SectionEntry
-
-      # Backward-compatible aliases. The registries above are the only
-      # place to edit; these dictionaries are derived for callers (and
-      # specs) that walk descriptions only.
-      KNOWN_SECTIONS     = SECTION_REGISTRY.transform_values(&.[:description])
-      KNOWN_SUB_SECTIONS = SUB_SECTION_REGISTRY.transform_values(&.[:description])
 
       def self.content_files : String
         <<-TOML
@@ -1090,7 +1084,7 @@ module Hwaro
       # SECTION_REGISTRY (top-level keys like "pwa") or SUB_SECTION_REGISTRY
       # (dotted keys like "og.auto_image"). The top-level `[doctor]` key
       # is special-cased because it documents diagnostics behaviour and
-      # isn't surfaced via KNOWN_SECTIONS (no need to advertise it as a
+      # isn't surfaced via SECTION_REGISTRY (no need to advertise it as a
       # missing-section advisory).
       def self.doctor_snippet_for(key : String) : String?
         if entry = SECTION_REGISTRY[key]?

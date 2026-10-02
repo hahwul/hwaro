@@ -138,7 +138,7 @@ describe "[git] config" do
   end
 
   it "ships a doctor/config snippet for the section" do
-    Hwaro::Services::ConfigSnippets::KNOWN_SECTIONS.has_key?("git").should be_true
+    Hwaro::Services::ConfigSnippets::SECTION_REGISTRY.has_key?("git").should be_true
     Hwaro::Services::ConfigSnippets.git.should contain("# [git]")
     Hwaro::Services::Doctor::OPTIONAL_SECTIONS.includes?("git").should be_true
   end

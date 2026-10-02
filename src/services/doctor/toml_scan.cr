@@ -31,14 +31,14 @@ module Hwaro
         mentioned = mentioned_sections(raw_text)
         missing = [] of String
 
-        KNOWN_CONFIG_SECTIONS.each_key do |key|
+        ConfigSnippets::SECTION_REGISTRY.each_key do |key|
           unless raw.has_key?(key) || mentioned.includes?(key)
             missing << key
           end
         end
 
         # Check sub-sections (only when parent section exists)
-        KNOWN_SUB_SECTIONS.each_key do |parent, child|
+        ConfigSnippets::SUB_SECTION_REGISTRY.each_key do |parent, child|
           sub_key = "#{parent}.#{child}"
           if parent_hash = raw[parent]?.try(&.as_h?)
             unless parent_hash.has_key?(child) || mentioned.includes?(sub_key)

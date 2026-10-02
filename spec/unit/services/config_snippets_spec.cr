@@ -2,15 +2,15 @@ require "../../spec_helper"
 
 describe Hwaro::Services::ConfigSnippets do
   describe ".doctor_snippet_for" do
-    it "returns snippet for every KNOWN_SECTIONS key" do
-      Hwaro::Services::ConfigSnippets::KNOWN_SECTIONS.each_key do |key|
+    it "returns snippet for every SECTION_REGISTRY key" do
+      Hwaro::Services::ConfigSnippets::SECTION_REGISTRY.each_key do |key|
         snippet = Hwaro::Services::ConfigSnippets.doctor_snippet_for(key)
         snippet.should_not be_nil, "Missing doctor_snippet_for(\"#{key}\")"
       end
     end
 
-    it "returns snippet for every KNOWN_SUB_SECTIONS key" do
-      Hwaro::Services::ConfigSnippets::KNOWN_SUB_SECTIONS.each_key do |parent, child|
+    it "returns snippet for every SUB_SECTION_REGISTRY key" do
+      Hwaro::Services::ConfigSnippets::SUB_SECTION_REGISTRY.each_key do |parent, child|
         key = "#{parent}.#{child}"
         snippet = Hwaro::Services::ConfigSnippets.doctor_snippet_for(key)
         snippet.should_not be_nil, "Missing doctor_snippet_for(\"#{key}\")"

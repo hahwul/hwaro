@@ -290,7 +290,7 @@ module Hwaro
           # users to run a command that won't add them. Stay silent for those —
           # users opt in by manually configuring the section.
           next if OPTIONAL_SECTIONS.includes?(key)
-          desc = KNOWN_CONFIG_SECTIONS[key]? || KNOWN_SUB_SECTIONS.find { |k, _| "#{k[0]}.#{k[1]}" == key }.try(&.last) || key
+          desc = ConfigSnippets::SECTION_REGISTRY[key]?.try(&.[:description]) || ConfigSnippets::SUB_SECTION_REGISTRY.find { |k, _| "#{k[0]}.#{k[1]}" == key }.try(&.last[:description]) || key
           issues << Issue.new(id: "missing-config-#{key}", level: :info, category: "config_missing", file: @config_path,
             message: "Optional section [#{key}] not present (#{desc}). Add it manually if needed, or use 'hwaro doctor --full' for recommendations.")
         end

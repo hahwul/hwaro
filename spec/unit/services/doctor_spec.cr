@@ -891,14 +891,14 @@ describe Hwaro::Services::Doctor do
           # parse under a bare `rescue` that swallowed errors — now
           # `fix_config` surfaces parse errors as HwaroError.
           sub_children_by_parent = Hash(String, Array(String)).new { |h, k| h[k] = [] of String }
-          Hwaro::Services::Doctor::KNOWN_SUB_SECTIONS.each_key do |parent, child|
+          Hwaro::Services::ConfigSnippets::SUB_SECTION_REGISTRY.each_key do |parent, child|
             sub_children_by_parent[parent] << child
           end
 
           body = String.build do |str|
             str << %(title = "My Site"\n)
             str << %(base_url = "https://example.com"\n)
-            Hwaro::Services::Doctor::KNOWN_CONFIG_SECTIONS.each_key do |key|
+            Hwaro::Services::ConfigSnippets::SECTION_REGISTRY.each_key do |key|
               str << "[#{key}]\n"
               sub_children_by_parent[key]?.try &.each do |child|
                 str << "[#{key}.#{child}]\n"
@@ -1439,15 +1439,15 @@ describe Hwaro::Services::Doctor do
   end
 
   describe "ConfigSnippets drift guard" do
-    it "doctor_snippet_for returns non-nil for every KNOWN_SECTIONS key" do
-      Hwaro::Services::ConfigSnippets::KNOWN_SECTIONS.each_key do |key|
+    it "doctor_snippet_for returns non-nil for every SECTION_REGISTRY key" do
+      Hwaro::Services::ConfigSnippets::SECTION_REGISTRY.each_key do |key|
         Hwaro::Services::ConfigSnippets.doctor_snippet_for(key).should_not be_nil,
           "ConfigSnippets.doctor_snippet_for(#{key.inspect}) returned nil — add a case branch"
       end
     end
 
-    it "doctor_snippet_for returns non-nil for every KNOWN_SUB_SECTIONS key" do
-      Hwaro::Services::ConfigSnippets::KNOWN_SUB_SECTIONS.each_key do |parent, child|
+    it "doctor_snippet_for returns non-nil for every SUB_SECTION_REGISTRY key" do
+      Hwaro::Services::ConfigSnippets::SUB_SECTION_REGISTRY.each_key do |parent, child|
         key = "#{parent}.#{child}"
         Hwaro::Services::ConfigSnippets.doctor_snippet_for(key).should_not be_nil,
           "ConfigSnippets.doctor_snippet_for(#{key.inspect}) returned nil — add a case branch"
