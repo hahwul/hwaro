@@ -92,8 +92,9 @@ in `ARCHITECTURE.md`.
 - Bounded substrings (`html[pos, n]`) instead of `html[pos..]` in loops.
 - Cache `Crinja::Value` arrays per section/page; clear them at every reset
   point (see `invalidate_caches_for_pages`).
-- Tartrazine is not thread-safe: syntax highlighting goes through
-  `ServerHighlighter`'s mutex.
+- Tartrazine is only thread-safe through `src/ext/tartrazine_mt_fix.cr`;
+  highlighting goes through `ServerHighlighter`, which bounds concurrent
+  tokenization (`TOKENIZE_SLOTS`) to keep the GC allocation lock calm.
 
 ### Logging
 - `Logger.action(label, message, role = Role::Success)` for file operations,

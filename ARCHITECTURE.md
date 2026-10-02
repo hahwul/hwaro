@@ -176,8 +176,9 @@ Also, every PR: bilingual docs (`.md` + `.ko.md`) when user-facing.
 - `serve` output carries a dev marker; `build`/`deploy` refuse to consume it.
 - `Utils::FileSafe.mkdir_p`, never `FileUtils.mkdir_p`, on the build paths
   (check-then-create races under parallel rendering).
-- Tartrazine (syntax highlighting) is not thread-safe: all calls go through
-  `ServerHighlighter`'s mutex.
+- Tartrazine (syntax highlighting) is only thread-safe through the patches in
+  `src/ext/tartrazine_mt_fix.cr`; all calls go through `ServerHighlighter`,
+  which bounds concurrent tokenization (`TOKENIZE_SLOTS`).
 - Shared state mutated from render fibers needs a `Mutex`
   (`@crinja_cache_mutex`, `@page_template_hash_mutex`, …).
 - Escaping: `TextUtils.escape_xml` / `HTML.escape` for markup, `</` → `<\/`
