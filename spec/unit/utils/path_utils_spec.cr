@@ -2,6 +2,20 @@ require "../../spec_helper"
 require "../../../src/utils/path_utils"
 
 describe Hwaro::Utils::PathUtils do
+  describe ".chomp_separator" do
+    it "drops trailing separators but keeps a filesystem root" do
+      Hwaro::Utils::PathUtils.chomp_separator("/srv/site/").should eq("/srv/site")
+      Hwaro::Utils::PathUtils.chomp_separator("/").should eq("/")
+    end
+
+    {% if flag?(:windows) %}
+      it "keeps a drive root, which stripped would name the drive's cwd" do
+        Hwaro::Utils::PathUtils.chomp_separator("C:/").should eq("C:/")
+        Hwaro::Utils::PathUtils.chomp_separator("C:/site/").should eq("C:/site")
+      end
+    {% end %}
+  end
+
   describe ".absolute?" do
     it "treats a rooted path as absolute" do
       Hwaro::Utils::PathUtils.absolute?("/etc/x").should be_true

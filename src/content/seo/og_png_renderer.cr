@@ -285,7 +285,7 @@ module Hwaro
           # every role (it may be a CJK font — that's the documented use).
           custom : FontEntry? = nil
           if cfp = custom_font_path
-            abs = Hwaro::Utils::PathUtils.absolute?(cfp) ? cfp : File.join(Dir.current, cfp)
+            abs = File.expand_path(cfp)
             custom = load_font_file(abs)
             unless custom
               Logger.warn "  Custom font '#{cfp}' not found or failed to load. Using bundled fonts."

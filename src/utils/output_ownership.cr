@@ -59,7 +59,7 @@ module Hwaro
       # setup whose clearing the cold build must keep.
       def conventional?(output_dir : String) : Bool
         expanded = File.expand_path(output_dir)
-        expanded = expanded.rstrip(File::SEPARATOR) unless expanded == File::SEPARATOR_STRING
+        expanded = PathUtils.chomp_separator(expanded)
         expanded == File.join(File.expand_path(Dir.current), "public")
       end
 

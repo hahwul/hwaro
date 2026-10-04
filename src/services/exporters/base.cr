@@ -128,9 +128,7 @@ module Hwaro
         # already judges the RESOLVED destination; both guards must, or the
         # cheaper one is the way in.
         private def self.canonical_dir(path : String) : String
-          expanded = Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(path))
-          return expanded if expanded == File::SEPARATOR_STRING
-          expanded.rstrip(File::SEPARATOR)
+          Hwaro::Utils::PathUtils.chomp_separator(Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(path)))
         end
 
         abstract def run(options : Config::Options::ExportOptions) : ExportResult

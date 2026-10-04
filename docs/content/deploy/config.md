@@ -79,6 +79,9 @@ command = "aws s3 sync {source}/ {url} --delete --exclude '.git/*'"
 
 For `az://container/sub/dir` URLs the path becomes the `--destination` prefix inside the container.
 
+On Windows a `file://` URL takes a drive path: `file:///C:/www/site` (or
+`file://C:/www/site`). `path = "C:\\www\\site"` works too.
+
 If a `command` field is set, it always takes priority over auto-generation.
 
 A value that starts with a URL scheme is never treated as a local path, so a

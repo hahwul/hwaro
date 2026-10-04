@@ -5,9 +5,10 @@
 # against a `/` path.
 #
 # Rather than route ~400 call sites through a helper, the path-producing
-# stdlib methods return `/` on Windows. Every Windows file API accepts `/`,
-# and `\` can't appear in a Windows file name, so the swap is lossless.
-# Compiled out everywhere else.
+# stdlib methods return `/` on Windows: Path#to_s (which File.join and
+# File.expand_path go through) and Dir.current. Every Windows file API
+# accepts `/`, and `\` can't appear in a Windows file name, so the swap is
+# lossless. Compiled out everywhere else.
 module Hwaro::WindowsPaths
   # `\` to `/`, except for an extended-length path (`\\?\C:\...`): Windows
   # passes those to the filesystem verbatim, so `/` there is not a separator.
@@ -24,15 +25,16 @@ end
   module Hwaro::WindowsPaths
     # The path the OS itself resolves `path` to — every symlink and junction
     # along it followed, short names expanded. Raises `File::Error` when it
-    # does not exist.
+    # does not exist; nil when it exists but the volume can't name it (no
+    # drive letter: a folder mount, a RAM disk, some network redirectors).
     #
     # The API answers in extended-length form (`\\?\C:\...`). The prefix is
     # dropped only when the ordinary spelling resolves to the very same path:
     # without it Win32 trims a trailing dot or space and applies MAX_PATH. A
     # kept prefix makes a containment check against an unprefixed root fail,
     # which is the safe direction.
-    def self.final_path(path : String) : String
-      final = extended_final_path(path)
+    def self.final_path(path : String) : String?
+      return unless final = extended_final_path(path)
       ordinary = if final.starts_with?("\\\\?\\UNC\\")
                    "\\\\#{final[8..]}"
                  elsif final.starts_with?("\\\\?\\")
@@ -47,7 +49,7 @@ end
       end
     end
 
-    private def self.extended_final_path(path : String) : String
+    private def self.extended_final_path(path : String) : String?
       handle = LibC.CreateFileW(Crystal::System.to_wstr(path), LibC::FILE_READ_ATTRIBUTES,
         LibC::DEFAULT_SHARE_MODE, nil, LibC::OPEN_EXISTING, LibC::FILE_FLAG_BACKUP_SEMANTICS,
         LibC::HANDLE.null)
@@ -63,7 +65,7 @@ end
           elsif small_buf && len > 0
             next len
           else
-            raise ::File::Error.from_winerror("Error resolving real path", file: path)
+            break nil
           end
         end
       ensure
@@ -73,25 +75,14 @@ end
   end
 
   class File
-    def self.join(*parts : String | Path) : String
-      Hwaro::WindowsPaths.to_slash(previous_def)
-    end
-
-    def self.join(parts : Enumerable) : String
-      Hwaro::WindowsPaths.to_slash(previous_def)
-    end
-
-    def self.expand_path(path : Path | String, dir = nil, *, home = false) : String
-      Hwaro::WindowsPaths.to_slash(previous_def)
-    end
-
     # Not `previous_def`: the stdlib's Windows `realpath` resolves a link only
     # in the *last* component, so a path through a symlinked directory
     # (`static/vendor/x` with `vendor -> C:\elsewhere`) came back unresolved
     # and passed every "real path still under the project?" check that keeps
-    # symlinked files from being copied into the site.
+    # symlinked files from being copied into the site. A volume that can't
+    # name the final path falls back to the stdlib.
     def self.realpath(path : Path | String) : String
-      Hwaro::WindowsPaths.to_slash(Hwaro::WindowsPaths.final_path(path.to_s))
+      Hwaro::WindowsPaths.to_slash(Hwaro::WindowsPaths.final_path(path.to_s) || previous_def)
     end
   end
 
@@ -103,9 +94,12 @@ end
 
   struct Path
     # `relative_to`, `join`, `normalize`, `expand`, … all build `\` names on
-    # Windows; every one of them reaches callers through `to_s`.
+    # Windows; every one of them reaches callers through `to_s`, and so do
+    # File.join and File.expand_path, which the stdlib builds from Path.
+    # POSIX-kind paths (Path.posix) keep `\`: there it is an ordinary
+    # character, not a separator.
     def to_s : String
-      Hwaro::WindowsPaths.to_slash(previous_def)
+      windows? ? Hwaro::WindowsPaths.to_slash(previous_def) : previous_def
     end
   end
 {% end %}

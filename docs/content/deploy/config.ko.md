@@ -79,6 +79,9 @@ command = "aws s3 sync {source}/ {url} --delete --exclude '.git/*'"
 
 `az://container/sub/dir` 형태의 URL에서는 경로가 컨테이너 내부의 `--destination` 접두사가 됩니다.
 
+Windows에서는 `file://` URL에 드라이브 경로를 씁니다: `file:///C:/www/site`(또는
+`file://C:/www/site`). `path = "C:\\www\\site"`도 동작합니다.
+
 `command` 필드를 지정하면 항상 자동 생성보다 우선합니다.
 
 URL 스킴으로 시작하는 값은 로컬 경로로 취급하지 않습니다. 따라서 슬래시를

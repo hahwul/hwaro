@@ -5,6 +5,17 @@ module Hwaro
     module PathUtils
       extend self
 
+      # `path` without trailing separators, unless it is a filesystem root:
+      # `/`, and on Windows `C:/`, which stripped to `C:` would name that
+      # drive's current directory instead of its root.
+      def chomp_separator(path : String) : String
+        return path if path == File::SEPARATOR_STRING
+        {% if flag?(:windows) %}
+          return path if path.matches?(/\A[A-Za-z]:\/+\z/)
+        {% end %}
+        path.rstrip(File::SEPARATOR)
+      end
+
       # `Path#absolute?`, plus a rooted path (`/x`, `\x`) on Windows. The
       # stdlib calls those drive-relative, but they never name something
       # under the current directory: `File.join(root, "/x")` would quietly

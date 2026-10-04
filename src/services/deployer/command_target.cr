@@ -306,10 +306,11 @@ module Hwaro
 
       private def local_directory_destination(url : String) : String?
         {% if flag?(:windows) %}
-          # `file://C:/out` / `file:///C:/out`: URI turns the drive letter into
+          # `file://C:/out`, `file:///C:/out` (and `file://localhost/C:/out`):
+          # URI turns the drive letter into
           # a host (dropping its colon) or keeps a `/` in front of it, and
           # neither is the drive path.
-          if drive = url.match(/\Afile:\/\/\/?([A-Za-z]:[\/\\].*)\z/i)
+          if drive = url.match(/\Afile:\/\/(?:localhost)?\/?([A-Za-z]:[\/\\].*)\z/i)
             return URI.decode(drive[1])
           end
         {% end %}

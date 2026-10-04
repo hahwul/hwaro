@@ -262,7 +262,7 @@ module Hwaro::Core::Build::Phases::Initialize
     expanded = File.expand_path(output_dir)
     # expand_path keeps a trailing separator, and `content/` must be
     # recognized as the same directory as `content`.
-    expanded = expanded.rstrip(File::SEPARATOR) unless expanded == File::SEPARATOR_STRING
+    expanded = Hwaro::Utils::PathUtils.chomp_separator(expanded)
     # expand_path is also purely LEXICAL — it never follows symlinks — so a
     # single symlinked component hid the real destination from every rule
     # below: `ln -s content pub && hwaro build -o pub/archive` passed the
