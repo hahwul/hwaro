@@ -35,7 +35,19 @@
  * stay valid and RENDER_REVISION deliberately does NOT move.
  */
 #include <stdlib.h>
+#if defined(__has_include) && !__has_include(<zlib.h>)
+/* Windows: Crystal's toolchain ships zlib's library but not its header.
+ * These are the two zlib 1.x entry points used below, verbatim. */
+typedef unsigned long uLong;
+typedef uLong uLongf;
+typedef unsigned char Bytef;
+#define Z_OK 0
+extern uLong compressBound(uLong sourceLen);
+extern int compress2(Bytef *dest, uLongf *destLen, const Bytef *source,
+                     uLong sourceLen, int level);
+#else
 #include <zlib.h>
+#endif
 
 #define HWARO_PNG_ZLIB_LEVEL 4
 
