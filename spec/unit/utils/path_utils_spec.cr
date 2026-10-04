@@ -2,6 +2,21 @@ require "../../spec_helper"
 require "../../../src/utils/path_utils"
 
 describe Hwaro::Utils::PathUtils do
+  describe ".absolute?" do
+    it "treats a rooted path as absolute" do
+      Hwaro::Utils::PathUtils.absolute?("/etc/x").should be_true
+      Hwaro::Utils::PathUtils.absolute?("posts/a.md").should be_false
+    end
+
+    {% if flag?(:windows) %}
+      it "treats drive, backslash-rooted and UNC paths as absolute on Windows" do
+        Hwaro::Utils::PathUtils.absolute?("C:/out").should be_true
+        Hwaro::Utils::PathUtils.absolute?("\\out").should be_true
+        Hwaro::Utils::PathUtils.absolute?("\\\\server\\share").should be_true
+      end
+    {% end %}
+  end
+
   describe ".sanitize_path" do
     it "sanitizes a normal path" do
       Hwaro::Utils::PathUtils.sanitize_path("/foo/bar").should eq("foo/bar")

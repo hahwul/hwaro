@@ -5,6 +5,19 @@ module Hwaro
     module PathUtils
       extend self
 
+      # `Path#absolute?`, plus a rooted path (`/x`, `\x`) on Windows. The
+      # stdlib calls those drive-relative, but they never name something
+      # under the current directory: `File.join(root, "/x")` would quietly
+      # nest what the user meant as `C:\x`, and a "no absolute paths" check
+      # would let `/etc/x` through.
+      def absolute?(path : String) : Bool
+        {% if flag?(:windows) %}
+          Path[path].absolute? || path.starts_with?('/') || path.starts_with?('\\')
+        {% else %}
+          Path[path].absolute?
+        {% end %}
+      end
+
       # Sanitize path to prevent directory traversal and normalize separators
       #
       # This method performs the following operations:

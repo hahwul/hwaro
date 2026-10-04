@@ -44,7 +44,7 @@ module Hwaro
           raise ArgumentError.new("missing <path> argument")
         end
 
-        if Path[stripped].absolute?
+        if Utils::PathUtils.absolute?(stripped)
           raise ArgumentError.new(
             "Absolute path '#{raw}' is not allowed. " \
             "Paths are relative to #{CONTENT_DIR}/, e.g. 'posts/my-article.md'."
@@ -642,7 +642,7 @@ module Hwaro
           # read arbitrary on-disk `.md` files (e.g. ../../etc/passwd.md).
           # Nested archetypes (tools/develop) stay allowed — only block `..`
           # and absolute paths.
-          if explicit_archetype.includes?("..") || Path[explicit_archetype].absolute?
+          if explicit_archetype.includes?("..") || Utils::PathUtils.absolute?(explicit_archetype)
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
               message: "Invalid archetype name: #{explicit_archetype}",

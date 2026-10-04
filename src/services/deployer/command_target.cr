@@ -305,6 +305,14 @@ module Hwaro
       private URL_SCHEME_RE = /\A[A-Za-z][A-Za-z0-9+.\-]+:/
 
       private def local_directory_destination(url : String) : String?
+        {% if flag?(:windows) %}
+          # `file://C:/out` / `file:///C:/out`: URI turns the drive letter into
+          # a host (dropping its colon) or keeps a `/` in front of it, and
+          # neither is the drive path.
+          if drive = url.match(/\Afile:\/\/\/?([A-Za-z]:[\/\\].*)\z/i)
+            return URI.decode(drive[1])
+          end
+        {% end %}
         if url.matches?(URL_SCHEME_RE)
           uri = URI.parse(url)
           return unless uri.scheme.try(&.downcase) == "file"

@@ -80,7 +80,7 @@ module Hwaro
 
         def initialize(@dir : String, root : String = ".", @sources : Array(String) = DEFAULT_SOURCES,
                        @tool : String = "doctor")
-          @base = Path[@dir].absolute? ? @dir : File.join(root, @dir)
+          @base = PathUtils.absolute?(@dir) ? @dir : File.join(root, @dir)
           @consulted = false
           @oldest_accepted = nil
           @stale = nil

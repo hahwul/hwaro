@@ -84,7 +84,7 @@ module Hwaro
             # Only resolve output_dir to absolute path when -o was explicitly
             # specified, so it stays relative to the original CWD.
             # The default "public" should remain relative to the input directory.
-            if options.output_dir_explicit && !Path[options.output_dir].absolute?
+            if options.output_dir_explicit && !Utils::PathUtils.absolute?(options.output_dir)
               options.output_dir = File.expand_path(options.output_dir)
             end
 
