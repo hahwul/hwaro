@@ -498,7 +498,12 @@ module Hwaro
           # Only contention means another session. A filesystem without
           # locking (NFS without lockd, some FUSE/shared-folder mounts) must
           # not stop serve from starting — it just runs unguarded.
-          unless ex.os_error.in?(Errno::EAGAIN, Errno::EWOULDBLOCK)
+          contended = {% if flag?(:windows) %}
+                        ex.os_error == WinError::ERROR_LOCK_VIOLATION
+                      {% else %}
+                        ex.os_error.in?(Errno::EAGAIN, Errno::EWOULDBLOCK)
+                      {% end %}
+          unless contended
             Logger.warn "Could not lock #{lock_path} (#{ex.message}); running without the one-session guard."
             return
           end
@@ -533,6 +538,15 @@ module Hwaro
       # EADDRNOTAVAIL, and a privileged port (`-p 80`) with EACCES — both
       # arrive as `Socket::BindError`, so both used to get the "another
       # process is listening, try -p/--port" hint, which is wrong for each.
+      # Socket errors arrive as WSA codes on Windows, errnos elsewhere.
+      {% if flag?(:windows) %}
+        private BIND_ADDR_NOT_AVAILABLE = WinError::WSAEADDRNOTAVAIL
+        private BIND_ACCESS_DENIED      = WinError::WSAEACCES
+      {% else %}
+        private BIND_ADDR_NOT_AVAILABLE = Errno::EADDRNOTAVAIL
+        private BIND_ACCESS_DENIED      = Errno::EACCES
+      {% end %}
+
       protected def bind_dev_server(server : HTTP::Server, host : String, port : Int32)
         server.bind_tcp host, port
       rescue ex : Socket::BindError
@@ -540,13 +554,13 @@ module Hwaro
         # use it verbatim rather than re-prefixing.
         message = ex.message || "Could not bind to '#{host}:#{port}'"
         case ex.os_error
-        when Errno::EADDRNOTAVAIL
+        when BIND_ADDR_NOT_AVAILABLE
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_USAGE,
             message: message,
             hint: "Check -b/--bind: #{host} is not an address this machine holds. Use 127.0.0.1, 0.0.0.0, ::1, or one of its interface addresses.",
           )
-        when Errno::EACCES
+        when BIND_ACCESS_DENIED
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
             message: message,
