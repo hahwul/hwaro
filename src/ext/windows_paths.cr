@@ -49,6 +49,16 @@ end
       end
     end
 
+    # Fallback for volumes final_path can't name: the stdlib resolves a link
+    # only in the last component, so feed it one component at a time and
+    # every directory link along the way gets followed too.
+    def self.walk_realpath(path : String) : String
+      parts = Path[::File.expand_path(path)].parts
+      resolved = parts.shift
+      parts.each { |part| resolved = Crystal::System::File.realpath(::File.join(resolved, part)) }
+      resolved
+    end
+
     private def self.extended_final_path(path : String) : String?
       handle = LibC.CreateFileW(Crystal::System.to_wstr(path), LibC::FILE_READ_ATTRIBUTES,
         LibC::DEFAULT_SHARE_MODE, nil, LibC::OPEN_EXISTING, LibC::FILE_FLAG_BACKUP_SEMANTICS,
@@ -80,9 +90,10 @@ end
     # (`static/vendor/x` with `vendor -> C:\elsewhere`) came back unresolved
     # and passed every "real path still under the project?" check that keeps
     # symlinked files from being copied into the site. A volume that can't
-    # name the final path falls back to the stdlib.
+    # name the final path is resolved component by component instead.
     def self.realpath(path : Path | String) : String
-      Hwaro::WindowsPaths.to_slash(Hwaro::WindowsPaths.final_path(path.to_s) || previous_def)
+      name = path.to_s
+      Hwaro::WindowsPaths.to_slash(Hwaro::WindowsPaths.final_path(name) || Hwaro::WindowsPaths.walk_realpath(name))
     end
   end
 

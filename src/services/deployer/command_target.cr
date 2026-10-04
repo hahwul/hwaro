@@ -310,7 +310,7 @@ module Hwaro
           # URI turns the drive letter into
           # a host (dropping its colon) or keeps a `/` in front of it, and
           # neither is the drive path.
-          if drive = url.match(/\Afile:\/\/(?:localhost)?\/?([A-Za-z]:[\/\\].*)\z/i)
+          if drive = url.match(/\Afile:\/\/(?:localhost)?\/?([A-Za-z]:[\/\\][^?#]*)(?:[?#].*)?\z/i)
             return URI.decode(drive[1])
           end
         {% end %}

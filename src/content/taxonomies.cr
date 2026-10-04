@@ -634,8 +634,9 @@ module Hwaro
           # problem the author can fix in front matter. Everything else
           # (permissions, full disk) stays an IO error.
           # Windows reports a path past MAX_PATH as not-found or invalid-name,
-          # never ENAMETOOLONG; judge the length there instead.
-          too_long = {% if flag?(:windows) %} output_path.size >= 260 {% else %} ex.os_error == Errno::ENAMETOOLONG {% end %}
+          # never ENAMETOOLONG; judge the length there instead, of the path
+          # Windows sees (absolute, in UTF-16 units).
+          too_long = {% if flag?(:windows) %} File.expand_path(output_path).to_utf16.size >= 260 {% else %} ex.os_error == Errno::ENAMETOOLONG {% end %}
           raise Hwaro::HwaroError.new(
             code: too_long ? Hwaro::Errors::HWARO_E_CONTENT : Hwaro::Errors::HWARO_E_IO,
             message: "Failed to write taxonomy page #{output_path.inspect}: #{ex.message}",

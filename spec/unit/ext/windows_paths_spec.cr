@@ -30,6 +30,10 @@ describe Hwaro::WindowsPaths do
 
         File.realpath(File.join(project, "vendor", "secret.txt"))
           .should eq(File.join(File.realpath(outside), "secret.txt"))
+        # The fallback for volumes GetFinalPathNameByHandleW can't name. It
+        # keeps 8.3 short names, so compare it with itself.
+        Hwaro::WindowsPaths.walk_realpath(File.join(project, "vendor", "secret.txt"))
+          .should eq(Hwaro::WindowsPaths.walk_realpath(File.join(outside, "secret.txt")))
       end
     end
 
