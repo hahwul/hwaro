@@ -1040,6 +1040,10 @@ end
 
 # Reopen Deployer to expose private methods for testing
 class Hwaro::Services::Deployer
+  def test_command_source(value : String) : String
+    command_source(value)
+  end
+
   def test_shell_escape(value : String) : String
     shell_escape(value)
   end
@@ -1109,6 +1113,14 @@ describe "Deployer private helpers" do
         Hwaro::Services::Deployer.new.test_shell_escape("D:\\site\\").should eq(%("D:\\site\\\\"))
       end
 
+      it "gives {source} native separators, in plans as in runs" do
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "prod"
+        target.url = "s3://bucket"
+        Hwaro::Services::Deployer.new.test_expand_placeholders("xcopy {source} D:\\www", "C:/site/public", target)
+          .should eq(%(xcopy "C:\\site\\public" D:\\www))
+      end
+
       it "drops embedded double quotes and null bytes" do
         Hwaro::Services::Deployer.new.test_shell_escape("a\"b\0c").should eq(%("abc"))
       end
@@ -1123,7 +1135,7 @@ describe "Deployer private helpers" do
       target.url = "s3://my-bucket"
 
       result = deployer.test_expand_placeholders("deploy {source} to {url} as {target}", "/tmp/out", target)
-      result.should eq("deploy #{deployer.test_shell_escape("/tmp/out")} to #{deployer.test_shell_escape("s3://my-bucket")} as #{deployer.test_shell_escape("prod")}")
+      result.should eq("deploy #{deployer.test_shell_escape(deployer.test_command_source("/tmp/out"))} to #{deployer.test_shell_escape("s3://my-bucket")} as #{deployer.test_shell_escape("prod")}")
     end
 
     it "shell-escapes placeholder values" do
@@ -1157,7 +1169,7 @@ describe "Deployer private helpers" do
       target.url = "s3://my-bucket"
 
       result = deployer.test_expand_placeholders("echo {source}", "/tmp/src{url}dir", target)
-      result.should eq("echo #{deployer.test_shell_escape("/tmp/src{url}dir")}")
+      result.should eq("echo #{deployer.test_shell_escape(deployer.test_command_source("/tmp/src{url}dir"))}")
       result.should_not contain("s3://my-bucket")
     end
 
@@ -1170,7 +1182,7 @@ describe "Deployer private helpers" do
       # `{bucket}` lives in the VALUE, not the template — validation must not
       # flag it as an unknown placeholder.
       result = deployer.test_expand_placeholders("echo {source}", "/tmp/{bucket}", target)
-      result.should eq("echo #{deployer.test_shell_escape("/tmp/{bucket}")}")
+      result.should eq("echo #{deployer.test_shell_escape(deployer.test_command_source("/tmp/{bucket}"))}")
     end
   end
 
