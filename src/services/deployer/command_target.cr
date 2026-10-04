@@ -27,14 +27,11 @@ module Hwaro
           # not blamed on the source or destination.
           classify_io_errors(target) { require_non_empty_source!(source_dir, effective) }
         end
-        # Native Windows tools (xcopy, robocopy, cmd built-ins) read the
-        # `/` in `C:/site/public` as a switch.
-        source_dir = source_dir.gsub('/', '\\') if {{ flag?(:windows) }}
         expanded = expand_placeholders(command, source_dir, target)
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
           "HWARO_DEPLOY_URL"    => target.url,
-          "HWARO_DEPLOY_SOURCE" => source_dir,
+          "HWARO_DEPLOY_SOURCE" => command_source(source_dir),
         }
 
         if effective.dry_run
@@ -55,8 +52,12 @@ module Hwaro
         # the template's own quotes undo it — so a quoted placeholder is
         # still judged by its expanded value.
         needs_confirm = effective.confirm
+        #
+        # cmd.exe (Windows) expands `%NAME%` even inside the double quotes a
+        # bare placeholder gets, so a `%` a value brought in is judged too.
         risky = DANGEROUS_SHELL_PATTERNS.matches?(command) ||
-                (quoted_placeholder?(command) && DANGEROUS_SHELL_PATTERNS.matches?(expanded))
+                (quoted_placeholder?(command) && DANGEROUS_SHELL_PATTERNS.matches?(expanded)) ||
+                ({{ flag?(:windows) }} && expanded.count('%') > command.count('%'))
         if !effective.force && risky
           Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
           needs_confirm = true
@@ -223,7 +224,7 @@ module Hwaro
 
         command.gsub(COMMAND_PLACEHOLDER_RE) do |token|
           case $~[1]
-          when "source" then shell_escape(source_dir)
+          when "source" then shell_escape(command_source(source_dir))
           when "url"    then shell_escape(target.url)
           when "target" then shell_escape(target.name)
           else               token
@@ -257,6 +258,17 @@ module Hwaro
                    "#{unresolved.map { |n| "{#{n}}" }.join(", ")}",
           hint: "Supported placeholders: #{COMMAND_PLACEHOLDERS.to_a.sort.map { |n| "{#{n}}" }.join(", ")}.",
         )
+      end
+
+      # The source dir as a deploy command sees it. Native Windows tools
+      # (xcopy, robocopy, cmd built-ins) read the `/` in `C:/site/public` as
+      # a switch. Shared by the real run and `--dry-run`/plan.
+      private def command_source(source_dir : String) : String
+        {% if flag?(:windows) %}
+          source_dir.gsub('/', '\\')
+        {% else %}
+          source_dir
+        {% end %}
       end
 
       # Escape a string for safe interpolation into a shell command.
