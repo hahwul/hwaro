@@ -475,7 +475,7 @@ module Hwaro
         # the checkout path: CI restores it under a different directory). A
         # path that escapes the project is not recorded — nothing reads it.
         def self.record_file_read(path : String) : Nil
-          return if path.empty? || path.starts_with?("/")
+          return if path.empty? || Hwaro::Utils::PathUtils.absolute?(path)
           normalized = Path.posix(path).normalize.to_s
           return if normalized == ".." || normalized.starts_with?("../")
           record_render_read(FILE_READ_PREFIX + normalized)
