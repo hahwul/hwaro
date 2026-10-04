@@ -261,11 +261,14 @@ module Hwaro
       #
       # cmd.exe (Windows) has no single quotes: the value is double-quoted
       # instead. `"` can't appear in a Windows path and the values come from
-      # config.toml, a trusted boundary, so an embedded `"` is dropped.
+      # config.toml, a trusted boundary, so an embedded `"` is dropped. A
+      # trailing `\` is doubled, or the child's argv parser would read `\"`
+      # as a literal quote and run the value into the next argument.
       private def shell_escape(value : String) : String
         sanitized = value.gsub("\0", "")
         {% if flag?(:windows) %}
-          %("#{sanitized.delete('"')}")
+          quoted = sanitized.delete('"')
+          %("#{quoted}#{"\\" * (quoted.size - quoted.rstrip('\\').size)}")
         {% else %}
           "'" + sanitized.gsub("'", "'\\''") + "'"
         {% end %}
