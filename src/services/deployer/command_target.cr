@@ -111,7 +111,7 @@ module Hwaro
       private def run_deploy_command(command : String, env : Hash(String, String)) : {Process::Status, String}
         quiet = Logger.quiet?
         input = CLI::Prompt.interactive? && !quiet ? Process::Redirect::Inherit : Process::Redirect::Close
-        process = Process.new(command, shell: true, env: env, input: input,
+        process = Process.new(Utils::CommandRunner.shell_command(command), shell: true, env: env, input: input,
           output: Process::Redirect::Pipe, error: Process::Redirect::Pipe)
 
         begin
@@ -258,9 +258,17 @@ module Hwaro
       # Escape a string for safe interpolation into a shell command.
       # Wraps the value in single quotes and escapes any embedded single quotes.
       # Strips null bytes which can bypass shell escaping.
+      #
+      # cmd.exe (Windows) has no single quotes: the value is double-quoted
+      # instead. `"` can't appear in a Windows path and the values come from
+      # config.toml, a trusted boundary, so an embedded `"` is dropped.
       private def shell_escape(value : String) : String
         sanitized = value.gsub("\0", "")
-        "'" + sanitized.gsub("'", "'\\''") + "'"
+        {% if flag?(:windows) %}
+          %("#{sanitized.delete('"')}")
+        {% else %}
+          "'" + sanitized.gsub("'", "'\\''") + "'"
+        {% end %}
       end
 
       # Auto-generate a deploy command for known cloud URL schemes.

@@ -87,6 +87,25 @@ describe Hwaro::Utils::CommandRunner do
     end
   end
 
+  describe ".shell_command" do
+    {% if flag?(:windows) %}
+      it "runs the command through cmd.exe" do
+        Hwaro::Utils::CommandRunner.shell_command("npm run build").should eq(%(cmd.exe /d /s /c "npm run build"))
+      end
+
+      it "gives hooks cmd.exe's && chaining" do
+        result = Hwaro::Utils::CommandRunner.run("echo one&& echo two")
+        result.success.should be_true
+        result.output.should contain("one")
+        result.output.should contain("two")
+      end
+    {% else %}
+      it "passes the command through to sh unchanged" do
+        Hwaro::Utils::CommandRunner.shell_command("npm run build").should eq("npm run build")
+      end
+    {% end %}
+  end
+
   describe ".run_all" do
     it "returns true for empty commands array" do
       result = Hwaro::Utils::CommandRunner.run_all([] of String)

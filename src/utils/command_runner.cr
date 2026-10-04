@@ -19,13 +19,26 @@ module Hwaro
         end
       end
 
+      # The command line to hand `Process` with `shell: true`. That is
+      # `sh -c` on POSIX but a bare CreateProcess on Windows: no `&&`, pipes
+      # or redirects, and no `.cmd` shims (`npm`, `npx`). Wrap it in cmd.exe
+      # there, the way Node's `shell: true` does (`/s` strips the outer
+      # quotes, `/d` skips AutoRun).
+      def self.shell_command(command : String) : String
+        {% if flag?(:windows) %}
+          %(cmd.exe /d /s /c "#{command}")
+        {% else %}
+          command
+        {% end %}
+      end
+
       # Execute a single command and return the result
       def self.run(command : String, working_dir : String? = nil) : Result
         stdout = IO::Memory.new
         stderr = IO::Memory.new
 
         process_args = {
-          command: command,
+          command: shell_command(command),
           shell:   true,
           output:  stdout,
           error:   stderr,
