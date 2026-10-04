@@ -11,6 +11,8 @@ on:
       - shard.yml
       - shard.lock
       - "**/*.cr"
+      - src/ext/**
+      - .gitattributes
   push:
     branches: [main]
     paths:
@@ -18,6 +20,8 @@ on:
       - shard.yml
       - shard.lock
       - "**/*.cr"
+      - src/ext/**
+      - .gitattributes
   workflow_dispatch:
 
 concurrency:
@@ -55,7 +59,7 @@ jobs:
           ./bin/hwaro.exe build -i docs
           for out in "$RUNNER_TEMP/site/public" docs/public; do
             test -f "$out/index.html"
-            if grep -rlE '(href|src)="[^"]*\\' "$out" --include='*.html' --include='*.xml'; then
+            if grep -rlE '(href|src)="[^"]*\\|<loc>[^<]*\\' "$out" --include='*.html' --include='*.xml'; then
               echo "::error::backslash in a generated URL under $out"
               exit 1
             fi
