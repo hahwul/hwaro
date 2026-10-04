@@ -21,7 +21,19 @@ jobs:
             platform: macos
           - os: macos-15-intel
             platform: macos
+          - os: windows-latest
+            platform: windows
+            # The compiler windows.yml tests the --static build with.
+            crystal: 1.21.0
     runs-on: ${{ matrix.os }}
+    # publish-homebrew and the deb/rpm/apk releases run only when this whole
+    # workflow succeeds; a Windows build failure must not hold the macOS/Linux
+    # release back (the leg warns instead, at the end).
+    continue-on-error: ${{ matrix.platform == 'windows' }}
+    # Windows runners default to PowerShell; every step here is bash.
+    defaults:
+      run:
+        shell: bash
     steps:
       # install-crystal apt-installs deps from the image's cached index, which
       # 404s once Ubuntu supersedes a package; refresh it first.
@@ -30,6 +42,8 @@ jobs:
         run: sudo apt-get update -q
       - name: Install Crystal
         uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: ${{ matrix.crystal || 'latest' }}
       - name: Checkout source code
         uses: actions/checkout@v6
       - name: Install dependencies
@@ -73,6 +87,17 @@ jobs:
           chmod +x scripts/package-macos.sh
           scripts/package-macos.sh "$BIN" "build/hwaro-${GITHUB_REF_SLUG}-osx-${ARCH}.tar.gz" hwaro
           rm -f "$BIN"
+      - if: matrix.platform == 'windows'
+        name: Build binary (Windows)
+        # A step timeout is a step failure, which continue-on-error absorbs;
+        # a job timeout would cancel the run and hold the release back.
+        timeout-minutes: 45
+        # --static links the static CRT, so the .exe runs without the Visual
+        # C++ redistributable installed.
+        run: |
+          mkdir -p build
+          crystal build src/main.cr -o "build/hwaro-${GITHUB_REF_SLUG}-windows-${ARCH}.exe" --release --no-debug --static
+          rm -f build/*.pdb build/*.lib build/*.exp
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -87,3 +112,7 @@ jobs:
           overwrite: true
           file_glob: true
           file: build/*
+      # Last, so a failed artifact or release upload is reported too.
+      - if: failure() && matrix.platform == 'windows'
+        name: Report the missing Windows binary
+        run: echo "::warning::The Windows .exe was not built or uploaded; this release may ship without it."

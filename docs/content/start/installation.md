@@ -93,7 +93,7 @@ Crystal toolchain, so no compiler has to be built from source.
 
 ## Pre-built Binary
 
-Pre-built binaries for macOS and Linux are available on the [GitHub Releases](https://github.com/hahwul/hwaro/releases) page.
+Pre-built binaries for macOS, Linux and Windows are available on the [GitHub Releases](https://github.com/hahwul/hwaro/releases) page.
 
 1. Download the binary for your platform from the [latest release](https://github.com/hahwul/hwaro/releases/latest).
 2. Move the binary to a directory in your PATH. **On macOS the download is a
@@ -137,12 +137,38 @@ so the dylibs are still found. Homebrew installs the tarball the same way.
 >
 > A patch release will carry the fix, after which no manual step is needed.
 
+### Windows
+
+The Windows download is a single static `.exe` (x86_64) that needs no Visual
+C++ redistributable. In PowerShell, install it for the current user and put it
+on your PATH:
+
+```powershell
+# Use the file name you downloaded, e.g. hwaro-v0.21.0-windows-x86_64.exe
+$exe = ".\hwaro-v0.21.0-windows-x86_64.exe"
+$dir = "$env:LOCALAPPDATA\hwaro"
+New-Item -ItemType Directory -Force $dir | Out-Null
+Move-Item -Force $exe "$dir\hwaro.exe"
+$path = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($path -split ";") -notcontains $dir) {
+  [Environment]::SetEnvironmentVariable("Path", "$path;$dir", "User")
+}
+```
+
+Open a new terminal afterwards. To update, run the same lines with the newer
+download (close any running `hwaro serve` first). On Windows,
+[build hooks](/features/build-hooks/) and deploy commands run through
+`cmd.exe`.
+
 ## From Source
 
 ### Prerequisites
 
 - [Crystal](https://crystal-lang.org/install/) 1.21+
 - Git
+- Windows only: build from a Git Bash terminal (its `sh` builds the
+  bundled image code) with LLVM's `clang-cl` on `PATH` (Visual Studio's
+  "C++ Clang tools" component or the LLVM installer)
 
 ### Build
 
@@ -153,7 +179,7 @@ shards install
 shards build --release --no-debug
 ```
 
-The binary is created at `./bin/hwaro`.
+The binary is created at `./bin/hwaro` (`bin\hwaro.exe` on Windows).
 
 > Requires Crystal **1.21 or newer**. Parallel page rendering is enabled in
 > `src/main.cr`, which resizes Crystal's default execution context, so no build
