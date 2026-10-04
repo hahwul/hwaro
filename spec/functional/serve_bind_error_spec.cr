@@ -14,7 +14,7 @@ require "socket"
 #
 # The CLI-level example is the one that matters — it compiles and fails
 # against pre-fix sources, where the seam below did not exist yet.
-private HWARO_BIND_BIN = File.expand_path("../../bin/hwaro", __DIR__)
+private HWARO_BIND_BIN = hwaro_binary
 
 Spec.before_suite do
   unless File.exists?(HWARO_BIND_BIN) && File::Info.executable?(HWARO_BIND_BIN)

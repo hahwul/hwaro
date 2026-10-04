@@ -6,7 +6,7 @@ require "../spec_helper"
 # got an unparseable stream on success. `run` writes straight to STDOUT and
 # `--json` has to take effect before option parsing, so these drive the real
 # binary rather than the command object.
-private HWARO_BIN = File.expand_path("../../bin/hwaro", __DIR__)
+private HWARO_BIN = hwaro_binary
 
 Spec.before_suite do
   unless File.exists?(HWARO_BIN) && File::Info.executable?(HWARO_BIN)

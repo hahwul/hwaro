@@ -18,7 +18,7 @@ require "http/client"
 # Skips when `bin/hwaro` isn't present (e.g. running `crystal spec`
 # without a prior `shards build`). In CI, the build step runs first
 # so the binary is always available.
-private HWARO_BIN = File.expand_path("../../bin/hwaro", __DIR__)
+private HWARO_BIN = hwaro_binary
 
 private def fast_start_serve_available? : Bool
   return false unless File.exists?(HWARO_BIN)

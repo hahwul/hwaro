@@ -5,7 +5,7 @@ require "../spec_helper"
 # restoring the old `return` inside `run` left it green. `run` calls `exit`,
 # which cannot be observed in-process, so these drive the built binary and
 # assert on the real exit status and the real stdout document.
-private HWARO_BIN = File.expand_path("../../bin/hwaro", __DIR__)
+private HWARO_BIN = hwaro_binary
 
 Spec.before_suite do
   unless File.exists?(HWARO_BIN) && File::Info.executable?(HWARO_BIN)

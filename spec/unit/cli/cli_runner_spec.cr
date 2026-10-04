@@ -128,7 +128,7 @@ describe Hwaro::CLI::Runner do
     # command plus --json triggers the ARGV.includes?("--json") branch (no
     # parser has run yet), so this also covers the ARGV-detection path.
     it "emits the structured JSON payload to stdout under --json (ARGV detection)" do
-      bin = File.expand_path("../../../bin/hwaro", __DIR__)
+      bin = hwaro_binary
       next unless File.exists?(bin) && File::Info.executable?(bin)
 
       stdout_sink = IO::Memory.new
