@@ -10,6 +10,7 @@ describe Hwaro::Utils::OutputOwnership do
     end
 
     it "does not treat an unreadable .hwaro-dev as owned" do
+      posix_only!("chmod can't make a file unreadable on Windows")
       Dir.mktmpdir do |dir|
         marker = File.join(dir, Hwaro::Utils::DevMarker::FILENAME)
         File.write(marker, Hwaro::Utils::DevMarker::CONTENT)

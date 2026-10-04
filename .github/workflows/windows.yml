@@ -1,0 +1,64 @@
+---
+name: Windows
+# Native Windows build, smoke build and spec run (#828). Its own workflow
+# rather than a ci.yml job so it also runs on stacked PRs, whose base is
+# another PR's branch, and so a red Windows run doesn't gate merges while
+# support is brought up.
+on:
+  pull_request:
+    paths: &paths
+      - .github/workflows/windows.yml
+      - shard.yml
+      - shard.lock
+      - "**/*.cr"
+      - src/ext/**
+      - .gitattributes
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+# As in ci.yml: a PR's next push supersedes it, but every push to main gets
+# its own Windows result.
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: 1.21.0
+      - name: Install dependencies
+        run: shards install --without-development
+      - name: Build
+        # --static, as the release ships it: a static-CRT link failure shows
+        # up here rather than at release time.
+        run: shards build --static
+      - name: Smoke test
+        # Build a scaffold and the docs site, then make sure no Windows
+        # separator leaked into a generated URL.
+        run: |
+          set -euo pipefail
+          ./bin/hwaro.exe --version
+          ./bin/hwaro.exe init "$RUNNER_TEMP/site" --scaffold blog
+          (cd "$RUNNER_TEMP/site" && "$GITHUB_WORKSPACE/bin/hwaro.exe" build)
+          ./bin/hwaro.exe build -i docs
+          for out in "$RUNNER_TEMP/site/public" docs/public; do
+            test -f "$out/index.html"
+            if grep -rlE '(href|src)="[^"]*\\|og:(url|image)" content="[^"]*\\|<(loc|link|guid)>[^<]*\\' "$out" --include='*.html' --include='*.xml'; then
+              echo "::error::backslash in a generated URL under $out"
+              exit 1
+            fi
+          done
+      - name: Run specs
+        run: crystal spec

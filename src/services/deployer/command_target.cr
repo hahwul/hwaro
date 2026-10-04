@@ -10,7 +10,8 @@ module Hwaro
       # Shell metacharacters that indicate potentially dangerous commands.
       # These are not inherently bad but warrant user attention when present
       # in deploy commands, especially from remote scaffolds.
-      DANGEROUS_SHELL_PATTERNS = /[|;&`$]|\bsudo\b|\brm\s+-rf\b/
+      # Windows adds cmd.exe's `%VAR%` expansion and `^` escape.
+      DANGEROUS_SHELL_PATTERNS = {% if flag?(:windows) %} /[|;&`$%^]|\bsudo\b|\brm\s+-rf\b/ {% else %} /[|;&`$]|\bsudo\b|\brm\s+-rf\b/ {% end %}
 
       private def deploy_via_command(
         target : Models::DeploymentTarget,
@@ -30,7 +31,7 @@ module Hwaro
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
           "HWARO_DEPLOY_URL"    => target.url,
-          "HWARO_DEPLOY_SOURCE" => source_dir,
+          "HWARO_DEPLOY_SOURCE" => command_source(source_dir),
         }
 
         if effective.dry_run
@@ -51,8 +52,12 @@ module Hwaro
         # the template's own quotes undo it — so a quoted placeholder is
         # still judged by its expanded value.
         needs_confirm = effective.confirm
+        #
+        # cmd.exe (Windows) expands `%NAME%` even inside the double quotes a
+        # bare placeholder gets, so a `%` a value brought in is judged too.
         risky = DANGEROUS_SHELL_PATTERNS.matches?(command) ||
-                (quoted_placeholder?(command) && DANGEROUS_SHELL_PATTERNS.matches?(expanded))
+                (quoted_placeholder?(command) && DANGEROUS_SHELL_PATTERNS.matches?(expanded)) ||
+                ({{ flag?(:windows) }} && expanded.count('%') > command.count('%'))
         if !effective.force && risky
           Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
           needs_confirm = true
@@ -111,7 +116,7 @@ module Hwaro
       private def run_deploy_command(command : String, env : Hash(String, String)) : {Process::Status, String}
         quiet = Logger.quiet?
         input = CLI::Prompt.interactive? && !quiet ? Process::Redirect::Inherit : Process::Redirect::Close
-        process = Process.new(command, shell: true, env: env, input: input,
+        process = Process.new(Utils::CommandRunner.shell_command(command), shell: true, env: env, input: input,
           output: Process::Redirect::Pipe, error: Process::Redirect::Pipe)
 
         begin
@@ -219,7 +224,7 @@ module Hwaro
 
         command.gsub(COMMAND_PLACEHOLDER_RE) do |token|
           case $~[1]
-          when "source" then shell_escape(source_dir)
+          when "source" then shell_escape(command_source(source_dir))
           when "url"    then shell_escape(target.url)
           when "target" then shell_escape(target.name)
           else               token
@@ -255,12 +260,33 @@ module Hwaro
         )
       end
 
+      # The source dir as a deploy command sees it. Native Windows tools
+      # (xcopy, robocopy, cmd built-ins) read the `/` in `C:/site/public` as
+      # a switch. Shared by the real run and `--dry-run`/plan.
+      private def command_source(source_dir : String) : String
+        {% if flag?(:windows) %}
+          source_dir.gsub('/', '\\')
+        {% else %}
+          source_dir
+        {% end %}
+      end
+
       # Escape a string for safe interpolation into a shell command.
       # Wraps the value in single quotes and escapes any embedded single quotes.
       # Strips null bytes which can bypass shell escaping.
+      #
+      # cmd.exe (Windows) has no single quotes: the value is double-quoted
+      # instead. `"` can't appear in a Windows path and the values come from
+      # config.toml, a trusted boundary, so an embedded `"` is dropped. A
+      # trailing `\` is doubled, or the child's argv parser would read `\"`
+      # as a literal quote and run the value into the next argument.
       private def shell_escape(value : String) : String
         sanitized = value.gsub("\0", "")
-        "'" + sanitized.gsub("'", "'\\''") + "'"
+        {% if flag?(:windows) %}
+          %("#{sanitized.delete('"').sub(/(\\+)\z/, "\\1\\1")}")
+        {% else %}
+          "'" + sanitized.gsub("'", "'\\''") + "'"
+        {% end %}
       end
 
       # Auto-generate a deploy command for known cloud URL schemes.
@@ -305,6 +331,15 @@ module Hwaro
       private URL_SCHEME_RE = /\A[A-Za-z][A-Za-z0-9+.\-]+:/
 
       private def local_directory_destination(url : String) : String?
+        {% if flag?(:windows) %}
+          # `file://C:/out`, `file:///C:/out` (and `file://localhost/C:/out`):
+          # URI turns the drive letter into
+          # a host (dropping its colon) or keeps a `/` in front of it, and
+          # neither is the drive path.
+          if drive = url.match(/\Afile:\/\/(?:localhost)?\/?([A-Za-z]:[\/\\][^?#]*)(?:[?#].*)?\z/i)
+            return URI.decode(drive[1])
+          end
+        {% end %}
         if url.matches?(URL_SCHEME_RE)
           uri = URI.parse(url)
           return unless uri.scheme.try(&.downcase) == "file"

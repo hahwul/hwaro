@@ -671,6 +671,7 @@ describe Hwaro::Content::Taxonomies do
     # alone: an absurd term must not abort a build into an ordinary output
     # directory — it publishes under a shortened, digest-suffixed slug.
     it "publishes an over-long term under a bounded slug instead of failing" do
+      posix_only!("Windows paths stop at MAX_PATH, long before a 245-byte slug")
       config = Hwaro::Models::Config.new
       config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
 

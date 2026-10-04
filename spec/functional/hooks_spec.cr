@@ -81,7 +81,7 @@ describe "Hooks: External command execution" do
       base_url = "http://localhost"
 
       [build.hooks]
-      post = ["echo $PWD > pwd_output.txt"]
+      post = ["echo #{{{ flag?(:windows) ? "%CD%" : "$PWD" }}} > pwd_output.txt"]
       TOML
 
     build_site(
@@ -92,6 +92,8 @@ describe "Hooks: External command execution" do
       File.exists?("pwd_output.txt").should be_true
       pwd = File.read("pwd_output.txt").strip
       pwd.should_not be_empty
+      pwd.should_not start_with("$")
+      pwd.should_not start_with("%")
     end
   end
 end
@@ -116,8 +118,8 @@ describe "Hooks: Pre and post hooks combined" do
       base_url = "http://localhost"
 
       [build.hooks]
-      pre = ["date +%s > pre_timestamp.txt"]
-      post = ["date +%s > post_timestamp.txt"]
+      pre = ["echo pre > pre_timestamp.txt"]
+      post = ["echo post > post_timestamp.txt"]
       TOML
 
     build_site(
@@ -139,7 +141,7 @@ describe "Hooks: Hook creates files used by build" do
       base_url = "http://localhost"
 
       [build.hooks]
-      pre = ["mkdir -p static && echo 'generated' > static/generated.txt"]
+      pre = ["mkdir static && echo generated> static/generated.txt"]
       TOML
 
     build_site(

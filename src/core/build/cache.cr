@@ -858,7 +858,7 @@ module Hwaro
           expanded = File.expand_path(output_dir)
           # expand_path preserves a trailing separator; `public/` and `public`
           # are the same directory and must produce the same key.
-          expanded = expanded.rstrip(File::SEPARATOR) unless expanded == File::SEPARATOR_STRING
+          expanded = Utils::PathUtils.chomp_separator(expanded)
           root = File.expand_path(Dir.current)
           return expanded unless expanded.starts_with?(root + File::SEPARATOR)
           expanded[(root.size + 1)..]

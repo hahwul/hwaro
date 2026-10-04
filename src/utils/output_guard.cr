@@ -102,9 +102,7 @@ module Hwaro
       # types for you) silently published nothing. Dropping trailing
       # separators makes `public/` and `public` the same directory again.
       private def canonical(path : String, base : String? = nil) : String
-        expanded = File.expand_path(path, base)
-        return expanded if expanded == File::SEPARATOR_STRING
-        expanded.rstrip(File::SEPARATOR)
+        PathUtils.chomp_separator(File.expand_path(path, base))
       end
     end
   end

@@ -93,7 +93,7 @@ nix develop github:hahwul/hwaro
 
 ## 사전 빌드 바이너리
 
-macOS와 Linux용 사전 빌드 바이너리를 [GitHub Releases](https://github.com/hahwul/hwaro/releases) 페이지에서 받을 수 있습니다.
+macOS, Linux, Windows용 사전 빌드 바이너리를 [GitHub Releases](https://github.com/hahwul/hwaro/releases) 페이지에서 받을 수 있습니다.
 
 1. [최신 릴리스](https://github.com/hahwul/hwaro/releases/latest)에서 플랫폼에 맞는 바이너리를 내려받습니다.
 2. PATH에 포함된 디렉터리로 바이너리를 옮깁니다. **macOS 배포물은 단일 바이너리가
@@ -136,12 +136,36 @@ sudo ln -sf /usr/local/libexec/hwaro/hwaro /usr/local/bin/hwaro
 >
 > 패치 릴리스가 나가면 이 과정은 필요 없습니다.
 
+### Windows
+
+Windows 배포물은 Visual C++ 재배포 패키지 없이 실행되는 단일 정적 `.exe`(x86_64)
+입니다. PowerShell에서 현재 사용자용으로 설치하고 PATH에 추가합니다.
+
+```powershell
+# 내려받은 파일 이름을 쓰세요. 예: hwaro-v0.21.0-windows-x86_64.exe
+$exe = ".\hwaro-v0.21.0-windows-x86_64.exe"
+$dir = "$env:LOCALAPPDATA\hwaro"
+New-Item -ItemType Directory -Force $dir | Out-Null
+Move-Item -Force $exe "$dir\hwaro.exe"
+$path = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($path -split ";") -notcontains $dir) {
+  [Environment]::SetEnvironmentVariable("Path", "$path;$dir", "User")
+}
+```
+
+설치 후 새 터미널을 여세요. 업데이트할 때는 새로 내려받은 파일로 같은 명령을
+다시 실행합니다(실행 중인 `hwaro serve`는 먼저 종료하세요). Windows에서는
+[빌드 훅](/ko/features/build-hooks/)과 배포 명령이 `cmd.exe`로 실행됩니다.
+
 ## 소스 빌드
 
 ### 사전 요구 사항
 
 - [Crystal](https://crystal-lang.org/install/) 1.21+
 - Git
+- Windows 한정: Git Bash 터미널에서 빌드하고(번들된 이미지 코드를 `sh`로
+  빌드), LLVM의 `clang-cl`이 `PATH`에 있어야 합니다(Visual Studio의 "C++ Clang
+  tools" 구성 요소 또는 LLVM 설치 프로그램)
 
 ### 빌드
 
@@ -152,7 +176,7 @@ shards install
 shards build --release --no-debug
 ```
 
-바이너리는 `./bin/hwaro`에 생성됩니다.
+바이너리는 `./bin/hwaro`(Windows에서는 `bin\hwaro.exe`)에 생성됩니다.
 
 > Crystal **1.21 이상**이 필요합니다. 병렬 페이지 렌더링은 `src/main.cr`에서
 > Crystal 기본 실행 컨텍스트 크기를 조정해 켜지므로 별도 빌드 플래그가

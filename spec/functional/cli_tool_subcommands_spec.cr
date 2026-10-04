@@ -15,7 +15,7 @@ require "../spec_helper"
 # originating log method.
 # =============================================================================
 
-private HWARO_BIN = File.expand_path("../../bin/hwaro", __DIR__)
+private HWARO_BIN = hwaro_binary
 
 # Pre-flight check: surface a clear error if the binary is missing rather
 # than letting every test fail with an inscrutable Process.run error.

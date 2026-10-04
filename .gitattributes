@@ -1,0 +1,7 @@
+# Git for Windows defaults to core.autocrlf=true. A CRLF checkout would bake
+# CRLF scaffold templates and assets into a Windows-built binary, and break
+# the sh script that builds src/ext/stb_impl.o.
+* text=auto eol=lf
+
+# Committed with CRLF; keep its bytes.
+src/ext/fonts/LICENSE-SpaceGrotesk -text

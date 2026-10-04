@@ -498,7 +498,12 @@ module Hwaro
           # Only contention means another session. A filesystem without
           # locking (NFS without lockd, some FUSE/shared-folder mounts) must
           # not stop serve from starting — it just runs unguarded.
-          unless ex.os_error.in?(Errno::EAGAIN, Errno::EWOULDBLOCK)
+          contended = {% if flag?(:windows) %}
+                        ex.os_error == WinError::ERROR_LOCK_VIOLATION
+                      {% else %}
+                        ex.os_error.in?(Errno::EAGAIN, Errno::EWOULDBLOCK)
+                      {% end %}
+          unless contended
             Logger.warn "Could not lock #{lock_path} (#{ex.message}); running without the one-session guard."
             return
           end
@@ -515,6 +520,19 @@ module Hwaro
         @output_lock.try(&.close)
         @output_lock = nil
       end
+
+      # Socket errors arrive as WSA codes on Windows, errnos elsewhere.
+      {% if flag?(:windows) %}
+        private BIND_ADDR_NOT_AVAILABLE = WinError::WSAEADDRNOTAVAIL
+        private BIND_ACCESS_DENIED      = WinError::WSAEACCES
+        # No privileged ports on Windows; WSAEACCES there is an excluded port
+        # range (Hyper-V/WSL2/Docker often reserve 3000) or an exclusive bind.
+        private BIND_ACCESS_DENIED_HINT = "Port %d is reserved or held exclusively on this system (see `netsh int ipv4 show excludedportrange protocol=tcp`). Try -p/--port with a different value."
+      {% else %}
+        private BIND_ADDR_NOT_AVAILABLE = Errno::EADDRNOTAVAIL
+        private BIND_ACCESS_DENIED      = Errno::EACCES
+        private BIND_ACCESS_DENIED_HINT = "Port %d needs elevated privileges on this system. Try -p/--port with a value above 1023."
+      {% end %}
 
       # Bind the dev server's listening socket, classifying every way that can
       # fail. Extracted from `run_with_options` so specs can drive the real
@@ -540,17 +558,17 @@ module Hwaro
         # use it verbatim rather than re-prefixing.
         message = ex.message || "Could not bind to '#{host}:#{port}'"
         case ex.os_error
-        when Errno::EADDRNOTAVAIL
+        when BIND_ADDR_NOT_AVAILABLE
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_USAGE,
             message: message,
             hint: "Check -b/--bind: #{host} is not an address this machine holds. Use 127.0.0.1, 0.0.0.0, ::1, or one of its interface addresses.",
           )
-        when Errno::EACCES
+        when BIND_ACCESS_DENIED
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
             message: message,
-            hint: "Port #{port} needs elevated privileges on this system. Try -p/--port with a value above 1023.",
+            hint: BIND_ACCESS_DENIED_HINT % port,
           )
         else
           raise Hwaro::HwaroError.new(

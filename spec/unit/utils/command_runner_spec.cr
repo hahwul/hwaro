@@ -33,7 +33,7 @@ describe Hwaro::Utils::CommandRunner do
 
   describe ".run" do
     it "executes a successful command" do
-      result = Hwaro::Utils::CommandRunner.run("echo 'hello'")
+      result = Hwaro::Utils::CommandRunner.run("echo hello")
       result.success.should be_true
       result.output.strip.should eq("hello")
       result.exit_code.should eq(0)
@@ -74,17 +74,41 @@ describe Hwaro::Utils::CommandRunner do
     end
 
     it "handles commands with special characters" do
+      posix_only!("sh single quotes")
       result = Hwaro::Utils::CommandRunner.run("echo 'hello world'")
       result.success.should be_true
       result.output.strip.should eq("hello world")
     end
 
     it "handles multiline output" do
-      result = Hwaro::Utils::CommandRunner.run("echo 'line1'; echo 'line2'")
+      # `&&` separates commands in both sh and cmd.exe (`;` doesn't in cmd).
+      result = Hwaro::Utils::CommandRunner.run("echo line1&& echo line2")
       result.success.should be_true
-      result.output.should contain("line1")
-      result.output.should contain("line2")
+      result.output.lines.map(&.strip).should eq(["line1", "line2"])
     end
+  end
+
+  describe ".shell_command" do
+    {% if flag?(:windows) %}
+      it "runs the command through %ComSpec%" do
+        Hwaro::Utils::CommandRunner.shell_command("npm run build").should eq(%("#{ENV["ComSpec"]? || "cmd.exe"}" /d /s /c "npm run build"))
+      end
+
+      it "gives hooks cmd.exe's && chaining" do
+        result = Hwaro::Utils::CommandRunner.run("echo one&& echo two")
+        result.success.should be_true
+        result.output.should contain("one")
+        result.output.should contain("two")
+      end
+    {% else %}
+      # `status.exit_code` raises for a signalled child; that used to turn a
+      # killed hook into an internal error instead of a failed hook.
+      it "reports a killed command as a failure instead of raising" do
+        result = Hwaro::Utils::CommandRunner.run("kill -9 $$")
+        result.success.should be_false
+        result.exit_code.should eq(-1)
+      end
+    {% end %}
   end
 
   describe ".run_all" do

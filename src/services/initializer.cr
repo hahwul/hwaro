@@ -487,8 +487,9 @@ module Hwaro
       # typed in the wrong terminal tab would otherwise empty them.
       private def protected_clean_root?(target_path : String) : Bool
         real = File.realpath(target_path)
-        return true if Path[real].root == Path[real]
-        home = ENV["HOME"]?
+        # `anchor`, not `root`: on Windows the root of `C:/` is `/`.
+        return true if Path[real].anchor == Path[real]
+        home = ENV[{{ flag?(:windows) ? "USERPROFILE" : "HOME" }}]?
         !!(home && !home.empty? && Dir.exists?(home) && File.realpath(home) == real)
       rescue File::Error
         false
@@ -590,7 +591,7 @@ module Hwaro
           .try(&.["output_dir"]?)
           .try(&.as_s?) || "public"
         dir = dir.strip.rstrip('/')
-        return if dir.empty? || dir == "." || dir.starts_with?('/') || dir.starts_with?('\\')
+        return if dir.empty? || dir == "." || dir.starts_with?('\\') || Utils::PathUtils.absolute?(dir)
         return if dir.split('/').includes?("..")
         # git does not normalize `./`: a `./public/` pattern matches nothing.
         dir = dir.lchop("./")

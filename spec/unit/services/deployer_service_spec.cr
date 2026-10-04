@@ -103,7 +103,7 @@ describe Hwaro::Services::Deployer do
         target = Hwaro::Models::DeploymentTarget.new
         target.name = "cmd"
         # We use a simple command that writes to a file
-        target.command = "echo 'deployed' > #{output_file}"
+        target.command = "echo deployed > #{Process.quote(output_file)}"
         config.deployment.targets << target
 
         deployer = Hwaro::Services::Deployer.new
@@ -1040,6 +1040,10 @@ end
 
 # Reopen Deployer to expose private methods for testing
 class Hwaro::Services::Deployer
+  def test_command_source(value : String) : String
+    command_source(value)
+  end
+
   def test_shell_escape(value : String) : String
     shell_escape(value)
   end
@@ -1068,31 +1072,60 @@ end
 describe "Deployer private helpers" do
   describe "#shell_escape" do
     it "wraps value in single quotes" do
+      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       deployer.test_shell_escape("hello").should eq("'hello'")
     end
 
     it "escapes embedded single quotes" do
+      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       deployer.test_shell_escape("it's").should eq("'it'\\''s'")
     end
 
     it "strips null bytes" do
+      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       deployer.test_shell_escape("hel\0lo").should eq("'hello'")
     end
 
     it "handles empty string" do
+      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       deployer.test_shell_escape("").should eq("''")
     end
 
     it "escapes multiple single quotes" do
+      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       result = deployer.test_shell_escape("a'b'c")
       result.should eq("'a'\\''b'\\''c'")
     end
   end
+
+  {% if flag?(:windows) %}
+    describe "#shell_escape on Windows" do
+      it "double-quotes the value for cmd.exe" do
+        Hwaro::Services::Deployer.new.test_shell_escape("C:/site/public").should eq(%("C:/site/public"))
+      end
+
+      it "doubles a trailing backslash so it can't escape the closing quote" do
+        Hwaro::Services::Deployer.new.test_shell_escape("D:\\site\\").should eq(%("D:\\site\\\\"))
+      end
+
+      it "gives {source} native separators, in plans as in runs" do
+        target = Hwaro::Models::DeploymentTarget.new
+        target.name = "prod"
+        target.url = "s3://bucket"
+        Hwaro::Services::Deployer.new.test_expand_placeholders("xcopy {source} D:\\www", "C:/site/public", target)
+          .should eq(%(xcopy "C:\\site\\public" D:\\www))
+      end
+
+      it "drops embedded double quotes and null bytes" do
+        Hwaro::Services::Deployer.new.test_shell_escape("a\"b\0c").should eq(%("abc"))
+      end
+    end
+  {% end %}
 
   describe "#expand_placeholders" do
     it "replaces source, url, and target placeholders" do
@@ -1102,12 +1135,11 @@ describe "Deployer private helpers" do
       target.url = "s3://my-bucket"
 
       result = deployer.test_expand_placeholders("deploy {source} to {url} as {target}", "/tmp/out", target)
-      result.should contain("'/tmp/out'")
-      result.should contain("'s3://my-bucket'")
-      result.should contain("'prod'")
+      result.should eq("deploy #{deployer.test_shell_escape(deployer.test_command_source("/tmp/out"))} to #{deployer.test_shell_escape("s3://my-bucket")} as #{deployer.test_shell_escape("prod")}")
     end
 
     it "shell-escapes placeholder values" do
+      posix_only!("sh single-quote escaping; Windows quoting has its own specs above")
       deployer = Hwaro::Services::Deployer.new
       target = Hwaro::Models::DeploymentTarget.new
       target.name = "it's a test"
@@ -1137,7 +1169,7 @@ describe "Deployer private helpers" do
       target.url = "s3://my-bucket"
 
       result = deployer.test_expand_placeholders("echo {source}", "/tmp/src{url}dir", target)
-      result.should eq("echo '/tmp/src{url}dir'")
+      result.should eq("echo #{deployer.test_shell_escape(deployer.test_command_source("/tmp/src{url}dir"))}")
       result.should_not contain("s3://my-bucket")
     end
 
@@ -1150,7 +1182,7 @@ describe "Deployer private helpers" do
       # `{bucket}` lives in the VALUE, not the template — validation must not
       # flag it as an unknown placeholder.
       result = deployer.test_expand_placeholders("echo {source}", "/tmp/{bucket}", target)
-      result.should eq("echo '/tmp/{bucket}'")
+      result.should eq("echo #{deployer.test_shell_escape(deployer.test_command_source("/tmp/{bucket}"))}")
     end
   end
 
@@ -1172,7 +1204,7 @@ describe "Deployer private helpers" do
       result = deployer.test_auto_command_for_url("az://my-container", "/tmp")
       # The container name (uri.host) is inlined+shell-escaped; {url} would
       # otherwise expand to the full az:// URL, which the az CLI rejects.
-      result.should eq("az storage blob sync --source {source} --container 'my-container'")
+      result.should eq("az storage blob sync --source {source} --container #{deployer.test_shell_escape("my-container")}")
     end
 
     it "appends --destination for az:// URLs with a path prefix" do
@@ -1180,7 +1212,7 @@ describe "Deployer private helpers" do
       # az://container/sub/dir used to drop the prefix and deploy to the
       # container root.
       result = deployer.test_auto_command_for_url("az://my-container/sub/dir", "/tmp")
-      result.should eq("az storage blob sync --source {source} --container 'my-container' --destination 'sub/dir'")
+      result.should eq("az storage blob sync --source {source} --container #{deployer.test_shell_escape("my-container")} --destination #{deployer.test_shell_escape("sub/dir")}")
     end
 
     it "returns nil for az:// URL with an empty container" do

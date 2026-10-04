@@ -5,8 +5,9 @@ require "./hwaro"
 # Boehm reads GC_MARKERS and GC_INITIAL_HEAP_SIZE from the environment only
 # once, inside GC_init — which `Crystal.main` runs before any top-level code.
 # Redefining `fun main` is the only place early enough to influence them, so
-# the values are injected here via setenv (overwrite: 0 keeps any value the
-# user exported, preserving both env vars as escape hatches).
+# the values are injected here via setenv, each only after getenv finds it
+# unset (any value the user exported wins, preserving both env vars as
+# escape hatches).
 #
 # Why these defaults (measured on the harsh benchmark corpus, 3000 pages,
 # scripts/benchmark_run.cr, release binary, Apple M-series 14-core):
@@ -44,6 +45,28 @@ lib LibCExt
   fun strncmp(s1 : UInt8*, s2 : UInt8*, n : LibC::SizeT) : LibC::Int
 end
 
+# Windows: Crystal's wmain only mallocs before calling this `main`, so the
+# tuning works the same way there. The UCRT has getenv but no setenv;
+# _putenv_s sets both the CRT copy GC_init reads and the process
+# environment children inherit.
+{% if flag?(:windows) %}
+  lib LibC
+    fun getenv(name : Char*) : Char*
+    fun _putenv_s(name : Char*, value : Char*) : Int
+  end
+{% end %}
+
+# setenv(3) with overwrite. The GC variables are only set after a getenv
+# check, so a user-exported value is never clobbered.
+# Only ever called with literals, whose bytes are static: no allocation.
+private def gc_setenv(name : String, value : String) : Nil
+  {% if flag?(:windows) %}
+    LibC._putenv_s(name.to_unsafe, value.to_unsafe)
+  {% else %}
+    LibC.setenv(name.to_unsafe, value.to_unsafe, 1)
+  {% end %}
+end
+
 fun main(argc : Int32, argv : UInt8**) : Int32
   command = Pointer(UInt8).null
   memory_limited = !LibC.getenv("HWARO_MEMORYLIMIT").null?
@@ -63,14 +86,14 @@ fun main(argc : Int32, argv : UInt8**) : Int32
   if !command.null? && LibCExt.strcmp(command, "build") == 0
     set_markers = LibC.getenv("GC_MARKERS").null?
     set_heap = !memory_limited && LibC.getenv("GC_INITIAL_HEAP_SIZE").null?
-    LibC.setenv("GC_MARKERS", "1", 0) if set_markers
-    LibC.setenv("GC_INITIAL_HEAP_SIZE", "256M", 0) if set_heap
+    gc_setenv("GC_MARKERS", "1") if set_markers
+    gc_setenv("GC_INITIAL_HEAP_SIZE", "256M") if set_heap
     if set_markers && set_heap
-      LibC.setenv("HWARO_GC_TUNED", "mh", 1)
+      gc_setenv("HWARO_GC_TUNED", "mh")
     elsif set_markers
-      LibC.setenv("HWARO_GC_TUNED", "m", 1)
+      gc_setenv("HWARO_GC_TUNED", "m")
     elsif set_heap
-      LibC.setenv("HWARO_GC_TUNED", "h", 1)
+      gc_setenv("HWARO_GC_TUNED", "h")
     end
   end
 

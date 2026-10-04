@@ -357,13 +357,13 @@ module Hwaro
           # Resolve absolute paths for logo and background image
           logo_abs_path = nil
           if logo_path = ai.logo
-            abs = logo_path.starts_with?("/") ? logo_path : File.join(Dir.current, logo_path)
+            abs = File.expand_path(logo_path)
             logo_abs_path = abs if File.exists?(abs)
           end
 
           bg_abs_path = nil
           if bg_image_path = ai.background_image
-            abs = bg_image_path.starts_with?("/") ? bg_image_path : File.join(Dir.current, bg_image_path)
+            abs = File.expand_path(bg_image_path)
             bg_abs_path = abs if File.exists?(abs)
           end
 
@@ -1516,7 +1516,7 @@ module Hwaro
         # cached images forever.
         def self.asset_digest(path : String?) : String
           return "" unless path
-          abs = path.starts_with?("/") ? path : File.join(Dir.current, path)
+          abs = File.expand_path(path)
           return "" unless File.exists?(abs)
           Digest::SHA256.new.file(abs).hexfinal
         rescue IO::Error

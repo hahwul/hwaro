@@ -425,6 +425,7 @@ describe "build: output directory that already holds unrelated files" do
   # into "clearable" and wipe a foreign directory whose `.hwaro-dev` we
   # simply could not read.
   it "does not treat an unreadable .hwaro-dev as a serve marker" do
+    posix_only!("chmod can't make a file unreadable on Windows")
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         guard_project(dir)

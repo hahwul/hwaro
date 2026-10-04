@@ -73,7 +73,7 @@ module Hwaro
           raw = @config.build.output_dir
           if raw.nil?
             "public"
-          elsif Path[raw].absolute?
+          elsif Utils::PathUtils.absolute?(raw)
             Logger.warn "[build] output_dir #{raw.inspect} is an absolute path; platform configs need a project-relative directory. Using \"public\" — set a relative output_dir so the host publishes what hwaro built."
             "public"
           else

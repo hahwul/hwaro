@@ -400,6 +400,7 @@ describe Hwaro::Services::PlatformConfig do
       # so it is skipped here too; the backslash escape is exercised through
       # `[build] output_dir` instead.
       it "escapes TOML-special characters in netlify redirect from/to so the block stays parseable" do
+        posix_only!("`\\` in output_dir is a path separator on Windows")
         Dir.mktmpdir do |dir|
           Dir.cd(dir) do
             FileUtils.mkdir_p("content/posts")

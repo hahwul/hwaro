@@ -326,7 +326,7 @@ module Hwaro
 
         source_dir = Path[config.assets.source_dir].normalize.to_s
         return roots if source_dir.empty? || source_dir == "." || source_dir.starts_with?("..")
-        return roots if Path[source_dir].absolute?
+        return roots if Utils::PathUtils.absolute?(source_dir)
 
         output = Path[output_dir].normalize.to_s
         return roots if source_dir == output ||

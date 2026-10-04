@@ -222,15 +222,16 @@ describe Hwaro::Services::Initializer do
           home = File.join(dir, "home")
           Dir.mkdir_p(home)
           File.write(File.join(home, "notes.txt"), "keep")
-          original = ENV["HOME"]?
+          var = {{ flag?(:windows) ? "USERPROFILE" : "HOME" }}
+          original = ENV[var]?
           begin
-            ENV["HOME"] = home
+            ENV[var] = home
             err = expect_raises(Hwaro::HwaroError, /home directory/) do
               Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(path: home, clean: true))
             end
             err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
           ensure
-            original ? (ENV["HOME"] = original) : ENV.delete("HOME")
+            original ? (ENV[var] = original) : ENV.delete(var)
           end
           File.exists?(File.join(home, "notes.txt")).should be_true
         end

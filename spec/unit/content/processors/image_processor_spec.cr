@@ -130,6 +130,7 @@ describe Hwaro::Content::Processors::ImageProcessor do
     # different pixels, so a truncate-in-place writer would hand the reader the
     # new bytes.
     it "replaces an existing variant atomically instead of truncating it" do
+      posix_only!("Windows can't rename over a file that is open")
       Dir.mktmpdir do |dir|
         src = File.join(dir, "photo.png")
         dest = File.join(dir, "photo_32w.png")
@@ -158,6 +159,7 @@ describe Hwaro::Content::Processors::ImageProcessor do
     # Same invariant for the no-upscale branch, which copies the source
     # verbatim instead of encoding.
     it "replaces a copied too-small variant atomically" do
+      posix_only!("Windows can't rename over a file that is open")
       Dir.mktmpdir do |dir|
         src = File.join(dir, "small.png")
         dest = File.join(dir, "small_8w.png")

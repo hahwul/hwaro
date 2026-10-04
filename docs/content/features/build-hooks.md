@@ -203,6 +203,7 @@ This design ensures that critical setup tasks (pre-build) must succeed, while op
 
 ## Tips
 
+- **Windows**: hooks run through `cmd.exe` (`cmd /d /s /c`), not `sh`. `&&`, pipes and `npm`/`npx` work; POSIX-only commands (`rm -rf`, `command -v`, `./script.sh`) do not, even when hwaro runs from Git Bash. Call a shell explicitly instead: `powershell -File scripts/setup.ps1`, a `.cmd` script, or `bash scripts/setup.sh` with Git Bash on `PATH`. Keep each command on one line: `cmd /c` stops at the first line break.
 - **Keep hooks fast**: Slow hooks run on every full rebuild during `hwaro serve`. Consider caching or conditional execution.
 - **Use scripts for complexity**: For multi-step processes, write a shell script and call it from the hook: `hooks.pre = ["./scripts/setup.sh"]`
 - **Check dependencies**: Use `command -v` to check if tools are available before running them:

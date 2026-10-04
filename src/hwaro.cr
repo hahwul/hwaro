@@ -20,6 +20,7 @@
 require "option_parser"
 require "yaml"
 require "file_utils"
+require "./ext/windows_paths"
 require "crinja"
 require "./ext/crinja_resolve_fix"
 require "./ext/crinja_include_depth_fix"

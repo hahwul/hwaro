@@ -5,7 +5,7 @@ require "json"
 # human-readable `--profile` tables and the `--debug` site tree printed to
 # stdout ahead of the envelope and made it unparseable.
 describe "hwaro build --json contract" do
-  binary = File.expand_path("../../bin/hwaro", __DIR__)
+  binary = hwaro_binary
 
   it "keeps --profile and --debug reports off stdout" do
     unless File.exists?(binary)
