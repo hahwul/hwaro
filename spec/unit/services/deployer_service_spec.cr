@@ -103,7 +103,7 @@ describe Hwaro::Services::Deployer do
         target = Hwaro::Models::DeploymentTarget.new
         target.name = "cmd"
         # We use a simple command that writes to a file
-        target.command = "echo deployed > #{output_file}"
+        target.command = "echo deployed > #{Process.quote(output_file)}"
         config.deployment.targets << target
 
         deployer = Hwaro::Services::Deployer.new
@@ -1117,20 +1117,17 @@ describe "Deployer private helpers" do
 
   describe "#expand_placeholders" do
     it "replaces source, url, and target placeholders" do
-      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       target = Hwaro::Models::DeploymentTarget.new
       target.name = "prod"
       target.url = "s3://my-bucket"
 
       result = deployer.test_expand_placeholders("deploy {source} to {url} as {target}", "/tmp/out", target)
-      result.should contain("'/tmp/out'")
-      result.should contain("'s3://my-bucket'")
-      result.should contain("'prod'")
+      result.should eq("deploy #{deployer.test_shell_escape("/tmp/out")} to #{deployer.test_shell_escape("s3://my-bucket")} as #{deployer.test_shell_escape("prod")}")
     end
 
     it "shell-escapes placeholder values" do
-      posix_only!("sh single-quote escaping; Windows has its own spec below")
+      posix_only!("sh single-quote escaping; Windows quoting has its own specs above")
       deployer = Hwaro::Services::Deployer.new
       target = Hwaro::Models::DeploymentTarget.new
       target.name = "it's a test"
@@ -1154,19 +1151,17 @@ describe "Deployer private helpers" do
     # values: a source path containing a literal `{url}` had the target URL
     # spliced into it (breaking the shell quoting along the way).
     it "does not re-expand placeholder tokens inside expanded values" do
-      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       target = Hwaro::Models::DeploymentTarget.new
       target.name = "prod"
       target.url = "s3://my-bucket"
 
       result = deployer.test_expand_placeholders("echo {source}", "/tmp/src{url}dir", target)
-      result.should eq("echo '/tmp/src{url}dir'")
+      result.should eq("echo #{deployer.test_shell_escape("/tmp/src{url}dir")}")
       result.should_not contain("s3://my-bucket")
     end
 
     it "does not reject brace tokens that only appear inside expanded values" do
-      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       target = Hwaro::Models::DeploymentTarget.new
       target.name = "prod"
@@ -1175,7 +1170,7 @@ describe "Deployer private helpers" do
       # `{bucket}` lives in the VALUE, not the template — validation must not
       # flag it as an unknown placeholder.
       result = deployer.test_expand_placeholders("echo {source}", "/tmp/{bucket}", target)
-      result.should eq("echo '/tmp/{bucket}'")
+      result.should eq("echo #{deployer.test_shell_escape("/tmp/{bucket}")}")
     end
   end
 
@@ -1193,21 +1188,19 @@ describe "Deployer private helpers" do
     end
 
     it "returns az command for az:// URL with the container name inlined" do
-      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       result = deployer.test_auto_command_for_url("az://my-container", "/tmp")
       # The container name (uri.host) is inlined+shell-escaped; {url} would
       # otherwise expand to the full az:// URL, which the az CLI rejects.
-      result.should eq("az storage blob sync --source {source} --container 'my-container'")
+      result.should eq("az storage blob sync --source {source} --container #{deployer.test_shell_escape("my-container")}")
     end
 
     it "appends --destination for az:// URLs with a path prefix" do
-      posix_only!("sh single-quote escaping; Windows has its own spec below")
       deployer = Hwaro::Services::Deployer.new
       # az://container/sub/dir used to drop the prefix and deploy to the
       # container root.
       result = deployer.test_auto_command_for_url("az://my-container/sub/dir", "/tmp")
-      result.should eq("az storage blob sync --source {source} --container 'my-container' --destination 'sub/dir'")
+      result.should eq("az storage blob sync --source {source} --container #{deployer.test_shell_escape("my-container")} --destination #{deployer.test_shell_escape("sub/dir")}")
     end
 
     it "returns nil for az:// URL with an empty container" do

@@ -81,10 +81,10 @@ describe Hwaro::Utils::CommandRunner do
     end
 
     it "handles multiline output" do
-      result = Hwaro::Utils::CommandRunner.run("echo 'line1'; echo 'line2'")
+      # `&&` separates commands in both sh and cmd.exe (`;` doesn't in cmd).
+      result = Hwaro::Utils::CommandRunner.run("echo line1&& echo line2")
       result.success.should be_true
-      result.output.should contain("line1")
-      result.output.should contain("line2")
+      result.output.lines.map(&.strip).should eq(["line1", "line2"])
     end
   end
 

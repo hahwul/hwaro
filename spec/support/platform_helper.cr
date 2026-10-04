@@ -6,7 +6,8 @@ end
 
 # Marks the running example pending on Windows, where the POSIX behaviour it
 # pins (chmod-based permissions, renaming over an open file, `\` in a file
-# name, signals, `sh` syntax) doesn't exist.
+# name, signals, `sh` syntax) doesn't exist. `why` documents the call site;
+# Crystal's spec runner doesn't print pending messages.
 def posix_only!(why : String) : Nil
   {% if flag?(:windows) %}
     pending!("POSIX only: #{why}")

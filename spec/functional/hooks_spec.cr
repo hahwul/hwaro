@@ -81,7 +81,7 @@ describe "Hooks: External command execution" do
       base_url = "http://localhost"
 
       [build.hooks]
-      post = ["echo $PWD > pwd_output.txt"]
+      post = ["echo #{{{ flag?(:windows) ? "%CD%" : "$PWD" }}} > pwd_output.txt"]
       TOML
 
     build_site(
@@ -92,6 +92,8 @@ describe "Hooks: External command execution" do
       File.exists?("pwd_output.txt").should be_true
       pwd = File.read("pwd_output.txt").strip
       pwd.should_not be_empty
+      pwd.should_not start_with("$")
+      pwd.should_not start_with("%")
     end
   end
 end
@@ -132,9 +134,6 @@ describe "Hooks: Pre and post hooks combined" do
   end
 end
 
-# cmd.exe has no `mkdir -p` and keeps `'` in echo output.
-private MKDIR_AND_WRITE = {{ flag?(:windows) ? "mkdir static && echo generated> static/generated.txt" : "mkdir -p static && echo 'generated' > static/generated.txt" }}
-
 describe "Hooks: Hook creates files used by build" do
   it "pre hook can create files before build runs" do
     config = <<-TOML
@@ -142,7 +141,7 @@ describe "Hooks: Hook creates files used by build" do
       base_url = "http://localhost"
 
       [build.hooks]
-      pre = [#{MKDIR_AND_WRITE.inspect}]
+      pre = ["mkdir static && echo generated> static/generated.txt"]
       TOML
 
     build_site(

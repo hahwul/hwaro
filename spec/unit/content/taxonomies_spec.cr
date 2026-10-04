@@ -619,7 +619,6 @@ describe Hwaro::Content::Taxonomies do
     # (the index page writes fine) and `<deep>/tags/<245-byte slug>/index.html`
     # does not.
     it "reports a term the filesystem cannot store as a classified content error" do
-      posix_only!("Windows paths stop at MAX_PATH, long before a 245-byte slug")
       config = Hwaro::Models::Config.new
       config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
 

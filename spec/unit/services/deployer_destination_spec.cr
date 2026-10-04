@@ -361,7 +361,7 @@ describe Hwaro::Services::Deployer do
 
   describe "review follow-ups" do
     it "checks a placeholder the template quotes by its expanded value" do
-      posix_only!("`$(`, `;` can't appear in a Windows file name")
+      posix_only!("the setup nests a drive path, colon included, inside a directory name")
       Dir.mktmpdir do |dir|
         src = dest_spec_site(File.join(dir, "x$(touch #{dir}/PWNED)"))
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"])
