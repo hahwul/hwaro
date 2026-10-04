@@ -12,7 +12,11 @@
 # Windows the object must be MSVC-compatible, so it is built with `clang-cl`
 # (shipped with LLVM) rather than whatever `cc` is on PATH (often MinGW
 # gcc), and `-Zl` leaves out the CRT default-lib directive: the Crystal link
-# picks the static or DLL CRT itself.
+# picks the static or DLL CRT itself. A CC you set is used as given. The
+# compiler's stdout goes to stderr: only the object path may reach ldflags.
+# Windows hands ldflags to the linker in a response file, where the quoted
+# path survives a space (`C:\Users\First Last\...`); a POSIX shell would
+# keep the quotes literally.
 #
 # stb's PNG writer deflates through zlib (the STBIW_ZLIB_COMPRESS block in
 # stb_impl.c), so this object needs libz at link time. `lib_z` carries the
@@ -20,7 +24,7 @@
 # without emitting a second `-lz` (the linker warns about duplicates).
 require "lib_z"
 
-@[Link(ldflags: "`sh -c 'D=\"#{__DIR__}\"; OBJ=$D/stb_impl.o; STALE=0; if [ ! -f \"$OBJ\" ]; then STALE=1; else for f in $D/stb_impl.c $D/stb_image.h $D/stb_image_write.h $D/stb_image_resize2.h $D/stb_truetype.h; do [ \"$f\" -nt \"$OBJ\" ] && STALE=1; done; fi; case $(uname -s) in MINGW*|MSYS*|CYGWIN*) CC=\"${CC:-clang-cl} -Zl\";; *) CC=${CC:-cc};; esac; [ $STALE -eq 1 ] && $CC -c -O2 -o \"$OBJ\" \"$D/stb_impl.c\"; echo \"$OBJ\"'`")]
+@[Link(ldflags: "`sh -c 'D=\"#{__DIR__}\"; OBJ=\"$D/stb_impl.o\"; STALE=0; if [ ! -f \"$OBJ\" ]; then STALE=1; else for f in \"$D/stb_impl.c\" \"$D/stb_image.h\" \"$D/stb_image_write.h\" \"$D/stb_image_resize2.h\" \"$D/stb_truetype.h\"; do [ \"$f\" -nt \"$OBJ\" ] && STALE=1; done; fi; case $(uname -s) in MINGW*|MSYS*|CYGWIN*) CC=${CC:-clang-cl -Zl}; Q=\\\";; *) CC=${CC:-cc}; Q=;; esac; [ $STALE -eq 1 ] && $CC -c -O2 -o \"$OBJ\" \"$D/stb_impl.c\" >&2; echo \"$Q$OBJ$Q\"'`")]
 lib LibStb
   # --- stb_image ---
   fun stbi_load(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, channels_in_file : LibC::Int*, desired_channels : LibC::Int) : UInt8*

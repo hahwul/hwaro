@@ -9,6 +9,12 @@
  * Source: https://github.com/nothings/stb
  */
 
+/* Windows: Crystal passes UTF-8 paths; without these stb opens them with
+ * fopen in the ANSI code page, so a Korean slug or a non-ASCII user profile
+ * can't be read or written. No effect elsewhere. */
+#define STBI_WINDOWS_UTF8
+#define STBIW_WINDOWS_UTF8
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -35,9 +41,16 @@
  * stay valid and RENDER_REVISION deliberately does NOT move.
  */
 #include <stdlib.h>
-#if defined(__has_include) && !__has_include(<zlib.h>)
 /* Windows: Crystal's toolchain ships zlib's library but not its header.
- * These are the two zlib 1.x entry points used below, verbatim. */
+ * (Nested: a preprocessor without __has_include can't parse it in an
+ * `&&` with the defined() test.) */
+#if defined(_WIN32) && defined(__has_include)
+#if !__has_include(<zlib.h>)
+#define HWARO_NO_ZLIB_H 1
+#endif
+#endif
+#ifdef HWARO_NO_ZLIB_H
+/* The two zlib 1.x entry points used below, verbatim. */
 typedef unsigned long uLong;
 typedef uLong uLongf;
 typedef unsigned char Bytef;

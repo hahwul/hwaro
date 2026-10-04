@@ -5,8 +5,9 @@ require "./hwaro"
 # Boehm reads GC_MARKERS and GC_INITIAL_HEAP_SIZE from the environment only
 # once, inside GC_init — which `Crystal.main` runs before any top-level code.
 # Redefining `fun main` is the only place early enough to influence them, so
-# the values are injected here via setenv (overwrite: 0 keeps any value the
-# user exported, preserving both env vars as escape hatches).
+# the values are injected here via setenv, each only after getenv finds it
+# unset (any value the user exported wins, preserving both env vars as
+# escape hatches).
 #
 # Why these defaults (measured on the harsh benchmark corpus, 3000 pages,
 # scripts/benchmark_run.cr, release binary, Apple M-series 14-core):
@@ -39,53 +40,69 @@ require "./hwaro"
 # can scrub them from the child-process environment after GC_init consumed
 # them (setenv would otherwise leak build-shaped GC tuning into user hook
 # and deploy commands).
-#
-# ponytail: POSIX only — Windows keeps Boehm's stock tuning (getenv/setenv
-# are not in Crystal's Windows LibC); port via _putenv_s if Windows builds
-# need the speedup.
-{% unless flag?(:windows) %}
-  lib LibCExt
-    fun strcmp(s1 : UInt8*, s2 : UInt8*) : LibC::Int
-    fun strncmp(s1 : UInt8*, s2 : UInt8*, n : LibC::SizeT) : LibC::Int
-  end
+lib LibCExt
+  fun strcmp(s1 : UInt8*, s2 : UInt8*) : LibC::Int
+  fun strncmp(s1 : UInt8*, s2 : UInt8*, n : LibC::SizeT) : LibC::Int
+end
 
-  fun main(argc : Int32, argv : UInt8**) : Int32
-    command = Pointer(UInt8).null
-    memory_limited = !LibC.getenv("HWARO_MEMORYLIMIT").null?
-    i = 1
-    while i < argc
-      arg = argv[i]
-      if LibCExt.strncmp(arg, "--memory-limit", 14) == 0
-        memory_limited = true
-      elsif command.null? && LibCExt.strcmp(arg, "-q") != 0 && LibCExt.strcmp(arg, "--quiet") != 0
-        # First non-quiet argument is the command name (mirrors Runner#run,
-        # which strips -q/--quiet globally and then shifts the command).
-        command = arg
-      end
-      i += 1
-    end
-
-    if !command.null? && LibCExt.strcmp(command, "build") == 0
-      set_markers = LibC.getenv("GC_MARKERS").null?
-      set_heap = !memory_limited && LibC.getenv("GC_INITIAL_HEAP_SIZE").null?
-      LibC.setenv("GC_MARKERS", "1", 0) if set_markers
-      LibC.setenv("GC_INITIAL_HEAP_SIZE", "256M", 0) if set_heap
-      if set_markers && set_heap
-        LibC.setenv("HWARO_GC_TUNED", "mh", 1)
-      elsif set_markers
-        LibC.setenv("HWARO_GC_TUNED", "m", 1)
-      elsif set_heap
-        LibC.setenv("HWARO_GC_TUNED", "h", 1)
-      end
-    end
-
-    # Crystal's Unix main shim ends with LibC.exit so the main fiber may
-    # resume on any thread of the parallel execution context; a plain return
-    # here would re-enter the C startup frame from whichever thread ran the
-    # final continuation. Mirror the shim, never return.
-    LibC.exit(Crystal.main(argc, argv))
+# Windows: Crystal's wmain only mallocs before calling this `main`, so the
+# tuning works the same way there. The UCRT has getenv but no setenv;
+# _putenv_s sets both the CRT copy GC_init reads and the process
+# environment children inherit.
+{% if flag?(:windows) %}
+  lib LibC
+    fun getenv(name : Char*) : Char*
+    fun _putenv_s(name : Char*, value : Char*) : Int
   end
 {% end %}
+
+# setenv(3) with overwrite. The GC variables are only set after a getenv
+# check, so a user-exported value is never clobbered.
+# Only ever called with literals, whose bytes are static: no allocation.
+private def gc_setenv(name : String, value : String) : Nil
+  {% if flag?(:windows) %}
+    LibC._putenv_s(name.to_unsafe, value.to_unsafe)
+  {% else %}
+    LibC.setenv(name.to_unsafe, value.to_unsafe, 1)
+  {% end %}
+end
+
+fun main(argc : Int32, argv : UInt8**) : Int32
+  command = Pointer(UInt8).null
+  memory_limited = !LibC.getenv("HWARO_MEMORYLIMIT").null?
+  i = 1
+  while i < argc
+    arg = argv[i]
+    if LibCExt.strncmp(arg, "--memory-limit", 14) == 0
+      memory_limited = true
+    elsif command.null? && LibCExt.strcmp(arg, "-q") != 0 && LibCExt.strcmp(arg, "--quiet") != 0
+      # First non-quiet argument is the command name (mirrors Runner#run,
+      # which strips -q/--quiet globally and then shifts the command).
+      command = arg
+    end
+    i += 1
+  end
+
+  if !command.null? && LibCExt.strcmp(command, "build") == 0
+    set_markers = LibC.getenv("GC_MARKERS").null?
+    set_heap = !memory_limited && LibC.getenv("GC_INITIAL_HEAP_SIZE").null?
+    gc_setenv("GC_MARKERS", "1") if set_markers
+    gc_setenv("GC_INITIAL_HEAP_SIZE", "256M") if set_heap
+    if set_markers && set_heap
+      gc_setenv("HWARO_GC_TUNED", "mh")
+    elsif set_markers
+      gc_setenv("HWARO_GC_TUNED", "m")
+    elsif set_heap
+      gc_setenv("HWARO_GC_TUNED", "h")
+    end
+  end
+
+  # Crystal's Unix main shim ends with LibC.exit so the main fiber may
+  # resume on any thread of the parallel execution context; a plain return
+  # here would re-enter the C startup frame from whichever thread ran the
+  # final continuation. Mirror the shim, never return.
+  LibC.exit(Crystal.main(argc, argv))
+end
 
 # GC_init has consumed the injected variables above; scrub exactly the ones
 # this process injected (HWARO_GC_TUNED says which) so spawned children —

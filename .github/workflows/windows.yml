@@ -6,7 +6,7 @@ name: Windows
 # support is brought up.
 on:
   pull_request:
-    paths:
+    paths: &paths
       - .github/workflows/windows.yml
       - shard.yml
       - shard.lock
@@ -15,18 +15,14 @@ on:
       - .gitattributes
   push:
     branches: [main]
-    paths:
-      - .github/workflows/windows.yml
-      - shard.yml
-      - shard.lock
-      - "**/*.cr"
-      - src/ext/**
-      - .gitattributes
+    paths: *paths
   workflow_dispatch:
 
+# As in ci.yml: a PR's next push supersedes it, but every push to main gets
+# its own Windows result.
 concurrency:
   group: windows-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -59,7 +55,7 @@ jobs:
           ./bin/hwaro.exe build -i docs
           for out in "$RUNNER_TEMP/site/public" docs/public; do
             test -f "$out/index.html"
-            if grep -rlE '(href|src)="[^"]*\\|<loc>[^<]*\\' "$out" --include='*.html' --include='*.xml'; then
+            if grep -rlE '(href|src)="[^"]*\\|og:(url|image)" content="[^"]*\\|<(loc|link|guid)>[^<]*\\' "$out" --include='*.html' --include='*.xml'; then
               echo "::error::backslash in a generated URL under $out"
               exit 1
             fi

@@ -521,6 +521,19 @@ module Hwaro
         @output_lock = nil
       end
 
+      # Socket errors arrive as WSA codes on Windows, errnos elsewhere.
+      {% if flag?(:windows) %}
+        private BIND_ADDR_NOT_AVAILABLE = WinError::WSAEADDRNOTAVAIL
+        private BIND_ACCESS_DENIED      = WinError::WSAEACCES
+        # No privileged ports on Windows; WSAEACCES there is an excluded port
+        # range (Hyper-V/WSL2/Docker often reserve 3000) or an exclusive bind.
+        private BIND_ACCESS_DENIED_HINT = "Port %d is reserved or held exclusively on this system (see `netsh int ipv4 show excludedportrange protocol=tcp`). Try -p/--port with a different value."
+      {% else %}
+        private BIND_ADDR_NOT_AVAILABLE = Errno::EADDRNOTAVAIL
+        private BIND_ACCESS_DENIED      = Errno::EACCES
+        private BIND_ACCESS_DENIED_HINT = "Port %d needs elevated privileges on this system. Try -p/--port with a value above 1023."
+      {% end %}
+
       # Bind the dev server's listening socket, classifying every way that can
       # fail. Extracted from `run_with_options` so specs can drive the real
       # bind without standing up a whole serve session.
@@ -538,15 +551,6 @@ module Hwaro
       # EADDRNOTAVAIL, and a privileged port (`-p 80`) with EACCES — both
       # arrive as `Socket::BindError`, so both used to get the "another
       # process is listening, try -p/--port" hint, which is wrong for each.
-      # Socket errors arrive as WSA codes on Windows, errnos elsewhere.
-      {% if flag?(:windows) %}
-        private BIND_ADDR_NOT_AVAILABLE = WinError::WSAEADDRNOTAVAIL
-        private BIND_ACCESS_DENIED      = WinError::WSAEACCES
-      {% else %}
-        private BIND_ADDR_NOT_AVAILABLE = Errno::EADDRNOTAVAIL
-        private BIND_ACCESS_DENIED      = Errno::EACCES
-      {% end %}
-
       protected def bind_dev_server(server : HTTP::Server, host : String, port : Int32)
         server.bind_tcp host, port
       rescue ex : Socket::BindError
@@ -564,7 +568,7 @@ module Hwaro
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
             message: message,
-            hint: "Port #{port} needs elevated privileges on this system. Try -p/--port with a value above 1023.",
+            hint: BIND_ACCESS_DENIED_HINT % port,
           )
         else
           raise Hwaro::HwaroError.new(
