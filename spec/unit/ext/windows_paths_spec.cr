@@ -16,7 +16,6 @@ describe Hwaro::WindowsPaths do
       File.join("a", "b", "c").should eq("a/b/c")
       File.expand_path("x").should_not contain('\\')
       Dir.current.should_not contain('\\')
-      Dir.tempdir.should_not contain('\\')
       Path["content\\blog\\post.md"].relative_to("content").to_s.should eq("blog/post.md")
     end
 

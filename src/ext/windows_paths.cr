@@ -99,10 +99,6 @@ end
     def self.current : String
       Hwaro::WindowsPaths.to_slash(previous_def)
     end
-
-    def self.tempdir : String
-      Hwaro::WindowsPaths.to_slash(previous_def)
-    end
   end
 
   struct Path
