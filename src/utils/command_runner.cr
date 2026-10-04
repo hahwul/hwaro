@@ -22,11 +22,12 @@ module Hwaro
       # The command line to hand `Process` with `shell: true`. That is
       # `sh -c` on POSIX but a bare CreateProcess on Windows: no `&&`, pipes
       # or redirects, and no `.cmd` shims (`npm`, `npx`). Wrap it in cmd.exe
-      # there, the way Node's `shell: true` does (`/s` strips the outer
-      # quotes, `/d` skips AutoRun).
+      # there, the way Node's `shell: true` does: %ComSpec% (not a `cmd.exe`
+      # found in the current directory), `/s` strips the outer quotes, `/d`
+      # skips AutoRun.
       def self.shell_command(command : String) : String
         {% if flag?(:windows) %}
-          %(cmd.exe /d /s /c "#{command}")
+          %("#{ENV["ComSpec"]? || "cmd.exe"}" /d /s /c "#{command}")
         {% else %}
           command
         {% end %}
@@ -51,7 +52,9 @@ module Hwaro
           success: status.success?,
           output: stdout.to_s,
           error: stderr.to_s,
-          exit_code: status.exit_code
+          # A killed or crashed hook (or, on Windows, a negative exit code)
+          # has no exit code; `exit_code` would raise and abort as internal.
+          exit_code: status.exit_code? || -1
         )
       end
 

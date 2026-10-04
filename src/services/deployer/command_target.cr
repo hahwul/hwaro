@@ -10,7 +10,8 @@ module Hwaro
       # Shell metacharacters that indicate potentially dangerous commands.
       # These are not inherently bad but warrant user attention when present
       # in deploy commands, especially from remote scaffolds.
-      DANGEROUS_SHELL_PATTERNS = /[|;&`$]|\bsudo\b|\brm\s+-rf\b/
+      # Windows adds cmd.exe's `%VAR%` expansion and `^` escape.
+      DANGEROUS_SHELL_PATTERNS = {% if flag?(:windows) %} /[|;&`$%^]|\bsudo\b|\brm\s+-rf\b/ {% else %} /[|;&`$]|\bsudo\b|\brm\s+-rf\b/ {% end %}
 
       private def deploy_via_command(
         target : Models::DeploymentTarget,
@@ -26,6 +27,9 @@ module Hwaro
           # not blamed on the source or destination.
           classify_io_errors(target) { require_non_empty_source!(source_dir, effective) }
         end
+        # Native Windows tools (xcopy, robocopy, cmd built-ins) read the
+        # `/` in `C:/site/public` as a switch.
+        source_dir = source_dir.gsub('/', '\\') if {{ flag?(:windows) }}
         expanded = expand_placeholders(command, source_dir, target)
         env = {
           "HWARO_DEPLOY_TARGET" => target.name,
@@ -267,8 +271,7 @@ module Hwaro
       private def shell_escape(value : String) : String
         sanitized = value.gsub("\0", "")
         {% if flag?(:windows) %}
-          quoted = sanitized.delete('"')
-          %("#{quoted}#{"\\" * (quoted.size - quoted.rstrip('\\').size)}")
+          %("#{sanitized.delete('"').sub(/(\\+)\z/, "\\1\\1")}")
         {% else %}
           "'" + sanitized.gsub("'", "'\\''") + "'"
         {% end %}

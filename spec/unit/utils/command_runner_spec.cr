@@ -89,8 +89,8 @@ describe Hwaro::Utils::CommandRunner do
 
   describe ".shell_command" do
     {% if flag?(:windows) %}
-      it "runs the command through cmd.exe" do
-        Hwaro::Utils::CommandRunner.shell_command("npm run build").should eq(%(cmd.exe /d /s /c "npm run build"))
+      it "runs the command through %ComSpec%" do
+        Hwaro::Utils::CommandRunner.shell_command("npm run build").should eq(%("#{ENV["ComSpec"]? || "cmd.exe"}" /d /s /c "npm run build"))
       end
 
       it "gives hooks cmd.exe's && chaining" do
@@ -100,8 +100,12 @@ describe Hwaro::Utils::CommandRunner do
         result.output.should contain("two")
       end
     {% else %}
-      it "passes the command through to sh unchanged" do
-        Hwaro::Utils::CommandRunner.shell_command("npm run build").should eq("npm run build")
+      # `status.exit_code` raises for a signalled child; that used to turn a
+      # killed hook into an internal error instead of a failed hook.
+      it "reports a killed command as a failure instead of raising" do
+        result = Hwaro::Utils::CommandRunner.run("kill -9 $$")
+        result.success.should be_false
+        result.exit_code.should eq(-1)
       end
     {% end %}
   end

@@ -114,7 +114,7 @@ sync removes it before copying the new one, and the plan lists it as a
 delete. If it holds anything the sync keeps (a hidden directory, a path
 outside `include`/`exclude`), the deploy refuses before writing anything.
 
-**Command targets** run through `sh`. Their output streams as the tool runs,
+**Command targets** run through `sh` (`cmd.exe` on Windows). Their output streams as the tool runs,
 stderr included. On an interactive terminal the tool can read your input (a
 login or confirmation prompt); in pipes, CI, `--quiet` and `--json` runs stdin
 is closed. The command also gets `HWARO_DEPLOY_TARGET`, `HWARO_DEPLOY_URL` and
@@ -127,6 +127,11 @@ the placeholder stands on its own (`rsync -a {source}/ host:`). Do not wrap a
 placeholder in quotes of your own (`"{source}"`). That undoes the quoting, so
 hwaro checks the expanded value for shell metacharacters and asks for
 confirmation when it finds any.
+
+On Windows the command runs through `cmd.exe` instead of `sh`. Placeholder
+values are double-quoted, since `cmd.exe` has no single quotes, and
+`{source}` uses `\` separators. `cmd.exe` still expands `%NAME%` inside
+double quotes, so `%` and `^` count as metacharacters there too.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

@@ -203,6 +203,7 @@ hooks.post = [
 
 ## 팁
 
+- **Windows**: 훅은 `sh`가 아니라 `cmd.exe`(`cmd /d /s /c`)로 실행됩니다. `&&`, 파이프, `npm`/`npx`는 동작하지만, POSIX 전용 명령(`rm -rf`, `command -v`, `./script.sh`)은 hwaro를 Git Bash 터미널에서 실행할 때만 동작합니다. `.cmd`나 PowerShell 스크립트(`powershell -File scripts/setup.ps1`)를 권장합니다. `cmd /c`는 첫 줄바꿈에서 멈추므로 명령은 한 줄로 작성하세요.
 - **훅은 빠르게 유지**: 느린 훅은 `hwaro serve` 중 전체 재빌드마다 실행됩니다. 캐싱이나 조건부 실행을 고려합니다.
 - **복잡한 작업은 스크립트로**: 여러 단계가 필요하면 셸 스크립트를 작성해 훅에서 호출합니다: `hooks.pre = ["./scripts/setup.sh"]`
 - **의존성 확인**: 도구를 실행하기 전에 `command -v`로 사용 가능 여부를 확인합니다:
