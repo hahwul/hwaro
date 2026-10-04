@@ -98,6 +98,7 @@ describe "exporter regressions" do
     # Review finding 5: the exporter must agree with the importer twin —
     # names from `Dir.each_child` are single components, so no sanitising.
     it "preserves a backslash in a legitimate asset filename" do
+      posix_only!("`\\` can't appear in a Windows file name")
       Dir.mktmpdir do |dir|
         bundle_dir = File.join(dir, "content", "posts", "bundle")
         FileUtils.mkdir_p(bundle_dir)

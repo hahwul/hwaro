@@ -116,8 +116,8 @@ describe "Hooks: Pre and post hooks combined" do
       base_url = "http://localhost"
 
       [build.hooks]
-      pre = ["date +%s > pre_timestamp.txt"]
-      post = ["date +%s > post_timestamp.txt"]
+      pre = ["echo pre > pre_timestamp.txt"]
+      post = ["echo post > post_timestamp.txt"]
       TOML
 
     build_site(
@@ -132,6 +132,9 @@ describe "Hooks: Pre and post hooks combined" do
   end
 end
 
+# cmd.exe has no `mkdir -p` and keeps `'` in echo output.
+private MKDIR_AND_WRITE = {{ flag?(:windows) ? "mkdir static && echo generated> static/generated.txt" : "mkdir -p static && echo 'generated' > static/generated.txt" }}
+
 describe "Hooks: Hook creates files used by build" do
   it "pre hook can create files before build runs" do
     config = <<-TOML
@@ -139,7 +142,7 @@ describe "Hooks: Hook creates files used by build" do
       base_url = "http://localhost"
 
       [build.hooks]
-      pre = ["mkdir -p static && echo 'generated' > static/generated.txt"]
+      pre = [#{MKDIR_AND_WRITE.inspect}]
       TOML
 
     build_site(

@@ -12,6 +12,7 @@ private def new_builder : Hwaro::Core::Build::Builder
 end
 
 private def run_write_failure_build(parallel : Bool) : Hwaro::HwaroError
+  posix_only!("chmod can't make a directory unwritable on Windows")
   Dir.mktmpdir do |dir|
     Dir.cd(dir) do
       File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")

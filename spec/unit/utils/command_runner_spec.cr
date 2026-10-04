@@ -33,7 +33,7 @@ describe Hwaro::Utils::CommandRunner do
 
   describe ".run" do
     it "executes a successful command" do
-      result = Hwaro::Utils::CommandRunner.run("echo 'hello'")
+      result = Hwaro::Utils::CommandRunner.run("echo hello")
       result.success.should be_true
       result.output.strip.should eq("hello")
       result.exit_code.should eq(0)
@@ -74,6 +74,7 @@ describe Hwaro::Utils::CommandRunner do
     end
 
     it "handles commands with special characters" do
+      posix_only!("sh single quotes")
       result = Hwaro::Utils::CommandRunner.run("echo 'hello world'")
       result.success.should be_true
       result.output.strip.should eq("hello world")

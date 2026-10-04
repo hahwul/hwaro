@@ -400,6 +400,7 @@ describe Hwaro::Utils::PathUtils do
 
   describe ".case_folding_fs?" do
     it "answers case-sensitive for a path with no ASCII letters to flip" do
+      posix_only!("every Windows absolute path starts with a drive letter")
       Hwaro::Utils::PathUtils.case_folding_fs?("/").should be_false
     end
 

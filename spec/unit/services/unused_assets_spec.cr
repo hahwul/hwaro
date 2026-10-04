@@ -638,6 +638,7 @@ describe Hwaro::Services::UnusedAssets do
       end
 
       it "skips (with a warning) an asset whose file name is not valid UTF-8" do
+        posix_only!("Windows file names are always valid Unicode")
         Dir.mktmpdir do |dir|
           content_dir = File.join(dir, "content")
           static_dir = File.join(dir, "static")

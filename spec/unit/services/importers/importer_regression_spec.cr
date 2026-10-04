@@ -296,6 +296,7 @@ describe "importer regressions" do
     # split on `\`, renaming a legitimate file and leaving the very reference
     # the copy exists to repair still broken.
     it "preserves a backslash in a legitimate asset filename" do
+      posix_only!("`\\` can't appear in a Windows file name")
       Dir.mktmpdir do |dir|
         bundle_dir = File.join(dir, "content", "posts", "bundle")
         FileUtils.mkdir_p(bundle_dir)

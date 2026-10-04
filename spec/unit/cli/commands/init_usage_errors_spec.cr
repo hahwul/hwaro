@@ -155,6 +155,7 @@ describe "hwaro init classified usage errors" do
     # made unwritable mid-run) still produced a bare `Error:` and exit 1 —
     # the exact inconsistency the classification was meant to close.
     it "raises HwaroError(HWARO_E_IO) when a write fails after the target dir exists" do
+      posix_only!("chmod can't make a directory unwritable on Windows")
       Dir.mktmpdir do |dir|
         target = File.join(dir, "site")
         # The target directory exists and is empty, so init gets past both the

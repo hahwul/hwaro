@@ -411,9 +411,8 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     # stbi_write_png. Writing into a read-only directory makes the write fail;
     # render_png must return false (not raise) and leave no file behind.
     it "returns false without raising when the png cannot be written" do
-      {% if flag?(:windows) %}
-        next # chmod does not make a directory unwritable on Windows
-      {% else %}
+      posix_only!("chmod can't make a directory unwritable on Windows")
+      {% unless flag?(:windows) %}
         next if LibC.getuid == 0 # root bypasses chmod-based unwritability
       {% end %}
 

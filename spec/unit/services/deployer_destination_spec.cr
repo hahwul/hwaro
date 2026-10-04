@@ -223,6 +223,7 @@ describe Hwaro::Services::Deployer do
 
   describe "command targets" do
     it "reports a signal-terminated command as a classified failure" do
+      posix_only!("no signals on Windows")
       Dir.mktmpdir do |dir|
         src = dest_spec_site(dir)
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"], force: true)
@@ -238,6 +239,7 @@ describe Hwaro::Services::Deployer do
     end
 
     it "shows the command's stderr even when it succeeds" do
+      posix_only!("sh syntax (printf, >&2)")
       Dir.mktmpdir do |dir|
         src = dest_spec_site(dir)
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"], force: true)
@@ -264,6 +266,7 @@ describe Hwaro::Services::Deployer do
     end
 
     it "leaves shell ${VAR} expansion to the shell instead of rejecting it" do
+      posix_only!("sh single-quote escaping")
       Dir.mktmpdir do |dir|
         src = dest_spec_site(dir)
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"], dry_run: true)
@@ -358,6 +361,7 @@ describe Hwaro::Services::Deployer do
 
   describe "review follow-ups" do
     it "checks a placeholder the template quotes by its expanded value" do
+      posix_only!("`$(`, `;` can't appear in a Windows file name")
       Dir.mktmpdir do |dir|
         src = dest_spec_site(File.join(dir, "x$(touch #{dir}/PWNED)"))
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"])
@@ -372,6 +376,7 @@ describe Hwaro::Services::Deployer do
     end
 
     it "still expands ${source} like {source}" do
+      posix_only!("sh single-quote escaping")
       Dir.mktmpdir do |dir|
         src = dest_spec_site(dir)
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"], dry_run: true)
@@ -447,6 +452,7 @@ describe Hwaro::Services::Deployer do
     end
 
     it "keeps draining a command whose stderr can no longer be echoed" do
+      posix_only!("sh syntax")
       Dir.mktmpdir do |dir|
         src = dest_spec_site(dir)
         sentinel = File.join(dir, "finished")

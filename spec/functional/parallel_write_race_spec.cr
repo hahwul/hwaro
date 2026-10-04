@@ -64,6 +64,7 @@ end
 
 describe "Serve watcher file copies" do
   it "replaces a static file atomically instead of truncating it in place" do
+    posix_only!("Windows can't rename over a file that is open")
     Dir.mktmpdir do |dir|
       static_dir = File.join(dir, "static")
       output_dir = File.join(dir, "public")

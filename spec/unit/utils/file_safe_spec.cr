@@ -216,6 +216,7 @@ describe Hwaro::Utils::FileSafe do
     # truncate-and-stream `FileUtils.cp` this replaces. Both revisions are the
     # same length so only atomicity can satisfy the assertion.
     it "replaces an existing destination without truncating it in place" do
+      posix_only!("Windows can't rename over a file that is open")
       Dir.mktmpdir do |root|
         src = File.join(root, "src.css")
         dest = File.join(root, "dest.css")

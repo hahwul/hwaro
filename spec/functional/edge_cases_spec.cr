@@ -610,6 +610,7 @@ describe "Edge Cases: Duplicate output path detection" do
   # Windows, and browsers rewrite it to `/` inside a URL path — so it too used
   # to split into directories and clobber the real page.
   it "refuses a page whose URL contains a backslash" do
+    posix_only!("`\\` is a path separator on Windows, so the setup can't create both pages")
     log = with_captured_log do
       build_site(
         BASIC_CONFIG,

@@ -163,6 +163,7 @@ describe Hwaro::Core::Build::Phases::Write do
     # re-copy must keep seeing one complete revision. Both revisions have the
     # same length, so only atomicity can satisfy it.
     it "replaces a raw file atomically instead of truncating it in place" do
+      posix_only!("Windows can't rename over a file that is open")
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           FileUtils.mkdir_p("content")
@@ -327,6 +328,7 @@ describe Hwaro::Core::Build::Phases::Write do
     # re-copied on every serve rebuild while the browser streams them, and
     # FileUtils.cp truncated the live destination before streaming into it.
     it "replaces a changed bundle asset atomically instead of truncating it" do
+      posix_only!("Windows can't rename over a file that is open")
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           FileUtils.mkdir_p("content/blog/post")

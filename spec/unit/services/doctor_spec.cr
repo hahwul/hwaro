@@ -856,6 +856,7 @@ describe Hwaro::Services::Doctor do
       end
 
       it "preserves file permissions when rewriting config.toml" do
+        posix_only!("Windows has no POSIX permission bits")
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
           File.write(config_path, %(title = "S"\nbase_url = "https://example.com/"\n))
