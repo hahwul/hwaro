@@ -348,16 +348,22 @@ module Hwaro
         STANDALONE_LINE_RE = /\A(?: {0,3}>[ \t]?)*(?: {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)| {0,3}(?:=+|-+|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})[ \t]*\r?\n?\z)/
         # One blockquote marker, as TableParser strips it for a quoted table.
         QUOTE_PREFIX_RE = /\A {0,3}> ?/
-        # A footnote definition starts a new block, as a list item does.
-        FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:/
+        # A footnote definition starts a new block, as a list item does. Same
+        # shape preprocess_footnotes extracts (`FOOTNOTE_DEF_RE` there).
+        FOOTNOTE_DEF_RE = /\A\[\^[^\]]+\]:[^\n]/
+        # The blockquote markers a line opens with.
+        QUOTE_MARKERS_RE = /\A(?: {0,3}>[ \t]?)*/
 
         # The walk shared by `rewrite` and `each_link`. Fenced and indented
         # code and raw HTML block lines (FenceTracker) pass through; the rest
         # is matched one chunk at a time: the lines of one paragraph or list
         # item (a chunk ends at a blank line and before a list marker or a
-        # footnote definition; STANDALONE_LINE_RE lines and the rows of a
-        # table TableParser would build are chunks of their own), so a code
-        # span can cross a line break but not a block.
+        # footnote definition, after a definition at the first line its parser
+        # does not continue it with (anything not indented by a tab or four
+        # spaces), and before a line quoted deeper than the chunk began;
+        # STANDALONE_LINE_RE lines and the rows of a table TableParser would
+        # build are chunks of their own), so a code span can cross a line
+        # break but not a block.
         # Code/comment matches pass through; every other match is replaced
         # by the block's result (nil keeps it).
         private def walk(content : String, re : Regex, & : Regex::MatchData -> String?) : String
@@ -365,22 +371,31 @@ module Hwaro
           chunk = String::Builder.new
           lines = content.lines(chomp: false)
           in_table = false
+          in_footnote = false
+          chunk_quote = 0
           String.build(content.bytesize) do |io|
             lines.each_with_index do |line, i|
               verbatim = tracker.fence_line?(line) || tracker.html_block_line?
               in_table = !verbatim && table_line?(line, lines[i + 1]?, in_table)
               standalone = !verbatim && (in_table || STANDALONE_LINE_RE.matches?(line))
-              if verbatim || standalone || line.blank? || tracker.list_item_line? || FOOTNOTE_DEF_RE.matches?(line)
+              blank = line.blank?
+              footnote = FOOTNOTE_DEF_RE.matches?(line)
+              indented = line.starts_with?("    ") || line.starts_with?('\t')
+              quote = QUOTE_MARKERS_RE.match(line).try(&.[0].count('>')) || 0
+              if verbatim || standalone || blank || tracker.list_item_line? || footnote ||
+                 (in_footnote && !indented) || (!chunk.empty? && quote > chunk_quote)
                 unless chunk.empty?
                   io << transform(chunk.to_s, re) { |md| yield md }
                   chunk = String::Builder.new
                 end
               end
-              if verbatim || line.blank?
+              in_footnote = footnote || (in_footnote && (blank || indented))
+              if verbatim || blank
                 io << line
               elsif standalone
                 io << transform(line, re) { |md| yield md }
               else
+                chunk_quote = quote if chunk.empty?
                 chunk << line
               end
             end

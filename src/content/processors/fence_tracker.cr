@@ -140,7 +140,10 @@ module Hwaro
         # The last line fed was raw HTML to Markd: it opened or continued a
         # generic HTML block (no inline parsing happens there).
         getter? html_block_line = false
-        # The last line fed opened a list item (it carries a list marker).
+        # The last line fed opened a list item that Markd starts: a list
+        # marker, unless it sits in the open paragraph's container and is an
+        # item CommonMark forbids from interrupting a paragraph (an empty one,
+        # or an ordered one not starting at 1), which is continuation text.
         getter? list_item_line = false
 
         # `raw_html_code: false` turns off raw-HTML code-block tracking and
@@ -264,8 +267,9 @@ module Hwaro
             end
           end
 
+          in_paragraph = paragraph_open && depth == @paragraph_depth && column >= @paragraph_column
           marker_item = blank ? nil : track_list_item(content, depth, column, text_start, prefix)
-          @list_item_line = !marker_item.nil?
+          @list_item_line = !marker_item.nil? && (!in_paragraph || interrupting_item?(content, text_start))
           container_column = marker_item || list_content_column(depth, column)
           opened_html = !blank && !in_html_block && @track_raw_html_code &&
                         open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)
@@ -537,6 +541,14 @@ module Hwaro
             offset += marker_size + spaces
           end
           pushed
+        end
+
+        # The item just tracked may interrupt a paragraph (commonmark.js
+        # parseListMarker): non-empty, and a bullet or an ordered start of 1.
+        private def interrupting_item?(content : String, text_start : Int32) : Bool
+          return false if @empty_item_open
+          digits = content.byte_slice(text_start, content.bytesize - text_start)[/\A\d+/]?
+          digits.nil? || digits.to_i == 1
         end
 
         private def run_length(text : String, char : Char) : Int32

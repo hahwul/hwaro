@@ -128,6 +128,25 @@ describe Hwaro::Content::Processors::Wikilinks do
       wl_rewrite(lists, src, index).should eq("- a `\n- b [My Note](@/notes/My%20Note.md) `\n")
     end
 
+    it "keeps a line that cannot start a list item inside the paragraph" do
+      md = "Released in `v[[My Note]]\n2026. year` end.\n\nSee `[[My Note]] and\n*\nmore` end.\n"
+      wl_rewrite(md, src, index).should eq(md)
+      # Sibling items still end the chunk.
+      wl_rewrite("1. a `\n2. b [[My Note]] `\n", src, index).should eq("1. a `\n2. b [My Note](@/notes/My%20Note.md) `\n")
+    end
+
+    it "ends a chunk where a blockquote opens" do
+      md = "A1 stray ` tick\n> quote `[[My Note]]` here\n"
+      wl_rewrite(md, src, index).should eq(md)
+    end
+
+    it "ends a footnote definition's chunk where the footnote parser ends it" do
+      wl_rewrite("[^n]: Footnote with a ` tick\nnext line [[My Note]] and ` here\n", src, index)
+        .should eq("[^n]: Footnote with a ` tick\nnext line [My Note](@/notes/My%20Note.md) and ` here\n")
+      indented = "[^n]: a ` tick\n    b [[My Note]] ` c\n"
+      wl_rewrite(indented, src, index).should eq(indented)
+    end
+
     it "puts math back into a link's own text and never leaks a NUL" do
       with_captured_log do
         wl_rewrite("[[My Note|cost $x$ here]]", src, index, math: true).should eq("[cost \\$x\\$ here](@/notes/My%20Note.md)")
