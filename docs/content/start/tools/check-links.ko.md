@@ -92,7 +92,7 @@ URL은 빌드와 같은 방식으로 원본에서 계산하므로 첫 빌드 전
 
 - `/sitemap.xml`, `/robots.txt`, `/llms.txt`, 검색 인덱스, `404.html`. 각각
   설정된 `filename`을 따릅니다
-- 피드(`/rss.xml`, `/atom.xml`). 언어별 사본(`/ko/rss.xml`)과 섹션별
+- 피드(`/rss.xml`, `/atom.xml`, `/feed.json`). 언어별 사본(`/ko/rss.xml`)과 섹션별
   사본(`/posts/rss.xml`) 포함. 섹션 피드는 해당 섹션의 `_index.md`가
   `generate_feeds = true`를 선언했을 때만 인정합니다. 빌드가 그때만 파일을
   쓰기 때문입니다

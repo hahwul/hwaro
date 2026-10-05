@@ -899,3 +899,46 @@ describe Hwaro::Content::Seo::JsonLd do
     end
   end
 end
+
+describe Hwaro::Models::Config do
+  describe "[feeds] type" do
+    it "accepts json" do
+      load_config(%([feeds]\nenabled = true\ntype = "JSON"\n)).feeds.type.should eq("json")
+    end
+
+    it "warns and keeps the default for an unknown type" do
+      log = with_captured_log { load_config(%([feeds]\ntype = "xml"\n)).feeds.type.should eq("rss") }
+      log.should contain(%(expected "rss", "atom" or "json"))
+    end
+  end
+
+  describe "[[robots.rules]] content_signal" do
+    it "reads the bools in search, ai-input, ai-train order" do
+      config = load_config(<<-TOML)
+        [robots]
+        rules = [
+          { user_agent = "*", content_signal = { ai_train = false, ai_input = true, search = true } },
+          { user_agent = "GPTBot" },
+        ]
+        TOML
+      config.robots.rules[0].content_signal.should eq([{"search", true}, {"ai-input", true}, {"ai-train", false}])
+      config.robots.rules[1].content_signal.should be_empty
+    end
+
+    it "rejects an unknown key, naming the rule and suggesting the closest key" do
+      err = expect_config_error(%([robots]\nrules = [{ user_agent = "*" }, { user_agent = "GPTBot", content_signal = { ai_trian = false } }]\n))
+      err.message.to_s.should contain("ai_trian")
+      err.message.to_s.should contain(%(user_agent "GPTBot"))
+      err.hint.to_s.should contain("Did you mean 'ai_train'?")
+    end
+
+    it "rejects a non-bool value" do
+      err = expect_config_error(%([robots]\nrules = [{ user_agent = "*", content_signal = { search = "yes" } }]\n))
+      err.message.to_s.should contain("search")
+    end
+
+    it "rejects a non-table value" do
+      expect_config_error(%([robots]\nrules = [{ user_agent = "*", content_signal = "yes" }]\n))
+    end
+  end
+end

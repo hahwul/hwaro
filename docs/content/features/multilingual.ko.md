@@ -35,7 +35,7 @@ weight = 3
 | default_language | string | "en" | 기본 언어 코드 |
 | language_name | string | — | 사람이 읽는 언어 이름 |
 | weight | int | 0 | 정렬 순서(낮을수록 앞) |
-| generate_feed | bool | true | 해당 언어의 RSS/Atom 피드 생성 여부 |
+| generate_feed | bool | true | 해당 언어의 RSS/Atom/JSON 피드 생성 여부 |
 | build_search_index | bool | true | 검색 인덱스 포함 여부 |
 | taxonomies | array | 모든 `[[taxonomies]]` 이름 | 해당 언어의 택소노미. 생략하면 전역 설정을 상속하고, `[]`이면 사용하지 않음 |
 
@@ -337,7 +337,7 @@ back = "뒤로"
 | 비기본 언어 (예: `ko`) | `/ko/rss.xml` | 한국어 페이지만 |
 | 비기본 언어 (예: `ja`) | `/ja/rss.xml` | 일본어 페이지만 |
 
-기본적으로 메인 사이트 피드(`/rss.xml` 또는 `/atom.xml`)에는 **기본 언어 페이지만** 포함됩니다. 이 동작은 `default_language_only` 옵션으로 바꿀 수 있습니다. `generate_feed = true`인 비기본 언어는 이 설정과 무관하게 각자의 언어 접두사 아래에 자체 피드를 갖습니다.
+기본적으로 메인 사이트 피드(`/rss.xml`, `/atom.xml` 또는 `/feed.json`)에는 **기본 언어 페이지만** 포함됩니다. 이 동작은 `default_language_only` 옵션으로 바꿀 수 있습니다. `generate_feed = true`인 비기본 언어는 이 설정과 무관하게 각자의 언어 접두사 아래에 자체 피드를 갖습니다.
 
 ### 설정
 
@@ -367,7 +367,7 @@ generate_feed = false   # No /ja/rss.xml will be generated
 ```toml
 [feeds]
 enabled = true
-type = "rss"           # 또는 "atom"
+type = "rss"           # 또는 "atom", "json"
 limit = 20
 truncate = 0
 full_content = true    # false = 설명/요약만 포함
@@ -379,6 +379,7 @@ default_language_only = true
 
 - **RSS 피드**에는 `<language>` 태그가 포함됩니다 (예: `<language>ko</language>`)
 - **Atom 피드**에는 `xml:lang` 속성이 포함됩니다 (예: `<feed xmlns="..." xml:lang="ko">`)
+- **JSON 피드**에는 최상위 `"language"` 필드가 포함됩니다 (예: `"language": "ko"`)
 - 피드 제목에 언어 이름이 붙습니다: `"My Site (한국어)"`
 - 자기 참조 링크는 해당 언어 경로를 가리킵니다 (예: `https://example.com/ko/rss.xml`)
 - 초안 페이지와 섹션 인덱스 페이지는 제외됩니다

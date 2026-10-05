@@ -1,5 +1,6 @@
 require "file_utils"
 require "html"
+require "json"
 require "crinja"
 require "../../models/config"
 require "../../models/page"
@@ -27,7 +28,11 @@ module Hwaro
         # User template keys that override the built-in feed output, per feed
         # type. `templates/rss.xml.jinja` loads under the key "rss.xml"
         # (template keys strip only the final template extension).
-        FEED_TEMPLATE_KEYS = {"rss" => "rss.xml", "atom" => "atom.xml"}
+        FEED_TEMPLATE_KEYS = {"rss" => "rss.xml", "atom" => "atom.xml", "json" => "feed.json"}
+
+        # `[feeds] type` values the writer knows, and the file each one
+        # publishes when `filename` is left empty.
+        DEFAULT_FILENAMES = {"rss" => "rss.xml", "atom" => "atom.xml", "json" => "feed.json"}
 
         # One feed this generator writes: the pages it lists, where it goes,
         # and the channel metadata `process_feed` needs.
@@ -268,9 +273,7 @@ module Hwaro
         ) : String
           # Determine feed type and filename
           feed_type = config.feeds.type.downcase
-          unless ["rss", "atom"].includes?(feed_type)
-            feed_type = "rss"
-          end
+          feed_type = "rss" unless DEFAULT_FILENAMES.has_key?(feed_type)
 
           # Basename only — nested components would desync the self URL from
           # the write path (basename at write, full string in build_feed_url).
@@ -307,6 +310,8 @@ module Hwaro
                            case feed_type
                            when "atom"
                              generate_atom(pages, config, filename, is_text, feed_title, base_path, language)
+                           when "json"
+                             generate_json(pages, config, filename, is_text, feed_title, base_path, language)
                            else
                              generate_rss(pages, config, filename, is_text, feed_title, base_path, language)
                            end
@@ -346,7 +351,7 @@ module Hwaro
         # basename under the feed's output directory.
         def self.safe_feed_filename(custom_filename : String, feed_type : String) : String
           if custom_filename.empty?
-            feed_type.downcase == "atom" ? "atom.xml" : "rss.xml"
+            DEFAULT_FILENAMES[feed_type.downcase]? || "rss.xml"
           else
             File.basename(custom_filename)
           end
@@ -436,6 +441,7 @@ module Hwaro
               "date"            => page.date,
               "updated"         => page.updated,
               "date_rfc822"     => page.date.try { |d| format_rfc822(d) },
+              "date_rfc3339"    => page.date.try { |d| normalize_feed_time(d).to_rfc3339 },
               "updated_rfc3339" => entry_updated.to_rfc3339,
               "description"     => page.description,
               "summary"         => summary_for_feed(page, config),
@@ -443,6 +449,7 @@ module Hwaro
               "content_html"    => full_content_for_feed(page, config),
               "content_is_html" => !is_text,
               "authors"         => page.authors,
+              "image"           => page.social_image.try { |img| feed_image_url(img, base_url) },
               "categories"      => feed_categories(page),
               "section"         => page.section,
               "language"        => page.language,
@@ -719,6 +726,71 @@ module Hwaro
 
             str << "</feed>\n"
           end
+        end
+
+        # JSON Feed 1.1 (https://www.jsonfeed.org/version/1.1/). Same inputs
+        # and helpers as the RSS/Atom writers: `summary` mirrors RSS
+        # `<description>`, and the body follows Atom's `<content>` choice —
+        # `content_html` for full HTML, `content_text` when `full_content` is
+        # off or `truncate` > 0 (an item must carry one of the two).
+        def self.generate_json(
+          pages : Array(Models::Page),
+          config : Models::Config,
+          filename : String,
+          is_text : Bool,
+          feed_title : String,
+          base_path : String,
+          language : String? = nil,
+        ) : String
+          base_url, feed_url = build_feed_url(config, base_path, filename)
+          content_key = is_text ? "content_text" : "content_html"
+
+          json = JSON.build(indent: "  ") do |j|
+            j.object do
+              j.field "version", "https://jsonfeed.org/version/1.1"
+              j.field "title", feed_title
+              j.field "home_page_url", feed_home_url(config, base_path)
+              j.field "feed_url", feed_url
+              j.field "description", config.description unless config.description.empty?
+              j.field "language", language if language
+              j.field "items" do
+                j.array do
+                  pages.each do |page|
+                    full_url = page_full_url(page, base_url)
+                    j.object do
+                      j.field "id", full_url
+                      j.field "url", full_url
+                      j.field "title", page.title.empty? ? config.title : page.title
+                      j.field content_key, get_content_for_feed(page, config)
+                      summary = summary_for_feed(page, config)
+                      j.field "summary", summary unless summary.empty?
+                      if image = page.social_image
+                        j.field "image", feed_image_url(image, base_url)
+                      end
+                      page.date.try { |d| j.field "date_published", normalize_feed_time(d).to_rfc3339 }
+                      page.updated.try { |d| j.field "date_modified", normalize_feed_time(d).to_rfc3339 }
+                      authors = page.authors.reject(&.strip.empty?)
+                      unless authors.empty?
+                        j.field "authors" do
+                          j.array { authors.each { |name| j.object { j.field "name", name } } }
+                        end
+                      end
+                      tags = feed_categories(page)
+                      j.field "tags", tags unless tags.empty?
+                    end
+                  end
+                end
+              end
+            end
+          end
+          json + "\n"
+        end
+
+        # A page image as an absolute URL: external URLs as written, a site
+        # path under base_url with its path percent-encoded (og:image rules).
+        private def self.feed_image_url(image : String, base_url : String) : String
+          return image if Processors::InternalLinkResolver.has_own_origin?(image)
+          "#{base_url}#{Utils::PathUtils.root_relative(Utils::TextUtils.encode_url_path_keep_query(image))}"
         end
 
         # Summary text for `<description>` / atom `<summary>`. Prefers
