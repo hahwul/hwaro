@@ -432,6 +432,30 @@ describe Hwaro::Content::Menus do
       main.map { |e| {e.identifier, e.url} }.should eq([{"api", "/api/"}, {"guide", "/guide/"}])
     end
 
+    [{"v1", "v2"}, {"1.0", "2.0"}].each do |(old_name, new_name)|
+      it "gives a shared directory to the menu set's own version (#{old_name}/#{new_name})" do
+        config = Hwaro::Models::Config.new
+        config.menus_auto_sections = "main"
+        config.versions.latest_at_root = false
+        old_v = Hwaro::Models::VersionConfig.new(old_name, path: "docs/#{old_name}")
+        new_v = Hwaro::Models::VersionConfig.new(new_name, path: "docs/#{new_name}", latest: true)
+        config.versions.list = [old_v, new_v]
+        sections = [auto_section("docs", "Docs")]
+        {old_v, new_v}.each do |v|
+          root = auto_section("docs/#{v.name}", "Docs #{v.name}")
+          root.version = v
+          sections << root
+        end
+
+        url = ->(version : Hwaro::Models::VersionConfig?) do
+          Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, sections, version)["en"]["main"].map(&.url)
+        end
+        url.call(nil).should eq(["/docs/"]), "#{old_name}/#{new_name}: unversioned menus"
+        url.call(old_v).should eq(["/docs/#{old_name}/"]), "#{old_name}/#{new_name}: #{old_name} menus"
+        url.call(new_v).should eq(["/docs/#{new_name}/"]), "#{old_name}/#{new_name}: #{new_name} menus"
+      end
+    end
+
     it "leaves the menu out of a language with no auto entry, so get_menu falls back" do
       config = Hwaro::Models::Config.new
       config.default_language = "en"

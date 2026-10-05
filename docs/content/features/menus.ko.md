@@ -69,7 +69,7 @@ parent = "posts"
 auto_sections = "main"
 ```
 
-각 섹션은 `identifier` = 디렉터리 이름(`content/posts/_index.md`라면 `posts`), `name` = 섹션 제목, `url` = 섹션 URL, `weight` = 섹션의 `weight`인 엔트리가 됩니다. 목록에서 빠지는 섹션은 제외합니다. 초안, 게시 전(unpublished), 헤드리스(`render = false`), `transparent` 섹션과 `redirect_to`가 외부 사이트를 가리키는 섹션이 여기에 해당합니다. 중첩 섹션은 들어가지 않으며, 제외된 `transparent` 섹션의 하위 섹션도 마찬가지입니다. 섹션에는 `_index.md`가 있어야 합니다. 페이지만 있는 디렉터리는 섹션이 아니므로 엔트리가 생기지 않습니다. 버전 문서 사이트에서는 섹션을 버전 루트 기준으로 해석합니다. `docs/v2`는 `docs`로, 최상위 `v2/` 버전이라면 `v2/guide`는 `guide`로 취급합니다.
+각 섹션은 `identifier` = 디렉터리 이름(`content/posts/_index.md`라면 `posts`), `name` = 섹션 제목, `url` = 섹션 URL, `weight` = 섹션의 `weight`인 엔트리가 됩니다. 목록에서 빠지는 섹션은 제외합니다. 초안, 게시 전(unpublished), 헤드리스(`render = false`), `transparent` 섹션과 `redirect_to`가 외부 사이트를 가리키는 섹션이 여기에 해당합니다. 중첩 섹션은 들어가지 않으며, 제외된 `transparent` 섹션의 하위 섹션도 마찬가지입니다. 섹션에는 `_index.md`가 있어야 합니다. 페이지만 있는 디렉터리는 섹션이 아니므로 엔트리가 생기지 않습니다. 버전 문서 사이트에서는 섹션을 버전 루트 기준으로 해석합니다. `docs/v2`는 `docs`로, 최상위 `v2/` 버전이라면 `v2/guide`는 `guide`로 취급합니다. 버전이 없는 `docs/_index.md`가 버전 루트와 함께 있으면, 각 버전의 페이지는 그 버전의 루트로, 버전이 없는 페이지는 버전이 없는 섹션으로 연결됩니다.
 
 `auto_sections`는 `[menus]` 아래의 예약된 키이며 메뉴 이름이 아닙니다. 문자열이 아니거나 빈 값이면 설정 오류이고, `[languages.<code>.menus]` 아래에 지정하면 경고와 함께 무시합니다.
 

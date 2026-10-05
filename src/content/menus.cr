@@ -79,13 +79,13 @@ module Hwaro
 
         result = {} of String => Hash(String, Array(Entry))
         languages.each do |lang|
-          result[lang] = build_for_language(config, content, lang, default_lang)
+          result[lang] = build_for_language(config, content, lang, default_lang, version)
         end
         result
       end
 
       # Builds every named menu for a single language.
-      private def self.build_for_language(config : Models::Config, content : Array(Models::Page), lang : String, default_lang : String) : Hash(String, Array(Entry))
+      private def self.build_for_language(config : Models::Config, content : Array(Models::Page), lang : String, default_lang : String, version : Models::VersionConfig?) : Hash(String, Array(Entry))
         menu_defs = config.language(lang).try(&.menus) || config.menus
 
         # menu_name => flat candidate list, before tree assembly.
@@ -131,7 +131,7 @@ module Hwaro
         # Only materialize the menu when an entry was added: a missing key is
         # what lets `get_menu` fall back to the default language.
         if auto_menu = config.menus_auto_sections
-          auto = auto_section_entries(flat[auto_menu]? || [] of Entry, content, lang, default_lang)
+          auto = auto_section_entries(flat[auto_menu]? || [] of Entry, content, lang, default_lang, version)
           (flat[auto_menu] ||= [] of Entry).concat(auto) unless auto.empty?
         end
 
@@ -150,19 +150,23 @@ module Hwaro
       # — config, or front matter — sharing the identifier wins, as does the
       # section's own front-matter registration into the same menu.
       # Returns the entries to add next to `existing`.
-      private def self.auto_section_entries(existing : Array(Entry), content : Array(Models::Page), lang : String, default_lang : String) : Array(Entry)
+      #
+      # Two sections can stand for one directory (an unversioned
+      # `docs/_index.md` next to a `docs/1.0` version root). The one in the
+      # menu set's own version wins — the version's root in its menus, the
+      # unversioned section in the unversioned menus — whatever the version
+      # directories are called; path order breaks any remaining tie.
+      private def self.auto_section_entries(existing : Array(Entry), content : Array(Models::Page), lang : String, default_lang : String, version : Models::VersionConfig?) : Array(Entry)
         taken = existing.map(&.identifier).to_set
         registered = existing.compact_map(&.page_path).to_set
         entries = [] of Entry
-        content.each do |s|
-          next unless s.is_a?(Models::Section)
+        own, others = content.select(Models::Section).partition(&.version.same?(version))
+        (own + others).each do |s|
           next unless dir = top_level_dir(s.section, s.version)
           next unless (s.language || default_lang) == lang
           next if s.excluded_from_listings? || s.transparent
           next if s.redirect_to.try { |r| external_url?(r) }
           next if registered.includes?(s.path)
-          # First (path-sorted) section wins a shared directory, e.g. an
-          # unversioned `docs/_index.md` next to a `docs/v2` version root.
           next unless taken.add?(dir)
 
           entries << Entry.new(
