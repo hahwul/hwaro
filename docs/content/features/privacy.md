@@ -7,7 +7,10 @@ toc = true
 
 `[privacy]` downloads the third-party assets your pages load (web fonts,
 CDN stylesheets and scripts, remote images) at build time and serves them
-from your own site. The built site then makes no requests to other hosts.
+from your own site, so visitors' browsers stop contacting those hosts for
+them. It covers the tags listed under [What Gets Localized](#what-gets-localized);
+anything else a page or script loads (see [Limitations](#limitations)) still
+goes to its own host.
 
 The usual reason is the GDPR. Embedding Google Fonts from
 `fonts.googleapis.com` sends every visitor's IP address to Google, and a
@@ -50,7 +53,7 @@ on_error = "warn-and-keep"      # warn-and-keep | fail
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `enabled` | `false` | Turn privacy mode on. When it is off the output is unchanged. |
-| `include` | `[]` | Hosts to localize, compared exactly (`fonts.googleapis.com`). Empty means every external host. |
+| `include` | `[]` | Hosts to localize, compared exactly (`fonts.googleapis.com`). Empty means every external host. A listed host is also trusted on the network (see [Network Safety](#network-safety)). |
 | `exclude` | `[]` | Hosts that stay external. `exclude` wins over `include`. |
 | `output_dir` | `"assets/external"` | Where the downloaded files are published. URLs include the `base_url` subpath. |
 | `cache_ttl` | `"7d"` | Download cache lifetime, in the `[[data.remote]]` duration syntax (`"90s"`, `"12h"`, `"7d"`). |
@@ -75,7 +78,34 @@ A downloaded stylesheet is rewritten too: its `@import` and `url(...)`
 references are resolved against the stylesheet's own URL and localized,
 nested up to four levels deep. Those references are followed whatever
 `include` says (the stylesheet needs them), but `exclude` still applies.
-A reference that stays remote is written back as an absolute URL.
+A reference that stays remote is written back as an absolute URL. Strings
+inside `image-set(...)` are handled like `url(...)`.
+
+`<link rel="preconnect">` and `<link rel="dns-prefetch">` hints to a host
+whose assets are now served locally are removed, since the browser would
+still open a connection to it.
+
+### File types
+
+A file is published only under an extension that suits the tag that loads
+it, taken from the response `Content-Type` (or, when that is generic, the URL
+path): images for `<img>`, `<source>` and `poster`, audio and video for
+`<video>` and `<audio>`, CSS for stylesheets, JavaScript for scripts, and
+fonts, images and CSS for references inside a stylesheet. Anything else, such
+as an `<img>` that answers with HTML, keeps its external URL with a warning.
+HTML or XML is never published.
+
+SVG is published only for `<img>`-like tags, with a warning: an SVG opened
+directly on your site can run script. Add the host to `exclude` if you do not
+trust it.
+
+### Hwaro's own tags
+
+`[markdown] math = "mathjax"` loads MathJax from `cdn.jsdelivr.net`, and
+MathJax loads its fonts and extensions relative to its own URL, so it stays
+external. Mermaid (`[markdown] mermaid = true`) is loaded by an inline module
+`import`, which privacy mode does not rewrite. KaTeX and highlight.js are
+localized normally.
 
 Published files are named `<hash>-<name>.<ext>`, where the hash is the first
 12 hex characters of the SHA-256 of the bytes. Identical files are stored
@@ -87,6 +117,26 @@ stale copy.
 Downloads send a desktop browser `User-Agent`. Google Fonts chooses the font
 format from it, and an unknown client gets TrueType instead of the much
 smaller woff2. No cookies or credentials are ever sent.
+
+### Network Safety
+
+The URLs privacy mode fetches are not all written by you: redirects and the
+`url(...)` references inside a downloaded stylesheet come from the third
+party. So every request, including every redirect hop, is checked first. A
+host that resolves to a loopback, private (10/8, 172.16/12, 192.168/16,
+fc00::/7), link-local (169.254/16, fe80::/10), CGNAT (100.64/10),
+unspecified or multicast address is refused, and the refusal follows
+`on_error`. This keeps a third party from making the build read internal
+services or cloud metadata and publish the response on your site. The
+connection is pinned to the address that was checked.
+
+A host listed in `include` skips this check, which is how an intranet CDN or
+a local test server is allowed.
+
+A failed download is not retried by the same process for 10 minutes, so a
+dead host slows down only one `hwaro serve` rebuild. Each file is capped at
+20 MiB; a larger one (a long video, say) keeps its external URL with a
+warning.
 
 ## Cache and Offline Builds
 
@@ -102,8 +152,11 @@ SHA-256. The directory sits outside the build cache and outside everything
 - With no copy at all, `on_error` decides.
 
 `hwaro serve` uses the same cache, so rebuilds do not hit the network.
-Commit `.hwaro/external/` (or cache it in CI) if your builds must never
-depend on the third-party hosts being up.
+To keep builds independent of the third-party hosts, cache
+`.hwaro/external/` in CI, or commit it. Hwaro writes a `.hwaro/.gitignore`
+that ignores everything inside `.hwaro/`, so add it with
+`git add -f .hwaro/external`. Old downloads are never deleted from this
+directory; remove it to start over.
 
 The rewrite happens when a page is written, after `--minify`, so a
 `--cache` build that skips a page keeps its already-rewritten HTML and the
@@ -125,12 +178,22 @@ files it uses.
 
 ## Limitations
 
-- Inline `style="…url(…)"` attributes, `<style>` blocks and other
-  attributes (such as `<link rel="icon">`) are not rewritten.
-- `srcset` is split on commas, so a candidate URL that itself contains a
-  comma is not recognised.
+- Inline `style="…url(…)"` attributes, `<style>` blocks, inline module
+  `import`s, import maps and other attributes (such as `<link rel="icon">`,
+  `<link imagesrcset>` or `<track src>`) are not rewritten, so they still
+  load from their own host.
+- Scripts that load further files relative to their own URL (MathJax, ESM
+  bundles with absolute `/npm/...` imports, pdf.js workers) break when moved;
+  add their host to `exclude`.
+- Tags inside HTML comments (including IE conditional comments) and tags
+  with a `>` inside a quoted attribute value are left as they are, without a
+  warning.
 - `include` and `exclude` match whole host names; subdomains need their own
   entry.
+- In the rare case of stylesheets that import each other in a cycle, or a
+  chain deeper than four levels, which reference stays absolute depends on
+  which page reaches the chain first.
+- There is no limit on the total size or number of downloads per build.
 - Raw `.html` files copied from `content/` are published as they are.
 
 ## See Also
