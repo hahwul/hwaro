@@ -41,29 +41,31 @@ module Hwaro
         @mode == "server"
       end
 
-      # Generate the CSS link tag for highlighting
-      def css_tag(cache_bust : String = "") : String
+      # Generate the CSS link tag for highlighting. `base_path` (the path of
+      # base_url, `Config#base_path`) prefixes the local files, which are
+      # published under it on a subpath deploy.
+      def css_tag(cache_bust : String = "", base_path : String = "") : String
         return "" unless @enabled
         safe_theme = HTML.escape(@theme)
         if @use_cdn
           %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/#{safe_theme}.min.css">)
         else
           suffix = Models.cache_bust_suffix(cache_bust)
-          %(<link rel="stylesheet" href="/assets/css/highlight/#{safe_theme}.min.css#{suffix}">)
+          %(<link rel="stylesheet" href="#{HTML.escape(base_path)}/assets/css/highlight/#{safe_theme}.min.css#{suffix}">)
         end
       end
 
       # Generate the JS script tag for highlighting.
       # Server-side highlighting needs no JavaScript at all — unless the
       # copy button is on, whose (dependency-free) runtime ships either way.
-      def js_tag(cache_bust : String = "") : String
+      def js_tag(cache_bust : String = "", base_path : String = "") : String
         return "" unless @enabled
         return copy ? COPY_SNIPPET : "" if server?
         hljs = if @use_cdn
                  %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
                else
                  suffix = Models.cache_bust_suffix(cache_bust)
-                 %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
+                 %(<script src="#{HTML.escape(base_path)}/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
                end
         copy ? "#{hljs}\n#{COPY_SNIPPET}" : hljs
       end
@@ -84,10 +86,11 @@ module Hwaro
         HTML
 
       # Generate both CSS and JS tags
-      def tags(cache_bust : String = "") : String
+      def tags(cache_bust : String = "", base_path : String = "") : String
         return "" unless @enabled
-        js = js_tag(cache_bust)
-        js.empty? ? css_tag(cache_bust) : "#{css_tag(cache_bust)}\n#{js}"
+        js = js_tag(cache_bust, base_path)
+        css = css_tag(cache_bust, base_path)
+        js.empty? ? css : "#{css}\n#{js}"
       end
     end
   end

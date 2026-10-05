@@ -295,6 +295,14 @@ describe Hwaro::Models::HighlightConfig do
       tag.should contain("/assets/css/highlight/github.min.css?v=a1b2c3d4")
     end
 
+    it "puts local files under the base_url path on a subpath deploy" do
+      config = Hwaro::Models::HighlightConfig.new
+      config.use_cdn = false
+      config.mode = "client"
+      config.css_tag("", "/sub").should contain(%(href="/sub/assets/css/highlight/github.min.css"))
+      config.tags("", "/sub").should contain(%(src="/sub/assets/js/highlight.min.js"))
+    end
+
     it "does not add cache bust to CDN URL" do
       config = Hwaro::Models::HighlightConfig.new
       tag = config.css_tag("a1b2c3d4")
