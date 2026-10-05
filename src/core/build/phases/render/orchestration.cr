@@ -33,6 +33,9 @@ module Hwaro::Core::Build::Phases::Render
       # Reads from before this render (a serve session's incremental passes)
       # are not this build's.
       Content::Processors::TemplateEngine.take_render_reads
+      # Except this build's include reads: the summaries expanded (and
+      # memoised, see expanded_raw_content) them before the render started.
+      include_sources.each { |path| Content::Processors::TemplateEngine.record_file_read(path) }
       render_globals = render_globals_digest(site.config, ctx.options.cache_busting)
       build_cache.check_render_inputs(render_inputs_digest(render_globals, build_cache.render_input_keys, render_input_values))
     end

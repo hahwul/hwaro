@@ -128,4 +128,23 @@ describe "serve: include sources" do
       end
     end
   end
+
+  it "forgets a file no page includes any more on the next full build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        include_serve_site
+        server = Hwaro::Services::Server.new
+        builder = server.include_spec_builder
+        builder.run(include_serve_options).should be_true
+        tracked = server.include_spec_scan
+        builder.include_source_changed?(["examples/a.cr"]).should be_true
+
+        File.write("content/p.md", "+++\ntitle = \"P\"\n+++\nplain\n")
+        builder.run(include_serve_options).should be_true
+        builder.include_source_changed?(["examples/a.cr"]).should be_false
+        # Leaving the snapshot is not a deletion.
+        server.include_spec_detect(tracked, server.include_spec_scan).removed_files.should be_empty
+      end
+    end
+  end
 end

@@ -213,3 +213,128 @@ describe "include dependencies under --cache" do
     end
   end
 end
+
+describe "include dependencies under --cache: what the included text brings in" do
+  it "re-renders the includer when a link target only the included file names moves" do
+    in_include_project({
+      "examples/s.md" => "See [T](@/t.md) and [[t]].",
+      "content/t.md"  => page("t"),
+      "content/p.md"  => page(%({{ include_md(path="examples/s.md") }})),
+    }, wikilinks: true) do
+      include_build(cache: true).should be_true
+      include_build(cache: true).should be_true
+      File.write("content/t.md", "+++\ntitle = \"T\"\nslug = \"tee\"\n+++\nt\n")
+      include_build(cache: true).should be_true
+      html = File.read("public/p/index.html")
+      html.scan(%(href="/tee/")).size.should eq(2)
+      html.should_not contain(%(href="/t/"))
+    end
+  end
+
+  it "re-renders the includer when a shortcode only the included file calls changes" do
+    in_include_project({
+      "templates/shortcodes/note.html" => "N1:{{ body }}",
+      "examples/s.md"                  => %({{ note(body="x") }}),
+      "content/p.md"                   => page(%({{ include_md(path="examples/s.md") }})),
+    }) do
+      include_build(cache: true).should be_true
+      File.read("public/p/index.html").should contain("N1:x")
+      File.write("templates/shortcodes/note.html", "N2:{{ body }}")
+      include_build(cache: true).should be_true
+      File.read("public/p/index.html").should contain("N2:x")
+    end
+  end
+end
+
+describe "include and transclusion edge cases" do
+  other = "+++\ntitle = \"Other\"\n+++\nOTHER BODY\n"
+
+  it "never transcludes an embed that included text brings in (one pass)" do
+    in_include_project({
+      "content/other.md"  => other,
+      "examples/notes.md" => "```md\n![[other]]\n```\n",
+      "content/p.md"      => page(%(![[other]]\n\n{{ include_code(path="examples/notes.md") }}\n\n{{ include_md(path="examples/notes.md") }})),
+    }, wikilinks: true) do
+      include_build.should be_true
+      html = File.read("public/p/index.html")
+      html.scan("OTHER BODY").size.should eq(1)
+      html.scan("![[other]]").size.should eq(2)
+    end
+  end
+
+  it "keeps an include on a list-marker line inside its item" do
+    in_include_project({
+      "examples/a.cr" => "puts 1\nputs 2\n",
+      "examples/s.md" => "one\n\ntwo\n",
+      "content/p.md"  => page(%(- {{ include_code(path="examples/a.cr") }}\n- second\n\n1. {{ include_md(path="examples/s.md") }}\n2. next)),
+    }) do
+      include_build.should be_true
+      html = File.read("public/p/index.html")
+      html.should contain(%(<ul>\n<li>\n<pre><code class="language-crystal">puts 1\nputs 2\n</code></pre>\n</li>\n<li>second</li>\n</ul>))
+      html.should contain(%(<ol>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n<li>\n<p>next</p>\n</li>\n</ol>))
+    end
+  end
+
+  it "leaves an include in a fence inside a block shortcode body literal" do
+    in_include_project({
+      "templates/shortcodes/box.html" => "<div class=\"box\">{{ body }}</div>",
+      "content/p.md"                  => page(%({% box() %}\n```\n{{ include_code(path="examples/nope.cr") }}\n```\n{% end %})),
+    }) do
+      include_build.should be_true
+      File.read("public/p/index.html").should contain(%(```\n{{ include_code(path="examples/nope.cr") }}\n```))
+    end
+  end
+
+  it "leaves calls in a {% raw %} region literal" do
+    in_include_project({"content/p.md" => page(%({% raw %}{{ include_code(path="nope") }}{% endraw %}))}) do
+      include_build.should be_true
+      File.read("public/p/index.html").should contain(%({{ include_code(path=&quot;nope&quot;) }}))
+    end
+  end
+
+  it "does not transclude inside display math or a raw HTML block" do
+    in_include_project({
+      "config.toml"      => %(title = "t"\nbase_url = "https://example.com"\n[markdown]\nwikilinks = true\nmath = true\n),
+      "content/other.md" => other,
+      "content/p.md"     => page("$$\n![[other]]\n$$\n\n<div>\n![[other]]\n</div>"),
+    }) do
+      include_build.should be_true
+      File.read("public/p/index.html").should_not contain("OTHER BODY")
+    end
+  end
+
+  it "lets a note embed its own other heading, and still reports a real section cycle" do
+    in_include_project({"content/p.md" => page("# A\n\n![[p#B]]\n\n# B\n\nbee")}, wikilinks: true) do
+      include_build.should be_true
+      File.read("public/p/index.html").should contain(%(<div class="transclusion" data-source="/p/">))
+
+      File.write("content/p.md", page("# A\n\n![[p#B]]\n\n# B\n\n![[p#A]]"))
+      ex = expect_raises(Hwaro::HwaroError) { include_build }
+      ex.message.to_s.should contain("include cycle: content/p.md → content/p.md#b → content/p.md#a → content/p.md#b")
+    end
+  end
+
+  it "reports an include error once, not again from the automatic summary" do
+    in_include_project({
+      "config.toml"  => %(title = "t"\nbase_url = "https://example.com"\n[content]\nsummary_length = 20\n),
+      "content/p.md" => page(%({{ include_md(path="nope.md") }})),
+    }) do
+      log = with_captured_log { expect_raises(Hwaro::HwaroError, "file not found: nope.md") { include_build } }
+      log.should_not contain("Automatic summary skipped")
+      log.should_not contain("Summary render failed")
+    end
+  end
+
+  it "reads a percent sign in path= literally" do
+    in_include_project({
+      "examples/a%20b.txt" => "percent\n",
+      "examples/a b.txt"   => "space\n",
+      "content/p.md"       => page(%({{ include_code(path="examples/a%20b.txt") }})),
+    }) do
+      include_build.should be_true
+      html = File.read("public/p/index.html")
+      html.should contain("percent")
+      html.should_not contain("space")
+    end
+  end
+end

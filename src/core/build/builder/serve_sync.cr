@@ -236,7 +236,7 @@ module Hwaro
         end
 
         # Project-relative paths every include call and transclusion has read
-        # this session (see Builder@include_sources).
+        # since the last full build (see Builder@include_sources).
         def include_sources : Array(String)
           @include_sources_mutex.synchronize { @include_sources.keys }
         end

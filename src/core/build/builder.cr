@@ -305,12 +305,18 @@ module Hwaro
         @wikilink_warnings : Content::Processors::Wikilinks::WarnLog = Content::Processors::Wikilinks::WarnLog.new
         # Project-relative path => MD5 of the bytes read (nil: missing, or a
         # transcluded page) for every file an `include_code` / `include_md`
-        # call or a `![[note]]` transclusion read. Only grows within a
-        # session: serve escalates a save of any of them to a full rebuild
-        # (Server#effective_strategy), and a page that stopped including one
-        # costs at most a redundant rebuild.
+        # call or a `![[note]]` transclusion read. Serve escalates a save
+        # of any of them to a full rebuild (Server#effective_strategy). Rebuilt by every full build, so a file
+        # nothing includes any more stops escalating.
         @include_sources : Hash(String, String?) = {} of String => String?
         @include_sources_mutex : Mutex = Mutex.new
+        # page path => {raw content, wikilink index, include-expanded raw}:
+        # `expanded_raw_content`, shared by the render and the per-page scans
+        # (fingerprints, serve's template-change selection). Valid while the
+        # page's raw string and the index are the same objects; cleared with
+        # @include_sources by every full build, the only strategy serve runs
+        # after an include source changed. Guarded by @include_sources_mutex.
+        @expanded_raw_memo : Hash(String, {String, Content::Processors::Wikilinks::Index?, String}) = {} of String => {String, Content::Processors::Wikilinks::Index?, String}
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve
@@ -764,6 +770,12 @@ module Hwaro
           # Same for the SRI digests (keyed on mtime + size, so this is
           # belt-and-braces) and the record `hooks.post` is checked against.
           Utils::SriCache.clear
+          # Include sources and the expanded-content memo are re-learned by
+          # this build's render.
+          @include_sources_mutex.synchronize do
+            @include_sources = {} of String => String?
+            @expanded_raw_memo.clear
+          end
           # Same lifetime for the once-per-BUILD shortcode warnings (missing
           # template, unclosed block): a `serve` session that never cleared them
           # reported each name only for the first rebuild it appeared in.

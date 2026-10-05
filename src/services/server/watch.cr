@@ -155,9 +155,10 @@ module Hwaro
 
         # --- Files that existed before but are now gone ---
         old_mtimes.each_key do |path|
-          unless new_mtimes.has_key?(path)
-            removed_files << path
-          end
+          next if new_mtimes.has_key?(path)
+          # An include source outside the roots leaves the snapshot when no
+          # page includes it any more; a deleted one keeps a MISSING_STAMP.
+          removed_files << path if watched_root_path?(path) || watched_config_file?(path)
         end
 
         ChangeSet.new(
