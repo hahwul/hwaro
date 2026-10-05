@@ -113,8 +113,10 @@ module Hwaro
         text.size > 80 ? "#{text[0, 79]}…" : text
       end
 
+      # A bound for messages: whole values print as integers ("5"), except
+      # those too large for Int64 (`to_i64` would raise OverflowError).
       def self.number(value : Float64) : String
-        value == value.round ? value.to_i64.to_s : value.to_s
+        value == value.round && value.abs < 1e15 ? value.to_i64.to_s : value.to_s
       end
     end
 

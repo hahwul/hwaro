@@ -574,10 +574,19 @@ module Hwaro::Core::Build::Phases::ParseContent
     return violations if config.nil? || config.content_schema.empty?
     cascade_map = @cascade_map || build_cascade_map([] of Models::Section)
     taxonomies = Content::FrontMatterSchema.taxonomy_names(config)
+    # ParallelHelper.map drops an item whose block raises, so the block
+    # never raises: a failure is carried out and re-raised here instead of
+    # leaving that page silently unchecked.
     checked = ParallelHelper.map(pages.reject(&.parse_failed), parallel) do |page|
-      {page, content_schema_result(page, config, cascade_map, taxonomies)}
+      result = begin
+        content_schema_result(page, config, cascade_map, taxonomies)
+      rescue ex
+        ex
+      end
+      {page, result}
     end
     checked.each do |page, result|
+      raise result if result.is_a?(Exception)
       violations.concat(apply_schema_result(page, result)) if result
     end
     violations

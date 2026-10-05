@@ -118,6 +118,11 @@ describe "[[content.schema]] config" do
       load_config(SCHEMA_HEAD + "[content.schema.fields.weight]\ntype = \"int\"\ndefault = 3\n").content_schema.first.fields.size.should eq(1)
     end
 
+    it "reports min > max for huge bounds instead of overflowing" do
+      expect_config_error(SCHEMA_HEAD + "[content.schema.fields.n]\ntype = \"float\"\nmin = 1e30\nmax = 1.0\n")
+        .message.to_s.should contain("min (1.0e+30) is greater than max (1)")
+    end
+
     it "rejects a NaN bound" do
       expect_config_error(SCHEMA_HEAD + "[content.schema.fields.n]\ntype = \"float\"\nmax = nan\n")
         .message.to_s.should contain("'max' must be a number")

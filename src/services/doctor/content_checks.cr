@@ -263,12 +263,23 @@ module Hwaro
           builder = Core::Build::Builder.new
           cascade_map = builder.build_cascade_map(sections)
           taxonomies = Content::FrontMatterSchema.taxonomy_names(config)
+          # Never raises inside the map (which would drop the page); see
+          # Phases::ParseContent#apply_content_schemas.
           checked = Hwaro::Core::Build::ParallelHelper.map(pages.sort_by!(&.[1])) do |page, file, source, extra, generated|
-            rule = Content::FrontMatterSchema.rule_for(config, page.section)
-            cascade = builder.merged_cascade_for(page, cascade_map)
-            {file, rule.try { |r| Content::FrontMatterSchema.check(r, file, source, extra, cascade, locate: !generated, taxonomies: taxonomies) }}
+            result = begin
+              Content::FrontMatterSchema.rule_for(config, page.section).try do |rule|
+                cascade = builder.merged_cascade_for(page, cascade_map)
+                Content::FrontMatterSchema.check(rule, file, source, extra, cascade, locate: !generated, taxonomies: taxonomies)
+              end
+            rescue ex
+              ex
+            end
+            {file, result}
           end
-          checked.each { |file, result| results << {file, result} if result }
+          checked.each do |file, result|
+            raise result if result.is_a?(Exception)
+            results << {file, result} if result
+          end
         ensure
           Logger.level = previous
         end
