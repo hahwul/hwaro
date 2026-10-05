@@ -126,6 +126,9 @@ module Hwaro::Core::Build::Phases::Render
       rescue File::Error | IO::Error
         "<unreadable>"
       end
+    elsif key.starts_with?(Content::Processors::TemplateEngine::ASSET_READ_PREFIX)
+      name = key[Content::Processors::TemplateEngine::ASSET_READ_PREFIX.size..]
+      Content::Hooks::AssetHooks.integrity(name) || "<absent>"
     else
       ""
     end

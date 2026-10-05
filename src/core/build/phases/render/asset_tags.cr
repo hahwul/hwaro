@@ -67,8 +67,14 @@ module Hwaro::Core::Build::Phases::Render
   # The build output directory when `[assets] sri` is on: the tag emitters
   # hash the emitted bytes under it (static copy, Sass and bundles have all
   # written by the time the Render phase asks). Nil when SRI is off.
+  # Off under `hwaro serve`: its tags carry the dev origin, so viewing the
+  # site from another host name (localhost vs 127.0.0.1, a LAN address)
+  # would make every check fail. `asset_integrity()` still answers there.
   private def sri_root(config : Models::Config) : String?
-    config.assets.sri ? @context.try(&.output_dir) : nil
+    return unless config.assets.sri
+    ctx = @context
+    return if ctx.nil? || ctx.options.serve_mode
+    ctx.output_dir
   end
 
   # True when a template calls `asset_integrity()`. Its value digests an
@@ -76,6 +82,38 @@ module Hwaro::Core::Build::Phases::Render
   # re-render after any static change while one does.
   def asset_integrity_used? : Bool
     @templates.try(&.each_value.any?(&.includes?("asset_integrity"))) || false
+  end
+
+  # Hand AssetHooks the source of every output the Write phase copies
+  # verbatim AFTER rendering — `[content.files]` raw files and page-bundle
+  # assets — so `asset_integrity()` hashes those bytes on a cold build (the
+  # copy does not exist yet) and on a `--cache` build (it still holds the
+  # previous copy) alike. Raw files `--minify` rewrites are left out, along
+  # with the bundle copies they shadow: their source is not what ships.
+  private def publish_asset_sources(ctx : Lifecycle::BuildContext) : Nil
+    sources = {} of String => String
+    if asset_integrity_used?
+      output_dir = ctx.options.output_dir
+      transformed = Set(String).new
+      withheld = withheld_bundle_dirs
+      ctx.raw_files.each do |raw|
+        next if !withheld.empty? && withheld_content_file?(raw.relative_path, withheld)
+        dest = File.expand_path(File.join(output_dir, raw.relative_path))
+        if ctx.options.minify && File.extname(raw.source_path).downcase.in?(".json", ".xml", ".html", ".htm")
+          transformed << dest
+        else
+          sources[dest] = raw.source_path
+        end
+      end
+      ctx.all_pages.each do |page|
+        next if page.assets.empty?
+        bundle_asset_destinations(page, output_dir).try &.each do |source, dest|
+          dest = File.expand_path(dest)
+          sources[dest] ||= source unless transformed.includes?(dest)
+        end
+      end
+    end
+    Content::Hooks::AssetHooks.sources = sources
   end
 
   # Compute a content-based cache bust hash from local CSS/JS files.

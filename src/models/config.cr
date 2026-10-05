@@ -31,13 +31,16 @@ module Hwaro
       value.empty? ? "" : "?v=#{HTML.escape(value)}"
     end
 
-    # ` integrity="sha384-…"` for the file at `path` (an output-root URL
-    # path) under `sri_root`, the build output directory. "" when SRI is off
-    # (`sri_root` nil) or the file was not emitted.
+    # ` integrity="sha384-…" crossorigin="anonymous"` for the file at `path`
+    # (an output-root URL path) under `sri_root`, the build output directory.
+    # "" when SRI is off (`sri_root` nil) or the file was not emitted.
     def self.integrity_attr(sri_root : String?, path : String) : String
       return "" unless sri_root
-      sri = Utils::DigestUtils.sri_file(File.join(sri_root, path.lchop('/')))
-      sri ? %( integrity="#{sri}") : ""
+      sri = Utils::SriCache.sri(File.join(sri_root, path.lchop('/')))
+      # `crossorigin`: a tag URL under an absolute `base_url` is cross-origin
+      # whenever the page is viewed from another host (www vs apex, a deploy
+      # preview), and an integrity check on a no-cors response always fails.
+      sri ? %( integrity="#{sri}" crossorigin="anonymous") : ""
     end
 
     # Join non-empty tag fragments with newlines.

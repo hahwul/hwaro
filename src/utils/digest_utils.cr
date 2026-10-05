@@ -35,5 +35,50 @@ module Hwaro
         nil
       end
     end
+
+    # Per-build memo of `DigestUtils.sri_file`, keyed on the file's absolute
+    # path, mtime and size: every page printing `asset_integrity()` or an
+    # `[assets] sri` tag would otherwise re-read and re-hash the same file.
+    # It also remembers each value handed out, so a `[build] hooks.post` that
+    # rewrites one of those files can be caught (`stale`). Cleared at every
+    # build and serve pass; mutex-guarded for parallel render workers.
+    module SriCache
+      @@memo = {} of {String, Int64, Int64} => String
+      @@emitted = {} of String => String
+      @@mutex = Mutex.new
+
+      def self.clear : Nil
+        @@mutex.synchronize do
+          @@memo.clear
+          @@emitted.clear
+        end
+      end
+
+      def self.sri(path : String) : String?
+        info = File.info?(path)
+        return unless info && info.file?
+        absolute = File.expand_path(path)
+        key = {absolute, info.modification_time.to_unix_ms, info.size}
+        if hit = @@mutex.synchronize { @@memo[key]? }
+          @@mutex.synchronize { @@emitted[absolute] = hit }
+          return hit
+        end
+        return unless sri = DigestUtils.sri_file(path)
+        @@mutex.synchronize do
+          @@memo[key] = sri
+          @@emitted[absolute] = sri
+        end
+        sri
+      rescue File::Error
+        nil
+      end
+
+      # Files whose bytes no longer match the value handed out this build.
+      def self.stale : Array(String)
+        @@mutex.synchronize { @@emitted.dup }.compact_map do |path, sri|
+          path unless DigestUtils.sri_file(path) == sri
+        end.sort!
+      end
+    end
   end
 end

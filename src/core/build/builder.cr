@@ -738,6 +738,9 @@ module Hwaro
           # one filesystem timestamp tick does not move; a build must read
           # the data files as they are now, not as a previous build saw them.
           Content::Processors::TemplateEngine.clear_load_data_cache
+          # Same for the SRI digests (keyed on mtime + size, so this is
+          # belt-and-braces) and the record `hooks.post` is checked against.
+          Utils::SriCache.clear
           # Same lifetime for the once-per-BUILD shortcode warnings (missing
           # template, unclosed block): a `serve` session that never cleared them
           # reported each name only for the first rebuild it appeared in.
@@ -803,6 +806,7 @@ module Hwaro
             unless Utils::CommandRunner.run_post_hooks(post_hooks)
               Logger.warn "Post-build hooks failed, but build was successful."
             end
+            warn_integrity_changed_by_post_hooks
           end
 
           if options.debug
@@ -812,6 +816,15 @@ module Hwaro
           end
 
           true
+        end
+
+        # The pages carry `integrity` values hashed during Render; a post hook
+        # that rewrote one of those files (a minifier over public/) makes the
+        # browser block it. Nothing re-renders after the hooks, so say so.
+        private def warn_integrity_changed_by_post_hooks
+          Utils::SriCache.stale.each do |path|
+            Logger.warn "[build] hooks.post changed #{path} after its integrity was printed into pages; browsers will block it. Rewrite it in hooks.pre (into static/) instead."
+          end
         end
 
         # Emit the end-of-build cache statistics at the requested verbosity.

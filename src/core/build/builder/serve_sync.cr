@@ -536,6 +536,10 @@ module Hwaro
         # reads, mark the claim set as a previous build's, and drop the mkdir
         # memo (see `forget_created_dirs`).
         private def begin_serve_pass : Nil
+          # A serve pass is a new build for `asset_integrity()` and the SRI
+          # tags: re-hash, and re-map the copied sources.
+          Utils::SriCache.clear
+          @context.try { |ctx| publish_asset_sources(ctx) }
           forget_created_dirs
           mark_build_output_epoch
           @generated_claims_current = false

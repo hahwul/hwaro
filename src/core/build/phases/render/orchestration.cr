@@ -23,6 +23,8 @@ module Hwaro::Core::Build::Phases::Render
     # fingerprint of those sets into the rebuild decision.
     @unpublished_pages.set(0)
     @published_pages.set(0)
+    publish_asset_sources(ctx)
+
     # What templates read outside the tracked files (see render_inputs.cr):
     # compared BEFORE the filter, so a change re-renders every page.
     render_globals = ""

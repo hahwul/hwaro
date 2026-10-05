@@ -185,13 +185,16 @@ module Hwaro
         # global vars — so the pages re-render without the full build's
         # re-parse, image and OG passes: this is the most frequent theming
         # save, and a full build made each one a multi-second wait.
-        # `[assets] sri` prints a digest of the same files' bytes (with or
-        # without `?v=`), and a template's `asset_integrity()` one of any
-        # emitted file — a stale value makes the browser refuse the asset.
-        sri = @builder.config.try(&.assets.sri) || false
-        if ((build_options.cache_busting || sri) && @builder.cache_bust_input_changed?(changeset.modified_static)) ||
-           @builder.asset_integrity_used?
-          Logger.info "  A cache-busted asset changed — re-rendering pages to update its ?v= hash."
+        # A template's `asset_integrity()` prints a digest of an emitted file
+        # (serve emits no `[assets] sri` tags of its own); a stale value makes
+        # the browser refuse the asset.
+        cache_bust_changed = build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
+        if cache_bust_changed || @builder.asset_integrity_used?
+          if cache_bust_changed
+            Logger.info "  A cache-busted asset changed — re-rendering pages to update its ?v= hash."
+          else
+            Logger.info "  A static file changed and templates call asset_integrity() — re-rendering pages to update it."
+          end
           if site = @builder.site
             return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
           end
@@ -226,6 +229,12 @@ module Hwaro
             changed = @builder.reject_withheld_content_sources(changeset.modified_content_files)
             Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changed, config, output_dir, pages: pages)
           end
+        end
+        # Same as copy_static: `asset_integrity()` may name a page-bundle or
+        # `[content.files]` asset, whose new bytes the copy alone never shows.
+        if @builder.asset_integrity_used? && (site = @builder.site)
+          Logger.info "  A content file changed and templates call asset_integrity() — re-rendering pages to update it."
+          return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
         end
         # Same as copy_static: a template reading the file via load_data().
         if @builder.load_data_source_changed?(changeset.modified_content_files)
