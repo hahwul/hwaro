@@ -718,6 +718,12 @@ module Hwaro
             end
 
             apply_cascade_to(page, cascade_map)
+            # A schema violation fails the build: let the full build report
+            # it (every page, sorted) and set the overlay.
+            unless apply_content_schema(page, config, cascade_map).empty?
+              Logger.info "  #{page.path} violates its [[content.schema]] — running full rebuild."
+              return
+            end
 
             changed_pages << page
             affected_sections << page.section

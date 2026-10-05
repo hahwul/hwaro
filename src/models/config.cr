@@ -17,6 +17,7 @@ require "./config/markdown"
 require "./config/versions"
 require "./config/data_remote"
 require "./config/content_generate"
+require "./config/content_schema"
 require "./config/content"
 require "./config/i18n"
 require "./config/assets"
@@ -91,6 +92,7 @@ module Hwaro
       property links : LinksConfig
       property data_remote : Array(RemoteDataConfig)
       property content_generate : Array(ContentGenerateConfig)
+      property content_schema : Array(ContentSchemaConfig)
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_path : String? = nil
@@ -136,6 +138,7 @@ module Hwaro
         @links = LinksConfig.new
         @data_remote = [] of RemoteDataConfig
         @content_generate = [] of ContentGenerateConfig
+        @content_schema = [] of ContentSchemaConfig
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -394,6 +397,7 @@ module Hwaro
         SectionLoader.new(%w[links], ->(c : Config) { load_links(c) }),
         SectionLoader.new(%w[data], ->(c : Config) { load_data_remote(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_generate(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_schema(c) }),
       ]
 
       # The four scalar keys `load` reads directly, ahead of any section.

@@ -241,6 +241,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     # _index files) still cascade to their descendants — include them.
     apply_cascades(ctx.all_pages, ctx.sections + ctx.excluded_cascade_sections)
 
+    # [[content.schema]] after cascade (cascaded values count as present).
+    # Only pages that survive the filters below fail the build.
+    schema_violations = apply_content_schemas(ctx.pages, ctx.options.parallel)
+
     # Single-pass filtering: remove parse-failed, draft, and expired pages.
     # Combines multiple reject! calls into one pass per array to avoid
     # repeated traversals, and calls invalidate_all_pages_cache at most once.
@@ -305,6 +309,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     # Deferred date-token permalink errors: only pages that survived the
     # filters above can publish a URL, so only they can fail the build.
     raise_on_permalink_errors!(ctx.pages)
+    unless schema_violations.empty?
+      published = ctx.pages.map { |p| File.join("content", p.path) }.to_set
+      Content::FrontMatterSchema.raise_if_any!(schema_violations.select { |v| published.includes?(v.file) })
+    end
 
     # The skipped total feeds the receipt's "parse … N skipped" emphasis; the
     # per-reason breakdown stays available under --verbose. Parse errors remain
@@ -556,8 +564,93 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
   end
 
+  # Validate regular pages against `[[content.schema]]` and fill the
+  # defaults of their missing fields. Returns every violation, in page
+  # order. The check (a source re-read and front-matter parse per page) is
+  # pure and fans out; defaults are applied afterwards, on this fiber.
+  private def apply_content_schemas(pages : Array(Models::Page), parallel : Bool) : Array(Content::FrontMatterSchema::Violation)
+    violations = [] of Content::FrontMatterSchema::Violation
+    config = @config
+    return violations if config.nil? || config.content_schema.empty?
+    cascade_map = @cascade_map || build_cascade_map([] of Models::Section)
+    taxonomies = Content::FrontMatterSchema.taxonomy_names(config)
+    # ParallelHelper.map drops an item whose block raises, so the block
+    # never raises: a failure is carried out and re-raised here instead of
+    # leaving that page silently unchecked.
+    checked = ParallelHelper.map(pages.reject(&.parse_failed), parallel) do |page|
+      result = begin
+        content_schema_result(page, config, cascade_map, taxonomies)
+      rescue ex
+        ex
+      end
+      {page, result}
+    end
+    checked.each do |page, result|
+      raise result if result.is_a?(Exception)
+      violations.concat(apply_schema_result(page, result)) if result
+    end
+    violations
+  end
+
+  # Check one page and apply its defaults (the serve incremental path).
+  protected def apply_content_schema(page : Models::Page, config : Models::Config, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Array(Content::FrontMatterSchema::Violation)
+    result = content_schema_result(page, config, cascade_map, Content::FrontMatterSchema.taxonomy_names(config))
+    result ? apply_schema_result(page, result) : [] of Content::FrontMatterSchema::Violation
+  end
+
+  # nil when the page is a section or matches no schema.
+  private def content_schema_result(page : Models::Page, config : Models::Config, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue)), taxonomies : Array(String)) : Content::FrontMatterSchema::Result?
+    return if page.is_a?(Models::Section)
+    return unless rule = Content::FrontMatterSchema.rule_for(config, page.section)
+    source_path = File.join("content", page.path)
+    source = page.synthesis.try(&.markdown) || File.read(source_path)
+    Content::FrontMatterSchema.check(rule, source_path, source, page.extra, merged_cascade_for(page, cascade_map),
+      locate: !page.synthesized?, taxonomies: taxonomies)
+  end
+
+  private def apply_schema_result(page : Models::Page, result : Content::FrontMatterSchema::Result) : Array(Content::FrontMatterSchema::Violation)
+    result.defaults.each { |name, value| apply_schema_default(page, name, value) }
+    result.violations
+  end
+
+  # The typed property for a known field (the set
+  # `ContentSchemaField::DEFAULTABLE_KNOWN` allows), else `page.extra`.
+  private def apply_schema_default(page : Models::Page, name : String, value : Models::SchemaValue)
+    extra_value = value.is_a?(Time) ? value.to_s : value
+    if name.starts_with?("extra.") || !Content::FrontMatterSchema::KNOWN_KEYS.includes?(name)
+      page.extra[name.lchop("extra.")] = extra_value
+      return
+    end
+
+    case name
+    when "description"         then extra_value.as?(String).try { |v| page.description = v }
+    when "image"               then extra_value.as?(String).try { |v| page.image = v }
+    when "template"            then extra_value.as?(String).try { |v| page.template = normalize_template_name(v) }
+    when "series"              then extra_value.as?(String).try { |v| page.series = v }
+    when "render"              then extra_value.as?(Bool).try { |b| page.render = b }
+    when "toc"                 then extra_value.as?(Bool).try { |b| page.toc = b }
+    when "insert_anchor_links" then extra_value.as?(Bool).try { |b| page.insert_anchor_links = b }
+    when "in_sitemap"          then extra_value.as?(Bool).try { |b| page.in_sitemap = b }
+    when "in_search_index"     then extra_value.as?(Bool).try { |b| page.in_search_index = b }
+    when "weight"              then extra_value.as?(Int64).try { |i| page.weight = i.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32 }
+    when "series_weight"       then extra_value.as?(Int64).try { |i| page.series_weight = i.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32 }
+    when "authors"
+      # Like a cascade: authors/tags given through [taxonomies] are present.
+      cascade_string_array(extra_value).try { |a| page.authors = a } if page.authors.empty?
+    when "tags"
+      if page.tags.empty? && (tags = cascade_string_array(extra_value))
+        page.tags = tags
+        page.taxonomies["tags"] = tags unless tags.empty?
+      end
+    when "updated"
+      page.updated = value.as?(Time) || extra_value.as?(String).try { |s| Utils::DateUtils.parse_content_date(s) }
+    end
+  end
+
   # Build {directory, language} => validated cascade map from sections.
-  protected def build_cascade_map(sections : Array(Models::Section)) : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))
+  # Public: the schema tools (doctor, `tool validate`) resolve cascades
+  # through it too.
+  def build_cascade_map(sections : Array(Models::Section)) : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))
     map = {} of Tuple(String, String) => Hash(String, Models::ExtraValue)
     sections.each do |section|
       next if section.cascade.empty?
@@ -657,7 +750,7 @@ module Hwaro::Core::Build::Phases::ParseContent
 
   # Collect cascades from the page's ancestor directories, shallowest first,
   # restricted to sections in the same language tree.
-  private def merged_cascade_for(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Hash(String, Models::ExtraValue)
+  def merged_cascade_for(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Hash(String, Models::ExtraValue)
     dir = Path[page.path].dirname.to_s
     dir = "" if dir == "."
 

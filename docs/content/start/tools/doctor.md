@@ -97,6 +97,9 @@ hwaro doctor --json
 - Front matter `template` (or a section's `page_template` or `[cascade]
   template`) naming a template that does not exist, which the build silently
   replaces with the default
+- Pages that violate their section's [front-matter schema](/writing/schema/)
+  (`[[content.schema]]`): the same check, over the same published pages, as
+  `hwaro build` (`content-schema-violation`, error; the message carries the line)
 
 **Structure diagnostics:**
 
@@ -157,6 +160,7 @@ hwaro: doctor
     [ok]   front matter (TOML/YAML parse)
     [ok]   front matter menus (declared in config)
     [ok]   front matter templates (exist)
+    [ok]   front matter schema ([[content.schema]])
     [info] section index files (_index.md)
     [ok]   translations (pages in every language)
 
@@ -264,6 +268,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `content-read-error` | content | Failed to read content file ✗ |
 | `menu-undeclared` | content | Front matter menu name not declared in config |
 | `content-template-missing` | content | Front matter `template` / `page_template` / `[cascade] template` names a missing template |
+| `content-schema-violation` | content | Front matter violates its `[[content.schema]]` ✗ |
 | `structure-missing-index` | structure | Section missing _index.md |
 | `translation-missing` | i18n | Page or section has no counterpart in a configured language |
 | `translation-orphan` | i18n | Translation has no default-language original |

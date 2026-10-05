@@ -33,6 +33,8 @@
       url: /writing/shortcodes/
     - title: Archetypes
       url: /writing/archetypes/
+    - title: Front Matter Schema
+      url: /writing/schema/
 - title: Templates
   section: templates
   items:

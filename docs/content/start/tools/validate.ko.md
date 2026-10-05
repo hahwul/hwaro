@@ -41,6 +41,11 @@ hwaro tool validate --json
 - 유효하지 않은 날짜 형식
 - 대소문자가 섞인 태그 (예: `crystal` 대신 `Crystal`)
 - 초안 파일 (info로 보고)
+- `config.toml`에 `[[content.schema]]`가 있으면 [프론트 매터 스키마](/ko/writing/schema/)
+  위반. 기본 빌드가 게시하는 페이지에 빌드와 같은 검사를 실행하므로 validate와
+  `hwaro build`가 같은 위반을 보고합니다. validate는 콘텐츠 디렉터리 옆의
+  `config.toml`을 스키마가 선언된 경우에만 읽으며, 잘못된 스키마는 설정 오류
+  코드(3)로 종료합니다
 
 ## 출력 예시
 
@@ -86,6 +91,7 @@ checked: 0 errors, 2 warnings, 2 info
 | `content-read-error` | error | 콘텐츠 파일 읽기 실패 |
 | `content-tag-mixed-case` | info | 대소문자가 섞인 태그 |
 | `content-draft` | info | 초안으로 표시된 파일 |
+| `content-schema-violation` | error | 프론트 매터가 `[[content.schema]]`를 위반 |
 
 ## JSON 출력
 
@@ -100,5 +106,18 @@ checked: 0 errors, 2 warnings, 2 info
       "message": "Missing description in frontmatter"
     }
   ]
+}
+```
+
+스키마 위반에는 `line`이 들어갑니다(빠진 필드는 null). `[[content.schema]]`가
+선언되어 있으면 `defaults` 객체가 파일별로, 빌드가 그 페이지의 빠진 필드에
+적용하는 기본값을 나열합니다:
+
+```json
+{
+  "findings": [],
+  "defaults": {
+    "content/posts/b.md": { "status": "draft" }
+  }
 }
 ```

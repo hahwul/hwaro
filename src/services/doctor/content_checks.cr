@@ -198,6 +198,94 @@ module Hwaro
         per_file.each { |arr| arr.each { |i| issues << i } }
       end
 
+      # `[[content.schema]]` violations, one error per violation.
+      private def check_content_schema(issues : Array(Issue), config : Models::Config)
+        Doctor.content_schema_results(@content_dir, config).each do |_, result|
+          issues.concat(result.violations.map { |v| Doctor.schema_issue(v) })
+        end
+      end
+
+      def self.schema_issue(v : Content::FrontMatterSchema::Violation) : Issue
+        message = "field #{v.field.inspect}: #{v.message}"
+        message = "line #{v.line}: #{message}" if v.line
+        Issue.new(id: "content-schema-violation", level: :error, category: "content", file: v.file, message: message, line: v.line)
+      end
+
+      # The build's `[[content.schema]]` check over the regular pages a
+      # default build publishes (ContentLister, plus `[[content.generate]]`
+      # pages), with section cascades resolved by the build's own
+      # `build_cascade_map` / `merged_cascade_for`. {file, result} per
+      # checked page, in path order. Shared by doctor and `tool validate`.
+      def self.content_schema_results(content_dir : String, config : Models::Config) : Array({String, Content::FrontMatterSchema::Result})
+        results = [] of {String, Content::FrontMatterSchema::Result}
+        return results if config.content_schema.empty? || !Dir.exists?(content_dir)
+
+        # Re-parsing replays the build's front-matter warnings; those belong
+        # to `hwaro build` (see PageRouteIndex).
+        previous = Logger.level
+        Logger.level = Logger::Level::Error
+        begin
+          menus = MenuScope.new(config)
+          sections = [] of Models::Section
+          pages = [] of {Models::Page, String, String, Hash(String, Models::ExtraValue), Bool}
+          ContentLister.new(content_dir, GeneratedContent.infos(content_dir)).list_all.each do |info|
+            generated = !info.generated_from.nil?
+            relative = generated ? info.path : Path[info.path].relative_to(content_dir).to_s
+            file = generated ? File.join(content_dir, info.path) : info.path
+            source = generated ? (info.generated_source || next) : File.read(info.path)
+            data = begin
+              Processor::Markdown.parse(source, file)
+            rescue Hwaro::HwaroError
+              next # doctor's parse check and the build report it
+            end
+
+            # Section / language placement, as ReadContent assigns it.
+            language = menus.filename_language(file)
+            basename = File.basename(relative)
+            ext = File.extname(basename)
+            clean = language ? "#{basename.rchop(".#{language}#{ext}")}#{ext}" : basename
+            parts = Path[relative].parts
+            if clean == "_index#{ext}"
+              section = Models::Section.new(relative)
+              section.cascade = data[:cascade]
+              section.language = language == config.default_language ? nil : language
+              sections << section
+              next
+            end
+            next unless info.published?
+            page = Models::Page.new(relative)
+            depth = clean == "index#{ext}" ? 2 : 1
+            page.section = parts.size > depth ? parts[0..-(depth + 1)].join("/") : ""
+            page.language = language == config.default_language ? nil : language
+            pages << {page, file, source, data[:extra], generated}
+          end
+
+          builder = Core::Build::Builder.new
+          cascade_map = builder.build_cascade_map(sections)
+          taxonomies = Content::FrontMatterSchema.taxonomy_names(config)
+          # Never raises inside the map (which would drop the page); see
+          # Phases::ParseContent#apply_content_schemas.
+          checked = Hwaro::Core::Build::ParallelHelper.map(pages.sort_by!(&.[1])) do |page, file, source, extra, generated|
+            result = begin
+              Content::FrontMatterSchema.rule_for(config, page.section).try do |rule|
+                cascade = builder.merged_cascade_for(page, cascade_map)
+                Content::FrontMatterSchema.check(rule, file, source, extra, cascade, locate: !generated, taxonomies: taxonomies)
+              end
+            rescue ex
+              ex
+            end
+            {file, result}
+          end
+          checked.each do |file, result|
+            raise result if result.is_a?(Exception)
+            results << {file, result} if result
+          end
+        ensure
+          Logger.level = previous
+        end
+        results
+      end
+
       # Pages and sections that exist in the default language but not in
       # another configured one, and translations with no default-language
       # original. Pairing is the build's own: `Multilingual.link_translations!`
