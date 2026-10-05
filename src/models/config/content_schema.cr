@@ -21,9 +21,27 @@ module Hwaro
       # Known front-matter fields a `default` may fill: the ones read after
       # parsing (cascade's set plus a few listing fields). URL-, date- and
       # publication-window fields are resolved during parsing, so a default
-      # on them could not take effect.
-      DEFAULTABLE_KNOWN = %w[description image template draft render toc insert_anchor_links
+      # on them could not take effect. `draft` is left out on purpose: the
+      # tools' publish state (ContentLister) reads front matter and
+      # [cascade] only, and a default it cannot see would split the page set.
+      DEFAULTABLE_KNOWN = %w[description image template render toc insert_anchor_links
         in_sitemap in_search_index weight series series_weight tags authors updated]
+
+      # The type each known front-matter field has to the parser. A schema
+      # may only declare that type for it (`menus`/`menu` take several shapes
+      # and are not listed).
+      KNOWN_TYPES = {
+        "title" => "string", "description" => "string", "image" => "string", "template" => "string",
+        "slug" => "string", "path" => "string", "sort_by" => "string", "page_template" => "string",
+        "paginate_path" => "string", "redirect_to" => "string", "series" => "string",
+        "draft" => "bool", "in_sitemap" => "bool", "toc" => "bool", "render" => "bool",
+        "transparent" => "bool", "generate_feeds" => "bool", "pagination_enabled" => "bool",
+        "reverse" => "bool", "in_search_index" => "bool", "insert_anchor_links" => "bool",
+        "paginate" => "int", "paginate_by" => "int", "weight" => "int", "series_weight" => "int",
+        "date" => "date", "updated" => "date", "expires" => "date",
+        "aliases" => "array", "tags" => "array", "authors" => "array", "categories" => "array",
+        "taxonomies" => "table", "cascade" => "table",
+      }
 
       getter name : String
       getter type : String
@@ -45,11 +63,12 @@ module Hwaro
       def problem(value : SchemaValue) : String?
         actual = ContentSchemaField.type_name(value)
         unless type_accepts?(value)
-          return "expected #{@type}, got #{actual}#{" #{value.inspect}" if actual == "string"}"
+          return "expected #{@type}, got #{actual}#{" #{ContentSchemaField.show(value)}" if actual == "string"}"
         end
         if (allowed = @enum_values) && !allowed.includes?(value)
-          return "#{value.inspect} is not one of #{allowed.map(&.inspect).join(", ")}"
+          return "#{ContentSchemaField.show(value)} is not one of #{allowed.map(&.inspect).join(", ")}"
         end
+        return "NaN is outside the bounds" if value.is_a?(Float64) && value.nan? && (@min || @max)
         measure, what = case value
                         when Int64, Float64 then {value.to_f, value.inspect}
                         when String         then {value.size.to_f, "length #{value.size}"}
@@ -86,6 +105,12 @@ module Hwaro
         in Array   then "array"
         in Hash    then "table"
         end
+      end
+
+      # `value.inspect`, cut to about 80 characters for messages.
+      def self.show(value : SchemaValue) : String
+        text = value.inspect
+        text.size > 80 ? "#{text[0, 79]}…" : text
       end
 
       def self.number(value : Float64) : String
@@ -197,8 +222,16 @@ module Hwaro
           raise schema_config_error("#{where}: min (#{ContentSchemaField.number(lo)}) is greater than max (#{ContentSchemaField.number(hi)}).")
         end
 
+        known_type = name.starts_with?("extra.") ? nil : ContentSchemaField::KNOWN_TYPES[name]?
+        if known_type && known_type != type
+          raise schema_config_error("#{where}: '#{name}' is #{known_type == "int" || known_type == "array" ? "an" : "a"} #{known_type} front-matter field; declare type = \"#{known_type}\".")
+        end
+
         built = ContentSchemaField.new(name, type, required, enum_values, nil, min, max)
         if default_any = field["default"]?
+          if name == "draft"
+            raise schema_config_error("#{where}: 'draft' cannot take a default — doctor and `tool list` decide what publishes from front matter and [cascade] alone. Set draft in the page or in a section's [cascade].")
+          end
           if !name.starts_with?("extra.") && Content::Processors::Markdown::KNOWN_FRONT_MATTER_KEYS.includes?(name) &&
              !ContentSchemaField::DEFAULTABLE_KNOWN.includes?(name)
             raise schema_config_error("#{where}: '#{name}' is resolved while the page is parsed, so a default cannot apply. Defaults can fill extra keys and #{ContentSchemaField::DEFAULTABLE_KNOWN.join(", ")}.")
@@ -217,7 +250,9 @@ module Hwaro
         unless type.in?("int", "float", "string", "array")
           raise schema_config_error("#{where}: '#{key}' applies to int and float (value) and string and array (length) fields, not #{type}.")
         end
-        raw.as_f? || raw.as_i64?.try(&.to_f) || raise schema_config_error("#{where}: '#{key}' must be a number.")
+        bound = raw.as_f? || raw.as_i64?.try(&.to_f)
+        raise schema_config_error("#{where}: '#{key}' must be a number.") if bound.nil? || bound.nan?
+        bound
       end
 
       private def self.schema_bool(raw : TOML::Any?, key : String, where : String) : Bool

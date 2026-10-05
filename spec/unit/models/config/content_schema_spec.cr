@@ -105,6 +105,24 @@ describe "[[content.schema]] config" do
         .message.to_s.should contain("'slug' is resolved while the page is parsed")
     end
 
+    it "rejects a draft default: publish state stays with front matter and [cascade]" do
+      expect_config_error(SCHEMA_HEAD + "[content.schema.fields.draft]\ntype = \"bool\"\ndefault = true\n")
+        .message.to_s.should contain("'draft' cannot take a default")
+    end
+
+    it "rejects a type that contradicts a known field's own type" do
+      expect_config_error(SCHEMA_HEAD + "[content.schema.fields.weight]\ntype = \"float\"\n")
+        .message.to_s.should contain("'weight' is an int front-matter field")
+      expect_config_error(SCHEMA_HEAD + "[content.schema.fields.tags]\ntype = \"string\"\n")
+        .message.to_s.should contain("'tags' is an array front-matter field")
+      load_config(SCHEMA_HEAD + "[content.schema.fields.weight]\ntype = \"int\"\ndefault = 3\n").content_schema.first.fields.size.should eq(1)
+    end
+
+    it "rejects a NaN bound" do
+      expect_config_error(SCHEMA_HEAD + "[content.schema.fields.n]\ntype = \"float\"\nmax = nan\n")
+        .message.to_s.should contain("'max' must be a number")
+    end
+
     it "rejects names that nest deeper than extra.<key>" do
       expect_config_error(SCHEMA_HEAD + "[content.schema.fields.\"extra.a.b\"]\ntype = \"int\"\n")
         .message.to_s.should contain("nothing nests deeper")
