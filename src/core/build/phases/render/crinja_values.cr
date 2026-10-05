@@ -163,7 +163,10 @@ module Hwaro::Core::Build::Phases::Render
         end
       end
 
-      if series_key = series_group_key(page, default_lang)
+      # series_index 0: the page names a series but was left out of it
+      # (draft, unpublished, render = false), so it must not seed the
+      # group's shared list with its own empty one.
+      if page.series_index > 0 && (series_key = series_group_key(page, default_lang))
         unless @series_crinja_cache.has_key?(series_key)
           @series_crinja_cache[series_key] = Crinja::Value.new(page.series_pages.map { |sp|
             cached_page_crinja_value(sp, default_lang)

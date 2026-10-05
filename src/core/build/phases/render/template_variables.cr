@@ -154,9 +154,11 @@ module Hwaro::Core::Build::Phases::Render
       "ancestors"         => Crinja::Value.new(ancestors_array),
       "series"            => Crinja::Value.new(page.series || ""),
       "series_index"      => Crinja::Value.new(page.series_index),
-      "series_pages"      => if page.series.nil?
+      "series_pages"      => if page.series.nil? || page.series_index == 0
         # Mirror related_posts below: series-less pages (the default) must not
-        # acquire the cache mutex just to hand back the same empty array.
+        # acquire the cache mutex just to hand back the same empty array. A
+        # page left out of its series (series_index 0) reads no group either:
+        # the shared list belongs to the members.
         Crinja::Value.new([] of Crinja::Value)
       elsif @crinja_caches_frozen
         if cached_series = series_group_key(page, default_lang).try { |k| @series_crinja_cache[k]? }
