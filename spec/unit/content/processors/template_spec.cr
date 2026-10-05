@@ -374,6 +374,18 @@ describe Hwaro::Content::Processors::TemplateEngine do
       end
     end
 
+    it "load_data reads a data file that starts with a UTF-8 BOM, like site.data" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          File.write("data/bom.json", "\uFEFF{\"bom\": 1}")
+          Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+
+          render_crinja(%({{ load_data(path="data/bom.json").bom }})).should eq("1")
+        end
+      end
+    end
+
     it "load_data blocks path traversal outside the project root" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

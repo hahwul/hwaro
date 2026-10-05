@@ -1088,6 +1088,11 @@ describe "CollectionFilters (extended)" do
       result = render_crinja("{% for i in items | compact %}{{ i }},{% endfor %}", vars)
       result.should eq("a,b,")
     end
+
+    it "removes empty lists and mappings" do
+      vars = {"items" => Crinja.value([1, [] of String, {} of String => String, [2]])}
+      render_crinja("{{ items | compact | length }}", vars).should eq("2")
+    end
   end
 end
 
@@ -1375,6 +1380,11 @@ describe "I18nFilters" do
       vars = {"count" => Crinja::Value.new(1.0)}
       result = render_crinja("{{ count | pluralize(\"item\", \"items\") }}", vars)
       result.should eq("item")
+    end
+
+    it "reads a numeric string as its number" do
+      vars = {"one" => Crinja::Value.new("1"), "two" => Crinja::Value.new(" 2 ")}
+      render_crinja(%({{ one | pluralize("item", "items") }}|{{ two | pluralize("item", "items") }}), vars).should eq("item|items")
     end
   end
 end

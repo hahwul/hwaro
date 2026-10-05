@@ -5,6 +5,21 @@ module Hwaro
     module Processors
       module Filters
         module CollectionFilters
+          # Empty for templates: nil, undefined, or an empty string, list or
+          # mapping. Shared by `compact` and the `empty`/`present` tests.
+          def self.blank?(value : Crinja::Raw) : Bool
+            case value
+            when String, Crinja::SafeString
+              value.to_s.empty?
+            when Array, Hash
+              value.empty?
+            when Nil, Crinja::Undefined
+              true
+            else
+              false
+            end
+          end
+
           def self.register(env : Crinja)
             # Array where filter
             env.filters["where"] = Crinja.filter({attribute: nil, value: nil}) do
@@ -140,10 +155,7 @@ module Hwaro
             # Compact filter — removes nil/empty values from an array
             env.filters["compact"] = Crinja.filter do
               safe_array do
-                arr = target.as_a
-                arr.reject do |item|
-                  item.raw.nil? || item.to_s.empty?
-                end
+                target.as_a.reject { |item| CollectionFilters.blank?(item.raw) }
               end
             end
           end

@@ -48,21 +48,9 @@ module Hwaro
           Filters::MenuFilters.register(@env)
         end
 
-        # Shared body for the `empty`/`present` Crinja tests: a value is empty
-        # when it's an empty string/array/hash, nil or undefined.
+        # Shared body for the `empty`/`present` Crinja tests.
         private def value_empty?(value : Crinja::Raw) : Bool
-          case value
-          when String, Crinja::SafeString
-            value.to_s.empty?
-          when Array
-            value.empty?
-          when Hash
-            value.empty?
-          when Nil, Crinja::Undefined
-            true
-          else
-            false
-          end
+          Filters::CollectionFilters.blank?(value)
         end
 
         # Register custom tests
@@ -217,6 +205,8 @@ module Hwaro
           #        {% for page in blog.pages %}
           @env.functions["get_section"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
+            # "blog", "/blog", "blog/" and "/blog/" all name the same section.
+            url_key = "/#{path_arg.strip('/')}/"
 
             # A section name can occur in every language variant. Resolve an
             # ambiguous name in the current page's language before falling
@@ -233,7 +223,7 @@ module Hwaro
                 next unless candidate_map = language_maps[candidate]?
                 next unless candidate_map.raw.is_a?(Hash)
                 raw_candidate_map = candidate_map.raw.as(Hash)
-                if found = raw_candidate_map[path_arg]? || raw_candidate_map["/#{path_arg}/"]?
+                if found = raw_candidate_map[path_arg]? || raw_candidate_map[url_key]?
                   return found
                 end
               end
@@ -243,7 +233,7 @@ module Hwaro
             sections_map = env.resolve("__sections_by_key__")
             if !sections_map.raw.nil? && sections_map.raw.is_a?(Hash)
               raw_map = sections_map.raw.as(Hash)
-              found = raw_map[path_arg]? || raw_map["/#{path_arg}/"]?
+              found = raw_map[path_arg]? || raw_map[url_key]?
               found || Crinja::Value.new(nil)
             else
               # Fallback to linear search O(N) if map is not available
@@ -258,7 +248,7 @@ module Hwaro
                     section_name = section_val["name"]?.try(&.to_s) || ""
                     section_url = section_val["url"]?.try(&.to_s) || ""
 
-                    if section_path == path_arg || section_name == path_arg || section_url == "/#{path_arg}/"
+                    if section_path == path_arg || section_name == path_arg || section_url == url_key
                       result = Crinja::Value.new(section_val)
                       break
                     end
@@ -568,7 +558,7 @@ module Hwaro
                   cached = @@load_data_cache[resolved]?
                   if cached && cached[0] == mtime
                     cached[1]
-                  elsif parsed = parse_data_content(path, File.read(resolved))
+                  elsif parsed = parse_data_content(path, Utils::TextUtils.strip_bom(File.read(resolved)))
                     @@load_data_cache[resolved] = {mtime, parsed}
                     parsed
                   else

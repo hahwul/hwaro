@@ -56,8 +56,10 @@ module Hwaro
               # Keep the count as a number (don't .to_i): truncating 1.9 → 1
               # would wrongly pick the singular form. Grammatically only an
               # exact count of 1 is singular.
+              # A numeric string counts too: CSV and load_data values are
+              # always strings, and "1" must still pick the singular.
               count = begin
-                target.as_number
+                target.number? ? target.as_number : (target.to_s.strip.to_f? || 0)
               rescue Exception
                 0
               end
