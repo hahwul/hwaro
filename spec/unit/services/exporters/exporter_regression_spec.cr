@@ -1,12 +1,11 @@
 require "../../../spec_helper"
 
-# Exposes the bundle-asset copy failure path deterministically: a bundle
-# directory that becomes unlistable mid-run (permissions, NFS hiccup) makes
-# `Dir.children` raise inside `copy_bundle_assets` after the post itself was
-# already written.
+# Exposes the asset copy failure path deterministically: a content tree that
+# becomes unlistable mid-run (permissions, NFS hiccup) makes the asset walk
+# raise after the posts themselves were already written.
 private class BundleListFailHugoExporter < Hwaro::Services::Exporters::HugoExporter
-  protected def copy_bundle_assets(source_dir : String, dest_dir : String, output_dir : String, verbose : Bool = false) : Int32
-    raise File::Error.new("Permission denied", file: source_dir)
+  protected def each_published_asset(content_dir : String, pages : Array(String), & : String, String, String? ->) : Nil
+    raise File::Error.new("Permission denied", file: content_dir)
   end
 end
 
@@ -530,6 +529,45 @@ describe "exporter regressions" do
         result.error_count.should eq(0)
         result.success.should be_true
         File.exists?(File.join(output_dir, "content", "posts", "bundle", "index.md")).should be_true
+      end
+    end
+  end
+end
+
+# Regression: only a leaf bundle's `index.md` siblings were exported, so files
+# the build publishes beside a section `_index.md`, at the content root
+# (`[content.files]`) or in a bundle subdirectory were silently dropped.
+describe "Export: published content assets" do
+  {"hugo", "jekyll"}.each do |target|
+    it "exports every content asset the build publishes (#{target})" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "sec"))
+        FileUtils.mkdir_p(File.join(content_dir, "about", "img"))
+        FileUtils.mkdir_p(File.join(content_dir, "drafty"))
+        File.write(File.join(dir, "config.toml"), "title = \"t\"\n[content.files]\nallow_extensions = [\"png\"]\n")
+        File.write(File.join(content_dir, "_index.md"), "+++\ntitle = \"Home\"\n+++\n")
+        File.write(File.join(content_dir, "root.png"), "PNG")
+        File.write(File.join(content_dir, "notes.txt"), "not published")
+        File.write(File.join(content_dir, "sec", "_index.md"), "+++\ntitle = \"Sec\"\n+++\n![a](a.png)\n")
+        File.write(File.join(content_dir, "sec", "a.png"), "PNG")
+        File.write(File.join(content_dir, "about", "index.md"), "+++\ntitle = \"About\"\n+++\n")
+        File.write(File.join(content_dir, "about", "img", "me.png"), "PNG")
+        File.write(File.join(content_dir, "about", "skip.txt"), "filtered by [content.files]")
+
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: target, content_dir: content_dir, output_dir: output_dir)
+        exporter = target == "hugo" ? Hwaro::Services::Exporters::HugoExporter.new : Hwaro::Services::Exporters::JekyllExporter.new
+        result = exporter.run(options)
+        result.success.should be_true
+        result.exported_count.should eq(3)
+
+        root = target == "hugo" ? File.join(output_dir, "content") : output_dir
+        File.read(File.join(root, "sec", "a.png")).should eq("PNG")
+        File.exists?(File.join(root, "root.png")).should be_true
+        File.exists?(File.join(root, "about", "img", "me.png")).should be_true
+        File.exists?(File.join(root, "notes.txt")).should be_false
+        File.exists?(File.join(root, "about", "skip.txt")).should be_false
       end
     end
   end

@@ -18,6 +18,11 @@ module Hwaro
         # instead of silently overwriting the earlier export.
         @written_paths = Set(String).new
 
+        # Expanded bundle directory → its index source, for each page bundle
+        # flattened into `_posts/` or `_drafts/` this run (see
+        # `note_flattened_bundle`).
+        @flattened_bundles = {} of String => String
+
         def run(options : Config::Options::ExportOptions) : ExportResult
           content_dir = options.content_dir
           output_dir = options.output_dir
@@ -25,6 +30,8 @@ module Hwaro
           verbose = options.verbose
 
           @written_paths.clear
+          @flattened_bundles.clear
+          @exported_index_dirs.clear
           files = scan_content_files(content_dir)
           load_draft_paths(content_dir)
 
@@ -49,6 +56,8 @@ module Hwaro
             errors += 1
             Logger.warn "Error exporting #{file_path}: #{ex.message}"
           end
+
+          export_assets(content_dir, files, output_dir, verbose)
 
           # Any per-file error fails the run: `exported > 0` used to mask
           # errors, so a partial export reported success and exited 0.
@@ -213,45 +222,49 @@ module Hwaro
           # that accompany an exported post, so it is skipped too.
           return :skipped unless write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", output_dir, verbose)
 
-          # Counts cover content documents only (as Hugo's do); assets left
-          # behind are named in a warning instead.
-          note_unexported_bundle_assets(file_path, content_dir)
+          note_exported_index(file_path, content_dir)
+          note_flattened_bundle(file_path, content_dir, out_path, output_dir)
           :exported
         end
 
         # A page bundle keeps its assets next to `index.md`
-        # (`posts/my-post/cover.png`), and the Hugo exporter copies them across
-        # because it preserves the bundle directory. Jekyll's `_posts/` layout
-        # is FLAT — `_posts/2024-01-15-my-post.md` — so there is no destination
-        # that keeps a bare `![](cover.png)` resolving without ALSO rewriting
-        # the exported body, which is a separate change with its own spec.
-        #
-        # Until then the assets stay behind, so name them in a warning: the
-        # export used to report a clean run for a post whose every image link
-        # was dead.
-        private def note_unexported_bundle_assets(file_path : String, content_dir : String) : Nil
-          basename = File.basename(file_path)
-          return unless basename == "index.md" || basename == "index.markdown"
-
-          # The site root is never a bundle: `content/index.md` sits beside
-          # every top-level file in the content tree, none of which belongs to
-          # it. Same nesting test the Hugo exporter uses before copying.
+        # (`posts/my-post/cover.png`). Jekyll's `_posts/` layout is FLAT —
+        # `_posts/2024-01-15-my-post.md` — so for a bundle exported there is
+        # no destination that keeps a bare `![](cover.png)` resolving without
+        # ALSO rewriting the exported body, which is a separate change with
+        # its own spec. Every other index keeps its directory.
+        private def note_flattened_bundle(file_path : String, content_dir : String, out_path : String, output_dir : String) : Nil
+          return unless File.basename(file_path).matches?(INDEX_PAGE_RE)
           relative = file_path.sub(content_dir, "").lstrip('/')
+          # The site root is never a bundle.
           return unless relative.includes?('/')
+          return if File.dirname(out_path) == File.join(output_dir, File.dirname(relative))
+          @flattened_bundles[File.expand_path(File.dirname(file_path))] = file_path
+        end
 
-          source_dir = File.dirname(file_path)
-          assets = Dir.children(source_dir).sort!.reject do |entry|
-            entry.ends_with?(".md") || entry.ends_with?(".markdown") ||
-              File.directory?(File.join(source_dir, entry))
+        # Copy every non-Markdown file the build publishes to the same
+        # relative path, where Jekyll publishes it at the same URL. A
+        # flattened bundle's files stay behind and are named in a warning:
+        # the export used to report a clean run for a post whose every image
+        # link was dead. Counts cover content documents only, as Hugo's do.
+        private def export_assets(content_dir : String, files : Array(String), output_dir : String, verbose : Bool) : Nil
+          left_behind = {} of String => Array(String)
+          begin
+            each_published_asset(content_dir, files) do |src, relative, owner|
+              if owner && (index = @flattened_bundles[owner]?)
+                (left_behind[index] ||= [] of String) << Path[File.expand_path(src)].relative_to(owner).to_s
+              else
+                copy_asset(src, File.join(output_dir, relative), output_dir, verbose)
+              end
+            end
+          rescue ex : File::Error
+            Logger.warn "Could not export content assets: #{ex.message}"
           end
-          return if assets.empty?
 
-          Logger.warn "#{assets.size} bundle asset(s) not exported for #{file_path}: #{assets.join(", ")}. " \
-                      "Copy them into the Jekyll site and update the links."
-        rescue ex : File::Error
-          # The bundle directory vanished or is unreadable between the scan and
-          # here — the post itself already exported, so don't fail the run.
-          Logger.debug "Could not inspect bundle directory for #{file_path}: #{ex.message}"
+          left_behind.each do |index, assets|
+            Logger.warn "#{assets.size} bundle asset(s) not exported for #{index}: #{assets.join(", ")}. " \
+                        "Copy them into the Jekyll site and update the links."
+          end
         end
 
         # String form of a scalar front-matter value: strings pass through

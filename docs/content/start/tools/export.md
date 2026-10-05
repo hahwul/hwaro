@@ -68,8 +68,19 @@ full manifest before writing.
 }
 ```
 
-`files` lists every destination written, page-bundle assets included,
+`files` lists every destination written, content assets included,
 while the counts cover content documents only.
+
+## Content Assets
+
+Every non-Markdown file the build publishes from `content/` is exported to the
+same relative path: page-bundle and section files (filtered by
+`[content.files]` when it is configured), `[content.files]` matches anywhere
+in the tree, and raw `.json`/`.xml` files. Files of a draft that is not
+exported are left out, as the build leaves them out. Hugo reads files beside an
+`index.md`/`_index.md` as bundle resources. In a Jekyll export, a post bundle
+flattened into `_posts/` or `_drafts/` has no directory to keep its files in,
+so they are named in a warning instead.
 
 ## Field Mappings
 

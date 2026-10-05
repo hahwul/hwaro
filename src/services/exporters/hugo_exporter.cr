@@ -19,6 +19,7 @@ module Hwaro
 
           files = scan_content_files(content_dir)
           load_draft_paths(content_dir)
+          @exported_index_dirs.clear
           @relative_files = files.map(&.sub(content_dir, "").lstrip('/')).to_set
 
           if files.empty?
@@ -41,6 +42,20 @@ module Hwaro
           rescue ex
             errors += 1
             Logger.warn "Error exporting #{file_path}: #{ex.message}"
+          end
+
+          # Every non-Markdown file the build publishes keeps its place under
+          # `content/`: beside an exported index Hugo reads it as a (leaf or
+          # branch) bundle resource, so `![](cover.png)` keeps resolving.
+          # Assets are listed in the manifest but not counted.
+          begin
+            each_published_asset(content_dir, files) do |src, relative, _owner|
+              copy_asset(src, File.join(output_dir, "content", relative), output_dir, verbose)
+            end
+          rescue ex : File::Error
+            # The tree changed under the walk after the pages were written —
+            # warn instead of letting the counts/manifest disagree with disk.
+            Logger.warn "Could not export content assets: #{ex.message}"
           end
 
           # Any per-file error fails the run: `exported > 0` used to mask
@@ -153,20 +168,7 @@ module Hwaro
           # exported post for them to sit next to.
           return :skipped unless write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", output_dir, verbose)
 
-          # Leaf bundle (`posts/my-post/index.md`): Hugo reads the bundle's
-          # co-located resources out of this same directory, so carry them
-          # across instead of exporting a post whose images all 404.
-          if File.basename(relative).in?("index.md", "index.markdown") && relative.includes?('/')
-            begin
-              copy_bundle_assets(File.dirname(file_path), File.dirname(out_path), output_dir, verbose)
-            rescue ex : File::Error
-              # The bundle directory vanished or became unlistable after the
-              # post was written — the post itself exported, so warn instead
-              # of letting the counts/manifest disagree with disk.
-              Logger.warn "Could not export bundle assets for #{file_path}: #{ex.message}"
-            end
-          end
-
+          note_exported_index(file_path, content_dir)
           :exported
         end
 
