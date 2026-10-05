@@ -260,6 +260,17 @@ weight = 2
 
 페이지/섹션은 이 파일을 건드리지 않고도 자기 프론트 매터(`menus = ["main"]`)로 메뉴에 참여할 수 있습니다. 메뉴 테이블이 없는 `[languages.<code>]` 블록은 이 전역 메뉴를 상속하고, `[[languages.<code>.menus.<name>]]`을 선언하면 그 언어에서는 전역 메뉴를 대체합니다. 전체 레퍼런스(계층 구조, 언어별 동작, `active_path` 스타일링)는 [메뉴](/ko/features/menus/)를 참고합니다.
 
+최상위 섹션으로 메뉴를 자동으로 채우려면(Hugo의 `sectionPagesMenu`) `[menus]` 아래에 메뉴 이름을 지정합니다.
+
+```toml
+[menus]
+auto_sections = "main"
+```
+
+| 키 | 타입 | 기본값 | 설명 |
+|-----|------|---------|-------------|
+| auto_sections | string | 없음(꺼짐) | 모든 최상위 섹션이 들어갈 메뉴(`identifier` = 디렉터리 이름, `name` = 제목, `url`, `weight`). 초안, 게시 전, 헤드리스, `transparent`, 외부 `redirect_to` 섹션과 `_index.md`가 없는 디렉터리는 제외하며, `identifier`가 같은 명시적 엔트리가 우선합니다. 예약된 키이므로 문자열이 아니거나 빈 값이면 설정 오류입니다. [섹션 메뉴 자동 생성](/ko/features/menus/#섹션-메뉴-자동-생성)을 참고합니다. |
+
 ## 정적 파일
 
 `static/` 아래의 모든 것은 디렉터리 구조를 유지한 채 사이트 루트로 그대로 복사되므로 `static/css/app.css`는 `/css/app.css`로 서빙됩니다. 숨김 항목도 포함되므로 `static/.well-known/security.txt`는 `/.well-known/security.txt`로 게시됩니다. 기본적으로 Hwaro는 흔한 OS·에디터·VCS 잔여 파일을 걸러내 프로덕션에 실려 가지 않게 합니다.

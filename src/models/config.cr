@@ -67,6 +67,9 @@ module Hwaro
       property og : OpenGraphConfig
       property taxonomies : Array(TaxonomyConfig)
       property menus : Hash(String, Array(MenuItemConfig))
+      # `[menus] auto_sections = "main"`: the menu every top-level section
+      # joins automatically (Hugo's `sectionPagesMenu`). nil = off.
+      property menus_auto_sections : String? = nil
       property default_language : String
       property languages : Hash(String, LanguageConfig)
       property versions : VersionsConfig

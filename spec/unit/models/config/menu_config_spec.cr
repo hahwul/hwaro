@@ -141,4 +141,56 @@ describe "menu configuration" do
 
     config.languages["fr"].menus.should be_nil
   end
+
+  it "parses [menus] auto_sections alongside [[menus.*]] tables" do
+    config = load_config(<<-TOML)
+      title = "Test"
+
+      [menus]
+      auto_sections = "main"
+
+      [[menus.main]]
+      name = "About"
+      url = "/about/"
+      TOML
+
+    config.menus_auto_sections.should eq("main")
+    config.menus.keys.should eq(["main"])
+    config.menus["main"].map(&.name).should eq(["About"])
+  end
+
+  it "leaves auto_sections off when absent" do
+    Hwaro::Models::Config.new.menus_auto_sections.should be_nil
+    load_config(%(title = "T"\n[[menus.main]]\nname = "A"\n)).menus_auto_sections.should be_nil
+  end
+
+  it "rejects a non-string or blank auto_sections with a config error" do
+    [%(["main"]), "true", %("  ")].each do |value|
+      err = expect_config_error(%(title = "T"\n[menus]\nauto_sections = #{value}\n))
+      err.message.to_s.should contain("[menus] auto_sections must be a menu name string")
+    end
+  end
+
+  it "reserves auto_sections: never parsed as a menu" do
+    expect_config_error(%(title = "T"\n[[menus.auto_sections]]\nname = "A"\n))
+    config = load_config(%(title = "T"\n[menus]\nauto_sections = "main"\n))
+    config.menus.has_key?("auto_sections").should be_false
+  end
+
+  it "warns on a per-language auto_sections and keeps inheriting the global menus" do
+    config = nil
+    log = with_captured_log do
+      config = load_config(<<-TOML)
+        title = "T"
+        [[menus.main]]
+        name = "A"
+        [languages.ko]
+        [languages.ko.menus]
+        auto_sections = "nav"
+        TOML
+    end
+    log.should contain("[languages.ko.menus] auto_sections is ignored: the name is reserved")
+    log.should contain("for a menu, pick another name")
+    config.not_nil!.languages["ko"].menus.should be_nil
+  end
 end

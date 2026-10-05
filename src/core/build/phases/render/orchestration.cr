@@ -38,7 +38,7 @@ module Hwaro::Core::Build::Phases::Render
     end
     listing_fields = cache_enabled ? listing_page_fields(templates) : Builder::ListingPageFields.new(false, false)
     page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages, listing_fields) : ""
-    section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
+    section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
                        # Publish the set-change signal for the Generate phase

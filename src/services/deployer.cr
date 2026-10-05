@@ -1,3 +1,4 @@
+require "compress/gzip"
 require "file_utils"
 require "digest/sha256"
 require "json"
@@ -16,6 +17,7 @@ require "./deployer/directory_sync"
 require "./deployer/command_target"
 require "./deployer/validation"
 require "./deployer/fs_utils"
+require "./deployer/matchers"
 
 module Hwaro
   module Services
@@ -28,7 +30,8 @@ module Hwaro
         action : String,
         path : String,
         source : String?,
-        destination : String? do
+        destination : String?,
+        headers : Hash(String, String)? = nil do
         include JSON::Serializable
 
         # Every op carries every documented key: a delete has no source, and
@@ -36,6 +39,10 @@ module Hwaro
         # consumers that index `op["source"]`.
         @[JSON::Field(emit_null: true)]
         @source : String?
+
+        # Only a cloud metadata upload carries headers; every other op omits
+        # the key, so plans without matchers keep their exact shape.
+        @headers : Hash(String, String)?
       end
 
       # Per-target summary emitted by `#deploy_structured` for
@@ -81,11 +88,12 @@ module Hwaro
         targets = resolve_targets!(target_names, deployment)
         warn_deployment_config(deployment)
         effective = EffectiveOptions.new(deployment, options)
-        force_patterns = force_matcher_patterns(deployment)
+        matchers = compile_matchers(deployment)
 
         targets.each do |target|
           if command = target.command
             warn_unapplied_target_options(target)
+            warn_unapplied_matchers(target, deployment)
             classify_io_errors(target) { require_non_empty_source!(source_dir, effective) } if command_reads_source?(command)
             ops << PlannedOp.new(
               target: target.name,
@@ -105,7 +113,7 @@ module Hwaro
             # would, so the plan runs the exact preparation (overlap check,
             # destination validation, delete cap) a deploy does.
             classify_io_errors(target) do
-              sync = prepare_directory_sync(target, source_dir, directory_destination, effective, deployment, force_patterns: force_patterns)
+              sync = prepare_directory_sync(target, source_dir, directory_destination, effective, deployment, matchers: matchers)
               dest_dir = sync.dest_dir
               symlink_memo = {} of String => Bool
 
@@ -121,6 +129,10 @@ module Hwaro
               sync.to_delete.each do |rel|
                 ops << PlannedOp.new(target: target.name, action: "delete", path: rel, source: nil, destination: File.join(dest_dir, rel))
               end
+
+              sync.to_gzip.each do |rel|
+                ops << PlannedOp.new(target: target.name, action: "gzip", path: "#{rel}.gz", source: File.join(dest_dir, rel), destination: File.join(dest_dir, "#{rel}.gz"))
+              end
             end
           elsif auto_command = auto_command_for_url(url, source_dir)
             warn_unapplied_target_options(target)
@@ -132,6 +144,16 @@ module Hwaro
               source: source_dir,
               destination: url,
             )
+            classify_io_errors(target) { metadata_uploads(url, source_dir, matchers) }.each do |upload|
+              ops << PlannedOp.new(
+                target: target.name,
+                action: "upload",
+                path: upload.rel,
+                source: upload.source,
+                destination: upload.destination,
+                headers: metadata_headers(upload.matcher),
+              )
+            end
           else
             raise_unsupported_scheme!(target, url)
           end
@@ -253,7 +275,6 @@ module Hwaro
 
       private def warn_deployment_config(deployment : Models::DeploymentConfig) : Nil
         warn_duplicate_targets(deployment)
-        warn_unapplied_matchers(deployment)
         warn_unapplied_workers(deployment)
       end
 
@@ -274,6 +295,7 @@ module Hwaro
         counts : TargetCounts = TargetCounts.new,
       ) : {Bool, TargetCounts}
         if command = target.command
+          warn_unapplied_matchers(target, deployment)
           ok = deploy_via_command(target, source_dir, command, effective)
           return {ok, TargetCounts.new}
         end
@@ -294,7 +316,8 @@ module Hwaro
 
         if auto_command = auto_command_for_url(url, source_dir)
           Logger.debug "  Auto-generated command for #{url}"
-          ok = deploy_via_command(target, source_dir, auto_command, effective)
+          uploads = classify_io_errors(target) { metadata_uploads(url, source_dir, compile_matchers(deployment)) }
+          ok = deploy_via_command(target, source_dir, auto_command, effective, uploads)
           return {ok, TargetCounts.new}
         end
 

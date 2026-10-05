@@ -83,7 +83,7 @@ describe Hwaro::Models::DeploymentMatcher do
       matcher.pattern.should eq("")
       matcher.cache_control.should be_nil
       matcher.content_type.should be_nil
-      matcher.gzip.should be_false
+      matcher.gzip.should be_nil
       matcher.force.should be_false
     end
   end

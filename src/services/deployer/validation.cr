@@ -114,14 +114,6 @@ module Hwaro
         )
       end
 
-      # The built-in sync only honors matcher `force`; header/compression
-      # keys need an object-store/CDN API that hwaro's copy/exec deploys
-      # don't speak. Warn instead of silently ignoring configured intent.
-      private def warn_unapplied_matchers(deployment : Models::DeploymentConfig)
-        return if deployment.matchers.none? { |m| m.cache_control || m.content_type || m.gzip }
-        Logger.warn "deployment.matchers: cache_control/content_type/gzip are not applied by hwaro's built-in sync (only 'force' is). Configure headers/compression at your host or CDN."
-      end
-
       # `include` / `exclude` / `strip_index_html` are applied by the built-in
       # file sync (`#build_desired_map`), which only runs for local `file://`
       # and `path` destinations. Command-driven targets — an explicit
