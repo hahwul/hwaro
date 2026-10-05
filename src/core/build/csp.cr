@@ -46,7 +46,7 @@ module Hwaro
           {markers: ["https://cdn.jsdelivr.net/npm/mermaid@"], sources: {"script-src" => "https://cdn.jsdelivr.net"}},
           {markers: ["https://www.youtube.com/embed/"], sources: {"frame-src" => "https://www.youtube.com"}},
           {markers: ["https://player.vimeo.com/video/"], sources: {"frame-src" => "https://player.vimeo.com"}},
-          {markers: ["https://gist.github.com/", %(class="sc-gist")], sources: {"script-src" => "https://gist.github.com", "style-src" => "https://github.githubassets.com"}},
+          {markers: ["https://gist.github.com/", %(class="sc-gist")], sources: {"script-src" => "https://gist.github.com", "style-src" => "https://github.githubassets.com", "img-src" => "https://gist.github.com https://gist.githubusercontent.com"}},
           {markers: ["https://platform.twitter.com/widgets.js", %(class="twitter-tweet")], sources: {"script-src" => "https://platform.twitter.com", "frame-src" => "https://platform.twitter.com"}},
           {markers: ["https://codepen.io/"], sources: {"frame-src" => "https://codepen.io"}},
         ]
@@ -291,7 +291,7 @@ module Hwaro
           end
           FEATURE_SOURCES.each do |row|
             next unless row[:markers].any? { |marker| Utils::ByteScan.includes?(html, marker) }
-            row[:sources].each { |directive, source| add_source(dirs, directive, source) }
+            row[:sources].each { |directive, sources| sources.split.each { |source| add_source(dirs, directive, source) } }
           end
           add_hashes(dirs, "script-src", scan.scripts)
           add_hashes(dirs, "script-src-elem", scan.scripts) if dirs.has_key?("script-src-elem")

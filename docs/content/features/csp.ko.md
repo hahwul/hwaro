@@ -130,7 +130,7 @@ HTML 주석, `<textarea>`, `<title>` 안의 내용은 브라우저에게 마크�
 | `[markdown] mermaid` | `script-src` `https://cdn.jsdelivr.net` |
 | `youtube` 숏코드 | `frame-src` `https://www.youtube.com` |
 | `vimeo` 숏코드 | `frame-src` `https://player.vimeo.com` |
-| `gist` 숏코드 | `script-src` `https://gist.github.com`, `style-src` `https://github.githubassets.com` |
+| `gist` 숏코드 | `script-src` `https://gist.github.com`, `style-src` `https://github.githubassets.com`, `img-src` `https://gist.github.com` `https://gist.githubusercontent.com` |
 | `tweet` 숏코드 | `script-src`, `frame-src` `https://platform.twitter.com` |
 | `codepen` 숏코드 | `frame-src` `https://codepen.io` |
 

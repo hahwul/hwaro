@@ -157,6 +157,7 @@ describe Hwaro::Core::Build::Csp do
       directive(policy, "script-src").should eq("'self' https://platform.twitter.com")
       gist = %(<div class="sc-gist"><script src="/assets/external/3c4d-1.js"></script></div>)
       directive(Csp.policy(csp_config, gist), "style-src").should eq("'self' https://github.githubassets.com")
+      directive(Csp.policy(csp_config, gist), "img-src").should eq("'self' data: https://gist.github.com https://gist.githubusercontent.com")
     end
 
     it "leaves a directive with 'unsafe-inline' without hashes" do

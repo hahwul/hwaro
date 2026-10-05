@@ -130,7 +130,7 @@ own site, or a shortcode the page does not use, adds nothing.
 | `[markdown] mermaid` | `script-src` `https://cdn.jsdelivr.net` |
 | `youtube` shortcode | `frame-src` `https://www.youtube.com` |
 | `vimeo` shortcode | `frame-src` `https://player.vimeo.com` |
-| `gist` shortcode | `script-src` `https://gist.github.com`, `style-src` `https://github.githubassets.com` |
+| `gist` shortcode | `script-src` `https://gist.github.com`, `style-src` `https://github.githubassets.com`, `img-src` `https://gist.github.com` `https://gist.githubusercontent.com` |
 | `tweet` shortcode | `script-src`, `frame-src` `https://platform.twitter.com` |
 | `codepen` shortcode | `frame-src` `https://codepen.io` |
 
