@@ -59,9 +59,10 @@ module Hwaro
           when ".webp"         then webp_dimensions(path)
           when ".svg"          then svg_dimensions(path)
           end
-        rescue
+        rescue ex
           # A best-effort probe: a hostile or truncated header must never
           # fail the page that asked (callers fall back to no size).
+          Logger.debug "image dimensions: #{path}: #{ex.message}"
           nil
         end
 
