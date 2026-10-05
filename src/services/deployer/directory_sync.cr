@@ -17,14 +17,15 @@ module Hwaro
         to_copy : Array({String, String}),
         to_delete : Array(String),
         skipped : Int32,
-        clear_first : Array(String)
+        clear_first : Array(String),
+        to_gzip : Array(String)
 
       # Validate and select files for syncing `source_dir` into the local
       # directory `dest_dir`. Nothing here writes: a missing destination is
       # only created by `#write_directory_sync`, so a dry run — or a deploy the
       # user then declines at the `--confirm` prompt — leaves no trace.
       #
-      # `force_patterns` lets the plan compile (and warn about) the matcher
+      # `matchers` lets the plan compile (and warn about) the matcher
       # patterns once for the whole run; the deploy paths compile them per
       # target, as they always did.
       private def prepare_directory_sync(
@@ -33,9 +34,11 @@ module Hwaro
         dest_dir : String,
         effective : EffectiveOptions,
         deployment : Models::DeploymentConfig,
-        force_patterns : Array(Regex)? = nil,
+        matchers : Array(CompiledMatcher)? = nil,
       ) : DirectorySync
         require_non_empty_source!(source_dir, effective)
+        matchers ||= compile_matchers(deployment)
+        warn_local_header_matchers(target, deployment)
         dest_dir = expand_local_path(dest_dir)
 
         check_overlap!(source_dir, dest_dir)
@@ -46,14 +49,17 @@ module Hwaro
 
         validate_strip_index_html_for_filesystem(target, desired.keys)
 
-        to_delete = compute_deletes(existing, desired.keys, target, dest_dir)
+        stems = gzip_stems(desired, source_dir, matchers)
+        to_delete = compute_deletes(existing, desired.keys, target, dest_dir, stems.map { |rel| "#{rel}.gz" }.to_set)
         clear_first = validate_destination_paths(dest_dir, desired.keys, to_delete.to_set)
         check_empty_selection!(desired, to_delete, target, effective)
-        check_max_deletes!(to_delete.size, effective)
+        check_max_deletes!(to_delete.size - stale_gzip_siblings(to_delete, existing, desired, matchers), effective)
 
-        to_copy, skipped = compute_copies(desired, source_dir, dest_dir, effective.force, force_patterns || force_matcher_patterns(deployment))
+        to_copy, skipped = compute_copies(desired, source_dir, dest_dir, effective.force, force_patterns(matchers))
+        copied = to_copy.map(&.[0]).to_set
+        to_gzip = stems.select { |rel| copied.includes?(rel) || gzip_sibling_stale?(File.join(dest_dir, rel)) }
 
-        DirectorySync.new(dest_dir, desired, to_copy, to_delete, skipped, clear_first)
+        DirectorySync.new(dest_dir, desired, to_copy, to_delete, skipped, clear_first, to_gzip)
       end
 
       # Apply a prepared sync: clear stale entries standing where the new
@@ -101,6 +107,12 @@ module Hwaro
           else
             counts.created += 1
           end
+        end
+
+        # Precompressed siblings, once the files they compress are in place.
+        sync.to_gzip.each do |rel|
+          unlink_destination_symlinks!(dest_dir, "#{rel}.gz")
+          gzip_file(File.join(dest_dir, rel), File.join(dest_dir, "#{rel}.gz"))
         end
 
         remaining = early.empty? ? sync.to_delete : sync.to_delete.reject { |rel| early.includes?(rel) }
@@ -171,7 +183,7 @@ module Hwaro
 
         write_directory_sync(sync, counts)
         Logger.info "" if Logger.color_enabled?
-        Logger.outcome("deployed", "#{sync.dest_dir} · #{counts.created} created · #{counts.updated} updated · #{counts.deleted} deleted")
+        Logger.outcome("deployed", "#{sync.dest_dir} · #{counts.created} created · #{counts.updated} updated · #{counts.deleted} deleted#{gzipped_note(sync)}")
         {true, counts}
       end
 
@@ -191,11 +203,11 @@ module Hwaro
         Logger::Receipt.new("deploy", target.name)
           .row("source", source_dir)
           .row("dest", dest_dir)
-          .row("plan", "copy #{sync.to_copy.size} · delete #{sync.to_delete.size} · skip #{sync.skipped}")
+          .row("plan", "copy #{sync.to_copy.size} · delete #{sync.to_delete.size} · skip #{sync.skipped}#{" · gzip #{sync.to_gzip.size}" unless sync.to_gzip.empty?}")
           .emit
 
         if effective.dry_run
-          log_plan(sync.to_copy, sync.to_delete)
+          log_plan(sync.to_copy, sync.to_delete, sync.to_gzip)
           return true
         end
 
@@ -203,7 +215,7 @@ module Hwaro
 
         counts = write_directory_sync(sync)
         Logger.info "" if Logger.color_enabled?
-        Logger.outcome("deployed", "#{dest_dir} · #{counts.created + counts.updated} copied · #{counts.deleted} deleted · #{sync.skipped} skipped")
+        Logger.outcome("deployed", "#{dest_dir} · #{counts.created + counts.updated} copied · #{counts.deleted} deleted · #{sync.skipped} skipped#{gzipped_note(sync)}")
         true
       end
 
@@ -309,6 +321,7 @@ module Hwaro
         desired_paths : Array(String),
         target : Models::DeploymentTarget,
         dest_dir : String,
+        keep : Set(String) = Set(String).new,
       ) : Array(String)
         desired_set = desired_paths.to_set
         # A destination symlink at a directory prefix of a desired path is
@@ -323,6 +336,7 @@ module Hwaro
 
         existing.select do |rel|
           next false if ignored_file?(rel)
+          next false if keep.includes?(rel)
           next false if ancestors.includes?(rel) && symlink?(File.join(dest_dir, rel))
           next false unless delete_candidate?(rel, target)
           !desired_set.includes?(rel)
@@ -382,17 +396,6 @@ module Hwaro
         files.sort!
       end
 
-      # Compile `force = true` matcher patterns (regex, per the deploy docs).
-      # An invalid pattern warns and is skipped instead of crashing the deploy.
-      private def force_matcher_patterns(deployment : Models::DeploymentConfig) : Array(Regex)
-        deployment.matchers.select(&.force).compact_map do |matcher|
-          Regex.new(matcher.pattern)
-        rescue ex : ArgumentError
-          Logger.warn "Ignoring invalid deployment matcher pattern #{matcher.pattern.inspect}: #{ex.message}"
-          nil
-        end
-      end
-
       private def force_match?(rel : String, patterns : Array(Regex)) : Bool
         return false if patterns.empty?
         normalized = rel.gsub('\\', '/')
@@ -436,7 +439,7 @@ module Hwaro
         normalized
       end
 
-      private def log_plan(to_copy : Array({String, String}), to_delete : Array(String))
+      private def log_plan(to_copy : Array({String, String}), to_delete : Array(String), to_gzip : Array(String))
         if to_copy.present?
           Logger.section("copy")
           to_copy.first(50).each { |(dest_rel, _)| Logger.item("+ #{dest_rel}", glyph: :bullet) }
@@ -446,6 +449,11 @@ module Hwaro
           Logger.section("delete")
           to_delete.first(50).each { |rel| Logger.item("- #{rel}", glyph: :bullet) }
           Logger.item("… and #{to_delete.size - 50} more", glyph: :bullet) if to_delete.size > 50
+        end
+        if to_gzip.present?
+          Logger.section("gzip")
+          to_gzip.first(50).each { |rel| Logger.item("+ #{rel}.gz", glyph: :bullet) }
+          Logger.item("… and #{to_gzip.size - 50} more", glyph: :bullet) if to_gzip.size > 50
         end
       end
     end
