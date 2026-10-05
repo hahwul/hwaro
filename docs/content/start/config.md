@@ -266,7 +266,7 @@ auto_sections = "main"
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| auto_sections | string | none (off) | Menu that every top-level section joins (`identifier` = directory name, `name` = title, `url`, `weight`). Draft, unpublished, headless, `transparent` and off-site `redirect_to` sections are skipped; an explicit entry with the same `identifier` wins. See [Automatic Section Menus](/features/menus/#automatic-section-menus). |
+| auto_sections | string | none (off) | Menu that every top-level section joins (`identifier` = directory name, `name` = title, `url`, `weight`). Draft, unpublished, headless, `transparent` and off-site `redirect_to` sections are skipped, as is a directory without `_index.md`; an explicit entry with the same `identifier` wins. Reserved key: a non-string or blank value is a config error. See [Automatic Section Menus](/features/menus/#automatic-section-menus). |
 
 ## Static Files
 

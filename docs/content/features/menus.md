@@ -69,7 +69,9 @@ Set `auto_sections` to a menu name and every top-level section (a direct child o
 auto_sections = "main"
 ```
 
-Each section becomes an entry with `identifier` = its directory name (`posts` for `content/posts/_index.md`), `name` = its title, `url` = its URL and `weight` = its `weight`. Sections that listings skip are left out: drafts, unpublished, headless (`render = false`) and `transparent` sections, plus sections whose `redirect_to` points off-site. Nested sections never join.
+Each section becomes an entry with `identifier` = its directory name (`posts` for `content/posts/_index.md`), `name` = its title, `url` = its URL and `weight` = its `weight`. Sections that listings skip are left out: drafts, unpublished, headless (`render = false`) and `transparent` sections, plus sections whose `redirect_to` points off-site. Nested sections never join, including the children of a skipped `transparent` section. A section needs an `_index.md`: a directory that holds only pages has no section and gets no entry. On a versioned site a section is read through its version root, so `docs/v2` counts as `docs`, and with a top-level `v2/` version, `v2/guide` counts as `guide`.
+
+`auto_sections` is a reserved key under `[menus]`, not a menu name. A non-string or blank value is a config error, and setting it under `[languages.<code>.menus]` is ignored with a warning.
 
 Explicit entries win. A `[[menus.main]]` entry or a front-matter registration with the same `identifier` replaces the auto entry; entries with other identifiers are added next to the auto ones, and the whole menu sorts by `weight`, then `name`. A section that registers itself into the same menu through its own front matter keeps only that registration.
 
@@ -85,7 +87,24 @@ identifier = "posts"
 weight = 99
 ```
 
-On a multilingual site the entries are built per language from that language's sections (`posts/_index.ko.md` gives the Korean entry its title and `/ko/posts/` URL). A language without a translated section gets no entry for it. Per-language `[[languages.<code>.menus.<name>]]` overrides apply by `identifier` the same way.
+On a multilingual site the entries are built per language from that language's sections (`posts/_index.ko.md` gives the Korean entry its title and `/ko/posts/` URL). A language without a translated section gets no entry for it, and a language left with no entries at all falls back to the default language's menu in `get_menu()`.
+
+A global `[[menus.main]]` override like the one above applies to every language without its own `[languages.<code>.menus]` table, so Korean pages would link `/posts/` too. On a multilingual site, override per language instead:
+
+```toml
+[menus]
+auto_sections = "main"
+
+[[menus.main]]
+name = "Journal"
+url = "/posts/"
+identifier = "posts"
+
+[[languages.ko.menus.main]]
+name = "저널"
+url = "/ko/posts/"
+identifier = "posts"
+```
 
 ## Hierarchy
 

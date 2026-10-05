@@ -69,7 +69,9 @@ parent = "posts"
 auto_sections = "main"
 ```
 
-각 섹션은 `identifier` = 디렉터리 이름(`content/posts/_index.md`라면 `posts`), `name` = 섹션 제목, `url` = 섹션 URL, `weight` = 섹션의 `weight`인 엔트리가 됩니다. 목록에서 빠지는 섹션은 제외합니다. 초안, 게시 전(unpublished), 헤드리스(`render = false`), `transparent` 섹션과 `redirect_to`가 외부 사이트를 가리키는 섹션이 여기에 해당합니다. 중첩 섹션은 들어가지 않습니다.
+각 섹션은 `identifier` = 디렉터리 이름(`content/posts/_index.md`라면 `posts`), `name` = 섹션 제목, `url` = 섹션 URL, `weight` = 섹션의 `weight`인 엔트리가 됩니다. 목록에서 빠지는 섹션은 제외합니다. 초안, 게시 전(unpublished), 헤드리스(`render = false`), `transparent` 섹션과 `redirect_to`가 외부 사이트를 가리키는 섹션이 여기에 해당합니다. 중첩 섹션은 들어가지 않으며, 제외된 `transparent` 섹션의 하위 섹션도 마찬가지입니다. 섹션에는 `_index.md`가 있어야 합니다. 페이지만 있는 디렉터리는 섹션이 아니므로 엔트리가 생기지 않습니다. 버전 문서 사이트에서는 섹션을 버전 루트 기준으로 해석합니다. `docs/v2`는 `docs`로, 최상위 `v2/` 버전이라면 `v2/guide`는 `guide`로 취급합니다.
+
+`auto_sections`는 `[menus]` 아래의 예약된 키이며 메뉴 이름이 아닙니다. 문자열이 아니거나 빈 값이면 설정 오류이고, `[languages.<code>.menus]` 아래에 지정하면 경고와 함께 무시합니다.
 
 명시적인 엔트리가 우선합니다. `identifier`가 같은 `[[menus.main]]` 엔트리나 프론트 매터 등록은 자동 엔트리를 대체하고, identifier가 다른 엔트리는 자동 엔트리 옆에 추가됩니다. 메뉴 전체는 `weight`, 그다음 `name` 순으로 정렬합니다. 섹션이 자기 프론트 매터로 같은 메뉴에 등록하면 그 등록만 남습니다.
 
@@ -85,7 +87,24 @@ identifier = "posts"
 weight = 99
 ```
 
-다국어 사이트에서는 언어마다 그 언어의 섹션으로 엔트리를 만듭니다(`posts/_index.ko.md`가 한국어 엔트리의 제목과 `/ko/posts/` URL을 정합니다). 번역된 섹션이 없는 언어에는 해당 엔트리가 생기지 않습니다. 언어별 `[[languages.<code>.menus.<name>]]` 재정의도 같은 방식으로 `identifier` 기준으로 적용됩니다.
+다국어 사이트에서는 언어마다 그 언어의 섹션으로 엔트리를 만듭니다(`posts/_index.ko.md`가 한국어 엔트리의 제목과 `/ko/posts/` URL을 정합니다). 번역된 섹션이 없는 언어에는 해당 엔트리가 생기지 않고, 엔트리가 하나도 없는 언어는 `get_menu()`에서 기본 언어의 메뉴로 대체됩니다.
+
+위와 같은 전역 `[[menus.main]]` 재정의는 자체 `[languages.<code>.menus]` 테이블이 없는 모든 언어에 적용되므로, 한국어 페이지도 `/posts/`로 연결됩니다. 다국어 사이트에서는 언어별로 재정의합니다.
+
+```toml
+[menus]
+auto_sections = "main"
+
+[[menus.main]]
+name = "Journal"
+url = "/posts/"
+identifier = "posts"
+
+[[languages.ko.menus.main]]
+name = "저널"
+url = "/ko/posts/"
+identifier = "posts"
+```
 
 ## 계층 구조
 

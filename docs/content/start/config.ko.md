@@ -264,7 +264,7 @@ auto_sections = "main"
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
-| auto_sections | string | 없음(꺼짐) | 모든 최상위 섹션이 들어갈 메뉴(`identifier` = 디렉터리 이름, `name` = 제목, `url`, `weight`). 초안, 게시 전, 헤드리스, `transparent`, 외부 `redirect_to` 섹션은 제외하며, `identifier`가 같은 명시적 엔트리가 우선합니다. [섹션 메뉴 자동 생성](/ko/features/menus/#섹션-메뉴-자동-생성)을 참고합니다. |
+| auto_sections | string | 없음(꺼짐) | 모든 최상위 섹션이 들어갈 메뉴(`identifier` = 디렉터리 이름, `name` = 제목, `url`, `weight`). 초안, 게시 전, 헤드리스, `transparent`, 외부 `redirect_to` 섹션과 `_index.md`가 없는 디렉터리는 제외하며, `identifier`가 같은 명시적 엔트리가 우선합니다. 예약된 키이므로 문자열이 아니거나 빈 값이면 설정 오류입니다. [섹션 메뉴 자동 생성](/ko/features/menus/#섹션-메뉴-자동-생성)을 참고합니다. |
 
 ## 정적 파일
 
