@@ -34,7 +34,7 @@ mermaid = true
 | sub | bool | false | 아래 첨자(`~text~` → `<sub>text</sub>`) |
 | sup | bool | false | 위 첨자(`^text^` → `<sup>text</sup>`) |
 | attributes | bool | false | 헤딩과 인라인 이미지에 붙는 일반화된 `{#id .class key=val}` 블록 |
-| wikilinks | bool | false | `[[위키링크]]`, `![[이미지]]` 임베드, 접을 수 있는 `> [!TIP]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
+| wikilinks | bool | false | `[[위키링크]]`, `![[이미지]]` 임베드, `![[노트]]` 트랜스클루전, 접을 수 있는 `> [!TIP]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
 | safe | bool | false | 출력에서 원시 HTML 제거(주석으로 대체) |
 | lazy_loading | bool | false | `<img>` 태그에 `loading="lazy"` 추가 |
 | emoji | bool | false | 이모지 숏코드(예: `:smile:`)를 이모지 문자로 변환 |

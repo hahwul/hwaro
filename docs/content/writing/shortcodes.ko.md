@@ -171,6 +171,65 @@ CodePen을 삽입합니다.
 [WARN] Shortcode `codepen` is missing required argument `user` — it renders a broken embed. Usage: `{{ codepen(user="…", id="…") }}`.
 ```
 
+### include_code
+
+소스 파일 전체나 일부를 펜스 코드 블록으로 넣습니다. 블록은 일반 코드 파이프라인을 그대로 거칩니다: 하이라이팅, [펜스 옵션](/ko/features/syntax-highlighting/), 복사 버튼, render-codeblock 훅.
+
+```markdown
+{{ include_code(path="examples/site/config.toml") }}
+{{ include_code(path="examples/site/config.toml", region="feeds", lines="2-8", title="config.toml", hl_lines="3") }}
+```
+
+| 매개변수 | 기본값 | 설명 |
+|-------|---------|-------------|
+| `path` | (필수) | 프로젝트 루트 기준 파일 경로 |
+| `region` | (없음) | `#region <name>`과 `#endregion <name>` 사이의 줄만 |
+| `lines` | (없음) | 줄 범위 `a-b` 또는 한 줄 `a` (1부터, 양 끝 포함; `region`과 함께 쓰면 영역 안에서 셉니다) |
+| `lang` | 확장자에서 추론 | 코드 블록 언어 |
+| `title`, `hl_lines`, `hide_lines`, `linenos`, `linenostart`, `copy` | | 펜스 옵션으로 전달 |
+
+영역 표시는 어떤 주석 기호 뒤에도 쓸 수 있어서 원본 파일에서도 올바른 코드로 남습니다:
+
+```crystal
+module App
+  # #region server
+  def run
+    serve
+  end
+  # #endregion server
+end
+```
+
+`//`, `#`, `--`, `<!--`, `/*`, `;` 모두 쓸 수 있고, 이름 없는 `#endregion`은 가장 안쪽의 열린 영역을 닫습니다. 표시 줄과 선택한 영역 안의 중첩된 표시는 출력에서 빠집니다. `region` 없이 쓰면 파일을 그대로 넣습니다. 모든 줄에 공통인 앞쪽 들여쓰기는 제거됩니다.
+
+### include_md
+
+마크다운 파일을 그 자리에 쓴 것처럼 렌더링합니다.
+
+```markdown
+{{ include_md(path="shared/install.md") }}
+{{ include_md(path="shared/install.md", region="brew") }}
+```
+
+| 매개변수 | 기본값 | 설명 |
+|-------|---------|-------------|
+| `path` | (필수) | 프로젝트 루트 기준 파일 경로 |
+| `region` | (없음) | `<!-- #region <name> -->`과 `<!-- #endregion <name> -->` 사이의 줄만 |
+
+포함된 파일 안의 숏코드도 펼쳐지고, 그 제목은 페이지의 목차와 제목 id에 함께 들어갑니다. 프런트 매터는 버립니다. 포함된 파일이 다른 파일을 다시 포함할 수 있으며 깊이는 8단계까지입니다. 순환 포함은 그 경로를 보여 주는 오류가 됩니다.
+
+#### 경로와 오류
+
+두 숏코드 모두 프로젝트 루트 안의 파일만 읽습니다. 절대 경로, `..`, 프로젝트 밖으로 이어지는 심볼릭 링크, 빌드 출력 디렉터리, `.hwaro/`는 거부합니다. 파일이나 영역이 없거나, 줄 범위가 파일을 벗어나거나, 경로가 거부되면 페이지와 파일 이름을 담은 오류로 빌드가 실패합니다:
+
+```
+Error [HWARO_E_TEMPLATE]: {{ include_code(path="examples/app.cr", region="srv") }} in content/guide.md: region 'srv' not found
+```
+
+포함된 파일은 그것을 포함하는 페이지의 의존성입니다. `--cache` 웜 빌드와 `hwaro serve` 모두 파일이 바뀌면 페이지를 다시 렌더링하며, `content/` 밖의 파일도 마찬가지입니다.
+
+코드 스팬, 펜스 코드 블록, `{% raw %}` 영역 안의 호출은 글자 그대로 남습니다.
+
 > 내장 숏코드를 덮어쓰려면 `templates/shortcodes/`에 같은 이름의 파일을 만들면 됩니다(예: `templates/shortcodes/youtube.html`). 사용자 템플릿이 항상 우선하며, 자기 계약을 스스로 정의하므로 위 경고는 적용되지 않습니다.
 
 ## 커스텀 숏코드 작성

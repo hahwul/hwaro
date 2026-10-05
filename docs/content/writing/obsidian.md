@@ -1,6 +1,6 @@
 +++
 title = "Wikilinks & Backlinks"
-description = "Build an Obsidian vault or wiki-style notes as is: wikilinks, image embeds, foldable callouts and page.backlinks"
+description = "Build an Obsidian vault or wiki-style notes as is: wikilinks, image embeds, note transclusion, foldable callouts and page.backlinks"
 weight = 7
 toc = true
 +++
@@ -66,7 +66,18 @@ An embed becomes a Markdown image (with a `{width=… height=…}` attribute blo
 
 Turning on `wikilinks` also enables `{…}` attribute blocks on ordinary Markdown images, as `[markdown] attributes` does (`![alt](x.png){.wide}`).
 
-Embedding a note (`![[note]]`, `![[note#section]]`) currently renders as a link to the note. Transclusion is planned.
+## Note Embeds (Transclusion)
+
+A note embed on a line of its own pulls the note's Markdown into the page:
+
+| Syntax | Result |
+|--------|--------|
+| `![[note]]` | the whole note body |
+| `![[note#Setup]]` | the `Setup` heading through the line before the next heading of the same or a higher level |
+
+The text is rendered as if written in place, like [`include_md`](/writing/shortcodes/#include-md): shortcodes in it expand and its headings join the page's table of contents. It is wrapped in `<div class="transclusion" data-source="/note/">…</div>`, where `data-source` is the note's URL. A note can embed others, up to 8 levels deep; a cycle is a build error.
+
+An embed that is not alone on its line, or names a heading the note does not have, renders as a link to the note. A target that matches no note is handled like any [unresolved wikilink](#wikilinks). The embedding page is re-rendered when the note changes, on a warm `--cache` build and in `hwaro serve`.
 
 ## Foldable Callouts
 
