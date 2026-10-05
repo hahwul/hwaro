@@ -42,7 +42,7 @@ Both modes include a **Site-Specific Instructions** section where you can add yo
 | -f, --force | Regenerate an existing file without confirmation (Site-Specific Instructions still preserved) |
 | -h, --help | Show help |
 
-By default, the command prints to stdout so you can inspect the content before saving. Use `--write` to save to file. If `AGENTS.md` already exists, you'll be prompted for confirmation unless `--force` is used. Either way, your **Site-Specific Instructions** section is preserved across the rewrite.
+By default, the command prints to stdout so you can inspect the content before saving. Use `--write` to save to file. If `AGENTS.md` already exists, you'll be prompted for confirmation unless `--force` is used. Without a terminal to answer the prompt (piped or redirected stdin, CI), the command refuses with a usage error (exit 2) instead of writing. Either way, your **Site-Specific Instructions** section is preserved across the rewrite.
 
 When `AGENTS.md` is a symlink, `--write` updates the file it points at as long as that file resolves inside the project (for example `AGENTS.md -> CLAUDE.md`); a link resolving outside the project is refused.
 

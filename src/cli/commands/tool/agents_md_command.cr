@@ -114,8 +114,18 @@ module Hwaro
                            else
                              "AGENTS.md already exists and has no '#{SITE_SECTION_MARKER}' heading — regenerating will replace it ENTIRELY. Continue?"
                            end
-                # `confirm?` returns nil on EOF (piped/non-interactive stdin) —
-                # treat that the same as "no" and abort without writing.
+                # Without a terminal nobody can answer: refuse with a usage
+                # error (as deploy's `--confirm` does) instead of printing
+                # "Aborted." and exiting 0, which read as success in scripts.
+                unless Prompt.interactive?
+                  raise Hwaro::HwaroError.new(
+                    code: Hwaro::Errors::HWARO_E_USAGE,
+                    message: "AGENTS.md already exists and cannot prompt for confirmation: stdin is not a TTY.",
+                    hint: "Pass --force to regenerate it non-interactively.",
+                  )
+                end
+                # `confirm?` returns nil on EOF (Ctrl-D) — treat that the
+                # same as "no" and abort without writing.
                 unless Prompt.confirm?(question, default: false) == true
                   Logger.info "Aborted."
                   exit
