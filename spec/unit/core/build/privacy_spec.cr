@@ -36,6 +36,7 @@ private def fixture_handler(hits : Hits) : HTTP::Server::Context ->
     path = ctx.request.path
     hits.bump(path)
     res = ctx.response
+    port = ctx.request.headers["Host"]?.try(&.split(':').last) || "80"
     css = ->(body : String) { res.content_type = "text/css; charset=utf-8"; res.print(body) }
     case path
     when "/css/site.css"
@@ -61,6 +62,38 @@ private def fixture_handler(hits : Hits) : HTTP::Server::Context ->
     when "/img/pic.png", "/img/copy.png"
       res.content_type = "image/png"
       res.print(PNG)
+    when "/media/clip.mp4"
+      res.content_type = "video/mp4"
+      res.print("MP4")
+    when "/img/body.png"
+      res.content_type = "image/png"
+      res.print("BODY-PNG")
+    when "/img/only404.png"
+      res.content_type = "image/png"
+      res.print("ONLY-404-PNG")
+    when .starts_with?("/img/%")
+      res.content_type = "image/png"
+      res.print(PNG)
+    when "/upload/w_400,h_300/sample.jpg"
+      res.content_type = "image/jpeg"
+      res.print("JPEG")
+    when "/css/set.css"
+      css.call(%(.a { background-image: image-set("../img/pic.png" 1x, url(../img/copy.png) 2x); }\n))
+      # A third party pointing the build at the machine's own network.
+    when "/redir-internal"
+      res.status = HTTP::Status::FOUND
+      res.headers["Location"] = "http://localhost:#{port}/secret"
+    when "/css/evil.css"
+      css.call(%(body { background: url(http://localhost:#{port}/secret.png); }\n))
+    when "/secret", "/secret.png"
+      res.content_type = "image/png"
+      res.print("AWS_SECRET=hunter2")
+    when "/photo.html"
+      res.content_type = "text/html"
+      res.print("<script>alert(document.cookie)</script>")
+    when "/logo.svg"
+      res.content_type = "image/svg+xml"
+      res.print(%(<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>))
     when "/img/noext"
       res.content_type = "image/webp"
       res.print("RIFFwebp")
@@ -99,12 +132,38 @@ private def with_cdn(& : String, Hits, Proc(Nil) ->)
   end
 end
 
-private def privacy_config(extra : String = "", base_url : String = "http://example.com") : Hwaro::Models::Config
+# A server that answers every request with a malformed HTTP response.
+private def with_garbage_server(& : String ->)
+  server = TCPServer.new("127.0.0.1", 0)
+  port = server.local_address.port
+  spawn do
+    while client = server.accept?
+      spawn do
+        while (line = client.gets) && !line.empty?
+        end
+        client << "GARBAGE\r\n\r\n"
+        client.close
+      rescue IO::Error
+      end
+    end
+  end
+  Fiber.yield
+  begin
+    yield "http://127.0.0.1:#{port}"
+  ensure
+    server.close
+  end
+end
+
+# The fixture CDN lives on loopback, which privacy mode refuses unless
+# `include` names the host — so the default lists it.
+private def privacy_config(extra : String = "", base_url : String = "http://example.com", hosts : String = %(["127.0.0.1"])) : Hwaro::Models::Config
   load_config(<<-TOML)
     title = "T"
     base_url = "#{base_url}"
     [privacy]
     enabled = true
+    include = #{hosts}
     #{extra}
     TOML
 end
@@ -145,8 +204,8 @@ describe Hwaro::Core::Build::Privacy do
           <script src="#{cdn}/js/app.js"></script>
           <img src="#{cdn}/img/pic.png" alt="x">
           <picture><source srcset="#{cdn}/img/pic.png 1x, /local.png 2x"></picture>
-          <video poster="#{cdn}/img/pic.png" src="#{cdn}/img/pic.png"><source src="#{cdn}/img/pic.png"></video>
-          <audio src="#{cdn}/img/pic.png"></audio>
+          <video poster="#{cdn}/img/pic.png" src="#{cdn}/media/clip.mp4"><source src="#{cdn}/media/clip.mp4"></video>
+          <audio src="#{cdn}/media/clip.mp4"></audio>
           HTML
         result = rewrite(privacy, html)
         result.should_not contain(%(href="#{cdn}/css))
@@ -163,7 +222,7 @@ describe Hwaro::Core::Build::Privacy do
 
   it "leaves same-host, relative, data: and excluded/non-included URLs alone" do
     with_cdn do |cdn, hits, _server|
-      config = privacy_config(%(include = ["127.0.0.1"]\nexclude = ["example.org"]))
+      config = privacy_config(%(exclude = ["example.org"]))
       with_privacy(config) do |privacy, _dir|
         html = <<-HTML
           <img src="http://example.com/own.png">
@@ -326,6 +385,7 @@ describe Hwaro::Core::Build::Privacy do
         result.should_not contain("crossorigin")
         result.should end_with(" />")
         log.should contain("does not match")
+        log.should contain("#{cdn}/css/inner.css")
       end
     end
   end
@@ -357,6 +417,137 @@ describe Hwaro::Core::Build::Privacy do
       end
     end
   end
+
+  it "refuses a host that resolves to an internal address unless include names it" do
+    with_cdn do |cdn, hits, _offline|
+      with_privacy(privacy_config(hosts: "[]")) do |privacy, dir|
+        html = %(<img src="#{cdn}/img/pic.png">)
+        log = with_captured_log { rewrite(privacy, html).should eq(html) }
+        log.should contain("refused")
+        hits.total.should eq(0)
+        published(dir).should be_empty
+      end
+      with_privacy(privacy_config(%(on_error = "fail"), hosts: "[]")) do |privacy, _dir|
+        expect_raises(Hwaro::HwaroError, /refused/) { rewrite(privacy, %(<img src="#{cdn}/img/pic.png">)) }
+      end
+    end
+  end
+
+  it "refuses a redirect hop and a stylesheet reference into the internal network" do
+    with_cdn do |cdn, hits, _offline|
+      with_privacy(privacy_config) do |privacy, dir|
+        html = %(<img src="#{cdn}/redir-internal">)
+        log = with_captured_log { rewrite(privacy, html).should eq(html) }
+        log.should contain("refused")
+
+        result = rewrite(privacy, %(<link rel="stylesheet" href="#{cdn}/css/evil.css">))
+        css = read_published(dir, result.match!(/href="([^"]+)"/)[1])
+        css.should contain("url(\"http://localhost:")
+        hits["/secret"].should eq(0)
+        hits["/secret.png"].should eq(0)
+        published(dir).none? { |f| File.read(File.join(dir, "public/assets/external", f)).includes?("AWS_SECRET") }.should be_true
+      end
+    end
+  end
+
+  it "never publishes HTML, and publishes SVG for <img> with a warning" do
+    with_cdn do |cdn, _hits, _offline|
+      with_privacy(privacy_config) do |privacy, dir|
+        html = %(<img src="#{cdn}/photo.html">)
+        log = with_captured_log { rewrite(privacy, html).should eq(html) }
+        log.should contain("not a file type Hwaro publishes")
+        published(dir).should be_empty
+
+        log = with_captured_log { rewrite(privacy, %(<img src="#{cdn}/logo.svg">)).should contain("-logo.svg") }
+        log.should contain("SVG")
+        # A script reference answered with an image is not published as .svg.
+        script = %(<script src="#{cdn}/logo.svg"></script>)
+        rewrite(privacy, script).should eq(script)
+      end
+    end
+  end
+
+  it "survives a malformed response and undecodable URL bytes" do
+    with_garbage_server do |garbage|
+      with_cdn do |cdn, _hits, _offline|
+        with_privacy(privacy_config) do |privacy, _dir|
+          html = %(<img src="#{garbage}/x.png">)
+          log = with_captured_log { rewrite(privacy, html).should eq(html) }
+          log.should contain("Invalid HTTP response")
+          rewrite(privacy, %(<img src="#{cdn}/img/%ff%fe.png">)).should match(/src="\/assets\/external\/[0-9a-f]{12}-[^"]*\.png"/)
+        end
+      end
+    end
+  end
+
+  it "parses srcset candidates whose URLs contain commas" do
+    with_cdn do |cdn, hits, _offline|
+      with_privacy(privacy_config) do |privacy, _dir|
+        srcset = %(https://res.example.invalid/x.png 1x, #{cdn}/upload/w_400,h_300/sample.jpg 2x)
+        result = rewrite(privacy, %(<img srcset="#{srcset}">))
+        result.should match(/srcset="https:\/\/res\.example\.invalid\/x\.png 1x, \/assets\/external\/[0-9a-f]{12}-sample\.jpg 2x"/)
+        hits["/upload/w_400,h_300/sample.jpg"].should eq(1)
+        hits["/upload/w_400"].should eq(0)
+      end
+    end
+  end
+
+  it "drops preconnect and dns-prefetch hints to localized hosts" do
+    with_cdn do |cdn, _hits, _offline|
+      with_privacy(privacy_config(%(exclude = ["www.youtube.com"]))) do |privacy, _dir|
+        html = %(<link rel="preconnect" href="#{cdn}"><link rel="dns-prefetch" href="#{cdn.lchop("http:")}"><link rel="preconnect" href="https://www.youtube.com"><link rel="stylesheet" href="#{cdn}/css/inner.css">)
+        result = rewrite(privacy, html)
+        result.should_not contain("preconnect\" href=\"#{cdn}")
+        result.should_not contain("dns-prefetch")
+        result.should contain(%(<link rel="preconnect" href="https://www.youtube.com">))
+      end
+    end
+  end
+
+  it "leaves Hwaro's own MathJax loader external" do
+    Dir.mktmpdir do |dir|
+      # A fresh cache entry, so the pre-fix code would localize it offline.
+      url = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"
+      cache = File.join(dir, ".hwaro", "external")
+      FileUtils.mkdir_p(cache)
+      File.write(File.join(cache, "blob"), "mathjax")
+      File.write(File.join(cache, "index.json"), {url => {file: "blob", fetched_at: Time.utc.to_unix, content_type: "application/javascript", sha256: "blob", final_url: url}}.to_json)
+      privacy = Privacy.new(privacy_config(hosts: %(["cdn.jsdelivr.net"])), File.join(dir, "public"), nil, cache_dir: cache)
+      html = %(<script async src="#{url}"></script>)
+      rewrite(privacy, html).should eq(html)
+    end
+  end
+
+  it "treats another port on the site's host as external" do
+    with_cdn do |cdn, _hits, _offline|
+      with_privacy(privacy_config(base_url: "http://127.0.0.1:1")) do |privacy, _dir|
+        rewrite(privacy, %(<img src="#{cdn}/img/pic.png">)).should contain("/assets/external/")
+        rewrite(privacy, %(<img src="http://127.0.0.1:1/own.png">)).should contain("http://127.0.0.1:1/own.png")
+      end
+    end
+  end
+
+  it "rewrites image-set() strings in downloaded CSS" do
+    with_cdn do |cdn, _hits, _offline|
+      with_privacy(privacy_config) do |privacy, dir|
+        result = rewrite(privacy, %(<link rel="stylesheet" href="#{cdn}/css/set.css">))
+        css = read_published(dir, result.match!(/href="([^"]+)"/)[1])
+        css.should_not contain("../img")
+        css.should match(/image-set\("[0-9a-f]{12}-pic\.png" 1x, url\("[0-9a-f]{12}-copy\.png"\) 2x\)/)
+      end
+    end
+  end
+
+  it "does not retry a failed URL on the next build of the same process" do
+    with_cdn do |cdn, hits, _offline|
+      2.times do
+        with_privacy(privacy_config) do |privacy, _dir|
+          with_captured_log { rewrite(privacy, %(<img src="#{cdn}/missing">)) }
+        end
+      end
+      hits["/missing"].should eq(1)
+    end
+  end
 end
 
 # End-to-end through Builder#run.
@@ -368,6 +559,7 @@ private def privacy_site(cdn : String, extra : String = "", &)
         base_url = "http://example.com"
         [privacy]
         enabled = true
+        include = ["127.0.0.1"]
         #{extra}
         [[taxonomies]]
         name = "tags"
@@ -376,7 +568,7 @@ private def privacy_site(cdn : String, extra : String = "", &)
       FileUtils.mkdir_p("templates")
       File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
       File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
-      File.write("content/posts/a.md", "+++\ntitle = \"A\"\ntags = [\"x\"]\n+++\n<img src=\"#{cdn}/img/pic.png\">\n")
+      File.write("content/posts/a.md", "+++\ntitle = \"A\"\ntags = [\"x\"]\n+++\n<img src=\"#{cdn}/img/pic.png\"><img src=\"#{cdn}/img/body.png\">\n")
       layout = %(<html><head><link rel="stylesheet" href="#{cdn}/css/site.css"><script src="#{cdn}/js/app.js"></script></head><body>{{ content | safe }}</body></html>)
       %w[page section index taxonomy taxonomy_term 404].each { |t| File.write("templates/#{t}.html", layout) }
       yield dir
@@ -390,8 +582,24 @@ private def run_build(cache : Bool = false, minify : Bool = false, builder = Hwa
   builder
 end
 
+# Sources older than the build epoch, so a warm `--cache` build really
+# skips them (a file written in the build's own second reads as dirty).
+private def backdate_sources : Nil
+  past = Time.utc - 1.hour
+  (Dir.glob("content/**/*") + Dir.glob("templates/**/*") + ["config.toml"]).each do |path|
+    File.utime(past, past, path) if File.file?(path)
+  end
+end
+
 private def output_snapshot : Hash(String, String)
   Dir.glob("public/**/*").select { |p| File.file?(p) }.sort!.to_h { |p| {p, File.read(p)} }
+end
+
+# An incremental serve pass re-claims nothing.
+class Hwaro::Core::Build::Builder
+  def test_mark_claims_stale : Nil
+    @generated_claims_current = false
+  end
 end
 
 describe "[privacy] builds" do
@@ -417,11 +625,14 @@ describe "[privacy] builds" do
   it "is a byte-identical warm --cache build that keeps localized files, and works offline" do
     with_cdn do |cdn, hits, offline|
       privacy_site(cdn) do
+        backdate_sources
         run_build(cache: true)
         cold = output_snapshot
+        cold.keys.any?(&.ends_with?("-body.png")).should be_true
         fetched = hits.total
         offline.call
-        run_build(cache: true)
+        warm = run_build(cache: true)
+        warm.context.not_nil!.stats.pages_rendered.should eq(0)
         output_snapshot.should eq(cold)
         hits.total.should eq(fetched)
         # A full cold build offline still works from .hwaro/external.
@@ -441,6 +652,21 @@ describe "[privacy] builds" do
         run_build(builder: builder, serve_mode: true)
         hits.total.should eq(fetched)
         Hwaro::Services::Server::WATCH_ROOTS.none? { |root| Privacy::CACHE_DIR.starts_with?("#{root}/") }.should be_true
+      end
+    end
+  end
+
+  it "keeps a file only the 404 page uses through a serve incremental prune" do
+    with_cdn do |cdn, _hits, _offline|
+      privacy_site(cdn) do
+        File.write("templates/404.html", %(<html><body><img src="#{cdn}/img/only404.png"></body></html>))
+        builder = run_build(serve_mode: true)
+        file = Dir.glob("public/assets/external/*-only404.png").first
+        past = Time.utc - 1.hour
+        File.utime(past, past, file)
+        builder.test_mark_claims_stale
+        builder.prune_unclaimed_outputs([file], "public")
+        File.exists?(file).should be_true
       end
     end
   end
