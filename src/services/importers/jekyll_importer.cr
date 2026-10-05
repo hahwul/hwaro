@@ -72,7 +72,7 @@ module Hwaro
             return true if {"node_modules", "vendor", "assets"}.includes?(entry)
             if out_dir = out_dir_clean
               entry_full = File.expand_path(File.join(path, entry))
-              return true if entry_full == out_dir || out_dir.starts_with?(entry_full + "/")
+              return true if Hwaro::Utils::PathUtils.within?(out_dir, entry_full)
             end
             false
           }, source_root: path)

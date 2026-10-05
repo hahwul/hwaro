@@ -79,7 +79,7 @@ module Hwaro
                        nil
                      end
                    end
-        if resolved && (resolved == public_real || resolved.starts_with?(public_real + "/")) && Dir.exists?(resolved)
+        if resolved && Hwaro::Utils::PathUtils.within?(resolved, public_real) && Dir.exists?(resolved)
           # Build the Location from the already-resolved path to prevent
           # CRLF injection and path traversal in the redirect target, then
           # re-encode it: resolution decodes, so `/my page` would otherwise

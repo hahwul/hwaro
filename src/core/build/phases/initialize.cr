@@ -280,7 +280,7 @@ module Hwaro::Core::Build::Phases::Initialize
         # setups (/home/u -> /data/u), and comparing a resolved destination
         # against the unresolved `Path.home` would let `-o $HOME` through.
         "the home directory"
-      elsif cwd == expanded || cwd.starts_with?(expanded + File::SEPARATOR)
+      elsif Hwaro::Utils::PathUtils.within?(cwd, expanded)
         "the project directory (or a parent of it)"
       elsif input_dir = protected_input_dir(expanded, cwd)
         "the project's #{input_dir.inspect} directory (hwaro reads it as build input)"
@@ -306,7 +306,7 @@ module Hwaro::Core::Build::Phases::Initialize
   private def protected_input_dir(expanded : String, cwd : String) : String?
     PROTECTED_INPUT_DIRS.find do |dir|
       root = Hwaro::Utils::PathUtils.resolved_real_path(File.join(cwd, dir))
-      expanded == root || expanded.starts_with?(root + File::SEPARATOR)
+      Hwaro::Utils::PathUtils.within?(expanded, root)
     end
   end
 

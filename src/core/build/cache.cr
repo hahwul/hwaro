@@ -860,8 +860,8 @@ module Hwaro
           # are the same directory and must produce the same key.
           expanded = Utils::PathUtils.chomp_separator(expanded)
           root = File.expand_path(Dir.current)
-          return expanded unless expanded.starts_with?(root + File::SEPARATOR)
-          expanded[(root.size + 1)..]
+          relative = Utils::PathUtils.relative_path(expanded, root)
+          relative && !relative.empty? ? relative : expanded
         end
 
         # Fingerprint the CLI options that change what a page RENDERS TO.

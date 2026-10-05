@@ -541,8 +541,8 @@ module Hwaro
               resolved = File.expand_path(path, project_root)
               # Recorded before the existence check: a page rendered while the
               # file was missing changes once it appears.
-              if resolved.starts_with?(project_root + "/")
-                TemplateEngine.record_file_read(resolved[(project_root.size + 1)..])
+              if relative = Hwaro::Utils::PathUtils.relative_path(resolved, project_root)
+                TemplateEngine.record_file_read(relative) unless relative.empty?
               end
               resolved = begin
                 File.realpath(resolved)
@@ -551,7 +551,7 @@ module Hwaro
               end
 
               if resolved &&
-                 (resolved == project_root || resolved.starts_with?(project_root + "/")) &&
+                 Hwaro::Utils::PathUtils.within?(resolved, project_root) &&
                  (info = File.info?(resolved)) && info.file?
                 # to_unix_ms (Int64) like the build cache — to_unix_ns is Int128
                 mtime = info.modification_time.to_unix_ms
@@ -570,7 +570,7 @@ module Hwaro
                     Crinja::Value.new(nil)
                   end
                 end
-              elsif resolved && !(resolved == project_root || resolved.starts_with?(project_root + "/"))
+              elsif resolved && !Hwaro::Utils::PathUtils.within?(resolved, project_root)
                 warn_load_data_once(path, "resolves outside the project directory and is refused")
               else
                 warn_load_data_once(path, "is not a file (paths resolve against the project root)")

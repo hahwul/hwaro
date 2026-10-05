@@ -371,7 +371,7 @@ module Hwaro
         rescue File::Error
           @public_dir
         end
-        unless resolved && (resolved == public_real || resolved.starts_with?(public_real + "/"))
+        unless resolved && Hwaro::Utils::PathUtils.within?(resolved, public_real)
           call_next(context)
           return
         end

@@ -295,8 +295,39 @@ module Hwaro
       # comparable (expanded or resolved) form. A root that already ends in a
       # separator — the filesystem root "/" — is not given a second one.
       def within?(path : String, root : String) : Bool
+        path = comparable_path(path)
+        root = comparable_path(root)
         return true if path == root
         path.starts_with?(root.ends_with?(File::SEPARATOR) ? root : root + File::SEPARATOR)
+      end
+
+      # Return a slash-separated path relative to `root`, or nil when it is
+      # outside. This uses the same Windows extended-path normalization as
+      # `within?`, so callers do not slice using the original prefix length.
+      def relative_path(path : String, root : String) : String?
+        path = comparable_path(path)
+        root = chomp_separator(comparable_path(root))
+        return "" if path == root
+
+        prefix = root.ends_with?(File::SEPARATOR) ? root : root + File::SEPARATOR
+        return unless path.starts_with?(prefix)
+        path[prefix.size..]
+      end
+
+      private def comparable_path(path : String) : String
+        {% if flag?(:windows) %}
+          return path unless path.includes?('\\')
+          path = if path.starts_with?("\\\\?\\UNC\\")
+                   "//" + path[8..]
+                 elsif path.starts_with?("\\\\?\\")
+                   path[4..]
+                 else
+                   path
+                 end
+          path.tr("\\", "/")
+        {% else %}
+          path
+        {% end %}
       end
 
       # `path` with exactly one leading slash, for joining onto a base URL

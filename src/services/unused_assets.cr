@@ -116,7 +116,7 @@ module Hwaro
       private def inside_cwd?(path : String) : Bool
         expanded = File.expand_path(path)
         cwd = Dir.current
-        expanded == cwd || expanded.starts_with?(cwd + File::SEPARATOR)
+        Hwaro::Utils::PathUtils.within?(expanded, cwd)
       end
 
       # Join `name` under the project root, keeping the historical relative

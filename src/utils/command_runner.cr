@@ -27,11 +27,23 @@ module Hwaro
       # skips AutoRun.
       def self.shell_command(command : String) : String
         {% if flag?(:windows) %}
-          %("#{ENV["ComSpec"]? || "cmd.exe"}" /d /s /c "#{command}")
+          %("#{windows_comspec}" /d /s /c "#{command}")
         {% else %}
           command
         {% end %}
       end
+
+      {% if flag?(:windows) %}
+        private def self.windows_comspec : String
+          if shell = ENV["ComSpec"]?
+            return shell if Path[shell].absolute?
+          end
+          if root = ENV["SystemRoot"]?
+            return File.join(root, "System32", "cmd.exe").gsub('/', '\\') if Path[root].absolute?
+          end
+          raise ArgumentError.new("Cannot locate cmd.exe: ComSpec or SystemRoot must be an absolute path")
+        end
+      {% end %}
 
       # Execute a single command and return the result
       def self.run(command : String, working_dir : String? = nil) : Result

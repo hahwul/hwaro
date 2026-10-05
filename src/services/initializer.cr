@@ -547,7 +547,7 @@ module Hwaro
 
         target_root = Hwaro::Utils::PathUtils.resolved_real_path(target_path)
         resolved_path = Hwaro::Utils::PathUtils.resolved_real_path(path)
-        within_target = resolved_path == target_root || resolved_path.starts_with?(target_root + File::SEPARATOR)
+        within_target = Hwaro::Utils::PathUtils.within?(resolved_path, target_root)
         dangling_link = File.symlink?(path) && !File.exists?(path)
         return if within_target && !dangling_link
 
