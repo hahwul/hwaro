@@ -153,8 +153,10 @@ Anything else your templates load from another host needs its own entry in
 
 `mode = "headers"` writes one rule per page to `headers_file`, in the
 format Netlify and Cloudflare Pages read. Paths are the page URLs and include
-the `base_url` subpath: `/`, `/blog/hello/`, `/404.html`. Non-ASCII paths are
-percent-encoded, as browsers request them.
+the `base_url` subpath: `/`, `/blog/hello/`, `/404.html`. They are encoded
+exactly like the page's URL in the sitemap, as browsers request them: `#`
+becomes `%23`, `?` becomes `%3F`, and spaces and non-ASCII characters are
+percent-encoded.
 
 If `static/_headers` exists, it is not replaced. Hwaro writes your file
 first, unchanged, and appends its own rules after a
@@ -170,9 +172,12 @@ also sets `Content-Security-Policy` is therefore sent as a second policy,
 and the browser enforces both, so do not set one alongside `[csp]`. Hwaro
 warns when your file has a CSP block on a path with `*` or `:`.
 
-Hosts read `:name` in a path as a placeholder and `*` as a wildcard, so a page
-whose URL contains `:`, `*` or a control character gets no rule (Hwaro warns
-and names it). Rename it, or use meta mode.
+No rule can match some paths. Hosts read `:name` in a path as a placeholder
+and `*` as a wildcard, a control character breaks the file, and a `%` in a
+file name does not tell which URL the page has (`a%b` is published for both
+`/a%b/` and `/a%25b/`). Such a page gets its policy as a
+[`<meta>` tag](#meta-mode) instead, without `frame-ancestors`, `report-uri`
+and `sandbox`, and Hwaro warns and names it. Rename it to get a rule.
 
 Rules are per page because the format cannot list several paths in one rule.
 On this documentation site (about 160 pages in two languages) the file is about
