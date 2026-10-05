@@ -762,3 +762,147 @@ describe "Config.load image_processing" do
     end
   end
 end
+
+private def write_bytes(dir : String, name : String, bytes : Bytes) : String
+  path = File.join(dir, name)
+  File.write(path, bytes)
+  path
+end
+
+private def le16(v : Int32) : Array(UInt8)
+  [(v & 0xFF).to_u8, ((v >> 8) & 0xFF).to_u8]
+end
+
+private def le24(v : Int32) : Array(UInt8)
+  le16(v) + [((v >> 16) & 0xFF).to_u8]
+end
+
+private def webp_header(chunk : String, payload : Array(UInt8)) : Bytes
+  bytes = "RIFF".bytes + [0_u8, 0_u8, 0_u8, 0_u8] + "WEBP".bytes + chunk.bytes + [0_u8, 0_u8, 0_u8, 0_u8] + payload
+  bytes += [0_u8] * (30 - bytes.size) if bytes.size < 30
+  Bytes.new(bytes.size) { |i| bytes[i] }
+end
+
+# 4×2 RGB image: left half red, right half blue.
+private def write_halves_png(path : String) : Nil
+  pixels = Bytes.new(4 * 2 * 3)
+  2.times do |y|
+    4.times do |x|
+      o = (y * 4 + x) * 3
+      if x < 2
+        pixels[o] = 255_u8
+      else
+        pixels[o + 2] = 255_u8
+      end
+    end
+  end
+  LibStb.stbi_write_png(path, 4, 2, 3, pixels.to_unsafe.as(Void*), 4 * 3)
+end
+
+# {width, height, first pixel RGB} of a decoded image.
+private def probe(path : String) : {Int32, Int32, {UInt8, UInt8, UInt8}}
+  w = uninitialized LibC::Int
+  h = uninitialized LibC::Int
+  c = uninitialized LibC::Int
+  px = LibStb.stbi_load(path, pointerof(w), pointerof(h), pointerof(c), 3)
+  raise "decode failed" if px.null?
+  begin
+    {w.to_i32, h.to_i32, {px[0], px[1], px[2]}}
+  ensure
+    LibStb.stbi_image_free(px.as(Void*))
+  end
+end
+
+describe "ImageProcessor.dimensions (read-only formats)" do
+  it "reads GIF logical screen size" do
+    Dir.mktmpdir do |dir|
+      path = write_bytes(dir, "a.gif", Bytes.new(10) { |i| ("GIF89a".bytes + le16(300) + le16(70))[i] })
+      Hwaro::Content::Processors::ImageProcessor.dimensions(path).should eq({300, 70})
+    end
+  end
+
+  it "reads lossy (VP8), lossless (VP8L) and extended (VP8X) WebP" do
+    Dir.mktmpdir do |dir|
+      vp8 = webp_header("VP8 ", [0_u8, 0_u8, 0_u8, 0x9D_u8, 0x01_u8, 0x2A_u8] + le16(640) + le16(480))
+      Hwaro::Content::Processors::ImageProcessor.dimensions(write_bytes(dir, "a.webp", vp8)).should eq({640, 480})
+
+      bits = (1316 - 1) | ((483 - 1) << 14)
+      vp8l = webp_header("VP8L", [0x2F_u8] + le16(bits & 0xFFFF) + le16(bits >> 16))
+      Hwaro::Content::Processors::ImageProcessor.dimensions(write_bytes(dir, "b.webp", vp8l)).should eq({1316, 483})
+
+      vp8x = webp_header("VP8X", [0_u8, 0_u8, 0_u8, 0_u8] + le24(5000 - 1) + le24(20 - 1))
+      Hwaro::Content::Processors::ImageProcessor.dimensions(write_bytes(dir, "c.webp", vp8x)).should eq({5000, 20})
+    end
+  end
+
+  it "reads SVG width/height, falling back to the viewBox" do
+    Dir.mktmpdir do |dir|
+      dims = ->(svg : String) {
+        File.write(File.join(dir, "x.svg"), svg)
+        Hwaro::Content::Processors::ImageProcessor.dimensions(File.join(dir, "x.svg"))
+      }
+      dims.call(%(<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40px" viewBox="0 0 12 4">)).should eq({120, 40})
+      dims.call(%(<svg viewBox="0 0 24 12" stroke-width="2"></svg>)).should eq({24, 12})
+      dims.call(%(<svg width="100" viewBox="0 0 24 12"></svg>)).should eq({100, 50})
+      dims.call(%(<svg width="100%" height="100%"></svg>)).should be_nil
+      dims.call(%(<html></html>)).should be_nil
+    end
+  end
+
+  it "returns nil for truncated or mislabelled headers" do
+    Dir.mktmpdir do |dir|
+      Hwaro::Content::Processors::ImageProcessor.dimensions(write_bytes(dir, "a.gif", Bytes[0x47, 0x49])).should be_nil
+      Hwaro::Content::Processors::ImageProcessor.dimensions(write_bytes(dir, "a.webp", Bytes.new(40))).should be_nil
+    end
+  end
+end
+
+describe "ImageProcessor.transform" do
+  it "crops an unscaled region at the anchor" do
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "h.png")
+      write_halves_png(src)
+      left = File.join(dir, "l.png")
+      right = File.join(dir, "r.png")
+      Hwaro::Content::Processors::ImageProcessor.transform(src, left, 2, 2, "crop", "left").should eq({2, 2})
+      Hwaro::Content::Processors::ImageProcessor.transform(src, right, 2, 2, "crop", "top_right").should eq({2, 2})
+      probe(left).should eq({2, 2, {255_u8, 0_u8, 0_u8}})
+      probe(right).should eq({2, 2, {0_u8, 0_u8, 255_u8}})
+    end
+  end
+
+  it "clamps a crop box larger than the source" do
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "h.png")
+      write_halves_png(src)
+      dest = File.join(dir, "c.png")
+      Hwaro::Content::Processors::ImageProcessor.transform(src, dest, 10, 10, "crop", "center").should eq({4, 2})
+    end
+  end
+
+  it "fills the exact box, upscaling to cover it" do
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "h.png")
+      write_halves_png(src)
+      dest = File.join(dir, "f.png")
+      Hwaro::Content::Processors::ImageProcessor.transform(src, dest, 8, 8, "fill", "right").should eq({8, 8})
+      probe(dest).should eq({8, 8, {0_u8, 0_u8, 255_u8}})
+    end
+  end
+
+  it "returns nil for an undecodable source" do
+    Dir.mktmpdir do |dir|
+      src = write_bytes(dir, "bad.png", Bytes[1, 2, 3])
+      Hwaro::Content::Processors::ImageProcessor.transform(src, File.join(dir, "o.png"), 2, 2, "fill", "center").should be_nil
+    end
+  end
+end
+
+describe "[image_processing] dimensions" do
+  it "defaults to off and loads independently of enabled" do
+    load_config(%(title = "T"\n)).image_processing.dimensions.should be_false
+    config = load_config(%(title = "T"\n[image_processing]\ndimensions = true\n))
+    config.image_processing.dimensions.should be_true
+    config.image_processing.enabled.should be_false
+  end
+end

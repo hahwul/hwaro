@@ -1,6 +1,7 @@
 require "../../../spec_helper"
 require "../../../../src/content/hooks/image_hooks"
 require "../../../../src/content/processors/template"
+require "../../../support/build_helper"
 
 # =============================================================================
 # Unit specs for ImageHooks. Covers:
@@ -483,6 +484,54 @@ describe Hwaro::Content::Hooks::ImageHooks do
         result.should_not be_nil
         result.not_nil!.should eq({320 => "photo_320w.png", 640 => "photo_640w.png"})
       end
+    end
+  end
+end
+
+# Raw bytes of a w×h grey PNG, for build_site file maps.
+private def png_body(w : Int32, h : Int32) : String
+  Dir.mktmpdir do |dir|
+    path = File.join(dir, "x.png")
+    px = Bytes.new(w * h * 3, 90_u8)
+    LibStb.stbi_write_png(path, w, h, 3, px.to_unsafe.as(Void*), w * 3)
+    File.read(path)
+  end
+end
+
+private def png_size(path : String) : {Int32, Int32}?
+  Hwaro::Content::Processors::ImageProcessor.dimensions(path)
+end
+
+describe "resize_image fill/crop variants and content image dimensions (build)" do
+  it "writes op variants at render time, sizes content images, and keeps both on warm builds" do
+    page_tpl = <<-HTML
+      {{ content }}
+      {% set f = resize_image(path=page.url ~ "pic.png", width=20, height=20, op="fill", anchor="bottom_right") %}F={{ f.url }} {{ f.width }}x{{ f.height }}
+      {% set c = resize_image(path="/img/a.png", width=8, height=50, op="crop") %}C={{ c.url }} {{ c.width }}x{{ c.height }}
+      HTML
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com/sub"\n[image_processing]\ndimensions = true\n),
+      content_files: {"posts/b/index.md" => "+++\ntitle = \"B\"\n+++\n![p](pic.png) ![a](/img/a.png)\n", "posts/b/pic.png" => png_body(40, 10)},
+      template_files: {"page.html" => page_tpl, "section.html" => "{{ content }}", "index.html" => "{{ content }}"},
+      static_files: {"img/a.png" => png_body(12, 30)},
+      cache: true,
+    ) do
+      html = File.read("public/posts/b/index.html")
+      html.should contain(%(<img width="40" height="10" src="pic.png"))
+      html.should contain(%(<img width="12" height="30" src="/sub/img/a.png"))
+      html.should contain("F=https://example.com/sub/posts/b/pic_20x20_fill_bottom_right.png 20x20")
+      html.should contain("C=https://example.com/sub/img/a_8x50_crop_center.png 8x30")
+      png_size("public/posts/b/pic_20x20_fill_bottom_right.png").should eq({20, 20})
+      png_size("public/img/a_8x50_crop_center.png").should eq({8, 30})
+
+      # A warm build skips the page; its variants must survive the prune.
+      2.times do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true, highlight: false, parallel: false))
+      end
+      File.exists?("public/posts/b/pic_20x20_fill_bottom_right.png").should be_true
+      File.exists?("public/img/a_8x50_crop_center.png").should be_true
     end
   end
 end
