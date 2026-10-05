@@ -230,17 +230,26 @@ module Hwaro
           name = "#{File.basename(url, ext)}_#{width}x#{height}_#{op}_#{anchor}#{ext}"
           dir = File.dirname(url)
           variant_url = dir == "/" ? "/#{name}" : "#{dir}/#{name}"
-          # An authored file publishing at the variant's own URL (a static
-          # copy) is not this build's output: never reuse it as the variant.
-          authored = !resolve_source(variant_url).nil?
+          source_mtime = File.info(source).modification_time
 
-          @@lookup_mutex.synchronize do
+          # Memo hit: this build already wrote (or reused) the variant.
+          dest = @@lookup_mutex.synchronize do
             @@render_image_sources << Path.posix(source).normalize.to_s
             output_dir = @@op_output_dir
             return unless output_dir
-            dest = File.join(output_dir, variant_url.lchop('/'))
-            return unless safe_dest_path?(dest, File.expand_path(output_dir))
-            source_mtime = File.info(source).modification_time
+            path = File.join(output_dir, variant_url.lchop('/'))
+            return unless safe_dest_path?(path, File.expand_path(output_dir))
+            memo = @@op_variants[path]?
+            return claim_op_variant(path, variant_url, memo[1], page_path) if memo && memo[0] == source_mtime
+            path
+          end
+
+          # An authored file publishing at the variant's own URL (a static
+          # copy) is not this build's output: never reuse it as the variant.
+          # Resolved outside the lock — resolve_source takes it itself.
+          authored = !resolve_source(variant_url).nil?
+
+          @@lookup_mutex.synchronize do
             memo = @@op_variants[dest]?
             size = if memo && memo[0] == source_mtime
                      memo[1]
@@ -252,16 +261,22 @@ module Hwaro
                      @@op_variants[dest] = {source_mtime, made}
                      made
                    end
-            return unless size
-            if builder = @@op_builder
-              builder.claim_generated_output(dest)
-              builder.record_page_derived_output(page_path, dest) if page_path
-            end
-            {variant_url, size[0], size[1]}
+            claim_op_variant(dest, variant_url, size, page_path)
           end
         rescue ex : File::Error | IO::Error
           Logger.debug "resize_image variant failed for #{source}: #{ex.message}"
           nil
+        end
+
+        # Claim a made variant for this build and the rendering page, and
+        # shape the result. Caller holds @@lookup_mutex.
+        private def self.claim_op_variant(dest : String, variant_url : String, size : {Int32, Int32}?, page_path : String?) : {String, Int32, Int32}?
+          return unless size
+          if builder = @@op_builder
+            builder.claim_generated_output(dest)
+            builder.record_page_derived_output(page_path, dest) if page_path
+          end
+          {variant_url, size[0], size[1]}
         end
 
         # Describes a single image to be resized
