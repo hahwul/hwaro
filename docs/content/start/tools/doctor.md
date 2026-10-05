@@ -44,7 +44,7 @@ hwaro doctor --json
 | --strict | Treat warnings as errors when computing the exit code |
 | --max-warnings N | Exit non-zero when warning count exceeds N |
 | -j, --json | Output result as JSON |
-| -q, --quiet | Suppress info output and banner |
+| -q, --quiet | Suppress info output and banner; warnings and errors print one `[level] file: message` line each on stderr |
 | -h, --help | Show help |
 
 ## What It Checks
