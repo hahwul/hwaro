@@ -273,10 +273,11 @@ describe "serve watch-lane regressions" do
     end
   end
 
-  # The static lane only copies; an `integrity` printed into pages must
-  # still move with the bytes, or the browser refuses the asset — with
-  # `?v=` cache busting off, and for a template's own asset_integrity().
-  it "re-renders integrity values after a static save under [assets] sri" do
+  # Serve bakes the dev origin into its tags, so `[assets] sri` adds no
+  # integrity there (another host name for the same server would fail every
+  # check). `asset_integrity()` still answers, and the static lane — which
+  # only copies — must re-render so its value follows the bytes.
+  it "keeps asset_integrity() current after a static save and emits no sri tags" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         File.write("config.toml", <<-TOML
@@ -304,15 +305,17 @@ describe "serve watch-lane regressions" do
         options = watch_options
         options.cache_busting = false
         server.watch_fixes_builder.run(options).should be_true
-        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("a{}"))
-
-        File.write("static/inc/a.css", "a{color:red}")
-        server.watch_fixes_apply_changeset(watch_changeset(modified_static: ["static/inc/a.css"]), options)
-        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("a{color:red}"))
+        html = File.read("public/page/index.html")
+        html.should contain(%(<link rel="stylesheet" href="https://example.com/inc/a.css">))
+        html.should contain(Hwaro::Utils::DigestUtils.sri("one()"))
 
         File.write("static/js/app.js", "two()")
-        server.watch_fixes_apply_changeset(watch_changeset(modified_static: ["static/js/app.js"]), options)
+        log = with_captured_log do
+          server.watch_fixes_apply_changeset(watch_changeset(modified_static: ["static/js/app.js"]), options)
+        end
         File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("two()"))
+        log.should contain("asset_integrity()")
+        log.should_not contain("?v= hash")
       end
     end
   end

@@ -79,4 +79,29 @@ describe "[build] write_stats" do
       end
     end
   end
+
+  # A partial build extends the previous file; with that file gone (a CI
+  # that restores the cache but not the project root) or corrupt, a warm
+  # build listed only the pages it rendered, and Tailwind purged the rest.
+  it "renders every page on a warm --cache build when the stats file is missing or malformed" do
+    ["", %({"htmlElements": 5}), "{not json"].each do |replacement|
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", STATS_CONFIG)
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          STATS_TEMPLATES.each { |name, body| File.write(File.join("templates", name), body) }
+          File.write("content/a.md", "+++\ntitle = \"A\"\n[extra]\nkind = \"a\"\n+++\na")
+          File.write("content/b.md", "+++\ntitle = \"B\"\n[extra]\nkind = \"b\"\n+++\nb")
+          stats_build(cache: true)
+
+          replacement.empty? ? File.delete("hwaro_stats.json") : File.write("hwaro_stats.json", replacement)
+          stats_build(cache: true)
+
+          stats_classes.should contain("page-a")
+          stats_classes.should contain("page-b")
+        end
+      end
+    end
+  end
 end

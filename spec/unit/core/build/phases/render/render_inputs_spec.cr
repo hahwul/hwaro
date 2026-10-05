@@ -10,11 +10,11 @@ require "../../../../../../src/ext/stb_bindings"
 # `data/`. None of them was in any cache key, so every cached page kept the
 # old value — a 404ing stylesheet, the previous analytics ID.
 
-private def render_inputs_build(cache_busting : Bool = true)
+private def render_inputs_build(cache_busting : Bool = true, output_dir : String = "public")
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
   builder.run(Hwaro::Config::Options::BuildOptions.new(
-    output_dir: "public", parallel: false, cache: true, highlight: false,
+    output_dir: output_dir, parallel: false, cache: true, highlight: false,
     cache_busting: cache_busting,
   )).should be_true
 end
@@ -292,6 +292,28 @@ describe "warm --cache builds and template inputs outside the tracked files" do
       after = integrity_in(File.read("public/a/index.html"))
       after.should_not eq(before)
       after.should eq(Hwaro::Utils::DigestUtils.sri_file("public/assets/main.css"))
+    end
+  end
+
+  # The read is keyed by asset NAME, not by the output file's path: a path
+  # outside the project (`-o ../site`, an absolute `-o`) is never recorded
+  # as a file read, so those pages stayed cached with the old hash.
+  it "updates asset_integrity() on cached pages for an output dir outside the project" do
+    Dir.mktmpdir do |outside|
+      [File.join(outside, "abs-out"), "../#{File.basename(outside)}/rel-out"].each do |output_dir|
+        with_render_inputs_site("", %(<link integrity="{{ asset_integrity(name='css/site.css') }}">)) do
+          FileUtils.mkdir_p("static/css")
+          File.write("static/css/site.css", "a{}")
+          render_inputs_build(output_dir: output_dir)
+          page = File.join(output_dir, "a/index.html")
+          integrity_in(File.read(page)).should eq(Hwaro::Utils::DigestUtils.sri("a{}"))
+
+          File.write("static/css/site.css", "a{color:red}")
+          render_inputs_build(output_dir: output_dir)
+
+          integrity_in(File.read(page)).should eq(Hwaro::Utils::DigestUtils.sri("a{color:red}"))
+        end
+      end
     end
   end
 end

@@ -138,3 +138,70 @@ describe "Asset Pipeline: asset_integrity()" do
     end
   end
 end
+
+private def integrity_build(cache : Bool = false)
+  builder = Hwaro::Core::Build::Builder.new
+  Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+  builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false, cache: cache)).should be_true
+end
+
+describe "Asset Pipeline: asset_integrity() on content-copied files" do
+  # Page-bundle assets are copied in the Write phase, after rendering: a cold
+  # build found no emitted file, and a warm one hashed the previous copy.
+  it "hashes a page-bundle asset's source on cold and warm builds" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"https://example.com\"\n")
+        FileUtils.mkdir_p("content/bund")
+        FileUtils.mkdir_p("templates")
+        File.write("content/bund/index.md", "+++\ntitle = \"B\"\n+++\nb")
+        File.write("content/bund/app.js", "one()")
+        File.write("templates/page.html", %(<s i="{{ asset_integrity(name='bund/app.js') }}">))
+
+        integrity_build(cache: true)
+        File.read("public/bund/index.html").should eq(%(<s i="#{Hwaro::Utils::DigestUtils.sri("one()")}">))
+
+        File.write("content/bund/app.js", "two()")
+        integrity_build(cache: true)
+        File.read("public/bund/index.html").should eq(%(<s i="#{Hwaro::Utils::DigestUtils.sri("two()")}">))
+        Hwaro::Utils::DigestUtils.sri_file("public/bund/app.js").should eq(Hwaro::Utils::DigestUtils.sri("two()"))
+      end
+    end
+  end
+end
+
+describe "Asset Pipeline: [build] hooks.post and integrity" do
+  # Integrity is printed at Render; a post hook rewriting the file afterwards
+  # leaves every page pointing at bytes that no longer ship.
+  it "warns when a post hook rewrites a file whose integrity was printed" do
+    posix_only!("the hook is a POSIX shell command")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "T"
+          base_url = "https://example.com"
+
+          [build]
+          hooks.post = ["sh -c 'printf x >> public/css/site.css'"]
+          TOML
+        )
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", "a{}")
+        File.write("content/page.md", "---\ntitle: Test\n---\nHello")
+        File.write("templates/page.html", %(<link integrity="{{ asset_integrity(name='css/site.css') }}">))
+
+        previous = Hwaro::Logger.err_io
+        err = IO::Memory.new
+        Hwaro::Logger.err_io = err
+        begin
+          integrity_build
+        ensure
+          Hwaro::Logger.err_io = previous
+        end
+        err.to_s.should contain("hooks.post changed #{File.expand_path("public/css/site.css")}")
+      end
+    end
+  end
+end

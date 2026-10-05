@@ -21,6 +21,12 @@ describe Hwaro::Utils::HtmlStats do
       stats.classes.to_a.should eq(["ok"])
     end
 
+    it "ends raw-text elements at a closer in any case" do
+      stats = stats_of(%(<Script>x("<i class=no>")</SCRIPT ><p class="yes"><STYLE>a<b{}</Style><em class="also">))
+      stats.classes.to_a.sort.should eq(["also", "yes"])
+      stats.tags.to_a.sort.should eq(["em", "p", "script", "style"])
+    end
+
     it "decodes entities in values and drops empty ids" do
       stats = stats_of(%(<p class="q&amp;r [&amp;>*]:p-4" id=""><a id=" x ">))
       stats.classes.to_a.sort.should eq(["[&>*]:p-4", "q&r"])
@@ -83,7 +89,13 @@ describe Hwaro::Utils::HtmlStats do
       stats.classes.to_a.sort.should eq(["new", "old"])
       stats.tags.to_a.sort.should eq(["em", "p"])
 
+      Hwaro::Utils::HtmlStats.valid_file?(path).should be_true
+      File.write(path, %({"htmlElements": 5}))
+      Hwaro::Utils::HtmlStats.valid_file?(path).should be_false
+      stats_of("<em>").merge_file(path)
+
       File.write(path, "{not json")
+      Hwaro::Utils::HtmlStats.valid_file?(path).should be_false
       fresh = stats_of(%(<em>))
       fresh.merge_file(path)
       fresh.tags.to_a.should eq(["em"])

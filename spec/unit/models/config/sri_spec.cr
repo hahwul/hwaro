@@ -1,7 +1,9 @@
 require "../../../spec_helper"
 
-# `[assets] sri`: the local tags Hwaro emits carry `integrity` over the
-# emitted file under `sri_root` (the output directory); CDN tags never do.
+# `[assets] sri`: the local tags Hwaro emits carry `integrity` (with
+# `crossorigin="anonymous"`, so a cross-origin view of an absolute
+# `base_url` URL can still be checked) over the emitted file under
+# `sri_root` (the output directory); CDN tags never do.
 describe "[assets] sri" do
   it "defaults to off and parses from [assets]" do
     Hwaro::Models::Config.new.assets.sri.should be_false
@@ -31,8 +33,8 @@ describe "[assets] sri" do
       highlight.use_cdn = false
       css_sri = Hwaro::Utils::DigestUtils.sri("h{}")
       js_sri = Hwaro::Utils::DigestUtils.sri("x()")
-      highlight.css_tag("abc", dir).should eq(%(<link rel="stylesheet" href="/assets/css/highlight/github.min.css?v=abc" integrity="#{css_sri}">))
-      highlight.js_tag("", dir).should contain(%(<script src="/assets/js/highlight.min.js" integrity="#{js_sri}"></script>))
+      highlight.css_tag("abc", dir).should eq(%(<link rel="stylesheet" href="/assets/css/highlight/github.min.css?v=abc" integrity="#{css_sri}" crossorigin="anonymous">))
+      highlight.js_tag("", dir).should contain(%(<script src="/assets/js/highlight.min.js" integrity="#{js_sri}" crossorigin="anonymous"></script>))
       highlight.tags("", dir).should contain(css_sri)
       # Off (no root) is byte-identical to the pre-SRI tag.
       highlight.css_tag("abc").should eq(%(<link rel="stylesheet" href="/assets/css/highlight/github.min.css?v=abc">))
@@ -52,7 +54,7 @@ describe "[assets] sri" do
         includes.dirs = ["inc"]
 
         tags = includes.all_tags("https://x.test", "", "public")
-        tags.should contain(%(<link rel="stylesheet" href="https://x.test/inc/a.css" integrity="#{Hwaro::Utils::DigestUtils.sri("a{}")}">))
+        tags.should contain(%(<link rel="stylesheet" href="https://x.test/inc/a.css" integrity="#{Hwaro::Utils::DigestUtils.sri("a{}")}" crossorigin="anonymous">))
         tags.should contain(%(<script src="https://x.test/inc/b.js"></script>))
         includes.all_tags("https://x.test", "").should_not contain("integrity")
       end
