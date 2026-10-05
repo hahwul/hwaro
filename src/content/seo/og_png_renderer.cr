@@ -928,7 +928,12 @@ module Hwaro
 
         # Word-wrap using incremental chain-measured text width.
         # Handles CJK characters by allowing breaks between any CJK characters.
-        private def self.word_wrap_chain(chain : Array(FontEntry), px_size : Float32, text : String, max_width : Int32) : Array(String)
+        # A segment wider than `break_width` on its own (a URL, a file path)
+        # is hard-broken at the last glyph that fits, like the SVG
+        # `word_wrap`; otherwise it ran off the canvas. `balanced_wrap_chain`
+        # narrows `max_width` but keeps `break_width` at the real limit, so
+        # balancing never splits a word that already fits.
+        private def self.word_wrap_chain(chain : Array(FontEntry), px_size : Float32, text : String, max_width : Int32, break_width : Int32 = max_width) : Array(String)
           return [] of String if text.empty?
           segments = Content::Seo::OgImage.split_into_segments(text)
           lines = [] of String
@@ -948,6 +953,21 @@ module Hwaro
               current_line = seg.lstrip
               current_width = chain_measure(chain, px_size, current_line)
             end
+
+            if current_width > break_width && current_line.size > 1
+              piece = ""
+              current_line.each_char do |ch|
+                candidate = piece + ch
+                if !piece.empty? && chain_measure(chain, px_size, candidate) > break_width
+                  lines << piece.strip
+                  piece = ch.to_s
+                else
+                  piece = candidate
+                end
+              end
+              current_line = piece
+              current_width = chain_measure(chain, px_size, piece)
+            end
           end
           lines << current_line.strip unless current_line.strip.empty?
           lines
@@ -964,7 +984,7 @@ module Hwaro
           widest = widths.max
           return lines if widest <= 0 || widths.last >= widest * 0.55_f32
           target = Math.max(widths.sum / lines.size * 1.08_f32, widest * 0.6_f32)
-          rebalanced = word_wrap_chain(chain, px_size, text, to_px(target))
+          rebalanced = word_wrap_chain(chain, px_size, text, to_px(target), max_width)
           rebalanced.size <= lines.size ? rebalanced : lines
         end
 
