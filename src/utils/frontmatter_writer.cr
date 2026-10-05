@@ -5,6 +5,7 @@
 # emission rules — key quoting, string escaping, date formatting — stay
 # identical across every tool that produces content files.
 
+require "base64"
 require "yaml"
 require "json"
 require "toml"
@@ -360,6 +361,8 @@ module Hwaro
             end
           when Time
             FrontmatterWriter.serialize_time(raw)
+          when Bytes
+            "\"#{Base64.strict_encode(raw)}\""
           when Array
             "[#{array_items(value, depth).join(", ")}]"
           when Hash

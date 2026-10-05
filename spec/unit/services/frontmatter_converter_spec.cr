@@ -947,6 +947,20 @@ describe Hwaro::Services::ConversionResult do
       end
     end
   end
+
+  # Regression: a YAML `!!binary` value was written as `"Bytes[104, …]"`.
+  it "writes a YAML binary value as its base64 text" do
+    {"to_toml" => %(k = "aGVsbG8="\n), "to_json" => %("k": "aGVsbG8=")}.each do |target, expected|
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "post.md")
+        File.write(file_path, "---\ntitle: Post\nk: !!binary aGVsbG8=\n---\n\nContent")
+        result = target == "to_toml" ? converter.convert_to_toml : converter.convert_to_json
+        result.converted_count.should eq(1)
+        File.read(file_path).should contain(expected)
+      end
+    end
+  end
   describe "non-frontmatter leading blocks" do
     # Regression: a document whose first lines form a `---` … `---` pair that
     # is NOT a mapping (horizontal rule + prose, a list, an unclosed rule) was

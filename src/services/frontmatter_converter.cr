@@ -3,6 +3,7 @@
 # This service provides functionality to convert frontmatter between
 # YAML, TOML, and JSON formats in content files.
 
+require "base64"
 require "json"
 require "yaml"
 require "toml"
@@ -552,6 +553,7 @@ module Hwaro
         when String  then JSON::Any.new(raw)
         when Time    then JSON::Any.new(FrontmatterConverter.serialize_time(raw))
         when Nil     then JSON::Any.new(nil)
+        when Bytes   then JSON::Any.new(Base64.strict_encode(raw))
         when Array
           arr = yaml.as_a.map { |v| yaml_any_to_json_any(v, depth + 1) }
           JSON::Any.new(arr)
