@@ -102,6 +102,23 @@ describe "[[content.schema]] build" do
     end
   end
 
+  it "never drops a page's result: a huge float still reports both of its violations" do
+    config = SCHEMA_CONFIG.sub(%([content.schema.fields.description]), %([content.schema.fields."extra.n"]\ntype = "float"\nmax = 1e19\n\n[content.schema.fields.description]))
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(config,
+        content_files: {
+          "posts/p.md" => "+++\ntitle = \"P\"\n[extra]\nn = 2e19\n+++\n",
+          "posts/q.md" => "+++\ntitle = \"Q\"\n+++\n",
+        },
+        template_files: SCHEMA_TEMPLATES, parallel: true) { }
+    end
+    violation_lines(err).should eq([
+      %(content/posts/p.md: field "author": required but missing),
+      %(content/posts/p.md:4: field "extra.n": 2.0e+19 is greater than the maximum 1.0e+19),
+      %(content/posts/q.md: field "author": required but missing),
+    ])
+  end
+
   it "does not validate section index files or unpublished drafts" do
     build_site(SCHEMA_CONFIG,
       content_files: {
@@ -215,6 +232,12 @@ describe "[[content.schema]] CLI" do
       FileUtils.mkdir_p(File.join(dir, "site/content/posts"))
       File.write(File.join(dir, "site/config.toml"), SCHEMA_CONFIG)
       File.write(File.join(dir, "site/content/posts/p.md"), "+++\ntitle = \"P\"\ndescription = \"d\"\n+++\n")
+      code, text = run_schema_cli(["tool", "validate", "-c", "site/content"], dir)
+      code.should eq(Hwaro::Errors::EXIT_CONTENT)
+      text.should contain(%(field "author": required but missing))
+
+      # An unquoted env substitution still lets validate see the schema.
+      File.write(File.join(dir, "site/config.toml"), SCHEMA_CONFIG + "\n[feeds]\nlimit = ${HWARO_SCHEMA_SPEC_LIM:-10}\n")
       code, text = run_schema_cli(["tool", "validate", "-c", "site/content"], dir)
       code.should eq(Hwaro::Errors::EXIT_CONTENT)
       text.should contain(%(field "author": required but missing))

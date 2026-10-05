@@ -194,7 +194,8 @@ module Hwaro
           private def load_schema_config(content_dir : String) : Models::Config?
             path = File.join(File.dirname(File.expand_path(content_dir)), "config.toml")
             declared = begin
-              TOML.parse(File.read(path))["content"]?.try(&.as_h?).try(&.has_key?("schema"))
+              # Substituted like Config.load: an unquoted `${VAR}` is not TOML.
+              TOML.parse(Utils::EnvSubstitutor.substitute_toml(File.read(path))[0])["content"]?.try(&.as_h?).try(&.has_key?("schema"))
             rescue
               nil
             end
