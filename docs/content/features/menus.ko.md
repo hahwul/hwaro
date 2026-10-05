@@ -5,9 +5,7 @@ weight = 11
 toc = true
 +++
 
-이름 있는 내비게이션 메뉴를 트리로 구성해 `site.menus` / `get_menu()`로 템플릿에 노출합니다. 메뉴는 `config.toml`에서 전부 정의할 수도, 페이지/섹션 프론트 매터로만 구성할 수도, 둘을 동시에 쓸 수도 있습니다. 두 소스의 엔트리는 같은 트리로 병합됩니다.
-
-섹션에서 메뉴를 자동으로 만들어 주는 기능(Hugo의 `sectionPagesMenu`)은 없습니다. [후속 과제](#후속-과제)를 참고합니다.
+이름 있는 내비게이션 메뉴를 트리로 구성해 `site.menus` / `get_menu()`로 템플릿에 노출합니다. 메뉴는 `config.toml`에서 전부 정의할 수도, 페이지/섹션 프론트 매터로만 구성할 수도, 둘을 동시에 쓸 수도 있습니다. 두 소스의 엔트리는 같은 트리로 병합됩니다. `[menus] auto_sections`로 최상위 섹션에서 메뉴를 채울 수도 있습니다([섹션 메뉴 자동 생성](#섹션-메뉴-자동-생성) 참고).
 
 ## 메뉴 설정
 
@@ -61,6 +59,33 @@ parent = "posts"
 테이블 형태의 모든 필드는 선택 사항이며 페이지 자체 데이터로 대체됩니다. `name`은 `page.title`, `weight`는 `0`, `identifier`는 결정된 `name`, `parent`는 없음(루트 엔트리)이 기본값입니다.
 
 페이지/섹션은 `config.toml`이 선언한 적 없는 이름을 포함해 **어떤** 메뉴 이름에도 등록할 수 있습니다. 프론트 매터로만 정의한 메뉴도 그 자체로 정상적인 지원 구성입니다(`hwaro doctor`는 설정이 다른 곳에 메뉴를 하나라도 선언한 경우에만 선언되지 않은 이름을 지적합니다. `[[menus.*]]` 블록이 하나도 없는 사이트는 의도적으로 프론트 매터에 전부 맡긴 것으로 보기 때문입니다).
+
+## 섹션 메뉴 자동 생성
+
+`auto_sections`에 메뉴 이름을 지정하면 모든 최상위 섹션(`content/` 바로 아래의 섹션)이 `[[menus.*]]` 블록이나 프론트 매터 없이 그 메뉴에 들어갑니다. Hugo의 `sectionPagesMenu`에 해당합니다.
+
+```toml
+[menus]
+auto_sections = "main"
+```
+
+각 섹션은 `identifier` = 디렉터리 이름(`content/posts/_index.md`라면 `posts`), `name` = 섹션 제목, `url` = 섹션 URL, `weight` = 섹션의 `weight`인 엔트리가 됩니다. 목록에서 빠지는 섹션은 제외합니다. 초안, 게시 전(unpublished), 헤드리스(`render = false`), `transparent` 섹션과 `redirect_to`가 외부 사이트를 가리키는 섹션이 여기에 해당합니다. 중첩 섹션은 들어가지 않습니다.
+
+명시적인 엔트리가 우선합니다. `identifier`가 같은 `[[menus.main]]` 엔트리나 프론트 매터 등록은 자동 엔트리를 대체하고, identifier가 다른 엔트리는 자동 엔트리 옆에 추가됩니다. 메뉴 전체는 `weight`, 그다음 `name` 순으로 정렬합니다. 섹션이 자기 프론트 매터로 같은 메뉴에 등록하면 그 등록만 남습니다.
+
+```toml
+[menus]
+auto_sections = "main"
+
+# 자동 생성된 "posts" 엔트리의 이름을 바꾸고 맨 뒤로 보냅니다
+[[menus.main]]
+name = "Journal"
+url = "/posts/"
+identifier = "posts"
+weight = 99
+```
+
+다국어 사이트에서는 언어마다 그 언어의 섹션으로 엔트리를 만듭니다(`posts/_index.ko.md`가 한국어 엔트리의 제목과 `/ko/posts/` URL을 정합니다). 번역된 섹션이 없는 언어에는 해당 엔트리가 생기지 않습니다. 언어별 `[[languages.<code>.menus.<name>]]` 재정의도 같은 방식으로 `identifier` 기준으로 적용됩니다.
 
 ## 계층 구조
 
@@ -146,14 +171,10 @@ url = "/ko/posts/"
 | children | Array\<Entry\> | 중첩 엔트리([계층 구조](#계층-구조) 참고) |
 | page | Page? | 엔트리가 프론트 매터에서 왔고 `Page`로 해석될 때 등록한 페이지/섹션의 데이터(설정 전용 엔트리와 `Section`의 `_index.md`에서 등록한 엔트리는 nil) |
 
-## 후속 과제
-
-- **`sectionPagesMenu` 스타일 자동 생성** — Hugo는 `[[menus.*]]`나 프론트 매터 등록 없이 모든 최상위 섹션에서 메뉴를 자동으로 채울 수 있습니다. Hwaro는 아직 이를 지원하지 않으며, 모든 엔트리를 명시적으로(설정 또는 프론트 매터) 등록해야 합니다.
-
 ## 함께 보기
 
 - [함수](/ko/templates/functions/#get-menu) — `get_menu()` 레퍼런스
 - [필터](/ko/templates/filters/#url-필터) — `active_path` 레퍼런스
 - [데이터 모델](/ko/templates/data-model/#메뉴) — `site.menus`와 Entry 구조
-- [설정](/ko/start/config/#메뉴) — `[[menus.*]]` 설정 레퍼런스
+- [설정](/ko/start/config/#메뉴) — `[[menus.*]]`, `[menus] auto_sections` 설정 레퍼런스
 - [doctor](/ko/start/tools/doctor/) — `menu-parent-undefined` / `menu-undeclared` 검사기

@@ -257,6 +257,17 @@ weight = 2
 
 Pages/sections can also join a menu from their own front matter (`menus = ["main"]`) without touching this file. A `[languages.<code>]` block with no menus table inherits this global set; declaring `[[languages.<code>.menus.<name>]]` replaces it for that language. See [Menus](/features/menus/) for the full reference (hierarchy, per-language behavior, `active_path` styling).
 
+To fill a menu from the top-level sections automatically (Hugo's `sectionPagesMenu`), name it under `[menus]`:
+
+```toml
+[menus]
+auto_sections = "main"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| auto_sections | string | none (off) | Menu that every top-level section joins (`identifier` = directory name, `name` = title, `url`, `weight`). Draft, unpublished, headless, `transparent` and off-site `redirect_to` sections are skipped; an explicit entry with the same `identifier` wins. See [Automatic Section Menus](/features/menus/#automatic-section-menus). |
+
 ## Static Files
 
 Everything under `static/` is copied verbatim into the site root, preserving its directory structure, so `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.
