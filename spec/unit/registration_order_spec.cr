@@ -57,7 +57,7 @@ describe "registration order" do
       "section index files (_index.md)",
       "translations (pages in every language)",
     ])
-    Hwaro::Services::Doctor::KNOWN_ISSUE_IDS.size.should eq(38)
+    Hwaro::Services::Doctor::KNOWN_ISSUE_IDS.size.should eq(39)
     Hwaro::Services::ALL_BLOCKING_IDS.to_a.sort.should eq(
       ["config-not-found", "config-parse-error", "content-dir-missing", "template-dir-missing"]
     )

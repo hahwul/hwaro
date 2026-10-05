@@ -59,7 +59,9 @@ module Hwaro
         if (lo = @min) && measure < lo
           return "#{what} is less than the minimum #{ContentSchemaField.number(lo)}"
         end
-        "#{what} is greater than the maximum #{ContentSchemaField.number(hi)}" if (hi = @max) && measure > hi
+        if (hi = @max) && measure > hi
+          "#{what} is greater than the maximum #{ContentSchemaField.number(hi)}"
+        end
       end
 
       # `int` and `float` are distinct on purpose: `rating = 4.0` is not an
