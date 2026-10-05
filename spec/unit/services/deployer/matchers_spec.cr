@@ -461,14 +461,15 @@ describe "Deployer matchers" do
       Dir.mktmpdir do |dir|
         src = File.join(dir, "site")
         Dir.mkdir_p(src)
-        %w[q?.html b.html a[1].html].each { |name| File.write(File.join(src, name), "x") }
+        # Brackets only: Windows forbids `?` and `*` in file names.
+        %w[z[2].html b.html a[1].html].each { |name| File.write(File.join(src, name), "x") }
         config = matcher_config("gs://bkt", [deploy_matcher("\\.html$", cache_control: "no-cache")])
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], dry_run: true)
         ops = [] of Hwaro::Services::Deployer::PlannedOp
         log = with_captured_log { ops = Hwaro::Services::Deployer.new.plan(options, config) }
         ops.select(&.action.==("upload")).map(&.path).should eq(["b.html"])
-        a, q = log.index!("a[1].html"), log.index!("q?.html")
-        (a < q).should be_true
+        a, z = log.index!("a[1].html"), log.index!("z[2].html")
+        (a < z).should be_true
       end
     end
   end
