@@ -600,10 +600,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
 
     case name
-    when "description"         then page.description = extra_value.as?(String)
-    when "image"               then page.image = extra_value.as?(String)
-    when "template"            then page.template = normalize_template_name(extra_value.as?(String))
-    when "series"              then page.series = extra_value.as?(String)
+    when "description"         then extra_value.as?(String).try { |v| page.description = v }
+    when "image"               then extra_value.as?(String).try { |v| page.image = v }
+    when "template"            then extra_value.as?(String).try { |v| page.template = normalize_template_name(v) }
+    when "series"              then extra_value.as?(String).try { |v| page.series = v }
     when "draft"               then extra_value.as?(Bool).try { |b| page.draft = b }
     when "render"              then extra_value.as?(Bool).try { |b| page.render = b }
     when "toc"                 then extra_value.as?(Bool).try { |b| page.toc = b }
