@@ -240,6 +240,18 @@ describe "CSS hot-swap" do
         html_after.should_not eq(html_before)
       end
     end
+
+    # The page prints the stylesheet's integrity: an in-place swap would keep
+    # the old `integrity` on the `<link>` and the browser would block the new
+    # bytes, so the re-rendered page must reload.
+    it "reloads when a template prints asset_integrity() of the stylesheet" do
+      template = %(<link rel="stylesheet" href="/css/a.css" integrity="{{ asset_integrity(name='css/a.css') }}">{{ content }})
+      css_swap_site(["static/css/a.css"], template) do |pushes, html_before|
+        pushes.should eq(["reload"])
+        File.read("public/index.html").should_not eq(html_before)
+        File.read("public/index.html").should contain(Hwaro::Utils::DigestUtils.sri_file("public/css/a.css").not_nil!)
+      end
+    end
   end
 
   # A cache-busted static file that lands on a generated output (here the

@@ -289,6 +289,11 @@ module Hwaro
       ]
 
       protected def self.watcher_ignored?(path : String) : Bool
+        # `[build] write_stats` rewrites the project-root stats file on every
+        # build; a Tailwind hook reads it. Watching it would make each
+        # rebuild schedule the next one. Matched by full path only: a
+        # same-named file under data/ or static/ is a real source.
+        return true if path == Utils::HtmlStats::FILE || path == "./#{Utils::HtmlStats::FILE}"
         basename = File.basename(path)
         WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
       end

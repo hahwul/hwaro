@@ -74,6 +74,7 @@ hooks.post = ["npm run minify"]
 | parallel | bool | true | 병렬 처리 |
 | cache | bool | false | 빌드 캐시 사용 |
 | template_deps | bool | true | 템플릿 의존성을 추적해 템플릿 편집 시 해당 템플릿을 렌더링하는 페이지만 재빌드 |
+| write_stats | bool | false | 렌더링된 페이지가 쓰는 태그·클래스·id를 담은 `hwaro_stats.json`을 프로젝트 루트에 기록(Tailwind 등에서 사용). [에셋 파이프라인](/ko/features/asset-pipeline/#used-selector-manifest-tailwind) 참고 |
 | hooks.pre | array | [] | 빌드 전에 실행할 명령 |
 | hooks.post | array | [] | 빌드 후에 실행할 명령 |
 
@@ -322,7 +323,7 @@ Cache-Control = "no-store"
 | `[highlight]` | [구문 강조](/ko/features/syntax-highlighting/) | 코드 구문 강조 |
 | `[pagination]` | [페이지네이션](/ko/features/pagination/) | 섹션 페이지네이션 |
 | `[auto_includes]` | [자동 인클루드](/ko/features/auto-includes/) | CSS/JS 파일 자동 인클루드 |
-| `[assets]` | [에셋 파이프라인](/ko/features/asset-pipeline/) | CSS/JS 압축(minify) & 핑거프린팅 |
+| `[assets]` | [에셋 파이프라인](/ko/features/asset-pipeline/) | CSS/JS 압축(minify) & 핑거프린팅, 하위 리소스 무결성(`sri`) |
 | `[sass]` | [Sass/SCSS](/ko/features/sass/) | 내장 SCSS 컴파일 (순수 Crystal) |
 | `[image_processing]` | [이미지 처리](/ko/features/image-processing/) | 이미지 리사이즈 & LQIP |
 | `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | Base64 블러업 플레이스홀더 |

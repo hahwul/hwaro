@@ -370,6 +370,26 @@ Alias for `asset()`. Use whichever reads better in your templates.
 
 ---
 
+### asset_integrity()
+
+Return the [Subresource Integrity](/features/asset-pipeline/#subresource-integrity) value of the file `asset()` points to, computed over the bytes written to the output (after minify and fingerprint).
+
+```jinja
+<script src="{{ asset(name='app.js') }}" integrity="{{ asset_integrity(name='app.js') }}" crossorigin="anonymous"></script>
+```
+
+Page-bundle and `[content.files]` assets are copied after rendering, so their source file is hashed. Add `crossorigin="anonymous"` so the check also passes when the page is viewed from another host than `base_url`.
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| name | String | Bundle name or output path (e.g. `main.css`, `css/site.css`) |
+
+**Returns:** String, such as `sha384-…`. A name that this build does not publish raises a template error, as does a raw `.json`/`.xml`/`.html` file under `--minify` (it is rewritten after rendering).
+
+---
+
 ### now()
 
 Get current datetime:

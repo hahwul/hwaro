@@ -76,6 +76,7 @@ hooks.post = ["npm run minify"]
 | parallel | bool | true | Parallel processing |
 | cache | bool | false | Enable build caching |
 | template_deps | bool | true | Track template dependencies so a template edit only rebuilds the pages that render it |
+| write_stats | bool | false | Write `hwaro_stats.json` (tags, classes and ids used by the rendered pages) at the project root for Tailwind and similar tools. See [Asset Pipeline](/features/asset-pipeline/#used-selector-manifest-tailwind) |
 | hooks.pre | array | [] | Commands to run before build |
 | hooks.post | array | [] | Commands to run after build |
 
@@ -324,7 +325,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[highlight]` | [Syntax Highlighting](/features/syntax-highlighting/) | Code syntax highlighting |
 | `[pagination]` | [Pagination](/features/pagination/) | Section pagination |
 | `[auto_includes]` | [Auto Includes](/features/auto-includes/) | Auto-include CSS/JS files |
-| `[assets]` | [Asset Pipeline](/features/asset-pipeline/) | CSS/JS minification & fingerprinting |
+| `[assets]` | [Asset Pipeline](/features/asset-pipeline/) | CSS/JS minification & fingerprinting, Subresource Integrity (`sri`) |
 | `[sass]` | [Sass/SCSS](/features/sass/) | Built-in SCSS compilation (pure Crystal) |
 | `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing & LQIP |
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |

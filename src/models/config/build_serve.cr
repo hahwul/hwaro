@@ -46,6 +46,9 @@ module Hwaro
       property drafts : Bool? = nil
       property parallel : Bool? = nil
       property cache : Bool? = nil
+      # Write `hwaro_stats.json` (the tags/classes/ids of every rendered
+      # page) at the project root for utility-CSS tools such as Tailwind.
+      property write_stats : Bool = false
 
       def initialize
         @hooks = BuildHooksConfig.new
@@ -260,6 +263,7 @@ module Hwaro
         return unless s = config.raw["build"]?.try(&.as_h?)
 
         config.build.template_deps = bool_value(s["template_deps"]?, config.build.template_deps)
+        config.build.write_stats = bool_value(s["write_stats"]?, config.build.write_stats)
 
         # Left nil when absent so the CLI/default layers below stay in charge.
         if raw_output = s["output_dir"]?

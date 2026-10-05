@@ -2989,6 +2989,15 @@ describe "watcher ignore patterns" do
     end
   end
 
+  # `[build] write_stats` rewrites it on every build; watching it would make
+  # each rebuild trigger the next.
+  it "ignores the project-root hwaro_stats.json but not same-named sources" do
+    Hwaro::Services::Server.test_watcher_ignored?("hwaro_stats.json").should be_true
+    Hwaro::Services::Server.test_watcher_ignored?("./hwaro_stats.json").should be_true
+    Hwaro::Services::Server.test_watcher_ignored?("data/hwaro_stats.json").should be_false
+    Hwaro::Services::Server.test_watcher_ignored?("static/hwaro_stats.json").should be_false
+  end
+
   it "does NOT ignore regular content files" do
     [
       "index.md",

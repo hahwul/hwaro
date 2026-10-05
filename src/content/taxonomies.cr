@@ -625,6 +625,7 @@ module Hwaro
         begin
           Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
           Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+          builder.try(&.record_html_stats(content))
         rescue ex : File::Error
           # Term slugs are unbounded (a pasted phrase in `tags` becomes a
           # 300-character directory name), so this writer is where a term the
