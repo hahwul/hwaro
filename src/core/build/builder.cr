@@ -163,6 +163,11 @@ module Hwaro
         # Rebuilt by every Initialize phase; serve's incremental passes reuse
         # the last one, and its disk cache keeps them off the network.
         @privacy : Privacy? = nil
+        # Pages whose `[privacy]` rewrite left a reference external because a
+        # download failed: their cache entry is dropped, so the next `--cache`
+        # build renders them again instead of keeping the external URL.
+        # Guarded by @page_derived_mutex.
+        @privacy_incomplete : Set(String) = Set(String).new
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
@@ -629,11 +634,12 @@ module Hwaro
         # Public: the taxonomy generator writes through it too.
         def privacy_rewrite(html : String, owner : String? = nil) : String
           return html unless privacy = @privacy
-          html, files = privacy.rewrite_html(html)
+          html, files, incomplete = privacy.rewrite_html(html)
           files.each do |path|
             claim_generated_output(path)
             record_page_derived_output(owner, path) if owner
           end
+          @page_derived_mutex.synchronize { @privacy_incomplete << owner } if incomplete && owner
           html
         end
 

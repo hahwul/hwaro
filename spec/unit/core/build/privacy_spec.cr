@@ -78,7 +78,23 @@ private def fixture_handler(hits : Hits) : HTTP::Server::Context ->
       res.content_type = "image/jpeg"
       res.print("JPEG")
     when "/css/set.css"
-      css.call(%(.a { background-image: image-set("../img/pic.png" 1x, url(../img/copy.png) 2x); }\n))
+      css.call(%(.a { background-image: image-set("../img/pic.png" type("image/png") 1x, url(../img/copy.png) 2x); }\n))
+    when "/photo-jpg"
+      res.content_type = "image/jpg"
+      res.print("JPG")
+    when "/fonts/f3"
+      res.content_type = "application/x-font-woff"
+      res.print("wOFF")
+    when "/css/legacy.css"
+      css.call(%(@font-face { src: url(../fonts/f3); }\n))
+    when "/flaky.png"
+      # Down for the first request, up afterwards.
+      if hits["/flaky.png"] == 1
+        res.status = HTTP::Status::SERVICE_UNAVAILABLE
+      else
+        res.content_type = "image/png"
+        res.print("FLAKY-PNG")
+      end
       # A third party pointing the build at the machine's own network.
     when "/redir-internal"
       res.status = HTTP::Status::FOUND
@@ -504,6 +520,25 @@ describe Hwaro::Core::Build::Privacy do
     end
   end
 
+  it "keeps connection hints for hosts it localized nothing from" do
+    with_cdn do |cdn, _hits, _offline|
+      with_privacy(privacy_config(hosts: "[]")) do |privacy, _dir|
+        html = %(<link rel="preconnect" href="https://www.youtube-nocookie.com"><link rel="dns-prefetch" href="#{cdn}">)
+        with_captured_log { rewrite(privacy, html).should eq(html) }
+      end
+    end
+  end
+
+  it "accepts common non-standard image and font MIME types" do
+    with_cdn do |cdn, _hits, _offline|
+      with_privacy(privacy_config) do |privacy, dir|
+        rewrite(privacy, %(<img src="#{cdn}/photo-jpg">)).should match(/src="\/assets\/external\/[0-9a-f]{12}-photo-jpg\.jpg"/)
+        result = rewrite(privacy, %(<link rel="stylesheet" href="#{cdn}/css/legacy.css">))
+        read_published(dir, result.match!(/href="([^"]+)"/)[1]).should match(/url\("[0-9a-f]{12}-f3\.woff"\)/)
+      end
+    end
+  end
+
   it "leaves Hwaro's own MathJax loader external" do
     Dir.mktmpdir do |dir|
       # A fresh cache entry, so the pre-fix code would localize it offline.
@@ -528,12 +563,13 @@ describe Hwaro::Core::Build::Privacy do
   end
 
   it "rewrites image-set() strings in downloaded CSS" do
-    with_cdn do |cdn, _hits, _offline|
+    with_cdn do |cdn, hits, _offline|
       with_privacy(privacy_config) do |privacy, dir|
         result = rewrite(privacy, %(<link rel="stylesheet" href="#{cdn}/css/set.css">))
         css = read_published(dir, result.match!(/href="([^"]+)"/)[1])
         css.should_not contain("../img")
-        css.should match(/image-set\("[0-9a-f]{12}-pic\.png" 1x, url\("[0-9a-f]{12}-copy\.png"\) 2x\)/)
+        css.should match(/image-set\("[0-9a-f]{12}-pic\.png" type\("image\/png"\) 1x, url\("[0-9a-f]{12}-copy\.png"\) 2x\)/)
+        hits["/css/image/png"].should eq(0)
       end
     end
   end
@@ -593,6 +629,13 @@ end
 
 private def output_snapshot : Hash(String, String)
   Dir.glob("public/**/*").select { |p| File.file?(p) }.sort!.to_h { |p| {p, File.read(p)} }
+end
+
+# Specs run in one process; forget the 10-minute retry window.
+class Hwaro::Core::Build::Privacy
+  def self.test_forget_failures : Nil
+    @@failures_mutex.synchronize { @@failures.clear }
+  end
 end
 
 # An incremental serve pass re-claims nothing.
@@ -667,6 +710,20 @@ describe "[privacy] builds" do
         builder.test_mark_claims_stale
         builder.prune_unclaimed_outputs([file], "public")
         File.exists?(file).should be_true
+      end
+    end
+  end
+
+  it "renders a page again on the next --cache build after its download failed" do
+    with_cdn do |cdn, _hits, _offline|
+      privacy_site(cdn) do
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\n+++\n<img src=\"#{cdn}/flaky.png\">\n")
+        backdate_sources
+        with_captured_log { run_build(cache: true) }
+        File.read("public/posts/a/index.html").should contain("#{cdn}/flaky.png")
+        Privacy.test_forget_failures
+        run_build(cache: true)
+        File.read("public/posts/a/index.html").should match(/src="\/assets\/external\/[0-9a-f]{12}-flaky\.png"/)
       end
     end
   end

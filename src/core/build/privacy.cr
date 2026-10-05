@@ -90,6 +90,8 @@ module Hwaro
         IMAGE = {
           "image/png"                => ".png",
           "image/jpeg"               => ".jpg",
+          "image/jpg"                => ".jpg",
+          "image/pjpeg"              => ".jpg",
           "image/gif"                => ".gif",
           "image/webp"               => ".webp",
           "image/avif"               => ".avif",
@@ -108,17 +110,27 @@ module Hwaro
           "application/font-woff2"        => ".woff2",
           "application/font-woff"         => ".woff",
           "application/x-font-ttf"        => ".ttf",
+          "application/x-font-woff"       => ".woff",
+          "application/x-font-woff2"      => ".woff2",
+          "font/sfnt"                     => ".ttf",
+          "application/font-sfnt"         => ".ttf",
+          "application/x-font-otf"        => ".otf",
+          "application/x-font-opentype"   => ".otf",
+          "font/collection"               => ".ttc",
           "application/vnd.ms-fontobject" => ".eot",
         }
         MEDIA = {
-          "video/mp4"  => ".mp4",
-          "video/webm" => ".webm",
-          "video/ogg"  => ".ogv",
-          "audio/mpeg" => ".mp3",
-          "audio/ogg"  => ".ogg",
-          "audio/wav"  => ".wav",
-          "audio/mp4"  => ".m4a",
-          "audio/webm" => ".weba",
+          "video/mp4"       => ".mp4",
+          "video/webm"      => ".webm",
+          "video/ogg"       => ".ogv",
+          "audio/mpeg"      => ".mp3",
+          "audio/ogg"       => ".ogg",
+          "audio/wav"       => ".wav",
+          "audio/mp4"       => ".m4a",
+          "audio/webm"      => ".weba",
+          "video/quicktime" => ".mov",
+          "audio/flac"      => ".flac",
+          "audio/aac"       => ".aac",
         }
         ALLOWED = {
           Kind::Style   => STYLE,
@@ -134,8 +146,24 @@ module Hwaro
 
         # A localized URL: what to print in its place, its file in the output,
         # every output file it published (itself plus, for a stylesheet, what
-        # it pulls in), and the remote URL it came from.
-        record Localized, url : String, path : String, files : Array(String), source : String
+        # it pulls in), the remote URL it came from, and whether a stylesheet
+        # kept a reference external because its download failed.
+        record Localized, url : String, path : String, files : Array(String), source : String,
+          incomplete : Bool = false
+
+        # What one rewrite (a page, or a downloaded stylesheet) used: the
+        # output files, and whether a reference stayed external because a
+        # download failed — a transient state a `--cache` build must not keep.
+        # Refusals and type rejections are deterministic and do not count.
+        class Pass
+          getter files = [] of String
+          property incomplete = false
+
+          def add(localized : Localized) : Nil
+            @files.concat(localized.files)
+            @incomplete ||= localized.incomplete
+          end
+        end
 
         record IndexEntry, file : String, fetched_at : Int64, content_type : String?,
           sha256 : String, final_url : String do
@@ -148,7 +176,9 @@ module Hwaro
         SRI_RE  = /\s(?:integrity|crossorigin)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/i
         CSS_RE  = /\/\*[\s\S]*?\*\/|((?:-webkit-)?image-set\((?:[^()]|\([^()]*\))*\))|url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"'\s]*))\s*\)|@import\s+(?:"([^"]*)"|'([^']*)')/i
         # A reference inside `image-set(...)`: `url(...)` or a bare string.
-        IMAGE_SET_REF_RE = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"'\s]*))\s*\)|"([^"]*)"|'([^']*)'/
+        # A `type("image/avif")` argument is a MIME type, matched first so
+        # it passes through untouched.
+        IMAGE_SET_REF_RE = /type\(\s*(?:"[^"]*"|'[^']*')\s*\)|url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"'\s]*))\s*\)|"([^"]*)"|'([^']*)'/
 
         URL_ATTRS = {
           "link"   => %w[href],
@@ -176,13 +206,28 @@ module Hwaro
           if address.starts_with?("::ffff:") && (v4 = address.lchop("::ffff:")).includes?('.')
             return internal_address?(Socket::IPAddress.new(v4, 0))
           end
+          # NAT64 (64:ff9b::/96) carries an IPv4 address in its last 32 bits.
+          if v4 = nat64_ipv4(address)
+            return internal_address?(Socket::IPAddress.new(v4, 0))
+          end
           return true if ip.loopback? || ip.private? || ip.link_local? || ip.unspecified?
           if ip.family.inet?
             a, b = address.split('.').first(2).map(&.to_i)
-            a == 0 || (a == 100 && 64 <= b <= 127) || a >= 224
+            a == 0 || (a == 100 && 64 <= b <= 127) || (a == 192 && b == 0 && address.split('.')[2] == "0") || a >= 224
           else
-            address.downcase.starts_with?("ff")
+            # Multicast ff00::/8, deprecated site-local fec0::/10.
+            address.downcase.matches?(/\A(?:ff[0-9a-f]{2}|fe[c-f][0-9a-f]):/)
           end
+        end
+
+        private def self.nat64_ipv4(address : String) : String?
+          return unless address.downcase.starts_with?("64:ff9b::")
+          rest = address[9..]
+          return rest if rest.includes?('.')
+          words = rest.split(':')
+          return unless 1 <= words.size <= 2 && words.all?(&.matches?(/\A[0-9a-fA-F]{1,4}\z/))
+          value = words.reduce(0_u32) { |acc, w| (acc << 16) | w.to_u32(16) }
+          {value >> 24, (value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff}.join('.')
         end
 
         @site_origins : Set(String)
@@ -194,6 +239,8 @@ module Hwaro
         @warned = Set(String).new
         # Hosts something was downloaded from: their preconnect hints go.
         @localized_hosts = Set(String).new
+        # URLs whose download failed this build (not refused): see `Pass`.
+        @network_failed = Set(String).new
         @index : Hash(String, IndexEntry)
         # ponytail: one lock around memo + fetch + index, so concurrent render
         # fibers never fetch the same URL twice; fetches serialize. Reentrant
@@ -221,36 +268,39 @@ module Hwaro
           @index = read_index
         end
 
-        # Rewrite every localizable reference in `html`. Returns the new HTML
-        # and the output files those references now point at.
-        def rewrite_html(html : String) : {String, Array(String)}
-          files = [] of String
-          return {html, files} unless html.includes?("//")
+        # Rewrite every localizable reference in `html`. Returns the new HTML,
+        # the output files those references now point at, and whether a
+        # reference stayed external because a download failed.
+        def rewrite_html(html : String) : {String, Array(String), Bool}
+          pass = Pass.new
+          return {html, pass.files, false} unless html.includes?("//")
           result = html.gsub(HTML_RE) do |match, m|
             if script_attrs = m[2]?
               next match unless m[1].downcase == "script"
               open_tag = "<#{m[1]}#{script_attrs}>"
-              rewritten = rewrite_tag("script", script_attrs, files)
+              rewritten = rewrite_tag("script", script_attrs, pass)
               rewritten ? "<#{m[1]}#{rewritten}>#{match[open_tag.size..]}" : match
             elsif tag_attrs = m[5]?
-              rewritten = rewrite_tag(m[4].downcase, tag_attrs, files)
+              rewritten = rewrite_tag(m[4].downcase, tag_attrs, pass)
               rewritten ? "<#{m[4]}#{rewritten}>" : match
             else
               match # a comment
             end
           end
           result = drop_connection_hints(result) if result.includes?("preconnect") || result.includes?("dns-prefetch")
-          {result, files.uniq}
+          {result, pass.files.uniq, pass.incomplete}
         end
 
         # Localize one absolute (or protocol-relative) URL if the filters
         # allow it. Nil = keep the external URL (filtered out, refused, or a
         # failed fetch under `warn-and-keep`).
-        def localize(url : String, kind : Kind = Kind::Preload) : Localized?
+        def localize(url : String, kind : Kind = Kind::Preload, pass : Pass? = nil) : Localized?
           absolute = absolute_url(url)
           return unless absolute && included?(absolute)
           return if SELF_LOCATING.any? { |prefix| absolute.starts_with?(prefix) }
-          localize_absolute(absolute, kind, 0, [] of String)
+          localized = localize_absolute(absolute, kind, 0, [] of String)
+          pass.incomplete = true if pass && localized.nil? && network_failed?(absolute)
+          localized
         end
 
         # Every output file this instance has published — the serve prune
@@ -270,12 +320,12 @@ module Hwaro
             next tag unless (href = attrs["href"]?) && (absolute = absolute_url(href.strip))
             host = host_of(absolute)
             localized = host && @mutex.synchronize { @localized_hosts.includes?(host) }
-            localized || included?(absolute) ? "" : tag
+            localized ? "" : tag
           end
         end
 
         # The rewritten attribute string, or nil when nothing changed.
-        private def rewrite_tag(tag : String, attrs : String, files : Array(String)) : String?
+        private def rewrite_tag(tag : String, attrs : String, pass : Pass) : String?
           targets = URL_ATTRS[tag]
           parsed = parse_attrs(attrs)
           link_kind = nil
@@ -298,11 +348,11 @@ module Hwaro
             next full unless raw && targets.includes?(name)
             kind = link_kind || attr_kind(tag, name)
             value = HTML.unescape(raw)
-            new_value = name == "srcset" ? rewrite_srcset(value, kind, localized) : localize_one(value, kind, localized)
+            new_value = name == "srcset" ? rewrite_srcset(value, kind, localized, pass) : localize_one(value, kind, localized, pass)
             new_value ? %( #{m[1]}="#{HTML.escape(new_value)}") : full
           end
           return if localized.empty?
-          localized.each { |l| files.concat(l.files) }
+          localized.each { |l| pass.add(l) }
           return changed unless tag.in?("link", "script")
 
           local = localized.first
@@ -355,8 +405,8 @@ module Hwaro
           parsed
         end
 
-        private def localize_one(value : String, kind : Kind, localized : Array(Localized)) : String?
-          return unless l = localize(value.strip, kind)
+        private def localize_one(value : String, kind : Kind, localized : Array(Localized), pass : Pass) : String?
+          return unless l = localize(value.strip, kind, pass)
           localized << l
           l.url
         end
@@ -365,12 +415,12 @@ module Hwaro
         # commas end it), its descriptors run to the next comma outside
         # parentheses. Only the URL spans are replaced, so the rest of the
         # attribute keeps its exact spelling.
-        private def rewrite_srcset(value : String, kind : Kind, localized : Array(Localized)) : String?
+        private def rewrite_srcset(value : String, kind : Kind, localized : Array(Localized), pass : Pass) : String?
           spans = srcset_url_spans(value)
           changed = false
           result = value
           spans.reverse_each do |(start, stop)|
-            next unless local = localize_one(value[start...stop], kind, localized)
+            next unless local = localize_one(value[start...stop], kind, localized, pass)
             result = result[0, start] + local + result[stop..]
             changed = true
           end
@@ -435,17 +485,16 @@ module Hwaro
           if ext == ".svg"
             warn_once("svg:#{url}", "[privacy] #{RemoteFetch.sanitized_url(url)}: published an SVG, which can run script when opened directly on your site. Add its host to [privacy] exclude if you do not trust it.")
           end
-          files = [] of String
-          body = rewrite_css(body, final_url, depth + 1, chain + [url], files) if ext == ".css"
+          pass = Pass.new
+          body = rewrite_css(body, final_url, depth + 1, chain + [url], pass) if ext == ".css"
           name = published_name(url, ext, body)
           path = File.join(@output_root, name)
           unless File.info?(path).try(&.size) == body.bytesize
             Utils::FileSafe.mkdir_p(@output_root)
             Utils::FileSafe.atomic_write(path, body)
           end
-          files.unshift(path)
           host_of(url).try { |h| @localized_hosts << h }
-          Localized.new(public_url(name), path, files, url)
+          Localized.new(public_url(name), path, [path] + pass.files, url, pass.incomplete)
         end
 
         # The extension to publish under: the Content-Type's, else the URL
@@ -466,27 +515,28 @@ module Hwaro
         # filter picks pages' references; what a localized stylesheet needs
         # comes with it), except excluded hosts. A reference that stays
         # remote is written back absolute, so it still resolves from here.
-        private def rewrite_css(css : String, base : String, depth : Int32, chain : Array(String), files : Array(String)) : String
+        private def rewrite_css(css : String, base : String, depth : Int32, chain : Array(String), pass : Pass) : String
           css = css.scrub unless css.valid_encoding?
           base_uri = URI.parse(base)
           css.gsub(CSS_RE) do |match, m|
             next match if match.starts_with?("/*")
             if image_set = m[1]?
               next image_set.gsub(IMAGE_SET_REF_RE) do |ref_match, r|
+                next ref_match if ref_match.starts_with?("type")
                 raw = r[1]? || r[2]? || r[3]? || r[4]? || r[5]? || ""
-                next ref_match unless target = css_ref(raw, base_uri, depth, chain, files)
+                next ref_match unless target = css_ref(raw, base_uri, depth, chain, pass)
                 ref_match.starts_with?("url") ? %(url("#{target}")) : %("#{target}")
               end
             end
             raw = m[2]? || m[3]? || m[4]? || m[5]? || m[6]? || ""
-            next match unless target = css_ref(raw, base_uri, depth, chain, files)
+            next match unless target = css_ref(raw, base_uri, depth, chain, pass)
             match.starts_with?("@") ? %(@import "#{target}") : %(url("#{target}"))
           end
         end
 
         # What one stylesheet reference becomes: the local sibling filename,
         # or the absolute remote URL. Nil = leave it as written.
-        private def css_ref(raw : String, base_uri : URI, depth : Int32, chain : Array(String), files : Array(String)) : String?
+        private def css_ref(raw : String, base_uri : URI, depth : Int32, chain : Array(String), pass : Pass) : String?
           ref = raw.strip
           return if ref.empty? || ref.starts_with?('#') || ref.downcase.starts_with?("data:")
           fragment = ""
@@ -502,8 +552,11 @@ module Hwaro
           return unless resolved.downcase.matches?(/\Ahttps?:\/\//)
           target = if depth <= MAX_DEPTH && !chain.includes?(resolved) && !excluded?(resolved) && !site_url?(resolved)
                      if l = localize_absolute(resolved, Kind::CssRef, depth, chain)
-                       files.concat(l.files)
+                       pass.add(l)
                        File.basename(l.path)
+                     else
+                       pass.incomplete = true if network_failed?(resolved)
+                       nil
                      end
                    end
           (target || resolved) + fragment
@@ -546,7 +599,13 @@ module Hwaro
             )
           end
           warn_once(url, "[privacy] could not download #{RemoteFetch.sanitized_url(url)}: #{reason} — keeping the external URL (on_error = \"warn-and-keep\").")
+          # Refusals never enter the failure table, so this is a network one.
+          @network_failed << url if @@failures_mutex.synchronize { @@failures.has_key?(url) }
           nil
+        end
+
+        private def network_failed?(url : String) : Bool
+          @mutex.synchronize { @network_failed.includes?(url) }
         end
 
         # Every hop of every privacy fetch: refuse a host that resolves to an
@@ -554,7 +613,7 @@ module Hwaro
         # build read the machine's own network and publish it), and pin the
         # connection to the address vetted here. A host listed in `include`
         # is trusted as is (intranet CDNs, local fixtures).
-        private def vet_hop(uri : URI) : String?
+        private def vet_hop(uri : URI) : Array(String)?
           host = uri.host.to_s.downcase.lchop('[').rchop(']')
           return if @privacy.include.includes?(host)
           port = uri.port || (uri.scheme.try(&.downcase) == "https" ? 443 : 80)
@@ -563,7 +622,7 @@ module Hwaro
           if internal = addresses.find { |ip| Privacy.internal_address?(ip) }
             raise Refused.new("refused: #{host} resolves to the non-public address #{internal.address} (list the host in [privacy] include to allow it)")
           end
-          addresses.first.address
+          addresses.map(&.address).uniq!
         end
 
         private def media_type(content_type : String?) : String?
