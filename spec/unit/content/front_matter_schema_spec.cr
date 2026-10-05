@@ -181,6 +181,24 @@ describe Hwaro::Content::FrontMatterSchema do
     messages(check(rule, "n = nan")).should eq([%(content/p.md:2: field "n": NaN is outside the bounds)])
   end
 
+  it "checks huge whole floats without overflowing" do
+    rule = schema("[content.schema.fields.n]\ntype = \"float\"\nmax = 1e19\n")
+    messages(check(rule, "n = 2e19")).should eq([%(content/p.md:2: field "n": 2.0e+19 is greater than the maximum 1.0e+19)])
+  end
+
+  it "points at the [extra] key, not one nested deeper under extra:" do
+    rule = schema("[content.schema.fields.\"extra.n\"]\ntype = \"int\"\n")
+    yaml = "---\nextra:\n  meta:\n    n: 1\n  n: \"x\"\n---\n"
+    FMS.check(rule, "y.md", yaml, {} of String => Hwaro::Models::ExtraValue, {} of String => Hwaro::Models::ExtraValue).violations.map(&.to_s)
+      .should eq([%(y.md:5: field "extra.n": expected int, got string "x")])
+  end
+
+  it "ignores [table] lines inside a TOML multi-line string" do
+    rule = schema("[content.schema.fields.weight]\ntype = \"int\"\n")
+    messages(check(rule, "desc = \"\"\"\n[extra]\n\"\"\"\nweight = \"heavy\""))
+      .should eq([%(content/p.md:5: field "weight": expected int, got string "heavy")])
+  end
+
   it "fails once with every violation, sorted by file" do
     violations = [
       FMS::Violation.new("content/b.md", 2, "x", "bad"),

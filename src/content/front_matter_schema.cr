@@ -18,6 +18,8 @@ module Hwaro
 
       KNOWN_KEYS = Processors::Markdown::KNOWN_FRONT_MATTER_KEYS
 
+      TOML_MULTILINE_DELIMITERS = {"\"" * 3, "'" * 3}
+
       # One problem with one field of one page. `line` is the key's line in
       # the file when it is there to point at (nil for a missing field, or a
       # `[[content.generate]]` page, which has no file).
@@ -176,12 +178,21 @@ module Hwaro
         quoted = Regex.escape(key)
         key_re = /\A(?:#{quoted}|"#{quoted}"|'#{quoted}'|#{Regex.escape(key.to_json)})\s*[=:]/
         top_line = extra_line = nil
-        scope = ""       # "" top level, "extra", or another table
-        top_indent = nil # YAML/JSON: the top-level keys' indentation
+        scope = ""         # "" top level, "extra", or another table
+        top_indent = nil   # YAML/JSON: the top-level keys' indentation
+        extra_indent = nil # YAML/JSON: the `extra` table's keys' indentation
+        ml_delim = nil     # TOML: the open multi-line string's delimiter
         block.each_line.with_index do |line, i|
+          if delim = ml_delim
+            ml_delim = nil if line.includes?(delim)
+            next
+          end
           stripped = line.lstrip
           next if stripped.empty? || stripped.starts_with?('#')
           if dialect == :toml
+            # A multi-line string opened (and not closed) on this line hides
+            # the lines up to its closing delimiter.
+            ml_delim = TOML_MULTILINE_DELIMITERS.find { |d| line.split(d).size.even? }
             # A `[table]` header switches scope until the next one.
             if stripped.starts_with?('[')
               scope = stripped.starts_with?("[[") ? "[[" : stripped.lchop('[').split(']', 2).first.strip.strip('"')
@@ -193,8 +204,13 @@ module Hwaro
             top_indent ||= indent
             if indent <= top_indent
               scope = ""
-            elsif scope.empty? || scope == "open-extra"
-              scope = scope == "open-extra" ? "extra" : "nested"
+              extra_indent = nil
+            elsif scope == "open-extra"
+              scope = "extra"
+              extra_indent = indent
+            else
+              # Only the extra table's own keys are "extra"; deeper is not.
+              scope = indent == extra_indent ? "extra" : "nested"
             end
           end
           if key_re.matches?(stripped)
