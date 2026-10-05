@@ -730,7 +730,11 @@ module Hwaro
               next
             end
 
-            body = content.byte_slice(body_start, body_end - body_start).strip
+            body = content.byte_slice(body_start, body_end - body_start)
+            if prefix = body_line_prefix(content, open_start)
+              body = dedent_body(body, prefix)
+            end
+            body = body.strip
 
             # Recursively process nested shortcodes in body (with depth limit).
             # The body is already masked by the caller, so recurse through the
@@ -753,6 +757,45 @@ module Hwaro
           end
 
           result.to_s
+        end
+
+        # What a block opener's line starts with when that is only container
+        # structure: blockquote markers, indentation, at most one list marker.
+        BODY_PREFIX_RE = /\A[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?\z/
+
+        # The container prefix the body's lines repeat — the opener line's
+        # prefix with any list marker turned into spaces (`> ` stays `> `,
+        # `- ` becomes `  `). Nil when the opener follows other text or
+        # starts its line.
+        private def body_line_prefix(content : String, open_start : Int32) : String?
+          line_start = open_start
+          while line_start > 0 && content.byte_at(line_start - 1) != '\n'.ord
+            line_start -= 1
+          end
+          return if line_start == open_start
+          prefix = content.byte_slice(line_start, open_start - line_start)
+          return unless BODY_PREFIX_RE.matches?(prefix)
+          prefix.gsub(/[^>\s]/, " ")
+        end
+
+        # Strips the opener's container prefix from every body line, so a
+        # block shortcode inside a blockquote or list item gets the body the
+        # author wrote rather than a nested blockquote or a code block. A line
+        # that is only the prefix's markers becomes blank; any other line
+        # (lazy continuation) is kept as written.
+        private def dedent_body(body : String, prefix : String) : String
+          bare = prefix.rstrip
+          String.build do |io|
+            body.each_line(chomp: false) do |line|
+              if line.starts_with?(prefix)
+                io << line.byte_slice(prefix.bytesize)
+              elsif line.rstrip == bare
+                io << '\n' if line.ends_with?('\n')
+              else
+                io << line
+              end
+            end
+          end
         end
 
         # Shared helper: look up a shortcode template, render it, and either
