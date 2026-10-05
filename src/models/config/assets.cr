@@ -133,10 +133,13 @@ module Hwaro
     #   enabled = true
     #   widths = [320, 640, 1024, 1280]
     #   quality = 85
+    #   dimensions = true   # intrinsic width/height on content <img>
+    #                       # (independent of `enabled`)
     class ImageProcessingConfig
       property enabled : Bool
       property widths : Array(Int32)
       property quality : Int32
+      property dimensions : Bool
       property lqip_enabled : Bool
       property lqip_width : Int32
       property lqip_quality : Int32
@@ -145,6 +148,7 @@ module Hwaro
         @enabled = false
         @widths = [] of Int32
         @quality = 85
+        @dimensions = false
         @lqip_enabled = false
         @lqip_width = 32
         @lqip_quality = 20
@@ -297,6 +301,7 @@ module Hwaro
 
         config.image_processing.enabled = bool_value(s["enabled"]?, config.image_processing.enabled)
         config.image_processing.quality = int_value(s["quality"]?, config.image_processing.quality).clamp(1, 100)
+        config.image_processing.dimensions = bool_value(s["dimensions"]?, config.image_processing.dimensions)
         if widths = s["widths"]?.try(&.as_a?)
           config.image_processing.widths = widths.compact_map { |w|
             val = int_or_nil(w)

@@ -37,6 +37,26 @@ module Hwaro
         # so the source is not a render input. Guarded by @@resize_map_mutex.
         @@processing_active = false
 
+        # Render-time image lookups, reset by every `image:resize` run whether
+        # or not resizing is enabled: intrinsic sizes for content `<img>`
+        # (`[image_processing] dimensions`) and the `fill`/`crop` variants
+        # `resize_image(op=…)` writes while pages render. One lock for all of
+        # it — render is fiber-parallel.
+        # ponytail: global lock held across a fill/crop decode; per-path locks
+        # if a site ever renders many distinct op variants concurrently.
+        @@lookup_mutex = Mutex.new
+        @@lookup_pages = [] of Models::Page
+        @@lookup_config : Models::Config? = nil
+        @@bundle_sources : Hash(String, String)? = nil
+        @@intrinsic_sizes = {} of String => {Int32, Int32}?
+        # Variant output path => {source mtime, written size} (nil = failed).
+        @@op_variants = {} of String => {Time, {Int32, Int32}?}
+        # nil under `--skip-image-processing` or outside a build: resize_image
+        # then hands back the original URL for every op.
+        @@op_output_dir : String? = nil
+        @@op_quality = 85
+        @@op_builder : Core::Build::Builder? = nil
+
         # Max number of concurrent image processing fibers
         CONCURRENCY = 8
 
@@ -45,6 +65,7 @@ module Hwaro
           # call resize_image(). Source images live in content/ and static/
           # which are available at this point.
           manager.on(Core::Lifecycle::HookPoint::BeforeRender, priority: 20, name: "image:resize") do |ctx|
+            self.class.reset_render_lookups(ctx)
             process_images(ctx)
             Core::Lifecycle::HookResult::Continue
           end
@@ -93,6 +114,116 @@ module Hwaro
             best_key = widths_map.keys.select { |w| w >= width }.min? || widths_map.keys.max?
             best_key ? {best_key, widths_map[best_key]} : nil
           end
+        end
+
+        def self.reset_render_lookups(ctx : Core::Lifecycle::BuildContext) : Nil
+          @@lookup_mutex.synchronize do
+            @@lookup_pages = ctx.all_pages
+            @@lookup_config = ctx.config
+            @@bundle_sources = nil
+            @@intrinsic_sizes.clear
+            @@op_variants.clear
+            config = ctx.config
+            @@op_output_dir = ctx.options.skip_image_processing || config.nil? ? nil : ctx.output_dir
+            @@op_quality = config.try(&.image_processing.quality) || 85
+            @@op_builder = ctx.builder
+          end
+        end
+
+        # Source file published at the site-absolute, decoded `url` (no
+        # base_path), or nil: a page-bundle asset, a `[content.files]` copy,
+        # then a `static/` file — the order the resize jobs claim URLs in.
+        # `config` defaults to the running build's.
+        def self.resolve_source(url : String, config : Models::Config? = nil) : String?
+          url = Path.posix(url).normalize.to_s
+          if source = source_path_for(url) || bundle_source_for(url)
+            return source
+          end
+          config ||= @@lookup_mutex.synchronize { @@lookup_config }
+          return unless config
+          relative = url.lchop('/')
+          return if relative.empty?
+          content = File.join("content", relative)
+          if config.content_files.enabled? && config.content_files.publish?(relative) &&
+             File.file?(content) && safe_source_path?(content, "content")
+            return content
+          end
+          static = File.join("static", relative)
+          static if File.file?(static) && !config.static.excluded?(relative) && safe_source_path?(static, "static")
+        end
+
+        private def self.bundle_source_for(url : String) : String?
+          @@lookup_mutex.synchronize do
+            map = @@bundle_sources ||= begin
+              sources = {} of String => String
+              # Same URL derivation as collect_page_asset_jobs.
+              @@lookup_pages.each do |page|
+                next if page.assets.empty?
+                bundle_dir = File.dirname(page.path)
+                page.assets.each do |asset|
+                  relative = Path[asset].relative_to(bundle_dir).to_s
+                  sources[("/" + page.url.lchop("/") + relative)] ||= File.join("content", asset)
+                end
+              end
+              sources
+            end
+            source = map[url]?
+            source if source && File.file?(source) && safe_source_path?(source, "content")
+          end
+        end
+
+        # Intrinsic {width, height} of `source`, read from its header once
+        # per build.
+        def self.intrinsic_size(source : String) : {Int32, Int32}?
+          @@lookup_mutex.synchronize do
+            return @@intrinsic_sizes[source] if @@intrinsic_sizes.has_key?(source)
+            @@intrinsic_sizes[source] = Processors::ImageProcessor.dimensions(source)
+          end
+        end
+
+        # The `fill`/`crop` variant of `url` (backed by `source`) as
+        # `{variant_url, width, height}`, written into the output directory
+        # on first use and reused while it is newer than the source. The name
+        # carries size, op and anchor (`photo_400x300_fill_center.jpg`), so no
+        # two requests share a file. The file is claimed for the build and,
+        # when `page_path` names the rendering page, recorded as that page's
+        # derived output so a warm `--cache` build that skips the page keeps
+        # it. nil when ops are off for this build or the variant can't be made.
+        def self.op_variant(url : String, source : String, width : Int32, height : Int32,
+                            op : String, anchor : String, page_path : String?) : {String, Int32, Int32}?
+          return unless Processors::ImageProcessor.image?(source)
+          ext = File.extname(url)
+          name = "#{File.basename(url, ext)}_#{width}x#{height}_#{op}_#{anchor}#{ext}"
+          dir = File.dirname(url)
+          variant_url = dir == "/" ? "/#{name}" : "#{dir}/#{name}"
+
+          @@lookup_mutex.synchronize do
+            output_dir = @@op_output_dir
+            return unless output_dir
+            dest = File.join(output_dir, variant_url.lchop('/'))
+            return unless safe_dest_path?(dest, File.expand_path(output_dir))
+            source_mtime = File.info(source).modification_time
+            memo = @@op_variants[dest]?
+            size = if memo && memo[0] == source_mtime
+                     memo[1]
+                   else
+                     dest_info = File.info?(dest)
+                     fresh = dest_info && dest_info.file? && dest_info.size > 0 && dest_info.modification_time >= source_mtime
+                     made = (Processors::ImageProcessor.dimensions(dest) if fresh) ||
+                            Processors::ImageProcessor.transform(source, dest, width, height, op, anchor, @@op_quality)
+                     @@op_variants[dest] = {source_mtime, made}
+                     made
+                   end
+            return unless size
+            if builder = @@op_builder
+              builder.claim_generated_output(dest)
+              builder.record_page_derived_output(page_path, dest) if page_path
+            end
+            {variant_url, size[0], size[1]}
+          end
+        rescue ex : File::Error | IO::Error
+          Logger.debug "resize_image variant failed for #{source}: #{ex.message}"
+          nil
         end
 
         # Describes a single image to be resized

@@ -220,6 +220,9 @@ module Hwaro::Core::Build::Phases::Render
       page_obj["version_links"] = cached_raw["version_links"].as(Crinja::Value)
     end
     vars["page"] = Crinja::Value.new(page_obj)
+    # Which source file is rendering: `resize_image(op=…)` records the
+    # variant it writes as this page's derived output (ImageHooks.op_variant).
+    vars["__page_path__"] = Crinja::Value.new(page.path)
 
     # Flat variables for new properties
     vars["page_summary"] = Crinja::Value.new(page.summary_html || page.effective_summary || "")
