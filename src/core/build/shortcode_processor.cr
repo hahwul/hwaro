@@ -791,9 +791,10 @@ module Hwaro
             # legitimate references that the page-template engine will
             # resolve later. Pass those through untouched.
             return fallback if crinja_function?(name, crinja_env_override)
-            # The include pass (`expand_includes`) expands these before this
-            # pass; one still here sits where it keeps calls literal.
-            return fallback if name.in?("include_code", "include_md")
+            # The include pass (`expand_includes`) expands these inline calls
+            # before this pass; one still here sits where it keeps calls
+            # literal. The block form was never an include: it stays missing.
+            return fallback if fallback.starts_with?("{{") && name.in?("include_code", "include_md")
 
             warn_missing_shortcode(template_key) if warn_missing
 
