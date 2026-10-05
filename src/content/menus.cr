@@ -1,9 +1,10 @@
 # Menu tree builder for Hwaro's first-class menu system.
 #
-# Two sources feed a named menu:
+# Three sources feed a named menu:
 #   - config `[[menus.<name>]]` entries (and their per-language
 #     `[[languages.<code>.menus.<name>]]` overrides)
 #   - front-matter `menus`/`menu` registrations on pages/sections
+#   - `[menus] auto_sections = "<name>"`: every top-level section
 #
 # `Menus.build` resolves both into `{language => {menu_name => [Entry, ...]}}`
 # trees, ready for template exposure (`site.menus` / `get_menu()`, see
@@ -127,12 +128,46 @@ module Hwaro
           end
         end
 
+        if auto_menu = config.menus_auto_sections
+          list = flat[auto_menu] ||= [] of Entry
+          add_auto_section_entries(list, content, lang, default_lang)
+        end
+
         menus = {} of String => Array(Entry)
         flat.each do |menu_name, entries|
           normalize_urls!(entries)
           menus[menu_name] = assemble_tree(entries, menu_name)
         end
         menus
+      end
+
+      # `[menus] auto_sections`: every top-level section of `lang` joins
+      # `list` (Hugo's `sectionPagesMenu`), keyed by its directory name. A
+      # section listings would skip (draft, unpublished, headless,
+      # transparent) or that bounces off-site is left out. An explicit entry
+      # — config, or front matter — sharing the identifier wins, as does the
+      # section's own front-matter registration into the same menu.
+      private def self.add_auto_section_entries(list : Array(Entry), content : Array(Models::Page), lang : String, default_lang : String)
+        taken = list.map(&.identifier).to_set
+        registered = list.compact_map(&.page_path).to_set
+        content.each do |s|
+          next unless s.is_a?(Models::Section)
+          next if s.section.empty? || s.section.includes?('/')
+          next unless (s.language || default_lang) == lang
+          next if s.excluded_from_listings? || s.transparent
+          next if s.redirect_to.try { |r| external_url?(r) }
+          next if taken.includes?(s.section) || registered.includes?(s.path)
+
+          list << Entry.new(
+            name: s.title.presence || s.section,
+            url: s.url,
+            identifier: s.section,
+            weight: s.weight,
+            parent: nil,
+            external: false, # resolved by normalize_urls!
+            page_path: s.path,
+          )
+        end
       end
 
       # Normalizes each entry's `url` in place and flags `external`.

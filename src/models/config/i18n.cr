@@ -113,6 +113,9 @@ module Hwaro
         return unless menus_section = config.raw["menus"]?.try(&.as_h?)
 
         config.menus = parse_menu_tables(menus_section)
+        # A string value can't collide with a `[[menus.<name>]]` array:
+        # `parse_menu_tables` only reads array values.
+        config.menus_auto_sections = menus_section["auto_sections"]?.try(&.as_s?).try(&.strip.presence)
       end
 
       private def self.load_taxonomies(config : Config)

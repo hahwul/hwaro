@@ -238,11 +238,16 @@ module Hwaro
         def names_for(language : String) : {Array(String), String}
           cfg = config
           return {[] of String, "menus"} unless cfg
-          if lang_menus = cfg.language(language).try(&.menus)
-            {lang_menus.keys, "languages.#{language}.menus"}
-          else
-            {cfg.menus.keys, "menus"}
+          names, table = if lang_menus = cfg.language(language).try(&.menus)
+                           {lang_menus.keys, "languages.#{language}.menus"}
+                         else
+                           {cfg.menus.keys, "menus"}
+                         end
+          # `[menus] auto_sections` declares its menu too.
+          if (auto = cfg.menus_auto_sections) && !names.empty? && !names.includes?(auto)
+            names += [auto]
           end
+          {names, table}
         end
       end
 
