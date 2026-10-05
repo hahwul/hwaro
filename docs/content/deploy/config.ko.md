@@ -181,12 +181,24 @@ force = true
 | force | bool | false | 대상에 동일한 파일이 있어도 매칭된 파일을 항상 복사 |
 | cache_control | string | — | 매칭된 파일의 `Cache-Control` 헤더 (클라우드 대상) |
 | content_type | string | — | 매칭된 파일의 `Content-Type` 헤더 (클라우드 대상) |
-| gzip | bool | false | gzip으로 압축해 `Content-Encoding: gzip`으로 업로드(클라우드), 또는 `.gz` 파일을 옆에 생성(로컬) |
+| gzip | bool | — | gzip으로 압축해 `Content-Encoding: gzip`으로 업로드(클라우드), 또는 `.gz` 파일을 옆에 생성(로컬) |
 
 `force`는 패턴이 매칭되는 모든 매처에서 적용됩니다. 메타데이터 키
 (`cache_control`, `content_type`, `gzip`)는 이 중 하나라도 설정하고 파일에
 매칭되는 매처 중 설정 순서상 **첫 번째** 매처가 세 값을 모두 정합니다.
 매처끼리 값을 합치지 않으므로 구체적인 패턴을 일반적인 패턴보다 앞에 둡니다.
+`gzip = false`를 명시해도 설정한 것으로 보므로, 뒤에 오는 더 넓은 gzip
+매처에서 특정 경로를 뺄 수 있습니다:
+
+```toml
+[[deployment.matchers]]
+pattern = "\\.(png|jpg|woff2)$"
+gzip = false
+
+[[deployment.matchers]]
+pattern = ".*"
+gzip = true
+```
 
 ### 클라우드 대상 (`s3://`, `gs://`, `az://`)
 
@@ -205,6 +217,11 @@ hwaro가 같은 이름의 임시 파일로 압축해 그 파일을 업로드합�
 `headers` 객체를 담은 `upload` 항목을 추가합니다. 매칭된 파일은 배포할
 때마다 다시 업로드됩니다.
 
+`gsutil cp`는 파일 이름의 `[`, `]`, `*`, `?`를 와일드카드로 해석하며 이를
+이스케이프할 방법이 없습니다. 그래서 `gs://` 대상에서는 경로에 이 문자가
+들어간 매칭 파일을 경고와 함께 건너뜁니다(기본 동기화로는 배포되지만 추가
+헤더는 붙지 않습니다).
+
 ### 로컬 디렉터리 대상 (`file://`, `path`)
 
 `gzip = true`이면 매칭된 파일마다 미리 압축한 `<file>.gz`를 옆에
@@ -212,7 +229,10 @@ hwaro가 같은 이름의 임시 파일로 압축해 그 파일을 업로드합�
 원본보다 오래된 경우에만 다시 씁니다. 소스에 이미 `<file>.gz`가 있으면 그
 파일을 그대로 배포합니다. 원본이 배포되는 동안 `.gz` 파일은 낡은 파일로
 삭제되지 않습니다. 페이지가 사라지면 `.gz` 파일도 함께 삭제되며
-`max_deletes`에 포함되지 않습니다.
+`max_deletes`에 포함되지 않습니다. 그 밖의 `.gz` 파일은 평소처럼 개수에
+포함됩니다. 대상의 `exclude`에 걸리는 `.gz` 파일은 만들지 않습니다.
+`--dry-run --json`은 만들 `.gz` 파일마다 `gzip` 항목을 나열하며, 이 항목의
+`source`는 압축할 대상 쪽 파일입니다.
 
 로컬 복사본에는 HTTP 헤더가 없으므로 `cache_control`과 `content_type`을
 설정하면 경고가 출력됩니다. 이 헤더는 웹 서버에서 설정합니다.

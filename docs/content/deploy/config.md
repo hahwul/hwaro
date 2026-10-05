@@ -184,13 +184,24 @@ force = true
 | force | bool | false | Always copy matched files, even when identical at the destination |
 | cache_control | string | — | `Cache-Control` header for matched files (cloud targets) |
 | content_type | string | — | `Content-Type` header for matched files (cloud targets) |
-| gzip | bool | false | Upload gzip-compressed with `Content-Encoding: gzip` (cloud), or write a `.gz` sibling (local) |
+| gzip | bool | — | Upload gzip-compressed with `Content-Encoding: gzip` (cloud), or write a `.gz` sibling (local) |
 
 `force` is honored by every matcher whose pattern matches. For the
 metadata keys (`cache_control`, `content_type`, `gzip`), the **first**
 matcher in config order that sets any of them and matches the file wins,
 and it supplies all three. Matchers are not merged, so put specific
-patterns before general ones.
+patterns before general ones. An explicit `gzip = false` counts as set, so
+it opts a path out of a later, broader gzip matcher:
+
+```toml
+[[deployment.matchers]]
+pattern = "\\.(png|jpg|woff2)$"
+gzip = false
+
+[[deployment.matchers]]
+pattern = ".*"
+gzip = true
+```
 
 ### Cloud targets (`s3://`, `gs://`, `az://`)
 
@@ -209,6 +220,11 @@ uploads that. `--dry-run` lists the planned uploads, and `--dry-run --json`
 adds an `upload` op per file with a `headers` object. Matched files are
 re-uploaded on every deploy.
 
+`gsutil cp` reads `[`, `]`, `*` and `?` in a file name as wildcards, and
+has no way to escape them. On `gs://` targets, a matched file whose path
+contains one of them is skipped with a warning (it is still deployed by the
+main sync, without the extra headers).
+
 ### Local directory targets (`file://`, `path`)
 
 `gzip = true` writes a precompressed `<file>.gz` next to each matched file,
@@ -216,7 +232,10 @@ for nginx `gzip_static` or Caddy `precompressed`. A sibling is rewritten
 only when it is missing or older than its file. If the source already ships
 a `<file>.gz`, that file is deployed unchanged. Siblings are never deleted
 as stale while their file is deployed. When a page is removed, its sibling
-is deleted with it and does not count toward `max_deletes`.
+is deleted with it and does not count toward `max_deletes`. Any other `.gz`
+file at the destination counts as usual. A sibling the target's `exclude`
+matches is never written. `--dry-run --json` lists each sibling to write as a
+`gzip` op whose `source` is the destination file being compressed.
 
 A local copy has no HTTP headers, so `cache_control` and `content_type`
 print a warning there. Set those in your web server.
