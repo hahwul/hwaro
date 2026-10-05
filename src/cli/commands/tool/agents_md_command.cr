@@ -120,7 +120,7 @@ module Hwaro
                 unless Prompt.interactive?
                   raise Hwaro::HwaroError.new(
                     code: Hwaro::Errors::HWARO_E_USAGE,
-                    message: "AGENTS.md already exists and cannot prompt for confirmation: stdin is not a TTY.",
+                    message: "AGENTS.md already exists and cannot prompt for confirmation outside an interactive terminal.",
                     hint: "Pass --force to regenerate it non-interactively.",
                   )
                 end
