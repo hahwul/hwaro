@@ -521,6 +521,8 @@ describe "serve watch parity: image sizes read while rendering" do
   it "re-renders the pages when a static image they size changes" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
+        # The watched-source set is process-wide and cwd-relative.
+        Hwaro::Content::Hooks::ImageHooks.clear_intrinsic_sizes
         File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\ndimensions = true\n))
         FileUtils.mkdir_p("content")
         FileUtils.mkdir_p("templates")
