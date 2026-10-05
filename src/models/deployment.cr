@@ -6,14 +6,16 @@ module Hwaro
       property pattern : String
       property cache_control : String?
       property content_type : String?
-      property gzip : Bool
+      # nil = unset; an explicit `false` still claims the file, so an
+      # earlier matcher can opt a path out of a later `gzip = true` one.
+      property gzip : Bool?
       property force : Bool
 
       def initialize
         @pattern = ""
         @cache_control = nil
         @content_type = nil
-        @gzip = false
+        @gzip = nil
         @force = false
       end
     end

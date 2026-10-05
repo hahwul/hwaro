@@ -107,9 +107,7 @@ module Hwaro
           matcher.pattern = pattern
           matcher.cache_control = matcher_h["cacheControl"]?.try(&.as_s?) || matcher_h["cache_control"]?.try(&.as_s?)
           matcher.content_type = matcher_h["contentType"]?.try(&.as_s?) || matcher_h["content_type"]?.try(&.as_s?)
-          if gzip_val = matcher_h["gzip"]?.try(&.as_bool?)
-            matcher.gzip = gzip_val
-          end
+          matcher.gzip = matcher_h["gzip"]?.try(&.as_bool?)
           if force_val = matcher_h["force"]?.try(&.as_bool?)
             matcher.force = force_val
           end
