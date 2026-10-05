@@ -18,6 +18,7 @@ require "../../../utils/errors"
 require "../../../utils/logger"
 require "../../../utils/build_output"
 require "../../../utils/markdown_code"
+require "../../../content/processors/internal_link_resolver"
 
 require "./deadlink_command/scanner"
 require "./deadlink_command/internal_resolver"
@@ -43,6 +44,7 @@ module Hwaro
             FlagInfo.new(short: nil, long: "--internal-only", description: "Check internal links only"),
             FlagInfo.new(short: nil, long: "--ignore-url", description: "Skip links whose URL matches PATTERN (substring; * wildcards; repeatable)", takes_value: true, value_hint: "PATTERN"),
             FlagInfo.new(short: nil, long: "--allow-status", description: "Treat these HTTP status codes as healthy (comma-separated, e.g. 403,429)", takes_value: true, value_hint: "CODES"),
+            FlagInfo.new(short: nil, long: "--skip-anchors", description: "Do not check #fragment links against the built HTML"),
             JSON_FLAG,
             HELP_FLAG,
           ]
@@ -92,6 +94,7 @@ module Hwaro
             internal_only = false
             ignore_patterns = [] of Regex
             allowed_statuses = Set(Int32).new
+            skip_anchors = false
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool check-links [options]"
@@ -120,6 +123,7 @@ module Hwaro
               end
               parser.on("--external-only", "Check external links only") { external_only = true }
               parser.on("--internal-only", "Check internal links only") { internal_only = true }
+              parser.on("--skip-anchors", "Do not check #fragment links against the built HTML") { skip_anchors = true }
               parser.on("--ignore-url PATTERN", "Skip links whose URL matches PATTERN (substring; * wildcards; repeatable)") do |v|
                 if v.strip.empty?
                   raise Hwaro::HwaroError.new(
@@ -191,6 +195,7 @@ module Hwaro
 
             external_links = internal_only ? [] of Link : find_external_links(target_dir)
             internal_links = external_only ? [] of Link : find_internal_links(target_dir)
+            anchor_links = skip_anchors ? [] of Link : @anchor_links
 
             # `--ignore-url` drops matching links BEFORE any check runs, so an
             # ignored external host is never contacted at all — the point is
@@ -202,15 +207,17 @@ module Hwaro
               external_links = external_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
               internal_links = internal_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
               ignored_count = before - external_links.size - internal_links.size
+              anchor_links = anchor_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
             end
 
-            if external_links.empty? && internal_links.empty?
+            if external_links.empty? && internal_links.empty? && anchor_links.empty?
               if json_output
                 # `ignored_count` distinguishes "all healthy" from "an
                 # over-broad --ignore-url pattern checked nothing".
                 puts({
                   "dead_internal"    => [] of Result,
                   "dead_external"    => [] of Result,
+                  "dead_anchors"     => [] of Result,
                   "skipped_external" => [] of Result,
                   "ignored_count"    => ignored_count,
                   # Same key on every payload: a consumer reads one schema,
@@ -260,13 +267,14 @@ module Hwaro
               tool: "check-links",
             )
             dead_internal = check_internal_links(internal_links, target_dir, taxonomy_names, base_path, language_codes, generated_routes, oracle, config)
+            dead_anchors = check_anchor_links(anchor_links, target_dir, base_path, language_codes, oracle, config)
             # Say it only where it changes how the result should be read: an
             # unusable tree explains dead internal links, a stale one explains
             # links it just accepted.
             output_hint = oracle.hint if !dead_internal.empty? || oracle.usable?
 
             total = external_links.size + internal_links.size
-            dead_total = dead_external.size + dead_internal.size
+            dead_total = dead_external.size + dead_internal.size + dead_anchors.size
 
             if json_output
               # `skipped_external` names the links the SSRF guard refused to
@@ -276,6 +284,7 @@ module Hwaro
               puts({
                 "dead_internal"    => dead_internal,
                 "dead_external"    => dead_external,
+                "dead_anchors"     => dead_anchors,
                 "skipped_external" => skipped_external,
                 "ignored_count"    => ignored_count,
                 # Null unless the build tree changed how this result should be
@@ -292,6 +301,7 @@ module Hwaro
             end
 
             scan_detail = "#{external_links.size} external · #{internal_links.size} internal"
+            scan_detail += " · #{anchor_links.size} #{anchor_links.size == 1 ? "anchor" : "anchors"}" unless anchor_links.empty?
             scan_detail += " · #{ignored_count} ignored" if ignored_count > 0
             Logger.section("scan", scan_detail)
             links_noun = total == 1 ? "link" : "links"
@@ -305,7 +315,7 @@ module Hwaro
                 detail += " — #{sanitize_for_terminal(result.error.to_s)}" if result.error
                 Logger.error "#{sanitize_for_terminal(result.link.file)}: #{detail}"
               end
-              dead_internal.each do |result|
+              (dead_internal + dead_anchors).each do |result|
                 Logger.error "#{sanitize_for_terminal(result.link.file)}: #{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}"
               end
             elsif dead_total == 0 && skipped_external.empty?
@@ -324,7 +334,7 @@ module Hwaro
                 detail += " — #{sanitize_for_terminal(result.error.to_s)}" if result.error
                 Logger.item(detail, glyph: :arrow, indent: 4)
               end
-              dead_internal.each do |result|
+              (dead_internal + dead_anchors).each do |result|
                 Logger.item(sanitize_for_terminal(result.link.file), glyph: :err)
                 Logger.item("#{sanitize_for_terminal(result.link.url)}  #{sanitize_for_terminal(result.error.to_s)}", glyph: :arrow, indent: 4)
               end
@@ -332,7 +342,11 @@ module Hwaro
               if dead_total == 0
                 Logger.outcome("checked", "#{total} #{links_noun} · all healthy")
               else
-                Logger.outcome("checked", "#{total} #{links_noun} · #{dead_total} dead", :err)
+                parts = ["#{total} #{links_noun}"]
+                dead_links = dead_external.size + dead_internal.size
+                parts << "#{dead_links} dead" if dead_links > 0
+                parts << "#{dead_anchors.size} missing #{dead_anchors.size == 1 ? "anchor" : "anchors"}" unless dead_anchors.empty?
+                Logger.outcome("checked", parts.join(" · "), :err)
               end
             end
 
@@ -384,6 +398,10 @@ module Hwaro
           # Directory → its Markdown sources keyed by stem (`leaf` →
           # `[dir/leaf.MD]`), so route probes list each directory once per run.
           @markdown_stems = {} of String => Hash(String, Array(String))
+
+          # Internal page links that carry a `#fragment`, gathered by
+          # find_internal_links (url keeps the fragment, kind `:anchor`).
+          @anchor_links = [] of Link
 
           # Memoized per run: the same host used to be resolved synchronously
           # on every occurrence and every redirect hop, stalling all workers
