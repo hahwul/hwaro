@@ -43,9 +43,13 @@ backlinks = true   # page.backlinks
 
 ### 무엇이 바뀌는가
 
-해석된 위키링크는 마크다운 렌더링 전에 일반 내부 링크(`[text](@/path.md#heading)`)로 바뀝니다. 그래서 렌더 훅, `base_path`, 외부 링크 정책, `[links]` 검사가 `@/` 링크와 똑같이 적용됩니다. 펜스 코드, 들여쓰기 코드, 인라인 코드, HTML 주석 안은 바꾸지 않습니다.
+해석된 위키링크는 마크다운 렌더링 전에 일반 내부 링크(`[text](@/path.md#heading)`)로 바뀝니다. 그래서 렌더 훅, `base_path`, 외부 링크 정책, `[links]` 검사가 `@/` 링크와 똑같이 적용됩니다.
 
-어떤 페이지와도 일치하지 않는 대상은 `<span class="wikilink wikilink-missing">text</span>`로 렌더링되고 `[links] broken_internal`을 따릅니다. 기본은 경고이고, `broken_internal = "error"`이면 빌드 오류입니다.
+마크다운이 링크를 만들지 않는 곳에서는 위키링크도 그대로 둡니다: 펜스 코드, 들여쓰기 코드, 인라인 코드(두 줄에 걸친 코드 스팬 포함), 원시 HTML 블록, HTML 태그와 그 속성, HTML 주석, 수식(`[markdown] math`가 켜져 있을 때 `$…$`, `$$…$$`, `\(…\)`), 백슬래시 뒤(`\[[링크 아님]]`). 숏코드 호출이나 본문 안의 위키링크도 바꾸지 않습니다.
+
+`.md`가 아닌 확장자가 붙은 대상(`[[report.pdf]]`, `![[report.pdf]]`)은 게시된 그 파일로 연결되며, [이미지 임베드](#이미지-임베드)와 같은 방법으로 찾습니다.
+
+어떤 페이지나 파일과도 일치하지 않는 대상은 `<span class="wikilink wikilink-missing">text</span>`로 렌더링되고 `[links] broken_internal`을 따릅니다. 기본은 경고이고, `broken_internal = "error"`이면 빌드 오류입니다.
 
 ## 이미지 임베드
 
@@ -59,6 +63,8 @@ backlinks = true   # page.backlinks
 파일은 먼저 페이지 자신의 번들 파일에서 찾고, 없으면 게시되는 모든 파일에서 이름으로 찾습니다: 게시된 페이지의 번들 파일, `[content.files]`, `static/`. 초안 등 게시되지 않는 번들의 파일은 찾지 않습니다. 이름이 겹치면 페이지 링크와 같은 규칙을 따릅니다.
 
 임베드는 마크다운 이미지(크기가 있으면 `{width=… height=…}` 속성 블록 포함)가 되므로 render-image 훅, 반응형 `srcset`, `[image_processing] dimensions`가 적용됩니다. 너비를 지정하면 자동 크기 지정이 덮어쓰지 않습니다.
+
+`wikilinks`를 켜면 `[markdown] attributes`처럼 일반 마크다운 이미지에도 `{…}` 속성 블록(`![alt](x.png){.wide}`)이 적용됩니다.
 
 노트 임베드(`![[note]]`, `![[note#section]]`)는 지금은 노트로 가는 링크로 렌더링됩니다. 트랜스클루전은 계획되어 있습니다.
 
@@ -106,6 +112,6 @@ backlinks = true   # page.backlinks
 - 위키링크(`[markdown] wikilinks`가 켜져 있을 때)
 - URL이 페이지 URL인 마크다운·HTML 링크(`[x](/docs/setup/)`, `href="../setup/"`)
 
-숏코드나 템플릿이 만든 링크는 세지 않습니다.
+숏코드나 템플릿이 만든 링크는 세지 않으며, 숏코드 호출이나 본문 안에 쓴 링크도 세지 않습니다(바꾸지 않으므로 세지도 않습니다).
 
 `--cache` 빌드와 `hwaro serve`는 백링크가 바뀐 페이지를 다시 렌더링합니다. 예를 들어 다른 페이지가 이 페이지로 가는 링크를 추가하거나 지웠을 때입니다.

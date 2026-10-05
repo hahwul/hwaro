@@ -43,9 +43,13 @@ Titles are not used. When several pages match, Hwaro prefers, in order: a page i
 
 ### What gets rewritten
 
-A resolved wikilink turns into an ordinary internal link (`[text](@/path.md#heading)`) before Markdown rendering. Render hooks, `base_path`, the external-link policy and the `[links]` checks therefore treat it exactly like an `@/` link. Nothing changes inside fenced or indented code, inline code or HTML comments.
+A resolved wikilink turns into an ordinary internal link (`[text](@/path.md#heading)`) before Markdown rendering. Render hooks, `base_path`, the external-link policy and the `[links]` checks therefore treat it exactly like an `@/` link.
 
-A target that matches no page renders as `<span class="wikilink wikilink-missing">text</span>` and goes through `[links] broken_internal`: a warning by default, or a build error with `broken_internal = "error"`.
+A wikilink is left as written wherever Markdown would not make a link either: fenced or indented code, inline code (including a code span over two lines), raw HTML blocks, HTML tags and their attributes, HTML comments, math (`$…$`, `$$…$$` and `\(…\)` with `[markdown] math` on), and after a backslash (`\[[not a link]]`). Wikilinks inside a shortcode call or body are not rewritten either.
+
+A target with a file extension other than `.md` (`[[report.pdf]]`, `![[report.pdf]]`) links to that published file, found the same way as an [image embed](#image-embeds).
+
+A target that matches no page or file renders as `<span class="wikilink wikilink-missing">text</span>` and goes through `[links] broken_internal`: a warning by default, or a build error with `broken_internal = "error"`.
 
 ## Image Embeds
 
@@ -59,6 +63,8 @@ A target that matches no page renders as `<span class="wikilink wikilink-missing
 Hwaro looks for the file first among the page's own bundle files, then by name among every published file: bundle files of published pages, `[content.files]` and `static/`. A file in a draft or otherwise unpublished bundle is not found. Ambiguous names follow the same rules as page links.
 
 An embed becomes a Markdown image (with a `{width=… height=…}` attribute block for a size), so render-image hooks, responsive `srcset` and `[image_processing] dimensions` apply. An explicit width keeps the automatic dimensions from overriding it.
+
+Turning on `wikilinks` also enables `{…}` attribute blocks on ordinary Markdown images, as `[markdown] attributes` does (`![alt](x.png){.wide}`).
 
 Embedding a note (`![[note]]`, `![[note#section]]`) currently renders as a link to the note. Transclusion is planned.
 
@@ -106,6 +112,6 @@ Links are read from each page's Markdown source:
 - wikilinks (when `[markdown] wikilinks` is on);
 - Markdown and HTML links whose URL is a page's URL (`[x](/docs/setup/)`, `href="../setup/"`).
 
-Links produced by shortcodes or templates are not counted.
+Links produced by shortcodes or templates are not counted, and neither are links written inside a shortcode call or body (they are not rewritten, so they are not counted either).
 
 `--cache` builds and `hwaro serve` re-render a page when its backlinks change, for example when another page adds or removes a link to it.
