@@ -317,6 +317,36 @@ describe "serve watch-lane regressions" do
     end
   end
 
+  # `[build] write_stats` must cover the whole site after an incremental pass
+  # that re-renders one page, and the watcher must not see the rewrite.
+  it "updates hwaro_stats.json on an incremental pass without dropping other pages" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"https://example.com\"\n[build]\nwrite_stats = true\n")
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %(<p class="k-{{ page.extra.k }}">{{ content }}</p>))
+        File.write("content/a.md", "+++\ntitle = \"A\"\n[extra]\nk = \"a\"\n+++\na")
+        File.write("content/b.md", "+++\ntitle = \"B\"\n[extra]\nk = \"b\"\n+++\nb")
+
+        server = Hwaro::Services::Server.new
+        options = watch_options
+        server.watch_fixes_builder.run(options).should be_true
+        baseline = server.watch_fixes_scan_mtimes
+
+        File.write("content/a.md", "+++\ntitle = \"A\"\n[extra]\nk = \"a2\"\n+++\na")
+        server.watch_fixes_apply_changeset(watch_changeset(modified_content: ["content/a.md"]), options)
+
+        classes = JSON.parse(File.read("hwaro_stats.json"))["htmlElements"]["classes"].as_a.map(&.as_s)
+        classes.should contain("k-a2")
+        classes.should contain("k-b")
+        changes = server.watch_fixes_detect_changes(baseline, server.watch_fixes_scan_mtimes)
+        changes.modified_content.should eq(["content/a.md"])
+        (changes.added_files + changes.removed_files + changes.modified_static).should be_empty
+      end
+    end
+  end
+
   # The static-only strategy re-renders nothing, so a `static/` file that
   # publishes where a page renders replaced that page on its own URL for the
   # rest of the session (incremental rebuilds only touch changed content).
