@@ -60,7 +60,7 @@ describe Hwaro::Core::Build::RemoteFetch do
     end
   end
 
-  it "reports a connection closed without a response the same way pinned or not" do
+  it "reports a connection closed without a response, pinned or not" do
     server = TCPServer.new("127.0.0.1", 0)
     port = server.local_address.port
     spawn do
@@ -77,10 +77,13 @@ describe Hwaro::Core::Build::RemoteFetch do
     begin
       url = "http://127.0.0.1:#{port}/x"
       pinned = ->(_uri : URI) { ["127.0.0.1"].as(Array(String)?) }
-      {nil, pinned}.each do |guard|
-        expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "Unexpected end of http response") do
-          Hwaro::Core::Build::RemoteFetch.fetch(url, {} of String => String, 1024_i64, 10.seconds, guard: guard)
-        end
+      expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "Unexpected end of http response") do
+        Hwaro::Core::Build::RemoteFetch.fetch(url, {} of String => String, 1024_i64, 10.seconds)
+      end
+      # Pinned, the client cannot tell an EOF from a reset; never the
+      # misleading "cannot be reconnected".
+      expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "connection closed or reset before a response") do
+        Hwaro::Core::Build::RemoteFetch.fetch(url, {} of String => String, 1024_i64, 10.seconds, guard: pinned)
       end
     ensure
       server.close

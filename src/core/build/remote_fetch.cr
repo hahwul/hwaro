@@ -123,9 +123,10 @@ module Hwaro
           raise ex
         rescue ex
           message = ex.message || ex.class.name
-          # A client built on a connected socket reads an early EOF as a
-          # stale keep-alive and "retries" into this; say what happened.
-          message = "Unexpected end of http response" if message == "This HTTP::Client cannot be reconnected"
+          # A client built on a connected socket treats an early EOF, or a
+          # reset/broken pipe on its first request, as a stale keep-alive and
+          # "retries" into this. Which one happened is lost, so stay neutral.
+          message = "connection closed or reset before a response" if message == "This HTTP::Client cannot be reconnected"
           raise FetchError.new(message, cause: ex)
         end
 
