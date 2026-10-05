@@ -202,7 +202,7 @@ name = "tags"
 paginate_by = 20
 ```
 
-각 항목 목록(예: `/tags/crystal/`)이 20개씩 페이지로 나뉘고, 이후 페이지는 `/tags/crystal/page/2/`에 생성됩니다. 택소노미 템플릿에서도 동일한 `pagination`, `paginator` 템플릿 변수를 사용할 수 있습니다.
+각 항목 목록(예: `/tags/crystal/`)이 20개씩 페이지로 나뉘고, 이후 페이지는 `/tags/crystal/page/2/`에 생성됩니다. 택소노미 템플릿에서도 동일한 `pagination`, `pagination_obj`, `paginator` 템플릿 변수를 사용할 수 있습니다. 항목 페이지의 `content`는 페이지 목록 뒤에 페이지네이션 내비게이션이 이미 붙어 있으므로, `content` 대신 `paginator.pages`로 목록을 직접 만들 때만 `{{ pagination }}`을 출력하세요.
 
 ## CSS 예시
 

@@ -202,7 +202,7 @@ name = "tags"
 paginate_by = 20
 ```
 
-Each term listing (e.g. `/tags/crystal/`) is split into pages of 20 items, with later pages at `/tags/crystal/page/2/`. The same `pagination` and `paginator` template variables are available in the taxonomy template.
+Each term listing (e.g. `/tags/crystal/`) is split into pages of 20 items, with later pages at `/tags/crystal/page/2/`. The same `pagination`, `pagination_obj` and `paginator` template variables are available in the taxonomy template. A term page's `content` is the term's page list with the pagination nav already appended, so print `{{ pagination }}` only when you build the listing yourself from `paginator.pages` instead of printing `content`.
 
 ## CSS Example
 
