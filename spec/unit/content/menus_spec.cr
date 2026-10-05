@@ -18,6 +18,17 @@ private def page_with_menu(path : String, title : String, url : String, menu_nam
   page
 end
 
+private def auto_section(dir : String, title : String, weight : Int32 = 0, language : String? = nil) : Hwaro::Models::Section
+  suffix = language ? ".#{language}" : ""
+  section = Hwaro::Models::Section.new("#{dir}/_index#{suffix}.md")
+  section.section = dir
+  section.title = title
+  section.url = language ? "/#{language}/#{dir}/" : "/#{dir}/"
+  section.weight = weight
+  section.language = language
+  section
+end
+
 describe Hwaro::Content::Menus do
   describe ".build" do
     it "builds a flat menu from config entries, sorted by weight then name" do
@@ -302,6 +313,105 @@ describe Hwaro::Content::Menus do
 
       trees = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [] of Hwaro::Models::Section)
       trees["en"]["main"][0].external.should be_false
+    end
+  end
+
+  describe ".build with [menus] auto_sections" do
+    it "adds every top-level section, keyed by directory, sorted by weight then name" do
+      config = Hwaro::Models::Config.new
+      config.menus_auto_sections = "main"
+      root = auto_section("", "Home")
+      root.section = ""
+      sections = [
+        auto_section("posts", "Posts", weight: 2),
+        auto_section("about", "About", weight: 1),
+        auto_section("docs", "Docs", weight: 2),
+        auto_section("posts/2024", "2024"),
+        root,
+      ]
+
+      main = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, sections)["en"]["main"]
+      main.map(&.name).should eq(["About", "Docs", "Posts"])
+      main.map(&.identifier).should eq(["about", "docs", "posts"])
+      main.map(&.url).should eq(["/about/", "/docs/", "/posts/"])
+      main.map(&.weight).should eq([1, 2, 2])
+      main.map(&.page_path).should eq(["about/_index.md", "docs/_index.md", "posts/_index.md"])
+    end
+
+    it "is off by default" do
+      config = Hwaro::Models::Config.new
+      trees = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [auto_section("posts", "Posts")])
+      trees["en"].should be_empty
+    end
+
+    it "skips draft, unpublished, headless, transparent and off-site redirect sections" do
+      config = Hwaro::Models::Config.new
+      config.menus_auto_sections = "main"
+      draft = auto_section("draft", "Draft")
+      draft.draft = true
+      unpublished = auto_section("later", "Later")
+      unpublished.unpublished = true
+      headless = auto_section("data", "Data")
+      headless.render = false
+      transparent = auto_section("flat", "Flat")
+      transparent.transparent = true
+      offsite = auto_section("gone", "Gone")
+      offsite.redirect_to = "https://elsewhere.example/"
+      onsite = auto_section("moved", "Moved")
+      onsite.redirect_to = "/posts/"
+      sections = [draft, unpublished, headless, transparent, offsite, onsite, auto_section("posts", "Posts")]
+
+      main = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, sections)["en"]["main"]
+      main.map(&.identifier).should eq(["moved", "posts"])
+    end
+
+    it "lets a config or front-matter entry with the same identifier override the auto entry" do
+      config = Hwaro::Models::Config.new
+      config.menus_auto_sections = "main"
+      config.menus = {"main" => [
+        menu_item("Blog", "/posts/", identifier: "posts", weight: 9),
+        menu_item("GitHub", "https://github.com/hahwul", weight: 5),
+      ]}
+      fm_reg = Hwaro::Models::MenuRegistration.new(name: "Who", identifier: "about")
+      about_page = page_with_menu("who.md", "Who", "/who/", "main", fm_reg)
+
+      sections = [auto_section("posts", "Posts"), auto_section("about", "About"), auto_section("docs", "Docs", weight: 1)]
+      main = Hwaro::Content::Menus.build(config, [about_page], sections)["en"]["main"]
+      main.map { |e| {e.identifier, e.name, e.url} }.should eq([
+        {"about", "Who", "/who/"},
+        {"docs", "Docs", "/docs/"},
+        {"GitHub", "GitHub", "https://github.com/hahwul"},
+        {"posts", "Blog", "/posts/"},
+      ])
+    end
+
+    it "does not duplicate a section that registers itself into the same menu" do
+      config = Hwaro::Models::Config.new
+      config.menus_auto_sections = "main"
+      posts = auto_section("posts", "Posts")
+      posts.menus = {"main" => Hwaro::Models::MenuRegistration.new}
+
+      main = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [posts])["en"]["main"]
+      main.map(&.identifier).should eq(["Posts"])
+    end
+
+    it "builds per-language entries from each language's sections, under that language's overrides" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.menus_auto_sections = "main"
+      ko = Hwaro::Models::LanguageConfig.new("ko")
+      ko.menus = {"main" => [menu_item("소개", "/ko/about-us/", identifier: "about")]}
+      config.languages = {"ko" => ko}
+      sections = [
+        auto_section("posts", "Posts"),
+        auto_section("about", "About"),
+        auto_section("posts", "글", language: "ko"),
+        auto_section("about", "정보", language: "ko"),
+      ]
+
+      trees = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, sections)
+      trees["en"]["main"].map { |e| {e.name, e.url} }.should eq([{"About", "/about/"}, {"Posts", "/posts/"}])
+      trees["ko"]["main"].map { |e| {e.name, e.url} }.should eq([{"글", "/ko/posts/"}, {"소개", "/ko/about-us/"}])
     end
   end
 end

@@ -1429,6 +1429,14 @@ describe Hwaro::Services::Doctor do
         issues.any?(&.id.==("menu-undeclared")).should be_false
       end
 
+      it "treats the [menus] auto_sections menu as declared" do
+        issues = run_doctor(
+          base_config(%(\n[menus]\nauto_sections = "main"\n\n[[menus.footer]]\nname = "Privacy"\nurl = "/privacy/"\n)),
+          {"post.md" => %(+++\ntitle = "Post"\nmenus = ["main"]\n+++\nBody\n)}
+        )
+        issues.any?(&.id.==("menu-undeclared")).should be_false
+      end
+
       it "does not warn about undeclared front-matter menus when config declares no menus at all" do
         issues = run_doctor(
           base_config,

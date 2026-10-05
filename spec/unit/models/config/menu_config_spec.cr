@@ -141,4 +141,27 @@ describe "menu configuration" do
 
     config.languages["fr"].menus.should be_nil
   end
+
+  it "parses [menus] auto_sections alongside [[menus.*]] tables" do
+    config = load_config(<<-TOML)
+      title = "Test"
+
+      [menus]
+      auto_sections = "main"
+
+      [[menus.main]]
+      name = "About"
+      url = "/about/"
+      TOML
+
+    config.menus_auto_sections.should eq("main")
+    config.menus.keys.should eq(["main"])
+    config.menus["main"].map(&.name).should eq(["About"])
+  end
+
+  it "leaves auto_sections off when absent, blank, or not a string" do
+    Hwaro::Models::Config.new.menus_auto_sections.should be_nil
+    load_config(%(title = "T"\n[menus]\nauto_sections = "  "\n)).menus_auto_sections.should be_nil
+    load_config(%(title = "T"\n[menus]\nauto_sections = true\n)).menus_auto_sections.should be_nil
+  end
 end

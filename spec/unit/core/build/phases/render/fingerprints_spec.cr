@@ -241,3 +241,40 @@ describe "warm --cache: body edits next to relation readers" do
     end
   end
 end
+
+class Hwaro::Core::Build::Builder
+  def test_menu_set_fingerprint(site : Hwaro::Models::Site) : String
+    compute_menu_set_fingerprint(site)
+  end
+end
+
+# `hwaro serve` re-renders a nav partial only when the menu projection moves.
+# With `[menus] auto_sections` an unregistered top-level section feeds the
+# menu, so its title has to move the fingerprint; nested sections do not.
+describe "menu-set fingerprint with [menus] auto_sections" do
+  it "folds top-level sections only when auto_sections is set" do
+    config = Hwaro::Models::Config.new
+    site = Hwaro::Models::Site.new(config)
+    docs = Hwaro::Models::Section.new("docs/_index.md")
+    docs.section = "docs"
+    docs.title = "Docs"
+    nested = Hwaro::Models::Section.new("docs/api/_index.md")
+    nested.section = "docs/api"
+    nested.title = "API"
+    site.sections = [docs, nested]
+    builder = Hwaro::Core::Build::Builder.new
+
+    off = builder.test_menu_set_fingerprint(site)
+    docs.title = "Documentation"
+    builder.test_menu_set_fingerprint(site).should eq(off)
+
+    config.menus_auto_sections = "main"
+    before = builder.test_menu_set_fingerprint(site)
+    docs.title = "Docs"
+    builder.test_menu_set_fingerprint(site).should_not eq(before)
+
+    after = builder.test_menu_set_fingerprint(site)
+    nested.title = "Reference"
+    builder.test_menu_set_fingerprint(site).should eq(after)
+  end
+end
