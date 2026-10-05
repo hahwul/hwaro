@@ -250,6 +250,24 @@ describe "DateFilters" do
       result = render_crinja("{{ d | date(format='%Y-%m-%d') }}", vars)
       result.strip.should eq("2024-06-15")
     end
+
+    it "keeps the offset of every zoned string form" do
+      {
+        "2024-03-05 08:00:00 UTC"    => "08:00 +0000",
+        "2024-03-05 08:00:00 -05:00" => "08:00 -0500",
+        "2024-01-15T10:30:00-03:30"  => "10:30 -0330",
+        "2024-01-15T10:30:00+0900"   => "10:30 +0900",
+        "2024-01-15 10:30:00 +09:00" => "10:30 +0900",
+      }.each do |input, expected|
+        vars = {"d" => Crinja::Value.new(input)}
+        render_crinja("{{ d | date(format='%H:%M %z') }}", vars).strip.should eq(expected)
+      end
+    end
+
+    it "formats the Time#to_s form front matter datetimes reach templates as" do
+      vars = {"d" => Crinja::Value.new("2024-03-05 08:00:00 UTC")}
+      render_crinja("{{ d | date(format='%B %d, %Y') }}", vars).strip.should eq("March 05, 2024")
+    end
   end
 end
 

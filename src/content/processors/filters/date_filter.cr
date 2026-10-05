@@ -17,6 +17,35 @@ module Hwaro
             raise Crinja::TypeError.new("invalid date format #{format.inspect}: #{ex.message}")
           end
 
+          # Zoned forms come first: `Time.parse` ignores trailing input, so a
+          # zone-less format would accept "10:30:00-03:30" and drop the offset.
+          # The space-separated forms include `Time#to_s` output
+          # ("2024-03-05 08:00:00 UTC"), which is how front matter and data
+          # file datetimes reach templates.
+          T_ZONED     = {"%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%N%z"}
+          T_LOCAL     = {"%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"}
+          SPACE_ZONED = {"%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d %H:%M:%S.%N %z"}
+          SPACE_LOCAL = {"%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"}
+
+          # No date-only fallback for longer strings: `%Y-%m-%d` consumes only
+          # the first 10 chars, which would silently reformat garbage like
+          # "2024-01-15xxx" instead of passing it through unchanged.
+          def self.parse_string(value : String) : Time?
+            return try_parse(value, "%Y-%m-%d") if value.size <= 10
+            zoned, local = value[10] == 'T' ? {T_ZONED, T_LOCAL} : {SPACE_ZONED, SPACE_LOCAL}
+            if value.size > 19
+              zoned.each { |fmt| try_parse(value, fmt).try { |time| return time } }
+            end
+            local.each { |fmt| try_parse(value, fmt).try { |time| return time } }
+            nil
+          end
+
+          private def self.try_parse(value : String, format : String) : Time?
+            Time.parse(value, format, Time::Location::UTC)
+          rescue Time::Format::Error | ArgumentError
+            nil
+          end
+
           def self.register(env : Crinja)
             # Date formatting filter
             env.filters["date"] = Crinja.filter({format: "%Y-%m-%d"}) do
@@ -27,24 +56,7 @@ module Hwaro
               when Time
                 DateFilters.format_time(value, format)
               when String
-                # Detect format heuristically to avoid exception-based control flow
-                parsed = if value.includes?('T')
-                           if value.size > 19 && (value.includes?('+') || value.includes?('Z') || value.ends_with?("00"))
-                             Time.parse_rfc3339(value) rescue Time.parse(value, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC) rescue nil
-                           else
-                             # Fall back to minute precision (no seconds), e.g. "2024-01-15T10:30".
-                             Time.parse(value, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%dT%H:%M", Time::Location::UTC) rescue nil
-                           end
-                         elsif value.size > 10
-                           # Try full datetime, then minute precision (no seconds).
-                           # No date-only fallback here: `%Y-%m-%d` consumes only
-                           # the first 10 chars, which would silently reformat
-                           # garbage like "2024-01-15xxx" instead of passing it
-                           # through unchanged.
-                           Time.parse(value, "%Y-%m-%d %H:%M:%S", Time::Location::UTC) rescue Time.parse(value, "%Y-%m-%d %H:%M", Time::Location::UTC) rescue nil
-                         else
-                           Time.parse(value, "%Y-%m-%d", Time::Location::UTC) rescue nil
-                         end
+                parsed = DateFilters.parse_string(value)
                 parsed ? DateFilters.format_time(parsed, format) : value
               else
                 value.to_s

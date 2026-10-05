@@ -49,16 +49,16 @@ module Hwaro
         end
 
         # Shared body for the `empty`/`present` Crinja tests: a value is empty
-        # when it's an empty string/array/hash or nil.
+        # when it's an empty string/array/hash, nil or undefined.
         private def value_empty?(value : Crinja::Raw) : Bool
           case value
-          when String
-            value.empty?
+          when String, Crinja::SafeString
+            value.to_s.empty?
           when Array
             value.empty?
           when Hash
             value.empty?
-          when Nil
+          when Nil, Crinja::Undefined
             true
           else
             false
@@ -81,11 +81,16 @@ module Hwaro
             target.to_s.ends_with?(suffix)
           end
 
-          # Test if a string contains a substring
+          # Test if a string contains a substring, or a list/mapping an
+          # element/key (the `in` operator's rules, not the list's text)
           # Usage: {% if page_url is containing("products") %}
           @env.tests["containing"] = Crinja.test do
-            substring = arguments.varargs.first?.try(&.to_s) || ""
-            target.to_s.includes?(substring)
+            needle = arguments.varargs.first? || Crinja::Value.new("")
+            if target.iterable?
+              Crinja::Operator.member?(needle, target)
+            else
+              target.to_s.includes?(needle.to_s)
+            end
           end
 
           # Test if value is empty (string, array, hash)
