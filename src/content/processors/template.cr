@@ -472,12 +472,12 @@ module Hwaro
           page = env.resolve("page")
           return unless page.mapping?
           url = page["url"].to_s
+          source = env.resolve("__page_path__").to_s
           assets = page["assets"]
-          return if url.empty? || !assets.iterable?
-          assets.each do |asset|
-            name = asset.to_s
-            return "#{url.rstrip('/')}/#{own}" if name == own || name.ends_with?("/#{own}")
-          end
+          return if url.empty? || source.empty? || !assets.iterable?
+          dir = File.dirname(source)
+          wanted = dir == "." ? own : "#{dir}/#{own}"
+          assets.each { |asset| return "#{url.rstrip('/')}/#{own}" if asset.to_s == wanted }
           nil
         end
 

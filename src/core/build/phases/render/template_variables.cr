@@ -42,6 +42,8 @@ module Hwaro::Core::Build::Phases::Render
     vars["page_section"] = Crinja::Value.new(page.section)
     vars["page_date"] = date_crinja
     vars["page_image"] = Crinja::Value.new(page.image || config.og.default_image || "")
+    # Source path, for resize_image's bundle-relative lookup (internal).
+    vars["__page_path__"] = Crinja::Value.new(page.path)
     vars["taxonomy_name"] = Crinja::Value.new(page.taxonomy_name || "")
     vars["taxonomy_term"] = Crinja::Value.new(page.taxonomy_term || "")
     default_lang = config.default_language

@@ -55,15 +55,19 @@ describe "resize_image with a page-bundle image" do
     build_site(
       "title = \"T\"\nbase_url = \"https://ex.com\"\n",
       content_files: {
-        "posts/b2/index.md"  => "+++\ntitle = \"B\"\nimage = \"cover.png\"\n+++\n",
-        "posts/b2/cover.png" => "png",
-        "posts/flat.md"      => "+++\ntitle = \"F\"\nimage = \"logo.png\"\n+++\n",
+        "posts/b2/index.md"      => "+++\ntitle = \"B\"\nimage = \"cover.png\"\n+++\n",
+        "posts/b2/cover.png"     => "png",
+        "posts/b3/index.md"      => "+++\ntitle = \"B3\"\nimage = \"cover.png\"\n+++\n",
+        "posts/b3/img/cover.png" => "png",
+        "posts/flat.md"          => "+++\ntitle = \"F\"\nimage = \"logo.png\"\n+++\n",
       },
       template_files: {
         "page.html" => "{{ resize_image(path=page.image, width=300).url }}",
       },
     ) do
       File.read("public/posts/b2/index.html").should eq("https://ex.com/posts/b2/cover.png")
+      # Only the bundle's own file of that name, not one in a subdirectory.
+      File.read("public/posts/b3/index.html").should eq("https://ex.com/cover.png")
       # Not a bundle file: still read from the site root, as before.
       File.read("public/posts/flat/index.html").should eq("https://ex.com/logo.png")
     end
