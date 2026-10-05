@@ -1,6 +1,8 @@
 # Shared digest helpers for cache fingerprints.
 
+require "base64"
 require "digest"
+require "openssl"
 
 module Hwaro
   module Utils
@@ -18,6 +20,19 @@ module Hwaro
         digest.update(value.bytesize.to_s)
         digest.update(":")
         digest.update(value)
+      end
+
+      # Subresource Integrity value (`sha384-<base64>`) of `data`.
+      def sri(data : String | Bytes) : String
+        "sha384-" + Base64.strict_encode(OpenSSL::Digest.new("SHA384").update(data).final)
+      end
+
+      # `sri` of a file's bytes, or nil when it is not a readable file.
+      def sri_file(path : String) : String?
+        return unless File.file?(path)
+        "sha384-" + Base64.strict_encode(OpenSSL::Digest.new("SHA384").file(path).final)
+      rescue File::Error | IO::Error
+        nil
       end
     end
   end

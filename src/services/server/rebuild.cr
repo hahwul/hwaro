@@ -185,7 +185,12 @@ module Hwaro
         # global vars — so the pages re-render without the full build's
         # re-parse, image and OG passes: this is the most frequent theming
         # save, and a full build made each one a multi-second wait.
-        if build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
+        # `[assets] sri` prints a digest of the same files' bytes (with or
+        # without `?v=`), and a template's `asset_integrity()` one of any
+        # emitted file — a stale value makes the browser refuse the asset.
+        sri = @builder.config.try(&.assets.sri) || false
+        if ((build_options.cache_busting || sri) && @builder.cache_bust_input_changed?(changeset.modified_static)) ||
+           @builder.asset_integrity_used?
           Logger.info "  A cache-busted asset changed — re-rendering pages to update its ?v= hash."
           if site = @builder.site
             return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))

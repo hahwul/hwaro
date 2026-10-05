@@ -64,6 +64,20 @@ module Hwaro::Core::Build::Phases::Render
                 "static/assets/css/highlight/#{config.highlight.theme}.min.css), or set [highlight] use_cdn = true."
   end
 
+  # The build output directory when `[assets] sri` is on: the tag emitters
+  # hash the emitted bytes under it (static copy, Sass and bundles have all
+  # written by the time the Render phase asks). Nil when SRI is off.
+  private def sri_root(config : Models::Config) : String?
+    config.assets.sri ? @context.try(&.output_dir) : nil
+  end
+
+  # True when a template calls `asset_integrity()`. Its value digests an
+  # emitted file, so the serve static lane — which only copies — must
+  # re-render after any static change while one does.
+  def asset_integrity_used? : Bool
+    @templates.try(&.each_value.any?(&.includes?("asset_integrity"))) || false
+  end
+
   # Compute a content-based cache bust hash from local CSS/JS files.
   # Returns an 8-character hex digest, or "" if no local files exist.
   private def compute_cache_bust(config : Models::Config) : String

@@ -644,6 +644,20 @@ module Hwaro
 
           # asset_url is an alias for asset
           @env.functions["asset_url"] = @env.functions["asset"]
+
+          # asset_integrity() - Subresource Integrity value of the file
+          # asset() points to, over its emitted bytes (after minify and
+          # fingerprint). Recorded as a render read so `--cache` re-renders
+          # when the bytes move even if the name does not.
+          # Usage: integrity="{{ asset_integrity(name="main.css") }}"
+          @env.functions["asset_integrity"] = Crinja.function({name: ""}) do
+            asset_name = arguments["name"].to_s
+            path = Content::Hooks::AssetHooks.output_path(asset_name)
+            TemplateEngine.record_file_read(path) if path
+            sri = path.try { |p| Utils::DigestUtils.sri_file(p) }
+            raise Crinja::RuntimeError.new("asset_integrity: unknown asset '#{asset_name}' (no emitted file)") unless sri
+            Crinja::Value.new(sri)
+          end
         end
 
         private def register_env_function

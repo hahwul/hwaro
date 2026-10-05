@@ -6,6 +6,7 @@ require "../utils/text_utils"
 require "../utils/permalink_resolver"
 require "../utils/env_substitutor"
 require "../utils/path_utils"
+require "../utils/digest_utils"
 require "../content/processors/internal_link_resolver"
 
 require "./config/seo"
@@ -28,6 +29,15 @@ module Hwaro
     # Cache-busting query suffix shared by the asset/highlight tag emitters.
     def self.cache_bust_suffix(value : String) : String
       value.empty? ? "" : "?v=#{HTML.escape(value)}"
+    end
+
+    # ` integrity="sha384-…"` for the file at `path` (an output-root URL
+    # path) under `sri_root`, the build output directory. "" when SRI is off
+    # (`sri_root` nil) or the file was not emitted.
+    def self.integrity_attr(sri_root : String?, path : String) : String
+      return "" unless sri_root
+      sri = Utils::DigestUtils.sri_file(File.join(sri_root, path.lchop('/')))
+      sri ? %( integrity="#{sri}") : ""
     end
 
     # Join non-empty tag fragments with newlines.

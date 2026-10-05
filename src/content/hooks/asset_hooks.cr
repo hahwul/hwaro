@@ -16,6 +16,8 @@ module Hwaro
         # Class-level manifest shared with template functions
         @@manifest = {} of String => String
         @@manifest_mutex = Mutex.new
+        # Output directory of the current build, for `asset_integrity()`.
+        @@output_dir : String? = nil
 
         def register_hooks(manager : Core::Lifecycle::Manager)
           manager.on(Core::Lifecycle::HookPoint::AfterInitialize, priority: 40, name: "assets:process") do |ctx|
@@ -35,7 +37,26 @@ module Hwaro
           @@manifest_mutex.synchronize { @@manifest = manifest }
         end
 
+        def self.output_dir : String?
+          @@manifest_mutex.synchronize { @@output_dir }
+        end
+
+        def self.output_dir=(dir : String?)
+          @@manifest_mutex.synchronize { @@output_dir = dir }
+        end
+
+        # The emitted file `asset(name)` points to: the manifest bundle, else
+        # `name` under the output root. Nil before a build ran, or when the
+        # path leaves the output directory.
+        def self.output_path(name : String) : String?
+          return unless dir = output_dir
+          url = manifest[name]? || (name.starts_with?('/') ? name : "/#{name}")
+          path = File.join(dir, url.lchop('/'))
+          Utils::OutputGuard.within_output_dir?(path, dir) ? path : nil
+        end
+
         private def process_assets(ctx : Core::Lifecycle::BuildContext)
+          AssetHooks.output_dir = ctx.output_dir
           config = ctx.config
           return unless config && config.assets.enabled
 
