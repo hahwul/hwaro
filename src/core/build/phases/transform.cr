@@ -588,11 +588,17 @@ module Hwaro::Core::Build::Phases::Transform
 
     assign_series_groups(groups)
 
-    # Clear series data for pages whose series group became empty
+    # Clear series data for every page outside the rebuilt groups: one whose
+    # group became empty, one left out of its group (draft, render = false)
+    # and one that left every series (no group key any more) — an old index
+    # must not outlive the membership.
     site.pages.each do |page|
-      next unless key = series_group_key(page, default_lang)
-      next unless affected_series.includes?(key[0])
-      next if groups.has_key?(key)
+      if key = series_group_key(page, default_lang)
+        next unless affected_series.includes?(key[0])
+        next if groups[key]?.try(&.any?(&.same?(page)))
+      else
+        next if page.series_index == 0 && page.series_pages.empty?
+      end
       page.series_index = 0
       page.series_pages = [] of Models::Page
     end

@@ -12,8 +12,10 @@ module Hwaro::Core::Build
       compute_series(site)
     end
 
-    def test_recompute_series_for_pages(site, changed)
-      recompute_series_for_pages(site, changed)
+    # Same signature as phases_transform_spec.cr's: both files reopen
+    # Builder, and the later definition wins in a whole-suite build.
+    def test_recompute_series_for_pages(site, changed, old_names = {} of String => String?)
+      recompute_series_for_pages(site, changed, old_names)
     end
   end
 end

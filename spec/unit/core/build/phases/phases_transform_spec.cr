@@ -775,6 +775,28 @@ describe Hwaro::Core::Build::Phases::Transform do
       affected.includes?("other").should be_false
     end
 
+    it "clears the index of a page that left the series or was drafted out of it" do
+      config = Hwaro::Models::Config.new
+      config.series.enabled = true
+      site = Hwaro::Models::Site.new(config)
+
+      p1 = make_page("p1.md"); p1.title = "P1"; p1.series = "S"
+      p2 = make_page("p2.md"); p2.title = "P2"; p2.series = "S"
+      p3 = make_page("p3.md"); p3.title = "P3"; p3.series = "S"
+      site.pages = [p1, p2, p3]
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_compute_series(site)
+
+      p1.series = nil
+      p2.draft = true
+      builder.test_recompute_series_for_pages(site, [p1, p2], {"p1.md" => "S", "p2.md" => "S"})
+
+      p1.series_index.should eq(0)
+      p2.series_index.should eq(0)
+      p2.series_pages.should be_empty
+      p3.series_index.should eq(1)
+    end
+
     it "leaves series_pages empty for a single-post series" do
       config = Hwaro::Models::Config.new
       config.series.enabled = true
