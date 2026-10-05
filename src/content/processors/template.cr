@@ -422,7 +422,7 @@ module Hwaro
             # the decoded filesystem path, so decode any percent-encoding from
             # the incoming URL before the lookup; the returned variant is
             # re-encoded below so the emitted .url is a valid href.
-            normalized = URI.decode(path.starts_with?("/") ? path : "/#{path}")
+            normalized = URI.decode(TemplateEngine.bundle_image_url(env, path) || (path.starts_with?("/") ? path : "/#{path}"))
 
             # The variant set, width and LQIP colour all follow the SOURCE
             # image's bytes. An image no resize job covered (a missing file)
@@ -458,6 +458,27 @@ module Hwaro
               "dominant_color" => Crinja::Value.new(dominant_color_value),
             })
           end
+        end
+
+        # A relative `resize_image` path naming one of the current page's
+        # bundle files (`image = "cover.png"` beside `index.md`) is published
+        # under the page's URL, as relative images in its body and its
+        # og:image (`Page#social_image`) are; rooting it at `/cover.png`
+        # found no variant and emitted a 404. nil for anything else.
+        def self.bundle_image_url(env : Crinja, path : String) : String?
+          return if path.empty? || path.starts_with?('/')
+          own = Path.posix(path).normalize.to_s
+          return if own.starts_with?("..")
+          page = env.resolve("page")
+          return unless page.mapping?
+          url = page["url"].to_s
+          assets = page["assets"]
+          return if url.empty? || !assets.iterable?
+          assets.each do |asset|
+            name = asset.to_s
+            return "#{url.rstrip('/')}/#{own}" if name == own || name.ends_with?("/#{own}")
+          end
+          nil
         end
 
         # Inputs a render read from OUTSIDE the tracked tree, recorded so a

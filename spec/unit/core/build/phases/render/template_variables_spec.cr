@@ -47,3 +47,25 @@ describe "hreflang on paginated listings" do
     end
   end
 end
+
+describe "resize_image with a page-bundle image" do
+  # `resize_image(path=page.image)` with `image = "cover.png"` beside
+  # index.md resolves under the page URL, like its og:image does.
+  it "resolves a relative path against the current page's bundle" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\n",
+      content_files: {
+        "posts/b2/index.md"  => "+++\ntitle = \"B\"\nimage = \"cover.png\"\n+++\n",
+        "posts/b2/cover.png" => "png",
+        "posts/flat.md"      => "+++\ntitle = \"F\"\nimage = \"logo.png\"\n+++\n",
+      },
+      template_files: {
+        "page.html" => "{{ resize_image(path=page.image, width=300).url }}",
+      },
+    ) do
+      File.read("public/posts/b2/index.html").should eq("https://ex.com/posts/b2/cover.png")
+      # Not a bundle file: still read from the site root, as before.
+      File.read("public/posts/flat/index.html").should eq("https://ex.com/logo.png")
+    end
+  end
+end
