@@ -1086,8 +1086,9 @@ describe "check-links @/ links resolve like the build" do
 
       dead = dl_dead(dir, "@/draft.md", "@/UPPER.md", "@/./x.md", "@/posts/../x.md",
         "@/my%20post.md", "@/posts/", "@/posts", "@/x")
+      # `@/my%20post.md` resolves: the build percent-decodes, as Markd does.
       dead.should eq(["@/draft.md", "@/UPPER.md", "@/./x.md", "@/posts/../x.md",
-                      "@/my%20post.md", "@/posts/", "@/posts", "@/x"])
+                      "@/posts/", "@/posts", "@/x"])
     end
   end
 

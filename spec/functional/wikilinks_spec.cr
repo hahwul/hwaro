@@ -238,6 +238,38 @@ describe "wikilinks review regressions" do
     end
   end
 
+  it "re-renders an `<@/a b.md>` linker on a warm --cache build when the target moves (flags off)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"x\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        FileUtils.mkdir_p("content")
+        File.write("content/src.md", "---\ntitle: Src\n---\n[y](<@/a b.md>)\n")
+        File.write("content/a b.md", "---\ntitle: AB\nslug: s1\n---\nab\n")
+        wiki_build(cache: true)
+        File.read("public/src/index.html").should contain(%(href="/s1/"))
+        File.write("content/a b.md", "---\ntitle: AB\nslug: s2\n---\nab\n")
+        wiki_build(cache: true)
+        File.read("public/src/index.html").should contain(%(href="/s2/"))
+      end
+    end
+  end
+
+  it "keeps a link between two fenced braces as a backlink" do
+    build_site(
+      WIKI_CONFIG,
+      content_files: {
+        "a.md"   => "---\ntitle: A\n---\n{{ badge(text=\"new\") }}\n\n```rust\nprintln!(\"{{\");\n```\n\nSee [[foo]]\n\n```rust\nprintln!(\"}}\");\n```\n",
+        "foo.md" => "---\ntitle: Foo\n---\nfoo\n",
+      },
+      template_files: WIKI_TEMPLATES.merge({"shortcodes/badge.html" => "<b>{{ text }}</b>"}),
+    ) do |dir|
+      wiki_main(dir, "a").should contain(%(<a href="/foo/">foo</a>))
+      wiki_main(dir, "foo").should contain("|BL:A;")
+    end
+  end
+
   it "warns about an ambiguous wikilink once per serve session" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

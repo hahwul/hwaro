@@ -110,8 +110,10 @@ module Hwaro::Core::Build::Phases::Render
 
   # `@/path.md` internal links in raw content (Markdown destination, raw
   # `href="@/…"`, reference definition). Stops where the resolver's own
-  # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters.
-  INTERNAL_LINK_TARGET_RE = /@\/([^\s()"'#?<>\[\]]+)/
+  # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters. An
+  # angle-bracket destination (`<@/a b.md>`) may hold spaces and runs to its
+  # `>` (group 1); the bare form is group 2.
+  INTERNAL_LINK_TARGET_RE = /<@\/([^>\n#?]+)|@\/([^\s()"'#?<>\[\]]+)/
 
   # A content-derived field or `[extra]` read straight off a relation —
   # `page.higher.summary`, `get_page(path="x").extra.badge` — where the
@@ -854,7 +856,7 @@ module Hwaro::Core::Build::Phases::Render
     raw = page.raw_content
     return [] of String unless Utils::ByteScan.includes?(raw, "@/")
     targets = [] of String
-    raw.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << m[1] }
+    raw.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << (m[1]? || m[2]) }
     targets.uniq!.sort!
   end
 

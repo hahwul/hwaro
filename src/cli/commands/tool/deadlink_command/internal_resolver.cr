@@ -26,7 +26,8 @@ module Hwaro
 
             links.each do |link|
               # `@/` page links resolve exactly as the build resolves them:
-              # the raw (never percent-decoded) content path looked up among
+              # the content path (percent-decoded first, as Markd encodes
+              # destinations, then as written) looked up among
               # the pages a default build publishes. `@/` images are plain
               # files under content/ and take the path route below.
               if link.kind != :image && (key = Services::InternalLinkIndex.key(link.url))

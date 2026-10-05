@@ -926,10 +926,23 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
-  # A shortcode call or block (opener … closer, body included).
-  SHORTCODE_SPAN_RE = Regex.new(
-    "#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_OPEN_RE.source}(?s:.*?)#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_ANY_CLOSE_RE.source}|\\{\\{(?s:.*?)\\}\\}",
-    Regex::Options::IGNORE_CASE)
+  # A shortcode call (`{{ x() }}`) or block tag (`{% x() %}`) on one line.
+  SHORTCODE_TAG_RE = /\{\{.*?\}\}|\{%.*?%\}/
+
+  # `raw` without its shortcode calls and block bodies, the way the
+  # shortcode pass sees them: fenced code stays (FenceTracker, fed outside
+  # bodies only, as process_shortcodes_jinja does) and the bodies are the
+  # matched pairs block_body_lines finds.
+  private def strip_shortcode_spans(raw : String) : String
+    body = block_body_lines(raw)
+    tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+    String.build(raw.bytesize) do |io|
+      raw.each_line(chomp: false).each_with_index do |line, i|
+        next if body[i]?
+        io << (tracker.fence_line?(line) ? line : line.gsub(SHORTCODE_TAG_RE, ""))
+      end
+    end
+  end
 
   private def site_math? : Bool
     @site.try(&.config.markdown.math) || false
@@ -971,7 +984,7 @@ module Hwaro::Core::Build::Phases::Transform
     targets = Set(Models::Page).new
     index = @wikilink_index
     raw = source.raw_content
-    raw = raw.gsub(SHORTCODE_SPAN_RE, "") if content_may_contain_shortcodes?(raw)
+    raw = strip_shortcode_spans(raw) if content_may_contain_shortcodes?(raw)
     Content::Processors::Wikilinks.each_link(raw, math: site_math?) do |link|
       target = case link
                in Content::Processors::Wikilinks::Link

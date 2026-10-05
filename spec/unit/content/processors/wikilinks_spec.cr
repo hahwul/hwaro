@@ -106,6 +106,34 @@ describe Hwaro::Content::Processors::Wikilinks do
       wl_rewrite("a `code\n[[My Note]]` b", src, index).should eq("a `code\n[[My Note]]` b")
     end
 
+    it "ends a chunk at list items, table rows and setext underlines" do
+      md = <<-MD
+        - press the ` key
+        - run `echo [[My Note]]` here
+
+        | key | note |
+        |-----|------|
+        | ` | backtick |
+        | `[[My Note]]` | literal |
+
+        Shortcut `
+        ---
+        See `[[My Note]]` and [[My Note]].
+        MD
+      wl_rewrite(md, src, index).should eq(md.sub("and [[My Note]].", "and [My Note](@/notes/My%20Note.md)."))
+      lists = "- a `\n- b [[My Note]] `\n"
+      wl_rewrite(lists, src, index).should eq("- a `\n- b [My Note](@/notes/My%20Note.md) `\n")
+    end
+
+    it "puts math back into a link's own text and never leaks a NUL" do
+      with_captured_log do
+        wl_rewrite("[[My Note|cost $x$ here]]", src, index, math: true).should eq("[cost \\$x\\$ here](@/notes/My%20Note.md)")
+        out = wl_rewrite("[[$y$]] ![[pic $x$.png]] [[My Note#$z$]]", src, index, math: true)
+        out.should_not contain('\0')
+        out.should contain(%(<span class="wikilink wikilink-missing">$y$</span>))
+      end
+    end
+
     it "links a non-image file like a page link" do
       files = [{"notes/doc.pdf", "/notes/doc.pdf"}]
       idx = wl_index([src, target], files)

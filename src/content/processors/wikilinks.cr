@@ -90,6 +90,8 @@ module Hwaro
           end
           target = target.strip
           return if target.empty? && heading.nil?
+          # Never a file name or URL: Crystal's File API rejects NUL.
+          return if inner.includes?('\0')
           Link.new(embed, target, heading, label)
         end
 
@@ -229,10 +231,11 @@ module Hwaro
         def rewrite(content : String, source : Models::Page, index : Index, safe : Bool = false,
                     misses : Array({String, String})? = nil, warn : Bool = true, math : Bool = false) : String
           return content unless Utils::ByteScan.includes?(content, "[[")
-          scan(content, math, math ? WIKILINK_MATH_TOKEN_RE : WIKILINK_TOKEN_RE) do |md|
+          scan(content, math, math ? WIKILINK_MATH_TOKEN_RE : WIKILINK_TOKEN_RE) do |md, sources|
             next unless inner = md["inner"]?
-            next unless link = parse(inner, md["bang"] == "!")
-            render(link, md[0], source, index, safe, misses, warn)
+            # `[[foo|cost $x$]]`: the math inside is the link's own text.
+            next unless link = parse(MarkdownExtensions.restore_math(inner, sources), md["bang"] == "!")
+            render(link, MarkdownExtensions.restore_math(md[0], sources), source, index, safe, misses, warn)
           end
         end
 
@@ -241,13 +244,13 @@ module Hwaro
         def each_link(content : String, math : Bool = false, & : Link | String ->) : Nil
           return unless Utils::ByteScan.includes?(content, "[[") || Utils::ByteScan.includes?(content, "](") ||
                         Utils::ByteScan.includes?(content, "href")
-          scan(content, math, math ? LINK_MATH_TOKEN_RE : LINK_TOKEN_RE) do |md|
+          scan(content, math, math ? LINK_MATH_TOKEN_RE : LINK_TOKEN_RE) do |md, sources|
             if inner = md["inner"]?
-              parse(inner, md["bang"] == "!").try { |link| yield link }
+              parse(MarkdownExtensions.restore_math(inner, sources), md["bang"] == "!").try { |link| yield link }
             elsif url = md["url"]?
-              yield url
+              yield MarkdownExtensions.restore_math(url, sources)
             elsif tag = md["tag"]?
-              tag.scan(HREF_RE) { |m| yield m[1] }
+              MarkdownExtensions.restore_math(tag, sources).scan(HREF_RE) { |m| yield m[1] }
             end
             nil
           end
@@ -328,30 +331,48 @@ module Hwaro
 
         # `walk`, with `$…$` / `$$…$$` math stashed out first when the math
         # pass is on.
-        private def scan(content : String, math : Bool, re : Regex, & : Regex::MatchData -> String?) : String
-          return walk(content, re) { |md| yield md } unless math && content.includes?('$')
-          MarkdownExtensions.protect_math(content) { |stashed| walk(stashed, re) { |md| yield md } }
+        # The block also gets the stashed math sources (empty without math),
+        # for `MarkdownExtensions.restore_math` on what it lifts out.
+        private def scan(content : String, math : Bool, re : Regex, & : Regex::MatchData, Array(String) -> String?) : String
+          none = [] of String
+          return walk(content, re) { |md| yield md, none } unless math && content.includes?('$')
+          MarkdownExtensions.protect_math(content) do |stashed, sources|
+            walk(stashed, re) { |md| yield md, sources }
+          end
         end
+
+        # A line matched on its own, never joined to a chunk: an ATX heading,
+        # a setext underline or thematic break, or a table line (any `|`;
+        # each row is its own block to Markd).
+        STANDALONE_LINE_RE = /\A(?: {0,3}>[ \t]?)*(?: {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)| {0,3}(?:=+|-+|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})[ \t]*\r?\n?\z|.*\|)/
+        # A footnote definition starts a new block, as a list item does.
+        FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:/
 
         # The walk shared by `rewrite` and `each_link`. Fenced and indented
         # code and raw HTML block lines (FenceTracker) pass through; the rest
-        # is matched one chunk at a time (lines up to a blank line or an ATX
-        # heading, so a code span can cross a line break but not a
-        # paragraph). Code/comment matches pass through; every other match
-        # is replaced by the block's result (nil keeps it).
+        # is matched one chunk at a time: the lines of one paragraph or list
+        # item (a chunk ends at a blank line and before a list marker or a
+        # footnote definition; STANDALONE_LINE_RE lines are chunks of their
+        # own), so a code span can cross a line break but not a block.
+        # Code/comment matches pass through; every other match is replaced
+        # by the block's result (nil keeps it).
         private def walk(content : String, re : Regex, & : Regex::MatchData -> String?) : String
           tracker = FenceTracker.new
           chunk = String::Builder.new
           String.build(content.bytesize) do |io|
             content.each_line(chomp: false) do |line|
               verbatim = tracker.fence_line?(line) || tracker.html_block_line?
-              heading = !verbatim && FenceTracker::ATX_HEADING_RE.matches?(line)
-              if verbatim || heading || line.blank?
+              standalone = !verbatim && STANDALONE_LINE_RE.matches?(line)
+              if verbatim || standalone || line.blank? || tracker.list_item_line? || FOOTNOTE_DEF_RE.matches?(line)
                 unless chunk.empty?
                   io << transform(chunk.to_s, re) { |md| yield md }
                   chunk = String::Builder.new
                 end
-                io << (heading ? transform(line, re) { |md| yield md } : line)
+              end
+              if verbatim || line.blank?
+                io << line
+              elsif standalone
+                io << transform(line, re) { |md| yield md }
               else
                 chunk << line
               end

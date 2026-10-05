@@ -140,6 +140,8 @@ module Hwaro
         # The last line fed was raw HTML to Markd: it opened or continued a
         # generic HTML block (no inline parsing happens there).
         getter? html_block_line = false
+        # The last line fed opened a list item (it carries a list marker).
+        getter? list_item_line = false
 
         # `raw_html_code: false` turns off raw-HTML code-block tracking and
         # generic HTML-block tracking.
@@ -163,6 +165,7 @@ module Hwaro
           paragraph_open = @paragraph_open
           @paragraph_open = false
           @html_block_line = false
+          @list_item_line = false
 
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
@@ -262,6 +265,7 @@ module Hwaro
           end
 
           marker_item = blank ? nil : track_list_item(content, depth, column, text_start, prefix)
+          @list_item_line = !marker_item.nil?
           container_column = marker_item || list_content_column(depth, column)
           opened_html = !blank && !in_html_block && @track_raw_html_code &&
                         open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)

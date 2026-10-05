@@ -21,6 +21,17 @@ describe Hwaro::Services::InternalLinkIndex do
   end
 
   describe "#unresolved_reason" do
+    it "percent-decodes like the build's page_for" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "a b.md"), "+++\ntitle = \"AB\"\n+++\n")
+        File.write(File.join(dir, "c%20d.md"), "+++\ntitle = \"CD\"\n+++\n")
+        index = Hwaro::Services::InternalLinkIndex.new(dir + "/")
+        index.unresolved_reason("a%20b.md").should be_nil
+        index.unresolved_reason("c%20d.md").should be_nil
+        index.unresolved_reason("x%20y.md").should eq("not found")
+      end
+    end
+
     it "resolves published pages and sections by their exact content path" do
       Dir.mktmpdir do |dir|
         FileUtils.mkdir_p(File.join(dir, "posts", "bundle"))

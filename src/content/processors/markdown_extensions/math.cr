@@ -130,11 +130,20 @@ module Hwaro
         # `content` through the block with its math spans (as the math pass
         # sees them) stashed out, then put back as written — for passes that
         # run before `preprocess` (wikilinks) and must not touch formulas.
-        def protect_math(content : String, & : String -> String) : String
+        # The block also gets the spans' sources, for `restore_math` on any
+        # piece it lifts out (a placeholder must never reach Markd).
+        def protect_math(content : String, & : String, Array(String) -> String) : String
           stashed, store = stash_math(content)
-          return yield content if store.empty?
-          yield(stashed).gsub(MATH_PLACEHOLDER_RE) do |match|
-            $~[1].to_i?.try { |idx| store[idx]?.try(&.source) } || match
+          return yield(content, [] of String) if store.empty?
+          sources = store.map(&.source)
+          restore_math(yield(stashed, sources), sources)
+        end
+
+        # `text` with each math placeholder put back as written.
+        def restore_math(text : String, sources : Array(String)) : String
+          return text if sources.empty? || !text.includes?('\0')
+          text.gsub(MATH_PLACEHOLDER_RE) do |match|
+            $~[1].to_i?.try { |idx| sources[idx]? } || match
           end
         end
 
