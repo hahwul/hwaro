@@ -66,6 +66,20 @@ describe Hwaro::Content::Seo::Feeds do
       end
     end
 
+    it "exposes an RFC 3339 date and the absolute page image to templates" do
+      config = feed_config("json")
+      page = feed_page
+      page.image = "/img/a b.png"
+      templates = {"feed.json" => "{% for p in pages %}{{ p.date_rfc3339 }} {{ p.image }}{% endfor %}"}
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([page], config, output_dir,
+          templates: templates, renderer: feed_renderer)
+
+        File.read(File.join(output_dir, "feed.json")).should eq("2026-03-05T00:00:00Z https://example.com/img/a%20b.png")
+      end
+    end
+
     it "produces byte-identical output to the programmatic path when the template is absent" do
       config = feed_config("rss")
       page = feed_page
