@@ -11,10 +11,12 @@ module Hwaro
         css_swap_paths(changeset)
       end
 
-      # Initial build, then one watcher rebuild, pushing into `handler`.
-      def css_swap_spec_apply(changeset : ChangeSet, options : Config::Options::BuildOptions, handler : LiveReloadHandler)
+      def css_swap_spec_build(options : Config::Options::BuildOptions, handler : LiveReloadHandler)
         @live_reload_handler = handler
         run_full_build(options)
+      end
+
+      def css_swap_spec_apply(changeset : ChangeSet, options : Config::Options::BuildOptions)
         apply_changeset(changeset, options)
       end
     end
@@ -23,6 +25,15 @@ module Hwaro
       def css_swap_spec_register(socket : HTTP::WebSocket, css_swap : Bool)
         register_client(socket)
         @sockets_mutex.synchronize { @clients.last.css_swap = css_swap }
+      end
+
+      # Registered the way the WebSocket upgrade does, opted out.
+      def css_swap_spec_register(socket : HTTP::WebSocket)
+        register_client(socket)
+      end
+
+      def css_swap_spec_opted_in? : Bool
+        @sockets_mutex.synchronize { @clients.any?(&.css_swap?) }
       end
 
       # Every queued message, connect-time replay included, per client.
@@ -71,6 +82,22 @@ private class CssSwapParkedIO < IO
   end
 end
 
+# Reads the client's frames from a pipe; writes park like CssSwapParkedIO.
+private class CssSwapPipedIO < IO
+  @gate = Channel(Nil).new
+
+  def initialize(@input : IO)
+  end
+
+  def read(slice : Bytes) : Int32
+    @input.read(slice)
+  end
+
+  def write(slice : Bytes) : Nil
+    @gate.receive
+  end
+end
+
 private def css_changeset(static : Array(String)) : Hwaro::Services::ChangeSet
   Hwaro::Services::ChangeSet.new(
     modified_content: [] of String,
@@ -82,10 +109,15 @@ private def css_changeset(static : Array(String)) : Hwaro::Services::ChangeSet
   )
 end
 
-private def css_swap_push(static : Array(String), template = %(<link rel="stylesheet" href="/css/a.css">{{ content }})) : Array(String)
+CSS_SWAP_TEMPLATE = %(<link rel="stylesheet" href="/css/a.css">{{ content }})
+
+# Builds a small site, edits every file in `static`, runs the watcher rebuild
+# for that changeset and yields the live-reload pushes plus the home page HTML
+# from before the edit (still inside the project dir, for disk assertions).
+private def css_swap_site(static : Array(String), template = CSS_SWAP_TEMPLATE, config = "", files = {} of String => String, &)
   Dir.mktmpdir do |dir|
     Dir.cd(dir) do
-      File.write("config.toml", %(title = "t"\nbase_url = "http://localhost"\n))
+      File.write("config.toml", %(title = "t"\nbase_url = "http://localhost"\n#{config}))
       Dir.mkdir_p("content")
       File.write("content/index.md", "+++\ntitle = \"Home\"\n+++\nhi\n")
       Dir.mkdir_p("templates")
@@ -94,13 +126,40 @@ private def css_swap_push(static : Array(String), template = %(<link rel="styles
       Dir.mkdir_p("static/js")
       File.write("static/css/a.css", "body{}")
       File.write("static/js/app.js", "1")
+      files.each do |path, body|
+        Dir.mkdir_p(File.dirname(path))
+        File.write(path, body)
+      end
 
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       handler = CssSwapRecordingHandler.new
-      Hwaro::Services::Server.new.css_swap_spec_apply(css_changeset(static), options, handler)
-      handler.pushes
+      server = Hwaro::Services::Server.new
+      server.css_swap_spec_build(options, handler)
+      html_before = File.read("public/index.html")
+      static.each { |path| File.write(path, File.read(path) + "/* edited */") }
+      server.css_swap_spec_apply(css_changeset(static), options)
+      yield handler.pushes, html_before
     end
   end
+end
+
+private def css_swap_push(static : Array(String), template = CSS_SWAP_TEMPLATE, config = "") : Array(String)
+  pushes = [] of String
+  css_swap_site(static, template, config) { |got| pushes = got }
+  pushes
+end
+
+private def css_swap_bundle_config(fingerprint : Bool) : String
+  <<-TOML
+    [assets]
+    enabled = true
+    minify = false
+    fingerprint = #{fingerprint}
+
+    [[assets.bundles]]
+    name = "main.css"
+    files = ["css/a.css"]
+    TOML
 end
 
 describe "CSS hot-swap" do
@@ -154,9 +213,53 @@ describe "CSS hot-swap" do
       template = %({# load_data(path="static/css/a.css") #}{{ content }})
       css_swap_push(["static/css/a.css"], template).should eq(["reload"])
     end
+
+    # The rebuild renames main.<hash>.css and prunes the old file the open
+    # page still links to — only a reload picks up the new name.
+    it "reloads when a fingerprinted bundle source changed" do
+      template = %(<link rel="stylesheet" href="{{ asset(name='main.css') }}">{{ content }})
+      css_swap_push(["static/css/a.css"], template, css_swap_bundle_config(fingerprint: true)).should eq(["reload"])
+    end
+
+    # Unfingerprinted: the bundle keeps its name, but it does not live at the
+    # source's path, so every stylesheet is refreshed.
+    it "swaps every stylesheet when an unfingerprinted bundle source changed" do
+      css_swap_push(["static/css/a.css"], config: css_swap_bundle_config(fingerprint: false)).should eq([%(css:[])])
+    end
+
+    # Cache busting re-renders the pages for the new `?v=`, but only the query
+    # moves: the open page can keep its link and swap the bytes.
+    it "swaps a cache-busted auto-include and still re-renders its ?v=" do
+      config = %([auto_includes]\nenabled = true\ndirs = ["css"]\n)
+      template = %({{ auto_includes_css }}{{ content }})
+      css_swap_site(["static/css/a.css"], template, config) do |pushes, html_before|
+        pushes.should eq([%(css:["/css/a.css"])])
+        html_before.should contain("/css/a.css?v=")
+        html_after = File.read("public/index.html")
+        html_after.should contain("/css/a.css?v=")
+        html_after.should_not eq(html_before)
+      end
+    end
   end
 
   describe "LiveReloadHandler#notify_css" do
+    it "opts a client in when it sends the hello over the socket" do
+      handler = Hwaro::Services::LiveReloadHandler.new
+      frames_in, frames_out = IO.pipe
+      socket = HTTP::WebSocket.new(CssSwapPipedIO.new(frames_in))
+      handler.css_swap_spec_register(socket)
+      spawn { socket.run }
+      HTTP::WebSocket::Protocol.new(frames_out, masked: true).send(Hwaro::Services::LiveReloadHandler::CSS_SWAP_HELLO)
+
+      deadline = Time.instant + 5.seconds
+      until handler.css_swap_spec_opted_in? || Time.instant > deadline
+        Fiber.yield
+      end
+      handler.notify_css(["/css/a.css"])
+      handler.css_swap_spec_queued[0].last.should eq(%(css:{"paths":["/css/a.css"]}))
+      frames_out.close
+    end
+
     it "sends css only to clients that opted in, reload to the rest" do
       handler = Hwaro::Services::LiveReloadHandler.new
       handler.css_swap_spec_register(HTTP::WebSocket.new(CssSwapParkedIO.new), css_swap: true)
@@ -179,6 +282,13 @@ describe "CSS hot-swap" do
       script.should contain("ws.send('#{Hwaro::Services::LiveReloadHandler::CSS_SWAP_HELLO}')")
       script.should contain("data.indexOf('css:') === 0")
       script.should contain("swapCss(paths)")
+    end
+
+    it "retires in-flight swaps, drops SRI and reloads when a swap fails" do
+      script.should contain("if (links[i].__hwaroPending) continue;")
+      script.should contain("pending.remove();")
+      script.should contain("next.removeAttribute('integrity');")
+      script.should contain("next.onerror = function() { location.reload(); };")
     end
 
     it "keeps the existing message types" do
