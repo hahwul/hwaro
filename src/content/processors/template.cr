@@ -405,6 +405,19 @@ module Hwaro
 
             base_url = env.resolve("base_url").to_s
 
+            # A remote image (`page.image` is often a full URL) is never
+            # processed; hand it back as written instead of rooting it under
+            # base_url as `/https%3A//cdn…`.
+            if Filters::UrlFilters.has_own_origin?(path)
+              return Crinja::Value.new({
+                "url"            => Crinja::Value.new(path),
+                "width"          => Crinja::Value.new(width),
+                "height"         => Crinja::Value.new(height),
+                "lqip"           => Crinja::Value.new(""),
+                "dominant_color" => Crinja::Value.new(""),
+              })
+            end
+
             # Normalize path to start with /. The resize/LQIP maps are keyed by
             # the decoded filesystem path, so decode any percent-encoding from
             # the incoming URL before the lookup; the returned variant is

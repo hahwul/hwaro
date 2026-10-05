@@ -944,6 +944,11 @@ describe "UrlFilters" do
       result = render_crinja(%({{ resize_image(path="/img/a.png", width="999999999999").width }}), vars).strip
       result.should eq(Int32::MAX.to_s)
     end
+
+    it "resize_image hands a remote image URL back unchanged" do
+      vars = {"base_url" => Crinja::Value.new("https://example.com")}
+      render_crinja(%({{ resize_image(path="https://cdn.x/a.png", width=100).url }}), vars).strip.should eq("https://cdn.x/a.png")
+    end
   end
 
   describe "empty base_url (pre-deploy state)" do
