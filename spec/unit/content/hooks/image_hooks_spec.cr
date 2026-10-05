@@ -307,6 +307,20 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
+    it "finds the lowercased variants of an uppercase-extension source" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "B.JPG")
+        File.write(source, "src")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        File.write(File.join(dest_dir, "B_320w.jpg"), "320")
+
+        result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320])
+        result.should_not be_nil
+        result.not_nil![320].should eq("B_320w.jpg")
+      end
+    end
+
     # A `_<width>w` sibling whose number does not fit Int32 (a stray file
     # copied in from static/, a leftover from another tool) used to raise
     # `ArgumentError: Invalid Int32` out of the `image:resize` hook and abort

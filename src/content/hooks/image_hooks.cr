@@ -283,8 +283,11 @@ module Hwaro
           return unless Dir.exists?(dest_dir)
           source_mtime = File.info(source_path).modification_time
 
+          # Variants are written with a lowercased extension
+          # (ImageProcessor), so `B.JPG` must look for `B_320w.jpg`.
           ext = File.extname(source_path)
           basename = File.basename(source_path, ext)
+          ext = ext.downcase
 
           # resize_and_lqip clamps any requested width larger than the source to
           # the source's true width (writing a single `_<src_w>w` variant), so a

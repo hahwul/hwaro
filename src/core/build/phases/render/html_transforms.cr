@@ -37,7 +37,9 @@ module Hwaro::Core::Build::Phases::Render
               src
             else
               base = page.url.ends_with?("/") ? page.url : "#{page.url}/"
-              "#{base}#{src}".gsub("//", "/")
+              # normalize: `./hero.png` and `../other/x.png` name the same
+              # files the map keys by their plain path.
+              Path.posix("#{base}#{src}".gsub("//", "/")).normalize.to_s
             end
       # Markdown emits percent-encoded URLs (spaces/unicode), but the resize map
       # is keyed by the decoded filesystem path — decode before the lookup.
