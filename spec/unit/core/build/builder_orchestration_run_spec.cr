@@ -195,6 +195,34 @@ describe Hwaro::Core::Build::Builder do
     end
   end
 
+  describe "#run_incremental with a drafted section" do
+    it "drops the section from its parent's subsections and its pages' breadcrumbs" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content/blog/sub")
+          File.write("content/blog/_index.md", "---\ntitle: Blog\n---\n")
+          File.write("content/blog/sub/_index.md", "---\ntitle: Sub\n---\n")
+          File.write("content/blog/sub/inner.md", "---\ntitle: Inner\n---\nbody")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "BC:{% for a in page.ancestors %}{{ a.title }};{% endfor %}")
+          File.write("templates/section.html", "SS:{% for s in section.subsections %}{{ s.title }};{% endfor %}")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run_incremental(["content/blog/sub/_index.md"], options)
+          File.read("public/blog/index.html").should contain("SS:Sub;")
+
+          File.write("content/blog/sub/_index.md", "---\ntitle: Sub\ndraft: true\n---\n")
+          builder.run_incremental(["content/blog/sub/_index.md"], options)
+
+          File.read("public/blog/index.html").should_not contain("Sub;")
+          File.read("public/blog/sub/inner/index.html").should eq("BC:Blog;")
+        end
+      end
+    end
+  end
+
   describe "#run_incremental orphaned output pruning" do
     it "deletes the orphaned sibling format file when front matter drops the format" do
       Dir.mktmpdir do |dir|

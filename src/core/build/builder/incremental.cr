@@ -100,6 +100,7 @@ module Hwaro
           # would otherwise still show the drafted page in tag clouds and
           # term counts until the next full build.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
+          return run(options) if excluded_section?(excluded_pages)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Date-token permalink errors deferred by the lenient parse (see
@@ -282,6 +283,7 @@ module Hwaro
           # feeds, and on disk — because only the content-only strategy
           # applied the filters.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
+          return run(options) if excluded_section?(excluded_pages)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Deferred permalink errors — mirrors run_incremental.
@@ -656,6 +658,16 @@ module Hwaro
           end
 
           ReparsedPages.new(changed_pages, affected_sections, old_taxonomies_snapshot, old_series_names, old_output_paths, old_neighbors)
+        end
+
+        # A section leaving the build (drafted, expired) is still its
+        # parent's subsection and every descendant's ancestor; incremental
+        # bookkeeping only re-renders changed pages, so escalate to a full
+        # rebuild, as a changed [cascade] does.
+        private def excluded_section?(excluded_pages : Array(Models::Page)) : Bool
+          return false unless section = excluded_pages.find(&.is_a?(Models::Section))
+          Logger.info "  Section #{section.path} left the build — running full rebuild."
+          true
         end
 
         # Drop the re-parsed pages that the build options exclude (draft /
