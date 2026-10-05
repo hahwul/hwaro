@@ -299,6 +299,9 @@ module Hwaro
         # `[markdown] wikilinks` lookup over the current published page set;
         # rebuilt whenever that set may have changed (refresh_wikilink_index).
         @wikilink_index : Content::Processors::Wikilinks::Index? = nil
+        # Ambiguous-wikilink warnings already printed; kept across the index
+        # rebuilds of one serve session, cleared by each full build.
+        @wikilink_warnings : Content::Processors::Wikilinks::WarnLog = Content::Processors::Wikilinks::WarnLog.new
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve

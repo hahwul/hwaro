@@ -79,10 +79,13 @@ module Hwaro
         end
 
         # The page an `@/` path names. Markd percent-encodes a destination
-        # (`@/my note.md` arrives as `@/my%20note.md`), so a miss retries the
-        # decoded path.
+        # (`@/my note.md` arrives as `@/my%20note.md`), so the decoded path is
+        # tried first: `%20` means a space, as it does to Markd. A literal
+        # `%` file name is still reached when nothing decodes to it (or as
+        # `%25`).
         def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
-          pages_by_path[path]? || (path.includes?('%') ? pages_by_path[URI.decode(path)]? : nil)
+          return pages_by_path[path]? unless path.includes?('%')
+          pages_by_path[URI.decode(path)]? || pages_by_path[path]?
         end
 
         # Resolve internal `@/` links in HTML to actual page URLs.

@@ -178,6 +178,100 @@ describe "wikilinks build" do
   end
 end
 
+describe "wikilinks review regressions" do
+  it "drops a just-drafted page from the index before a serve rebuild renders its linkers" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", WIKI_CONFIG)
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}|{{ page.lower.title }}")
+        FileUtils.mkdir_p("content")
+        File.write("content/a.md", "---\ntitle: A\ndate: 2024-01-01\n---\nA\n")
+        File.write("content/c.md", "---\ntitle: C\ndate: 2024-01-02\n---\nSee [[a]].\n")
+        builder, options = wiki_build(serve: true)
+        File.read("public/c/index.html").should contain(%(<a href="/a/">a</a>))
+
+        File.write("content/a.md", "---\ntitle: A\ndate: 2024-01-01\ndraft: true\n---\nA\n")
+        with_captured_log { builder.run_incremental(["content/a.md"], options).should be_true }
+        html = File.read("public/c/index.html")
+        html.should_not contain("@/a.md")
+        html.should contain(%(<span class="wikilink wikilink-missing">a</span>))
+      end
+    end
+  end
+
+  it "skips a symlink loop and out-of-project links when indexing embed targets" do
+    Dir.mktmpdir do |outside|
+      File.write(File.join(outside, "leak.png"), "png")
+      build_site(
+        WIKI_CONFIG,
+        content_files: {"p.md" => "---\ntitle: P\n---\n![[nothere.png]] ![[leak.png]] ![[ok.png]]\n"},
+        static_files: {"ok.png" => "png"},
+        template_files: WIKI_TEMPLATES,
+      ) do |dir|
+        File.symlink("loop", File.join(dir, "static", "loop"))
+        File.symlink(File.join(outside, "leak.png"), File.join(dir, "static", "leak.png"))
+        with_captured_log { wiki_build }
+        html = wiki_main(dir, "p")
+        html.should contain(%(<img src="/ok.png" alt="ok.png" />))
+        html.should contain(%(<span class="wikilink wikilink-missing">leak.png</span>))
+        html.should contain(%(<span class="wikilink wikilink-missing">nothere.png</span>))
+      end
+    end
+  end
+
+  it "re-renders an `@/a%20b.md` linker on a warm --cache build when the target moves (flags off)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"x\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        FileUtils.mkdir_p("content")
+        File.write("content/src.md", "---\ntitle: Src\n---\n[x](@/a%20b.md)\n")
+        File.write("content/a b.md", "---\ntitle: AB\nslug: s1\n---\nab\n")
+        wiki_build(cache: true)
+        File.read("public/src/index.html").should contain(%(href="/s1/"))
+        File.write("content/a b.md", "---\ntitle: AB\nslug: s2\n---\nab\n")
+        wiki_build(cache: true)
+        File.read("public/src/index.html").should contain(%(href="/s2/"))
+      end
+    end
+  end
+
+  it "warns about an ambiguous wikilink once per serve session" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_backlink_site
+        FileUtils.mkdir_p("content/x")
+        FileUtils.mkdir_p("content/y")
+        File.write("content/x/foo.md", "---\ntitle: XF\n---\n")
+        File.write("content/y/foo.md", "---\ntitle: YF\n---\n")
+        File.write("content/src.md", "---\ntitle: Src\n---\n[[foo]]\n")
+        built = nil
+        with_captured_log { built = wiki_build(serve: true) }
+        builder, options = built.not_nil!
+        File.write("content/pad0.md", "---\ntitle: Pad edited\ndate: 2024-01-03\n---\npad\n")
+        log = with_captured_log { builder.run_incremental(["content/pad0.md"], options).should be_true }
+        log.should_not contain("Ambiguous wikilink")
+      end
+    end
+  end
+
+  it "does not count links inside a shortcode body as backlinks" do
+    build_site(
+      WIKI_CONFIG,
+      content_files: {
+        "a.md" => "---\ntitle: A\n---\n{% note() %}\nsee [[b]]\n{% end %}\n",
+        "b.md" => "---\ntitle: B\n---\nB\n",
+      },
+      template_files: WIKI_TEMPLATES.merge({"shortcodes/note.html" => "<aside>{{ body }}</aside>"}),
+    ) do |dir|
+      wiki_main(dir, "b").should contain("|BL:")
+      wiki_main(dir, "b").should_not contain("A;")
+    end
+  end
+end
+
 describe "page.backlinks" do
   it "lists same-language published linkers, newest first, without self-links, duplicates or drafts" do
     build_site(

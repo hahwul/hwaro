@@ -32,6 +32,8 @@ module Hwaro::Core::Build::Phases::ParseContent
     # page's URL is final (internal-link resolution) — and before Transform,
     # which bakes summary_html into Crinja page values.
     if (site = @site) && (templates = @templates)
+      # A full build reports each ambiguous wikilink again; serve rebuilds don't.
+      @wikilink_warnings.clear
       refresh_wikilink_index(ctx.all_pages, site)
       render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled)
     end
@@ -232,7 +234,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       return
     end
     files = -> { published_embed_files(pages, site.config) }
-    @wikilink_index = Content::Processors::Wikilinks::Index.new(pages, site.config.default_language, files)
+    @wikilink_index = Content::Processors::Wikilinks::Index.new(pages, site.config.default_language, files, @wikilink_warnings)
   end
 
   # Every published non-page file an `![[embed]]` can name, as
@@ -244,7 +246,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       next if page.assets.empty?
       bundle = File.dirname(page.path)
       base = page.url.ends_with?('/') ? page.url : "#{page.url}/"
-      page.assets.each { |asset| files << {asset, "#{base}#{asset.lchop("#{bundle}/")}"} }
+      page.assets.each do |asset|
+        files << {asset, "#{base}#{asset.lchop("#{bundle}/")}"} if publishable_source_file?(File.join("content", asset))
+      end
     end
     if config.content_files.enabled? && Dir.exists?("content")
       # withheld_bundle_dirs reads site.pages, which Transform fills only
@@ -253,16 +257,31 @@ module Hwaro::Core::Build::Phases::ParseContent
       Dir.glob("content/**/*") do |file|
         rel = file.lchop("content/")
         next if withheld_content_file?(rel, withheld)
-        files << {rel, "/#{rel}"} if File.file?(file) && config.content_files.publish?(rel)
+        files << {rel, "/#{rel}"} if config.content_files.publish?(rel) && publishable_source_file?(file)
       end
     end
     if Dir.exists?("static")
       Dir.glob("static/**/*") do |file|
         rel = file.lchop("static/")
-        files << {rel, "/#{rel}"} if File.file?(file) && !config.static.excluded?(rel)
+        next if config.static.excluded?(rel) || config.sass_source?(rel)
+        files << {rel, "/#{rel}"} if publishable_source_file?(file)
       end
     end
     files
+  end
+
+  # Whether the copiers would publish `path`: a regular file, or a symlink
+  # resolving inside the project to one (their skip policy, minus the
+  # warnings they already print). lstat first, so a symlink loop is skipped,
+  # never followed.
+  private def publishable_source_file?(path : String) : Bool
+    lstat = File.info?(path, follow_symlinks: false)
+    return false unless lstat
+    return lstat.file? unless lstat.symlink?
+    return false unless Utils::PathUtils.resolves_within?(path, Dir.current)
+    File.info?(path, follow_symlinks: true).try(&.file?) || false
+  rescue File::Error
+    false
   end
 
   # `content` with its wikilinks rewritten for `page` (a no-op unless
@@ -272,7 +291,8 @@ module Hwaro::Core::Build::Phases::ParseContent
     return content unless index = @wikilink_index
     strict = report && site.config.links.broken_internal == "error"
     misses = strict ? [] of {String, String} : nil
-    result = Content::Processors::Wikilinks.rewrite(content, page, index, site.config.markdown.safe, misses, warn: report)
+    md = site.config.markdown
+    result = Content::Processors::Wikilinks.rewrite(content, page, index, md.safe, misses, warn: report, math: md.math)
     if misses && !misses.empty?
       @broken_links_mutex.synchronize do
         misses.each { |target, reason| @broken_internal_links << "#{page.path} → #{target} (#{reason})" }

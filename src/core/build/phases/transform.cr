@@ -926,11 +926,21 @@ module Hwaro::Core::Build::Phases::Transform
     end
   end
 
+  # A shortcode call or block (opener … closer, body included).
+  SHORTCODE_SPAN_RE = Regex.new(
+    "#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_OPEN_RE.source}(?s:.*?)#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_ANY_CLOSE_RE.source}|\\{\\{(?s:.*?)\\}\\}",
+    Regex::Options::IGNORE_CASE)
+
+  private def site_math? : Bool
+    @site.try(&.config.markdown.math) || false
+  end
+
   # `page.backlinks`: every rendered page in the same language whose SOURCE
   # Markdown links here through an `@/` link, a wikilink (with `[markdown]
   # wikilinks`) or a Markdown/HTML link whose URL is a page's URL. Links a
-  # shortcode or template produces are not seen. Sorted by date (newest
-  # first, undated last), then path.
+  # shortcode or template produces are not seen, nor links written inside a
+  # shortcode call or body (the wikilink rewrite never reaches those either).
+  # Sorted by date (newest first, undated last), then path.
   #
   # ponytail: rescans every page's raw content on each call (serve calls it
   # per content save); memoize per-page targets by raw_content if it shows.
@@ -960,7 +970,9 @@ module Hwaro::Core::Build::Phases::Transform
   ) : Set(Models::Page)
     targets = Set(Models::Page).new
     index = @wikilink_index
-    Content::Processors::Wikilinks.each_link(source.raw_content) do |link|
+    raw = source.raw_content
+    raw = raw.gsub(SHORTCODE_SPAN_RE, "") if content_may_contain_shortcodes?(raw)
+    Content::Processors::Wikilinks.each_link(raw, math: site_math?) do |link|
       target = case link
                in Content::Processors::Wikilinks::Link
                  index.try(&.resolve(link.target, source)) unless link.image? || link.target.empty?

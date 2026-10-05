@@ -801,7 +801,7 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, "l#{links.size}")
       links.each do |target|
         fp_value(digest, target)
-        fp_value(digest, link_targets[target]?.try(&.url) || "")
+        fp_value(digest, Content::Processors::InternalLinkResolver.page_for(link_targets, target).try(&.url) || "")
       end
     end
     # B lists A when A links to B: A adding or dropping the link, or A's
@@ -869,13 +869,14 @@ module Hwaro::Core::Build::Phases::Render
   private def wikilink_resolutions(page : Models::Page) : Array(String)
     return [] of String unless index = @wikilink_index
     values = Set(String).new
-    Content::Processors::Wikilinks.each_link(page.raw_content) do |link|
+    Content::Processors::Wikilinks.each_link(page.raw_content, math: site_math?) do |link|
       next unless link.is_a?(Content::Processors::Wikilinks::Link)
       next if link.target.empty?
       resolved = if link.image?
                    index.resolve_file(link.target, page) || ""
                  else
-                   index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } || ""
+                   index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } ||
+                     (index.resolve_file(link.target, page) if link.file?) || ""
                  end
       values << "#{link.embed ? '!' : ' '}#{link.target}=#{resolved}"
     end

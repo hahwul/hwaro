@@ -186,7 +186,10 @@ module Hwaro
           # pass so a page just flipped to draft can't feed its summary's
           # broken @/ links into the strict-mode accumulator (the full build
           # renders summaries post-filter too).
-          refresh_wikilink_index((site.pages + site.sections).as(Array(Models::Page)), site)
+          # The excluded pages leave site.pages only at
+          # drop_excluded_and_orphaned_outputs below; keep them out of the
+          # index now, or the summaries and renders here still link to them.
+          refresh_wikilink_index((site.pages + site.sections).reject { |p| excluded_paths.includes?(p.path) }, site)
           render_page_summaries(changed_pages, site, templates, highlight,
             link_targets: (site.pages + site.sections).as(Array(Models::Page)))
 

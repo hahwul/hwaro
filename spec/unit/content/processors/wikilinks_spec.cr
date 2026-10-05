@@ -15,8 +15,8 @@ private def wl_index(pages : Array(Hwaro::Models::Page), files = [] of {String, 
   Hwaro::Content::Processors::Wikilinks::Index.new(pages, "en", -> { files })
 end
 
-private def wl_rewrite(content : String, source : Hwaro::Models::Page, index, safe = false, misses : Array({String, String})? = nil) : String
-  Hwaro::Content::Processors::Wikilinks.rewrite(content, source, index, safe, misses)
+private def wl_rewrite(content : String, source : Hwaro::Models::Page, index, safe = false, misses : Array({String, String})? = nil, math = false) : String
+  Hwaro::Content::Processors::Wikilinks.rewrite(content, source, index, safe, misses, math: math)
 end
 
 describe Hwaro::Content::Processors::Wikilinks do
@@ -66,7 +66,9 @@ describe Hwaro::Content::Processors::Wikilinks do
     it "never rewrites inside code or HTML comments" do
       md = <<-MD
         `[[My Note]]` and ``a [[My Note]] b``
-        <!-- [[My Note]] --> [[My Note]]
+        x <!-- [[My Note]] --> [[My Note]] <!-- inline
+        [[My Note]] -->
+
         <!-- open
         [[My Note]]
         -->
@@ -79,6 +81,35 @@ describe Hwaro::Content::Processors::Wikilinks do
         MD
       out = wl_rewrite(md, src, index)
       out.should eq(md.sub("--> [[My Note]]", "--> [My Note](@/notes/My%20Note.md)"))
+    end
+
+    it "never rewrites inside math" do
+      wl_rewrite("$[[My Note]]$ and $$[[My Note]]$$", src, index, math: true).should eq("$[[My Note]]$ and $$[[My Note]]$$")
+      wl_rewrite("\\([[My Note]]\\)", src, index, math: true).should eq("\\([[My Note]]\\)")
+      # Math off: `$` is plain text, so the link is rewritten.
+      wl_rewrite("$[[My Note]]$", src, index).should eq("$[My Note](@/notes/My%20Note.md)$")
+    end
+
+    it "never rewrites inside a raw HTML block" do
+      wl_rewrite("<div>\n[[My Note]] in html\n</div>\n", src, index).should eq("<div>\n[[My Note]] in html\n</div>\n")
+    end
+
+    it "never rewrites inside tag attributes" do
+      wl_rewrite(%(<abbr title="[[My Note]]">x</abbr>), src, index).should eq(%(<abbr title="[[My Note]]">x</abbr>))
+    end
+
+    it "leaves an escaped `\\[[` alone" do
+      wl_rewrite("\\[[My Note]]", src, index).should eq("\\[[My Note]]")
+    end
+
+    it "never rewrites inside a code span that crosses a line break" do
+      wl_rewrite("a `code\n[[My Note]]` b", src, index).should eq("a `code\n[[My Note]]` b")
+    end
+
+    it "links a non-image file like a page link" do
+      files = [{"notes/doc.pdf", "/notes/doc.pdf"}]
+      idx = wl_index([src, target], files)
+      wl_rewrite("[[doc.pdf]] ![[doc.pdf|the doc]]", src, idx).should eq("[doc\\.pdf](/notes/doc.pdf) [the doc](/notes/doc.pdf)")
     end
 
     it "is a no-op without `[[`" do
@@ -128,6 +159,14 @@ describe Hwaro::Content::Processors::Wikilinks do
       with_captured_log { wl_index([far, short, near, other]).resolve("setup", other).should be(short) }
       b = wl_page("b/setup.md")
       with_captured_log { wl_index([b, short, other]).resolve("setup", other).should be(short) }
+    end
+
+    it "matches NFC and NFD spellings of the same name" do
+      nfd = wl_page("u/Cafe\u0301.md")
+      src = wl_page("a.md")
+      wl_index([nfd, src]).resolve("Caf\u00e9", src).should be(nfd)
+      nfc = wl_page("u/Caf\u00e9.md")
+      wl_index([nfc, src]).resolve("Cafe\u0301", src).should be(nfc)
     end
 
     it "does not match titles" do

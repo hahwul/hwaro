@@ -4,12 +4,15 @@
 # before Markd: a resolved link becomes an ordinary `[text](@/path.md#slug)`
 # link and an image embed an ordinary `![alt](url)` image, so the `@/`
 # resolver, render hooks, `base_path`, the external-link policy and the
-# `[links]` checks all apply unchanged. Nothing is rewritten inside fenced or
-# indented code (FenceTracker), inline code spans or HTML comments (which
-# also covers shortcode placeholders).
+# `[links]` checks all apply unchanged. Nothing is rewritten where Markd
+# would not parse a link either: fenced or indented code and raw HTML blocks
+# (FenceTracker), code spans, HTML comments (which also covers shortcode
+# placeholders), HTML tags, backslash escapes, and math when `[markdown]
+# math` is on (the math pass's own stash).
 
 require "html"
 require "./fence_tracker"
+require "./markdown_extensions"
 require "../../models/page"
 require "../../utils/byte_scan"
 require "../../utils/logger"
@@ -21,14 +24,30 @@ module Hwaro
       module Wikilinks
         extend self
 
-        # One prose token per match: an inline code span or an HTML comment
-        # (both kept verbatim; an unclosed comment runs to the end of the
-        # line and on until `-->`), or a `[[…]]` / `![[…]]` wikilink.
-        WIKILINK_TOKEN_RE = /(?<code>`+).*?(?<!`)\k<code>(?!`)|(?<comment><!--.*?(?:-->|$))|(?<bang>!?)\[\[(?<inner>[^\[\]\n]+)\]\]/
+        # Tokens kept verbatim, matched over one paragraph-sized chunk: a
+        # code span (which may cross a line break), an HTML comment, an HTML
+        # tag (Markd's grammar, so attribute values are never rewritten) and
+        # a backslash escape (`\[[x]]` stays literal).
+        VERBATIM_TOKENS = [
+          /(?<code>`+)(?s:.*?)(?<!`)\k<code>(?!`)/.source,
+          /(?<comment><!--(?s:.*?)-->)/.source,
+          "(?<tag>#{MarkdownExtensions::HTML_TAG_RE.source})",
+        ].join('|')
+        ESC_TOKEN = /(?<esc>\\[^\n])/.source
+        # `\(…\)` TeX math, kept verbatim with `[markdown] math` (the `$`
+        # forms are stashed by MarkdownExtensions.protect_math). Precedes
+        # ESC_TOKEN, which would otherwise take its `\(`.
+        TEX_TOKEN      = /(?<tex>\\\((?s:.*?)\\\))/.source
+        WIKILINK_TOKEN = /(?<bang>!?)\[\[(?<inner>[^\[\]\n]+)\]\]/.source
+        # The other link form backlinks count: a Markdown destination. HTML
+        # `href`s are read out of the `tag` token.
+        URL_TOKEN = /\]\(\s*<?(?<url>[^\s)>]+)/.source
+        HREF_RE   = /\bhref\s*=\s*["']([^"']*)["']/i
 
-        # WIKILINK_TOKEN_RE plus the other link forms backlinks count: a
-        # Markdown destination (`](url)`) and an HTML `href`.
-        LINK_TOKEN_RE = /(?<code>`+).*?(?<!`)\k<code>(?!`)|(?<comment><!--.*?(?:-->|$))|(?<bang>!?)\[\[(?<inner>[^\[\]\n]+)\]\]|\]\(\s*<?(?<url>[^\s)>]+)|\bhref\s*=\s*["'](?<href>[^"']*)["']/
+        WIKILINK_TOKEN_RE      = Regex.new("#{VERBATIM_TOKENS}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}")
+        WIKILINK_MATH_TOKEN_RE = Regex.new("#{VERBATIM_TOKENS}|#{TEX_TOKEN}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}")
+        LINK_TOKEN_RE          = Regex.new("#{VERBATIM_TOKENS}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}|#{URL_TOKEN}")
+        LINK_MATH_TOKEN_RE     = Regex.new("#{VERBATIM_TOKENS}|#{TEX_TOKEN}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}|#{URL_TOKEN}")
 
         IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp|ico|tiff?)\z/i
         SIZE_RE      = /\A(\d+)(?:x(\d+))?\z/
@@ -48,6 +67,11 @@ module Hwaro
 
           def image? : Bool
             embed && target.matches?(IMAGE_EXT_RE)
+          end
+
+          # A target naming a non-page file (`doc.pdf`, `photo.png`).
+          def file? : Bool
+            !File.extname(target).downcase.in?("", ".md", ".markdown")
           end
         end
 
@@ -69,21 +93,42 @@ module Hwaro
           Link.new(embed, target, heading, label)
         end
 
+        # The {source, target} pairs already warned about. Owned by the
+        # Builder so a serve session warns once, not on every rebuild.
+        class WarnLog
+          @seen = Set({String, String}).new
+          @mutex = Mutex.new
+
+          def first?(source : String, target : String) : Bool
+            @mutex.synchronize { @seen.add?({source, target}) }
+          end
+
+          def clear : Nil
+            @mutex.synchronize { @seen.clear }
+          end
+        end
+
+        # Lookup key: NFC (a file name saved decomposed still matches a link
+        # typed composed) and lowercase.
+        def self.key(text : String) : String
+          text.unicode_normalize(:nfc).downcase
+        end
+
         # Page and file lookup for one page set. Read-only after construction
-        # except for the warn-once set and the lazily built file index, both
-        # behind the mutex (render workers share one index).
+        # except for the lazily built file index, behind the mutex (render
+        # workers share one index).
         class Index
           @by_name = {} of String => Array(Models::Page)
           @by_path = {} of String => Array(Models::Page)
-          @warned = Set({String, String}).new
           @files : Hash(String, Array({String, String}))? = nil
           @mutex = Mutex.new
 
           # `files` lists every published non-page file as
-          # `{relative path, URL}`; it is only called on the first embed
+          # `{relative path, URL}`; it is only called on the first file link
           # that is not one of the source page's own bundle assets.
           def initialize(pages : Enumerable(Models::Page), default_language : String,
-                         @files_source : Proc(Array({String, String})) = -> { [] of {String, String} })
+                         @files_source : Proc(Array({String, String})) = -> { [] of {String, String} },
+                         @warned : WarnLog = WarnLog.new)
             pages.each do |page|
               next unless keys = Index.keys_for(page, default_language)
               (@by_name[keys[0]] ||= [] of Models::Page) << page
@@ -104,14 +149,14 @@ module Hwaro
             stem = stem.rchop(lang) if stem.ends_with?(lang)
             if page.is_index
               return if dir.empty?
-              {File.basename(dir).downcase, dir.downcase}
+              {Wikilinks.key(File.basename(dir)), Wikilinks.key(dir)}
             else
-              {stem.downcase, (dir.empty? ? stem : "#{dir}/#{stem}").downcase}
+              {Wikilinks.key(stem), Wikilinks.key(dir.empty? ? stem : "#{dir}/#{stem}")}
             end
           end
 
           def resolve(target : String, source : Models::Page) : Models::Page?
-            key = target.strip.lchop('/').rchop('/').downcase.rchop(".markdown").rchop(".md")
+            key = Wikilinks.key(target.strip.lchop('/').rchop('/')).rchop(".markdown").rchop(".md")
             return if key.empty?
             list = key.includes?('/') ? @by_path[key]? : @by_name[key]?
             return unless list
@@ -123,7 +168,7 @@ module Hwaro
           # The URL of the file an embed names: one of the source page's own
           # bundle assets (relative), else a published file anywhere.
           def resolve_file(target : String, source : Models::Page) : String?
-            want = target.strip.lchop('/').downcase
+            want = Wikilinks.key(target.strip.lchop('/'))
             return if want.empty?
             unless source.assets.empty?
               bundle = File.dirname(source.path)
@@ -142,14 +187,14 @@ module Hwaro
           end
 
           private def file_matches?(rel : String, want : String) : Bool
-            low = rel.downcase
+            low = Wikilinks.key(rel)
             want.includes?('/') ? low == want || low.ends_with?("/#{want}") : File.basename(low) == want
           end
 
           private def index_files : Hash(String, Array({String, String}))
             map = {} of String => Array({String, String})
             @files_source.call.each do |entry|
-              (map[File.basename(entry[0]).downcase] ||= [] of {String, String}) << entry
+              (map[Wikilinks.key(File.basename(entry[0]))] ||= [] of {String, String}) << entry
             end
             map
           end
@@ -162,8 +207,7 @@ module Hwaro
             src_dir = Index.container_dir(source)
             keyed = list.map { |c| path, dir = yield(c); {c, path, dir} }
             chosen = keyed.min_by { |_, path, dir| {dir == src_dir ? 0 : 1, path.size, path} }
-            first = @mutex.synchronize { @warned.add?({source.path, target}) }
-            if first
+            if @warned.first?(source.path, target)
               Logger.warn "Ambiguous wikilink '[[#{target}]]' in '#{source.path}' matches #{keyed.map(&.[1]).sort!.join(", ")}; using '#{chosen[1]}'."
             end
             chosen[0]
@@ -183,24 +227,27 @@ module Hwaro
         # safe mode), is warned about, and is appended to `misses` as
         # `{"[[…]]" source text, reason}`.
         def rewrite(content : String, source : Models::Page, index : Index, safe : Bool = false,
-                    misses : Array({String, String})? = nil, warn : Bool = true) : String
+                    misses : Array({String, String})? = nil, warn : Bool = true, math : Bool = false) : String
           return content unless Utils::ByteScan.includes?(content, "[[")
-          walk(content, WIKILINK_TOKEN_RE) do |md|
-            next unless link = parse(md["inner"], md["bang"] == "!")
+          scan(content, math, math ? WIKILINK_MATH_TOKEN_RE : WIKILINK_TOKEN_RE) do |md|
+            next unless inner = md["inner"]?
+            next unless link = parse(inner, md["bang"] == "!")
             render(link, md[0], source, index, safe, misses, warn)
           end
         end
 
-        # Yields every link-ish token outside code and comments: a parsed
+        # Yields every link-ish token where `rewrite` would see one: a parsed
         # wikilink, or the URL of a Markdown destination / HTML href.
-        def each_link(content : String, & : Link | String ->) : Nil
+        def each_link(content : String, math : Bool = false, & : Link | String ->) : Nil
           return unless Utils::ByteScan.includes?(content, "[[") || Utils::ByteScan.includes?(content, "](") ||
                         Utils::ByteScan.includes?(content, "href")
-          walk(content, LINK_TOKEN_RE) do |md|
+          scan(content, math, math ? LINK_MATH_TOKEN_RE : LINK_TOKEN_RE) do |md|
             if inner = md["inner"]?
               parse(inner, md["bang"] == "!").try { |link| yield link }
-            elsif url = md["url"]? || md["href"]?
+            elsif url = md["url"]?
               yield url
+            elsif tag = md["tag"]?
+              tag.scan(HREF_RE) { |m| yield m[1] }
             end
             nil
           end
@@ -218,9 +265,12 @@ module Hwaro
             dest = "@/#{encode(page.path)}"
             dest += "##{encode(slug(link.heading))}" if link.heading
             return "[#{escape_text(link.text)}](#{dest})"
+          elsif link.file? && (url = index.resolve_file(link.target, source))
+            # An attachment (`[[doc.pdf]]`, `![[doc.pdf]]`): a plain link.
+            return "[#{escape_text(link.text)}](#{encode(url)})"
           end
 
-          reason = link.image? ? "file not found" : "page not found"
+          reason = link.file? ? "file not found" : "page not found"
           Logger.warn "Wikilink '#{source_text}' in '#{source.path}' could not be resolved: #{reason}." if warn
           misses << {source_text, reason} if misses
           safe ? escape_text(link.text) : %(<span class="wikilink wikilink-missing">#{HTML.escape(link.text)}</span>)
@@ -276,39 +326,44 @@ module Hwaro
           end
         end
 
-        # The fence- and comment-aware line walk shared by `rewrite` and
-        # `each_link`: `re`'s `code`/`comment` matches pass through, every
-        # other match is replaced by the block's result (nil keeps it).
+        # `walk`, with `$…$` / `$$…$$` math stashed out first when the math
+        # pass is on.
+        private def scan(content : String, math : Bool, re : Regex, & : Regex::MatchData -> String?) : String
+          return walk(content, re) { |md| yield md } unless math && content.includes?('$')
+          MarkdownExtensions.protect_math(content) { |stashed| walk(stashed, re) { |md| yield md } }
+        end
+
+        # The walk shared by `rewrite` and `each_link`. Fenced and indented
+        # code and raw HTML block lines (FenceTracker) pass through; the rest
+        # is matched one chunk at a time (lines up to a blank line or an ATX
+        # heading, so a code span can cross a line break but not a
+        # paragraph). Code/comment matches pass through; every other match
+        # is replaced by the block's result (nil keeps it).
         private def walk(content : String, re : Regex, & : Regex::MatchData -> String?) : String
           tracker = FenceTracker.new
-          in_comment = false
+          chunk = String::Builder.new
           String.build(content.bytesize) do |io|
             content.each_line(chomp: false) do |line|
-              if tracker.fence_line?(line)
-                io << line
-                next
-              end
-              if in_comment
-                unless close = line.index("-->")
-                  io << line
-                  next
+              verbatim = tracker.fence_line?(line) || tracker.html_block_line?
+              heading = !verbatim && FenceTracker::ATX_HEADING_RE.matches?(line)
+              if verbatim || heading || line.blank?
+                unless chunk.empty?
+                  io << transform(chunk.to_s, re) { |md| yield md }
+                  chunk = String::Builder.new
                 end
-                io << line[0, close + 3]
-                line = line[(close + 3)..]
-                in_comment = false
-              end
-              io << line.gsub(re) do |match|
-                md = $~
-                if md["code"]?
-                  match
-                elsif comment = md["comment"]?
-                  in_comment = !comment.ends_with?("-->")
-                  match
-                else
-                  yield(md) || match
-                end
+                io << (heading ? transform(line, re) { |md| yield md } : line)
+              else
+                chunk << line
               end
             end
+            io << transform(chunk.to_s, re) { |md| yield md } unless chunk.empty?
+          end
+        end
+
+        private def transform(text : String, re : Regex, & : Regex::MatchData -> String?) : String
+          text.gsub(re) do |match|
+            md = $~
+            md["code"]? || md["comment"]? ? match : yield(md) || match
           end
         end
       end

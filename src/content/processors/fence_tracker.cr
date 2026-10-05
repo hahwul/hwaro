@@ -137,6 +137,9 @@ module Hwaro
         @paragraph_open = false
         @paragraph_depth = 0
         @paragraph_column = 0
+        # The last line fed was raw HTML to Markd: it opened or continued a
+        # generic HTML block (no inline parsing happens there).
+        getter? html_block_line = false
 
         # `raw_html_code: false` turns off raw-HTML code-block tracking and
         # generic HTML-block tracking.
@@ -159,6 +162,7 @@ module Hwaro
           @prev_atx_heading = false
           paragraph_open = @paragraph_open
           @paragraph_open = false
+          @html_block_line = false
 
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
@@ -262,6 +266,7 @@ module Hwaro
           opened_html = !blank && !in_html_block && @track_raw_html_code &&
                         open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)
 
+          @html_block_line = in_html_block || opened_html
           stripped = content.lstrip
           heading = !blank && ATX_HEADING_RE.matches?(content)
           fence_run = indented?(content) ? nil : opener_run(stripped)
