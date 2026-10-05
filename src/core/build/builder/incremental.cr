@@ -560,8 +560,8 @@ module Hwaro
             needs_menu: needs_menu,
             needs_taxonomy: needs_taxonomy,
             page: needs_page ? compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) : "",
-            section: needs_section ? compute_section_set_fingerprint(site.sections) : "",
-            menu: needs_menu ? compute_menu_set_fingerprint(site.pages, site.sections) : "",
+            section: needs_section ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : "",
+            menu: needs_menu ? compute_menu_set_fingerprint(site) : "",
             taxonomy: needs_taxonomy ? compute_taxonomy_slug_fingerprint(site) : "",
             lookup_targets: lookup_targets,
             lookup_fields: lookup_fields,
@@ -596,9 +596,9 @@ module Hwaro
           page_changed = before.needs_page &&
                          compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) != before.page
           section_changed = before.needs_section &&
-                            compute_section_set_fingerprint(site.sections) != before.section
+                            compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) != before.section
           menu_changed = before.needs_menu &&
-                         compute_menu_set_fingerprint(site.pages, site.sections) != before.menu
+                         compute_menu_set_fingerprint(site) != before.menu
           taxonomy_changed = before.needs_taxonomy &&
                              compute_taxonomy_slug_fingerprint(site) != before.taxonomy
           lookup_changed = !before.lookup_targets.empty? &&

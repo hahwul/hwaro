@@ -240,3 +240,109 @@ describe "Menus: --cache incremental rebuild" do
     end
   end
 end
+
+describe "Menus: [menus] auto_sections" do
+  it "fills the menu from top-level sections per language, with config overrides by identifier" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
+
+      [languages.ko]
+      language_name = "한국어"
+      weight = 1
+
+      [menus]
+      auto_sections = "main"
+
+      [[menus.main]]
+      name = "Journal"
+      url = "/posts/"
+      identifier = "posts"
+      weight = 3
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "posts/_index.md"     => "+++\ntitle = \"Posts\"\nweight = 1\n+++\n",
+        "posts/_index.ko.md"  => "+++\ntitle = \"글\"\nweight = 1\n+++\n",
+        "posts/hello.md"      => "---\ntitle: Hello\n---\nHi",
+        "posts/sub/_index.md" => "+++\ntitle = \"Sub\"\n+++\n",
+        "docs/_index.md"      => "+++\ntitle = \"Docs\"\nweight = 2\n+++\n",
+        "docs/_index.ko.md"   => "+++\ntitle = \"문서\"\nweight = 2\n+++\n",
+        "flat/_index.md"      => "+++\ntitle = \"Flat\"\ntransparent = true\n+++\n",
+        "wip/_index.md"       => "+++\ntitle = \"WIP\"\ndraft = true\n+++\n",
+        "about.md"            => "---\ntitle: About\n---\nAbout",
+      },
+      template_files: {
+        "page.html"    => MENU_NAV_TEMPLATE,
+        "section.html" => MENU_NAV_TEMPLATE,
+      },
+    ) do
+      en_html = File.read("public/posts/hello/index.html")
+      en_html.should contain(%(<nav><a href="/docs/" data-url="/docs/" data-external="false">Docs</a><a href="/posts/" data-url="/posts/" data-external="false">Journal</a></nav>))
+
+      ko_html = File.read("public/ko/docs/index.html")
+      # ko inherits the global [[menus.main]] override; its own sections
+      # supply the rest.
+      ko_html.should contain(%(<nav><a href="/ko/docs/" data-url="/ko/docs/" data-external="false" aria-current="page">문서</a><a href="/posts/" data-url="/posts/" data-external="false">Journal</a></nav>))
+    end
+  end
+
+  it "re-renders the nav on a --cache build when a top-level section turns headless" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n[menus]\nauto_sections = \"main\"\n")
+        FileUtils.mkdir_p("content/docs")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", MENU_NAV_TEMPLATE)
+        File.write("templates/section.html", MENU_NAV_TEMPLATE)
+        File.write("content/a.md", "---\ntitle: A\n---\nPage A")
+        File.write("content/docs/_index.md", "+++\ntitle = \"Docs\"\n+++\n")
+
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false, verbose: false, profile: false)
+        builder1 = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder1.register(h) }
+        builder1.run(options)
+        File.read("public/a/index.html").should contain(%(data-url="/docs/"))
+
+        sleep 100.milliseconds
+        File.write("content/docs/_index.md", "+++\ntitle = \"Docs\"\nrender = false\n+++\n")
+
+        builder2 = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder2.register(h) }
+        builder2.run(options)
+        File.read("public/a/index.html").should_not contain(%(data-url="/docs/"))
+      end
+    end
+  end
+end
+
+describe "Menus: auto_sections default-language fallback" do
+  it "a language with no translated top-level section falls back to the default-language menu" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
+
+      [languages.ko]
+      language_name = "한국어"
+
+      [menus]
+      auto_sections = "main"
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "blog/_index.md" => "+++\ntitle = \"Blog\"\n+++\n",
+        "about.md"       => "---\ntitle: About\n---\nEN",
+        "about.ko.md"    => "---\ntitle: 소개\n---\nKO",
+      },
+      template_files: {"page.html" => MENU_NAV_TEMPLATE, "section.html" => MENU_NAV_TEMPLATE},
+    ) do
+      File.read("public/ko/about/index.html").should contain(%(<nav><a href="/blog/" data-url="/blog/" data-external="false">Blog</a></nav>))
+    end
+  end
+end

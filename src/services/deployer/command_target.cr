@@ -18,6 +18,7 @@ module Hwaro
         source_dir : String,
         command : String,
         effective : EffectiveOptions,
+        uploads : Array(MetadataUpload) = [] of MetadataUpload,
       ) : Bool
         Logger.heading("deploy", target.name)
         warn_unapplied_target_options(target)
@@ -37,6 +38,7 @@ module Hwaro
         if effective.dry_run
           Logger.info "Dry run: would run command:"
           Logger.info "  #{expanded}"
+          log_planned_uploads(uploads) unless uploads.empty?
           return true
         end
 
@@ -62,6 +64,10 @@ module Hwaro
           Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
           needs_confirm = true
         end
+        if !effective.force && {{ flag?(:windows) }} && (percent = metadata_percent_warning(target.url, uploads))
+          Logger.warn percent
+          needs_confirm = true
+        end
 
         if needs_confirm && !confirm?("Run deploy command for '#{target.name}'?")
           Logger.warn "Cancelled."
@@ -69,30 +75,33 @@ module Hwaro
         end
 
         status, stderr = run_deploy_command(expanded, env)
-        unless status.success?
-          # A quiet run streamed nothing, so surface the tool's stderr before
-          # raising; the classified error itself carries only the summary.
-          if Logger.quiet? && !stderr.empty?
-            stderr.each_line { |line| Logger.error "  #{line}" }
-          end
-          # `exit_code` raises for a signal-terminated child (a killed
-          # `rsync`, an OOM-killed uploader), which crashed the deploy with
-          # an unclassified RuntimeError instead of reporting the failure.
-          how = if code = status.exit_code?
-                  "exit #{code}"
-                else
-                  "terminated by signal #{status.exit_signal?.try(&.to_s) || "?"}"
-                end
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_IO,
-            message: "Deploy command failed (#{how}): #{expanded}",
-            hint: "Inspect the stderr above for details from the deploy tool.",
-          )
-        end
+        raise_command_failed!(status, stderr, expanded) unless status.success?
+        run_metadata_uploads(target, uploads, env)
 
         Logger.info "" if Logger.color_enabled?
         Logger.outcome("deployed", target.name)
         true
+      end
+
+      private def raise_command_failed!(status : Process::Status, stderr : String, command : String) : NoReturn
+        # A quiet run streamed nothing, so surface the tool's stderr before
+        # raising; the classified error itself carries only the summary.
+        if Logger.quiet? && !stderr.empty?
+          stderr.each_line { |line| Logger.error "  #{line}" }
+        end
+        # `exit_code` raises for a signal-terminated child (a killed
+        # `rsync`, an OOM-killed uploader), which crashed the deploy with
+        # an unclassified RuntimeError instead of reporting the failure.
+        how = if code = status.exit_code?
+                "exit #{code}"
+              else
+                "terminated by signal #{status.exit_signal?.try(&.to_s) || "?"}"
+              end
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Deploy command failed (#{how}): #{command}",
+          hint: "Inspect the stderr above for details from the deploy tool.",
+        )
       end
 
       # Run a deploy command, streaming its output as it arrives. Deploy tools

@@ -5,9 +5,7 @@ weight = 11
 toc = true
 +++
 
-Named navigation menus, resolved into a tree and exposed to templates via `site.menus` / `get_menu()`. A menu can be fully defined in `config.toml`, built entirely from page/section front matter, or both at once. Entries from both sources are merged into the same tree.
-
-There's no automatic derivation from sections (Hugo's `sectionPagesMenu`). See [Follow-ups](#follow-ups).
+Named navigation menus, resolved into a tree and exposed to templates via `site.menus` / `get_menu()`. A menu can be fully defined in `config.toml`, built entirely from page/section front matter, or both at once. Entries from both sources are merged into the same tree. `[menus] auto_sections` can also fill a menu from the top-level sections (see [Automatic Section Menus](#automatic-section-menus)).
 
 ## Configuring a Menu
 
@@ -61,6 +59,52 @@ parent = "posts"
 All table-form fields are optional and fall back to the page's own data: `name` defaults to `page.title`, `weight` to `0`, `identifier` to the resolved `name`, and `parent` to none (a root entry).
 
 A page/section may register into **any** menu name, including one `config.toml` never declares. A fully front-matter-defined menu is a legal, supported setup on its own (`hwaro doctor` only flags an undeclared name when config declares at least one menu elsewhere, on the theory that a site with zero `[[menus.*]]` blocks is intentionally going all-in on front matter).
+
+## Automatic Section Menus
+
+Set `auto_sections` to a menu name and every top-level section (a direct child of `content/`) joins that menu, with no `[[menus.*]]` block or front matter needed. This is Hugo's `sectionPagesMenu`.
+
+```toml
+[menus]
+auto_sections = "main"
+```
+
+Each section becomes an entry with `identifier` = its directory name (`posts` for `content/posts/_index.md`), `name` = its title, `url` = its URL and `weight` = its `weight`. Sections that listings skip are left out: drafts, unpublished, headless (`render = false`) and `transparent` sections, plus sections whose `redirect_to` points off-site. Nested sections never join, including the children of a skipped `transparent` section. A section needs an `_index.md`: a directory that holds only pages has no section and gets no entry. On a versioned site a section is read through its version root, so `docs/v2` counts as `docs`, and with a top-level `v2/` version, `v2/guide` counts as `guide`. When an unversioned `docs/_index.md` sits next to the version roots, each version's pages link that version's root and unversioned pages link the unversioned section.
+
+`auto_sections` is a reserved key under `[menus]`, not a menu name. A non-string or blank value is a config error, and setting it under `[languages.<code>.menus]` is ignored with a warning.
+
+Explicit entries win. A `[[menus.main]]` entry or a front-matter registration with the same `identifier` replaces the auto entry; entries with other identifiers are added next to the auto ones, and the whole menu sorts by `weight`, then `name`. A section that registers itself into the same menu through its own front matter keeps only that registration.
+
+```toml
+[menus]
+auto_sections = "main"
+
+# Renames the auto "posts" entry and moves it last
+[[menus.main]]
+name = "Journal"
+url = "/posts/"
+identifier = "posts"
+weight = 99
+```
+
+On a multilingual site the entries are built per language from that language's sections (`posts/_index.ko.md` gives the Korean entry its title and `/ko/posts/` URL). A language without a translated section gets no entry for it, and a language left with no entries at all falls back to the default language's menu in `get_menu()`.
+
+A global `[[menus.main]]` override like the one above applies to every language without its own `[languages.<code>.menus]` table, so Korean pages would link `/posts/` too. On a multilingual site, override per language instead:
+
+```toml
+[menus]
+auto_sections = "main"
+
+[[menus.main]]
+name = "Journal"
+url = "/posts/"
+identifier = "posts"
+
+[[languages.ko.menus.main]]
+name = "저널"
+url = "/ko/posts/"
+identifier = "posts"
+```
 
 ## Hierarchy
 
@@ -146,14 +190,10 @@ Always render `item.href`, and compare against `item.url` (as `active_path` does
 | children | Array\<Entry\> | Nested entries (see [Hierarchy](#hierarchy)) |
 | page | Page? | The registering page/section's data, when the entry came from front matter and resolves to a `Page` (nil for config-only entries, and for entries registered on a `Section`'s `_index.md`) |
 
-## Follow-ups
-
-- **`sectionPagesMenu`-style auto-derivation** — Hugo can auto-populate a menu from every top-level section without any `[[menus.*]]` or front-matter registration. Hwaro doesn't do this yet; every entry must be explicit (config or front matter).
-
 ## See Also
 
 - [Templates: Functions](/templates/functions/#get-menu) — `get_menu()` reference
 - [Templates: Filters](/templates/filters/#url-filters) — `active_path` reference
 - [Templates: Data Model](/templates/data-model/#menus) — `site.menus` and the Entry shape
-- [Configuration](/start/config/#menus) — `[[menus.*]]` config reference
+- [Configuration](/start/config/#menus) — `[[menus.*]]` and `[menus] auto_sections` config reference
 - [Doctor](/start/tools/doctor/) — `menu-parent-undefined` / `menu-undeclared` validators

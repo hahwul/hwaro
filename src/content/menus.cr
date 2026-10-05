@@ -1,9 +1,10 @@
 # Menu tree builder for Hwaro's first-class menu system.
 #
-# Two sources feed a named menu:
+# Three sources feed a named menu:
 #   - config `[[menus.<name>]]` entries (and their per-language
 #     `[[languages.<code>.menus.<name>]]` overrides)
 #   - front-matter `menus`/`menu` registrations on pages/sections
+#   - `[menus] auto_sections = "<name>"`: every top-level section
 #
 # `Menus.build` resolves both into `{language => {menu_name => [Entry, ...]}}`
 # trees, ready for template exposure (`site.menus` / `get_menu()`, see
@@ -78,13 +79,13 @@ module Hwaro
 
         result = {} of String => Hash(String, Array(Entry))
         languages.each do |lang|
-          result[lang] = build_for_language(config, content, lang, default_lang)
+          result[lang] = build_for_language(config, content, lang, default_lang, version)
         end
         result
       end
 
       # Builds every named menu for a single language.
-      private def self.build_for_language(config : Models::Config, content : Array(Models::Page), lang : String, default_lang : String) : Hash(String, Array(Entry))
+      private def self.build_for_language(config : Models::Config, content : Array(Models::Page), lang : String, default_lang : String, version : Models::VersionConfig?) : Hash(String, Array(Entry))
         menu_defs = config.language(lang).try(&.menus) || config.menus
 
         # menu_name => flat candidate list, before tree assembly.
@@ -127,12 +128,71 @@ module Hwaro
           end
         end
 
+        # Only materialize the menu when an entry was added: a missing key is
+        # what lets `get_menu` fall back to the default language.
+        if auto_menu = config.menus_auto_sections
+          auto = auto_section_entries(flat[auto_menu]? || [] of Entry, content, lang, default_lang, version)
+          (flat[auto_menu] ||= [] of Entry).concat(auto) unless auto.empty?
+        end
+
         menus = {} of String => Array(Entry)
         flat.each do |menu_name, entries|
           normalize_urls!(entries)
           menus[menu_name] = assemble_tree(entries, menu_name)
         end
         menus
+      end
+
+      # `[menus] auto_sections`: every top-level section of `lang` joins
+      # the menu (Hugo's `sectionPagesMenu`), keyed by its directory name. A
+      # section listings would skip (draft, unpublished, headless,
+      # transparent) or that bounces off-site is left out. An explicit entry
+      # — config, or front matter — sharing the identifier wins, as does the
+      # section's own front-matter registration into the same menu.
+      # Returns the entries to add next to `existing`.
+      #
+      # Two sections can stand for one directory (an unversioned
+      # `docs/_index.md` next to a `docs/1.0` version root). The one in the
+      # menu set's own version wins — the version's root in its menus, the
+      # unversioned section in the unversioned menus — whatever the version
+      # directories are called; path order breaks any remaining tie.
+      private def self.auto_section_entries(existing : Array(Entry), content : Array(Models::Page), lang : String, default_lang : String, version : Models::VersionConfig?) : Array(Entry)
+        taken = existing.map(&.identifier).to_set
+        registered = existing.compact_map(&.page_path).to_set
+        entries = [] of Entry
+        own, others = content.select(Models::Section).partition(&.version.same?(version))
+        (own + others).each do |s|
+          next unless dir = top_level_dir(s.section, s.version)
+          next unless (s.language || default_lang) == lang
+          next if s.excluded_from_listings? || s.transparent
+          next if s.redirect_to.try { |r| external_url?(r) }
+          next if registered.includes?(s.path)
+          next unless taken.add?(dir)
+
+          entries << Entry.new(
+            name: s.title.presence || dir,
+            url: s.url,
+            identifier: dir,
+            weight: s.weight,
+            parent: nil,
+            external: false, # resolved by normalize_urls!
+            page_path: s.path,
+          )
+        end
+        entries
+      end
+
+      # The top-level directory `dir` (a section's content directory)
+      # stands for, or nil for the root and nested sections. A versioned
+      # section is read through its version root, as visitors see it:
+      # `docs/v2` → `docs`, `v2` → the root (nil), `v2/guide` → `guide`.
+      # Shared by the menu build, the serve menu fingerprint and doctor.
+      def self.top_level_dir(dir : String, version : Models::VersionConfig?) : String?
+        if version
+          rel = dir == version.path ? "" : (version.relative_path(dir) || dir)
+          dir = {version.parent_dir, rel}.reject(&.empty?).join('/')
+        end
+        dir unless dir.empty? || dir.includes?('/')
       end
 
       # Normalizes each entry's `url` in place and flags `external`.
