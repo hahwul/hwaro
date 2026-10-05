@@ -95,6 +95,15 @@ module Hwaro
           !@config_changed
       end
 
+      # True when only stylesheet sources were modified — `.css` files or
+      # `.scss` sources (which publish as compiled `.css`). The live-reload
+      # client can swap these in place instead of reloading the page.
+      def css_only? : Bool
+        static_only? && @modified_static.all? do |path|
+          {".css", ".scss"}.includes?(Path[path].extension.downcase)
+        end
+      end
+
       # True when only non-Markdown content files were modified — just
       # republish them, no markdown re-parsing, no template re-render.
       def content_files_only? : Bool

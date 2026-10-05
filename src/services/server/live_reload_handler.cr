@@ -9,6 +9,9 @@ module Hwaro
 
       LIVE_RELOAD_PATH = "/__hwaro_livereload"
 
+      # Sent by the client script on connect to opt in to `css:` messages.
+      CSS_SWAP_HELLO = "hello:css"
+
       # How many outbound messages one client may fall behind by. Broadcast
       # enqueues here instead of writing to the socket, so a tab that
       # handshakes and then stops reading (suspended laptop, paused debugger,
@@ -41,6 +44,10 @@ module Hwaro
         # the writer fiber retires, so the browser's `onclose` fires and its
         # reconnect replays the current build state.
         property? dropped : Bool = false
+        # Set when the client announced CSS_SWAP_HELLO: it understands the
+        # `css:` message. A page still running an older client script (open
+        # across a hwaro upgrade) never says so and keeps getting `reload`.
+        property? css_swap : Bool = false
 
         def initialize(@socket)
         end
@@ -141,6 +148,9 @@ module Hwaro
             client.queue.send("clear-error")
           end
         end
+        socket.on_message do |message|
+          @sockets_mutex.synchronize { client.css_swap = true } if message == CSS_SWAP_HELLO
+        end
         socket.on_close do
           @sockets_mutex.synchronize { @clients.delete(client) }
           # Let the writer fiber retire: `receive?` returns nil once the queue
@@ -211,6 +221,16 @@ module Hwaro
         broadcast("reload")
       end
 
+      # A rebuild changed only stylesheets: clients that opted in (see
+      # CSS_SWAP_HELLO) swap the `<link rel="stylesheet">`s whose path ends
+      # with one of `paths` (every same-origin one when `paths` is empty)
+      # without reloading; any other client reloads as before.
+      def notify_css(paths : Array(String))
+        @sockets_mutex.synchronize { @current_error = nil }
+        css = "css:#{{"paths" => paths}.to_json}"
+        broadcast { |client| client.css_swap? ? css : "reload" }
+      end
+
       # Push a build-error message so connected browsers can render an
       # overlay. The message is a single line `error:<json>` so the
       # client side can split on the first colon and parse the rest;
@@ -223,13 +243,18 @@ module Hwaro
       end
 
       private def broadcast(message : String)
+        broadcast { message }
+      end
+
+      # Sends each client the message the block picks for it.
+      private def broadcast(& : Client -> String)
         # Snapshot under the lock: a connection fiber may `<<`/`delete` from
         # @clients concurrently. Nothing below can wait on a socket — the
         # enqueue is non-blocking and each client's writer fiber owns the
         # actual write — because this runs on the watcher fiber.
-        snapshot = @sockets_mutex.synchronize { @clients.dup }
+        snapshot = @sockets_mutex.synchronize { @clients.map { |client| {client, yield client} } }
         overflowed = [] of Client
-        snapshot.each do |client|
+        snapshot.each do |client, message|
           # `select` with an `else` branch is the non-blocking send: a full
           # queue means the client is too far behind to be worth keeping.
           select
@@ -254,6 +279,11 @@ module Hwaro
       # We render the overlay client-side (not server-side) because a
       # whole-build failure produces no new HTML to inject into. The
       # overlay clears on the next `reload` or `clear-error` message.
+      # `css:<json>` swaps the matching stylesheets in place (see
+      # LiveReloadHandler#notify_css); the script opts in on connect. A swap
+      # still loading when the next `css:` arrives is retired and re-cloned
+      # from the original link, so overlapping saves never leave duplicates;
+      # a clone that fails to load falls back to a full reload.
       LIVE_RELOAD_SCRIPT = <<-JS
         <script>
         (function() {
@@ -284,10 +314,51 @@ module Hwaro
             var existing = document.getElementById(OVERLAY_ID);
             if (existing) existing.remove();
           }
+          function swapLink(link, href) {
+            var pending = link.__hwaroNext;
+            if (pending) {
+              pending.onload = pending.onerror = null;
+              pending.remove();
+            }
+            var next = link.cloneNode();
+            next.removeAttribute('integrity');
+            next.href = href;
+            next.__hwaroPending = true;
+            next.onload = function() {
+              next.__hwaroPending = false;
+              link.remove();
+            };
+            next.onerror = function() { location.reload(); };
+            link.__hwaroNext = next;
+            link.parentNode.insertBefore(next, link.nextSibling);
+          }
+          function swapCss(paths) {
+            var links = document.querySelectorAll('link[rel~="stylesheet"][href]');
+            var swapped = 0;
+            for (var i = 0; i < links.length; i++) {
+              if (links[i].__hwaroPending) continue;
+              var url = new URL(links[i].href, location.href);
+              if (url.origin !== location.origin) continue;
+              var path = url.pathname;
+              try { path = decodeURIComponent(path); } catch (e) {}
+              var match = paths.length === 0;
+              for (var j = 0; j < paths.length && !match; j++) {
+                match = path.slice(-paths[j].length) === paths[j];
+              }
+              if (!match) continue;
+              url.searchParams.set('__hwaro', Date.now());
+              swapLink(links[i], url.href);
+              swapped++;
+            }
+            if (swapped === 0) location.reload();
+          }
           function connect() {
             var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             var ws = new WebSocket(protocol + '//' + location.host + '/__hwaro_livereload');
-            ws.onopen = function() { reconnectDelay = 1000; };
+            ws.onopen = function() {
+              reconnectDelay = 1000;
+              ws.send('hello:css');
+            };
             ws.onmessage = function(event) {
               var data = event.data;
               if (data === 'reload') {
@@ -295,6 +366,11 @@ module Hwaro
                 location.reload();
               } else if (data === 'clear-error') {
                 clearError();
+              } else if (typeof data === 'string' && data.indexOf('css:') === 0) {
+                clearError();
+                var paths = [];
+                try { paths = JSON.parse(data.slice('css:'.length)).paths || []; } catch (e) {}
+                swapCss(paths);
               } else if (typeof data === 'string' && data.indexOf('error:') === 0) {
                 try {
                   var payload = JSON.parse(data.slice('error:'.length));
