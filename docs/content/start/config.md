@@ -336,6 +336,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[[content.generate]]` | [Content Generation](/features/content-generation/) | Materialize `site.data` records into pages |
 | `[[content.schema]]` | [Front Matter Schema](/writing/schema/) | Per-section front-matter types, required fields, enums, bounds and defaults |
 | `[[data.remote]]` | [Remote Data Sources](/features/remote-data/) | Fetch remote data into `site.data` at build time |
+| `[privacy]` | [Privacy Mode](/features/privacy/) | Self-host third-party fonts, scripts and images at build time |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
 | `[links]` | [Links](#links) | Broken internal `@/` link handling (warn or fail the build) |
