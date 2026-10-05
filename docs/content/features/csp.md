@@ -71,8 +71,21 @@ removes a default directive (`frame-ancestors = ""`); any other directive with
 an empty value is written without sources, which is how you add
 `upgrade-insecure-requests = ""`. Values may not contain `;` or `,`.
 
-`'unsafe-inline'` has no effect next to hashes: browsers ignore it as soon as
-a directive lists a hash. Do not count on it as a fallback.
+### Allowing Inline Code Hwaro Cannot Hash
+
+Browsers ignore `'unsafe-inline'` in a directive that also lists a hash. So
+when your `script-src` or `style-src` contains `'unsafe-inline'`, Hwaro adds
+no hashes to that directive; with `'unsafe-inline'` in `style-src` it also
+writes no `style-src-attr`. This is the opt-out for features that create
+styles while the page runs, which no hash can cover: Mermaid, MathJax and the
+`gist` and `tweet` shortcodes.
+
+```toml
+[csp.directives]
+style-src = "'self' 'unsafe-inline'"
+```
+
+Only styles are relaxed here; inline scripts still need their hashes.
 
 ## What Gets Hashed
 
@@ -121,6 +134,14 @@ own site, or a shortcode the page does not use, adds nothing.
 | `tweet` shortcode | `script-src`, `frame-src` `https://platform.twitter.com` |
 | `codepen` shortcode | `frame-src` `https://codepen.io` |
 
+The `gist` and `tweet` rows also match the shortcode's own markup
+(`class="sc-gist"`, `class="twitter-tweet"`). `[privacy]` can localize their
+scripts, but those scripts still load styles and frames from the original
+host at run time.
+
+Mermaid, MathJax, `gist` and `tweet` also add styles at run time, so they need
+the [style opt-out](#allowing-inline-code-hwaro-cannot-hash).
+
 A directive that is not set starts from the value the browser would have
 fallen back to (`frame-src` from `child-src`, then `default-src`), so adding a
 frame host keeps `'self'`.
@@ -142,9 +163,16 @@ file already has a block for a page's path that sets
 `Content-Security-Policy` (or `Content-Security-Policy-Report-Only` with
 `report_only`), your block wins and Hwaro writes no rule for that path.
 
+Hwaro logs each path where your block replaced its rule.
+
 Hosts combine every rule that matches a request. A `/*` rule of your own that
 also sets `Content-Security-Policy` is therefore sent as a second policy,
-and the browser enforces both, so do not set one alongside `[csp]`.
+and the browser enforces both, so do not set one alongside `[csp]`. Hwaro
+warns when your file has a CSP block on a path with `*` or `:`.
+
+Hosts read `:name` in a path as a placeholder and `*` as a wildcard, so a page
+whose URL contains `:`, `*` or a control character gets no rule (Hwaro warns
+and names it). Rename it, or use meta mode.
 
 Rules are per page because the format cannot list several paths in one rule.
 On this documentation site (about 160 pages in two languages) the file is about
@@ -152,8 +180,14 @@ On this documentation site (about 160 pages in two languages) the file is about
 has more. Netlify has no such limit. For larger sites on Cloudflare, use meta
 mode.
 
+Cloudflare Pages also limits a single header to 2000 characters. Each hash
+adds about 54, so Hwaro warns about pages whose policy is longer.
+
 A host serves `404.html` at the missing URL, where no rule matches, so the
-404 page gets no policy in headers mode.
+404 page gets no policy in headers mode. Likewise, Cloudflare Pages redirects
+`/page.html` to `/page`, so a rule for a page published as a file
+(`/404.html`, or `path = "x.html"`) may never match there and the page gets no
+policy. Use meta mode if those pages matter.
 
 ## Meta Mode
 
@@ -182,7 +216,7 @@ own to templates while `[csp]` is on.
   build.
 - **`[build] hooks.post`.** The policy is computed before post-build hooks
   run. If a hook changes a page's inline scripts or styles, Hwaro warns that
-  the page's policy no longer matches. Change the HTML in a template or in
+  the page's policy no longer matches and names the page. Change the HTML in a template or in
   `hooks.pre` instead.
 - **`hwaro serve`.** No policy is written. The live-reload client and the
   error overlay are inline and dev-only.
@@ -196,9 +230,15 @@ own to templates while `[csp]` is on.
 ## Limitations
 
 - Styles that a script creates at run time (a `<style>` element, or a
-  `style` attribute set through `setAttribute` or `innerHTML`) are blocked.
-  Mermaid and MathJax do this, so their output renders without its styles;
-  KaTeX works. Setting `element.style.color` from a script is allowed.
+  `style` attribute set through `setAttribute` or `innerHTML`) are blocked
+  unless you [opt out](#allowing-inline-code-hwaro-cannot-hash). Mermaid,
+  MathJax and the `gist` and `tweet` embeds do this; KaTeX does not. Setting
+  `element.style.color` from a script is allowed.
+- A `<style>` or `<script>` inside inline `<svg>` or `<math>` whose content
+  uses `<![CDATA[…]]>` or character references (`&amp;`) is blocked: the
+  browser hashes the decoded text there, Hwaro hashes the bytes. SVG icons
+  exported from design tools often carry CDATA; remove it, or move the styles
+  into a stylesheet.
 - `javascript:` URLs are blocked like event handler attributes.
 - The feature host table covers Hwaro's own features. Embeds in your own
   templates or Markdown need their hosts in `[csp.directives]`.

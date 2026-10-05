@@ -72,8 +72,21 @@ img-src = "'self' data: https://images.example.com"
 소스 없이 지시어만 씁니다. `upgrade-insecure-requests = ""`는 이렇게
 추가합니다. 값에는 `;`나 `,`를 넣을 수 없습니다.
 
-해시가 있으면 `'unsafe-inline'`은 효과가 없습니다. 지시어에 해시가 하나라도
-있으면 브라우저가 무시하므로, 대비책으로 기대하지 마세요.
+### Hwaro가 해시할 수 없는 인라인 코드 허용하기
+
+해시가 하나라도 있는 지시어에서는 브라우저가 `'unsafe-inline'`을 무시합니다.
+그래서 `script-src`나 `style-src`에 `'unsafe-inline'`이 있으면 Hwaro는 그
+지시어에 해시를 넣지 않고, `style-src`에 있으면 `style-src-attr`도 쓰지
+않습니다. 페이지가 실행되는 동안 스타일을 만들어서 어떤 해시로도 허용할 수
+없는 기능, 즉 Mermaid, MathJax, `gist`와 `tweet` 숏코드를 위한 예외 설정입니다.
+
+```toml
+[csp.directives]
+style-src = "'self' 'unsafe-inline'"
+```
+
+이렇게 하면 스타일만 느슨해지며, 인라인 스크립트에는 여전히 해시가
+필요합니다.
 
 ## 해시 대상
 
@@ -121,6 +134,14 @@ HTML 주석, `<textarea>`, `<title>` 안의 내용은 브라우저에게 마크�
 | `tweet` 숏코드 | `script-src`, `frame-src` `https://platform.twitter.com` |
 | `codepen` 숏코드 | `frame-src` `https://codepen.io` |
 
+`gist`와 `tweet` 행은 숏코드 자체의 마크업(`class="sc-gist"`,
+`class="twitter-tweet"`)도 찾습니다. `[privacy]`가 이들의 스크립트를 로컬로
+옮겨도, 그 스크립트는 실행 중에 원래 호스트에서 스타일과 프레임을 불러오기
+때문입니다.
+
+Mermaid, MathJax, `gist`, `tweet`은 실행 중에 스타일도 추가하므로
+[스타일 예외 설정](#hwaro가-해시할-수-없는-인라인-코드-허용하기)이 필요합니다.
+
 설정되지 않은 지시어는 브라우저가 대신 썼을 값(`frame-src`라면 `child-src`,
 그다음 `default-src`)에서 시작하므로, 프레임 호스트를 추가해도 `'self'`는
 남습니다.
@@ -142,9 +163,16 @@ ASCII가 아닌 경로는 브라우저가 요청하는 대로 퍼센트 인코�
 `Content-Security-Policy-Report-Only`)를 설정하면 사용자 블록이 우선하며,
 Hwaro는 그 경로의 규칙을 쓰지 않습니다.
 
+사용자 블록이 Hwaro의 규칙을 대신한 경로는 로그에 남깁니다.
+
 호스트는 요청에 맞는 규칙을 모두 합칩니다. 직접 만든 `/*` 규칙이
 `Content-Security-Policy`를 설정하면 두 번째 정책으로 함께 전송되고
-브라우저는 둘 다 적용하므로, `[csp]`와 함께 쓰지 마세요.
+브라우저는 둘 다 적용하므로, `[csp]`와 함께 쓰지 마세요. 사용자 파일에서
+`*`나 `:`가 들어간 경로의 블록이 CSP를 설정하면 Hwaro가 경고합니다.
+
+호스트는 경로의 `:name`을 자리표시자로, `*`를 와일드카드로 읽습니다. 그래서
+URL에 `:`, `*`, 제어 문자가 들어간 페이지에는 규칙을 쓰지 않으며, Hwaro가 그
+페이지를 밝혀 경고합니다. 이름을 바꾸거나 meta 모드를 쓰세요.
 
 이 형식은 규칙 하나에 여러 경로를 담을 수 없어서 규칙이 페이지마다 하나씩
 생깁니다. 이 문서 사이트(두 언어, 약 160페이지)에서는 파일이 약 50 KB입니다.
@@ -152,8 +180,14 @@ Cloudflare Pages는 규칙을 최대 100개까지만 읽으며, 이를 넘으면
 경고합니다. Netlify에는 이런 제한이 없습니다. Cloudflare에서 큰 사이트라면
 meta 모드를 쓰세요.
 
+Cloudflare Pages는 헤더 하나의 길이도 2000자로 제한합니다. 해시 하나가 약
+54자를 더하므로, 정책이 이보다 긴 페이지는 Hwaro가 경고합니다.
+
 호스트는 없는 URL에서 `404.html`을 내보내는데, 그 URL에 맞는 규칙이 없으므로
-headers 모드에서 404 페이지에는 정책이 붙지 않습니다.
+headers 모드에서 404 페이지에는 정책이 붙지 않습니다. 마찬가지로 Cloudflare
+Pages는 `/page.html`을 `/page`로 리다이렉트하므로, 파일로 게시되는 페이지
+(`/404.html`, `path = "x.html"`)의 규칙은 그곳에서 맞지 않을 수 있고 그
+페이지에는 정책이 붙지 않습니다. 이런 페이지가 중요하다면 meta 모드를 쓰세요.
 
 ## meta 모드
 
@@ -179,8 +213,8 @@ Hwaro는 그 위치에 있는 `<meta http-equiv="Content-Security-Policy">`를 �
 - **`--cache`.** 캐시된 페이지는 디스크에 있는 HTML로 해시하므로, 웜
   빌드도 콜드 빌드와 같은 `_headers` 파일과 같은 페이지를 씁니다.
 - **`[build] hooks.post`.** 정책은 빌드 후 훅이 돌기 전에 계산됩니다. 훅이
-  페이지의 인라인 스크립트나 스타일을 바꾸면 Hwaro가 그 페이지의 정책이 더
-  이상 맞지 않는다고 경고합니다. HTML은 템플릿이나 `hooks.pre`에서 바꾸세요.
+  페이지의 인라인 스크립트나 스타일을 바꾸면 Hwaro가 그 페이지를 밝혀 정책이
+  더 이상 맞지 않는다고 경고합니다. HTML은 템플릿이나 `hooks.pre`에서 바꾸세요.
 - **`hwaro serve`.** 정책을 쓰지 않습니다. 라이브 리로드 클라이언트와 오류
   오버레이가 인라인이고 개발 전용이기 때문입니다.
 - **`static/`과 `[content.files]`의 HTML**은 사용자 파일이므로 그대로
@@ -193,9 +227,16 @@ Hwaro는 그 위치에 있는 `<meta http-equiv="Content-Security-Policy">`를 �
 ## 제한 사항
 
 - 스크립트가 실행 중에 만드는 스타일(`<style>` 요소, 또는 `setAttribute`나
-  `innerHTML`로 넣은 `style` 속성)은 차단됩니다. Mermaid와 MathJax가 이렇게
-  하므로 결과물이 스타일 없이 그려집니다. KaTeX는 동작합니다. 스크립트에서
-  `element.style.color`를 설정하는 것은 허용됩니다.
+  `innerHTML`로 넣은 `style` 속성)은
+  [예외 설정](#hwaro가-해시할-수-없는-인라인-코드-허용하기)을 하지 않으면
+  차단됩니다. Mermaid, MathJax, `gist`와 `tweet` 임베드가 이렇게 하며, KaTeX는
+  그렇지 않습니다. 스크립트에서 `element.style.color`를 설정하는 것은
+  허용됩니다.
+- 인라인 `<svg>`나 `<math>` 안의 `<style>`, `<script>` 내용에
+  `<![CDATA[…]]>`나 문자 참조(`&amp;`)가 있으면 차단됩니다. 브라우저는 그곳에서
+  디코딩한 텍스트를 해시하지만 Hwaro는 바이트를 해시하기 때문입니다. 디자인
+  도구에서 내보낸 SVG 아이콘에는 CDATA가 흔하니, 이를 없애거나 스타일을
+  스타일시트로 옮기세요.
 - `javascript:` URL은 이벤트 핸들러 속성처럼 차단됩니다.
 - 기능 호스트 표는 Hwaro 자체 기능만 다룹니다. 직접 만든 템플릿이나
   Markdown의 임베드는 그 호스트를 `[csp.directives]`에 넣어야 합니다.
