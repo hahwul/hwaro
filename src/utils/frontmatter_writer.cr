@@ -26,19 +26,27 @@ module Hwaro
       # day's `23:00Z`).
       #
       # The bare-date shortcut applies only to a UTC or LOCAL-ZONE midnight —
-      # the shapes a parsed bare date actually takes (TOML parses one as
-      # local midnight, YAML as UTC midnight) — so authored bare dates
-      # round-trip unchanged through their own format. Note the UTC branch is
+      # the shapes a parsed bare date actually takes (local midnight; YAML
+      # gave UTC midnight before ext/yaml_local_time_fix) — so authored bare
+      # dates round-trip unchanged through their own format. Note the UTC branch is
       # deliberately lossy for an *authored* `...T00:00:00Z` timestamp when
       # the file is later reparsed as TOML (local zone); that trade-off keeps
       # YAML bare dates stable and predates this rule. A midnight with any
       # other fixed offset is a genuine timestamp: collapsing it to
       # `YYYY-MM-DD` silently shifted the instant, so it keeps its offset.
       # Fractional seconds are preserved in both timestamp forms.
+      #
+      # Any other local-zone value is a zone-less date-time as authored
+      # (`2024-01-02T03:04:05`, which TOML and YAML both parse in the local
+      # zone), so it is written without an offset rather than pinning the
+      # converting machine's zone. On a UTC machine it can't be told from an
+      # authored `Z`, so it stays `Z` there.
       def self.serialize_time(time : Time) : String
         midnight = time.hour == 0 && time.minute == 0 && time.second == 0 && time.nanosecond == 0
         if midnight && (time.offset == 0 || time.location == Time::Location.local)
           time.to_s("%Y-%m-%d")
+        elsif time.location == Time::Location.local && !time.location.utc?
+          "#{time.to_s("%Y-%m-%dT%H:%M:%S")}#{second_fraction(time.nanosecond)}"
         elsif time.offset == 0
           time.to_rfc3339(fraction_digits: rfc3339_fraction_digits(time.nanosecond))
         else

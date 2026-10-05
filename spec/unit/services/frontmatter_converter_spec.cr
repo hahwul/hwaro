@@ -915,8 +915,38 @@ describe Hwaro::Services::ConversionResult do
         converted.should_not contain("2026-06-30")
       end
     end
-  end
 
+    # Regression: a zone-less date-time was written with the converting
+    # machine's offset (`2024-01-02T03:04:05+09:00`), pinning that zone.
+    it "keeps a local date-time zone-less in every target format" do
+      saved = Time::Location.local
+      Time::Location.local = Time::Location.load("Asia/Seoul")
+      begin
+        Dir.mktmpdir do |dir|
+          converter = Hwaro::Services::FrontmatterConverter.new(dir)
+          file_path = File.join(dir, "post.md")
+          File.write(file_path, "+++\ntitle = \"Post\"\nupdated = 2024-01-02T03:04:05.5\nz = 2024-01-02T03:04:05Z\n+++\n\nContent")
+
+          converter.convert_to_yaml.converted_count.should eq(1)
+          File.read(file_path).should contain(%(updated: "2024-01-02T03:04:05.500"\n))
+          converter.convert_to_json.converted_count.should eq(1)
+          File.read(file_path).should contain(%("updated": "2024-01-02T03:04:05.500"))
+          converter.convert_to_toml.converted_count.should eq(1)
+          File.read(file_path).should contain(%(updated = "2024-01-02T03:04:05.500"\n))
+          File.read(file_path).should contain(%(z = "2024-01-02T03:04:05Z"\n))
+        end
+        Dir.mktmpdir do |dir|
+          converter = Hwaro::Services::FrontmatterConverter.new(dir)
+          file_path = File.join(dir, "post.md")
+          File.write(file_path, "---\ntitle: Post\nupdated: 2024-01-02T03:04:05\n---\n\nContent")
+          converter.convert_to_toml.converted_count.should eq(1)
+          File.read(file_path).should contain("updated = 2024-01-02T03:04:05\n")
+        end
+      ensure
+        Time::Location.local = saved
+      end
+    end
+  end
   describe "non-frontmatter leading blocks" do
     # Regression: a document whose first lines form a `---` … `---` pair that
     # is NOT a mapping (horizontal rule + prose, a list, an unclosed rule) was

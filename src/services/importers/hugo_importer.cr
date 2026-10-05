@@ -399,8 +399,9 @@ module Hwaro
         LOCAL_DATETIME_LINE_RE = /\A[ \t]*([A-Za-z0-9_-]+)[ \t]*=[ \t]*\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2}(?:\.\d+)?[ \t]*(?:#.*)?\z/
 
         # The (lowercased) top-level keys of a TOML front matter block whose
-        # value is a local date-time. Empty for YAML/JSON front matter, whose
-        # zone-less timestamps already parse as UTC on every machine.
+        # value is a local date-time. Empty for YAML/JSON front matter: JSON
+        # dates are strings, and a zone-less YAML timestamp parses in the local
+        # zone, which `serialize_time` already writes zone-less.
         private def toml_local_datetime_keys(raw : String) : Set(String)
           keys = Set(String).new
           return keys unless raw.starts_with?("+++") && (match = TOML_FM_REGEX.match(raw))
