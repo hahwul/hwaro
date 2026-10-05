@@ -25,6 +25,9 @@ module Hwaro
         property exported_count : Int32
         property skipped_count : Int32
         property error_count : Int32
+        # The part of `error_count` caused by unparseable front matter: a
+        # run that failed only on those is a content error, not an IO one.
+        property content_error_count : Int32
 
         def initialize(
           @success : Bool = true,
@@ -32,6 +35,7 @@ module Hwaro
           @exported_count : Int32 = 0,
           @skipped_count : Int32 = 0,
           @error_count : Int32 = 0,
+          @content_error_count : Int32 = 0,
         )
         end
       end
@@ -134,6 +138,13 @@ module Hwaro
         end
 
         abstract def run(options : Config::Options::ExportOptions) : ExportResult
+
+        # A per-file failure raised by `parse_content` (malformed TOML, YAML
+        # or JSON front matter, or front matter nested too deep).
+        protected def front_matter_error?(ex : Exception) : Bool
+          ex.is_a?(TOML::ParseException) || ex.is_a?(YAML::ParseException) ||
+            ex.is_a?(JSON::ParseException) || ex.is_a?(ArgumentError) || ex.is_a?(Utils::Nesting::TooDeep)
+        end
 
         # When set, the run resolves and reports every destination (counts,
         # manifest) but writes nothing to disk.

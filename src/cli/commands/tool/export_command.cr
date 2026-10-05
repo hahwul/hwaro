@@ -101,7 +101,7 @@ module Hwaro
                 "error_count"    => result.error_count,
                 "files"          => exporter.file_actions,
               }.to_json)
-              exit(Hwaro::Errors::EXIT_IO) unless result.success
+              exit(Hwaro::Errors.exit_for(failure_code(result))) unless result.success
               return
             end
 
@@ -111,10 +111,11 @@ module Hwaro
               # the exit code lands in the documented IO class. A run with
               # ANY per-file error fails here — `success` no longer reports
               # a partial export as clean.
+              code = failure_code(result)
               raise Hwaro::HwaroError.new(
-                code: Hwaro::Errors::HWARO_E_IO,
+                code: code,
                 message: result.message,
-                hint: "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
+                hint: code == Hwaro::Errors::HWARO_E_CONTENT ? "Fix the front matter errors listed above (hwaro tool validate names them)." : "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
               )
             end
 
@@ -126,6 +127,17 @@ module Hwaro
             overwritten = exporter.file_actions.count { |a| a.action == "overwritten" }
             if overwritten > 0
               Logger.warn "#{overwritten} existing file(s) #{options.dry_run ? "would be" : "were"} overwritten in #{options.output_dir} (re-exports replace previous output)."
+            end
+          end
+
+          # A run that failed only on unparseable front matter is a content
+          # error, as `build` and `tool validate` classify it; anything else
+          # (a missing content dir, an unwritable destination) is IO.
+          private def failure_code(result : Services::Exporters::ExportResult) : String
+            if result.error_count > 0 && result.content_error_count == result.error_count
+              Hwaro::Errors::HWARO_E_CONTENT
+            else
+              Hwaro::Errors::HWARO_E_IO
             end
           end
 

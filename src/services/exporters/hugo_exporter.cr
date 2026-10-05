@@ -32,6 +32,7 @@ module Hwaro
           exported = 0
           skipped = 0
           errors = 0
+          content_errors = 0
 
           files.each do |file_path|
             result = export_file(file_path, content_dir, output_dir, include_drafts, verbose)
@@ -41,6 +42,7 @@ module Hwaro
             end
           rescue ex
             errors += 1
+            content_errors += 1 if front_matter_error?(ex)
             Logger.warn "Error exporting #{file_path}: #{ex.message}"
           end
 
@@ -65,7 +67,8 @@ module Hwaro
             message: errors > 0 ? "#{errors} file(s) could not be exported (#{exported} exported, #{skipped} skipped)" : "Exported #{exported} items, skipped #{skipped}, errors #{errors}",
             exported_count: exported,
             skipped_count: skipped,
-            error_count: errors
+            error_count: errors,
+            content_error_count: content_errors
           )
         end
 

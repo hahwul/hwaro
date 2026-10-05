@@ -153,3 +153,24 @@ describe "convert regressions" do
     end
   end
 end
+
+# Regression: unparseable front matter failed `tool convert` with
+# HWARO_E_IO (exit 6) and a `-c DIR` hint, while build and validate classify
+# the same file as HWARO_E_CONTENT (exit 5), as docs/content/start/cli.md says.
+describe "convert: front-matter parse error class" do
+  it "raises HWARO_E_CONTENT when every failure is a front-matter parse error" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "bad.md"), "+++\ntitle = = broken\n+++\n\nBody.\n")
+
+      error = expect_raises(Hwaro::HwaroError) do
+        with_captured_log do
+          Hwaro::CLI::Commands::Tool::ConvertCommand.new.run(["to-yaml", "--content-dir", content_dir])
+        end
+      end
+      error.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+      error.hint.to_s.should_not contain("-c DIR")
+    end
+  end
+end
