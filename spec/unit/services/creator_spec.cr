@@ -652,6 +652,34 @@ describe Hwaro::Services::Creator do
         end
       end
 
+      it "refuses an explicit index.md or _index.md whose URL a flat page already claims" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            File.write("content/zz.md", "+++\ntitle = \"Z\"\n+++\n")
+            File.write("content/mm.markdown", "+++\ntitle = \"M\"\n+++\n")
+            {"zz/index.md", "zz/_index.md", "mm/index.md", "mm.md"}.each do |path|
+              options = Hwaro::Config::Options::NewOptions.new(path: path, title: "T")
+              err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+              err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+            end
+            Dir.exists?("content/zz").should be_false
+            File.exists?("content/mm.md").should be_false
+          end
+        end
+      end
+
+      it "keeps a .markdown path's extension" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(path: "x.markdown")
+            Hwaro::Services::Creator.new.run(options).should eq("content/x.markdown")
+            File.read("content/x.markdown").should contain(%(title = "X"))
+          end
+        end
+      end
+
       it "classifies a file squatting on a parent directory segment as HWARO_E_IO" do
         # Previously this unwound as a bare File::AlreadyExistsError — no
         # error code, no exit taxonomy, and an empty stdout in --json mode.
