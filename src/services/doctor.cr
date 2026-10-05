@@ -14,6 +14,7 @@ require "../utils/build_output"
 require "../content/menus"
 require "../content/processors/markdown"
 require "../content/processors/internal_link_resolver"
+require "../content/multilingual"
 require "../core/build/parallel"
 require "../core/build/shortcode_processor"
 require "./config_snippets"
@@ -99,6 +100,7 @@ module Hwaro
         check_directory_structure(issues, config)
         check_content_frontmatter(issues, config, template_names)
         if config
+          check_translations(issues, config)
           check_referenced_paths(issues, config)
           check_sass(issues, config)
         end

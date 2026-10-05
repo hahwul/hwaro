@@ -198,6 +198,43 @@ module Hwaro
         per_file.each { |arr| arr.each { |i| issues << i } }
       end
 
+      # Pages and sections that exist in the default language but not in
+      # another configured one, and translations with no default-language
+      # original. Pairing is the build's own: `Multilingual.link_translations!`
+      # over the files a default build publishes (ContentLister, so drafts and
+      # future/expired pages never count either way), with each file's
+      # language read the way ReadContent reads it. Info only: a partial
+      # translation is a normal state, not a defect `--strict` should fail on.
+      private def check_translations(issues : Array(Issue), config : Models::Config)
+        return unless config.multilingual? && Dir.exists?(@content_dir)
+
+        default = config.default_language
+        others = Content::Multilingual.ordered_language_codes(config) - [default]
+        menus = MenuScope.new(config)
+        entries = ContentLister.new(@content_dir).list_all.select(&.published?).sort_by!(&.path).map do |info|
+          page = Models::Page.new(Path[info.path].relative_to(@content_dir).to_s)
+          language = menus.filename_language(info.path)
+          page.language = language == default ? nil : language
+          {page, info.path}
+        end
+        Content::Multilingual.link_translations!(entries.map(&.[0]), config)
+
+        # Grouped per language, in configured order.
+        others.each do |other|
+          entries.each do |page, file|
+            code = Content::Multilingual.language_code(page, config)
+            codes = page.translations.empty? ? [code] : page.translations.map(&.code)
+            if code == default && !codes.includes?(other)
+              issues << Issue.new(id: "translation-missing", level: :info, category: "i18n", file: file,
+                message: "No '#{other}' translation", language: other)
+            elsif code == other && !codes.includes?(default)
+              issues << Issue.new(id: "translation-orphan", level: :info, category: "i18n", file: file,
+                message: "'#{other}' translation has no '#{default}' original", language: other)
+            end
+          end
+        end
+      end
+
       # The `[[menus.*]]` names a page may register into, resolved per
       # language exactly like `Content::Menus.build_for_language`: a
       # `[languages.<code>]` block with its own `menus` table REPLACES the

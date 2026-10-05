@@ -132,7 +132,7 @@ Available on every page of a versioned site. It is a list (`{% for v in versions
 | `versions.all` | The same list as a plain array |
 | `versions.size` | Number of versions |
 
-Like `page.url`, every URL above is site-relative, so prefix it with `{{ base_url }}` (or `{{ base_path }}`) in links so [subpath deployments](/start/config/#base-url) work.
+Like `page.url`, every URL above is site-relative, so prefix it with `{{ base_url }}` (or `{{ base_path }}`) in links so [subpath deployments](/start/config/#site-settings) work.
 
 ## Version Switcher Example
 

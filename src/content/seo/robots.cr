@@ -13,6 +13,12 @@ module Hwaro
             config.robots.rules.each do |rule|
               str << "User-agent: #{rule.user_agent.gsub('\n', ' ')}\n"
 
+              unless rule.content_signal.empty?
+                str << "Content-Signal: "
+                rule.content_signal.join(str, ", ") { |(name, value), io| io << name << '=' << (value ? "yes" : "no") }
+                str << '\n'
+              end
+
               rule.allow.each do |path|
                 str << "Allow: #{path.gsub('\n', ' ')}\n"
               end

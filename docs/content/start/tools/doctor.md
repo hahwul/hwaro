@@ -102,6 +102,31 @@ hwaro doctor --json
 
 - Section directories missing `_index.md`
 
+**Translation report** (sites with more than one language):
+
+- A page or section that exists in the default language but has no
+  counterpart in another configured language (`translation-missing`)
+- A translation with no default-language original (`translation-orphan`)
+
+Pages are paired exactly as the build pairs `page.translations` (same base
+name without the language suffix, so `about.md`, `about.en.md` and
+`about.ko.md` belong together), and only pages a default build publishes
+count: a draft or future-dated page neither has nor provides a translation.
+Both are `info` level, so `--strict` never fails on a partial translation.
+The human report groups them per language with counts:
+
+```
+Translations:
+  ko: 2 missing · 1 without original
+  [info] content/about.md: No 'ko' translation
+  [info] content/blog/_index.md: No 'ko' translation
+  [info] content/notes.ko.md: 'ko' translation has no 'en' original
+```
+
+Each language lists its first 10 issues, then `… and N more (use --json for
+all)`. In `--json` every issue is included and carries a `language` field. Silence
+either kind with `[doctor] ignore`.
+
 ## Example Output
 
 ```
@@ -133,6 +158,7 @@ hwaro: doctor
     [ok]   front matter menus (declared in config)
     [ok]   front matter templates (exist)
     [info] section index files (_index.md)
+    [ok]   translations (pages in every language)
 
 Config:
   [warn] config.toml: base_url is not set
@@ -239,6 +265,8 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `menu-undeclared` | content | Front matter menu name not declared in config |
 | `content-template-missing` | content | Front matter `template` / `page_template` / `[cascade] template` names a missing template |
 | `structure-missing-index` | structure | Section missing _index.md |
+| `translation-missing` | i18n | Page or section has no counterpart in a configured language |
+| `translation-orphan` | i18n | Translation has no default-language original |
 
 An entry that matches no rule id is reported as having no effect, so a typo
 in this list never passes silently.

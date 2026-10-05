@@ -284,6 +284,22 @@ describe "check-links section feed routes" do
     end
   end
 
+  it "resolves json feeds at feed.json" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "posts"))
+      File.write(File.join(dir, "posts", "_index.md"), "---\ntitle: Posts\ngenerate_feeds: true\n---\n")
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.feeds.type = "json"
+
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      routes = cmd.routes_for_test(config)
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/feed.json")], dir, routes).should be_empty
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/posts/feed.json")], dir, routes).should be_empty
+      cmd.resolve_with_routes_for_test([feed_link(dir, "/rss.xml")], dir, routes).should_not be_empty
+    end
+  end
+
   it "still rejects a section feed for a section that did not opt in" do
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "posts"))

@@ -35,7 +35,7 @@ weight = 3
 | default_language | string | "en" | Default language code |
 | language_name | string | — | Human-readable language name |
 | weight | int | 0 | Sort order (lower = first) |
-| generate_feed | bool | true | Generate RSS/Atom feed for this language |
+| generate_feed | bool | true | Generate the RSS/Atom/JSON feed for this language |
 | build_search_index | bool | true | Include in search index |
 | taxonomies | array | every `[[taxonomies]]` name | Taxonomies for this language; omit to inherit the global set, `[]` for none |
 
@@ -85,6 +85,8 @@ content/
 Hwaro automatically links translated pages based on their filenames. Pages with the same base name (without the language suffix) are considered translations of each other.
 
 For example, `hello.md`, `hello.ko.md`, and `hello.ja.md` are all linked as translations.
+
+To find pages that are not translated yet, run `hwaro doctor`: on a site with more than one language it lists, per language, every page or section missing a translation and every translation without a default-language original, using the same pairing. See [doctor](/start/tools/doctor/#what-it-checks).
 
 ### Template Variables
 
@@ -337,7 +339,7 @@ When the site is multilingual, Hwaro automatically generates separate RSS/Atom f
 | Non-default (e.g., `ko`) | `/ko/rss.xml` | Only Korean pages |
 | Non-default (e.g., `ja`) | `/ja/rss.xml` | Only Japanese pages |
 
-By default, the main site feed (`/rss.xml` or `/atom.xml`) includes **only default language pages**. You can change this behavior with the `default_language_only` option. Each non-default language with `generate_feed = true` gets its own feed under its language prefix regardless of this setting.
+By default, the main site feed (`/rss.xml`, `/atom.xml` or `/feed.json`) includes **only default language pages**. You can change this behavior with the `default_language_only` option. Each non-default language with `generate_feed = true` gets its own feed under its language prefix regardless of this setting.
 
 ### Configuration
 
@@ -367,7 +369,7 @@ Language feeds share the same `sections`, `limit`, `truncate`, and `full_content
 ```toml
 [feeds]
 enabled = true
-type = "rss"           # or "atom"
+type = "rss"           # or "atom", "json"
 limit = 20
 truncate = 0
 full_content = true    # false = description/summary only
@@ -379,6 +381,7 @@ default_language_only = true
 
 - **RSS feeds** include a `<language>` tag (e.g., `<language>ko</language>`)
 - **Atom feeds** include an `xml:lang` attribute (e.g., `<feed xmlns="..." xml:lang="ko">`)
+- **JSON feeds** include a top-level `"language"` field (e.g., `"language": "ko"`)
 - Feed title includes the language name: `"My Site (한국어)"`
 - Self-referencing links point to the correct language path (e.g., `https://example.com/ko/rss.xml`)
 - Draft pages and section index pages are excluded

@@ -54,8 +54,9 @@ describe "registration order" do
       "front matter menus (declared in config)",
       "front matter templates (exist)",
       "section index files (_index.md)",
+      "translations (pages in every language)",
     ])
-    Hwaro::Services::Doctor::KNOWN_ISSUE_IDS.size.should eq(36)
+    Hwaro::Services::Doctor::KNOWN_ISSUE_IDS.size.should eq(38)
     Hwaro::Services::ALL_BLOCKING_IDS.to_a.sort.should eq(
       ["config-not-found", "config-parse-error", "content-dir-missing", "template-dir-missing"]
     )
