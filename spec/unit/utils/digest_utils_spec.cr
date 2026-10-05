@@ -66,4 +66,65 @@ describe Hwaro::Utils::DigestUtils do
       digest.hexfinal.size.should eq(32)
     end
   end
+
+  # Subresource Integrity values are what browsers compare byte-for-byte
+  # against the fetched asset; the MDN reference vector pins the encoding.
+  describe ".sri" do
+    it "returns sha384 in base64 with the algorithm prefix" do
+      Hwaro::Utils::DigestUtils.sri("alert('Hello, world.');")
+        .should eq("sha384-H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO")
+    end
+  end
+
+  describe ".sri_file" do
+    it "hashes a file's bytes and returns nil for a missing file" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "a.js")
+        File.write(path, "alert('Hello, world.');")
+        Hwaro::Utils::DigestUtils.sri_file(path).should eq(Hwaro::Utils::DigestUtils.sri("alert('Hello, world.');"))
+        Hwaro::Utils::DigestUtils.sri_file(File.join(dir, "missing.js")).should be_nil
+        Hwaro::Utils::DigestUtils.sri_file(dir).should be_nil
+      end
+    end
+  end
+end
+
+describe Hwaro::Utils::SriCache do
+  it "memoizes per path, mtime and size until cleared" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "a.css")
+      File.write(path, "a{}")
+      stamp = Time.utc(2020, 1, 1)
+      File.utime(stamp, stamp, path)
+      Hwaro::Utils::SriCache.clear
+      Hwaro::Utils::SriCache.sri(path).should eq(Hwaro::Utils::DigestUtils.sri("a{}"))
+
+      # Same size and mtime: served from the memo, the file is not re-read.
+      File.write(path, "b{}")
+      File.utime(stamp, stamp, path)
+      Hwaro::Utils::SriCache.sri(path).should eq(Hwaro::Utils::DigestUtils.sri("a{}"))
+
+      # A different size (or mtime) is a different key.
+      File.write(path, "b{x}")
+      Hwaro::Utils::SriCache.sri(path).should eq(Hwaro::Utils::DigestUtils.sri("b{x}"))
+      Hwaro::Utils::SriCache.sri(File.join(dir, "missing.css")).should be_nil
+      Hwaro::Utils::SriCache.clear
+    end
+  end
+
+  it "reports files rewritten after their value was handed out" do
+    Dir.mktmpdir do |dir|
+      kept = File.join(dir, "kept.css")
+      changed = File.join(dir, "changed.css")
+      File.write(kept, "k{}")
+      File.write(changed, "c{}")
+      Hwaro::Utils::SriCache.clear
+      Hwaro::Utils::SriCache.sri(kept)
+      Hwaro::Utils::SriCache.sri(changed)
+      File.write(changed, "c{color:red}")
+      Hwaro::Utils::SriCache.stale.should eq([File.expand_path(changed)])
+      Hwaro::Utils::SriCache.clear
+      Hwaro::Utils::SriCache.stale.should be_empty
+    end
+  end
 end

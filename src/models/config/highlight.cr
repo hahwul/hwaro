@@ -42,28 +42,32 @@ module Hwaro
       end
 
       # Generate the CSS link tag for highlighting
-      def css_tag(cache_bust : String = "") : String
+      # `sri_root` (the build output directory) adds `integrity` to the
+      # self-hosted tags; CDN tags never get one (their bytes are unknown).
+      def css_tag(cache_bust : String = "", sri_root : String? = nil) : String
         return "" unless @enabled
         safe_theme = HTML.escape(@theme)
         if @use_cdn
           %(<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/#{safe_theme}.min.css">)
         else
           suffix = Models.cache_bust_suffix(cache_bust)
-          %(<link rel="stylesheet" href="/assets/css/highlight/#{safe_theme}.min.css#{suffix}">)
+          integrity = Models.integrity_attr(sri_root, "assets/css/highlight/#{@theme}.min.css")
+          %(<link rel="stylesheet" href="/assets/css/highlight/#{safe_theme}.min.css#{suffix}"#{integrity}>)
         end
       end
 
       # Generate the JS script tag for highlighting.
       # Server-side highlighting needs no JavaScript at all — unless the
       # copy button is on, whose (dependency-free) runtime ships either way.
-      def js_tag(cache_bust : String = "") : String
+      def js_tag(cache_bust : String = "", sri_root : String? = nil) : String
         return "" unless @enabled
         return copy ? COPY_SNIPPET : "" if server?
         hljs = if @use_cdn
                  %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
                else
                  suffix = Models.cache_bust_suffix(cache_bust)
-                 %(<script src="/assets/js/highlight.min.js#{suffix}"></script>\n<script>hljs.highlightAll();</script>)
+                 integrity = Models.integrity_attr(sri_root, "assets/js/highlight.min.js")
+                 %(<script src="/assets/js/highlight.min.js#{suffix}"#{integrity}></script>\n<script>hljs.highlightAll();</script>)
                end
         copy ? "#{hljs}\n#{COPY_SNIPPET}" : hljs
       end
@@ -84,10 +88,11 @@ module Hwaro
         HTML
 
       # Generate both CSS and JS tags
-      def tags(cache_bust : String = "") : String
+      def tags(cache_bust : String = "", sri_root : String? = nil) : String
         return "" unless @enabled
-        js = js_tag(cache_bust)
-        js.empty? ? css_tag(cache_bust) : "#{css_tag(cache_bust)}\n#{js}"
+        js = js_tag(cache_bust, sri_root)
+        css = css_tag(cache_bust, sri_root)
+        js.empty? ? css : "#{css}\n#{js}"
       end
     end
   end

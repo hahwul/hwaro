@@ -20,6 +20,8 @@ module Hwaro::Core::Build::Phases::Finalize
       end
       # Files a failed serve pass relocated away from (a no-op otherwise).
       settle_page_outputs(ctx.options.output_dir)
+      # Cache hits and fast-start's deferred pages were not rendered here.
+      write_html_stats(complete: ctx.stats.cache_hits == 0 && @deferred_pages.try(&.empty?) != false)
     end
     profiler.end_phase
     result

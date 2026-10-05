@@ -273,6 +273,120 @@ describe "serve watch-lane regressions" do
     end
   end
 
+  # Serve bakes the dev origin into its tags, so `[assets] sri` adds no
+  # integrity there (another host name for the same server would fail every
+  # check). `asset_integrity()` still answers, and the static lane — which
+  # only copies — must re-render so its value follows the bytes.
+  it "keeps asset_integrity() current after a static save and emits no sri tags" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "Watch Fixes"
+          base_url = "https://example.com"
+
+          [assets]
+          sri = true
+
+          [auto_includes]
+          enabled = true
+          dirs = ["inc"]
+          TOML
+        )
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static/inc")
+        FileUtils.mkdir_p("static/js")
+        File.write("templates/page.html", %({{ auto_includes_css }}<script integrity="{{ asset_integrity(name='js/app.js') }}"></script>))
+        File.write("content/page.md", "---\ntitle: Test\n---\nHello")
+        File.write("static/inc/a.css", "a{}")
+        File.write("static/js/app.js", "one()")
+
+        server = Hwaro::Services::Server.new
+        options = watch_options
+        options.cache_busting = false
+        server.watch_fixes_builder.run(options).should be_true
+        html = File.read("public/page/index.html")
+        html.should contain(%(<link rel="stylesheet" href="https://example.com/inc/a.css">))
+        html.should contain(Hwaro::Utils::DigestUtils.sri("one()"))
+
+        File.write("static/js/app.js", "two()")
+        log = with_captured_log do
+          server.watch_fixes_apply_changeset(watch_changeset(modified_static: ["static/js/app.js"]), options)
+        end
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("two()"))
+        log.should contain("asset_integrity()")
+        log.should_not contain("?v= hash")
+      end
+    end
+  end
+
+  # The content-files lane only copies too; an `asset_integrity()` naming a
+  # `[content.files]` asset must follow its new bytes.
+  it "keeps asset_integrity() current after a content-file save" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "Watch Fixes"
+          base_url = "https://example.com"
+
+          [content.files]
+          allow_extensions = ["js"]
+          TOML
+        )
+        FileUtils.mkdir_p("content/docs")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %(<script integrity="{{ asset_integrity(name='docs/app.js') }}"></script>))
+        File.write("content/page.md", "---\ntitle: Test\n---\nHello")
+        File.write("content/docs/app.js", "one()")
+
+        server = Hwaro::Services::Server.new
+        options = watch_options
+        server.watch_fixes_builder.run(options).should be_true
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("one()"))
+
+        File.write("content/docs/app.js", "two()")
+        changeset = Hwaro::Services::ChangeSet.new(
+          modified_content: [] of String, modified_templates: [] of String, modified_static: [] of String,
+          added_files: [] of String, removed_files: [] of String, config_changed: false,
+          modified_content_files: ["content/docs/app.js"],
+        )
+        server.watch_fixes_apply_changeset(changeset, options)
+        File.read("public/docs/app.js").should eq("two()")
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("two()"))
+      end
+    end
+  end
+
+  # `[build] write_stats` must cover the whole site after an incremental pass
+  # that re-renders one page, and the watcher must not see the rewrite.
+  it "updates hwaro_stats.json on an incremental pass without dropping other pages" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"https://example.com\"\n[build]\nwrite_stats = true\n")
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %(<p class="k-{{ page.extra.k }}">{{ content }}</p>))
+        File.write("content/a.md", "+++\ntitle = \"A\"\n[extra]\nk = \"a\"\n+++\na")
+        File.write("content/b.md", "+++\ntitle = \"B\"\n[extra]\nk = \"b\"\n+++\nb")
+
+        server = Hwaro::Services::Server.new
+        options = watch_options
+        server.watch_fixes_builder.run(options).should be_true
+        baseline = server.watch_fixes_scan_mtimes
+
+        File.write("content/a.md", "+++\ntitle = \"A\"\n[extra]\nk = \"a2\"\n+++\na")
+        server.watch_fixes_apply_changeset(watch_changeset(modified_content: ["content/a.md"]), options)
+
+        classes = JSON.parse(File.read("hwaro_stats.json"))["htmlElements"]["classes"].as_a.map(&.as_s)
+        classes.should contain("k-a2")
+        classes.should contain("k-b")
+        changes = server.watch_fixes_detect_changes(baseline, server.watch_fixes_scan_mtimes)
+        changes.modified_content.should eq(["content/a.md"])
+        (changes.added_files + changes.removed_files + changes.modified_static).should be_empty
+      end
+    end
+  end
+
   # The static-only strategy re-renders nothing, so a `static/` file that
   # publishes where a page renders replaced that page on its own URL for the
   # rest of the session (incremental rebuilds only touch changed content).

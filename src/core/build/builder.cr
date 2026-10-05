@@ -52,6 +52,7 @@ require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/digest_utils"
+require "../../utils/html_stats"
 require "../../utils/errors"
 require "../../utils/file_safe"
 require "../../utils/logger"
@@ -312,6 +313,11 @@ module Hwaro
         # every auto-include asset — O(site) work for one page — and silently
         # used cache_busting defaults instead of the build's options.
         @render_global_vars : Hash(String, Crinja::Value)? = nil
+        # `[build] write_stats`: tags/classes/ids of every HTML page this
+        # Builder wrote, flushed to `hwaro_stats.json`. Nil when the feature
+        # is off. Replaced per full build; serve's incremental passes keep
+        # adding to it.
+        @html_stats : Utils::HtmlStats? = nil
         # Pages stashed by `--fast-start` during the initial build so the
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
@@ -687,6 +693,7 @@ module Hwaro
           # command line left at its default. Applied before the BuildContext is
           # built so every phase (and the output guard) sees the same values.
           options.apply_build_config!(config.build)
+          @html_stats = config.build.write_stats ? Utils::HtmlStats.new : nil
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post
 
@@ -737,6 +744,9 @@ module Hwaro
           # one filesystem timestamp tick does not move; a build must read
           # the data files as they are now, not as a previous build saw them.
           Content::Processors::TemplateEngine.clear_load_data_cache
+          # Same for the SRI digests (keyed on mtime + size, so this is
+          # belt-and-braces) and the record `hooks.post` is checked against.
+          Utils::SriCache.clear
           # Same lifetime for the once-per-BUILD shortcode warnings (missing
           # template, unclosed block): a `serve` session that never cleared them
           # reported each name only for the first rebuild it appeared in.
@@ -799,9 +809,13 @@ module Hwaro
 
           # Run post-build hooks
           unless post_hooks.empty?
+            # Files already off their printed value were changed by the build
+            # itself (Write's minify, Finalize's prune), not by the hooks.
+            stale_before = Utils::SriCache.stale.to_set
             unless Utils::CommandRunner.run_post_hooks(post_hooks)
               Logger.warn "Post-build hooks failed, but build was successful."
             end
+            warn_integrity_changed_by_post_hooks(stale_before)
           end
 
           if options.debug
@@ -811,6 +825,16 @@ module Hwaro
           end
 
           true
+        end
+
+        # The pages carry `integrity` values hashed during Render; a post hook
+        # that rewrote one of those files (a minifier over public/) makes the
+        # browser block it. Nothing re-renders after the hooks, so say so.
+        private def warn_integrity_changed_by_post_hooks(stale_before : Set(String))
+          Utils::SriCache.stale.each do |path|
+            next if stale_before.includes?(path)
+            Logger.warn "[build] hooks.post changed #{path} after its integrity was printed into pages; browsers will block it. Rewrite it in hooks.pre (into static/) instead."
+          end
         end
 
         # Emit the end-of-build cache statistics at the requested verbosity.

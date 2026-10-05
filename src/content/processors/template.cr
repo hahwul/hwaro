@@ -497,6 +497,9 @@ module Hwaro
 
         ENV_READ_PREFIX  = "env:"
         FILE_READ_PREFIX = "file:"
+        # `asset_integrity(name)`: the value is the integrity of what the name
+        # resolves to (see AssetHooks.integrity), wherever the output lives.
+        ASSET_READ_PREFIX = "asset:"
 
         def self.record_render_read(key : String) : Nil
           @@render_reads_mutex.synchronize { @@render_reads << key }
@@ -675,6 +678,20 @@ module Hwaro
 
           # asset_url is an alias for asset
           @env.functions["asset_url"] = @env.functions["asset"]
+
+          # asset_integrity() - Subresource Integrity value of the file
+          # asset() points to, over its emitted bytes (after minify and
+          # fingerprint). Recorded as a render read by NAME, so `--cache`
+          # re-renders when the bytes move even if the name does not — for
+          # any output directory, inside the project or not.
+          # Usage: integrity="{{ asset_integrity(name="main.css") }}"
+          @env.functions["asset_integrity"] = Crinja.function({name: ""}) do
+            asset_name = arguments["name"].to_s
+            TemplateEngine.record_render_read(ASSET_READ_PREFIX + asset_name)
+            sri = Content::Hooks::AssetHooks.integrity(asset_name)
+            raise Crinja::RuntimeError.new("asset_integrity: unknown asset '#{asset_name}' (no emitted file)") unless sri
+            Crinja::Value.new(sri)
+          end
         end
 
         private def register_env_function

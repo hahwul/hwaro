@@ -66,6 +66,7 @@ module Hwaro::Core::Build::Phases::Write
     output_path = File.join(output_dir, "404.html")
     Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
     Hwaro::Utils::FileSafe.atomic_write(output_path, final_html)
+    record_html_stats(final_html)
     # 404 is rewritten on every build, so its live claim should not depend on
     # the filesystem's mtime precision when a static 404.html was removed.
     claim_generated_output(output_path)
@@ -172,13 +173,27 @@ module Hwaro::Core::Build::Phases::Write
     count
   end
 
+  # `{source, destination}` of each of `page`'s bundle assets. Nil when the
+  # page URL is unpublishable (a traversing segment); empty when its
+  # directory resolves outside the output directory.
+  private def bundle_asset_destinations(page : Models::Page, output_dir : String) : Array({String, String})?
+    return unless safe_url_path = url_output_path(page.url.lchop("/"))
+    dest_dir = File.join(output_dir, safe_url_path)
+    return [] of {String, String} unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
+    # Page bundle directory relative to content/
+    page_bundle_dir = File.dirname(page.path)
+    page.assets.map do |asset_path|
+      # asset_path is relative to content/ (e.g. "blog/post/image.jpg");
+      # the destination keeps its path inside the bundle (e.g. "image.jpg").
+      relative_to_bundle = Path[asset_path].relative_to(page_bundle_dir)
+      {File.join("content", asset_path), File.join(dest_dir, relative_to_bundle.to_s)}
+    end
+  end
+
   # Process co-located assets for pages
   private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new)
     pages.each do |page|
       next if page.assets.empty?
-
-      # Page bundle directory relative to content/
-      page_bundle_dir = File.dirname(page.path)
 
       # Destination directory matches the page's URL structure
       # page.url typically starts with / and ends with /, e.g., /blog/post/
@@ -190,22 +205,13 @@ module Hwaro::Core::Build::Phases::Write
       # the output directory — outside it — on every build, even though the
       # per-file guard below then correctly refused every asset in it.
       # Nothing creates the directory now until an asset is actually copied.
-      safe_url_path = url_output_path(page.url.lchop("/"))
-      unless safe_url_path
+      pairs = bundle_asset_destinations(page, output_dir)
+      unless pairs
         Logger.warn "Skipping bundle assets for #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory."
         next
       end
-      dest_dir = File.join(output_dir, safe_url_path)
-      next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
 
-      page.assets.each do |asset_path|
-        # asset_path is relative to content/ (e.g. "blog/post/image.jpg")
-        source_path = File.join("content", asset_path)
-
-        # Calculate relative path inside the bundle (e.g. "image.jpg")
-        relative_to_bundle = Path[asset_path].relative_to(page_bundle_dir)
-        dest_path = File.join(dest_dir, relative_to_bundle.to_s)
-
+      pairs.each do |source_path, dest_path|
         next unless File.exists?(source_path)
 
         # A symlinked bundle asset whose target escapes the project would
@@ -264,6 +270,22 @@ module Hwaro::Core::Build::Phases::Write
     end
   end
 
+  # `[build] write_stats`: fold one written HTML page into the collector.
+  def record_html_stats(html : String) : Nil
+    @html_stats.try(&.add(html))
+  end
+
+  # Flush the collector to `hwaro_stats.json`. `complete` means every page
+  # rendered into this collector, so it replaces the file; a partial pass
+  # (`--cache` hits, fast-start, serve's incremental passes) folds the
+  # previous file in instead — a superset, so a selector only a removed or
+  # edited page used lingers until the next build that renders every page.
+  def write_html_stats(complete : Bool) : Nil
+    return unless stats = @html_stats
+    stats.merge_file(Utils::HtmlStats::FILE) unless complete
+    stats.write(Utils::HtmlStats::FILE)
+  end
+
   private def write_output(page : Models::Page, output_dir : String, content : String, verbose : Bool)
     # A page that lost an output-path collision renders normally (its content
     # still feeds listings/feeds/search) but must not race the winner on disk.
@@ -281,6 +303,7 @@ module Hwaro::Core::Build::Phases::Write
 
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+    record_html_stats(content)
     note_published_page
     Logger.action :create, output_path if verbose
   end

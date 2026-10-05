@@ -11,7 +11,8 @@
 #
 #   * build-derived globals — the fingerprinted `asset()` bundle names (the
 #     AfterInitialize asset hook produces them AFTER the key is set) and the
-#     `[auto_includes]` / local-highlight tags with their `?v=` digest;
+#     `[auto_includes]` / local-highlight tags with their `?v=` digest and,
+#     under `[assets] sri`, their `integrity` digests;
 #   * reads made mid-render — `env()`, `load_data()` of a file outside data/,
 #     and the source image behind `resize_image()`.
 #
@@ -32,7 +33,12 @@ module Hwaro::Core::Build::Phases::Render
     Utils::DigestUtils.update_length_prefixed(digest, cache_bust)
     # The tag list itself, not just the digest: an empty file added to an
     # auto-include dir adds a `<link>` without moving `?v=`.
-    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust))
+    sri_root = sri_root(config)
+    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust, sri_root))
+    # `[assets] sri` prints a digest of the emitted bytes into the tags; the
+    # `?v=` above is "" under --skip-cache-busting and never covers the
+    # highlight files' bytes, so fold the tags themselves.
+    Utils::DigestUtils.update_length_prefixed(digest, config.highlight.tags(cache_bust, sri_root)) if sri_root
     digest.hexfinal
   end
 
@@ -120,6 +126,9 @@ module Hwaro::Core::Build::Phases::Render
       rescue File::Error | IO::Error
         "<unreadable>"
       end
+    elsif key.starts_with?(Content::Processors::TemplateEngine::ASSET_READ_PREFIX)
+      name = key[Content::Processors::TemplateEngine::ASSET_READ_PREFIX.size..]
+      Content::Hooks::AssetHooks.integrity(name, record: false) || "<absent>"
     else
       ""
     end

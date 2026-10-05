@@ -23,6 +23,8 @@ module Hwaro::Core::Build::Phases::Render
     # fingerprint of those sets into the rebuild decision.
     @unpublished_pages.set(0)
     @published_pages.set(0)
+    publish_asset_sources(ctx)
+
     # What templates read outside the tracked files (see render_inputs.cr):
     # compared BEFORE the filter, so a change re-renders every page.
     render_globals = ""
@@ -47,7 +49,14 @@ module Hwaro::Core::Build::Phases::Render
                        # render in a later pass, so persisting the new fingerprint
                        # now would let the next build skip them while stale.
                        build_cache.record_set_fingerprints(page_set_fp, section_set_fp) unless ctx.options.fast_start
-                       filtered
+                       # `[build] write_stats` extends the previous stats file
+                       # with what a partial build renders; with that file gone
+                       # or corrupt, only a full render can list every page.
+                       if @html_stats && !Utils::HtmlStats.valid_file?(Utils::HtmlStats::FILE)
+                         all_pages
+                       else
+                         filtered
+                       end
                      else
                        all_pages
                      end

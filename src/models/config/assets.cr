@@ -21,21 +21,22 @@ module Hwaro
         @sass_enabled = false
       end
 
-      # Generate CSS link tags for files in configured directories
-      def css_tags(base_url : String = "", cache_bust : String = "") : String
-        collect_tags("css", base_url, cache_bust) do |url|
-          %(<link rel="stylesheet" href="#{url}">)
+      # Generate CSS link tags for files in configured directories.
+      # `sri_root` (the build output directory) adds `integrity` attributes.
+      def css_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil) : String
+        collect_tags("css", base_url, cache_bust, sri_root) do |url, integrity|
+          %(<link rel="stylesheet" href="#{url}"#{integrity}>)
         end
       end
 
       # Generate JS script tags for files in configured directories
-      def js_tags(base_url : String = "", cache_bust : String = "") : String
-        collect_tags("js", base_url, cache_bust) do |url|
-          %(<script src="#{url}"></script>)
+      def js_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil) : String
+        collect_tags("js", base_url, cache_bust, sri_root) do |url, integrity|
+          %(<script src="#{url}"#{integrity}></script>)
         end
       end
 
-      private def collect_tags(extension : String, base_url : String, cache_bust : String, & : String -> String) : String
+      private def collect_tags(extension : String, base_url : String, cache_bust : String, sri_root : String?, & : String, String -> String) : String
         return "" unless @enabled
         return "" if @dirs.empty?
 
@@ -60,16 +61,16 @@ module Hwaro
 
           files.sort.each do |file|
             relative_path = file.sub(/^static\/?/, "/")
-            tags << yield(HTML.escape("#{base_url}#{relative_path}#{suffix}"))
+            tags << yield(HTML.escape("#{base_url}#{relative_path}#{suffix}"), Models.integrity_attr(sri_root, relative_path))
           end
         end
         tags.join("\n")
       end
 
       # Generate both CSS and JS tags
-      def all_tags(base_url : String = "", cache_bust : String = "") : String
-        css = css_tags(base_url, cache_bust)
-        js = js_tags(base_url, cache_bust)
+      def all_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil) : String
+        css = css_tags(base_url, cache_bust, sri_root)
+        js = js_tags(base_url, cache_bust, sri_root)
         Models.join_tags(css, js)
       end
     end
@@ -91,8 +92,14 @@ module Hwaro
       property source_dir : String
       property output_dir : String
       property bundles : Array(AssetBundleConfig)
+      # Subresource Integrity: the local `<link>`/`<script>` tags Hwaro emits
+      # (auto-includes, self-hosted highlight assets) carry
+      # `integrity="sha384-…"` over the emitted bytes. Independent of
+      # `enabled`; `asset_integrity()` works either way.
+      property sri : Bool
 
       def initialize
+        @sri = false
         @enabled = false
         @minify = true
         @fingerprint = true
@@ -228,6 +235,7 @@ module Hwaro
         config.assets.enabled = bool_value(s["enabled"]?, config.assets.enabled)
         config.assets.minify = bool_value(s["minify"]?, config.assets.minify)
         config.assets.fingerprint = bool_value(s["fingerprint"]?, config.assets.fingerprint)
+        config.assets.sri = bool_value(s["sri"]?, config.assets.sri)
         config.assets.source_dir = s["source_dir"]?.try(&.as_s?) || config.assets.source_dir
         config.assets.output_dir = s["output_dir"]?.try(&.as_s?) || config.assets.output_dir
 
