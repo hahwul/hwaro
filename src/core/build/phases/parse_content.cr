@@ -321,9 +321,6 @@ module Hwaro::Core::Build::Phases::ParseContent
   # spaces), so an include stays inside its list item or quote.
   INCLUDE_PREFIX_RE = /\A[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?\z/
   LIST_MARKER_RE    = /[-*+]|\d{1,9}[.)]/
-  # A line opening or closing a `$$` display-math block (an odd `$$` count
-  # once blockquote markers are gone).
-  DISPLAY_MATH_RE = /\A[ \t>]*\$\$/
 
   # `content` with its include calls and transclusions replaced by the text
   # they name (see Content::Processors::Includes). Runs before shortcodes,
@@ -339,35 +336,48 @@ module Hwaro::Core::Build::Phases::ParseContent
     transclude = !@wikilink_index.nil? && Utils::ByteScan.includes?(content, "![[")
     return content unless transclude || Utils::ByteScan.includes?(content, "include_")
     chain ||= [File.join("content", page.path)]
-    math = site.config.markdown.math
+    math = transclude && site.config.markdown.math
     map_shortcode_chunks(content) do |chunk|
       masked, spans = mask_inline_code(chunk)
       masked = mask_raw_blocks(masked, spans)
-      # The chunk walk does not split at a fence inside a block-shortcode
-      # body; this tracker sees only body lines and keeps those literal.
-      body_lines = block_body_lines(masked)
-      body_fences = Content::Processors::FenceTracker.new(raw_html_code: false)
-      # What the wikilink rewrite leaves alone: raw HTML blocks (and code).
-      verbatim_lines = Content::Processors::FenceTracker.new
-      in_math = false
-      expanded = String.build(masked.bytesize) do |io|
-        masked.each_line(chomp: false).with_index do |line, i|
-          fenced = (body_lines[i]? || false) && body_fences.fence_line?(line)
-          verbatim = verbatim_lines.fence_line?(line) || verbatim_lines.html_block_line?
-          math_line = in_math
-          in_math = !in_math if math && DISPLAY_MATH_RE.matches?(line) && line.scan("$$").size.odd?
-          if fenced
-            io << line
-          elsif transclude && !verbatim && !math_line && (m = TRANSCLUDE_LINE_RE.match(line)) &&
-                (spliced = transclusion(m[2], m[1], page, site, chain))
-            io << spliced
-            io << '\n' if line.ends_with?('\n')
-          else
-            io << expand_include_calls(line, spans, page, site, chain)
-          end
+      # With `[markdown] math`, math is stashed out first, as the wikilink
+      # walk does, so an embed inside display math stays literal.
+      expanded = if math && masked.includes?('$')
+                   Content::Processors::MarkdownExtensions.protect_math(masked) do |stashed, sources|
+                     expand_include_lines(stashed, sources, spans, transclude, page, site, chain)
+                   end
+                 else
+                   expand_include_lines(masked, [] of String, spans, transclude, page, site, chain)
+                 end
+      unmask_inline_code(expanded, spans)
+    end
+  end
+
+  # The line pass of `expand_includes` over one masked chunk (math stashed
+  # as `math_sources` when on; include calls see the math restored).
+  private def expand_include_lines(text : String, math_sources : Array(String), spans : Array(String), transclude : Bool,
+                                   page : Models::Page, site : Models::Site, chain : Array(String)) : String
+    # The chunk walk does not split at a fence inside a block-shortcode
+    # body; this tracker sees only body lines and keeps those literal.
+    body_lines = block_body_lines(text)
+    body_fences = Content::Processors::FenceTracker.new(raw_html_code: false)
+    # What the wikilink rewrite leaves alone: raw HTML blocks (and code).
+    verbatim_lines = Content::Processors::FenceTracker.new
+    String.build(text.bytesize) do |io|
+      text.each_line(chomp: false).with_index do |line, i|
+        fenced = (body_lines[i]? || false) && body_fences.fence_line?(line)
+        verbatim = verbatim_lines.fence_line?(line) || verbatim_lines.html_block_line?
+        if fenced
+          io << line
+        elsif transclude && !verbatim && (m = TRANSCLUDE_LINE_RE.match(line)) &&
+              (spliced = transclusion(m[2], m[1], page, site, chain))
+          io << spliced
+          io << '\n' if line.ends_with?('\n')
+        else
+          line = Content::Processors::MarkdownExtensions.restore_math(line, math_sources) unless math_sources.empty?
+          io << expand_include_calls(line, spans, page, site, chain)
         end
       end
-      unmask_inline_code(expanded, spans)
     end
   end
 
@@ -499,7 +509,9 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
     body = expand_includes(body, page, site, chain + [key]).rstrip('\n')
     source = HTML.escape(site.config.with_base_path(target.url))
-    %(<div class="transclusion" data-source="#{source}">\n\n#{body}\n\n</div>).gsub('\n', "\n#{prefix}").insert(0, prefix)
+    # The closing blank line ends the `</div>` HTML block, so the next line
+    # is Markdown again (otherwise it is raw HTML, dropped under `safe`).
+    %(<div class="transclusion" data-source="#{source}">\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
   end
 
   private def include_output_dir : String?

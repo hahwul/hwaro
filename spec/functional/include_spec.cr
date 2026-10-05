@@ -338,3 +338,47 @@ describe "include and transclusion edge cases" do
     end
   end
 end
+
+describe "transclusion and the Markdown after it" do
+  a = "+++\ntitle = \"A\"\n+++\nALPHA\n"
+  body = "intro\n![[a]]\nNext **bold** line.\n## Heading after\n\n- item\n  ![[a]]\n  more in item\n"
+
+  {false, true}.each do |safe|
+    it "parses the line after an embed as Markdown (safe = #{safe})" do
+      in_include_project({
+        "config.toml"  => %(title = "t"\nbase_url = "https://example.com"\n[markdown]\nwikilinks = true\nsafe = #{safe}\n),
+        "content/a.md" => a,
+        "content/p.md" => page(body),
+      }) do
+        include_build.should be_true
+        html = File.read("public/p/index.html")
+        html.should contain("<strong>bold</strong>")
+        html.should contain(%(<h2 id="heading-after">Heading after</h2>))
+        html.should contain("more in item")
+        html.should_not contain("Next **bold**")
+        html.scan("ALPHA").size.should eq(2)
+      end
+    end
+  end
+
+  it "transcludes after a display-math block closed at the end of a line" do
+    in_include_project({
+      "config.toml"  => %(title = "t"\nbase_url = "https://example.com"\n[markdown]\nwikilinks = true\nmath = true\n),
+      "content/a.md" => a,
+      "content/p.md" => page("$$\\begin{aligned}\na &= b\n\\end{aligned}$$\n\n![[a]]\n\n$$ c\nd $$\n\n![[a]]"),
+    }) do
+      include_build.should be_true
+      File.read("public/p/index.html").scan("ALPHA").size.should eq(2)
+    end
+  end
+end
+
+describe "the block form of include_*" do
+  it "is still a missing shortcode" do
+    in_include_project({"content/p.md" => page(%({% include_md(path="examples/a.txt") %}\nbody\n{% end %}))}) do
+      log = with_captured_log { include_build.should be_true }
+      log.should contain("shortcodes/include_md")
+      File.read("public/p/index.html").should contain("<!-- hwaro: missing shortcode 'include_md' -->")
+    end
+  end
+end
