@@ -430,6 +430,40 @@ describe Hwaro::Content::Processors::ImageProcessor do
       result.should_not be_nil
       result.not_nil![0].starts_with?("data:image/jpeg;base64,").should be_true
     end
+
+    # JPEG has no alpha: the placeholder used to keep the black color bytes
+    # under transparent pixels, so a logo's transparent border went black.
+    it "flattens transparent pixels onto white and weights the color by alpha" do
+      w = 16_i32
+      h = 16_i32
+      pixel_data = Bytes.new(w * h * 4, 0_u8) # transparent black
+      (4...12).each do |y|
+        (4...12).each do |x|
+          o = (y * w + x) * 4
+          pixel_data[o] = 255_u8     # R
+          pixel_data[o + 3] = 255_u8 # A
+        end
+      end
+
+      result = Hwaro::Content::Processors::ImageProcessor.generate_lqip_with_color(
+        pixel_data.to_unsafe, w, h, 4, 16, 90
+      ).not_nil!
+      result[1].should eq("#ff0000")
+
+      Dir.mktmpdir do |dir|
+        jpg = File.join(dir, "lqip.jpg")
+        File.write(jpg, Base64.decode(result[0].lchop("data:image/jpeg;base64,")))
+        jw = uninitialized LibC::Int
+        jh = uninitialized LibC::Int
+        jc = uninitialized LibC::Int
+        decoded = LibStb.stbi_load(jpg, pointerof(jw), pointerof(jh), pointerof(jc), 3)
+        begin
+          3.times { |c| decoded[c].should be > 240 } # top-left corner is white
+        ensure
+          LibStb.stbi_image_free(decoded.as(Void*))
+        end
+      end
+    end
   end
 
   describe ".dominant_color" do
@@ -471,14 +505,14 @@ describe Hwaro::Content::Processors::ImageProcessor do
       result.should eq("#808080")
     end
 
-    it "treats 2-channel (gray+alpha) as grayscale, ignoring alpha" do
+    it "treats 2-channel (gray+alpha) as grayscale" do
       w = 2_i32
       h = 2_i32
       channels = 2_i32
       pixel_data = Bytes.new(w * h * channels)
       (w * h).times do |i|
         pixel_data[i * 2] = 100_u8     # gray
-        pixel_data[i * 2 + 1] = 255_u8 # alpha (should be ignored)
+        pixel_data[i * 2 + 1] = 255_u8 # alpha
       end
 
       result = Hwaro::Content::Processors::ImageProcessor.dominant_color(
@@ -487,7 +521,7 @@ describe Hwaro::Content::Processors::ImageProcessor do
       result.should eq("#646464") # 100 = 0x64, all RGB channels same
     end
 
-    it "handles RGBA by ignoring alpha channel" do
+    it "leaves the RGBA average unchanged under uniform alpha" do
       w = 2_i32
       h = 2_i32
       channels = 4_i32
@@ -496,7 +530,7 @@ describe Hwaro::Content::Processors::ImageProcessor do
         pixel_data[i * 4] = 100_u8     # R
         pixel_data[i * 4 + 1] = 150_u8 # G
         pixel_data[i * 4 + 2] = 200_u8 # B
-        pixel_data[i * 4 + 3] = 50_u8  # A (should be ignored)
+        pixel_data[i * 4 + 3] = 50_u8  # A
       end
 
       result = Hwaro::Content::Processors::ImageProcessor.dominant_color(

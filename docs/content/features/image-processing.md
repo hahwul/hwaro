@@ -143,6 +143,8 @@ When LQIP is enabled, `resize_image()` returns two additional properties: `lqip`
 
 When LQIP is disabled, `lqip` and `dominant_color` return empty strings, so templates work without changes.
 
+For images with transparency (PNG logos, icons), `dominant_color` is weighted by opacity, so transparent pixels do not darken it, and the `lqip` JPEG (which has no alpha channel) shows transparent areas as white.
+
 ## Live Demo
 
 ### Resize Demo
