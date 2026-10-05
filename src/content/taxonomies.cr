@@ -622,6 +622,10 @@ module Hwaro
         # build, and this generator only ever writes the terms that exist).
         builder.try(&.claim_generated_output(output_path))
 
+        if builder && output_path.ends_with?(".html")
+          content = builder.privacy_rewrite(content)
+        end
+
         begin
           Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
           Hwaro::Utils::FileSafe.atomic_write(output_path, content)

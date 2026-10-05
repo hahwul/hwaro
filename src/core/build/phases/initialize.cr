@@ -94,6 +94,7 @@ module Hwaro::Core::Build::Phases::Initialize
       site = Models::Site.new(config)
       @site = site
       load_data_files(site, config, ctx.options.serve_mode)
+      @privacy = config.privacy.enabled ? Privacy.new(config, output_dir, config.assets.sri ? output_dir : nil) : nil
       collect_git_info(config)
 
       # Load i18n translations

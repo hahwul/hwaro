@@ -62,6 +62,7 @@ module Hwaro::Core::Build::Phases::Write
     final_html = apply_template(template, content, page, site, section_list, toc, templates, template_name: "404", global_vars: global_vars)
 
     final_html = Utils::HtmlMinifier.minify(final_html) if minify
+    final_html = privacy_rewrite(final_html)
 
     output_path = File.join(output_dir, "404.html")
     Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
@@ -301,6 +302,7 @@ module Hwaro::Core::Build::Phases::Write
       return
     end
 
+    content = privacy_rewrite(content, page.path)
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)
     record_html_stats(content)

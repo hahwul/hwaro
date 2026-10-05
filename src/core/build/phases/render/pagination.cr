@@ -87,6 +87,7 @@ module Hwaro::Core::Build::Phases::Render
       return
     end
 
+    content = privacy_rewrite(content, page.path)
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)
     record_html_stats(content)
