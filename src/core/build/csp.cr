@@ -88,6 +88,9 @@ module Hwaro
           styles = [] of String
           style_attrs = [] of String
           handlers = false
+          # One buffer for every tag's attributes: a page has thousands of
+          # tags, and the pass runs on many fibers that share the allocator.
+          attrs = [] of Attr
           i = 0
           n = bytes.size
           loop do
@@ -104,7 +107,7 @@ module Hwaro
             while name_end < n && !tag_name_end?(bytes[name_end])
               name_end += 1
             end
-            attrs, tag_end = parse_attributes(bytes, name_end)
+            tag_end = parse_attributes(bytes, name_end, attrs)
             attrs.each do |attr|
               if attr_named?(bytes, attr, "style")
                 value = attr_value(bytes, attr)
@@ -191,14 +194,20 @@ module Hwaro
         # past its `>`. Byte ranges only: this runs on every tag of every page.
         private def self.parse_attributes(bytes : Bytes, pos : Int32) : {Array(Attr), Int32}
           attrs = [] of Attr
+          {attrs, parse_attributes(bytes, pos, attrs)}
+        end
+
+        # Same, filling `attrs` (cleared first) and returning the offset.
+        private def self.parse_attributes(bytes : Bytes, pos : Int32, attrs : Array(Attr)) : Int32
+          attrs.clear
           n = bytes.size
           i = pos
           loop do
             while i < n && (space?(bytes[i]) || bytes[i] == '/'.ord)
               i += 1
             end
-            return {attrs, n} if i >= n
-            return {attrs, i + 1} if bytes[i] == '>'.ord
+            return n if i >= n
+            return i + 1 if bytes[i] == '>'.ord
             start = i
             while i < n && !space?(bytes[i]) && !bytes[i].in?('/'.ord, '>'.ord, '='.ord)
               i += 1
