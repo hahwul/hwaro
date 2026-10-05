@@ -159,7 +159,7 @@ language_name = "日本語"
 generate_feed = false   # /ja/rss.xml을 생성하지 않음
 ```
 
-언어 피드는 `[feeds]` 설정의 `sections`, `limit`, `truncate`, `full_content` 값을 그대로 공유합니다. RSS 언어 피드에는 `<language>` 태그가, Atom 피드에는 `xml:lang` 속성이 들어갑니다. 피드 제목에는 언어 이름이 포함됩니다 (예: `"My Site (한국어)"`).
+언어 피드는 `[feeds]` 설정의 `sections`, `limit`, `truncate`, `full_content` 값을 그대로 공유합니다. RSS 언어 피드에는 `<language>` 태그가, Atom 피드에는 `xml:lang` 속성이, JSON 피드에는 최상위 `"language"` 필드가 들어갑니다. 피드 제목에는 언어 이름이 포함됩니다 (예: `"My Site (한국어)"`).
 
 ### 커스텀 피드 템플릿
 
@@ -204,6 +204,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 | `url` | string | 절대 페이지 URL (퍼센트 인코딩) |
 | `date` / `updated` | time? | 프론트 매터의 원본 날짜 (`date` 필터에 사용 가능) |
 | `date_rfc822` | string? | 미리 형식화된 RFC 822 날짜; 날짜 없는 페이지는 없음 |
+| `date_rfc3339` | string? | `date`를 RFC 3339 UTC로 형식화한 값 (JSON Feed `date_published`); 날짜 없는 페이지는 없음 |
 | `updated_rfc3339` | string | `updated`/`date` 기반 RFC 3339 타임스탬프 (없으면 epoch) |
 | `description` | string? | 프론트 매터 description |
 | `summary` | string | 일반 텍스트 요약 (description → `<!-- more -->` 요약 → 발췌 순) |
@@ -211,6 +212,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 | `content_html` | string | 외부 리더를 위해 링크를 절대 URL로 바꾼 전체 HTML 본문 |
 | `content_is_html` | bool | `content`가 HTML인지 여부 (`truncate`/`full_content = false`면 `false`) |
 | `authors` | array | 프론트 매터 authors |
+| `image` | string? | 페이지 `image`의 절대 URL (퍼센트 인코딩됨) |
 | `categories` | array | 택소노미 항목 — `tags`가 먼저, 그다음 다른 택소노미, 중복 제거 |
 | `section` | string | 페이지 섹션 경로 |
 | `language` | string? | 페이지 언어 코드 |

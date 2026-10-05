@@ -159,7 +159,7 @@ language_name = "日本語"
 generate_feed = false   # No /ja/rss.xml will be generated
 ```
 
-Language feeds share the same `sections`, `limit`, `truncate`, and `full_content` settings from `[feeds]` config. RSS language feeds include a `<language>` tag, and Atom feeds include an `xml:lang` attribute. The feed title includes the language name (e.g., `"My Site (한국어)"`).
+Language feeds share the same `sections`, `limit`, `truncate`, and `full_content` settings from `[feeds]` config. RSS language feeds include a `<language>` tag, Atom feeds include an `xml:lang` attribute, and JSON feeds include a top-level `"language"` field. The feed title includes the language name (e.g., `"My Site (한국어)"`).
 
 ### Custom Feed Templates
 
@@ -204,6 +204,7 @@ Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`). Only the fin
 | `url` | string | Absolute, percent-encoded page URL |
 | `date` / `updated` | time? | Raw front-matter dates (usable with the `date` filter) |
 | `date_rfc822` | string? | Preformatted RFC 822 date; none for dateless pages |
+| `date_rfc3339` | string? | `date` as RFC 3339 UTC (JSON Feed `date_published`); none for dateless pages |
 | `updated_rfc3339` | string | RFC 3339 timestamp from `updated`/`date` (epoch fallback) |
 | `description` | string? | Front-matter description |
 | `summary` | string | Plain-text summary (description → `<!-- more -->` summary → excerpt) |
@@ -211,6 +212,7 @@ Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`). Only the fin
 | `content_html` | string | Full HTML body with links absolutized for out-of-context readers |
 | `content_is_html` | bool | Whether `content` is HTML (`false` under `truncate`/`full_content = false`) |
 | `authors` | array | Front-matter authors |
+| `image` | string? | Page `image` as an absolute, percent-encoded URL |
 | `categories` | array | Taxonomy terms — `tags` first, then other taxonomies, deduplicated |
 | `section` | string | Page section path |
 | `language` | string? | Page language code |
