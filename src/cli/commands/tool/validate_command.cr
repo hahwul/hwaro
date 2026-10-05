@@ -7,6 +7,7 @@
 
 require "json"
 require "option_parser"
+require "toml"
 require "../../metadata"
 require "../../../services/content_validator"
 require "../../../content/front_matter_schema"
@@ -86,7 +87,7 @@ module Hwaro
               issues = validator.run
               # `[[content.schema]]`: the build's own check (see
               # Doctor.content_schema_results), so validate and build agree.
-              if config = load_schema_config
+              if config = load_schema_config(content_dir)
                 schema_results = Services::Doctor.content_schema_results(content_dir, config)
                 schema_results.each do |_, result|
                   issues.concat(result.violations.map { |v| Services::Doctor.schema_issue(v) })
@@ -184,19 +185,27 @@ module Hwaro
             exit(code) if code != Hwaro::Errors::EXIT_SUCCESS
           end
 
-          # The project's config when it declares `[[content.schema]]`, else
-          # nil. Its load warnings belong to `hwaro build` / `doctor`; a
-          # malformed schema still raises (HWARO_E_CONFIG).
-          private def load_schema_config : Models::Config?
-            return unless File.exists?("config.toml")
+          # The config of the project `content_dir` belongs to (the
+          # `config.toml` beside it), loaded only when it declares
+          # `[[content.schema]]`: validate is a content linter, so a config
+          # problem unrelated to schemas stays `hwaro build`'s to report. A
+          # declared but malformed schema still raises (HWARO_E_CONFIG). Load
+          # warnings belong to `hwaro build` / `doctor`.
+          private def load_schema_config(content_dir : String) : Models::Config?
+            path = File.join(File.dirname(File.expand_path(content_dir)), "config.toml")
+            declared = begin
+              TOML.parse(File.read(path))["content"]?.try(&.as_h?).try(&.has_key?("schema"))
+            rescue
+              nil
+            end
+            return unless declared
             previous = Logger.level
             Logger.level = Logger::Level::Error
-            config = begin
-              Models::Config.load
+            begin
+              Models::Config.load(path)
             ensure
               Logger.level = previous
             end
-            config unless config.content_schema.empty?
           end
 
           # Mirrors `tool doctor`'s exit policy: hard errors keep their

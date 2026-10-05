@@ -93,6 +93,15 @@ describe "[[content.schema]] build" do
     end
   end
 
+  it "lets strict pages assign terms of configured taxonomies" do
+    config = SCHEMA_CONFIG + "\n[[taxonomies]]\nname = \"genres\"\n"
+    build_site(config,
+      content_files: {"about.md" => "+++\ntitle = \"About\"\ngenres = [\"rock\"]\n+++\n"},
+      template_files: SCHEMA_TEMPLATES) do
+      File.exists?("public/about/index.html").should be_true
+    end
+  end
+
   it "does not validate section index files or unpublished drafts" do
     build_site(SCHEMA_CONFIG,
       content_files: {
@@ -190,6 +199,25 @@ describe "[[content.schema]] CLI" do
       schema.map { |f| {f["file"].as_s, f["line"].as_i?} }.should eq([{"content/posts/a.md", nil}, {"content/posts/b.md", 3}])
       json["defaults"]["content/posts/a.md"]["status"].should eq("draft")
       json["defaults"]["content/posts/a.md"]["description"].should eq("No description.")
+    end
+  end
+
+  it "validate reads config only when it declares a schema, from the content dir's project" do
+    pending!("bin/hwaro missing (run shards build)") unless File.exists?(hwaro_binary)
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "content"))
+      File.write(File.join(dir, "content/a.md"), "+++\ntitle = \"A\"\ndescription = \"d\"\n+++\n")
+      # No schema: a config the build would reject is not validate's business.
+      File.write(File.join(dir, "config.toml"), "[[content.generate]]\nsection = \"x\"\n")
+      run_schema_cli(["tool", "validate"], dir)[0].should eq(0)
+
+      # The schema lives in site/config.toml, next to `-c site/content`.
+      FileUtils.mkdir_p(File.join(dir, "site/content/posts"))
+      File.write(File.join(dir, "site/config.toml"), SCHEMA_CONFIG)
+      File.write(File.join(dir, "site/content/posts/p.md"), "+++\ntitle = \"P\"\ndescription = \"d\"\n+++\n")
+      code, text = run_schema_cli(["tool", "validate", "-c", "site/content"], dir)
+      code.should eq(Hwaro::Errors::EXIT_CONTENT)
+      text.should contain(%(field "author": required but missing))
     end
   end
 end
