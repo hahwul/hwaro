@@ -6,6 +6,7 @@ require "../models/config"
 require "../utils/date_utils"
 require "../utils/errors"
 require "../utils/file_safe"
+require "../utils/frontmatter_writer"
 require "../utils/logger"
 require "../utils/path_utils"
 require "../utils/text_utils"
@@ -778,7 +779,7 @@ module Hwaro
           str << "+++\n"
           str << "title = \"#{safe_title}\"\n"
           str << "date = #{date_literal}\n"
-          extra_fields.each { |f| str << "#{f} = \"#{escape_string(field_values[f]? || "")}\"\n" }
+          extra_fields.each { |f| str << "#{Utils::FrontmatterWriter.format_toml_key(f)} = \"#{escape_string(field_values[f]? || "")}\"\n" }
           str << "draft = true\n" if is_draft
           unless tags.empty?
             rendered = tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")
@@ -797,7 +798,7 @@ module Hwaro
           # valid YAML, and a normal date parses back as a String scalar (an
           # unquoted YYYY-MM-DD parses as a Time node and is silently dropped).
           str << "date: \"#{escape_string(date)}\"\n"
-          extra_fields.each { |f| str << "#{f}: \"#{escape_string(field_values[f]? || "")}\"\n" }
+          extra_fields.each { |f| str << "#{Utils::FrontmatterWriter.yaml_scalar(f)}: \"#{escape_string(field_values[f]? || "")}\"\n" }
           str << "draft: true\n" if is_draft
           unless tags.empty?
             str << "tags:\n"

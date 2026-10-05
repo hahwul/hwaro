@@ -820,6 +820,28 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    it "quotes default_fields keys that are not bare keys, so the page parses" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          config = Hwaro::Models::Config.new
+          config.content_new.default_fields = ["my key", "x: y", "ok"]
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "t.md", title: "T")
+          toml = File.read(Hwaro::Services::Creator.new.run(options, config))
+          parsed = TOML.parse(toml.split("+++")[1])
+          parsed["my key"].as_s.should eq("")
+          parsed["x: y"].as_s.should eq("")
+          toml.should contain("ok = \"\"")
+
+          config.content_new.front_matter_format = "yaml"
+          options = Hwaro::Config::Options::NewOptions.new(path: "y.md", title: "Y")
+          yaml = YAML.parse(File.read(Hwaro::Services::Creator.new.run(options, config)).split("---")[1])
+          yaml["x: y"].as_s.should eq("")
+        end
+      end
+    end
+
     it "ignores built-in fields listed in default_fields" do
       # Built-ins (title/date/draft/tags) have dedicated rendering. Listing
       # them in default_fields must not duplicate them with empty values.
