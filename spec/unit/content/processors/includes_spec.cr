@@ -97,12 +97,15 @@ describe Hwaro::Content::Processors::Includes do
   describe ".relative_path" do
     it "normalizes a project-relative path" do
       Includes.relative_path("./examples//a.cr").should eq("examples/a.cr")
+      # Decoding only decides the refusal; the literal name is read.
+      Includes.relative_path("examples/a%20b.txt").should eq("examples/a%20b.txt")
     end
 
     it "refuses absolute paths and traversal" do
       expect_raises(Includes::Error, "absolute") { Includes.relative_path("/etc/passwd") }
       expect_raises(Includes::Error, "escapes") { Includes.relative_path("../secret.txt") }
       expect_raises(Includes::Error, "escapes") { Includes.relative_path("a/%2e%2e/../../x") }
+      expect_raises(Includes::Error, "escapes") { Includes.relative_path("%2e%2e/x") }
       expect_raises(Includes::Error, "empty") { Includes.relative_path("  ") }
     end
   end

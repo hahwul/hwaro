@@ -10,6 +10,7 @@
 require "./fence_tracker"
 require "./syntax_highlighter"
 require "../../utils/frontmatter_scanner"
+require "../../utils/errors"
 require "../../utils/path_utils"
 require "../../utils/text_utils"
 
@@ -22,6 +23,15 @@ module Hwaro
         # A bad call: the builder prefixes the page and the call, then raises
         # it as a template error.
         class Error < Exception
+        end
+
+        # The build error an include or transclusion failure surfaces as
+        # (HWARO_E_TEMPLATE, exit 4). Its own type, so the summary passes can
+        # leave the report to the body render instead of repeating it.
+        class IncludeError < Hwaro::HwaroError
+          def initialize(message : String)
+            super(Hwaro::Errors::HWARO_E_TEMPLATE, message)
+          end
         end
 
         # The file does not exist (yet). Unlike a refusal, the caller still
@@ -47,13 +57,16 @@ module Hwaro
 
         # `path` as a project-relative path, or an Error for an absolute path
         # or one that climbs out (`..`). Lexical only: `read` re-checks the
-        # real path, so a symlink cannot reach outside either.
+        # real path, so a symlink cannot reach outside either. The decoded
+        # segments only decide the refusal (`%2e%2e` climbs too); the path
+        # read is the literal one, so `a%20b.txt` names that file.
         def relative_path(path : String) : String
           raise Error.new("path is empty") if path.strip.empty?
           raise Error.new("absolute paths are refused: #{path}") if Utils::PathUtils.absolute?(path) || path.includes?('\0')
-          segments, refused = Utils::PathUtils.split_safe_segments(path.split('/').reject(&.==(".")).join('/'))
-          raise Error.new("path escapes the project root: #{path}") if refused || segments.empty?
-          segments.join('/')
+          literal = path.split('/').reject { |segment| segment.empty? || segment == "." }
+          _, refused = Utils::PathUtils.split_safe_segments(literal.join('/'))
+          raise Error.new("path escapes the project root: #{path}") if refused || literal.empty?
+          literal.join('/')
         end
 
         # The bytes of the project file `relative` (see `clean`). Refused when its path —
