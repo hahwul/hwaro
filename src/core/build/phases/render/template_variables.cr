@@ -467,16 +467,22 @@ module Hwaro::Core::Build::Phases::Render
       # keeps self-canonicalizing (page/2/ of an old listing is not page/2/
       # of the new one).
       canonical_override = page_url_override
+      # Section rendering passes its first page's own URL as an override
+      # too; only a later pager (page/2/ …) really overrides.
+      later_pager = !canonical_override.nil? && canonical_override != page.url
       noindex = false
       if versions_enabled && (page_version = page.version) && !page_version.latest
-        if canonical_override.nil? && (latest_link = page.version_links.find { |l| l.latest && l.exists })
+        if !later_pager && (latest_link = page.version_links.find { |l| l.latest && l.exists })
           canonical_override = latest_link.url
         end
         noindex = config.versions.noindex_old
       end
       canonical_tag = Content::Seo::Tags.canonical_tag(page, config, canonical_override)
       canonical_tag = "#{canonical_tag}\n  #{Content::Seo::Tags::NOINDEX_TAG}" if noindex
-      hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
+      # The alternates are the translations' first pages, so a later pager
+      # (which canonicalizes to itself) would name page 1 as its own
+      # hreflang URL; it gets none.
+      hreflang_tags = later_pager ? "" : Content::Seo::Tags.hreflang_tags(page, config)
       vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
       vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 

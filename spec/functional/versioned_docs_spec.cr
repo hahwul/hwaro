@@ -146,6 +146,9 @@ describe "Versioned docs: URL mapping (latest_at_root = true)" do
       latest = read("public/docs/install/index.html")
       latest.should contain(%(<link rel="canonical" href="http://localhost/docs/install/">))
       latest.should_not contain("noindex")
+
+      # An older version's section root follows the same rule as its pages.
+      read("public/docs/v1/index.html").should contain(%(<link rel="canonical" href="http://localhost/docs/">))
     end
   end
 
