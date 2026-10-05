@@ -1144,7 +1144,7 @@ module Hwaro
                 <div class="sidebar-title">{{ sec.title | e }}</div>
                 <ul class="sidebar-links">
                   <li><a href="{{ base_url }}{{ sec.url }}"{% if sec.url | active_path %} class="active" aria-current="page"{% endif %}>Overview</a></li>
-                  {% for p in sec.pages | sort(attribute="path") | sort(attribute="weight") %}{% if not p.is_index %}
+                  {% for p in sec.pages | sort(attribute="path") | sort(attribute="weight") %}{% if not p.is_section %}
                   <li><a href="{{ base_url }}{{ p.url }}"{% if p.url | active_path %} class="active" aria-current="page"{% endif %}>{{ p.title | e }}</a></li>
                   {% endif %}{% endfor %}
                 </ul>

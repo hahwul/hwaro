@@ -1029,7 +1029,7 @@ module Hwaro
                 <section class="home-latest" aria-labelledby="home-latest-title">
                   <h2 id="home-latest-title" class="home-section-title">Latest posts</h2>
                   <ul class="post-list">
-                    {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | selectattr("language", "equalto", page_language) | sort(attribute="date", reverse=true) %}
+                    {% for p in site.pages | selectattr("date") | rejectattr("draft") | selectattr("language", "equalto", page_language) | sort(attribute="date", reverse=true) %}
                     {% if loop.index <= 5 %}
                       <li class="post-item">
                         <time class="post-date" datetime="{{ p.date }}">{{ p.date }}</time>
@@ -1149,16 +1149,16 @@ module Hwaro
                      flat reading chain, which for a date-sorted feed runs
                      newest to oldest: lower is the newer post, higher the
                      older one. Both links are guarded to stay inside this
-                     post's section and to skip _index. #}
-                  {% if (page.lower and page.lower.section == page.section and not page.lower.is_index) or (page.higher and page.higher.section == page.section and not page.higher.is_index) %}
+                     post's section and to skip section indexes. #}
+                  {% if (page.lower and page.lower.section == page.section and not page.lower.is_section) or (page.higher and page.higher.section == page.section and not page.higher.is_section) %}
                   <nav class="post-nav" aria-label="More posts">
-                    {% if page.lower and page.lower.section == page.section and not page.lower.is_index %}
+                    {% if page.lower and page.lower.section == page.section and not page.lower.is_section %}
                     <a class="post-nav-link post-nav-prev" href="{{ base_url }}{{ page.lower.url }}" rel="prev">
                       <span class="post-nav-label">Newer</span>
                       <span class="post-nav-title">{{ page.lower.title | e }}</span>
                     </a>
                     {% endif %}
-                    {% if page.higher and page.higher.section == page.section and not page.higher.is_index %}
+                    {% if page.higher and page.higher.section == page.section and not page.higher.is_section %}
                     <a class="post-nav-link post-nav-next" href="{{ base_url }}{{ page.higher.url }}" rel="next">
                       <span class="post-nav-label">Older</span>
                       <span class="post-nav-title">{{ page.higher.title | e }}</span>
@@ -1499,7 +1499,7 @@ module Hwaro
                 {{ content }}
 
                 <ul class="archive-list">
-                {% for p in site.pages | selectattr("date") | rejectattr("is_index") | rejectattr("draft") | selectattr("language", "equalto", page_language) | sort(attribute="date", reverse=true) %}
+                {% for p in site.pages | selectattr("date") | rejectattr("draft") | selectattr("language", "equalto", page_language) | sort(attribute="date", reverse=true) %}
                   <li class="archive-entry">
                     <time datetime="{{ p.date }}">{{ p.date }}</time>
                     <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>

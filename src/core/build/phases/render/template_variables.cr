@@ -130,6 +130,7 @@ module Hwaro::Core::Build::Phases::Render
       "toc"          => Crinja::Value.new(page.toc),
       "render"       => Crinja::Value.new(page.render),
       "is_index"     => Crinja::Value.new(page.is_index),
+      "is_section"   => Crinja::Value.new(page.is_a?(Models::Section)),
       "generated"    => Crinja::Value.new(page.generated),
       "synthesized"  => Crinja::Value.new(page.synthesized?),
       "in_sitemap"   => Crinja::Value.new(page.in_sitemap),

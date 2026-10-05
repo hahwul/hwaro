@@ -356,7 +356,8 @@ Rendered HTML content is available as the top-level `content` variable.
 |----------|------|---------|-------------|
 | page.toc | Bool | false | Show table of contents |
 | page.render | Bool | true | Should render |
-| page.is_index | Bool | — | Is index file |
+| page.is_index | Bool | — | Is an index file: a section's `_index.md`, the home page, or a page bundle's `index.md` |
+| page.is_section | Bool | — | Is a section's `_index.md`. Use `rejectattr("is_section")` to drop subsection entries from `section.pages` while keeping page bundles |
 | page.generated | Bool | false | Auto-generated page |
 | page.in_sitemap | Bool | true | Include in sitemap |
 | page.in_search_index | Bool | true | Include in search |

@@ -73,7 +73,9 @@ describe Hwaro::Services::Scaffolds::Blog do
       tpl.should contain(%(selectattr("date")))
       tpl.should_not contain(%(selectattr("section", "equalto", "posts")))
       tpl.should contain(%(rejectattr("draft")))
-      tpl.should contain(%(rejectattr("is_index")))
+      # Page-bundle posts (`posts/x/index.md`) are `is_index` too; filtering
+      # on it dropped them from the archive.
+      tpl.should_not contain(%(rejectattr("is_index")))
     end
 
     it "wires archives.md to the archives template (gh#523)" do
@@ -134,7 +136,7 @@ describe Hwaro::Services::Scaffolds::Blog do
       tpl.should contain(%(class="post-nav"))
       tpl.should contain("page.lower.section == page.section")
       tpl.should contain("page.higher.section == page.section")
-      tpl.should contain("not page.lower.is_index")
+      tpl.should contain("not page.lower.is_section")
       tpl.should contain(%(rel="prev"))
       tpl.should contain(%(rel="next"))
       tpl.should contain("{{ base_url }}{{ page.lower.url }}")

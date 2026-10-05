@@ -54,6 +54,7 @@ module Hwaro::Core::Build::Phases::Render
       "toc"               => Crinja::Value.new(p.toc),
       "render"            => Crinja::Value.new(p.render),
       "is_index"          => Crinja::Value.new(p.is_index),
+      "is_section"        => Crinja::Value.new(p.is_a?(Models::Section)),
       "generated"         => Crinja::Value.new(p.generated),
       "synthesized"       => Crinja::Value.new(p.synthesized?),
       "in_sitemap"        => Crinja::Value.new(p.in_sitemap),

@@ -356,7 +356,8 @@ john-doe:
 |----------|------|---------|-------------|
 | page.toc | Bool | false | 목차 표시 여부 |
 | page.render | Bool | true | 렌더링 여부 |
-| page.is_index | Bool | — | 인덱스 파일 여부 |
+| page.is_index | Bool | — | 인덱스 파일 여부: 섹션의 `_index.md`, 홈 페이지, 페이지 번들의 `index.md` |
+| page.is_section | Bool | — | 섹션의 `_index.md` 여부. `section.pages`에서 페이지 번들은 남기고 하위 섹션 항목만 빼려면 `rejectattr("is_section")`을 사용하세요 |
 | page.generated | Bool | false | 자동 생성된 페이지 여부 |
 | page.in_sitemap | Bool | true | 사이트맵 포함 여부 |
 | page.in_search_index | Bool | true | 검색 인덱스 포함 여부 |
