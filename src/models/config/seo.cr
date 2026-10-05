@@ -24,14 +24,22 @@ module Hwaro
     end
 
     class RobotsRule
+      # `content_signal` config keys and the Content-Signal names they emit,
+      # in emission order (https://contentsignals.org/).
+      CONTENT_SIGNAL_KEYS = {"search" => "search", "ai_input" => "ai-input", "ai_train" => "ai-train"}
+
       property user_agent : String
       property allow : Array(String)
       property disallow : Array(String)
+      # Emitted (name, value) pairs in CONTENT_SIGNAL_KEYS order; empty
+      # means no `Content-Signal:` line.
+      property content_signal : Array({String, Bool})
 
       def initialize(user_agent : String)
         @user_agent = user_agent
         @allow = [] of String
         @disallow = [] of String
+        @content_signal = [] of {String, Bool}
       end
     end
 
@@ -131,9 +139,43 @@ module Hwaro
               rule = RobotsRule.new(user_agent)
               rule.allow = string_or_array(rule_h["allow"]?)
               rule.disallow = string_or_array(rule_h["disallow"]?)
+              if signal = rule_h["content_signal"]?
+                rule.content_signal = robots_content_signal(signal)
+              end
               rule
             end
           end
+        end
+      end
+
+      # `[[robots.rules]] content_signal = { search = true, ai_train = false }`
+      # → ordered (name, value) pairs. Anything but a table of known bool
+      # keys is a config error: a typo'd key silently dropping an
+      # `ai-train=no` would publish the opposite of what the site asked for.
+      private def self.robots_content_signal(raw : TOML::Any) : Array({String, Bool})
+        table = raw.as_h? || raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Invalid [robots] rules content_signal = #{raw.raw.inspect}: expected a table.",
+          hint: "Use content_signal = { search = true, ai_input = true, ai_train = false }.",
+        )
+        table.each do |key, value|
+          unless RobotsRule::CONTENT_SIGNAL_KEYS.has_key?(key)
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "Unknown [robots] rules content_signal key #{key.inspect}.",
+              hint: "Valid keys are search, ai_input and ai_train.",
+            )
+          end
+          if value.as_bool?.nil?
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "Invalid [robots] rules content_signal #{key} = #{value.raw.inspect}: expected true or false.",
+              hint: "Set #{key} = true or #{key} = false, or remove it.",
+            )
+          end
+        end
+        RobotsRule::CONTENT_SIGNAL_KEYS.compact_map do |key, name|
+          table[key]?.try(&.as_bool?).try { |v| {name, v} }
         end
       end
 

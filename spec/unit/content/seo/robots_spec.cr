@@ -481,3 +481,22 @@ describe Hwaro::Models::RobotsConfig do
     end
   end
 end
+
+describe Hwaro::Content::Seo::Robots do
+  describe "Content-Signal" do
+    it "emits the configured signals in fixed order inside the rule's group" do
+      config = Hwaro::Models::Config.new
+      rule = Hwaro::Models::RobotsRule.new("*")
+      rule.disallow = ["/admin"]
+      rule.content_signal = [{"search", true}, {"ai-train", false}]
+      config.robots.rules = [rule, Hwaro::Models::RobotsRule.new("GPTBot")]
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Robots.generate(config, output_dir)
+        File.read(File.join(output_dir, "robots.txt")).should eq(
+          "User-agent: *\nContent-Signal: search=yes, ai-train=no\nDisallow: /admin\n\n" \
+          "User-agent: GPTBot\nAllow: /\n\n")
+      end
+    end
+  end
+end

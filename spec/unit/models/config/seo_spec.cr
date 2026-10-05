@@ -911,4 +911,32 @@ describe Hwaro::Models::Config do
       log.should contain(%(expected "rss", "atom" or "json"))
     end
   end
+
+  describe "[[robots.rules]] content_signal" do
+    it "reads the bools in search, ai-input, ai-train order" do
+      config = load_config(<<-TOML)
+        [robots]
+        rules = [
+          { user_agent = "*", content_signal = { ai_train = false, ai_input = true, search = true } },
+          { user_agent = "GPTBot" },
+        ]
+        TOML
+      config.robots.rules[0].content_signal.should eq([{"search", true}, {"ai-input", true}, {"ai-train", false}])
+      config.robots.rules[1].content_signal.should be_empty
+    end
+
+    it "rejects an unknown key" do
+      err = expect_config_error(%([robots]\nrules = [{ user_agent = "*", content_signal = { ai_trian = false } }]\n))
+      err.message.to_s.should contain("ai_trian")
+    end
+
+    it "rejects a non-bool value" do
+      err = expect_config_error(%([robots]\nrules = [{ user_agent = "*", content_signal = { search = "yes" } }]\n))
+      err.message.to_s.should contain("search")
+    end
+
+    it "rejects a non-table value" do
+      expect_config_error(%([robots]\nrules = [{ user_agent = "*", content_signal = "yes" }]\n))
+    end
+  end
 end
