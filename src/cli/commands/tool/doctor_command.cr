@@ -21,6 +21,9 @@ module Hwaro
           # that machine consumers may rely on.
           JSON_SCHEMA_VERSION = 1
 
+          # Translation issues listed per language in the human report.
+          TRANSLATION_ISSUES_SHOWN = 10
+
           MAX_WARNINGS_FLAG = FlagInfo.new(short: nil, long: "--max-warnings", description: "Exit non-zero when warning count exceeds N (default: unlimited)", takes_value: true, value_hint: "N")
 
           # Flags defined here are used both for OptionParser and completion generation
@@ -314,6 +317,23 @@ module Hwaro
             unless structure_issues.empty?
               Logger.info "Structure:"
               structure_issues.each { |issue| print_issue(issue, plain) }
+              Logger.info ""
+            end
+
+            translation_issues = issues.select { |i| i.category == "i18n" }
+            unless translation_issues.empty?
+              Logger.info "Translations:"
+              translation_issues.group_by(&.language).each do |code, group|
+                missing = group.count { |i| i.id == "translation-missing" }
+                counts = [] of String
+                counts << "#{missing} missing" if missing > 0
+                counts << "#{group.size - missing} without original" if group.size > missing
+                Logger.info "  #{code}: #{counts.join(" · ")}"
+                # A partly translated site can list thousands of pages; the
+                # counts carry the size, --json carries every issue.
+                group.first(TRANSLATION_ISSUES_SHOWN).each { |issue| print_issue(issue, plain) }
+                Logger.info "  … and #{group.size - TRANSLATION_ISSUES_SHOWN} more (use --json for all)" if group.size > TRANSLATION_ISSUES_SHOWN
+              end
               Logger.info ""
             end
 

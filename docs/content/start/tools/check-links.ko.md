@@ -19,6 +19,9 @@ hwaro tool check-links --timeout 30 --concurrency 4
 hwaro tool check-links --external-only
 hwaro tool check-links --internal-only
 
+# #fragment 링크는 검사하지 않음
+hwaro tool check-links --skip-anchors
+
 # 알려진 불안정 호스트 무시, 봇 차단 상태 코드 허용
 hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 ```
@@ -34,6 +37,7 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 | --internal-only | 내부 링크만 검사 |
 | --ignore-url PATTERN | URL이 PATTERN과 일치하는 링크는 건너뜀 (반복 가능) |
 | --allow-status CODES | 나열한 HTTP 상태 코드를 정상으로 취급 (쉼표 구분) |
+| --skip-anchors | `#fragment` 링크를 빌드된 HTML과 대조하지 않음 |
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
 
@@ -59,7 +63,8 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 5. 빌드가 생성하는 경로는 소스 파일 없이도 유효한 것으로 인정
 6. 파이프라인이 만들어 내는 에셋은 직전 빌드 출력에서 확인
    ([빌드 출력을 근거로 사용하기](#빌드-출력을-근거로-사용하기) 참고)
-7. 깨졌거나 접근할 수 없는 링크 보고
+7. 내부 링크의 `#fragment`를 빌드된 HTML과 대조 ([앵커](#앵커) 참고)
+8. 깨졌거나 접근할 수 없는 링크 보고
 
 사설/내부 주소(localhost, RFC 1918 대역, `.local`/`.internal` 호스트)로
 해석되는 외부 링크에는 요청을 보내지 않습니다. 이런 링크는 사람용 출력과
@@ -106,6 +111,22 @@ URL은 빌드와 같은 방식으로 원본에서 계산하므로 첫 빌드 전
 확장자를 포함하고, 섹션은 `_index.md`로 링크하세요. `@/posts/hello`와
 `@/posts/`는 보고되며, 초안·미래 날짜·만료된 페이지로의 링크도 보고됩니다.
 
+### 앵커
+
+프래그먼트가 붙은 내부 링크(`#intro`, `/guide/#install`, `../b/#faq`,
+`@/posts/hello.md#setup`)는 빌드 출력에 있는 대상 HTML 파일의 `id`·`name`
+속성과 대조합니다. 따라서 제목, `{#id}` 속성, 숏코드와 템플릿 출력, 각주 등
+페이지가 실제로 가진 모든 id가 인정됩니다. `#top`과 텍스트 조각 링크(`#:~:text=…`)는
+항상 유효하며, id는 적힌 그대로 또는 퍼센트 디코딩한 값으로 대조합니다. 없는
+앵커는 별도 분류(`Anchor not found: #id`, kind `anchor`, JSON의
+`dead_anchors`)로 보고되며 깨진 링크와 마찬가지로 실행을 실패시킵니다.
+
+이 검사에는 `hwaro build` 출력이 필요합니다
+([빌드 출력을 근거로 사용하기](#빌드-출력을-근거로-사용하기) 참고). 출력이
+없거나 대상 페이지의 HTML 파일이 없으면 프래그먼트는 검사하지 않습니다.
+`--skip-anchors`로 검사를 끌 수 있습니다. 빌드 중에 같은 문제를 잡으려면
+`[links] broken_anchors`를 설정하세요 ([설정](/ko/start/config/#링크) 참고).
+
 ## 링크 유형
 
 | 유형 | 설명 |
@@ -113,6 +134,7 @@ URL은 빌드와 같은 방식으로 원본에서 계산하므로 첫 빌드 전
 | 외부 | `http://`, `https://` 링크 — HTTP HEAD로 검사 |
 | 내부 | 상대·절대 경로 링크 — 파일 시스템에서 검사 |
 | 이미지 | `![alt](path)` 이미지 참조 — 파일 시스템에서 검사 |
+| 앵커 | 내부 링크의 `#fragment` — 빌드된 HTML에서 검사 |
 
 ## 출력 예시
 
@@ -160,6 +182,17 @@ checked: 50 links, 3 dead
       },
       "status": 404,
       "error": null
+    }
+  ],
+  "dead_anchors": [
+    {
+      "link": {
+        "file": "content/guide.md",
+        "url": "/install/#linux",
+        "kind": "anchor"
+      },
+      "status": -1,
+      "error": "Anchor not found: #linux"
     }
   ],
   "skipped_external": [

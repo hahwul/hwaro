@@ -73,7 +73,8 @@ module Hwaro
         # deciding evidence, not just present.
         getter? consulted : Bool
 
-        @base : String
+        # `dir` resolved against `root`: where the tree's files actually are.
+        getter base : String
         @oldest_accepted : Time?
         @stale : Bool?
         @budget : Int32 = 0

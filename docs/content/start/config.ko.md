@@ -195,13 +195,17 @@ summary_ellipsis = "…"
 ```toml
 [links]
 broken_internal = "error"
+broken_anchors = "warn"
 ```
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
 | broken_internal | string | "warn" | `"warn"`은 해석되지 않은 `@/` 링크를 하나씩 로그로 남기고 원본 마크업을 유지; `"error"`는 위반 전체를 하나의 목록으로 모아 빌드를 실패시킴 (종료 코드 5) |
+| broken_anchors | string | "ignore" | `"warn"` 또는 `"error"`는 페이지 본문의 `@/page.md#id` 및 같은 페이지 `#id` 링크를 대상 페이지의 렌더링된 HTML에 있는 `id`/`name` 속성(제목, `{#id}`, 숏코드, 템플릿, 각주)과 대조; `"error"`는 `source → link → missing id` 목록으로 빌드를 실패시킴. `"ignore"`는 검사하지 않음 |
 
 `@/` 링크 문법과 strict 모드의 `--cache` 주의 사항은 [페이지](/ko/writing/pages/#내부-링크)를 참고합니다.
+
+앵커 검사는 렌더 단계가 끝난 뒤 대상 페이지의 출력 파일을 읽으므로, `--cache` 빌드나 `serve` 재빌드에서 다시 렌더링되지 않은 대상도 마지막으로 쓰인 내용으로 검사됩니다 (오탐 없음). 해당 패스에서 렌더링된 페이지의 링크만 검사하므로 CI에서는 캐시 없는 빌드로 전체를 검사하세요.
 
 ## 택소노미
 
