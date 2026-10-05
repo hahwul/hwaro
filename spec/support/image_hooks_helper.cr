@@ -20,6 +20,9 @@ class Hwaro::Content::Hooks::ImageHooks
   # Forget the per-build intrinsic-size cache (keyed by project-relative
   # path, so specs in different temp projects would otherwise share it).
   def self.clear_intrinsic_sizes : Nil
-    @@lookup_mutex.synchronize { @@intrinsic_sizes.clear }
+    @@lookup_mutex.synchronize do
+      @@intrinsic_sizes.clear
+      @@render_image_sources.clear
+    end
   end
 end

@@ -48,7 +48,18 @@ module Hwaro
         @@lookup_pages = [] of Models::Page
         @@lookup_config : Models::Config? = nil
         @@bundle_sources : Hash(String, String)? = nil
-        @@intrinsic_sizes = {} of String => {Int32, Int32}?
+        # Draft / future / expired bundle directories: their files publish
+        # nothing, so they back no size and no variant either.
+        @@withheld_dirs = Set(String).new
+        # Source path => {mtime, byte size, intrinsic size}; a stale stamp is
+        # re-read, so a serve pass that re-renders after an image swap prints
+        # the new size.
+        @@intrinsic_sizes = {} of String => {Time, Int64, {Int32, Int32}?}
+        # Every image whose size or bytes a render printed, for the serve
+        # watcher: a copy-only change to one of them must re-render (see
+        # `render_image_source_changed?`). Kept for the whole process — a
+        # cached page that skipped this build's render still prints them.
+        @@render_image_sources = Set(String).new
         # Variant output path => {source mtime, written size} (nil = failed).
         @@op_variants = {} of String => {Time, {Int32, Int32}?}
         # nil under `--skip-image-processing` or outside a build: resize_image
@@ -127,6 +138,17 @@ module Hwaro
             @@op_output_dir = ctx.options.skip_image_processing || config.nil? ? nil : ctx.output_dir
             @@op_quality = config.try(&.image_processing.quality) || 85
             @@op_builder = ctx.builder
+            @@withheld_dirs = ctx.builder.try(&.withheld_bundle_dirs) || Set(String).new
+          end
+        end
+
+        # Did any of `paths` (project-relative) back a size or a variant a
+        # render printed? The serve watcher escalates such a change to a
+        # rebuild, like a `load_data()` source.
+        def self.render_image_source_changed?(paths : Array(String)) : Bool
+          @@lookup_mutex.synchronize do
+            return false if @@render_image_sources.empty?
+            paths.any? { |path| @@render_image_sources.includes?(Path.posix(path).normalize.to_s) }
           end
         end
 
@@ -145,7 +167,7 @@ module Hwaro
           return if relative.empty?
           content = File.join("content", relative)
           if config.content_files.enabled? && config.content_files.publish?(relative) &&
-             File.file?(content) && safe_source_path?(content, "content")
+             File.file?(content) && safe_source_path?(content, "content") && !withheld_content?(relative)
             return content
           end
           static = File.join("static", relative)
@@ -172,12 +194,24 @@ module Hwaro
           end
         end
 
+        private def self.withheld_content?(relative : String) : Bool
+          builder, withheld = @@lookup_mutex.synchronize { {@@op_builder, @@withheld_dirs} }
+          !!builder.try(&.withheld_content_file?(relative, withheld))
+        end
+
         # Intrinsic {width, height} of `source`, read from its header once
-        # per build.
+        # per version of the file.
         def self.intrinsic_size(source : String) : {Int32, Int32}?
+          info = File.info?(source)
+          return unless info
           @@lookup_mutex.synchronize do
-            return @@intrinsic_sizes[source] if @@intrinsic_sizes.has_key?(source)
-            @@intrinsic_sizes[source] = Processors::ImageProcessor.dimensions(source)
+            @@render_image_sources << Path.posix(source).normalize.to_s
+            if (memo = @@intrinsic_sizes[source]?) && memo[0] == info.modification_time && memo[1] == info.size
+              return memo[2]
+            end
+            size = Processors::ImageProcessor.dimensions(source)
+            @@intrinsic_sizes[source] = {info.modification_time, info.size, size}
+            size
           end
         end
 
@@ -196,8 +230,12 @@ module Hwaro
           name = "#{File.basename(url, ext)}_#{width}x#{height}_#{op}_#{anchor}#{ext}"
           dir = File.dirname(url)
           variant_url = dir == "/" ? "/#{name}" : "#{dir}/#{name}"
+          # An authored file publishing at the variant's own URL (a static
+          # copy) is not this build's output: never reuse it as the variant.
+          authored = !resolve_source(variant_url).nil?
 
           @@lookup_mutex.synchronize do
+            @@render_image_sources << Path.posix(source).normalize.to_s
             output_dir = @@op_output_dir
             return unless output_dir
             dest = File.join(output_dir, variant_url.lchop('/'))
@@ -208,7 +246,7 @@ module Hwaro
                      memo[1]
                    else
                      dest_info = File.info?(dest)
-                     fresh = dest_info && dest_info.file? && dest_info.size > 0 && dest_info.modification_time >= source_mtime
+                     fresh = !authored && dest_info && dest_info.file? && dest_info.size > 0 && dest_info.modification_time >= source_mtime
                      made = (Processors::ImageProcessor.dimensions(dest) if fresh) ||
                             Processors::ImageProcessor.transform(source, dest, width, height, op, anchor, @@op_quality)
                      @@op_variants[dest] = {source_mtime, made}

@@ -503,3 +503,45 @@ describe "serve watch parity: load_data() sources outside data/" do
     end
   end
 end
+
+# Raw bytes of a w×h PNG.
+private def watch_parity_png(w : Int32, h : Int32) : String
+  Dir.mktmpdir do |dir|
+    path = File.join(dir, "x.png")
+    px = Bytes.new(w * h * 3, 90_u8)
+    LibStb.stbi_write_png(path, w, h, 3, px.to_unsafe.as(Void*), w * 3)
+    File.read(path)
+  end
+end
+
+describe "serve watch parity: image sizes read while rendering" do
+  # `[image_processing] dimensions` prints the image's intrinsic size into the
+  # page. A static image swap took the copy-only lane, so every page kept the
+  # old width/height (and the browser laid the new image out distorted).
+  it "re-renders the pages when a static image they size changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\ndimensions = true\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static/img")
+        File.write("templates/page.html", "<html><body>{{ content }}</body></html>")
+        File.write("content/about.md", "+++\ntitle = \"About\"\n+++\n![a](/img/a.png)\n")
+        File.write("static/img/a.png", watch_parity_png(20, 3))
+        File.write("static/img/b.png", watch_parity_png(5, 5))
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/about/index.html").should contain(%(width="20" height="3"))
+        # Only an image a page actually printed escalates.
+        Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(["static/img/b.png"]).should be_false
+        Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(["static/img/a.png"]).should be_true
+
+        File.write("static/img/a.png", watch_parity_png(7, 6))
+        File.touch("static/img/a.png", Time.local + 2.seconds)
+        server.watch_parity_apply_changeset(watch_parity_changeset(static: ["static/img/a.png"]), options)
+        File.read("public/about/index.html").should contain(%(width="7" height="6"))
+      end
+    end
+  end
+end

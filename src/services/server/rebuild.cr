@@ -198,6 +198,12 @@ module Hwaro
           Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
           return run_full_build(build_options)
         end
+        # A page prints this image's size (`[image_processing] dimensions`) or
+        # a `resize_image(op=…)` variant cut from it.
+        if Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(static_sources)
+          Logger.info "  An image a page sizes or crops changed — rebuilding the pages that print it."
+          return run_full_build(build_options)
+        end
         if static_shadowed_page
           Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
           return run_full_build(build_options)
@@ -225,6 +231,10 @@ module Hwaro
         # Same as copy_static: a template reading the file via load_data().
         if @builder.load_data_source_changed?(changeset.modified_content_files)
           Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
+          return run_full_build(build_options)
+        end
+        if Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(changeset.modified_content_files)
+          Logger.info "  An image a page sizes or crops changed — rebuilding the pages that print it."
           return run_full_build(build_options)
         end
         true

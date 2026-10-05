@@ -535,3 +535,61 @@ describe "resize_image fill/crop variants and content image dimensions (build)" 
     end
   end
 end
+
+private def rebuild_cached : Nil
+  builder = Hwaro::Core::Build::Builder.new
+  Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+  builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true, highlight: false, parallel: false))
+end
+
+describe "ImageHooks render-time lookups (review fixes)" do
+  it "never publishes a fill variant of a withheld (draft) bundle's image" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n[content.files]\nallow_extensions = ["png"]\n),
+      content_files: {
+        "posts/dr/index.md"   => "+++\ntitle = \"Draft\"\ndraft = true\n+++\nhidden\n",
+        "posts/dr/secret.png" => png_body(20, 20),
+        "about.md"            => "+++\ntitle = \"About\"\n+++\nabout\n",
+      },
+      template_files: {
+        "page.html" => %({% set v = resize_image(path="/posts/dr/secret.png", width=10, height=10, op="fill") %}V={{ v.url }}),
+        "section.html" => "{{ content }}", "index.html" => "{{ content }}",
+      },
+    ) do
+      File.read("public/about/index.html").should contain("V=https://example.com/posts/dr/secret.png")
+      Dir.exists?("public/posts/dr").should be_false
+    end
+  end
+
+  it "re-reads an image's size when its bytes change at the same path" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Hwaro::Content::Hooks::ImageHooks.clear_intrinsic_sizes
+        File.write("a.png", png_body(6, 3))
+        Hwaro::Content::Hooks::ImageHooks.intrinsic_size("a.png").should eq({6, 3})
+        File.write("a.png", png_body(9, 5))
+        File.touch("a.png", Time.local + 2.seconds)
+        Hwaro::Content::Hooks::ImageHooks.intrinsic_size("a.png").should eq({9, 5})
+        Hwaro::Content::Hooks::ImageHooks.clear_intrinsic_sizes
+      end
+    end
+  end
+
+  it "does not pass off a static file that sits on the variant's name as the variant" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n),
+      content_files: {"about.md" => "+++\ntitle = \"About\"\n+++\nabout\n"},
+      template_files: {
+        "page.html" => %({% set v = resize_image(path="/img/a.png", width=10, height=10, op="fill") %}V={{ v.width }}x{{ v.height }}),
+        "section.html" => "{{ content }}", "index.html" => "{{ content }}",
+      },
+      static_files: {"img/a.png" => png_body(12, 30), "img/a_10x10_fill_center.png" => png_body(4, 4)},
+      cache: true,
+    ) do
+      File.read("public/about/index.html").should contain("V=10x10")
+      png_size("public/img/a_10x10_fill_center.png").should eq({10, 10})
+      rebuild_cached
+      png_size("public/img/a_10x10_fill_center.png").should eq({10, 10})
+    end
+  end
+end
