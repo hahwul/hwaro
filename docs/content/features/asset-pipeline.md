@@ -89,9 +89,9 @@ The hash covers the bytes Hwaro writes to the output (after minify and fingerpri
 - pipeline bundles
 - files copied from `static/`, such as `asset_integrity(name='css/site.css')` for `static/css/site.css`
 - Sass outputs
-- page-bundle assets and `[content.files]` files, such as `asset_integrity(name='posts/demo/app.js')`. These are copied after rendering, so their source is hashed. The copy is byte-for-byte, except `.json`, `.xml` and `.html` files under `--minify`.
+- page-bundle assets and `[content.files]` files, such as `asset_integrity(name='posts/demo/app.js')`. These are copied after rendering, so their source is hashed. The copy is byte-for-byte, except for `.json`, `.xml` and `.html` files under `--minify`: those are rewritten after rendering, so `asset_integrity()` raises for them.
 
-A name with no emitted file fails the build with a template error.
+A name that this build does not publish fails the build with a template error. This holds on `--cache` builds too, even while the output directory still holds a copy from an earlier build (a deleted static file, an asset of a page that became a draft).
 
 Set `sri = true` to add the attribute to the tags Hwaro generates itself:
 

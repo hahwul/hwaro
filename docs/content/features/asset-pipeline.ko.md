@@ -89,9 +89,9 @@ CSS 번들은 원본 파일 옆이 아니라 `output_dir` 아래에 게시됩니
 - 파이프라인 번들
 - `static/`에서 복사된 파일. 예를 들어 `static/css/site.css`라면 `asset_integrity(name='css/site.css')`
 - Sass 출력
-- 페이지 번들 에셋과 `[content.files]` 파일. 예를 들어 `asset_integrity(name='posts/demo/app.js')`. 이 파일들은 렌더링 뒤에 복사되므로 원본으로 해시를 계산합니다. 복사는 바이트 그대로이며, `--minify`일 때의 `.json`, `.xml`, `.html`만 예외입니다.
+- 페이지 번들 에셋과 `[content.files]` 파일. 예를 들어 `asset_integrity(name='posts/demo/app.js')`. 이 파일들은 렌더링 뒤에 복사되므로 원본으로 해시를 계산합니다. 복사는 바이트 그대로이며, `--minify`일 때의 `.json`, `.xml`, `.html`만 예외입니다. 이 파일들은 렌더링 뒤에 다시 쓰이므로 `asset_integrity()`가 오류를 냅니다.
 
-출력된 파일이 없는 이름은 템플릿 오류로 빌드가 실패합니다.
+이번 빌드가 게시하지 않는 이름은 템플릿 오류로 빌드가 실패합니다. 출력 디렉터리에 이전 빌드의 사본(삭제된 정적 파일, 초안이 된 페이지의 에셋)이 아직 남아 있는 `--cache` 빌드에서도 마찬가지입니다.
 
 `sri = true`로 설정하면 Hwaro가 직접 만드는 태그에도 이 속성이 붙습니다.
 

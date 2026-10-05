@@ -386,7 +386,7 @@ Page-bundle and `[content.files]` assets are copied after rendering, so their so
 |------|------|-------------|
 | name | String | Bundle name or output path (e.g. `main.css`, `css/site.css`) |
 
-**Returns:** String, such as `sha384-…`. A name with no emitted file raises a template error.
+**Returns:** String, such as `sha384-…`. A name that this build does not publish raises a template error, as does a raw `.json`/`.xml`/`.html` file under `--minify` (it is rewritten after rendering).
 
 ---
 
