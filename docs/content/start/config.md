@@ -123,6 +123,7 @@ math_engine = "katex"
 | math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |
 | smart_punctuation | bool | false | Typographic quotes/dashes/ellipses (`"x"` → “x”, `--` → –, `...` → …) |
 | containers | bool | false | `:::note Title` … `:::` custom containers (admonition markup) |
+| wikilinks | bool | false | Obsidian syntax: `[[wikilinks]]`, `![[image]]` embeds and foldable `> [!type]-` callouts (see [Wikilinks & Backlinks](/writing/obsidian/)) |
 | insert_anchor_links | string | "none" | Site-wide heading anchor links: `"none"`, `"left"`, or `"right"` (page front matter overrides) |
 | external_links_target_blank | bool | false | Add `target="_blank" rel="noopener"` to absolute http(s) links |
 | external_links_no_follow | bool | false | Add `rel="nofollow"` to absolute http(s) links |
@@ -136,12 +137,14 @@ See [Markdown Extensions](/features/markdown-extensions/) for syntax details and
 [content]
 summary_length = 70
 summary_ellipsis = "…"
+backlinks = false
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | summary_length | int | 70 | Automatic summary length for pages without `<!-- more -->` or `description`: words for space-delimited text, characters ×2 for CJK-dominant text. `0` disables the automatic summary |
 | summary_ellipsis | string | "…" | Appended to an automatic summary only when text was cut |
+| backlinks | bool | false | Fill `page.backlinks` with the pages linking to each page (see [Wikilinks & Backlinks](/writing/obsidian/#backlinks)) |
 
 See [Content Summary](/writing/pages/#content-summary) for how `page.summary` is chosen. `[content.files]`, `[content.new]`, `[[content.generate]]` and `[[content.schema]]` are documented in the feature reference below.
 
