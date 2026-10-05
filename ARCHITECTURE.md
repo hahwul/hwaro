@@ -26,6 +26,7 @@ src/
     seo/                  sitemap, feeds, robots, llms, JSON-LD, meta tags, OG images (+ PNG renderer)
     pagination/           Paginator + paginated page renderer
     search.cr, taxonomies.cr, menus.cr, i18n.cr, multilingual.cr, versions.cr
+    search_ui.cr          built-in search client (`[search] ui`); its JS/CSS live in search_ui/
   core/
     lifecycle/            Manager, HookPoint/phases, BuildContext, Hookable/HookResult
     build/                Builder (+ builder/ parts), Cache/CacheManager, ShortcodeProcessor,
