@@ -24,6 +24,29 @@ describe Hwaro::Content::Multilingual do
     ko.translations.map(&.url).should eq(["/about/", "/ko/about/"])
   end
 
+  it "does not link translations that are never written or only redirect" do
+    config = Hwaro::Models::Config.new
+    config.default_language = "en"
+    config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+    config.languages["ja"] = Hwaro::Models::LanguageConfig.new("ja")
+
+    en = Hwaro::Models::Page.new("about.md")
+    en.url = "/about/"
+    ko = Hwaro::Models::Page.new("about.ko.md")
+    ko.url = "/ko/about/"
+    ko.language = "ko"
+    ko.render = false
+    ja = Hwaro::Models::Page.new("about.ja.md")
+    ja.url = "/ja/about/"
+    ja.language = "ja"
+    ja.redirect_to = "https://elsewhere.example/"
+
+    Hwaro::Content::Multilingual.link_translations!([en, ko, ja], config)
+
+    # Only the page itself is left, so there is nothing to switch to.
+    en.translations.should be_empty
+  end
+
   it "links translation variants on .markdown pages" do
     config = Hwaro::Models::Config.new
     config.default_language = "en"

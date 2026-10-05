@@ -165,6 +165,31 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    it "keeps redirect_to stubs out of a term feed, like every other feed" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.feed = true
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+      shown = Hwaro::Models::Page.new("shown.md")
+      shown.url = "/blog/shown/"
+      shown.tags = ["x"]
+      moved = Hwaro::Models::Page.new("moved.md")
+      moved.url = "/blog/moved/"
+      moved.tags = ["x"]
+      moved.redirect_to = "https://elsewhere.example/"
+      site.pages = [shown, moved]
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Taxonomies.generate(site, output_dir, {"taxonomy_term" => "{{ content }}"})
+
+        feed = File.read(File.join(output_dir, "tags", "x", "rss.xml"))
+        feed.should contain("/blog/shown/")
+        feed.should_not contain("/blog/moved/")
+      end
+    end
+
     it "hands the pagination nav to term templates as pagination and pagination_obj.html" do
       config = Hwaro::Models::Config.new
       tax = Hwaro::Models::TaxonomyConfig.new("tags")
