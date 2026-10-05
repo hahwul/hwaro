@@ -36,6 +36,7 @@ require "./ext/markd_regex_stack_fix"
 require "toml"
 require "./ext/toml_nesting_limit_fix"
 require "./ext/toml_datetime_fix"
+require "./ext/toml_multiline_string_fix"
 require "emoji"
 
 # Load utilities
