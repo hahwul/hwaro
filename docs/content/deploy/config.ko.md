@@ -166,6 +166,12 @@ Windows에서는 명령이 `sh` 대신 `cmd.exe`로 실행됩니다. `cmd.exe`�
 ```toml
 [[deployment.matchers]]
 pattern = "^.+\\.html$"
+cache_control = "max-age=0, no-cache"
+gzip = true
+
+[[deployment.matchers]]
+pattern = "^assets/.+\\.(css|js)$"
+cache_control = "max-age=31536000, immutable"
 force = true
 ```
 
@@ -173,11 +179,48 @@ force = true
 |-----|------|---------|-------------|
 | pattern | string | — | 소스 기준 상대 경로와 대상 이름에 매칭할 정규식 (`strip_index_html`에서는 둘이 다름) |
 | force | bool | false | 대상에 동일한 파일이 있어도 매칭된 파일을 항상 복사 |
-| cache_control | string | — | 예약됨 — 내장 동기화에서는 적용되지 않음(아래 참고) |
-| content_type | string | — | 예약됨 — 내장 동기화에서는 적용되지 않음(아래 참고) |
-| gzip | bool | false | 예약됨 — 내장 동기화에서는 적용되지 않음(아래 참고) |
+| cache_control | string | — | 매칭된 파일의 `Cache-Control` 헤더 (클라우드 대상) |
+| content_type | string | — | 매칭된 파일의 `Content-Type` 헤더 (클라우드 대상) |
+| gzip | bool | false | gzip으로 압축해 `Content-Encoding: gzip`으로 업로드(클라우드), 또는 `.gz` 파일을 옆에 생성(로컬) |
 
-내장 동기화는 파일을 복사하고 외부 CLI를 실행할 뿐 오브젝트 스토어 API와 직접 통신하지 않으므로, 실제로 반영되는 옵션은 `force`뿐입니다. `cache_control`, `content_type`, `gzip`을 설정하면 경고가 출력됩니다. 헤더와 압축은 호스트나 CDN에서 설정합니다.
+`force`는 패턴이 매칭되는 모든 매처에서 적용됩니다. 메타데이터 키
+(`cache_control`, `content_type`, `gzip`)는 이 중 하나라도 설정하고 파일에
+매칭되는 매처 중 설정 순서상 **첫 번째** 매처가 세 값을 모두 정합니다.
+매처끼리 값을 합치지 않으므로 구체적인 패턴을 일반적인 패턴보다 앞에 둡니다.
+
+### 클라우드 대상 (`s3://`, `gs://`, `az://`)
+
+기본 동기화가 끝나면 매칭된 파일을 클라우드 CLI의 플래그로 헤더와 함께 다시
+업로드합니다:
+
+| 대상 | 명령 |
+|--------|---------|
+| `s3://` | `aws s3 cp FILE s3://… --cache-control … --content-type … --content-encoding gzip` |
+| `gs://` | `gsutil -h "Cache-Control:…" -h "Content-Type:…" cp -Z FILE gs://…` |
+| `az://` | `az storage blob upload --container-name … --file FILE --name … --overwrite --content-cache-control … --content-type … --content-encoding gzip` |
+
+`gzip = true`일 때 `gsutil`은 `-Z`로 직접 압축합니다. `aws`와 `az`는
+hwaro가 같은 이름의 임시 파일로 압축해 그 파일을 업로드합니다.
+`--dry-run`은 예정된 업로드를 보여 주고, `--dry-run --json`은 파일마다
+`headers` 객체를 담은 `upload` 항목을 추가합니다. 매칭된 파일은 배포할
+때마다 다시 업로드됩니다.
+
+### 로컬 디렉터리 대상 (`file://`, `path`)
+
+`gzip = true`이면 매칭된 파일마다 미리 압축한 `<file>.gz`를 옆에
+만듭니다(nginx `gzip_static`, Caddy `precompressed`용). `.gz` 파일이 없거나
+원본보다 오래된 경우에만 다시 씁니다. 소스에 이미 `<file>.gz`가 있으면 그
+파일을 그대로 배포합니다. 원본이 배포되는 동안 `.gz` 파일은 낡은 파일로
+삭제되지 않습니다. 페이지가 사라지면 `.gz` 파일도 함께 삭제되며
+`max_deletes`에 포함되지 않습니다.
+
+로컬 복사본에는 HTTP 헤더가 없으므로 `cache_control`과 `content_type`을
+설정하면 경고가 출력됩니다. 이 헤더는 웹 서버에서 설정합니다.
+
+### 사용자 `command` 대상
+
+`command`를 직접 지정한 대상에는 매처가 적용되지 않으며, 메타데이터 키를
+설정하면 경고가 출력됩니다. 헤더는 명령에서 직접 지정합니다.
 
 ## 함께 보기
 
