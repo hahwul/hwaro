@@ -16,11 +16,13 @@ module Hwaro
           [File.join(output_dir, "manifest.json"), File.join(output_dir, "sw.js")]
         end
 
-        def self.generate(site : Models::Site, output_dir : String, verbose : Bool = false)
+        # `localize` maps an external precache URL to its `[privacy]` local
+        # copy (nil = keep it external).
+        def self.generate(site : Models::Site, output_dir : String, verbose : Bool = false, localize : (String -> String?)? = nil)
           return unless site.config.pwa.enabled
 
           generate_manifest(site, output_dir, verbose)
-          generate_service_worker(site, output_dir, verbose)
+          generate_service_worker(site, output_dir, verbose, localize)
         end
 
         private def self.generate_manifest(site : Models::Site, output_dir : String, verbose : Bool)
@@ -69,7 +71,7 @@ module Hwaro
           Logger.info "  Generated manifest.json"
         end
 
-        private def self.generate_service_worker(site : Models::Site, output_dir : String, verbose : Bool)
+        private def self.generate_service_worker(site : Models::Site, output_dir : String, verbose : Bool, localize : (String -> String?)? = nil)
           config = site.config
           pwa = config.pwa
 
@@ -81,7 +83,7 @@ module Hwaro
           # Build precache URL list (each entry is a site-internal root-relative
           # path that must carry the subpath prefix, same as start_url).
           base_path = config.base_path
-          precache_urls = pwa.precache_urls.map { |u| config.with_base_path(u) }
+          precache_urls = pwa.precache_urls.map { |u| localize.try(&.call(u)) || config.with_base_path(u) }
           precache_urls << resolved_start unless precache_urls.includes?(resolved_start)
           if offline = pwa.offline_page
             resolved_offline = config.with_base_path(offline)

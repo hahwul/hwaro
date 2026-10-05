@@ -480,6 +480,9 @@ module Hwaro
             end
           end
           kept.concat(generated_output_claims.to_a) if @generated_claims_current
+          # `[privacy]` files a taxonomy or 404 page alone may use: an
+          # incremental pass re-claims nothing, so ask the localizer.
+          @privacy.try { |privacy| kept.concat(privacy.published_files) }
           kept.each { |path| keep_output(path, cwd, exact, folded) }
 
           stale = [] of String

@@ -334,6 +334,7 @@ Cache-Control = "no-store"
 | `[[content.generate]]` | [콘텐츠 생성](/ko/features/content-generation/) | `site.data` 레코드를 페이지로 구체화 |
 | `[[content.schema]]` | [프론트 매터 스키마](/ko/writing/schema/) | 섹션별 프론트 매터 타입, 필수 필드, enum, 범위, 기본값 |
 | `[[data.remote]]` | [원격 데이터 소스](/ko/features/remote-data/) | 빌드 시 원격 데이터를 `site.data`로 가져오기 |
+| `[privacy]` | [프라이버시 모드](/ko/features/privacy/) | 외부 폰트, 스크립트, 이미지를 빌드 시 직접 호스팅하기 |
 | `[static]` | [정적 파일](#정적-파일) | `static/` 복사에서 잔여 파일 필터링 / 경로 제외 |
 | `[serve]` | [개발 서버](#개발-서버) | 개발 서버 응답 헤더 & 빠른 모드 |
 | `[links]` | [링크](#링크) | 깨진 내부 `@/` 링크 처리 (경고 또는 빌드 실패) |

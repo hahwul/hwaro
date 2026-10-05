@@ -25,6 +25,7 @@ require "./cache_manager"
 require "./parallel"
 require "./data_disk"
 require "./remote_data"
+require "./privacy"
 require "./content_generate"
 require "./template_deps"
 require "./template_loader"
@@ -158,6 +159,15 @@ module Hwaro
         # config.toml misses the memo and refetches, exactly like the disk
         # cache.
         @remote_data_memo : Hash({String, String}, {RemoteData::Result, Time}) = {} of {String, String} => {RemoteData::Result, Time}
+        # `[privacy]` localizer for this build (nil when the feature is off).
+        # Rebuilt by every Initialize phase; serve's incremental passes reuse
+        # the last one, and its disk cache keeps them off the network.
+        @privacy : Privacy? = nil
+        # Pages whose `[privacy]` rewrite left a reference external because a
+        # download failed: their cache entry is dropped, so the next `--cache`
+        # build renders them again instead of keeping the external URL.
+        # Guarded by @page_derived_mutex.
+        @privacy_incomplete : Set(String) = Set(String).new
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
@@ -601,11 +611,36 @@ module Hwaro
           info.modification_time >= epoch
         end
 
-        # Record an alias stub / pagination page `page` just wrote.
+        # Record an alias stub / pagination page / localized `[privacy]`
+        # file `page` just wrote.
         def record_page_derived_output(page_path : String, output_path : String) : Nil
           @page_derived_mutex.synchronize do
-            (@page_derived_outputs[page_path] ||= [] of String) << output_path
+            list = @page_derived_outputs[page_path] ||= [] of String
+            list << output_path unless list.includes?(output_path)
           end
+        end
+
+        # `[privacy]`: the local URL for one external URL (the PWA precache
+        # list), or nil to keep it external.
+        def privacy_url(url : String) : String?
+          return unless localized = @privacy.try(&.localize(url))
+          localized.files.each { |path| claim_generated_output(path) }
+          localized.url
+        end
+
+        # `[privacy]`: point `html`'s external assets at local copies. The
+        # files they now load are claimed, and recorded against `owner` (a
+        # page path) so a `--cache` hit, which skips the render, keeps them.
+        # Public: the taxonomy generator writes through it too.
+        def privacy_rewrite(html : String, owner : String? = nil) : String
+          return html unless privacy = @privacy
+          html, files, incomplete = privacy.rewrite_html(html)
+          files.each do |path|
+            claim_generated_output(path)
+            record_page_derived_output(owner, path) if owner
+          end
+          @page_derived_mutex.synchronize { @privacy_incomplete << owner } if incomplete && owner
+          html
         end
 
         # Start this page's list over — called at the top of every render so a

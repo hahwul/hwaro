@@ -129,6 +129,8 @@
           url: /features/amp/
         - title: Deployment
           url: /features/deployment/
+        - title: Privacy Mode
+          url: /features/privacy/
 - title: Deploy
   section: deploy
   items:

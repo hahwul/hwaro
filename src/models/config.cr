@@ -16,6 +16,7 @@ require "./config/highlight"
 require "./config/markdown"
 require "./config/versions"
 require "./config/data_remote"
+require "./config/privacy"
 require "./config/content_generate"
 require "./config/content_schema"
 require "./config/content"
@@ -93,6 +94,7 @@ module Hwaro
       property outputs : OutputsConfig
       property links : LinksConfig
       property data_remote : Array(RemoteDataConfig)
+      property privacy : PrivacyConfig
       property content_generate : Array(ContentGenerateConfig)
       property content_schema : Array(ContentSchemaConfig)
       property permalinks : Hash(String, String)
@@ -139,6 +141,7 @@ module Hwaro
         @outputs = OutputsConfig.new
         @links = LinksConfig.new
         @data_remote = [] of RemoteDataConfig
+        @privacy = PrivacyConfig.new
         @content_generate = [] of ContentGenerateConfig
         @content_schema = [] of ContentSchemaConfig
         @permalinks = {} of String => String
@@ -401,6 +404,7 @@ module Hwaro
         SectionLoader.new(%w[outputs], ->(c : Config) { load_outputs(c) }),
         SectionLoader.new(%w[links], ->(c : Config) { load_links(c) }),
         SectionLoader.new(%w[data], ->(c : Config) { load_data_remote(c) }),
+        SectionLoader.new(%w[privacy], ->(c : Config) { load_privacy(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_generate(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_schema(c) }),
       ]

@@ -127,6 +127,8 @@
           url: /ko/features/amp/
         - title: 배포 명령
           url: /ko/features/deployment/
+        - title: 프라이버시 모드
+          url: /ko/features/privacy/
 - title: 배포
   section: deploy
   items:

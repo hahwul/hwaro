@@ -706,6 +706,7 @@ module Hwaro::Core::Build::Phases::Render
     # serve builder can prune what a later render stops writing. Sorted so a
     # re-render in a different fiber order can't make the entry look changed.
     derived = take_page_derived_outputs(page.path).sort!
+    privacy_incomplete = @page_derived_mutex.synchronize { @privacy_incomplete.delete(page.path) }
     return unless cache.enabled?
     # A `[[content.generate]]` page has no source file to stat or hash —
     # `cache.update` would raise on the missing path. Skipping keeps it
@@ -718,6 +719,9 @@ module Hwaro::Core::Build::Phases::Render
     # No output file was written for an escaping page, so recording it as
     # up-to-date would let filter_changed_pages skip it forever.
     return unless output_path
+    # A failed `[privacy]` download is transient: forget the entry so the
+    # next warm build retries instead of keeping the external URL forever.
+    return cache.invalidate(source_path) if privacy_incomplete
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
     relations_hash = @page_template_hash_mutex.synchronize { @filter_relations_hashes.delete(page.path) } ||
                      page_relations_hash(page, templates, site, @pages_by_path || build_pages_by_path(site))
