@@ -225,6 +225,43 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
+    # Racy-git (#857): an entry stamped while the file's mtime was still
+    # inside its timestamp tick cannot vouch for the bytes — a same-size
+    # rewrite in that tick keeps the mtime. Pinning the rewrite's mtime to
+    # the original is that rewrite, without depending on the clock.
+    it "re-hashes a file whose stamp was recorded inside its mtime tick" do
+      Dir.mktmpdir do |dir|
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "one")
+        written = File.info(test_file).modification_time
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
+        cache.update(test_file)
+
+        File.write(test_file, "two")
+        File.utime(written, written, test_file)
+        cache.changed?(test_file).should be_true
+      end
+    end
+
+    it "trusts the stamp of a file that was safely old when recorded" do
+      Dir.mktmpdir do |dir|
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "one")
+        File.touch(test_file, Time.utc - 1.hour)
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
+        cache.update(test_file)
+        # Unreadable: re-hashing would fail and report a change.
+        File.chmod(test_file, 0o000)
+        begin
+          cache.changed?(test_file).should be_false
+        ensure
+          File.chmod(test_file, 0o644)
+        end
+      end
+    end
+
     it "detects change from non-empty to empty" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")

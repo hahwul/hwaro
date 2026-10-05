@@ -140,6 +140,9 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     head = %({% set im = resize_image(path="/img.png", width=640) %}<img src="{{ im.url }}">)
     with_render_inputs_site(config, head) do
       write_solid_png("static/img.png", 900, 30, 255_u8, 0_u8, 0_u8)
+      # A photo, not a file written a moment ago: a stamp taken inside the
+      # file's mtime tick is not trusted (#857).
+      File.touch("static/img.png", Time.utc - 1.hour)
       render_inputs_build
       render_inputs_build
       mark_outputs(["public/a/index.html"])
@@ -198,10 +201,14 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     with_render_inputs_site("", head) do
       FileUtils.mkdir_p("extdata")
       File.write("extdata/x.json", %({"v":"old"}))
+      written = File.info("extdata/x.json").modification_time
       render_inputs_build
       File.read("public/a/index.html").should contain(%(content="old"))
 
+      # Same size and, pinned, the same mtime: a rewrite inside the
+      # timestamp tick the warm build's stamp was taken in (#857).
       File.write("extdata/x.json", %({"v":"new"}))
+      File.utime(written, written, "extdata/x.json")
       render_inputs_build
       File.read("public/a/index.html").should contain(%(content="new"))
     end
