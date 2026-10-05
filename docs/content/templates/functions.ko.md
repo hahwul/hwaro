@@ -424,6 +424,8 @@ base_url이 포함된 URL을 생성합니다.
 | path | String | 이미지 경로(예: `/images/photo.jpg`) |
 | width | Int | 요청 너비(픽셀, 0 = 원본) |
 | height | Int | 요청 높이(픽셀, 0 = 원본) |
+| op | String | `fit`(기본값), `fill`, `crop` — [자르기와 채우기](/ko/features/image-processing/#자르기와-채우기) 참고 |
+| anchor | String | `fill`/`crop`이 남길 위치: `center`(기본값), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right` |
 
 **반환값:** 다음 속성을 가진 객체:
 
@@ -443,6 +445,11 @@ base_url이 포함된 URL을 생성합니다.
 `height`는 전달한 값 그대로입니다(전달하지 않으면 `0`). 증분 빌드에서는 변형
 맵을 파일 이름으로 복원하기 때문에, 모든 이미지를 디코딩하지 않고서는 실제
 높이를 알 수 없습니다.
+
+`op="fill"`이나 `op="crop"`에서는 `width`와 `height`가 모두 필요하고, 변형은
+렌더링 시점에 만들어지며(`hero_400x300_fill_center.jpg` 같은 이름),
+`width`/`height`는 실제로 쓴 파일의 크기를 돌려줍니다. 알 수 없는 `op`나
+`anchor`는 템플릿 오류입니다.
 
 `lqip`과 `dominant_color` 속성은 `[image_processing.lqip]`이 활성화되어 있어야 합니다. 꺼져 있으면 빈 문자열을 반환합니다.
 

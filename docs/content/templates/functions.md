@@ -424,6 +424,8 @@ Returns a resized image variant. When [image processing](/features/image-process
 | path | String | Image path (e.g., `/images/photo.jpg`) |
 | width | Int | Requested width in pixels (0 = original) |
 | height | Int | Requested height in pixels (0 = original) |
+| op | String | `fit` (default), `fill` or `crop` — see [Crop and Fill](/features/image-processing/#crop-and-fill) |
+| anchor | String | Where `fill`/`crop` keep the image: `center` (default), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right` |
 
 **Returns:** Object with properties:
 
@@ -443,6 +445,11 @@ to a 900px file — and `img.width` reports `900`, so
 is only ever the value you passed (`0` when you passed none): the variant map
 is rebuilt from filenames on incremental builds, so a real height is not
 available without decoding every image.
+
+With `op="fill"` or `op="crop"`, both `width` and `height` are required, the
+variant is written at render time (named like `hero_400x300_fill_center.jpg`),
+and `width`/`height` report the written file's size. An unknown `op` or
+`anchor` is a template error.
 
 The `lqip` and `dominant_color` properties require `[image_processing.lqip]` to be enabled. When disabled, they return empty strings.
 
