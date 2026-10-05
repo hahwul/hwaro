@@ -16,7 +16,7 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.excerpt_text(html).should eq("Hello & world, it's fine.")
     end
 
-    it "drops code, pre, script, style, figure, img and heading content" do
+    it "drops code blocks, script, style, figure, img and heading content but keeps inline code" do
       html = <<-HTML
         <h1 id="t">Title Heading</h1>
         <p>Lead paragraph.</p>
@@ -30,13 +30,13 @@ describe Hwaro::Utils::TextUtils do
         <p>Tail paragraph.</p>
         HTML
       text = Hwaro::Utils::TextUtils.excerpt_text(html)
-      text.should eq("Lead paragraph. Inline here. Tail paragraph.")
-      %w[Title Heading CODE INLINE_CODE ALT CAPTION LONE SCRIPT STYLE Second].each do |leak|
+      text.should eq("Lead paragraph. Inline INLINE_CODE here. Tail paragraph.")
+      %w[Title Heading BLOCK ALT CAPTION LONE SCRIPT STYLE Second].each do |leak|
         text.should_not contain(leak)
       end
     end
 
-    it "drops math source, footnote markers and the footnotes section" do
+    it "drops display math, footnote markers and the footnotes section but keeps inline math" do
       html = <<-HTML
         <p>Euler<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">[1]</a></sup> wrote <span class="math math-inline">(e^{ipi})</span> first.</p>
         <div class="math math-display">[x^2]</div>
@@ -45,7 +45,7 @@ describe Hwaro::Utils::TextUtils do
         <ol><li id="fn-1">FOOTNOTE BODY</li></ol>
         </section>
         HTML
-      Hwaro::Utils::TextUtils.excerpt_text(html).should eq("Euler wrote first.")
+      Hwaro::Utils::TextUtils.excerpt_text(html).should eq("Euler wrote (e^{ipi}) first.")
     end
 
     it "never reads a decoded entity as markup" do

@@ -688,22 +688,24 @@ module Hwaro
       end
 
       # Elements whose CONTENT is not prose and must not seed an automatic
-      # summary: code (`<pre>`/`<code>`), raw-text elements, figures/images
+      # summary: code blocks (`<pre>`), raw-text elements, figures/images
       # (captions and alt text read badly out of context) and headings (a
-      # summary that opens with the page's own title is noise). Matched
-      # with a lazy `[\s\S]*?` so multi-line blocks are removed whole; a
-      # nested `<code>` inside `<pre>` is consumed by the outer match.
-      # Unterminated tags fall through to the generic tag stripper.
-      EXCERPT_SKIP_ELEMENT = /<(pre|code|script|style|figure|h[1-6])(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
+      # summary that opens with the page's own title is noise). Inline
+      # `<code>` is part of the sentence and stays. Matched with a lazy
+      # `[\s\S]*?` so multi-line blocks are removed whole; the `<code>`
+      # inside `<pre>` is consumed by the outer match. Unterminated tags
+      # fall through to the generic tag stripper.
+      EXCERPT_SKIP_ELEMENT = /<(pre|script|style|figure|h[1-6])(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
       EXCERPT_SKIP_VOID    = /<img(?:\s[^>]*)?\/?>/i
       # Markup the Markdown extensions emit whose text is not prose either:
-      # math (`<span class="math …">\(x\)</span>` holds TeX source until
-      # KaTeX/MathJax runs in the browser), footnote reference markers
-      # (`[1]`) and the trailing footnotes section.
-      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math|footnote-ref|footnotes)[^"]*"[^>]*>[\s\S]*?<\/\1\s*>/i
+      # display math (TeX source until KaTeX/MathJax runs in the browser),
+      # footnote reference markers (`[1]`) and the trailing footnotes
+      # section. Inline math (`math-inline`) is part of the sentence and
+      # keeps its `\(x\)` source.
+      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math(?! math-inline)|footnote-ref|footnotes)[^"]*"[^>]*>[\s\S]*?<\/\1\s*>/i
 
       # Plain prose of a rendered HTML body, for the automatic summary:
-      # code/figure/heading/math/footnote blocks dropped, tags stripped,
+      # code-block/figure/heading/display-math/footnote blocks dropped, tags stripped,
       # entities decoded
       # (after stripping, so `&lt;p&gt;` can never be read as markup), and
       # whitespace collapsed to single spaces. The result is TEXT — a
