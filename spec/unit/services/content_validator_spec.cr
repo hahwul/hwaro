@@ -758,8 +758,9 @@ describe "ContentValidator @/ links resolve like the build" do
     broken_links("[a](@/./x.md) [b](@/posts/../x.md)", {"x.md" => target, "posts/p.md" => target}).size.should eq(2)
   end
 
-  it "does not percent-decode the path" do
-    broken_links("[a](@/my%20post.md)", {"my post.md" => target}).size.should eq(1)
+  it "percent-decodes the path, as the build does" do
+    broken_links("[a](@/my%20post.md)", {"my post.md" => target}).size.should eq(0)
+    broken_links("[a](@/my%20post.md)", {"other.md" => target}).size.should eq(1)
   end
 
   it "is case-sensitive even on a case-insensitive filesystem" do

@@ -215,6 +215,11 @@ module Hwaro::Core::Build::Phases::Render
         end
       end,
     }
+    # Only with `[content] backlinks`, so templates of sites without it see
+    # exactly the page object they always did.
+    if config.backlinks
+      page_obj["backlinks"] = Crinja::Value.new(page.backlinks.map { |bp| cached_page_crinja_value(bp, default_lang) })
+    end
     if versions_enabled
       page_obj["version"] = cached_raw["version"].as(Crinja::Value)
       page_obj["version_links"] = cached_raw["version_links"].as(Crinja::Value)

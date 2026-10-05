@@ -35,6 +35,8 @@
       url: /writing/archetypes/
     - title: Front Matter Schema
       url: /writing/schema/
+    - title: Wikilinks & Backlinks
+      url: /writing/obsidian/
 - title: Templates
   section: templates
   items:

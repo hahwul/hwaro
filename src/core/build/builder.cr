@@ -50,6 +50,7 @@ require "../../content/seo/pwa"
 require "../../content/seo/og_image"
 require "../../content/search"
 require "../../content/front_matter_schema"
+require "../../content/processors/wikilinks"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/digest_utils"
@@ -295,6 +296,12 @@ module Hwaro
         # filter-time one. Cleared after the render fan-out; guarded by
         # @page_template_hash_mutex.
         @filter_relations_hashes : Hash(String, String) = {} of String => String
+        # `[markdown] wikilinks` lookup over the current published page set;
+        # rebuilt whenever that set may have changed (refresh_wikilink_index).
+        @wikilink_index : Content::Processors::Wikilinks::Index? = nil
+        # Ambiguous-wikilink warnings already printed; kept across the index
+        # rebuilds of one serve session, cleared by each full build.
+        @wikilink_warnings : Content::Processors::Wikilinks::WarnLog = Content::Processors::Wikilinks::WarnLog.new
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve

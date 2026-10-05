@@ -121,6 +121,7 @@ math_engine = "katex"
 | math_engine | string | "katex" | 수식 렌더링 엔진 (`"katex"` 또는 `"mathjax"`) |
 | smart_punctuation | bool | false | 타이포그래피용 인용부호/대시/줄임표 (`"x"` → “x”, `--` → –, `...` → …) |
 | containers | bool | false | `:::note Title` … `:::` 커스텀 컨테이너 (admonition 마크업) |
+| wikilinks | bool | false | Obsidian 문법: `[[위키링크]]`, `![[이미지]]` 임베드, 접을 수 있는 `> [!type]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
 | insert_anchor_links | string | "none" | 사이트 전역 헤딩 앵커 링크: `"none"`, `"left"`, `"right"` (페이지 프론트 매터가 우선) |
 | external_links_target_blank | bool | false | 절대 http(s) 링크에 `target="_blank" rel="noopener"` 추가 |
 | external_links_no_follow | bool | false | 절대 http(s) 링크에 `rel="nofollow"` 추가 |
@@ -134,12 +135,14 @@ math_engine = "katex"
 [content]
 summary_length = 70
 summary_ellipsis = "…"
+backlinks = false
 ```
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
 | summary_length | int | 70 | `<!-- more -->`도 `description`도 없는 페이지의 자동 요약 길이. 공백으로 구분되는 텍스트는 단어 수, CJK 위주 텍스트는 글자 수 ×2. `0`이면 자동 요약 비활성화 |
 | summary_ellipsis | string | "…" | 자동 요약이 잘린 경우에만 끝에 추가되는 문자열 |
+| backlinks | bool | false | 각 페이지로 링크하는 페이지를 `page.backlinks`에 채움 ([위키링크와 백링크](/ko/writing/obsidian/#백링크) 참고) |
 
 `page.summary`가 선택되는 방식은 [콘텐츠 요약](/ko/writing/pages/#콘텐츠-요약)을 참고하세요. `[content.files]`, `[content.new]`, `[[content.generate]]`, `[[content.schema]]`는 아래 기능 설정 레퍼런스에 있습니다.
 

@@ -240,6 +240,10 @@ module Hwaro
       # New: Related posts (computed by taxonomy similarity)
       property related_posts : Array(Page)
 
+      # Published pages in the same language linking here (`[content]
+      # backlinks = true`); see Transform#compute_backlinks.
+      property backlinks : Array(Page)
+
       # New: Redirect to - URL to redirect this page to
       property redirect_to : String?
 
@@ -296,6 +300,7 @@ module Hwaro
         @series_index = 0
         @series_pages = [] of Page
         @related_posts = [] of Page
+        @backlinks = [] of Page
         @redirect_to = nil
         @git = nil
         @cascade_fingerprint = ""

@@ -104,7 +104,7 @@ describe "registration order" do
     # the deployment source-dir resolver after build + deployment); pinning
     # the whole sequence is simpler than pinning the constraints.
     Hwaro::Models::Config::SECTION_LOADERS.map(&.keys.join(",")).should eq(%w[
-      sitemap robots llms feeds search plugins content content content
+      sitemap robots llms feeds search plugins content content content content
       pagination highlight auto_includes og menus taxonomies languages
       versions build serve markdown series related git permalinks assets
       sass pwa amp image_processing doctor static deployment

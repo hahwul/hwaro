@@ -78,6 +78,16 @@ module Hwaro
           value.starts_with?("//") || value.matches?(SCHEME_PREFIX_REGEX)
         end
 
+        # The page an `@/` path names. Markd percent-encodes a destination
+        # (`@/my note.md` arrives as `@/my%20note.md`), so the decoded path is
+        # tried first: `%20` means a space, as it does to Markd. A literal
+        # `%` file name is still reached when nothing decodes to it (or as
+        # `%25`).
+        def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          return pages_by_path[path]? unless path.includes?('%')
+          pages_by_path[URI.decode(path)]? || pages_by_path[path]?
+        end
+
         # Resolve internal `@/` links in HTML to actual page URLs.
         #
         # - `html` — rendered HTML string
@@ -132,7 +142,7 @@ module Hwaro
               next match
             end
 
-            if page = pages_by_path[path_part]?
+            if page = page_for(pages_by_path, path_part)
               page_url = page.url.starts_with?("/") ? page.url : "/#{page.url}"
               url = HTML.escape("#{base_path}#{page_url}")
               # `query`/`anchor` are usually captured out of already-rendered

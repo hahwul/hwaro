@@ -106,11 +106,14 @@ module Hwaro::Core::Build::Phases::Render
   RELATION_RELATED_MARKER      = "related_posts"
   RELATION_TRANSLATION_MARKERS = ["translations", "hreflang"]
   RELATION_ANCESTOR_MARKERS    = ["ancestors", "jsonld"]
+  RELATION_BACKLINKS_MARKER    = "backlinks"
 
   # `@/path.md` internal links in raw content (Markdown destination, raw
   # `href="@/…"`, reference definition). Stops where the resolver's own
-  # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters.
-  INTERNAL_LINK_TARGET_RE = /@\/([^\s()"'#?<>\[\]]+)/
+  # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters. An
+  # angle-bracket destination (`<@/a b.md>`) may hold spaces and runs to its
+  # `>` (group 1); the bare form is group 2.
+  INTERNAL_LINK_TARGET_RE = /<@\/([^>\n#?]+)|@\/([^\s()"'#?<>\[\]]+)/
 
   # A content-derived field or `[extra]` read straight off a relation —
   # `page.higher.summary`, `get_page(path="x").extra.badge` — where the
@@ -128,7 +131,10 @@ module Hwaro::Core::Build::Phases::Render
     translations : Bool,
     ancestors : Bool,
     get_page_targets : Array(String),
-    fields : Builder::ListingPageFields do
+    fields : Builder::ListingPageFields,
+    # Folded only under `[content] backlinks` (see page_relations_hash),
+    # so it stays out of `reads_any?`.
+    backlinks : Bool = false do
     def reads_any? : Bool
       neighbors || series || related || translations || ancestors || !get_page_targets.empty?
     end
@@ -179,6 +185,7 @@ module Hwaro::Core::Build::Phases::Render
         ancestors: RELATION_ANCESTOR_MARKERS.any? { |m| blob.includes?(m) },
         get_page_targets: get_page_targets(blob),
         fields: relation_page_fields(blob),
+        backlinks: blob.includes?(RELATION_BACKLINKS_MARKER),
       ),
     )
     @page_template_scan_mutex.synchronize do
@@ -746,7 +753,9 @@ module Hwaro::Core::Build::Phases::Render
   protected def page_relations_hash(page : Models::Page, templates : Hash(String, String), site : Models::Site, link_targets : Hash(String, Models::Page)) : String
     rel = page_template_scan(page, templates, site).relations
     links = internal_link_targets(page)
-    return "" if !rel.reads_any? && links.empty?
+    backlinks = rel.backlinks && site.config.backlinks
+    wikilinks = wikilink_resolutions(page)
+    return "" if !rel.reads_any? && links.empty? && !backlinks && wikilinks.empty?
 
     digest = Digest::MD5.new
     if rel.neighbors
@@ -794,8 +803,16 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, "l#{links.size}")
       links.each do |target|
         fp_value(digest, target)
-        fp_value(digest, link_targets[target]?.try(&.url) || "")
+        fp_value(digest, Content::Processors::InternalLinkResolver.page_for(link_targets, target).try(&.url) || "")
       end
+    end
+    # B lists A when A links to B: A adding or dropping the link, or A's
+    # listed fields moving, re-renders B.
+    fp_backlinks(digest, page, rel.fields) if backlinks
+    # What each wikilink resolves to ("" while unresolved), like `@/` above.
+    unless wikilinks.empty?
+      fp_value(digest, "w#{wikilinks.size}")
+      wikilinks.each { |value| fp_value(digest, value) }
     end
     digest.final.hexstring
   end
@@ -839,8 +856,33 @@ module Hwaro::Core::Build::Phases::Render
     raw = page.raw_content
     return [] of String unless Utils::ByteScan.includes?(raw, "@/")
     targets = [] of String
-    raw.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << m[1] }
+    raw.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << (m[1]? || m[2]) }
     targets.uniq!.sort!
+  end
+
+  private def fp_backlinks(digest : ::Digest, page : Models::Page, fields : Builder::ListingPageFields) : Nil
+    fp_value(digest, "b#{page.backlinks.size}")
+    page.backlinks.each { |p| fp_relation(digest, p, fields) }
+  end
+
+  # `target=resolution` for each distinct wikilink in a page's raw content:
+  # the linked page's path and URL, or an embed's file URL. Empty unless
+  # `[markdown] wikilinks`.
+  private def wikilink_resolutions(page : Models::Page) : Array(String)
+    return [] of String unless index = @wikilink_index
+    values = Set(String).new
+    Content::Processors::Wikilinks.each_link(page.raw_content, math: site_math?) do |link|
+      next unless link.is_a?(Content::Processors::Wikilinks::Link)
+      next if link.target.empty?
+      resolved = if link.image?
+                   index.resolve_file(link.target, page) || ""
+                 else
+                   index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } ||
+                     (index.resolve_file(link.target, page) if link.file?) || ""
+                 end
+      values << "#{link.embed ? '!' : ' '}#{link.target}=#{resolved}"
+    end
+    values.to_a.sort!
   end
 
   # Fingerprint of the page's `[git]` metadata (see CacheEntry#git_hash):

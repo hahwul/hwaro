@@ -316,3 +316,14 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
     end
   end
 end
+
+describe "Hwaro::Content::Processors::InternalLinkResolver.page_for" do
+  it "prefers the decoded path, so `%20` names the page with a space" do
+    space = Hwaro::Models::Page.new("a b.md")
+    pct = Hwaro::Models::Page.new("a%20b.md")
+    map = {"a b.md" => space, "a%20b.md" => pct}
+    Hwaro::Content::Processors::InternalLinkResolver.page_for(map, "a%20b.md").should be(space)
+    Hwaro::Content::Processors::InternalLinkResolver.page_for(map, "a%2520b.md").should be(pct)
+    Hwaro::Content::Processors::InternalLinkResolver.page_for({"a%20b.md" => pct}, "a%20b.md").should be(pct)
+  end
+end

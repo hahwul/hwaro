@@ -1,5 +1,6 @@
 # `@/` content-link lookup shared by `tool check-links` and `tool validate`.
 
+require "uri"
 require "./content_lister"
 require "./generated_content"
 
@@ -9,13 +10,15 @@ module Hwaro
     #
     # The build rewrites `href="@/posts/hello.md"` by looking `posts/hello.md`
     # up in its content-path → page map (`InternalLinkResolver.resolve` over
-    # `build_pages_by_path`). That lookup is exact: case-sensitive, never
-    # percent-decoded, no `./` or `../` normalization, no guessing of an
-    # extension or an `_index.md`, and the map only holds pages and sections
-    # that survived draft, future and expired filtering. The tools used to
-    # test file existence instead, so they passed `@/draft.md`, `@/UPPER.md`
-    # (on a case-insensitive filesystem), `@/./x.md`, `@/../README.md` and
-    # `@/my%20post.md` — every one a link the build leaves unresolved.
+    # `build_pages_by_path`, through `InternalLinkResolver.page_for`). That
+    # lookup is exact apart from percent-decoding: Markd encodes a
+    # destination, so `@/my%20post.md` is tried as `my post.md` first, then
+    # as written. It is case-sensitive, does no `./` or `../` normalization,
+    # no guessing of an extension or an `_index.md`, and the map only holds
+    # pages and sections that survived draft, future and expired filtering.
+    # The tools used to test file existence instead, so they passed
+    # `@/draft.md`, `@/UPPER.md` (on a case-insensitive filesystem), `@/./x.md`
+    # and `@/../README.md` — every one a link the build leaves unresolved.
     #
     # The keys come from `ContentLister`, the publish-state source of truth
     # for authored files, plus the planned `[[content.generate]]` pages.
@@ -38,7 +41,8 @@ module Hwaro
       # "future", "expired").
       def unresolved_reason(key : String) : String?
         return "empty link" if key.empty?
-        state = states[key]?
+        # Same order as InternalLinkResolver.page_for.
+        state = (states[URI.decode(key)]? if key.includes?('%')) || states[key]?
         return "not found" unless state
         state == PublishState::Published.label ? nil : state
       end

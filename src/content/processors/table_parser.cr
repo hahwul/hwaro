@@ -236,7 +236,7 @@ module Hwaro
         end
 
         # Check if a line looks like a table row (contains pipe characters)
-        private def table_row?(line : String) : Bool
+        def table_row?(line : String) : Bool
           stripped = line.strip
           return false if stripped.empty?
 
@@ -245,7 +245,7 @@ module Hwaro
         end
 
         # Check if a line is a separator row (contains dashes and optional colons)
-        private def separator_row?(line : String) : Bool
+        def separator_row?(line : String) : Bool
           stripped = line.strip
           return false if stripped.empty?
           return false unless stripped.includes?("|")

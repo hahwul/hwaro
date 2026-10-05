@@ -43,6 +43,9 @@ module Hwaro
       # rendered with the admonition markup (shared CSS). Unsupported
       # under safe mode (the raw <div> wrapper would be stripped).
       property containers : Bool
+      # If true, enables Obsidian syntax: `[[wikilinks]]`, `![[image]]`
+      # embeds and foldable `> [!type]-` / `> [!type]+` callouts.
+      property wikilinks : Bool
 
       def initialize
         @safe = false
@@ -68,6 +71,7 @@ module Hwaro
         @task_list_classes = false
         @insert_anchor_links = "none"
         @containers = false
+        @wikilinks = false
       end
 
       # Compact fingerprint of every field that changes rendered body HTML.
@@ -86,6 +90,8 @@ module Hwaro
           io << (@external_links_no_referrer ? '1' : '0') << (@task_list_classes ? '1' : '0')
           io << (@containers ? '1' : '0')
           io << @math_engine << ':' << @insert_anchor_links
+          # Appended only when on, so every existing fingerprint is unchanged.
+          io << ":w" if @wikilinks
         end
       end
 
@@ -175,6 +181,7 @@ module Hwaro
         config.markdown.external_links_no_referrer = bool_value(s["external_links_no_referrer"]?, config.markdown.external_links_no_referrer)
         config.markdown.task_list_classes = bool_value(s["task_list_classes"]?, config.markdown.task_list_classes)
         config.markdown.containers = bool_value(s["containers"]?, config.markdown.containers)
+        config.markdown.wikilinks = bool_value(s["wikilinks"]?, config.markdown.wikilinks)
         if anchors = s["insert_anchor_links"]?.try(&.as_s?)
           if anchors.in?("none", "left", "right", "before", "after")
             config.markdown.insert_anchor_links = anchors
