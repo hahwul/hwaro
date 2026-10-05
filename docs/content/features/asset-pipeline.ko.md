@@ -42,6 +42,7 @@ files = ["js/util.js", "js/app.js"]
 | `fingerprint` | bool | `true` | 파일명에 콘텐츠 해시 추가 |
 | `source_dir` | string | `"static"` | 소스 파일이 있는 디렉터리 (프로젝트 안에 있는 한 어디를 가리켜도 `hwaro serve`가 감시합니다) |
 | `output_dir` | string | `"assets"` | 빌드 출력 내 출력 하위 디렉터리 |
+| `sri` | bool | `false` | Hwaro가 출력하는 로컬 CSS/JS 태그에 `integrity` 속성 추가([하위 리소스 무결성](#sri) 참고). `enabled = false`여도 동작 |
 
 ### 번들 정의
 
@@ -74,6 +75,70 @@ CSS 번들은 원본 파일 옆이 아니라 `output_dir` 아래에 게시됩니
 에셋이 파이프라인 매니페스트에 없으면(예: 번들로 설정하지 않은 경우) `base_url` 아래의 경로를 그대로 반환합니다.
 
 `asset`의 별칭으로 `asset_url`도 쓸 수 있습니다.
+
+## 하위 리소스 무결성 {#sri}
+
+[하위 리소스 무결성(SRI)](https://developer.mozilla.org/ko/docs/Web/Security/Subresource_Integrity)을 쓰면 페이지가 기대한 바이트와 다른 스타일시트나 스크립트를 브라우저가 거부합니다. `asset_integrity()`는 `asset()`이 가리키는 파일의 `sha384-…` 값을 돌려줍니다.
+
+```html
+<link rel="stylesheet" href="{{ asset(name='main.css') }}" integrity="{{ asset_integrity(name='main.css') }}">
+```
+
+해시는 Hwaro가 출력에 쓴 바이트(압축과 핑거프린트 이후)로 계산하므로 항상 게시된 파일과 일치합니다. 파이프라인 번들뿐 아니라 출력된 다른 파일에도 쓸 수 있습니다. 예를 들어 복사된 `static/css/site.css`라면 `asset_integrity(name='css/site.css')`입니다. 출력된 파일이 없는 이름은 템플릿 오류로 빌드가 실패합니다.
+
+`sri = true`로 설정하면 Hwaro가 직접 만드는 태그에도 이 속성이 붙습니다.
+
+```toml
+[assets]
+sri = true
+```
+
+- `{{ auto_includes }}`, `{{ auto_includes_css }}`, `{{ auto_includes_js }}` ([자동 인클루드](/ko/features/auto-includes/))
+- `[highlight] use_cdn = false`일 때의 `{{ highlight_css }}`, `{{ highlight_js }}`, `{{ highlight_tags }}`
+
+CDN 태그에는 바이트를 알 수 없으므로 `integrity`를 붙이지 않습니다. 같은 출처의 에셋에는 `crossorigin` 속성이 필요 없어 추가하지 않습니다. `?v=` [캐시 버스팅](/ko/features/cache-busting/) 쿼리는 해시에 영향을 주지 않습니다.
+
+CSS나 JS 파일이 바뀌면 `hwaro build --cache`와 `hwaro serve` 모두에서 그 값을 출력하는 모든 페이지가 갱신됩니다. 값이 오래된 채로 남으면 브라우저가 에셋을 차단하기 때문입니다.
+
+## 사용 선택자 매니페스트(Tailwind) {#used-selector-manifest-tailwind}
+
+Tailwind CSS v4 같은 유틸리티 CSS 도구는 HTML이 실제로 쓰는 클래스만 생성합니다. `[build] write_stats = true`로 설정하면 매 빌드가 프로젝트 루트에 `hwaro_stats.json`(Hugo의 `hugo_stats.json`과 같은 형식)을 쓰고, 렌더링된 모든 페이지(페이지, 섹션, 택소노미 페이지, 페이지네이션 페이지, 404 페이지)의 태그·클래스·id를 담습니다.
+
+```json
+{
+  "htmlElements": {
+    "tags": ["a", "body", "div"],
+    "classes": ["flex", "mt-4", "text-lg"],
+    "ids": ["main"]
+  }
+}
+```
+
+값은 정렬되고 중복이 제거됩니다. 파일은 내용이 바뀔 때만 다시 쓰고, `hwaro serve`는 이 파일을 소스 변경으로 보지 않으므로 재빌드 루프가 생기지 않습니다.
+
+모든 페이지를 렌더링한 빌드는 정확한 집합을 씁니다. 일부만 렌더링한 빌드(`--cache` 적중, `serve --fast-start`, serve의 증분 재빌드)는 이전 파일에 이번에 렌더링한 내용을 더합니다. 그래서 수정되거나 삭제된 페이지만 쓰던 클래스는 모든 페이지를 렌더링하는 다음 빌드까지 목록에 남습니다. 항목이 남아도 생성되는 CSS가 조금 늘어날 뿐이고, 페이지가 쓰는 클래스가 빠지는 일은 없습니다.
+
+### Tailwind v4 예시
+
+Tailwind가 매니페스트를 읽게 하고 CLI를 빌드 전 훅으로 실행합니다.
+
+```css
+/* assets/tailwind.css */
+@import "tailwindcss";
+@source "../hwaro_stats.json";
+```
+
+```toml
+[build]
+write_stats = true
+hooks.pre = ["npx @tailwindcss/cli -i assets/tailwind.css -o static/css/tailwind.css --minify"]
+```
+
+```html
+<link rel="stylesheet" href="{{ asset(name='css/tailwind.css') }}">
+```
+
+빌드 전 훅은 이전 빌드의 매니페스트를 읽으므로, 새로 체크아웃한 저장소에서는 `hwaro build`를 두 번 실행하거나 `hwaro_stats.json`을 소스와 함께 커밋해 두세요.
 
 ## 동작 방식
 
@@ -156,3 +221,4 @@ files = ["css/style.css"]
 - [캐시 버스팅](/ko/features/cache-busting/) — 파이프라인을 거치지 않는 에셋을 위한 쿼리 스트링 기반 캐시 무효화
 - [자동 인클루드](/ko/features/auto-includes/) — 정적 디렉터리의 CSS/JS 자동 로드
 - [빌드 훅](/ko/features/build-hooks/) — 빌드 전후 외부 도구 실행
+- [템플릿 함수](/ko/templates/functions/#asset-integrity) — `asset()`과 `asset_integrity()`

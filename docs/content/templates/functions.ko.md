@@ -370,6 +370,24 @@ base_url이 포함된 URL을 생성합니다.
 
 ---
 
+### asset_integrity()
+
+`asset()`이 가리키는 파일의 [하위 리소스 무결성](/ko/features/asset-pipeline/#sri) 값을 돌려줍니다. 출력에 쓰인 바이트(압축과 핑거프린트 이후)로 계산합니다.
+
+```jinja
+<script src="{{ asset(name='app.js') }}" integrity="{{ asset_integrity(name='app.js') }}"></script>
+```
+
+**파라미터:**
+
+| 이름 | 타입 | 설명 |
+|------|------|-------------|
+| name | String | 번들 이름 또는 출력 경로(예: `main.css`, `css/site.css`) |
+
+**반환값:** String(예: `sha384-…`). 출력된 파일이 없는 이름은 템플릿 오류를 일으킵니다.
+
+---
+
 ### now()
 
 현재 날짜와 시간을 가져옵니다.

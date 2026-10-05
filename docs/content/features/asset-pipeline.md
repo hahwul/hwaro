@@ -42,6 +42,7 @@ Bundle `files` may also name `.scss` sources. While `[sass]` is enabled they com
 | `fingerprint` | bool | `true` | Add content hash to filenames |
 | `source_dir` | string | `"static"` | Directory containing source files (watched by `hwaro serve` wherever it points, as long as it stays inside the project) |
 | `output_dir` | string | `"assets"` | Output subdirectory in the build output |
+| `sri` | bool | `false` | Add `integrity` attributes to the local CSS/JS tags Hwaro emits (see [Subresource Integrity](#subresource-integrity)). Works with `enabled = false` |
 
 ### Bundle definition
 
@@ -74,6 +75,70 @@ When fingerprinting is enabled, this resolves to the hashed path:
 When the asset is not found in the pipeline manifest (e.g., not configured as a bundle), the function falls back to returning the path as-is under `base_url`.
 
 `asset_url` is available as an alias for `asset`.
+
+## Subresource Integrity
+
+[Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) lets the browser refuse a stylesheet or script whose bytes differ from what the page expects. `asset_integrity()` returns the `sha384-…` value of the file `asset()` points to:
+
+```html
+<link rel="stylesheet" href="{{ asset(name='main.css') }}" integrity="{{ asset_integrity(name='main.css') }}">
+```
+
+The hash covers the bytes Hwaro writes to the output (after minify and fingerprint), so it always matches the published file. It works for pipeline bundles and for any other emitted file, such as `asset_integrity(name='css/site.css')` for a copied `static/css/site.css`. A name with no emitted file fails the build with a template error.
+
+Set `sri = true` to add the attribute to the tags Hwaro generates itself:
+
+```toml
+[assets]
+sri = true
+```
+
+- `{{ auto_includes }}`, `{{ auto_includes_css }}` and `{{ auto_includes_js }}` ([Auto Includes](/features/auto-includes/))
+- `{{ highlight_css }}`, `{{ highlight_js }}` and `{{ highlight_tags }}` when `[highlight] use_cdn = false`
+
+CDN tags get no `integrity`, because Hwaro does not know their bytes. Same-origin assets need no `crossorigin` attribute, so none is added. The `?v=` [cache-busting](/features/cache-busting/) query does not affect the hash.
+
+A changed CSS or JS file updates the value on every page that prints it, both on `hwaro build --cache` and under `hwaro serve`. A stale value would make the browser block the asset.
+
+## Used-selector manifest (Tailwind)
+
+Utility-CSS tools such as Tailwind CSS v4 generate only the classes your HTML uses. With `[build] write_stats = true`, every build writes `hwaro_stats.json` at the project root (like Hugo's `hugo_stats.json`) listing the tags, classes and ids of every rendered page (pages, sections, taxonomy pages, pagination pages and the 404 page):
+
+```json
+{
+  "htmlElements": {
+    "tags": ["a", "body", "div"],
+    "classes": ["flex", "mt-4", "text-lg"],
+    "ids": ["main"]
+  }
+}
+```
+
+Values are sorted and de-duplicated. The file is rewritten only when its content changes, and `hwaro serve` never treats it as a source change, so it cannot cause a rebuild loop.
+
+Builds that render every page write the exact set. A partial build (`--cache` hits, `serve --fast-start`, or serve's incremental rebuilds) adds what it rendered to the previous file instead. A class that only an edited or deleted page used then stays listed until the next build that renders every page. Extra entries only mean slightly more generated CSS; no class a page uses is ever missing.
+
+### Tailwind v4 recipe
+
+Point Tailwind at the manifest and run its CLI as a pre-build hook:
+
+```css
+/* assets/tailwind.css */
+@import "tailwindcss";
+@source "../hwaro_stats.json";
+```
+
+```toml
+[build]
+write_stats = true
+hooks.pre = ["npx @tailwindcss/cli -i assets/tailwind.css -o static/css/tailwind.css --minify"]
+```
+
+```html
+<link rel="stylesheet" href="{{ asset(name='css/tailwind.css') }}">
+```
+
+The pre-build hook reads the manifest from the previous build, so on a fresh checkout run `hwaro build` twice, or commit `hwaro_stats.json` along with the source.
 
 ## How It Works
 
@@ -156,3 +221,4 @@ files = ["css/style.css"]
 - [Cache Busting](/features/cache-busting/) — Query-string based cache invalidation for non-pipeline assets
 - [Auto Includes](/features/auto-includes/) — Automatically load CSS/JS from static directories
 - [Build Hooks](/features/build-hooks/) — Run external tools before/after builds
+- [Template Functions](/templates/functions/#asset-integrity) — `asset()` and `asset_integrity()`
