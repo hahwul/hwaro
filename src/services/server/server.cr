@@ -97,6 +97,11 @@ module Hwaro
       # built_config_rewrite? for what it buys and what it deliberately does
       # not swallow.
       @config_rewritten_by_build = {} of String => FileStamp
+      # Set by `copy_static` when a static save escalated to a rebuild that
+      # moves page HTML (a bundle fingerprint, a `load_data()` source, a
+      # static file shadowing a page). The live-reload push must then be a
+      # full `reload`, never an in-place stylesheet swap.
+      @static_changed_pages : Bool = false
 
       # Extensions whose served bytes are UTF-8 text, each with the base type to
       # assume when the platform's MIME database has no opinion.
