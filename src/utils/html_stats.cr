@@ -41,17 +41,29 @@ module Hwaro
 
       # Fold a previously written stats file in (a partial build keeps the
       # selectors of the pages it did not re-render). A missing or malformed
-      # file adds nothing.
+      # file adds nothing — and makes the next `--cache` build render every
+      # page (see `valid_file?`).
       def merge_file(path : String) : Nil
-        return unless File.file?(path)
-        elements = JSON.parse(File.read(path))["htmlElements"]?
-        return unless elements
+        return unless elements = HtmlStats.read_elements(path)
         @mutex.synchronize do
           {"tags" => @tags, "classes" => @classes, "ids" => @ids}.each do |key, set|
             elements[key]?.try(&.as_a?).try(&.each { |v| v.as_s?.try { |s| set << s } })
           end
         end
+      end
+
+      # True when `path` holds a stats file a partial build can extend.
+      def self.valid_file?(path : String) : Bool
+        !read_elements(path).nil?
+      end
+
+      # The `htmlElements` object of a stats file, or nil when the file is
+      # missing, unreadable or not shaped like one.
+      def self.read_elements(path : String) : Hash(String, JSON::Any)?
+        return unless File.file?(path)
+        JSON.parse(File.read(path)).as_h?.try(&.["htmlElements"]?).try(&.as_h?)
       rescue JSON::ParseException | File::Error | IO::Error
+        nil
       end
 
       def serialize : String
@@ -102,16 +114,25 @@ module Hwaro
             while i < n && tag_name_byte?(bytes[i])
               i += 1
             end
-            name = html.byte_slice(start, i - start).downcase
+            name = html.byte_slice(start, i - start)
+            name = name.downcase if bytes[start, i - start].any?(&.unsafe_chr.ascii_uppercase?)
             tags << name
             i = scan_attributes(html, bytes, i, classes, ids)
-            if RAW_TEXT_TAGS.includes?(name)
-              close = ByteScan.byte_index(html, "</#{name}", i) ||
-                      ByteScan.byte_index(html, "</#{name.upcase}", i)
-              i = close || n
-            end
+            i = raw_text_end(html, bytes, name, i) if RAW_TEXT_TAGS.includes?(name)
           end
         end
+      end
+
+      # Index of the `</name` (any case) closing a raw-text element opened
+      # before `i`, or the end of input. `name` is lowercase.
+      private def self.raw_text_end(html : String, bytes : Bytes, name : String, i : Int32) : Int32
+        n = bytes.size
+        while close = ByteScan.byte_index(html, "</", i)
+          j = close + 2
+          return close if j + name.bytesize <= n && ascii_ieq?(bytes, j, name)
+          i = j
+        end
+        n
       end
 
       # Walks one start tag's attributes from `i`; returns the index just
@@ -129,7 +150,7 @@ module Hwaro
           while i < n && !bytes[i].unsafe_chr.ascii_whitespace? && bytes[i] != '='.ord && bytes[i] != '>'.ord && bytes[i] != '/'.ord
             i += 1
           end
-          attr = html.byte_slice(start, i - start).downcase
+          attr = attribute_kind(bytes, start, i - start)
           while i < n && bytes[i].unsafe_chr.ascii_whitespace?
             i += 1
           end
@@ -151,10 +172,10 @@ module Hwaro
             end
             vend = i
           end
-          next unless attr == "class" || attr == "id"
+          next if attr.none?
           value = html.byte_slice(vstart, vend - vstart)
           value = HTML.unescape(value) if value.includes?('&')
-          if attr == "id"
+          if attr.id?
             id = value.strip
             ids << id unless id.empty?
           else
@@ -162,6 +183,34 @@ module Hwaro
           end
         end
         n
+      end
+
+      private enum AttributeKind
+        None
+        Class
+        Id
+      end
+
+      # `class` / `id` (any case) compared in place, without allocating the
+      # name of every attribute on the page.
+      private def self.attribute_kind(bytes : Bytes, start : Int32, size : Int32) : AttributeKind
+        if size == 5 && ascii_ieq?(bytes, start, "class")
+          AttributeKind::Class
+        elsif size == 2 && ascii_ieq?(bytes, start, "id")
+          AttributeKind::Id
+        else
+          AttributeKind::None
+        end
+      end
+
+      # `bytes[start, lower.bytesize]` equals `lower` ignoring ASCII case.
+      private def self.ascii_ieq?(bytes : Bytes, start : Int32, lower : String) : Bool
+        k = 0
+        while k < lower.bytesize
+          return false unless bytes[start + k].unsafe_chr.downcase.ord == lower.byte_at(k)
+          k += 1
+        end
+        true
       end
 
       private def self.tag_name_byte?(b : UInt8) : Bool
