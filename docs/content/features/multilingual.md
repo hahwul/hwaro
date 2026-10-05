@@ -86,6 +86,8 @@ Hwaro automatically links translated pages based on their filenames. Pages with 
 
 For example, `hello.md`, `hello.ko.md`, and `hello.ja.md` are all linked as translations.
 
+To find pages that are not translated yet, run `hwaro doctor`: on a site with more than one language it lists, per language, every page or section missing a translation and every translation without a default-language original, using the same pairing. See [doctor](/start/tools/doctor/#what-it-checks).
+
 ### Template Variables
 
 Access translation data in templates:

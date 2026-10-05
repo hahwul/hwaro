@@ -6,7 +6,9 @@
 module Hwaro
   module Services
     # Represents a single diagnostic issue found by the doctor
-    record Issue, id : String, level : Symbol, category : String, file : String?, message : String do
+    # `language` is set only by the translation check (and, being nil
+    # everywhere else, omitted from every other issue's JSON).
+    record Issue, id : String, level : Symbol, category : String, file : String?, message : String, language : String? = nil do
       include JSON::Serializable
 
       @[JSON::Field(converter: Hwaro::Services::Issue::SymbolConverter)]
@@ -123,6 +125,8 @@ module Hwaro
             ["content-template-missing"], blocked_by: ["template-dir-missing"]),
           CheckSpec.new("section index files (_index.md)",
             ["structure-missing-index"], blocked_by: CONFIG_BLOCKING_IDS),
+          CheckSpec.new("translations (pages in every language)",
+            ["translation-missing", "translation-orphan"], blocked_by: CONFIG_BLOCKING_IDS),
         ],
         blocked_by: ["content-dir-missing"],
       ),

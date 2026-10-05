@@ -317,6 +317,20 @@ module Hwaro
               Logger.info ""
             end
 
+            translation_issues = issues.select { |i| i.category == "i18n" }
+            unless translation_issues.empty?
+              Logger.info "Translations:"
+              translation_issues.group_by(&.language).each do |code, group|
+                missing = group.count { |i| i.id == "translation-missing" }
+                counts = [] of String
+                counts << "#{missing} missing" if missing > 0
+                counts << "#{group.size - missing} without original" if group.size > missing
+                Logger.info "  #{code}: #{counts.join(" · ")}"
+                group.each { |issue| print_issue(issue, plain) }
+              end
+              Logger.info ""
+            end
+
             # Summary — one severity-aware outcome line: the lead glyph reflects
             # the worst level found (✗ error / ⚠ warning / spark when clean).
             errors = issues.count { |i| i.level == :error }
