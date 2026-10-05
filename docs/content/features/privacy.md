@@ -91,13 +91,14 @@ A file is published only under an extension that suits the tag that loads
 it, taken from the response `Content-Type` (or, when that is generic, the URL
 path): images for `<img>`, `<source>` and `poster`, audio and video for
 `<video>` and `<audio>`, CSS for stylesheets, JavaScript for scripts, and
-fonts, images and CSS for references inside a stylesheet. Anything else, such
+fonts, images (not SVG) and CSS for references inside a stylesheet. Anything else, such
 as an `<img>` that answers with HTML, keeps its external URL with a warning.
 HTML or XML is never published.
 
 SVG is published only for `<img>`-like tags, with a warning: an SVG opened
 directly on your site can run script. Add the host to `exclude` if you do not
-trust it.
+trust it. An SVG referenced from a stylesheet (`background: url(icon.svg)`)
+is never published and keeps loading from its own host.
 
 ### Hwaro's own tags
 
@@ -124,14 +125,19 @@ The URLs privacy mode fetches are not all written by you: redirects and the
 `url(...)` references inside a downloaded stylesheet come from the third
 party. So every request, including every redirect hop, is checked first. A
 host that resolves to a loopback, private (10/8, 172.16/12, 192.168/16,
-fc00::/7), link-local (169.254/16, fe80::/10), CGNAT (100.64/10),
-unspecified or multicast address is refused, and the refusal follows
-`on_error`. This keeps a third party from making the build read internal
+fc00::/7, site-local fec0::/10), link-local (169.254/16, fe80::/10), CGNAT
+(100.64/10), IETF-reserved (192.0.0.0/24), unspecified or multicast address
+is refused, as is a NAT64 (64:ff9b::/96) or IPv4-mapped address that wraps
+one of these. The refusal follows `on_error`. This keeps a third party from making the build read internal
 services or cloud metadata and publish the response on your site. The
 connection is pinned to the address that was checked.
 
 A host listed in `include` skips this check, which is how an intranet CDN or
-a local test server is allowed.
+a local test server is allowed. `include` does both jobs at once: as soon as
+it lists any host, only the listed hosts are localized. Behind split-horizon
+DNS, where CDN names resolve to private addresses, list every host you need,
+including the hosts a stylesheet loads from (Google Fonts CSS pulls from
+`fonts.gstatic.com`).
 
 A failed download is not retried by the same process for 10 minutes, so a
 dead host slows down only one `hwaro serve` rebuild. Each file is capped at
@@ -160,7 +166,8 @@ directory; remove it to start over.
 
 The rewrite happens when a page is written, after `--minify`, so a
 `--cache` build that skips a page keeps its already-rewritten HTML and the
-files it uses.
+files it uses. A page that kept an external URL because its download failed
+is not cached; the next `--cache` build renders it again and retries.
 
 ## Interactions
 
