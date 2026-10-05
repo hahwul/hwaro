@@ -251,6 +251,33 @@ describe Hwaro::Core::Build::Builder do
       end
     end
 
+    it "moves a page bundle's assets with a slug change and drops them with a draft" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+          FileUtils.mkdir_p("content/blog/bun")
+          File.write("content/blog/bun/index.md", "---\ntitle: Bun\n---\nbody")
+          File.write("content/blog/bun/a.png", "png")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "<p>{{ content }}</p>")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          builder.run(options)
+          File.exists?("public/blog/bun/a.png").should be_true
+
+          File.write("content/blog/bun/index.md", "---\ntitle: Bun\nslug: bunny\n---\nbody")
+          builder.run_incremental(["content/blog/bun/index.md"], options)
+          File.exists?("public/blog/bunny/a.png").should be_true
+          File.exists?("public/blog/bun/a.png").should be_false
+
+          File.write("content/blog/bun/index.md", "---\ntitle: Bun\nslug: bunny\ndraft: true\n---\nbody")
+          builder.run_incremental(["content/blog/bun/index.md"], options)
+          File.exists?("public/blog/bunny/a.png").should be_false
+        end
+      end
+    end
+
     it "still prunes the old output on a pure relocation (slug change)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

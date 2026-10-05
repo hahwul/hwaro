@@ -632,7 +632,9 @@ module Hwaro
             old_series_names[page.path] = page.series
             old_neighbors[page.path] = {page.lower, page.higher}
             old_cascade = page.is_a?(Models::Section) ? page.cascade : nil
-            old_output_paths[page.path] = collect_page_output_paths(page, output_dir)
+            # Bundle assets publish under the page URL too, so a slug edit or
+            # a draft must move / drop them with the page's own files.
+            old_output_paths[page.path] = collect_page_output_paths(page, output_dir) + page_asset_outputs(page, output_dir)
             @unsettled_page_outputs.concat(old_output_paths[page.path])
 
             # Re-read, re-parse front-matter and recalculate URL
@@ -723,8 +725,11 @@ module Hwaro
           relocated = [] of String
           changed_pages.each do |page|
             next unless olds = old_output_paths[page.path]?
-            relocated.concat(olds - collect_page_output_paths(page, output_dir))
+            relocated.concat(olds - collect_page_output_paths(page, output_dir) - page_asset_outputs(page, output_dir))
           end
+          # A relocated bundle's assets are published at its new URL (unchanged
+          # copies are skipped by size + mtime).
+          process_assets(changed_pages, output_dir, false) unless relocated.empty?
           prune_unclaimed_outputs(relocated, output_dir) unless relocated.empty?
           settle_page_outputs(output_dir, except: old_output_paths.values.flatten)
         end

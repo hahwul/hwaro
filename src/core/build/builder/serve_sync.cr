@@ -520,16 +520,18 @@ module Hwaro
           outputs = [] of String
           site = @site
           return outputs unless site
-          (site.pages + site.sections).each do |page|
-            next if page.assets.empty? || !page.render
-            next unless url_path = url_output_path(page.url.lchop("/"))
-            bundle_dir = File.dirname(page.path)
-            dest_dir = File.join(output_dir, url_path)
-            page.assets.each do |asset|
-              outputs << File.join(dest_dir, Path[asset].relative_to(bundle_dir).to_s)
-            end
-          end
+          (site.pages + site.sections).each { |page| outputs.concat(page_asset_outputs(page, output_dir)) }
           outputs
+        end
+
+        # One page's share of `bundle_asset_outputs`. Not gated on `render`:
+        # `process_assets` publishes a headless bundle's files too.
+        private def page_asset_outputs(page : Models::Page, output_dir : String) : Array(String)
+          return [] of String if page.assets.empty?
+          return [] of String unless url_path = url_output_path(page.url.lchop("/"))
+          bundle_dir = File.dirname(page.path)
+          dest_dir = File.join(output_dir, url_path)
+          page.assets.map { |asset| File.join(dest_dir, Path[asset].relative_to(bundle_dir).to_s) }
         end
 
         # Start an incremental serve pass: stamp the epoch `written_this_build?`
