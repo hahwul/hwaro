@@ -303,6 +303,11 @@ module Hwaro
         end
       end
 
+      private def self.load_content_backlinks(config : Config)
+        return unless content_section = config.raw["content"]?.try(&.as_h?)
+        config.backlinks = bool_value(content_section["backlinks"]?, config.backlinks)
+      end
+
       private def self.load_series(config : Config)
         return unless s = config.raw["series"]?.try(&.as_h?)
 

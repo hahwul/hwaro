@@ -152,6 +152,7 @@ module Hwaro::Core::Build::Phases::Render
                         else
                           raw
                         end
+    processed_content = rewrite_wikilinks(processed_content, page, site)
 
     lazy_loading = site.config.markdown.lazy_loading
     emoji = site.config.markdown.emoji

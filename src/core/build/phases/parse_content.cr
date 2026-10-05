@@ -32,6 +32,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     # page's URL is final (internal-link resolution) — and before Transform,
     # which bakes summary_html into Crinja page values.
     if (site = @site) && (templates = @templates)
+      refresh_wikilink_index(ctx.all_pages, site)
       render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled)
     end
 
@@ -96,6 +97,7 @@ module Hwaro::Core::Build::Phases::ParseContent
                   else
                     summary_md
                   end
+      processed = rewrite_wikilinks(processed, page, site)
 
       html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
       html = replace_shortcode_placeholders(html, shortcode_results)
@@ -132,7 +134,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       # render never sees render:false summaries, and strict mode would
       # otherwise miss broken links that ship in listings.
       Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
-      fallback, _ = Processor::Markdown.render(summary_md.to_s, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+      fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
       pbp = (pages_by_path ||= begin
         map = {} of String => Models::Page
         link_targets.each { |p| map[p.path] ||= p }
@@ -205,6 +207,8 @@ module Hwaro::Core::Build::Phases::ParseContent
                 else
                   raw
                 end
+    # Only text survives, and the body render reports any broken link.
+    processed = rewrite_wikilinks(processed, page, site, report: false)
     html, _ = Processor::Markdown.render(processed, false, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
     html = replace_shortcode_placeholders(html, shortcode_results)
 
@@ -218,6 +222,63 @@ module Hwaro::Core::Build::Phases::ParseContent
   rescue ex
     Logger.warn "Automatic summary skipped for #{page.path}: #{ex.message}"
     had || false # nil when the raise preceded the assignment above
+  end
+
+  # Rebuild the `[[wikilink]]` lookup over `pages` (the published set).
+  # Called wherever that set may have changed before content renders.
+  private def refresh_wikilink_index(pages : Array(Models::Page), site : Models::Site) : Nil
+    unless site.config.markdown.wikilinks
+      @wikilink_index = nil
+      return
+    end
+    files = -> { published_embed_files(pages, site.config) }
+    @wikilink_index = Content::Processors::Wikilinks::Index.new(pages, site.config.default_language, files)
+  end
+
+  # Every published non-page file an `![[embed]]` can name, as
+  # `{relative path, URL}`: bundle assets of published pages, `[content.files]`
+  # outside withheld bundles, and `static/`.
+  private def published_embed_files(pages : Array(Models::Page), config : Models::Config) : Array({String, String})
+    files = [] of {String, String}
+    pages.each do |page|
+      next if page.assets.empty?
+      bundle = File.dirname(page.path)
+      base = page.url.ends_with?('/') ? page.url : "#{page.url}/"
+      page.assets.each { |asset| files << {asset, "#{base}#{asset.lchop("#{bundle}/")}"} }
+    end
+    if config.content_files.enabled? && Dir.exists?("content")
+      # withheld_bundle_dirs reads site.pages, which Transform fills only
+      # after the summaries this index serves.
+      withheld = @content_index_dirs - pages.select(&.is_index).map { |p| File.dirname(p.path) }.to_set
+      Dir.glob("content/**/*") do |file|
+        rel = file.lchop("content/")
+        next if withheld_content_file?(rel, withheld)
+        files << {rel, "/#{rel}"} if File.file?(file) && config.content_files.publish?(rel)
+      end
+    end
+    if Dir.exists?("static")
+      Dir.glob("static/**/*") do |file|
+        rel = file.lchop("static/")
+        files << {rel, "/#{rel}"} if File.file?(file) && !config.static.excluded?(rel)
+      end
+    end
+    files
+  end
+
+  # `content` with its wikilinks rewritten for `page` (a no-op unless
+  # `[markdown] wikilinks`). `report: true` routes unresolved links through
+  # `[links] broken_internal`, like an unresolved `@/` link.
+  private def rewrite_wikilinks(content : String, page : Models::Page, site : Models::Site, report : Bool = true) : String
+    return content unless index = @wikilink_index
+    strict = report && site.config.links.broken_internal == "error"
+    misses = strict ? [] of {String, String} : nil
+    result = Content::Processors::Wikilinks.rewrite(content, page, index, site.config.markdown.safe, misses, warn: report)
+    if misses && !misses.empty?
+      @broken_links_mutex.synchronize do
+        misses.each { |target, reason| @broken_internal_links << "#{page.path} → #{target} (#{reason})" }
+      end
+    end
+    result
   end
 
   # Default parsing when no hooks are registered.

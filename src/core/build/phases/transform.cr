@@ -27,6 +27,9 @@ module Hwaro::Core::Build::Phases::Transform
     # Compute related posts based on taxonomy similarity
     compute_related_posts(site) if site.config.related.enabled
 
+    # Pages linking to each page (`[content] backlinks`)
+    compute_backlinks(site) if site.config.backlinks
+
     # Build optimized lookup indices
     site.build_lookup_index
 
@@ -921,5 +924,75 @@ module Hwaro::Core::Build::Phases::Transform
 
       page.related_posts = top.map { |path, _| page_lookup[path] }
     end
+  end
+
+  # `page.backlinks`: every rendered page in the same language whose SOURCE
+  # Markdown links here through an `@/` link, a wikilink (with `[markdown]
+  # wikilinks`) or a Markdown/HTML link whose URL is a page's URL. Links a
+  # shortcode or template produces are not seen. Sorted by date (newest
+  # first, undated last), then path.
+  #
+  # ponytail: rescans every page's raw content on each call (serve calls it
+  # per content save); memoize per-page targets by raw_content if it shows.
+  private def compute_backlinks(site : Models::Site) : Nil
+    pages = (site.pages + site.sections).as(Array(Models::Page))
+    pages_by_path = build_pages_by_path(site)
+    by_url = {} of String => Models::Page
+    pages.each { |p| by_url[p.url] ||= p }
+    incoming = {} of String => Array(Models::Page)
+    pages.each do |source|
+      next unless source.render
+      outbound_link_targets(source, pages_by_path, by_url, site.config.base_path).each do |target|
+        next if target.same?(source) || target.language != source.language
+        (incoming[target.path] ||= [] of Models::Page) << source
+      end
+    end
+    pages.each do |page|
+      page.backlinks = incoming[page.path]?.try(&.sort_by { |p| {p.date ? 0 : 1, -(p.date.try(&.to_unix_ms) || 0_i64), p.path} }) || [] of Models::Page
+    end
+  end
+
+  private def outbound_link_targets(
+    source : Models::Page,
+    pages_by_path : Hash(String, Models::Page),
+    by_url : Hash(String, Models::Page),
+    base_path : String,
+  ) : Set(Models::Page)
+    targets = Set(Models::Page).new
+    index = @wikilink_index
+    Content::Processors::Wikilinks.each_link(source.raw_content) do |link|
+      target = case link
+               in Content::Processors::Wikilinks::Link
+                 index.try(&.resolve(link.target, source)) unless link.image? || link.target.empty?
+               in String
+                 page_for_link_url(link, source, pages_by_path, by_url, base_path)
+               end
+      targets << target if target
+    end
+    targets
+  end
+
+  # The page a link URL in `source`'s Markdown points at, if any: an `@/`
+  # content path, or a root- or document-relative URL equal to a page URL.
+  private def page_for_link_url(
+    url : String,
+    source : Models::Page,
+    pages_by_path : Hash(String, Models::Page),
+    by_url : Hash(String, Models::Page),
+    base_path : String,
+  ) : Models::Page?
+    path = url.partition('#')[0].partition('?')[0]
+    return if path.empty?
+    if path.starts_with?("@/")
+      return Content::Processors::InternalLinkResolver.page_for(pages_by_path, path.lchop("@/"))
+    end
+    return if Content::Processors::InternalLinkResolver.has_own_origin?(path)
+    unless path.starts_with?('/')
+      base = source.url.ends_with?('/') ? source.url : "#{source.url}/"
+      path = Path.posix(base, path).normalize.to_s
+      path += "/" if url.partition('#')[0].partition('?')[0].ends_with?('/') && !path.ends_with?('/')
+    end
+    path = path.lchop(base_path) if !base_path.empty? && path.starts_with?("#{base_path}/")
+    by_url[path]? || by_url["#{path}/"]?
   end
 end

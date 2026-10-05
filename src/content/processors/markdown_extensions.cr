@@ -81,7 +81,7 @@ module Hwaro
                             (do_heading_ids && (scan.includes?(result, "{#") || scan.includes?(result, "<!--HID:"))) ||
                             (do_ins && scan.includes?(result, "++")) || (do_mark && scan.includes?(result, "==")) ||
                             (do_sub && result.includes?('~')) || (do_sup && result.includes?('^')) ||
-                            (config.attributes && (result.includes?('{') || scan.includes?(result, "<!--HATTR:")))
+                            (image_attributes?(config) && (result.includes?('{') || scan.includes?(result, "<!--HATTR:")))
 
           if markers_present
             result = process_lines_fence_aware(result) do |line|
@@ -101,7 +101,7 @@ module Hwaro
                 end
               end
 
-              if config.attributes && transformed.includes?("<!--HATTR:")
+              if image_attributes?(config) && transformed.includes?("<!--HATTR:")
                 transformed = transform_outside_code_spans(transformed) do |stashed|
                   stashed.gsub("<!--HATTR:", "<!-- HATTR:")
                 end
@@ -147,7 +147,7 @@ module Hwaro
                 end
               end
 
-              if config.attributes && transformed.includes?("![") && transformed.includes?('{')
+              if image_attributes?(config) && transformed.includes?("![") && transformed.includes?('{')
                 transformed = transform_outside_code_spans(transformed) do |stashed|
                   stashed.gsub(IMAGE_ATTR_RE) do |full_match|
                     if MarkdownAttributes.parse($2)
@@ -217,16 +217,16 @@ module Hwaro
           if do_admonitions || do_heading_ids
             # Combine admonitions and heading_ids into one HTML pass when both active
             if do_admonitions && do_heading_ids
-              result = postprocess_admonitions(result)
+              result = postprocess_admonitions(result, foldable: config.wikilinks)
               result = postprocess_heading_ids(result)
             elsif do_admonitions
-              result = postprocess_admonitions(result)
+              result = postprocess_admonitions(result, foldable: config.wikilinks)
             else
               result = postprocess_heading_ids(result)
             end
           end
 
-          result = postprocess_attributes(result) if config.attributes
+          result = postprocess_attributes(result) if image_attributes?(config)
           result = postprocess_footnotes(result, flags: inline_flags(config)) if config.footnotes
           result = postprocess_mermaid(result) if config.mermaid
           result = postprocess_task_list_classes(result) if config.task_lists && config.task_list_classes
@@ -242,6 +242,13 @@ module Hwaro
         # rules apply across table cells, `<dt>/<dd>`, and `<section.footnotes>`.
         private def render_inline_md(text : String, flags : InlineMarkdown::Flags) : String
           InlineMarkdown.render(text, flags: flags)
+        end
+
+        # `{…}` attribute blocks on images: the `attributes` switch, or
+        # `wikilinks`, whose sized `![[img.png|300]]` embeds are emitted as
+        # `![img.png](img.png){width=300}`. Heading blocks stay `attributes`-only.
+        def image_attributes?(config : Models::MarkdownConfig) : Bool
+          config.attributes || config.wikilinks
         end
 
         # Builds the shared `InlineMarkdown::Flags` for a markdown config —

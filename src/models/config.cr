@@ -62,6 +62,8 @@ module Hwaro
       property content_files : ContentFilesConfig
       property content_new : ContentNewConfig
       property summary : SummaryConfig
+      # `[content] backlinks = true`: fill `page.backlinks`.
+      property backlinks : Bool = false
       property pagination : PaginationConfig
       property highlight : HighlightConfig
       property auto_includes : AutoIncludesConfig
@@ -369,6 +371,7 @@ module Hwaro
         SectionLoader.new(%w[content], ->(c : Config) { load_content_files(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_new(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_summary(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_backlinks(c) }),
         SectionLoader.new(%w[pagination], ->(c : Config) { load_pagination(c) }),
         SectionLoader.new(%w[highlight], ->(c : Config) { load_highlight(c) }),
         SectionLoader.new(%w[auto_includes], ->(c : Config) { load_auto_includes(c) }),

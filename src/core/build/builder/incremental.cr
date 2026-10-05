@@ -28,7 +28,7 @@ module Hwaro
             fragment = m[2]
             next if fragment.empty?
             if link_path = m[1]?
-              next unless target = pages_by_path[link_path.lchop("@/").partition('?')[0]]?
+              next unless target = Content::Processors::InternalLinkResolver.page_for(pages_by_path, link_path.lchop("@/").partition('?')[0])
             else
               target = page
             end
@@ -140,6 +140,7 @@ module Hwaro
           # re-parse, so the fan-out below can tell which of them this edit
           # actually moved. See listing_fanout_pages.
           listing_sets = snapshot_listing_sets(site, templates)
+          backlink_digests = snapshot_backlinks(site, templates)
 
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -185,6 +186,7 @@ module Hwaro
           # pass so a page just flipped to draft can't feed its summary's
           # broken @/ links into the strict-mode accumulator (the full build
           # renders summaries post-filter too).
+          refresh_wikilink_index((site.pages + site.sections).as(Array(Models::Page)), site)
           render_page_summaries(changed_pages, site, templates, highlight,
             link_targets: (site.pages + site.sections).as(Array(Models::Page)))
 
@@ -225,6 +227,7 @@ module Hwaro
           # Recompute related posts selectively (if enabled). Pass the excluded
           # pages' paths so pages that listed a now-removed page as related drop it.
           related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          compute_backlinks(site) if site.config.backlinks
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
@@ -250,6 +253,7 @@ module Hwaro
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+          backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
 
           # Pages that render a listing derived from the GLOBAL page/section
           # set — the homepage's "latest posts", a paginated archive, a nav
@@ -339,6 +343,7 @@ module Hwaro
           # `needs_*` answer, and a template edit that changes which
           # projections exist re-renders on its own account anyway.
           listing_sets = snapshot_listing_sets(site, @templates)
+          backlink_digests = snapshot_backlinks(site, @templates)
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
@@ -374,6 +379,8 @@ module Hwaro
                               Set(String).new
                             end
           related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          refresh_wikilink_index((site.pages + site.sections).as(Array(Models::Page)), site)
+          compute_backlinks(site) if site.config.backlinks
 
           # Re-render with reloaded templates. The selective path inside
           # run_rerender only covers template-affected pages, so the content
@@ -391,6 +398,7 @@ module Hwaro
           # membership change this path can see.
           force_pages = relationship_render_set(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+          backlinks_moved_pages(site, @templates, backlink_digests).each { |p| force_pages << p }
           run_rerender(options, force_pages: force_pages.to_a, membership_changed: !excluded_pages.empty?,
             listing_sets: listing_sets)
         end
@@ -507,6 +515,37 @@ module Hwaro
             moved << page if {page.translations, page.version_links, page.aliases} != before[i]
           end
           moved
+        end
+
+        # Each backlink-reading page's backlinks digest (fp_backlinks), taken
+        # before a re-parse so backlinks_moved_pages can diff it afterwards.
+        # Empty unless `[content] backlinks`.
+        private def snapshot_backlinks(site : Models::Site, templates : Hash(String, String)?) : Hash(String, String)
+          digests = {} of String => String
+          return digests unless templates && site.config.backlinks
+          (site.pages + site.sections).each do |page|
+            digest = backlinks_digest(page, site, templates)
+            digests[page.path] = digest if digest
+          end
+          digests
+        end
+
+        # Pages whose rendered backlinks this re-parse moved: A adding or
+        # dropping a link to B, or A's listed fields changing, re-renders B.
+        private def backlinks_moved_pages(site : Models::Site, templates : Hash(String, String)?, before : Hash(String, String)) : Array(Models::Page)
+          return [] of Models::Page unless templates && site.config.backlinks
+          (site.pages + site.sections).select do |page|
+            digest = backlinks_digest(page, site, templates)
+            digest && digest != before[page.path]?
+          end
+        end
+
+        private def backlinks_digest(page : Models::Page, site : Models::Site, templates : Hash(String, String)) : String?
+          rel = page_template_scan(page, templates, site).relations
+          return unless rel.backlinks
+          digest = Digest::MD5.new
+          fp_backlinks(digest, page, rel.fields)
+          digest.final.hexstring
         end
 
         # Digests of every page-set projection the site's templates read,
