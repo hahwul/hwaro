@@ -297,7 +297,10 @@
     dialog.tabIndex = -1;
     dialog.appendChild(ui.root);
     overlay.appendChild(dialog);
-    overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) hide(); });
+    // preventDefault: the click's default blur would undo hide()'s refocus.
+    overlay.addEventListener("mousedown", function (e) {
+      if (e.target === overlay) { e.preventDefault(); hide(); }
+    });
     document.body.appendChild(overlay);
   }
 

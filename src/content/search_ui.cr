@@ -30,6 +30,10 @@ module Hwaro
         "close"         => "Close",
       }
 
+      # Replaced static files already warned about: once per process, not on
+      # every serve rebuild. Initialize is sequential, so no lock.
+      @@warned = Set(String).new
+
       def asset_paths(output_dir : String) : Array(String)
         [File.join(output_dir, ASSET_DIR, "search.js"), File.join(output_dir, ASSET_DIR, "search.css")]
       end
@@ -46,7 +50,7 @@ module Hwaro
         paths = published_outputs(config, output_dir)
         paths.zip([JS, CSS]) do |path, body|
           user_file = File.join(static_dir, ASSET_DIR, File.basename(path))
-          if File.exists?(user_file)
+          if File.exists?(user_file) && @@warned.add?(File.expand_path(user_file))
             Logger.warn "#{user_file} is replaced by the built-in search UI's own file ([search] ui = true); theme it with the --hwaro-search-* CSS properties instead."
           end
           next if File.file?(path) && File.read(path) == body

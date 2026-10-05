@@ -147,6 +147,18 @@ describe Hwaro::Content::SearchUi do
       log.should_not contain("search.js is replaced")
     end
 
+    it "warns about a replaced static file once per process" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "static/assets/hwaro-search"))
+        File.write(File.join(dir, "static/assets/hwaro-search/search.js"), "mine")
+        config = ui_config
+        log = with_captured_log do
+          3.times { Hwaro::Content::SearchUi.write_assets(config, File.join(dir, "public"), static_dir: File.join(dir, "static")) }
+        end
+        log.scan("search.js is replaced").size.should eq(1)
+      end
+    end
+
     it "hashes the emitted assets under [assets] sri" do
       build_site(UI_CONFIG + "\n[assets]\nsri = true\n", content_files: {"a.md" => "+++\ntitle = \"A\"\n+++\nx\n"}, template_files: UI_TEMPLATE) do |dir|
         html = File.read(File.join(dir, "public/a/index.html"))
