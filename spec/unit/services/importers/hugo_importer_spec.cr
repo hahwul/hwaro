@@ -646,3 +646,32 @@ describe "Hwaro::Services::Importers::HugoImporter symlink boundary" do
     end
   end
 end
+
+# Regression: front matter outside the importer's whitelist was dropped —
+# `layout`, `toc`, `[params]`, any custom key, and on an export → import
+# round trip `template`, `page_template` and the whole `[extra]` table.
+describe "Hugo import: unmapped front matter" do
+  it "maps layout to template, carries hwaro keys and keeps params in [extra]" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = setup_hugo_site(tmpdir)
+      output_dir = File.join(tmpdir, "out")
+      write_hugo_content(hugo_dir, "posts/a.md", "+++\ntitle = \"A\"\nlayout = \"wide\"\ntoc = true\nsubtitle = \"Sub\"\n[params]\nhero = \"h.png\"\n+++\nbody\n")
+      write_hugo_content(hugo_dir, "posts/b.md", "+++\ntitle = \"B\"\ntemplate = \"post\"\npage_template = \"entry\"\n[extra]\nrating = 4.5\n[extra.nested]\nk = \"v\"\n+++\nbody\n")
+
+      Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+      a = TOML.parse(File.read(File.join(output_dir, "posts", "a.md"))[/\A\+\+\+\n(.*?)\+\+\+/m, 1])
+      a["template"].as_s.should eq("wide")
+      a["toc"].as_bool.should be_true
+      a["extra"]["subtitle"].as_s.should eq("Sub")
+      a["extra"]["hero"].as_s.should eq("h.png")
+      a.has_key?("layout").should be_false
+
+      b = TOML.parse(File.read(File.join(output_dir, "posts", "b.md"))[/\A\+\+\+\n(.*?)\+\+\+/m, 1])
+      b["template"].as_s.should eq("post")
+      b["page_template"].as_s.should eq("entry")
+      b["extra"]["rating"].as_f.should eq(4.5)
+      b["extra"]["nested"]["k"].as_s.should eq("v")
+    end
+  end
+end

@@ -52,6 +52,7 @@ module Hwaro
         ) : Symbol
           raw = read_text(file_path)
           fm_data, body = extract_frontmatter(raw)
+          source_data = fm_data
           fm_data = fm_data.try { |data| downcase_keys(data) }
           local_keys = toml_local_datetime_keys(raw)
 
@@ -158,9 +159,22 @@ module Hwaro
             if expires = date_string(data, "expirydate", local_keys)
               fields["expires"] = expires
             end
+
+            # Hugo's `layout` picks the page template, hwaro's `template` —
+            # the Jekyll importer's mapping. An authored `template` wins.
+            if (layout = string_value(data, "layout")) && !data.has_key?("template")
+              fields["template"] = layout
+            end
           end
 
           frontmatter = generate_frontmatter(fields)
+          if source_data && !(carried = carried_fields(source_data, fields)).empty?
+            # TomlBuilder emits scalars before tables, so appending after the
+            # mapped (scalar) lines keeps the document valid TOML.
+            toml = Hwaro::Utils::FrontmatterWriter::TomlBuilder.new.build(carried)
+            toml = "\n#{toml}" if toml.starts_with?('[')
+            frontmatter = "#{frontmatter.rchop("+++")}#{toml}+++"
+          end
 
           # Determine section and filename
           section, filename = section_from_path(file_path, content_dir, "")
@@ -222,6 +236,62 @@ module Hwaro
 
           return :skipped unless written
           has_shortcodes ? :imported_wrapped : :imported
+        end
+
+        # Keys `process_file` maps explicitly (lowercase).
+        MAPPED_KEYS = Set{
+          "title", "date", "publishdate", "lastmod", "draft", "description",
+          "summary", "tags", "categories", "authors", "series", "weight", "slug",
+          "aliases", "url", "images", "featured_image", "expirydate", "layout",
+        }
+
+        # hwaro front-matter keys Hugo gives no meaning of its own, carried
+        # through as-is: a value there came from `tool export hugo` or a theme
+        # param with the same intent (`toc`). hwaro keys Hugo uses
+        # differently (`menu`, `cascade`, `path`, …) are page params there,
+        # so they join every other unrecognised key in `[extra]`.
+        CARRIED_KEYS = Set{
+          "toc", "template", "page_template", "image", "updated", "expires",
+          "render", "in_sitemap", "in_search_index", "insert_anchor_links",
+          "transparent", "generate_feeds", "paginate", "paginate_by",
+          "pagination_enabled", "paginate_path", "sort_by", "reverse",
+          "redirect_to", "series_weight",
+        }
+
+        # The front matter `process_file` does not map: CARRIED_KEYS as-is,
+        # and every other key — Hugo page params, top-level or under
+        # `[params]` — into `[extra]`, where hwaro templates read custom
+        # fields. A `[extra]` table (from `tool export hugo`) merges in last.
+        # A key the mapping already filled goes to `[extra]` too. These were
+        # all silently dropped.
+        private def carried_fields(source : Hash(String, TOML::Any), mapped : Hash(String, FieldValue)) : Hash(String, YAML::Any)
+          carried = {} of String => YAML::Any
+          extra = {} of YAML::Any => YAML::Any
+          params = nil
+          own_extra = nil
+          source.each do |key, value|
+            lower = key.downcase
+            # The spelling `downcase_keys` kept wins, as for mapped keys.
+            next if key != lower && source.has_key?(lower)
+            next if MAPPED_KEYS.includes?(lower)
+            case lower
+            when "params" then params = value.as_h?
+            when "extra"  then own_extra = value.as_h?
+            end
+            next if (lower == "params" && params) || (lower == "extra" && own_extra)
+
+            converted = Hwaro::Utils::FrontmatterWriter.toml_to_yaml_any(value)
+            if CARRIED_KEYS.includes?(lower) && !mapped.has_key?(lower)
+              carried[lower] = converted
+            else
+              extra[YAML::Any.new(key)] = converted
+            end
+          end
+          {params, own_extra}.each do |table|
+            table.try &.each { |key, value| extra[YAML::Any.new(key)] = Hwaro::Utils::FrontmatterWriter.toml_to_yaml_any(value) }
+          end
+          carried["extra"] = YAML::Any.new(extra) unless extra.empty?
+          carried
         end
 
         # Hugo front matter keys are case-insensitive (`Title`, `Draft`,
