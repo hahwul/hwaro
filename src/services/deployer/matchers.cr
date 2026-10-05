@@ -67,6 +67,11 @@ module Hwaro
         uploads = [] of MetadataUpload
         return uploads if matchers.none? { |compiled| sets_metadata?(compiled.matcher) }
         gs = URI.parse(url).scheme == "gs"
+        # Every local path gsutil would see starts with the source root.
+        if gs && GSUTIL_WILDCARD.matches?(source_dir)
+          Logger.warn "deployment.matchers: skipping metadata uploads — gsutil reads [ ] * ? in the source directory #{source_dir} as a wildcard."
+          return uploads
+        end
         wildcards = [] of String
 
         each_project_file(source_dir) do |path|

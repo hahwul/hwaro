@@ -223,7 +223,9 @@ re-uploaded on every deploy.
 `gsutil cp` reads `[`, `]`, `*` and `?` in a file name as wildcards, and
 has no way to escape them. On `gs://` targets, a matched file whose path
 contains one of them is skipped with a warning (it is still deployed by the
-main sync, without the extra headers).
+main sync, without the extra headers). If the source directory's own path
+contains one of them, the target's metadata uploads are skipped with one
+warning.
 
 ### Local directory targets (`file://`, `path`)
 
