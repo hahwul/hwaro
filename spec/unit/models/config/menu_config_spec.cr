@@ -189,7 +189,8 @@ describe "menu configuration" do
         auto_sections = "nav"
         TOML
     end
-    log.should contain("[languages.ko.menus] auto_sections is ignored")
+    log.should contain("[languages.ko.menus] auto_sections is ignored: the name is reserved")
+    log.should contain("for a menu, pick another name")
     config.not_nil!.languages["ko"].menus.should be_nil
   end
 end

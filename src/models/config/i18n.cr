@@ -214,7 +214,7 @@ module Hwaro
 
           if menus = lang_hash["menus"]?.try(&.as_h?)
             ignored = menus.has_key?(AUTO_SECTIONS_KEY)
-            Logger.warn "[languages.#{lang_code}.menus] auto_sections is ignored — set it once under [menus]; entries are already built per language." if ignored
+            Logger.warn "[languages.#{lang_code}.menus] auto_sections is ignored: the name is reserved for the [menus] auto_sections setting. To fill a menu from sections, set auto_sections = \"<menu>\" once under [menus] (entries are built per language); for a menu, pick another name." if ignored
             # A table that only held the ignored key overrides nothing.
             lang_config.menus = parse_menu_tables(menus) unless ignored && menus.size == 1
           end
