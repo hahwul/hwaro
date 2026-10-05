@@ -197,13 +197,17 @@ Control how unresolved `@/path.md` internal links are treated during the build.
 ```toml
 [links]
 broken_internal = "error"
+broken_anchors = "warn"
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | broken_internal | string | "warn" | `"warn"` logs each unresolved `@/` link and keeps the raw markup; `"error"` fails the build (exit code 5) with one aggregated list of every offender |
+| broken_anchors | string | "ignore" | `"warn"` or `"error"` checks `@/page.md#id` and same-page `#id` links in page content against the `id`/`name` attributes in the target's rendered HTML (headings, `{#id}`, shortcodes, templates, footnotes); `"error"` fails the build listing `source → link → missing id`. `"ignore"` skips the check |
 
 See [Internal Links](/writing/pages/#internal-links) for the `@/` link syntax and the `--cache` caveat in strict mode.
+
+The anchor check reads each target page's output file after the render phase, so on `--cache` and `serve` rebuilds a target that was not re-rendered is checked as last written (no false positives). Only links in pages rendered in that pass are checked; run a cold build in CI for a complete check.
 
 ## Taxonomies
 
@@ -300,9 +304,9 @@ Each feature has its own documentation with full configuration details. Below is
 
 | Config Section | Documentation | Description |
 |----------------|---------------|-------------|
-| `[feeds]` | [SEO](/features/seo/) | RSS/Atom feed generation |
+| `[feeds]` | [SEO](/features/seo/) | RSS/Atom/JSON Feed generation |
 | `[sitemap]` | [SEO](/features/seo/) | Sitemap XML generation |
-| `[robots]` | [SEO](/features/seo/) | Robots.txt generation |
+| `[robots]` | [SEO](/features/seo/) | Robots.txt generation (including Content-Signal lines) |
 | `[og]` | [SEO](/features/seo/) | OpenGraph & Twitter Card meta tags |
 | `[og.auto_image]` | [Auto OG Images](/features/og-images/) | Auto-generate OG preview images (including `lazy_generate` for fast dev server) |
 | `[search]` | [Search](/features/search/) | Client-side search index |

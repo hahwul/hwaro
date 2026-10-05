@@ -100,7 +100,24 @@ module Hwaro
         # point keeps anything the rebuilt output still stands on.
         @builder.prune_unclaimed_outputs(stale_outputs, output_dir) unless stale_outputs.empty?
 
-        @live_reload_handler.try(&.notify_reload)
+        if strategy == :static && !@static_changed_pages && (css_paths = css_swap_paths(changeset))
+          @live_reload_handler.try(&.notify_css(css_paths))
+        else
+          @live_reload_handler.try(&.notify_reload)
+        end
+      end
+
+      # The URL paths a stylesheet-only static save changed, for an in-place
+      # swap in the browser — or nil when the save needs a full reload. Empty
+      # means "every same-origin stylesheet": Sass entries and asset bundles
+      # publish under names that don't map 1:1 from their sources.
+      protected def css_swap_paths(changeset : ChangeSet) : Array(String)?
+        return unless changeset.css_only?
+        changeset.modified_static.map do |path|
+          verbatim = path.starts_with?("static/") && path.downcase.ends_with?(".css")
+          return [] of String if !verbatim || @builder.asset_bundle_source?(path)
+          path.lchop("static")
+        end
       end
 
       # [serve.*] keys are consumed once at startup (headers baked into the
@@ -124,6 +141,7 @@ module Hwaro
       # Returns false when an escalated re-render failed (bundle fingerprint
       # moved and the page re-render below reported failure); true otherwise.
       private def copy_static(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
+        @static_changed_pages = false
         output_dir = sanitize_output_dir(build_options.output_dir)
         # Only `static/` publishes verbatim. The bucket can also carry files
         # from a config-resolved `[assets] source_dir` (see
@@ -175,7 +193,27 @@ module Hwaro
         # contract) re-render nothing. Correctness over cleverness — the
         # rebuild reuses the same options the watcher's :full strategy runs.
         if bundles_changed
+          @static_changed_pages = true
           Logger.info "  Asset bundle fingerprints changed — rebuilding pages to update references."
+          return run_full_build(build_options)
+        end
+        # A template reads one of the files through `load_data()`: the
+        # pages printing it must re-render, which the copy alone never does.
+        if @builder.load_data_source_changed?(static_sources)
+          @static_changed_pages = true
+          Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
+          return run_full_build(build_options)
+        end
+        # A page prints this image's size (`[image_processing] dimensions`) or
+        # a `resize_image(op=…)` variant cut from it.
+        if Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(static_sources)
+          @static_changed_pages = true
+          Logger.info "  An image a page sizes or crops changed — rebuilding the pages that print it."
+          return run_full_build(build_options)
+        end
+        if static_shadowed_page
+          @static_changed_pages = true
+          Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
           return run_full_build(build_options)
         end
         # Highlight and `[auto_includes]` asset tags carry a `?v=` digest of
@@ -184,28 +222,18 @@ module Hwaro
         # the cached bytes). Only the layout moved — the digest lands in the
         # global vars — so the pages re-render without the full build's
         # re-parse, image and OG passes: this is the most frequent theming
-        # save, and a full build made each one a multi-second wait.
+        # save, and a full build made each one a multi-second wait. Only the
+        # `?v=` query moves, never a path, so a stylesheet-only save can still
+        # be swapped in place (see css_swap_paths). Checked after the
+        # full-build escalations above: returning from the re-render first
+        # left a static copy on top of a generated file (an unfingerprinted
+        # bundle) that only a full build puts back.
         if build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
           Logger.info "  A cache-busted asset changed — re-rendering pages to update its ?v= hash."
           if site = @builder.site
             return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
           end
-          return run_full_build(build_options)
-        end
-        # A template reads one of the files through `load_data()`: the
-        # pages printing it must re-render, which the copy alone never does.
-        if @builder.load_data_source_changed?(static_sources)
-          Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
-          return run_full_build(build_options)
-        end
-        # A page prints this image's size (`[image_processing] dimensions`) or
-        # a `resize_image(op=…)` variant cut from it.
-        if Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(static_sources)
-          Logger.info "  An image a page sizes or crops changed — rebuilding the pages that print it."
-          return run_full_build(build_options)
-        end
-        if static_shadowed_page
-          Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
+          @static_changed_pages = true
           return run_full_build(build_options)
         end
         true

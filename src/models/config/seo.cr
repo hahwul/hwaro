@@ -24,14 +24,22 @@ module Hwaro
     end
 
     class RobotsRule
+      # `content_signal` config keys and the Content-Signal names they emit,
+      # in emission order (https://contentsignals.org/).
+      CONTENT_SIGNAL_KEYS = {"search" => "search", "ai_input" => "ai-input", "ai_train" => "ai-train"}
+
       property user_agent : String
       property allow : Array(String)
       property disallow : Array(String)
+      # Emitted (name, value) pairs in CONTENT_SIGNAL_KEYS order; empty
+      # means no `Content-Signal:` line.
+      property content_signal : Array({String, Bool})
 
       def initialize(user_agent : String)
         @user_agent = user_agent
         @allow = [] of String
         @disallow = [] of String
+        @content_signal = [] of {String, Bool}
       end
     end
 
@@ -131,9 +139,45 @@ module Hwaro
               rule = RobotsRule.new(user_agent)
               rule.allow = string_or_array(rule_h["allow"]?)
               rule.disallow = string_or_array(rule_h["disallow"]?)
+              if signal = rule_h["content_signal"]?
+                rule.content_signal = robots_content_signal(signal, user_agent)
+              end
               rule
             end
           end
+        end
+      end
+
+      # `[[robots.rules]] content_signal = { search = true, ai_train = false }`
+      # → ordered (name, value) pairs. Anything but a table of known bool
+      # keys is a config error: a typo'd key silently dropping an
+      # `ai-train=no` would publish the opposite of what the site asked for.
+      private def self.robots_content_signal(raw : TOML::Any, user_agent : String) : Array({String, Bool})
+        where = "[robots] rules (user_agent #{user_agent.inspect}) content_signal"
+        table = raw.as_h? || raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Invalid #{where} = #{raw.raw.inspect}: expected a table.",
+          hint: "Use content_signal = { search = true, ai_input = true, ai_train = false }.",
+        )
+        table.each do |key, value|
+          unless RobotsRule::CONTENT_SIGNAL_KEYS.has_key?(key)
+            suggestion = Utils::CommandSuggester.suggest(key, RobotsRule::CONTENT_SIGNAL_KEYS.keys).try { |k| "Did you mean '#{k}'? " } || ""
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "Unknown #{where} key #{key.inspect}.",
+              hint: "#{suggestion}Valid keys are search, ai_input and ai_train.",
+            )
+          end
+          if value.as_bool?.nil?
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "Invalid #{where} #{key} = #{value.raw.inspect}: expected true or false.",
+              hint: "Set #{key} = true or #{key} = false, or remove it.",
+            )
+          end
+        end
+        RobotsRule::CONTENT_SIGNAL_KEYS.compact_map do |key, name|
+          table[key]?.try(&.as_bool?).try { |v| {name, v} }
         end
       end
 
@@ -166,16 +210,16 @@ module Hwaro
 
         config.feeds.filename = s["filename"]?.try(&.as_s?) || config.feeds.filename
         # Empty is the shipped default (safe_feed_filename derives rss.xml /
-        # atom.xml from `type`), so only non-file values are rejected.
+        # atom.xml / feed.json from `type`), so only non-file values are rejected.
         validate_output_filename!("feeds", "filename", config.feeds.filename, "rss.xml", allow_empty: true)
         if feed_type = s["type"]?.try(&.as_s?)
-          # The writer only knows RSS and Atom and published anything else as
-          # RSS without a word.
+          # The writer only knows RSS, Atom and JSON Feed and published
+          # anything else as RSS without a word.
           normalized = feed_type.strip.downcase
-          if {"rss", "atom"}.includes?(normalized)
+          if {"rss", "atom", "json"}.includes?(normalized)
             config.feeds.type = normalized
           else
-            Logger.warn "Unknown [feeds] type '#{feed_type}' — expected \"rss\" or \"atom\". Using \"#{config.feeds.type}\"."
+            Logger.warn "Unknown [feeds] type '#{feed_type}' — expected \"rss\", \"atom\" or \"json\". Using \"#{config.feeds.type}\"."
           end
         end
         config.feeds.truncate = int_value(s["truncate"]?, config.feeds.truncate)

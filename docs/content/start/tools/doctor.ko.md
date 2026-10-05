@@ -98,6 +98,31 @@ hwaro doctor --json
 
 - `_index.md`가 없는 섹션 디렉터리
 
+**번역 보고** (언어가 둘 이상인 사이트):
+
+- 기본 언어에는 있지만 다른 설정 언어에는 대응 페이지가 없는 페이지나 섹션
+  (`translation-missing`)
+- 기본 언어 원본이 없는 번역 (`translation-orphan`)
+
+페이지는 빌드가 `page.translations`를 만들 때와 똑같이 짝지어집니다 (언어
+접미사를 뺀 기본 이름이 같으면 한 묶음이므로 `about.md`, `about.en.md`,
+`about.ko.md`는 서로 짝). 기본 빌드가 게시하는 페이지만 셈하므로, 초안이나
+미래 날짜 페이지는 번역이 있다고도 없다고도 보지 않습니다. 둘 다 `info`
+수준이라 `--strict`가 부분 번역 때문에 실패하지 않습니다. 사람용 보고서는 언어별로
+묶어 개수와 함께 보여 줍니다.
+
+```
+Translations:
+  ko: 2 missing · 1 without original
+  [info] content/about.md: No 'ko' translation
+  [info] content/blog/_index.md: No 'ko' translation
+  [info] content/notes.ko.md: 'ko' translation has no 'en' original
+```
+
+언어마다 처음 10개 항목만 보여 주고 나머지는 `… and N more (use --json for all)`로
+줄입니다. `--json`에는 모든 항목이 `language` 필드와 함께 들어갑니다. 두 종류 모두
+`[doctor] ignore`로 숨길 수 있습니다.
+
 ## 출력 예시
 
 ```
@@ -129,6 +154,7 @@ hwaro: doctor
     [ok]   front matter menus (declared in config)
     [ok]   front matter templates (exist)
     [info] section index files (_index.md)
+    [ok]   translations (pages in every language)
 
 Config:
   [warn] config.toml: base_url is not set
@@ -233,6 +259,8 @@ ignore = [
 | `menu-undeclared` | content | front matter의 메뉴 이름이 설정에 선언되지 않음 |
 | `content-template-missing` | content | front matter의 `template` / `page_template` / `[cascade] template`이 없는 템플릿을 가리킴 |
 | `structure-missing-index` | structure | `_index.md`가 없는 섹션 |
+| `translation-missing` | i18n | 설정된 언어에 대응 페이지가 없는 페이지나 섹션 |
+| `translation-orphan` | i18n | 기본 언어 원본이 없는 번역 |
 
 어떤 규칙 ID와도 맞지 않는 항목은 "효과 없음" 경고로 알려주므로, 오타가 조용히
 넘어가지 않습니다.
