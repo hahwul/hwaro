@@ -2792,7 +2792,9 @@ private def json_feed_page(path = "posts/hello.md", url = "/posts/hello/", title
   page.render = true
   page.is_index = false
   page.raw_content = "Body"
-  page.content = "<p>Body &amp; <a href=\"/posts/other/\">link</a></p>"
+  # Rendered body as the render phase leaves it: root-relative links
+  # already carry the `/sub` base_path.
+  page.content = "<p>Body &amp; <a href=\"/sub/posts/other/\">link</a></p>"
   page
 end
 
@@ -2827,7 +2829,7 @@ describe Hwaro::Content::Seo::Feeds do
         item["id"].should eq("https://example.com/sub/posts/hello/")
         item["url"].should eq("https://example.com/sub/posts/hello/")
         item["title"].should eq("Hello \"World\"")
-        item["content_html"].as_s.should contain("href=\"https://example.com/posts/other/\"")
+        item["content_html"].as_s.should contain("href=\"https://example.com/sub/posts/other/\"")
         item["content_text"]?.should be_nil
         item["summary"].should eq("Body & link")
         item["date_published"].should eq("2026-03-05T00:00:00Z")
@@ -2835,6 +2837,27 @@ describe Hwaro::Content::Seo::Feeds do
         item["tags"].should eq(JSON.parse(%(["crystal"])))
         item["authors"].should eq(JSON.parse(%([{"name": "kim"}])))
         item["image"].should eq("https://example.com/sub/img/a%20b.png")
+      end
+    end
+
+    it "keeps the calendar date of a date-only page on a +09:00 host" do
+      # A parsed date-only value is local midnight; a bare `.to_utc` would
+      # publish 2026-03-04T15:00:00Z. Pin the host zone so the example
+      # bites regardless of where the suite runs.
+      previous = Time::Location.local
+      Time::Location.local = Time::Location.fixed(9 * 3600)
+      begin
+        page = json_feed_page
+        page.date = Time.local(2026, 3, 5, location: Time::Location.local)
+        page.updated = Time.local(2026, 3, 6, location: Time::Location.local)
+        Dir.mktmpdir do |output_dir|
+          Hwaro::Content::Seo::Feeds.generate([page], json_feed_config, output_dir)
+          item = JSON.parse(File.read(File.join(output_dir, "feed.json")))["items"][0]
+          item["date_published"].should eq("2026-03-05T00:00:00Z")
+          item["date_modified"].should eq("2026-03-06T00:00:00Z")
+        end
+      ensure
+        Time::Location.local = previous
       end
     end
 
