@@ -159,6 +159,11 @@ describe "search split_by_heading" do
     sections[1][:body].should eq("d")
     Hwaro::Content::Search.heading_sections("<p>none</p>").should be_empty
   end
+
+  it "ignores headings inside HTML comments" do
+    html = %(<!-- <h2 id="ghost">Ghost</h2> --><h2 id="real">Real</h2><p>x</p><!--\n<h3 id="g2">G</h3>\n-->)
+    Hwaro::Content::Search.heading_sections(html).map { |s| s[:id] }.should eq(["real"])
+  end
 end
 
 describe "search facets" do

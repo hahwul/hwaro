@@ -33,6 +33,7 @@ module Hwaro
       # attribute list. `split_by_heading` cuts the page body at these.
       SPLIT_HEADING_RE = /<h([23])\b([^>]*)>(.*?)<\/h\1\s*>/im
       HEADING_ID_ATTR  = /\sid\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i
+      HTML_COMMENT     = /<!--.*?-->/m
 
       def self.manifest_path(output_dir : String) : String
         File.join(output_dir, SHARDS_DIR, MANIFEST_FILENAME)
@@ -402,6 +403,8 @@ module Hwaro
       def self.heading_sections(html : String) : Array({id: String, heading: String, body: String})
         sections = [] of {id: String, heading: String, body: String}
         return sections unless html.includes?("<h") || html.includes?("<H")
+        # A heading inside an HTML comment has no anchor on the page.
+        html = html.gsub(HTML_COMMENT, "") if html.includes?("<!--")
         matches = [] of Regex::MatchData
         html.scan(SPLIT_HEADING_RE) { |m| matches << m }
         matches.each_with_index do |m, i|
