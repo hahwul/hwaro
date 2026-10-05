@@ -268,12 +268,6 @@ module Hwaro
             Hwaro::Content::Hooks::ImageHooks.reprocess_changed_images(changed, config, output_dir, pages: pages)
           end
         end
-        # Same as copy_static: `asset_integrity()` may name a page-bundle or
-        # `[content.files]` asset, whose new bytes the copy alone never shows.
-        if @builder.asset_integrity_used? && (site = @builder.site)
-          Logger.info "  A content file changed and templates call asset_integrity() — re-rendering pages to update it."
-          return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
-        end
         # Same as copy_static: a template reading the file via load_data().
         if @builder.load_data_source_changed?(changeset.modified_content_files)
           Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
@@ -282,6 +276,14 @@ module Hwaro
         if Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(changeset.modified_content_files)
           Logger.info "  An image a page sizes or crops changed — rebuilding the pages that print it."
           return run_full_build(build_options)
+        end
+        # Same as copy_static, and after the full-build escalations above (a
+        # full build re-renders everything anyway): `asset_integrity()` may
+        # name a page-bundle or `[content.files]` asset, whose new bytes the
+        # copy alone never shows.
+        if @builder.asset_integrity_used? && (site = @builder.site)
+          Logger.info "  A content file changed and templates call asset_integrity() — re-rendering pages to update it."
+          return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
         end
         true
       end
