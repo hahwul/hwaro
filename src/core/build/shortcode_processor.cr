@@ -1044,6 +1044,16 @@ module Hwaro
         # inwards. Loop until the result stops changing (or until we hit
         # the same depth limit the recursive renderer uses) so every
         # nested level resolves.
+        #
+        # Markd also mangles the comment wherever raw HTML can't go: it is
+        # HTML-escaped in text and attribute values (`\{{ … }}`, a link or
+        # image title, an admonition title) and loses its angle brackets as
+        # a `<…>` link or reference destination. Those forms restore to the
+        # HTML-escaped output, so the token never ships. Inside `<code>` an
+        # escaped token is one the author is displaying (shortcodes never
+        # expand in code), so it stays literal.
+        SHORTCODE_PLACEHOLDER_RESTORE_RE = /<!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)-->|&lt;!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--&gt;|!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--|<(\/?)code\b/
+
         private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
           return html if shortcode_results.empty?
           result = html
@@ -1051,9 +1061,19 @@ module Hwaro
             # Substring probe before the regex pass: the typical page pays
             # one confirming scan per nesting level otherwise, over the
             # whole rendered HTML.
-            return result unless result.includes?(SHORTCODE_PLACEHOLDER_PREFIX)
-            replaced = result.gsub(SHORTCODE_PLACEHOLDER_RE) do |match|
-              shortcode_results[match]? || match
+            return result unless result.includes?("HWARO-SHORTCODE-PLACEHOLDER-")
+            code_depth = 0
+            replaced = result.gsub(SHORTCODE_PLACEHOLDER_RESTORE_RE) do |match, m|
+              if m[1]?
+                shortcode_results[match]? || match
+              elsif closing = m[4]?
+                code_depth = closing.empty? ? code_depth + 1 : Math.max(code_depth - 1, 0)
+                match
+              elsif code_depth == 0 && (output = shortcode_results["<!--#{m[2]? || m[3]}-->"]?)
+                HTML.escape(output)
+              else
+                match
+              end
             end
             return replaced if replaced == result
             result = replaced

@@ -711,6 +711,41 @@ describe Hwaro::Core::Build::Builder do
       output.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
     end
 
+    it "restores placeholders Markd escaped or unbracketed, but not ones displayed in code" do
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/val" => "{{ v }}"}
+      context = {} of String => Crinja::Value
+      results = {} of String => String
+
+      content = <<-MD
+        [docs]({{ val(v="/docs/") }}) [r]
+
+        [r]: {{ val(v="/ref/") }}
+
+        ![x](/a.png "{{ val(v="c\\"ap") }}")
+
+        :::note {{ val(v="T&i") }}
+        body
+        :::
+
+        Escaped \\{{ val(v="lit") }} and `<!--HWARO-SHORTCODE-PLACEHOLDER-0-->`
+        MD
+      substituted = builder.test_process_shortcodes_jinja(content, templates, context, results, crinja_env_override: env)
+      md = Hwaro::Models::MarkdownConfig.new
+      md.containers = true
+      rendered, _ = Hwaro::Processor::Markdown.render(substituted, markdown_config: md)
+      output = builder.test_replace_shortcode_placeholders(rendered, results)
+
+      output.should contain(%(<a href="/docs/">docs</a>))
+      output.should contain(%(<a href="/ref/">r</a>))
+      output.should contain(%(title="c&quot;ap"))
+      output.should contain(%(<p class="admonition-title">T&amp;i</p>))
+      output.should contain("Escaped lit")
+      output.should contain("<code>&lt;!--HWARO-SHORTCODE-PLACEHOLDER-0--&gt;</code>")
+      output.scan("HWARO-SHORTCODE-PLACEHOLDER").size.should eq(1)
+    end
+
     it "does not wrap block-level shortcode output in <p> when on its own line" do
       # End-to-end pipe: shortcode substitution → Markdown → placeholder replace.
       # Regression test for https://github.com/hahwul/hwaro/issues/473.
