@@ -69,7 +69,7 @@ When you run `hwaro new`, archetypes are matched in this order:
 ### 1. Explicit Flag (`-a`)
 
 ```bash
-hwaro new -t "My Article" -a posts
+hwaro new notes/my-article.md -t "My Article" -a posts
 ```
 
 Uses `archetypes/posts.md` regardless of the output path.
@@ -146,7 +146,7 @@ hwaro new posts/my-first-post.md
 hwaro new posts/my-post.md -t "My First Post"
 
 # Use specific archetype
-hwaro new -t "Quick Note" -a posts
+hwaro new notes/quick-note.md -t "Quick Note" -a posts
 ```
 
 ### Creating Different Content Types

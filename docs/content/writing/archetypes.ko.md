@@ -69,7 +69,7 @@ Add your content...
 ### 1. 명시적 플래그(`-a`)
 
 ```bash
-hwaro new -t "My Article" -a posts
+hwaro new notes/my-article.md -t "My Article" -a posts
 ```
 
 출력 경로와 무관하게 `archetypes/posts.md`를 사용합니다.
@@ -139,7 +139,7 @@ hwaro new posts/my-first-post.md
 hwaro new posts/my-post.md -t "My First Post"
 
 # 특정 아키타입 사용
-hwaro new -t "Quick Note" -a posts
+hwaro new notes/quick-note.md -t "Quick Note" -a posts
 ```
 
 ### 콘텐츠 유형별 생성
