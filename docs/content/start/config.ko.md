@@ -298,9 +298,9 @@ Cache-Control = "no-store"
 
 | 설정 섹션 | 문서 | 설명 |
 |----------------|---------------|-------------|
-| `[feeds]` | [SEO](/ko/features/seo/) | RSS/Atom 피드 생성 |
+| `[feeds]` | [SEO](/ko/features/seo/) | RSS/Atom/JSON Feed 생성 |
 | `[sitemap]` | [SEO](/ko/features/seo/) | 사이트맵 XML 생성 |
-| `[robots]` | [SEO](/ko/features/seo/) | robots.txt 생성 |
+| `[robots]` | [SEO](/ko/features/seo/) | robots.txt 생성 (Content-Signal 줄 포함) |
 | `[og]` | [SEO](/ko/features/seo/) | OpenGraph & Twitter Card 메타 태그 |
 | `[og.auto_image]` | [자동 OG 이미지](/ko/features/og-images/) | OG 미리보기 이미지 자동 생성 (빠른 개발 서버용 `lazy_generate` 포함) |
 | `[search]` | [검색](/ko/features/search/) | 클라이언트 사이드 검색 인덱스 |

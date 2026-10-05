@@ -300,9 +300,9 @@ Each feature has its own documentation with full configuration details. Below is
 
 | Config Section | Documentation | Description |
 |----------------|---------------|-------------|
-| `[feeds]` | [SEO](/features/seo/) | RSS/Atom feed generation |
+| `[feeds]` | [SEO](/features/seo/) | RSS/Atom/JSON Feed generation |
 | `[sitemap]` | [SEO](/features/seo/) | Sitemap XML generation |
-| `[robots]` | [SEO](/features/seo/) | Robots.txt generation |
+| `[robots]` | [SEO](/features/seo/) | Robots.txt generation (including Content-Signal lines) |
 | `[og]` | [SEO](/features/seo/) | OpenGraph & Twitter Card meta tags |
 | `[og.auto_image]` | [Auto OG Images](/features/og-images/) | Auto-generate OG preview images (including `lazy_generate` for fast dev server) |
 | `[search]` | [Search](/features/search/) | Client-side search index |

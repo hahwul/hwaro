@@ -66,24 +66,49 @@ in_sitemap = false
 ```toml
 [feeds]
 enabled = true
-type = "rss"              # "rss" 또는 "atom"
+type = "rss"              # "rss", "atom" 또는 "json"
 limit = 20                # 최대 항목 수
 truncate = 0              # N자로 자르기 (0 = 자르지 않음)
 full_content = true       # true = 전체 HTML 본문, false = description/요약만
-filename = ""             # 비워 두면 기본값 (rss.xml 또는 atom.xml)
+filename = ""             # 비워 두면 기본값 (rss.xml, atom.xml 또는 feed.json)
 sections = []             # 특정 섹션으로 제한, 예: ["posts"]
 ```
 
 | 옵션 | 기본값 | 설명 |
 |--------|---------|-------------|
 | `enabled` | `false` | 피드 생성 여부 |
-| `type` | `"rss"` | 피드 형식: `"rss"` 또는 `"atom"` |
+| `type` | `"rss"` | 피드 형식: `"rss"`, `"atom"` 또는 `"json"` ([JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)) |
 | `limit` | `10` | 피드의 최대 항목 수 |
 | `truncate` | `0` | 콘텐츠를 N자로 자르기 (0 = 전체 콘텐츠) |
 | `full_content` | `true` | `true` = 피드에 전체 HTML 포함, `false` = 프론트 매터 `description` 또는 자동 생성 요약 사용 |
-| `filename` | `""` | 커스텀 파일 이름 (비어 있으면 `rss.xml` 또는 `atom.xml`) |
+| `filename` | `""` | 커스텀 파일 이름 (비어 있으면 `rss.xml`, `atom.xml` 또는 `feed.json`) |
 | `sections` | `[]` | 피드를 특정 섹션으로 제한 |
 | `default_language_only` | `true` | 다국어: 메인 피드에 기본 언어만 포함 |
+
+### JSON Feed
+
+`type = "json"`으로 설정하면 [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/) 문서를 `feed.json`으로 생성합니다 (`filename`을 지정하면 그 이름을 씁니다). RSS·Atom과 같은 위치 모두에 생성됩니다. 메인 피드, 섹션 피드, 언어별 피드, 택소노미 용어 피드가 해당하며, `limit`, `truncate`, `full_content`, `sections`, `default_language_only` 설정도 똑같이 적용됩니다.
+
+각 항목에는 `id`와 `url`(페이지 퍼머링크), `title`, `summary`(RSS `<description>`과 같은 텍스트), `date_published`, `date_modified`(`updated`에서), `tags`, `authors`, `image`(절대 URL)가 들어갑니다. 본문은 `content_html`이며, `truncate`나 `full_content = false` 때문에 일반 텍스트가 되면 `content_text`로 들어갑니다. 페이지에 값이 없는 선택 필드는 생략됩니다.
+
+```json
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "My Site",
+  "home_page_url": "https://example.com/",
+  "feed_url": "https://example.com/feed.json",
+  "items": [
+    {
+      "id": "https://example.com/posts/hello/",
+      "url": "https://example.com/posts/hello/",
+      "title": "Hello",
+      "content_html": "<p>…</p>",
+      "date_published": "2026-03-05T00:00:00Z",
+      "tags": ["crystal"]
+    }
+  ]
+}
+```
 
 ### 섹션 피드
 
@@ -144,6 +169,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 |-----------|---------------|---------------|
 | RSS | `templates/rss.xml.jinja` | `rss.xml` |
 | Atom | `templates/atom.xml.jinja` | `atom.xml` |
+| JSON Feed | `templates/feed.json.jinja` | `feed.json` |
 
 템플릿 확장자는 무엇이든 됩니다(`.jinja`, `.j2`, `.jinja2`, `.html`). 마지막 확장자만 제거되므로 `rss.xml.jinja`는 `rss.xml` 키로 로드됩니다. 확장자와 무관하게 파일은 항상 **Jinja**로 렌더링됩니다(`.ecr` 파일도 인식되지만 ECR `<%= %>` 태그는 문자 그대로 출력되므로 Jinja 문법을 써야 합니다). 템플릿 파일의 존재 자체가 옵트인입니다: 파일이 없으면 Hwaro는 기존과 똑같이 내장 피드를 내보내고, 템플릿을 삭제하면 내장 출력으로 되돌아갑니다. 오버라이드는 **네 가지 피드 전부**(메인 피드, 섹션별 피드, 언어별 피드, 택소노미 항목별 피드)에 적용되고, 커스텀 `[feeds] filename`은 여전히 출력 경로를 결정합니다.
 
@@ -155,7 +181,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 
 | 변수 | 타입 | 설명 |
 |----------|------|-------------|
-| `feed.type` | string | `"rss"` 또는 `"atom"` (`[feeds] type`을 따름) |
+| `feed.type` | string | `"rss"`, `"atom"` 또는 `"json"` (`[feeds] type`을 따름) |
 | `feed.kind` | string | `"main"`, `"section"`, `"language"`, `"taxonomy"` 중 하나 |
 | `feed.title` | string | 피드 제목 (사이트 제목, `Site - Section`, `Site (한국어)` 등) |
 | `feed.description` | string | 사이트 설명 |
@@ -191,7 +217,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 
 #### 예시
 
-값은 **미리 이스케이프되지 않습니다.** `xml_escape`를 적용하거나 CDATA로 감싸는 일은 템플릿 작성자의 몫입니다:
+값은 **미리 이스케이프되지 않습니다.** `xml_escape`를 적용하거나 CDATA로 감싸는 일은 템플릿 작성자의 몫입니다. `feed.json` 템플릿에서는 `tojson` 필터를 쓰세요:
 
 ```jinja
 <?xml version="1.0" encoding="UTF-8"?>
@@ -230,6 +256,14 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 {% endif %}
 ```
 
+JSON Feed는 `type="application/feed+json"`과 `feed.json`을 씁니다:
+
+```jinja
+<link rel="alternate" type="application/feed+json"
+      href="{{ base_url }}/feed.json"
+      title="{{ site.title }}">
+```
+
 ---
 
 ## Robots.txt
@@ -261,6 +295,31 @@ rules = [
 | rules | array | [] | `allow`/`disallow` 경로를 담은 user-agent 규칙 목록 |
 
 규칙을 설정하지 않으면 Hwaro는 기본 전체 허용 규칙을 생성합니다. 규칙의 `allow`와 `disallow`가 모두 비어 있으면 모호한 동작을 막기 위해 명시적인 `Allow: /`가 추가됩니다.
+
+### Content Signals
+
+규칙에 `content_signal` 테이블을 넣으면 [Content Signals](https://contentsignals.org/) 줄을 출력합니다. 크롤러가 가져간 콘텐츠를 어떻게 써도 되는지 알리는 지시어입니다:
+
+```toml
+[robots]
+rules = [
+  { user_agent = "*", allow = ["/"], content_signal = { search = true, ai_input = true, ai_train = false } },
+]
+```
+
+```
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+Allow: /
+```
+
+| 키 | 시그널 | 의미 |
+|-----|--------|------|
+| `search` | `search` | 검색 색인을 만들고 링크와 짧은 발췌문을 보여 주는 용도 |
+| `ai_input` | `ai-input` | AI 모델의 입력으로 콘텐츠를 넣는 용도 (검색 증강, 그라운딩) |
+| `ai_train` | `ai-train` | AI 모델 학습이나 파인튜닝 |
+
+값은 `true`(`yes`) 또는 `false`(`no`)입니다. 생략한 키는 출력하지 않으며, 시그널은 항상 위 표의 순서로 나열됩니다. 알 수 없는 키나 불리언이 아닌 값은 설정 오류입니다. `content_signal`이 없는 규칙의 출력은 이전과 똑같습니다.
 
 ### 출력
 

@@ -337,7 +337,7 @@ When the site is multilingual, Hwaro automatically generates separate RSS/Atom f
 | Non-default (e.g., `ko`) | `/ko/rss.xml` | Only Korean pages |
 | Non-default (e.g., `ja`) | `/ja/rss.xml` | Only Japanese pages |
 
-By default, the main site feed (`/rss.xml` or `/atom.xml`) includes **only default language pages**. You can change this behavior with the `default_language_only` option. Each non-default language with `generate_feed = true` gets its own feed under its language prefix regardless of this setting.
+By default, the main site feed (`/rss.xml`, `/atom.xml` or `/feed.json`) includes **only default language pages**. You can change this behavior with the `default_language_only` option. Each non-default language with `generate_feed = true` gets its own feed under its language prefix regardless of this setting.
 
 ### Configuration
 
@@ -367,7 +367,7 @@ Language feeds share the same `sections`, `limit`, `truncate`, and `full_content
 ```toml
 [feeds]
 enabled = true
-type = "rss"           # or "atom"
+type = "rss"           # or "atom", "json"
 limit = 20
 truncate = 0
 full_content = true    # false = description/summary only
