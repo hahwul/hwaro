@@ -377,4 +377,85 @@ describe "Deployer matchers" do
       end
     end
   end
+
+  describe "re-review regressions" do
+    ["empty", "holding only .DS_Store"].each do |shape|
+      it "clears a directory at X.gz that is #{shape}" do
+        Dir.mktmpdir do |dir|
+          src = File.join(dir, "public")
+          dest = File.join(dir, "out")
+          Dir.mkdir_p(src)
+          Dir.mkdir_p(File.join(dest, "p.html.gz"))
+          File.write(File.join(dest, "p.html.gz", ".DS_Store"), "finder") if shape.includes?("DS_Store")
+          File.write(File.join(src, "p.html"), "page")
+          config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+          with_captured_log { Hwaro::Services::Deployer.new.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"]), config) }
+          gunzip(File.join(dest, "p.html.gz")).should eq("page")
+        end
+      end
+    end
+
+    it "refreshes a sibling before a delete pass that fails" do
+      posix_only!("read-only directory blocks unlink")
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        ro = File.join(dest, "ro")
+        Dir.mkdir_p(src)
+        File.write(File.join(src, "p.html"), "v1")
+        config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+        deployer = Hwaro::Services::Deployer.new
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"])
+        with_captured_log { deployer.run(options, config) }
+
+        File.write(File.join(src, "p.html"), "v2")
+        Dir.mkdir_p(ro)
+        File.write(File.join(ro, "x"), "stale")
+        File.chmod(ro, 0o555)
+        begin
+          pending!("running as root: a read-only directory does not block unlink") if File::Info.writable?(ro)
+          expect_raises(Hwaro::HwaroError) { with_captured_log { deployer.run(options, config) } }
+        ensure
+          File.chmod(ro, 0o755)
+        end
+        File.read(File.join(dest, "p.html")).should eq("v2")
+        gunzip(File.join(dest, "p.html.gz")).should eq("v2")
+      end
+    end
+
+    it "exempts a removed stripped page's sibling, matched by its source spelling" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        Dir.mkdir_p(File.join(src, "foo"))
+        File.write(File.join(src, "index.html"), "home")
+        File.write(File.join(src, "foo", "index.html"), "foo")
+        config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+        config.deployment.targets[0].strip_index_html = true
+        deployer = Hwaro::Services::Deployer.new
+        with_captured_log { deployer.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"]), config) }
+        File.exists?(File.join(dest, "foo.gz")).should be_true
+
+        FileUtils.rm_rf(File.join(src, "foo"))
+        with_captured_log { deployer.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], max_deletes: 1), config) }
+        File.exists?(File.join(dest, "foo")).should be_false
+        File.exists?(File.join(dest, "foo.gz")).should be_false
+      end
+    end
+
+    it "judges gsutil wildcards by the relative path and warns in sorted order" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "site[old]")
+        Dir.mkdir_p(src)
+        %w[q?.html b.html a[1].html].each { |name| File.write(File.join(src, name), "x") }
+        config = matcher_config("gs://bkt", [deploy_matcher("\\.html$", cache_control: "no-cache")])
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], dry_run: true)
+        ops = [] of Hwaro::Services::Deployer::PlannedOp
+        log = with_captured_log { ops = Hwaro::Services::Deployer.new.plan(options, config) }
+        ops.select(&.action.==("upload")).map(&.path).should eq(["b.html"])
+        a, q = log.index!("a[1].html"), log.index!("q?.html")
+        (a < q).should be_true
+      end
+    end
+  end
 end

@@ -67,6 +67,7 @@ module Hwaro
         uploads = [] of MetadataUpload
         return uploads if matchers.none? { |compiled| sets_metadata?(compiled.matcher) }
         gs = URI.parse(url).scheme == "gs"
+        wildcards = [] of String
 
         each_project_file(source_dir) do |path|
           rel = relative_to(path, source_dir)
@@ -74,11 +75,14 @@ module Hwaro
           next unless matcher = metadata_matcher(rel, matchers)
           # `gzip = false` alone claims the file but sets no header.
           next if metadata_headers(matcher).empty?
-          if gs && GSUTIL_WILDCARD.matches?(path)
-            Logger.warn "deployment.matchers: skipping metadata upload of #{rel} — gsutil reads [ ] * ? in a file name as a wildcard."
+          if gs && GSUTIL_WILDCARD.matches?(rel)
+            wildcards << rel
             next
           end
           uploads << MetadataUpload.new(rel, path, cloud_object_url(url, rel), matcher)
+        end
+        wildcards.sort!.each do |rel|
+          Logger.warn "deployment.matchers: skipping metadata upload of #{rel} — gsutil reads [ ] * ? in a file name as a wildcard."
         end
         uploads.sort_by!(&.rel)
       end
