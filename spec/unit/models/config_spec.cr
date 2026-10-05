@@ -2257,6 +2257,27 @@ describe Hwaro::Models::Config do
 
       config.links.broken_internal.should eq("warn")
     end
+
+    it "defaults broken_anchors to ignore and loads warn/error" do
+      Hwaro::Models::Config.new.links.broken_anchors.should eq("ignore")
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [links]
+        broken_anchors = "error"
+        TOML
+      config.links.broken_anchors.should eq("error")
+    end
+
+    it "keeps the ignore default for an unknown broken_anchors value" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [links]
+        broken_anchors = "loud"
+        TOML
+      config.links.broken_anchors.should eq("ignore")
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -3194,14 +3215,14 @@ describe "Hwaro::Models::Config" do
     it "warns about an unknown value and keeps the default" do
       config = nil
       log = with_captured_log do
-        config = load_config("[markdown]\nmath = true\nmath_engine = \"mathjx\"\n[feeds]\ntype = \"json\"")
+        config = load_config("[markdown]\nmath = true\nmath_engine = \"mathjx\"\n[feeds]\ntype = \"jsn\"")
       end
       config.not_nil!.markdown.math_engine.should eq("katex")
       config.not_nil!.markdown.math_tags.should contain("katex")
       config.not_nil!.feeds.type.should eq("rss")
       log.should contain("math_engine")
       log.should contain("mathjx")
-      log.should contain("json")
+      log.should contain("jsn")
     end
   end
 

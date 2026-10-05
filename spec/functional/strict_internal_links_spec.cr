@@ -156,3 +156,120 @@ describe "Strict internal links: warn mode (default)" do
     end
   end
 end
+
+private ANCHOR_LINKS_CONFIG = <<-TOML
+  title = "Test Site"
+  base_url = "http://localhost"
+
+  [links]
+  broken_anchors = "error"
+  TOML
+
+describe "Broken anchors" do
+  it "fails the build listing every missing fragment, against the rendered ids" do
+    ex = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        ANCHOR_LINKS_CONFIG,
+        content_files: {
+          "a.md" => "---\ntitle: A\n---\n# Hello\n\n[ok](#hello) [bad](#nope) [x](@/b.md#there) [y](@/b.md#missing) [t](#top) [fn][^1]\n\n[^1]: note\n",
+          "b.md" => "---\ntitle: B\n---\n## There\n",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+        parallel: true,
+      ) { }
+    end
+
+    ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+    message = ex.message.not_nil!
+    message.should contain("2 broken anchors")
+    message.should contain(%(a.md → #nope → missing id "nope"))
+    message.should contain(%(a.md → @/b.md#missing → missing id "missing"))
+  end
+
+  it "accepts ids that only the template emits" do
+    build_site(
+      ANCHOR_LINKS_CONFIG,
+      content_files: {
+        "a.md" => "---\ntitle: A\n---\n[c](#comments) [b](@/b.md#footer)",
+        "b.md" => "---\ntitle: B\n---\nBody",
+      },
+      template_files: {"page.html" => %(<div id="comments"></div>{{ content }}<footer id=footer></footer>)},
+    ) { }
+  end
+
+  it "only warns in warn mode" do
+    log = with_captured_log do
+      build_site(
+        ANCHOR_LINKS_CONFIG.sub(%("error"), %("warn")),
+        content_files: {"a.md" => "---\ntitle: A\n---\n[bad](#nope)"},
+        template_files: {"page.html" => "{{ content }}"},
+      ) { File.exists?("public/a/index.html").should be_true }
+    end
+    log.should contain(%(Broken anchor: a.md → #nope → missing id "nope"))
+  end
+
+  it "is not checked by default" do
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"a.md" => "---\ntitle: A\n---\n[bad](#nope)"},
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+    log.should_not contain("Broken anchor")
+  end
+
+  it "reads a target the warm --cache build skipped from disk" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", ANCHOR_LINKS_CONFIG)
+        Dir.mkdir_p("content")
+        Dir.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/a.md", "---\ntitle: A\n---\n[x](@/b.md#there)")
+        File.write("content/b.md", "---\ntitle: B\n---\n## There\n")
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
+        Hwaro::Core::Build::Builder.new.run(options)
+
+        # Only a.md re-renders; b.md's ids come from its output file.
+        File.write("content/a.md", "---\ntitle: A\n---\n[x](@/b.md#there) again")
+        Hwaro::Core::Build::Builder.new.run(options)
+      end
+    end
+  end
+
+  it "ignores data-href attributes" do
+    build_site(
+      ANCHOR_LINKS_CONFIG,
+      content_files: {"a.md" => %(---\ntitle: A\n---\n<a data-href="#data-attr">x</a>)},
+      template_files: {"page.html" => "{{ content }}"},
+    ) { }
+  end
+
+  # A fast-start priority page linking into a deferred page: the target has
+  # no output yet at the priority check, so the link must be re-checked by
+  # render_deferred instead of being dropped.
+  it "checks priority-page links to deferred targets in render_deferred" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", ANCHOR_LINKS_CONFIG)
+        FileUtils.mkdir_p("content")
+        File.write("content/_index.md", "---\ntitle: Home\n---\nhome")
+        File.write("content/recent.md", "---\ntitle: Recent\ndate: 2026-06-01\n---\n[old](@/old.md#missing) [ok](@/old.md#there)")
+        File.write("content/old.md", "---\ntitle: Old\ndate: 2020-01-01\n---\n## There\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/index.html", "{{ content }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 1)
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+
+        ex = expect_raises(Hwaro::HwaroError) { builder.render_deferred(options) }
+        ex.message.not_nil!.should contain(%(recent.md → @/old.md#missing → missing id "missing"))
+        ex.message.not_nil!.should_not contain("#there")
+      end
+    end
+  end
+end

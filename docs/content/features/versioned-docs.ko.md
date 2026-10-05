@@ -132,7 +132,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 | `versions.all` | 같은 리스트를 일반 배열로 |
 | `versions.size` | 버전 개수 |
 
-`page.url`처럼 위의 모든 URL은 사이트 상대 경로입니다. [서브패스 배포](/ko/start/config/#base-url)가 동작하도록 링크에는 `{{ base_url }}`(또는 `{{ base_path }}`)을 앞에 붙이세요.
+`page.url`처럼 위의 모든 URL은 사이트 상대 경로입니다. [서브패스 배포](/ko/start/config/#사이트-설정)가 동작하도록 링크에는 `{{ base_url }}`(또는 `{{ base_path }}`)을 앞에 붙이세요.
 
 ## 버전 전환기 예시
 

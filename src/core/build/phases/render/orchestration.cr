@@ -176,7 +176,7 @@ module Hwaro::Core::Build::Phases::Render
         # aggregated error after the whole fan-out so every offender is
         # listed. The lifecycle manager re-raises HwaroError unchanged
         # (exit code 5 for build/CI; serve's watcher surfaces the overlay).
-        raise_on_broken_internal_links!
+        raise_on_broken_internal_links!(output_dir)
       ensure
         @crinja_caches_frozen = false
       end
