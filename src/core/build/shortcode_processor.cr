@@ -117,6 +117,16 @@ module Hwaro
           # rule) — the previous ad-hoc regex opened on indented ``` (literal
           # text in CommonMark) and never closed on a longer closer run,
           # desyncing fence state for the rest of the document.
+          map_shortcode_chunks(content) do |chunk|
+            process_shortcodes_in_text(chunk, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, warnings: warnings)
+          end
+        end
+
+        # The fence walk of `process_shortcodes_jinja`, shared with the
+        # include pass (`expand_includes`) so both agree on what is fenced:
+        # fence lines pass through verbatim, every run of lines between them
+        # is replaced by the block's result.
+        private def map_shortcode_chunks(content : String, & : String -> String) : String
           String.build do |io|
             tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
             buffer = String::Builder.new
@@ -152,7 +162,7 @@ module Hwaro
               # fences inside a body are balanced, so the tracker resumes in
               # the same state on the far side).
               if !in_body && tracker.fence_line?(line) && !in_raw_region
-                io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, warnings: warnings)
+                io << yield buffer.to_s
                 buffer = String::Builder.new
                 io << line
                 next
@@ -161,7 +171,7 @@ module Hwaro
               buffer << line
             end
 
-            io << process_shortcodes_in_text(buffer.to_s, templates, context, shortcode_results, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, warnings: warnings)
+            io << yield buffer.to_s
           end
         end
 
