@@ -197,23 +197,6 @@ module Hwaro
           Logger.info "  Asset bundle fingerprints changed — rebuilding pages to update references."
           return run_full_build(build_options)
         end
-        # Highlight and `[auto_includes]` asset tags carry a `?v=` digest of
-        # these very files, printed into every page that references them;
-        # the copy alone left every page on the old hash (and browsers on
-        # the cached bytes). Only the layout moved — the digest lands in the
-        # global vars — so the pages re-render without the full build's
-        # re-parse, image and OG passes: this is the most frequent theming
-        # save, and a full build made each one a multi-second wait. Only the
-        # `?v=` query moves, never a path, so a stylesheet-only save can still
-        # be swapped in place (see css_swap_paths).
-        if build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
-          Logger.info "  A cache-busted asset changed — re-rendering pages to update its ?v= hash."
-          if site = @builder.site
-            return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
-          end
-          @static_changed_pages = true
-          return run_full_build(build_options)
-        end
         # A template reads one of the files through `load_data()`: the
         # pages printing it must re-render, which the copy alone never does.
         if @builder.load_data_source_changed?(static_sources)
@@ -224,6 +207,26 @@ module Hwaro
         if static_shadowed_page
           @static_changed_pages = true
           Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
+          return run_full_build(build_options)
+        end
+        # Highlight and `[auto_includes]` asset tags carry a `?v=` digest of
+        # these very files, printed into every page that references them;
+        # the copy alone left every page on the old hash (and browsers on
+        # the cached bytes). Only the layout moved — the digest lands in the
+        # global vars — so the pages re-render without the full build's
+        # re-parse, image and OG passes: this is the most frequent theming
+        # save, and a full build made each one a multi-second wait. Only the
+        # `?v=` query moves, never a path, so a stylesheet-only save can still
+        # be swapped in place (see css_swap_paths). Checked after the
+        # full-build escalations above: returning from the re-render first
+        # left a static copy on top of a generated file (an unfingerprinted
+        # bundle) that only a full build puts back.
+        if build_options.cache_busting && @builder.cache_bust_input_changed?(changeset.modified_static)
+          Logger.info "  A cache-busted asset changed — re-rendering pages to update its ?v= hash."
+          if site = @builder.site
+            return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
+          end
+          @static_changed_pages = true
           return run_full_build(build_options)
         end
         true

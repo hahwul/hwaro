@@ -242,6 +242,31 @@ describe "CSS hot-swap" do
     end
   end
 
+  # A cache-busted static file that lands on a generated output (here the
+  # unfingerprinted bundle) must take the full rebuild, not the `?v=`
+  # re-render, so the build output wins that path as on a cold build.
+  it "rebuilds when a cache-busted static file shadows a generated output" do
+    config = <<-TOML
+      [assets]
+      enabled = true
+      minify = false
+      fingerprint = false
+
+      [[assets.bundles]]
+      name = "main.css"
+      files = ["css/a.css"]
+
+      [auto_includes]
+      enabled = true
+      dirs = ["assets"]
+      TOML
+    shadow = {"static/assets/main.css" => "STATIC"}
+    css_swap_site(["static/assets/main.css"], %({{ auto_includes_css }}{{ content }}), config, shadow) do |pushes, _|
+      pushes.should eq(["reload"])
+      File.read("public/assets/main.css").should_not contain("STATIC")
+    end
+  end
+
   describe "LiveReloadHandler#notify_css" do
     it "opts a client in when it sends the hello over the socket" do
       handler = Hwaro::Services::LiveReloadHandler.new
