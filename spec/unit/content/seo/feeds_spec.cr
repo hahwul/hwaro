@@ -2771,3 +2771,157 @@ describe "feed dates: authored offset midnight" do
     end
   end
 end
+
+private def json_feed_config : Hwaro::Models::Config
+  config = Hwaro::Models::Config.new
+  config.feeds.enabled = true
+  config.feeds.type = "json"
+  config.base_url = "https://example.com/sub"
+  config.title = "Test Site"
+  config.description = "A test site"
+  config
+end
+
+private def json_feed_page(path = "posts/hello.md", url = "/posts/hello/", title = "Hello \"World\"") : Hwaro::Models::Page
+  page = Hwaro::Models::Page.new(path)
+  page.title = title
+  page.url = url
+  page.section = "posts"
+  page.date = Time.utc(2026, 3, 5)
+  page.draft = false
+  page.render = true
+  page.is_index = false
+  page.raw_content = "Body"
+  page.content = "<p>Body &amp; <a href=\"/posts/other/\">link</a></p>"
+  page
+end
+
+describe Hwaro::Content::Seo::Feeds do
+  describe "JSON Feed 1.1" do
+    it "writes a valid feed.json with the top-level fields" do
+      Dir.mktmpdir do |output_dir|
+        written = Hwaro::Content::Seo::Feeds.generate([json_feed_page], json_feed_config, output_dir)
+        path = File.join(output_dir, "feed.json")
+        written.should eq([path])
+        feed = JSON.parse(File.read(path))
+        feed["version"].should eq("https://jsonfeed.org/version/1.1")
+        feed["title"].should eq("Test Site")
+        feed["home_page_url"].should eq("https://example.com/sub/")
+        feed["feed_url"].should eq("https://example.com/sub/feed.json")
+        feed["description"].should eq("A test site")
+        feed["language"]?.should be_nil
+        feed["items"].as_a.size.should eq(1)
+      end
+    end
+
+    it "maps page fields onto items" do
+      page = json_feed_page
+      page.updated = Time.utc(2026, 3, 6, 10, 0, 0)
+      page.tags = ["crystal"]
+      page.authors = ["kim", " "]
+      page.image = "/img/a b.png"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([page], json_feed_config, output_dir)
+        item = JSON.parse(File.read(File.join(output_dir, "feed.json")))["items"][0]
+        item["id"].should eq("https://example.com/sub/posts/hello/")
+        item["url"].should eq("https://example.com/sub/posts/hello/")
+        item["title"].should eq("Hello \"World\"")
+        item["content_html"].as_s.should contain("href=\"https://example.com/posts/other/\"")
+        item["content_text"]?.should be_nil
+        item["summary"].should eq("Body & link")
+        item["date_published"].should eq("2026-03-05T00:00:00Z")
+        item["date_modified"].should eq("2026-03-06T10:00:00Z")
+        item["tags"].should eq(JSON.parse(%(["crystal"])))
+        item["authors"].should eq(JSON.parse(%([{"name": "kim"}])))
+        item["image"].should eq("https://example.com/sub/img/a%20b.png")
+      end
+    end
+
+    it "omits optional item fields the page does not carry" do
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([json_feed_page], json_feed_config, output_dir)
+        item = JSON.parse(File.read(File.join(output_dir, "feed.json")))["items"][0]
+        %w[date_modified tags authors image].each { |key| item[key]?.should be_nil }
+      end
+    end
+
+    it "uses content_text when truncate or full_content = false makes the body plain text" do
+      config = json_feed_config
+      config.feeds.truncate = 4
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([json_feed_page], config, output_dir)
+        item = JSON.parse(File.read(File.join(output_dir, "feed.json")))["items"][0]
+        item["content_text"].should eq("Body...")
+        item["content_html"]?.should be_nil
+      end
+
+      config = json_feed_config
+      config.feeds.full_content = false
+      page = json_feed_page
+      page.description = "Desc"
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([page], config, output_dir)
+        item = JSON.parse(File.read(File.join(output_dir, "feed.json")))["items"][0]
+        item["content_text"].should eq("Desc")
+        item["summary"].should eq("Desc")
+      end
+    end
+
+    it "honours limit and drops drafts" do
+      config = json_feed_config
+      config.feeds.limit = 1
+      older = json_feed_page("posts/old.md", "/posts/old/", "Old")
+      older.date = Time.utc(2020, 1, 1)
+      draft = json_feed_page("posts/draft.md", "/posts/draft/", "Draft")
+      draft.draft = true
+      draft.date = Time.utc(2030, 1, 1)
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([older, json_feed_page, draft], config, output_dir)
+        items = JSON.parse(File.read(File.join(output_dir, "feed.json")))["items"].as_a
+        items.map(&.["title"].as_s).should eq(["Hello \"World\""])
+      end
+    end
+
+    it "writes section and per-language feeds as feed.json" do
+      config = json_feed_config
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      section = Hwaro::Models::Section.new("posts/_index.md")
+      section.title = "Posts"
+      section.url = "/posts/"
+      section.section = "posts"
+      section.generate_feeds = true
+      section.render = true
+      ko = json_feed_page("posts/hello.ko.md", "/ko/posts/hello/", "안녕")
+      ko.language = "ko"
+
+      Dir.mktmpdir do |output_dir|
+        written = Hwaro::Content::Seo::Feeds.generate([section, json_feed_page, ko], config, output_dir)
+        written.should contain(File.join(output_dir, "posts", "feed.json"))
+        lang = JSON.parse(File.read(File.join(output_dir, "ko", "feed.json")))
+        lang["language"].should eq("ko")
+        lang["feed_url"].should eq("https://example.com/sub/ko/feed.json")
+        lang["items"].as_a.map(&.["title"].as_s).should eq(["안녕"])
+      end
+    end
+
+    it "lets an explicit filename win and plans the same path it writes" do
+      config = json_feed_config
+      config.feeds.filename = "custom.json"
+      Dir.mktmpdir do |output_dir|
+        written = Hwaro::Content::Seo::Feeds.generate([json_feed_page], config, output_dir)
+        written.should eq([File.join(output_dir, "custom.json")])
+        Hwaro::Content::Seo::Feeds.published_outputs([json_feed_page], config, output_dir).should eq(written)
+      end
+    end
+  end
+
+  describe ".safe_feed_filename" do
+    it "defaults json feeds to feed.json" do
+      Hwaro::Content::Seo::Feeds.safe_feed_filename("", "json").should eq("feed.json")
+      Hwaro::Content::Seo::Feeds.safe_feed_filename("", "atom").should eq("atom.xml")
+      Hwaro::Content::Seo::Feeds.safe_feed_filename("", "rss").should eq("rss.xml")
+    end
+  end
+end

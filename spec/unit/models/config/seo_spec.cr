@@ -899,3 +899,16 @@ describe Hwaro::Content::Seo::JsonLd do
     end
   end
 end
+
+describe Hwaro::Models::Config do
+  describe "[feeds] type" do
+    it "accepts json" do
+      load_config(%([feeds]\nenabled = true\ntype = "JSON"\n)).feeds.type.should eq("json")
+    end
+
+    it "warns and keeps the default for an unknown type" do
+      log = with_captured_log { load_config(%([feeds]\ntype = "xml"\n)).feeds.type.should eq("rss") }
+      log.should contain(%(expected "rss", "atom" or "json"))
+    end
+  end
+end

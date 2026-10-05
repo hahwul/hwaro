@@ -260,7 +260,11 @@ module Hwaro
 
           # Mirrors `Seo::Feeds.safe_feed_filename` for an unset filename.
           private def default_feed_filename(feed_type : String) : String
-            feed_type.downcase == "atom" ? "atom.xml" : "rss.xml"
+            case feed_type.downcase
+            when "atom" then "atom.xml"
+            when "json" then "feed.json"
+            else             "rss.xml"
+            end
           end
 
           # `/posts/page/2/` — a paginated listing route. It exists only in the

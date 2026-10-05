@@ -53,6 +53,19 @@ describe Hwaro::Content::Seo::Feeds do
       end
     end
 
+    it "uses the feed.json template override for json feeds" do
+      config = feed_config("json")
+      templates = {"feed.json" => "{\"type\": {{ feed.type | tojson }}, \"url\": {{ feed.url | tojson }}}"}
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Feeds.generate([feed_page], config, output_dir,
+          templates: templates, renderer: feed_renderer)
+
+        content = File.read(File.join(output_dir, "feed.json"))
+        content.should eq(%({"type": "json", "url": "https://example.com/feed.json"}))
+      end
+    end
+
     it "produces byte-identical output to the programmatic path when the template is absent" do
       config = feed_config("rss")
       page = feed_page
