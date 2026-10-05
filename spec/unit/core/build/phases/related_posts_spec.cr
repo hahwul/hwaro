@@ -341,3 +341,53 @@ describe "Related posts" do
     p1.related_posts[1].title.should eq("Post C")
   end
 end
+
+describe "Related posts candidates" do
+  it "includes page-bundle posts and still skips the homepage" do
+    builder = Hwaro::Core::Build::Builder.new
+    config = Hwaro::Models::Config.new
+    config.related.enabled = true
+    site = Hwaro::Models::Site.new(config)
+
+    flat = Hwaro::Models::Page.new("blog/flat.md")
+    flat.title = "Flat"
+    flat.tags = ["x"]
+    bundle = Hwaro::Models::Page.new("blog/bundle/index.md")
+    bundle.title = "Bundle"
+    bundle.is_index = true
+    bundle.tags = ["x"]
+    home = Hwaro::Models::Page.new("index.md")
+    home.title = "Home"
+    home.is_index = true
+    home.tags = ["x"]
+    site.pages = [flat, bundle, home]
+
+    builder.test_compute_related_posts(site)
+
+    flat.related_posts.map(&.title).should eq(["Bundle"])
+    bundle.related_posts.map(&.title).should eq(["Flat"])
+    home.related_posts.should be_empty
+  end
+
+  it "counts a term repeated in front matter once" do
+    builder = Hwaro::Core::Build::Builder.new
+    config = Hwaro::Models::Config.new
+    config.related.enabled = true
+    site = Hwaro::Models::Site.new(config)
+
+    me = Hwaro::Models::Page.new("me.md")
+    me.title = "Me"
+    me.tags = ["x", "y"]
+    dup = Hwaro::Models::Page.new("dup.md")
+    dup.title = "Dup"
+    dup.tags = ["x", "x", "x"]
+    both = Hwaro::Models::Page.new("both.md")
+    both.title = "Both"
+    both.tags = ["x", "y"]
+    site.pages = [me, dup, both]
+
+    builder.test_compute_related_posts(site)
+
+    me.related_posts.map(&.title).should eq(["Both", "Dup"])
+  end
+end

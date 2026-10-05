@@ -181,7 +181,7 @@ module Hwaro::Core::Build::Phases::Transform
       next if section_names.includes?(section)
       pages_by_section[section].each do |page|
         next unless seen_paths.add?(page.path)
-        if page.is_index && page.section.empty?
+        if page.home?
           root_indexes << page
         else
           flat_list << page
@@ -612,7 +612,7 @@ module Hwaro::Core::Build::Phases::Transform
 
     taxonomy_names = config.taxonomies
     limit = config.limit
-    all_pages = site.pages.reject { |p| p.draft || p.unpublished || p.is_index || p.generated || !p.render }
+    all_pages = site.pages.select { |p| related_candidate?(p) }
 
     # Build inverted index first (needed for both candidate discovery and scoring)
     inverted, page_lookup = build_related_index(all_pages, taxonomy_names)
@@ -639,7 +639,7 @@ module Hwaro::Core::Build::Phases::Transform
     # Include pages sharing taxonomy terms with changed pages
     changed_pages.each do |page|
       taxonomy_names.each do |tax_name|
-        values = page.taxonomy_values(tax_name)
+        values = page.taxonomy_values(tax_name).uniq
         inv_tax = inverted[tax_name]?
         next unless inv_tax
         values.each do |term|
@@ -657,7 +657,7 @@ module Hwaro::Core::Build::Phases::Transform
 
       scores = Hash(String, Int32).new(0)
       taxonomy_names.each do |tax_name|
-        values = page.taxonomy_values(tax_name)
+        values = page.taxonomy_values(tax_name).uniq
         inv_tax = inverted[tax_name]?
         next unless inv_tax
         values.each do |term|
@@ -838,6 +838,14 @@ module Hwaro::Core::Build::Phases::Transform
     assign_series_groups(groups)
   end
 
+  # Related-post candidates. A page bundle (`post/index.md`) is `is_index`
+  # too, but it is an ordinary post; only home pages and section indexes
+  # (`_index.md`) are left out with drafts, headless and generated pages.
+  private def related_candidate?(page : Models::Page) : Bool
+    return false if page.draft || page.unpublished || page.generated || !page.render || page.home?
+    !(page.is_index && File.basename(page.path).starts_with?("_index"))
+  end
+
   # Build the taxonomy inverted index ({tax_name => {term => [page_path]}}) and a
   # path->page lookup for the given candidate pages. Shared by the full and
   # incremental related-posts computations.
@@ -848,7 +856,9 @@ module Hwaro::Core::Build::Phases::Transform
     pages.each do |page|
       page_lookup[page.path] = page
       taxonomy_names.each do |tax_name|
-        values = page.taxonomy_values(tax_name)
+        # uniq: a term repeated in front matter is still one shared term,
+        # as on the taxonomy pages; counting it twice inflated scores.
+        values = page.taxonomy_values(tax_name).uniq
         values.each do |term|
           inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(String))
           arr = inv_tax[term]? || (inv_tax[term] = [] of String)
@@ -867,7 +877,7 @@ module Hwaro::Core::Build::Phases::Transform
     taxonomy_names = config.taxonomies
     limit = config.limit
     return if limit <= 0
-    pages = site.pages.reject { |p| p.draft || p.unpublished || p.is_index || p.generated || !p.render }
+    pages = site.pages.select { |p| related_candidate?(p) }
 
     # Build inverted index: {taxonomy_name => {term => Array(page_path)}}
     # This avoids the O(N²) pairwise comparison
@@ -881,7 +891,7 @@ module Hwaro::Core::Build::Phases::Transform
       scores = Hash(String, Int32).new(0)
       page_lang = page.language
       taxonomy_names.each do |tax_name|
-        values = page.taxonomy_values(tax_name)
+        values = page.taxonomy_values(tax_name).uniq
         inv_tax = inverted[tax_name]?
         next unless inv_tax
         values.each do |term|

@@ -320,6 +320,15 @@ module Hwaro
         "#{base}#{img}"
       end
 
+      # Is this the site (or per-language) homepage — the root `index.md` /
+      # `_index.md`? Its source sits directly under `content/`, so `path` has
+      # no `/` (`index.md`, `index.ko.md`, `_index.md`, …). Not
+      # `is_index && section.empty?`: a one-level page bundle like
+      # `content/about/index.md` also has an empty section (gh#601).
+      def home? : Bool
+        @is_index && !@path.includes?('/')
+      end
+
       # Check if page has redirect
       def has_redirect? : Bool
         !@redirect_to.nil? && !@redirect_to.try(&.empty?)

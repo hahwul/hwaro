@@ -366,7 +366,7 @@ module Hwaro::Core::Build::Phases::Render
     # pages were rendered with the homepage template, silently discarding
     # their own title and body (the gh#601 fix landed on `home?` but never
     # reached this call site).
-    if home?(page) && templates.has_key?("index")
+    if page.home? && templates.has_key?("index")
       return "index"
     end
 
@@ -418,16 +418,5 @@ module Hwaro::Core::Build::Phases::Render
                 "Found: #{sorted.join(", ")}. Convert to Hwaro's Crinja syntax — self-closing: " \
                 "`{{< name arg=\"v\" >}}` → `{{ name(arg=\"v\") }}`; with a body: " \
                 "`{{< name arg=\"v\" >}}body{{< /name >}}` → `{% name(arg=\"v\") %}body{% end %}` (named closer `{% endname %}` recommended)."
-  end
-
-  # Is this the site (or per-language) homepage — the root `index.md` /
-  # `_index.md`? Such a page is an index whose source file sits directly
-  # under `content/` with no parent directory, so `page.path` has no `/`
-  # (`index.md`, `index.ko.md`, `_index.md`, …). This deliberately does NOT
-  # use `page.is_index && page.section.empty?`: one-level page bundles like
-  # `content/about/index.md` also resolve to an empty section, so that test
-  # mislabels them as the homepage (gh#601).
-  private def home?(page : Models::Page) : Bool
-    page.is_index && !page.path.includes?('/')
   end
 end

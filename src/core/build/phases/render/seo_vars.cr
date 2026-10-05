@@ -12,7 +12,7 @@ module Hwaro::Core::Build::Phases::Render
     page_url_override : String?,
     og_type_override : String?,
   )
-    is_homepage = home?(page)
+    is_homepage = page.home?
     jsonld_article = if is_homepage || page.title.empty? || page.path == "404.html"
                        # The synthesized 404 page is neither an Article nor a
                        # collection — emit no page-level JSON-LD for it.
@@ -84,7 +84,7 @@ module Hwaro::Core::Build::Phases::Render
     # (gh#601).
     return "website" if page.is_a?(Models::Section)
     # Site / per-language homepage (`/`, `/<lang>/`). See `home?`.
-    return "website" if home?(page)
+    return "website" if page.home?
     # Defensive fallback for a custom-permalink homepage remapped to root.
     return "website" if effective_url == "/" || effective_url.empty?
     nil

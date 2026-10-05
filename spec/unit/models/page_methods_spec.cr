@@ -777,3 +777,14 @@ describe "Hwaro::Models::Page#social_image" do
     page.social_image.should be_nil
   end
 end
+
+describe "Hwaro::Models::Page#home?" do
+  it "is true only for an index file directly under content/" do
+    {"index.md" => true, "index.ko.md" => true, "_index.md" => true, "about/index.md" => false, "blog/_index.md" => false}.each do |path, expected|
+      page = Hwaro::Models::Page.new(path)
+      page.is_index = true
+      page.home?.should eq(expected)
+    end
+    Hwaro::Models::Page.new("about.md").home?.should be_false
+  end
+end
