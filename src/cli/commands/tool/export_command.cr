@@ -101,7 +101,7 @@ module Hwaro
                 "error_count"    => result.error_count,
                 "files"          => exporter.file_actions,
               }.to_json)
-              exit(Hwaro::Errors.exit_for(failure_code(result))) unless result.success
+              exit(failure(result).exit_code) unless result.success
               return
             end
 
@@ -111,12 +111,7 @@ module Hwaro
               # the exit code lands in the documented IO class. A run with
               # ANY per-file error fails here — `success` no longer reports
               # a partial export as clean.
-              code = failure_code(result)
-              raise Hwaro::HwaroError.new(
-                code: code,
-                message: result.message,
-                hint: code == Hwaro::Errors::HWARO_E_CONTENT ? "Fix the front matter errors listed above (hwaro tool validate names them)." : "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
-              )
+              raise failure(result)
             end
 
             summary = "#{result.exported_count} files · #{result.skipped_count} skipped"
@@ -130,15 +125,8 @@ module Hwaro
             end
           end
 
-          # A run that failed only on unparseable front matter is a content
-          # error, as `build` and `tool validate` classify it; anything else
-          # (a missing content dir, an unwritable destination) is IO.
-          private def failure_code(result : Services::Exporters::ExportResult) : String
-            if result.error_count > 0 && result.content_error_count == result.error_count
-              Hwaro::Errors::HWARO_E_CONTENT
-            else
-              Hwaro::Errors::HWARO_E_IO
-            end
+          private def failure(result : Services::Exporters::ExportResult) : Hwaro::HwaroError
+            Hwaro::Errors.per_file_failure(result.message, result.error_count, result.content_error_count)
           end
 
           private def parse_options(args : Array(String)) : {Config::Options::ExportOptions, Bool}

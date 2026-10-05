@@ -119,15 +119,9 @@ module Hwaro
           # identical failure purely because it asked for JSON. The payload
           # shape is untouched; only the process exit code changes.
           private def fail_conversion(result : Services::ConversionResult, json_output : Bool) : NoReturn
-            content = result.error_count > 0 && result.content_error_count == result.error_count
-            code = content ? Hwaro::Errors::HWARO_E_CONTENT : Hwaro::Errors::HWARO_E_IO
-            exit(Hwaro::Errors.exit_for(code)) if json_output
-
-            raise Hwaro::HwaroError.new(
-              code: code,
-              message: result.message,
-              hint: content ? "Fix the front matter errors listed above (hwaro tool validate names them)." : "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
-            )
+            error = Hwaro::Errors.per_file_failure(result.message, result.error_count, result.content_error_count)
+            exit(error.exit_code) if json_output
+            raise error
           end
         end
       end
