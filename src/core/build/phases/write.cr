@@ -66,6 +66,7 @@ module Hwaro::Core::Build::Phases::Write
     output_path = File.join(output_dir, "404.html")
     Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
     Hwaro::Utils::FileSafe.atomic_write(output_path, final_html)
+    record_html_stats(final_html)
     # 404 is rewritten on every build, so its live claim should not depend on
     # the filesystem's mtime precision when a static 404.html was removed.
     claim_generated_output(output_path)
@@ -264,6 +265,22 @@ module Hwaro::Core::Build::Phases::Write
     end
   end
 
+  # `[build] write_stats`: fold one written HTML page into the collector.
+  def record_html_stats(html : String) : Nil
+    @html_stats.try(&.add(html))
+  end
+
+  # Flush the collector to `hwaro_stats.json`. `complete` means every page
+  # rendered into this collector, so it replaces the file; a partial pass
+  # (`--cache` hits, fast-start, serve's incremental passes) folds the
+  # previous file in instead — a superset, so a selector only a removed or
+  # edited page used lingers until the next build that renders every page.
+  def write_html_stats(complete : Bool) : Nil
+    return unless stats = @html_stats
+    stats.merge_file(Utils::HtmlStats::FILE) unless complete
+    stats.write(Utils::HtmlStats::FILE)
+  end
+
   private def write_output(page : Models::Page, output_dir : String, content : String, verbose : Bool)
     # A page that lost an output-path collision renders normally (its content
     # still feeds listings/feeds/search) but must not race the winner on disk.
@@ -281,6 +298,7 @@ module Hwaro::Core::Build::Phases::Write
 
     ensure_dir(Path[output_path].dirname.to_s)
     Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+    record_html_stats(content)
     note_published_page
     Logger.action :create, output_path if verbose
   end

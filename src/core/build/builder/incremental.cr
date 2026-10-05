@@ -237,6 +237,7 @@ module Hwaro
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
           regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true, options: options)
+          write_html_stats(complete: false)
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{render_list.size}/#{all_pages.size} pages", :result, elapsed.total_milliseconds)
@@ -988,6 +989,7 @@ module Hwaro
 
           sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
+          write_html_stats(complete: false)
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{count} #{count == 1 ? "page" : "pages"} · re-render", :result, elapsed.total_milliseconds)
@@ -1140,6 +1142,7 @@ module Hwaro
           # and the next `--cache` cold start has to re-render them.
           sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
+          write_html_stats(complete: false)
 
           # Clear the stash so a second call is a no-op and subsequent
           # watch-triggered full rebuilds start clean.

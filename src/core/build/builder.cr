@@ -52,6 +52,7 @@ require "../../content/search"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/digest_utils"
+require "../../utils/html_stats"
 require "../../utils/errors"
 require "../../utils/file_safe"
 require "../../utils/logger"
@@ -312,6 +313,11 @@ module Hwaro
         # every auto-include asset — O(site) work for one page — and silently
         # used cache_busting defaults instead of the build's options.
         @render_global_vars : Hash(String, Crinja::Value)? = nil
+        # `[build] write_stats`: tags/classes/ids of every HTML page this
+        # Builder wrote, flushed to `hwaro_stats.json`. Nil when the feature
+        # is off. Replaced per full build; serve's incremental passes keep
+        # adding to it.
+        @html_stats : Utils::HtmlStats? = nil
         # Pages stashed by `--fast-start` during the initial build so the
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
@@ -681,6 +687,7 @@ module Hwaro
           # command line left at its default. Applied before the BuildContext is
           # built so every phase (and the output guard) sees the same values.
           options.apply_build_config!(config.build)
+          @html_stats = config.build.write_stats ? Utils::HtmlStats.new : nil
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post
 
