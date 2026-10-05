@@ -262,11 +262,22 @@ module Hwaro
         #
         # `[menus] auto_sections` adds one entry per top-level section, keyed
         # by its directory, so those directories are valid parents there.
-        auto = config.menus_auto_sections.try { |name| {name, auto_section_identifiers(config)} }
-        check_menu_parent_undefined(issues, "", config.menus, auto)
+        # Walked lazily: only a parent no declared entry matches needs it.
+        auto_menu = config.menus_auto_sections
+        auto_ids = nil.as(Set(String)?)
+        auto_parent = ->(menu_name : String, parent : String) do
+          if menu_name == auto_menu
+            ids = auto_ids
+            ids = auto_ids = auto_section_identifiers(config) unless ids
+            ids.includes?(parent)
+          else
+            false
+          end
+        end
+        check_menu_parent_undefined(issues, "", config.menus, auto_parent)
         config.languages.keys.sort!.each do |code|
           lang_menus = config.languages[code].menus
-          check_menu_parent_undefined(issues, code, lang_menus, auto) if lang_menus
+          check_menu_parent_undefined(issues, code, lang_menus, auto_parent) if lang_menus
         end
       end
 
@@ -275,9 +286,8 @@ module Hwaro
       # it only decides which parents count as declared.
       private def auto_section_identifiers(config : Models::Config) : Set(String)
         ids = Set(String).new
-        return ids unless Dir.exists?(@content_dir)
-        ContentWalk.find_content_files(@content_dir).each do |path|
-          next unless File.basename(path).starts_with?("_index.")
+        Dir.glob(File.join(@content_dir, "**", "_index.*")) do |path|
+          next unless ContentWalk.markdown?(path)
           dir = Path[File.dirname(path)].relative_to(@content_dir).to_posix.to_s
           dir = "" if dir == "."
           Content::Menus.top_level_dir(dir, config.versions.for_path(dir)).try { |id| ids << id }
@@ -285,15 +295,15 @@ module Hwaro
         ids
       end
 
-      private def check_menu_parent_undefined(issues : Array(Issue), lang_code : String, menus : Hash(String, Array(Models::MenuItemConfig)), auto : {String, Set(String)}?)
+      private def check_menu_parent_undefined(issues : Array(Issue), lang_code : String, menus : Hash(String, Array(Models::MenuItemConfig)), auto_parent : Proc(String, String, Bool))
         menus.each do |menu_name, items|
           identifiers = items.map(&.identifier).to_set
-          identifiers.concat(auto[1]) if auto && auto[0] == menu_name
           scope = lang_code.empty? ? "[[menus.#{menu_name}]]" : "[[languages.#{lang_code}.menus.#{menu_name}]]"
           items.each do |item|
             parent = item.parent
             next if parent.nil? || parent.empty?
             next if identifiers.includes?(parent)
+            next if auto_parent.call(menu_name, parent)
             issues << Issue.new(id: "menu-parent-undefined", level: :warning, category: "config", file: @config_path,
               message: "#{scope} entry \"#{item.name}\" has parent \"#{parent}\" but no entry in that menu declares identifier \"#{parent}\"")
           end
