@@ -128,9 +128,11 @@ module Hwaro
           end
         end
 
+        # Only materialize the menu when an entry was added: a missing key is
+        # what lets `get_menu` fall back to the default language.
         if auto_menu = config.menus_auto_sections
-          list = flat[auto_menu] ||= [] of Entry
-          add_auto_section_entries(list, content, lang, default_lang)
+          auto = auto_section_entries(flat[auto_menu]? || [] of Entry, content, lang, default_lang)
+          (flat[auto_menu] ||= [] of Entry).concat(auto) unless auto.empty?
         end
 
         menus = {} of String => Array(Entry)
@@ -142,32 +144,51 @@ module Hwaro
       end
 
       # `[menus] auto_sections`: every top-level section of `lang` joins
-      # `list` (Hugo's `sectionPagesMenu`), keyed by its directory name. A
+      # the menu (Hugo's `sectionPagesMenu`), keyed by its directory name. A
       # section listings would skip (draft, unpublished, headless,
       # transparent) or that bounces off-site is left out. An explicit entry
       # — config, or front matter — sharing the identifier wins, as does the
       # section's own front-matter registration into the same menu.
-      private def self.add_auto_section_entries(list : Array(Entry), content : Array(Models::Page), lang : String, default_lang : String)
-        taken = list.map(&.identifier).to_set
-        registered = list.compact_map(&.page_path).to_set
+      # Returns the entries to add next to `existing`.
+      private def self.auto_section_entries(existing : Array(Entry), content : Array(Models::Page), lang : String, default_lang : String) : Array(Entry)
+        taken = existing.map(&.identifier).to_set
+        registered = existing.compact_map(&.page_path).to_set
+        entries = [] of Entry
         content.each do |s|
           next unless s.is_a?(Models::Section)
-          next if s.section.empty? || s.section.includes?('/')
+          next unless dir = top_level_dir(s.section, s.version)
           next unless (s.language || default_lang) == lang
           next if s.excluded_from_listings? || s.transparent
           next if s.redirect_to.try { |r| external_url?(r) }
-          next if taken.includes?(s.section) || registered.includes?(s.path)
+          next if registered.includes?(s.path)
+          # First (path-sorted) section wins a shared directory, e.g. an
+          # unversioned `docs/_index.md` next to a `docs/v2` version root.
+          next unless taken.add?(dir)
 
-          list << Entry.new(
-            name: s.title.presence || s.section,
+          entries << Entry.new(
+            name: s.title.presence || dir,
             url: s.url,
-            identifier: s.section,
+            identifier: dir,
             weight: s.weight,
             parent: nil,
             external: false, # resolved by normalize_urls!
             page_path: s.path,
           )
         end
+        entries
+      end
+
+      # The top-level directory `dir` (a section's content directory)
+      # stands for, or nil for the root and nested sections. A versioned
+      # section is read through its version root, as visitors see it:
+      # `docs/v2` → `docs`, `v2` → the root (nil), `v2/guide` → `guide`.
+      # Shared by the menu build, the serve menu fingerprint and doctor.
+      def self.top_level_dir(dir : String, version : Models::VersionConfig?) : String?
+        if version
+          rel = dir == version.path ? "" : (version.relative_path(dir) || dir)
+          dir = {version.parent_dir, rel}.reject(&.empty?).join('/')
+        end
+        dir unless dir.empty? || dir.includes?('/')
       end
 
       # Normalizes each entry's `url` in place and flags `external`.

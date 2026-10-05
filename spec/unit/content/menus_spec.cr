@@ -395,6 +395,54 @@ describe Hwaro::Content::Menus do
       main.map(&.identifier).should eq(["Posts"])
     end
 
+    it "maps versioned sections through their version root (docs/v1, docs/v2 latest at root)" do
+      config = Hwaro::Models::Config.new
+      config.menus_auto_sections = "main"
+      v1 = Hwaro::Models::VersionConfig.new("v1", path: "docs/v1")
+      v2 = Hwaro::Models::VersionConfig.new("v2", path: "docs/v2", latest: true)
+      config.versions.list = [v1, v2]
+      d1 = auto_section("docs/v1", "Docs v1")
+      d1.url = "/docs/v1/"
+      d1.version = v1
+      d2 = auto_section("docs/v2", "Docs")
+      d2.url = "/docs/"
+      d2.version = v2
+      sections = [auto_section("blog", "Blog"), d1, d2]
+
+      latest = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, sections)["en"]["main"]
+      latest.map { |e| {e.identifier, e.url} }.should eq([{"blog", "/blog/"}, {"docs", "/docs/"}])
+      old = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, sections, v1)["en"]["main"]
+      old.map { |e| {e.identifier, e.url} }.should eq([{"blog", "/blog/"}, {"docs", "/docs/v1/"}])
+    end
+
+    it "uses a top-level version directory's own sections, not the version root" do
+      config = Hwaro::Models::Config.new
+      config.menus_auto_sections = "main"
+      v2 = Hwaro::Models::VersionConfig.new("v2", latest: true)
+      config.versions.list = [v2]
+      root = auto_section("v2", "Ver v2")
+      root.url = "/"
+      guide = auto_section("v2/guide", "Guide")
+      guide.url = "/guide/"
+      api = auto_section("v2/api", "API")
+      api.url = "/api/"
+      [root, guide, api].each(&.version=(v2))
+
+      main = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [root, guide, api])["en"]["main"]
+      main.map { |e| {e.identifier, e.url} }.should eq([{"api", "/api/"}, {"guide", "/guide/"}])
+    end
+
+    it "leaves the menu out of a language with no auto entry, so get_menu falls back" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      config.menus_auto_sections = "main"
+      config.languages = {"ko" => Hwaro::Models::LanguageConfig.new("ko")}
+
+      trees = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [auto_section("blog", "Blog")])
+      trees["en"]["main"].map(&.identifier).should eq(["blog"])
+      trees["ko"].has_key?("main").should be_false
+    end
+
     it "builds per-language entries from each language's sections, under that language's overrides" do
       config = Hwaro::Models::Config.new
       config.default_language = "en"

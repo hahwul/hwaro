@@ -554,7 +554,7 @@ module Hwaro::Core::Build::Phases::Render
     digest = Digest::MD5.new
     auto_sections = !site.config.menus_auto_sections.nil?
     (site.pages + site.sections).each do |p|
-      if auto_sections && p.is_a?(Models::Section) && !p.section.empty? && !p.section.includes?('/')
+      if auto_sections && p.is_a?(Models::Section) && Content::Menus.top_level_dir(p.section, p.version)
         fp_value(digest, p.path)
         fp_value(digest, p.url)
         fp_value(digest, p.title)

@@ -318,3 +318,31 @@ describe "Menus: [menus] auto_sections" do
     end
   end
 end
+
+describe "Menus: auto_sections default-language fallback" do
+  it "a language with no translated top-level section falls back to the default-language menu" do
+    config = <<-TOML
+      title = "Test Site"
+      base_url = "http://localhost"
+      default_language = "en"
+
+      [languages.ko]
+      language_name = "한국어"
+
+      [menus]
+      auto_sections = "main"
+      TOML
+
+    build_site(
+      config,
+      content_files: {
+        "blog/_index.md" => "+++\ntitle = \"Blog\"\n+++\n",
+        "about.md"       => "---\ntitle: About\n---\nEN",
+        "about.ko.md"    => "---\ntitle: 소개\n---\nKO",
+      },
+      template_files: {"page.html" => MENU_NAV_TEMPLATE, "section.html" => MENU_NAV_TEMPLATE},
+    ) do
+      File.read("public/ko/about/index.html").should contain(%(<nav><a href="/blog/" data-url="/blog/" data-external="false">Blog</a></nav>))
+    end
+  end
+end

@@ -277,4 +277,46 @@ describe "menu-set fingerprint with [menus] auto_sections" do
     nested.title = "Reference"
     builder.test_menu_set_fingerprint(site).should eq(after)
   end
+
+  it "moves when a top-level section's menu gates change" do
+    config = Hwaro::Models::Config.new
+    config.menus_auto_sections = "main"
+    site = Hwaro::Models::Site.new(config)
+    news = Hwaro::Models::Section.new("news/_index.md")
+    news.section = "news"
+    site.sections = [news]
+    builder = Hwaro::Core::Build::Builder.new
+
+    toggles = {
+      "transparent" => ->(on : Bool) { news.transparent = on },
+      "render"      => ->(on : Bool) { news.render = !on },
+      "draft"       => ->(on : Bool) { news.draft = on },
+      "redirect_to" => ->(on : Bool) { news.redirect_to = on ? "https://elsewhere.example/" : nil },
+    }
+    toggles.each do |field, toggle|
+      before = builder.test_menu_set_fingerprint(site)
+      toggle.call(true)
+      builder.test_menu_set_fingerprint(site).should_not eq(before), "#{field} did not move the fingerprint"
+      toggle.call(false)
+      builder.test_menu_set_fingerprint(site).should eq(before)
+    end
+  end
+
+  it "folds a versioned section that stands for a top-level directory" do
+    config = Hwaro::Models::Config.new
+    config.menus_auto_sections = "main"
+    v2 = Hwaro::Models::VersionConfig.new("v2", path: "docs/v2", latest: true)
+    config.versions.list = [v2]
+    site = Hwaro::Models::Site.new(config)
+    docs = Hwaro::Models::Section.new("docs/v2/_index.md")
+    docs.section = "docs/v2"
+    docs.version = v2
+    docs.title = "Docs"
+    site.sections = [docs]
+    builder = Hwaro::Core::Build::Builder.new
+
+    before = builder.test_menu_set_fingerprint(site)
+    docs.title = "Documentation"
+    builder.test_menu_set_fingerprint(site).should_not eq(before)
+  end
 end
