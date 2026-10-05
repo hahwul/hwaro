@@ -336,6 +336,12 @@ module Hwaro
         # into one classified error by raise_on_broken_internal_links!.
         @broken_internal_links : Array(String) = [] of String
         @broken_links_mutex : Mutex = Mutex.new
+        # Fragment links (`@/x.md#id`, same-page `#id`) found in rendered page
+        # content, collected only when `[links] broken_anchors` is not
+        # "ignore": {source path, link as written, target page, fragment}.
+        # Same mutex and lifetime as @broken_internal_links; checked against
+        # the target's output file by check_broken_anchors.
+        @anchor_links : Array({String, String, Models::Page, String}) = [] of {String, String, Models::Page, String}
         # Output files this build claims that no content source backs — the
         # taxonomy index/term pages, their pagination pages and their feeds.
         # A page's own output is recorded in its cache entry; these have no

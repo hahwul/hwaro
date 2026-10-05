@@ -189,6 +189,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Resolve internal @/ links to actual page URLs
     if pages_by_path = @pages_by_path
+      collect_anchor_links(page, html_content, pages_by_path) unless site.config.links.broken_anchors == "ignore"
       if site.config.links.broken_internal == "error"
         # Strict mode: collect unresolved links in a local array, then fold
         # them into the builder-wide accumulator under the mutex (render

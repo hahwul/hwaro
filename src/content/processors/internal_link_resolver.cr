@@ -21,6 +21,31 @@ module Hwaro
         # Matches href="@/path" and href="@/path#anchor"
         INTERNAL_LINK_REGEX = /href="@\/([^"#]*)(?:#([^"]*))?"/
 
+        # Matches a fragment link in not-yet-resolved content HTML: an
+        # `href="@/path#frag"` ($1 = "@/path") or a same-page `href="#frag"`.
+        FRAGMENT_LINK_REGEX = /href="(@\/[^"#]*)?#([^"]*)"/
+
+        # Matches an `id`/`name` attribute (quoted or, after minification,
+        # unquoted). The leading whitespace keeps `data-id=` out.
+        ANCHOR_ATTR_REGEX = /\s(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
+
+        # Every anchor target (`id` / `name` value, entity-decoded) in `html`.
+        def anchor_ids(html : String) : Set(String)
+          ids = Set(String).new
+          html.scan(ANCHOR_ATTR_REGEX) do |m|
+            ids << HTML.unescape(m[1]? || m[2]? || m[3])
+          end
+          ids
+        end
+
+        # True when `fragment` (as written in an href, possibly percent- and
+        # entity-encoded) names an anchor in `ids`. `#top` always resolves:
+        # browsers scroll to the top when no element carries that id.
+        def anchor_exists?(fragment : String, ids : Set(String)) : Bool
+          id = URI.decode(HTML.unescape(fragment))
+          ids.includes?(id) || id.compare("top", case_insensitive: true) == 0
+        end
+
         # Matches a plain root-relative href/src value (e.g. href="/posts/").
         # `\/[^\/"]` excludes protocol-relative `//host` URLs; the alternation
         # also allows a bare `/` (the homepage link).

@@ -156,3 +156,85 @@ describe "Strict internal links: warn mode (default)" do
     end
   end
 end
+
+private ANCHOR_LINKS_CONFIG = <<-TOML
+  title = "Test Site"
+  base_url = "http://localhost"
+
+  [links]
+  broken_anchors = "error"
+  TOML
+
+describe "Broken anchors" do
+  it "fails the build listing every missing fragment, against the rendered ids" do
+    ex = expect_raises(Hwaro::HwaroError) do
+      build_site(
+        ANCHOR_LINKS_CONFIG,
+        content_files: {
+          "a.md" => "---\ntitle: A\n---\n# Hello\n\n[ok](#hello) [bad](#nope) [x](@/b.md#there) [y](@/b.md#missing) [t](#top) [fn][^1]\n\n[^1]: note\n",
+          "b.md" => "---\ntitle: B\n---\n## There\n",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+        parallel: true,
+      ) { }
+    end
+
+    ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+    message = ex.message.not_nil!
+    message.should contain("2 broken anchors")
+    message.should contain(%(a.md → #nope → missing id "nope"))
+    message.should contain(%(a.md → @/b.md#missing → missing id "missing"))
+  end
+
+  it "accepts ids that only the template emits" do
+    build_site(
+      ANCHOR_LINKS_CONFIG,
+      content_files: {
+        "a.md" => "---\ntitle: A\n---\n[c](#comments) [b](@/b.md#footer)",
+        "b.md" => "---\ntitle: B\n---\nBody",
+      },
+      template_files: {"page.html" => %(<div id="comments"></div>{{ content }}<footer id=footer></footer>)},
+    ) { }
+  end
+
+  it "only warns in warn mode" do
+    log = with_captured_log do
+      build_site(
+        ANCHOR_LINKS_CONFIG.sub(%("error"), %("warn")),
+        content_files: {"a.md" => "---\ntitle: A\n---\n[bad](#nope)"},
+        template_files: {"page.html" => "{{ content }}"},
+      ) { File.exists?("public/a/index.html").should be_true }
+    end
+    log.should contain(%(Broken anchor: a.md → #nope → missing id "nope"))
+  end
+
+  it "is not checked by default" do
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"a.md" => "---\ntitle: A\n---\n[bad](#nope)"},
+        template_files: {"page.html" => "{{ content }}"},
+      ) { }
+    end
+    log.should_not contain("Broken anchor")
+  end
+
+  it "reads a target the warm --cache build skipped from disk" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", ANCHOR_LINKS_CONFIG)
+        Dir.mkdir_p("content")
+        Dir.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/a.md", "---\ntitle: A\n---\n[x](@/b.md#there)")
+        File.write("content/b.md", "---\ntitle: B\n---\n## There\n")
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
+        Hwaro::Core::Build::Builder.new.run(options)
+
+        # Only a.md re-renders; b.md's ids come from its output file.
+        File.write("content/a.md", "---\ntitle: A\n---\n[x](@/b.md#there) again")
+        Hwaro::Core::Build::Builder.new.run(options)
+      end
+    end
+  end
+end

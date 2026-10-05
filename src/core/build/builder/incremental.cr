@@ -12,7 +12,67 @@ module Hwaro
         # link doesn't keep failing (and a new one is attributed to the
         # right build). Called at every build entry point.
         private def clear_broken_internal_links
-          @broken_links_mutex.synchronize { @broken_internal_links.clear }
+          @broken_links_mutex.synchronize do
+            @broken_internal_links.clear
+            @anchor_links.clear
+          end
+        end
+
+        # Record every fragment link in `html` (content HTML BEFORE `@/`
+        # resolution, so the target page is still known by its source path)
+        # for check_broken_anchors. An `@/` link whose page doesn't exist is
+        # skipped: [links] broken_internal already reports it.
+        private def collect_anchor_links(page : Models::Page, html : String, pages_by_path : Hash(String, Models::Page)) : Nil
+          found = [] of {String, String, Models::Page, String}
+          html.scan(Content::Processors::InternalLinkResolver::FRAGMENT_LINK_REGEX) do |m|
+            fragment = m[2]
+            next if fragment.empty?
+            if link_path = m[1]?
+              next unless target = pages_by_path[link_path.lchop("@/").partition('?')[0]]?
+            else
+              target = page
+            end
+            found << {page.path, "#{link_path}##{fragment}", target, fragment}
+          end
+          @broken_links_mutex.synchronize { @anchor_links.concat(found) } unless found.empty?
+        end
+
+        # Check the collected fragment links against the `id`/`name`
+        # attributes in each target's output file ON DISK, so a target the
+        # pass didn't re-render (`--cache`, serve partial rebuilds) is read as
+        # last written instead of producing a false positive. A target with no
+        # output file (render: false, a refused URL) is skipped. Consumes the
+        # collected links, so a fast-start continuation doesn't re-report the
+        # priority pass's. "warn" logs each; "error" raises one aggregated
+        # HWARO_E_CONTENT error.
+        private def check_broken_anchors(output_dir : String) : Nil
+          links = @broken_links_mutex.synchronize { @anchor_links.dup.tap { @anchor_links.clear } }
+          return if links.empty?
+          return unless site = @site
+
+          ids_by_file = {} of String => Set(String)?
+          broken = [] of String
+          links.each do |source, link, target, fragment|
+            next unless file = get_output_path(target, output_dir)
+            ids = ids_by_file.put_if_absent(file) do
+              File.file?(file) ? Content::Processors::InternalLinkResolver.anchor_ids(File.read(file)) : nil
+            end
+            next unless ids
+            next if Content::Processors::InternalLinkResolver.anchor_exists?(fragment, ids)
+            broken << "#{source} → #{link} → missing id \"#{URI.decode(HTML.unescape(fragment))}\""
+          end
+          broken.sort!.uniq!
+          return if broken.empty?
+
+          if site.config.links.broken_anchors == "error"
+            label = broken.size == 1 ? "1 broken anchor" : "#{broken.size} broken anchors"
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "#{label}:\n  #{broken.join("\n  ")}",
+              hint: "Fix the #fragment links above, or set [links] broken_anchors = \"warn\" to demote them to warnings.",
+            )
+          end
+          broken.each { |entry| Logger.warn "Broken anchor: #{entry}" }
         end
 
         # Fail the build with ONE aggregated error listing every unresolved
@@ -21,18 +81,19 @@ module Hwaro
         # "warn" mode never appends, making this a no-op there. Raising
         # HwaroError(HWARO_E_CONTENT) maps to exit code 5 for CI; under
         # `serve` the watcher rescue surfaces it in the error overlay.
-        private def raise_on_broken_internal_links!
+        private def raise_on_broken_internal_links!(output_dir : String)
           # Dedupe: the same broken @/target repeated within one page (or a
           # page rendered twice in a pass) must produce one line, not N.
           entries = @broken_links_mutex.synchronize { @broken_internal_links.sort.uniq! }
-          return if entries.empty?
-
-          label = entries.size == 1 ? "1 broken internal link" : "#{entries.size} broken internal links"
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONTENT,
-            message: "#{label}:\n  #{entries.join("\n  ")}",
-            hint: "Fix the @/ links above, or set [links] broken_internal = \"warn\" to demote them to warnings.",
-          )
+          unless entries.empty?
+            label = entries.size == 1 ? "1 broken internal link" : "#{entries.size} broken internal links"
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "#{label}:\n  #{entries.join("\n  ")}",
+              hint: "Fix the @/ links above, or set [links] broken_internal = \"warn\" to demote them to warnings.",
+            )
+          end
+          check_broken_anchors(output_dir)
         end
 
         # Incremental build: only re-parse and re-render pages whose source
@@ -216,7 +277,7 @@ module Hwaro
           else
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
-          raise_on_broken_internal_links!
+          raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
           sweep_stale_derived_outputs(output_dir)
@@ -933,7 +994,7 @@ module Hwaro
                   else
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
-          raise_on_broken_internal_links!
+          raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(pages_to_render, site, output_dir, verbose)
 
           # Re-generate the 404 page with the new template — and whenever
@@ -1118,7 +1179,7 @@ module Hwaro
           # full build, which clears at entry. The server's fast-start fiber
           # rescues this and routes it into the error overlay via
           # notify_build_error; the server keeps running.
-          raise_on_broken_internal_links!
+          raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable, site, output_dir, verbose)
 
           # Refresh feeds / sitemap / search now that every page has rendered
