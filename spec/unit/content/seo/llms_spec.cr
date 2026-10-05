@@ -675,6 +675,23 @@ describe Hwaro::Content::Seo::Llms do
       end
     end
 
+    it "falls back to the site title for an untitled page, like llms.txt" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.llms.full_enabled = true
+      config.title = "My Site"
+      home = Hwaro::Models::Page.new("index.md")
+      home.title = ""
+      home.url = "/"
+      home.raw_content = "Welcome"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate_full([home], config, output_dir)
+
+        File.read(File.join(output_dir, "llms-full.txt")).should contain("Title: My Site\n")
+      end
+    end
+
     it "excludes pages with empty raw_content" do
       config = Hwaro::Models::Config.new
       config.llms.enabled = true

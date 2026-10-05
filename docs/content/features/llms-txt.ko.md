@@ -32,12 +32,24 @@ full_filename = "llms-full.txt"
 
 ### llms.txt
 
-기본 `llms.txt` 파일에는 설정에 정의한 안내 텍스트만 들어갑니다. 사이트 정책을 AI 크롤러에게 알리는 가벼운 파일입니다.
+`llms.txt`는 [llms.txt 형식](https://llmstxt.org/)을 따릅니다. 사이트 제목을 제목으로, 사이트 설명을 인용구로 쓰고, 안내 텍스트 뒤에 섹션별로 묶은 페이지 링크 목록(루트 페이지는 `## Pages` 아래)이 이어집니다. 검색 인덱스와 같은 페이지만 나열하므로 초안, 헤드리스(`render = false`) 페이지, `redirect_to` 스텁은 빠집니다.
 
 **출력 예시 (`llms.txt`):**
 
 ```
+# My Site
+
+> A great site about programming
+
 This is my site. Content is provided under the MIT license.
+
+## Pages
+
+- [About](https://example.com/about/): Who writes this site
+
+## Posts
+
+- [Hello World](https://example.com/posts/hello-world/): The first post
 ```
 
 ### llms-full.txt
