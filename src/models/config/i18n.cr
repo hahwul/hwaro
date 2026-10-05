@@ -73,6 +73,9 @@ end
 module Hwaro
   module Models
     class Config
+      # `[menus] auto_sections = "<menu>"` — a setting, not a menu name.
+      AUTO_SECTIONS_KEY = "auto_sections"
+
       # Parses a `menus` TOML table (either the top-level `[[menus.*]]` set
       # or a per-language `[[languages.<code>.menus.*]]` override) into
       # `{menu_name => [MenuItemConfig]}`. Shared by `load_menus` and
@@ -81,6 +84,8 @@ module Hwaro
         result = {} of String => Array(MenuItemConfig)
 
         h.each do |menu_name, menu_value|
+          # Reserved for `[menus] auto_sections`, never a menu name.
+          next if menu_name == AUTO_SECTIONS_KEY
           entries = menu_value.as_a?
           next unless entries
 
@@ -113,6 +118,17 @@ module Hwaro
         return unless menus_section = config.raw["menus"]?.try(&.as_h?)
 
         config.menus = parse_menu_tables(menus_section)
+        if raw = menus_section[AUTO_SECTIONS_KEY]?
+          name = raw.as_s?.try(&.strip.presence)
+          unless name
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONFIG,
+              message: "[menus] auto_sections must be a menu name string, got #{raw.raw.inspect}",
+              hint: "Use auto_sections = \"main\" to fill the \"main\" menu from top-level sections, or remove the key.",
+            )
+          end
+          config.menus_auto_sections = name
+        end
       end
 
       private def self.load_taxonomies(config : Config)
@@ -197,7 +213,10 @@ module Hwaro
           end
 
           if menus = lang_hash["menus"]?.try(&.as_h?)
-            lang_config.menus = parse_menu_tables(menus)
+            ignored = menus.has_key?(AUTO_SECTIONS_KEY)
+            Logger.warn "[languages.#{lang_code}.menus] auto_sections is ignored: the name is reserved for the [menus] auto_sections setting. To fill a menu from sections, set auto_sections = \"<menu>\" once under [menus] (entries are built per language); for a menu, pick another name." if ignored
+            # A table that only held the ignored key overrides nothing.
+            lang_config.menus = parse_menu_tables(menus) unless ignored && menus.size == 1
           end
           # No per-language `menus` key → leave `lang_config.menus` as `nil`,
           # signalling "inherit the global `[[menus.*]]` set wholesale" to

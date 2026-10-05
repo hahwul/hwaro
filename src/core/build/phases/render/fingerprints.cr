@@ -508,7 +508,11 @@ module Hwaro::Core::Build::Phases::Render
   # section's `[extra]` is unreachable from any section-set listing.
   # Fingerprinting it could only ever cause spurious invalidation, never
   # fix staleness.
-  private def compute_section_set_fingerprint(sections : Array(Models::Section)) : String
+  #
+  # `auto_sections_menu` (`[menus] auto_sections` is on) also folds the
+  # other gates that menu applies to a section; off, the digest keeps its
+  # old value so existing caches stay warm.
+  private def compute_section_set_fingerprint(sections : Array(Models::Section), auto_sections_menu : Bool = false) : String
     digest = Digest::MD5.new
     sections.each do |s|
       fp_value(digest, s.path)
@@ -522,6 +526,11 @@ module Hwaro::Core::Build::Phases::Render
       reverse = s.reverse
       fp_value(digest, reverse.nil? ? "-" : (reverse ? "1" : "0"))
       fp_value(digest, s.transparent ? "1" : "0")
+      if auto_sections_menu
+        fp_value(digest, s.render ? "1" : "0")
+        fp_value(digest, s.unpublished ? "1" : "0")
+        fp_value(digest, s.redirect_to || "")
+      end
       fp_value(digest, s.paginate.try(&.to_s) || "-")
       fp_list(digest, s.assets.sort)
       fp_menus(digest, s.menus)
@@ -539,10 +548,22 @@ module Hwaro::Core::Build::Phases::Render
   # applies: `render`, language, version). A page gaining or losing a
   # registration changes the number of folded entries, so membership moves
   # too. Config `[[menus.*]]` entries are not folded: a config edit forces a
-  # full rebuild before this is ever consulted.
-  private def compute_menu_set_fingerprint(pages : Array(Models::Page), sections : Array(Models::Section)) : String
+  # full rebuild before this is ever consulted. With `[menus] auto_sections`
+  # every top-level section feeds the menu, registered or not.
+  private def compute_menu_set_fingerprint(site : Models::Site) : String
     digest = Digest::MD5.new
-    (pages + sections).each do |p|
+    auto_sections = !site.config.menus_auto_sections.nil?
+    (site.pages + site.sections).each do |p|
+      if auto_sections && p.is_a?(Models::Section) && Content::Menus.top_level_dir(p.section, p.version)
+        fp_value(digest, p.path)
+        fp_value(digest, p.url)
+        fp_value(digest, p.title)
+        fp_value(digest, p.weight.to_s)
+        fp_value(digest, p.excluded_from_listings? || p.transparent ? "1" : "0")
+        fp_value(digest, p.redirect_to || "")
+        fp_value(digest, p.language || "")
+        fp_value(digest, p.version.try(&.name) || "")
+      end
       next if p.menus.empty?
       fp_value(digest, p.path)
       fp_value(digest, p.url)
