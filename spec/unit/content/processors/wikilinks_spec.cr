@@ -121,6 +121,9 @@ describe Hwaro::Content::Processors::Wikilinks do
         See `[[My Note]]` and [[My Note]].
         MD
       wl_rewrite(md, src, index).should eq(md.sub("and [[My Note]].", "and [My Note](@/notes/My%20Note.md)."))
+      # Not a table (the delimiter row is invalid): one paragraph, one code span.
+      not_table = "| a | `b [[My Note]] |\n|--|--| x\n| c ` |\n"
+      wl_rewrite(not_table, src, index).should eq(not_table)
       lists = "- a `\n- b [[My Note]] `\n"
       wl_rewrite(lists, src, index).should eq("- a `\n- b [My Note](@/notes/My%20Note.md) `\n")
     end

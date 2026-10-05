@@ -13,6 +13,7 @@
 require "html"
 require "./fence_tracker"
 require "./markdown_extensions"
+require "./table_parser"
 require "../../models/page"
 require "../../utils/byte_scan"
 require "../../utils/logger"
@@ -342,9 +343,11 @@ module Hwaro
         end
 
         # A line matched on its own, never joined to a chunk: an ATX heading,
-        # a setext underline or thematic break, or a table line (any `|`;
-        # each row is its own block to Markd).
-        STANDALONE_LINE_RE = /\A(?: {0,3}>[ \t]?)*(?: {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)| {0,3}(?:=+|-+|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})[ \t]*\r?\n?\z|.*\|)/
+        # a setext underline or thematic break. Table rows are too (see
+        # `walk`), each row being its own block.
+        STANDALONE_LINE_RE = /\A(?: {0,3}>[ \t]?)*(?: {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)| {0,3}(?:=+|-+|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})[ \t]*\r?\n?\z)/
+        # One blockquote marker, as TableParser strips it for a quoted table.
+        QUOTE_PREFIX_RE = /\A {0,3}> ?/
         # A footnote definition starts a new block, as a list item does.
         FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:/
 
@@ -352,17 +355,21 @@ module Hwaro
         # code and raw HTML block lines (FenceTracker) pass through; the rest
         # is matched one chunk at a time: the lines of one paragraph or list
         # item (a chunk ends at a blank line and before a list marker or a
-        # footnote definition; STANDALONE_LINE_RE lines are chunks of their
-        # own), so a code span can cross a line break but not a block.
+        # footnote definition; STANDALONE_LINE_RE lines and the rows of a
+        # table TableParser would build are chunks of their own), so a code
+        # span can cross a line break but not a block.
         # Code/comment matches pass through; every other match is replaced
         # by the block's result (nil keeps it).
         private def walk(content : String, re : Regex, & : Regex::MatchData -> String?) : String
           tracker = FenceTracker.new
           chunk = String::Builder.new
+          lines = content.lines(chomp: false)
+          in_table = false
           String.build(content.bytesize) do |io|
-            content.each_line(chomp: false) do |line|
+            lines.each_with_index do |line, i|
               verbatim = tracker.fence_line?(line) || tracker.html_block_line?
-              standalone = !verbatim && STANDALONE_LINE_RE.matches?(line)
+              in_table = !verbatim && table_line?(line, lines[i + 1]?, in_table)
+              standalone = !verbatim && (in_table || STANDALONE_LINE_RE.matches?(line))
               if verbatim || standalone || line.blank? || tracker.list_item_line? || FOOTNOTE_DEF_RE.matches?(line)
                 unless chunk.empty?
                   io << transform(chunk.to_s, re) { |md| yield md }
@@ -379,6 +386,15 @@ module Hwaro
             end
             io << transform(chunk.to_s, re) { |md| yield md } unless chunk.empty?
           end
+        end
+
+        # Whether `line` is a row of a table TableParser converts: a header
+        # whose next line is a delimiter row, or a piped row after one.
+        private def table_line?(line : String, following : String?, in_table : Bool) : Bool
+          return false unless line.includes?('|')
+          row = line.sub(QUOTE_PREFIX_RE, "")
+          return TableParser.table_row?(row) if in_table
+          !following.nil? && TableParser.table_row?(row) && TableParser.separator_row?(following.sub(QUOTE_PREFIX_RE, ""))
         end
 
         private def transform(text : String, re : Regex, & : Regex::MatchData -> String?) : String
