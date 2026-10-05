@@ -273,6 +273,50 @@ describe "serve watch-lane regressions" do
     end
   end
 
+  # The static lane only copies; an `integrity` printed into pages must
+  # still move with the bytes, or the browser refuses the asset — with
+  # `?v=` cache busting off, and for a template's own asset_integrity().
+  it "re-renders integrity values after a static save under [assets] sri" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "Watch Fixes"
+          base_url = "https://example.com"
+
+          [assets]
+          sri = true
+
+          [auto_includes]
+          enabled = true
+          dirs = ["inc"]
+          TOML
+        )
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static/inc")
+        FileUtils.mkdir_p("static/js")
+        File.write("templates/page.html", %({{ auto_includes_css }}<script integrity="{{ asset_integrity(name='js/app.js') }}"></script>))
+        File.write("content/page.md", "---\ntitle: Test\n---\nHello")
+        File.write("static/inc/a.css", "a{}")
+        File.write("static/js/app.js", "one()")
+
+        server = Hwaro::Services::Server.new
+        options = watch_options
+        options.cache_busting = false
+        server.watch_fixes_builder.run(options).should be_true
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("a{}"))
+
+        File.write("static/inc/a.css", "a{color:red}")
+        server.watch_fixes_apply_changeset(watch_changeset(modified_static: ["static/inc/a.css"]), options)
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("a{color:red}"))
+
+        File.write("static/js/app.js", "two()")
+        server.watch_fixes_apply_changeset(watch_changeset(modified_static: ["static/js/app.js"]), options)
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("two()"))
+      end
+    end
+  end
+
   # The static-only strategy re-renders nothing, so a `static/` file that
   # publishes where a page renders replaced that page on its own URL for the
   # rest of the session (incremental rebuilds only touch changed content).

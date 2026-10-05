@@ -66,4 +66,25 @@ describe Hwaro::Utils::DigestUtils do
       digest.hexfinal.size.should eq(32)
     end
   end
+
+  # Subresource Integrity values are what browsers compare byte-for-byte
+  # against the fetched asset; the MDN reference vector pins the encoding.
+  describe ".sri" do
+    it "returns sha384 in base64 with the algorithm prefix" do
+      Hwaro::Utils::DigestUtils.sri("alert('Hello, world.');")
+        .should eq("sha384-H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO")
+    end
+  end
+
+  describe ".sri_file" do
+    it "hashes a file's bytes and returns nil for a missing file" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "a.js")
+        File.write(path, "alert('Hello, world.');")
+        Hwaro::Utils::DigestUtils.sri_file(path).should eq(Hwaro::Utils::DigestUtils.sri("alert('Hello, world.');"))
+        Hwaro::Utils::DigestUtils.sri_file(File.join(dir, "missing.js")).should be_nil
+        Hwaro::Utils::DigestUtils.sri_file(dir).should be_nil
+      end
+    end
+  end
 end

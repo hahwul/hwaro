@@ -113,3 +113,28 @@ describe "Asset Pipeline: End-to-end build" do
     end
   end
 end
+
+describe "Asset Pipeline: asset_integrity()" do
+  it "hashes the emitted file for static paths and fails the build for an unknown asset" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"https://example.com\"\n")
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/site.css", "a{}")
+        File.write("content/page.md", "---\ntitle: Test\n---\nHello")
+        File.write("templates/page.html", %(<link integrity="{{ asset_integrity(name='/css/site.css') }}">))
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        builder.run(options).should be_true
+        File.read("public/page/index.html").should eq(%(<link integrity="#{Hwaro::Utils::DigestUtils.sri("a{}")}">))
+
+        File.write("templates/page.html", %({{ asset_integrity(name='missing.css') }}))
+        expect_raises(Exception, /asset_integrity: unknown asset 'missing.css'/) { builder.run(options) }
+      end
+    end
+  end
+end

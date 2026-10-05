@@ -10,12 +10,17 @@ require "../../../../../../src/ext/stb_bindings"
 # `data/`. None of them was in any cache key, so every cached page kept the
 # old value — a 404ing stylesheet, the previous analytics ID.
 
-private def render_inputs_build
+private def render_inputs_build(cache_busting : Bool = true)
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
   builder.run(Hwaro::Config::Options::BuildOptions.new(
     output_dir: "public", parallel: false, cache: true, highlight: false,
+    cache_busting: cache_busting,
   )).should be_true
+end
+
+private def integrity_in(html : String) : String
+  html.match!(/integrity="(sha384-[^"]+)"/)[1]
 end
 
 # A cached page is not rewritten, so a marker appended to its output survives
@@ -240,6 +245,53 @@ describe "warm --cache builds and template inputs outside the tracked files" do
       end
     ensure
       ENV.delete(name)
+    end
+  end
+
+  # A stale `integrity` makes the browser refuse the asset, so a warm build
+  # must re-render every page that prints one when the emitted bytes move —
+  # also when nothing else in the tag (no `?v=`) changes.
+  it "updates [assets] sri integrity on cached pages when an auto-include changes" do
+    config = "[assets]\nsri = true\n[auto_includes]\nenabled = true\ndirs = [\"inc\"]\n"
+    with_render_inputs_site(config, "{{ auto_includes_css }}") do
+      FileUtils.mkdir_p("static/inc")
+      File.write("static/inc/a.css", "a{}")
+      render_inputs_build(cache_busting: false)
+      integrity_in(File.read("public/a/index.html")).should eq(Hwaro::Utils::DigestUtils.sri("a{}"))
+
+      File.write("static/inc/a.css", "a{color:green}")
+      render_inputs_build(cache_busting: false)
+
+      integrity_in(File.read("public/a/index.html")).should eq(Hwaro::Utils::DigestUtils.sri("a{color:green}"))
+      integrity_in(File.read("public/b/index.html")).should eq(Hwaro::Utils::DigestUtils.sri_file("public/inc/a.css"))
+    end
+  end
+
+  it "updates asset_integrity() on cached pages when an unfingerprinted bundle changes" do
+    config = <<-TOML
+      [assets]
+      enabled = true
+      fingerprint = false
+      [[assets.bundles]]
+      name = "main.css"
+      files = ["css/s.css"]
+      TOML
+    head = %(<link href="{{ asset(name="main.css") }}" integrity="{{ asset_integrity(name="main.css") }}">)
+    with_render_inputs_site(config, head) do
+      FileUtils.mkdir_p("static/css")
+      File.write("static/css/s.css", "body { color: red; }")
+      render_inputs_build
+      before = integrity_in(File.read("public/a/index.html"))
+      # Over the emitted (minified) bytes, not the source.
+      before.should eq(Hwaro::Utils::DigestUtils.sri_file("public/assets/main.css"))
+      before.should_not eq(Hwaro::Utils::DigestUtils.sri("body { color: red; }"))
+
+      File.write("static/css/s.css", "body { color: blue; }")
+      render_inputs_build
+
+      after = integrity_in(File.read("public/a/index.html"))
+      after.should_not eq(before)
+      after.should eq(Hwaro::Utils::DigestUtils.sri_file("public/assets/main.css"))
     end
   end
 end
