@@ -184,10 +184,14 @@ module Hwaro
                 tag[2].scan(HTML_ATTR_RE) do |attr|
                   raw = attr[2]? || attr[3]? || attr[4]?
                   next unless raw
+                  # `\b` lets `data-href=` through; a real link attribute
+                  # is not glued to a `-` or `:` (see FRAGMENT_LINK_REGEX).
+                  start = attr.begin(0)
+                  real_attr = start == 0 || !tag[2][start - 1].in?('-', ':')
                   html_link_targets(attr[1], raw).each do |candidate|
                     url = clean_link_target(candidate)
                     next if url.includes?("{{") || url.includes?("{%")
-                    note_anchor_link(file, candidate, url) if kind == :internal
+                    note_anchor_link(file, candidate, url) if kind == :internal && real_attr
                     next if skip_internal?(url)
                     links << Link.new(file: file, url: url, kind: kind)
                   end

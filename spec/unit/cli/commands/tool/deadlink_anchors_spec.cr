@@ -61,4 +61,26 @@ describe "check-links anchors" do
       output.should_not contain("anchors")
     end
   end
+
+  it "ignores data-href attributes" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "content"))
+      anchor_site(dir, {"a" => {"<a data-href=\"#gone\">x</a> <a href=\"#gone2\">y</a>", %(<h1 id="intro">A</h1>)}})
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.dead_anchors_for_test(dir).should eq(["a.md #gone2"])
+    end
+  end
+
+  it "counts --ignore-url anchor links in the ignored total" do
+    Dir.mktmpdir do |dir|
+      content = File.join(dir, "content")
+      FileUtils.mkdir_p(content)
+      File.write(File.join(dir, "config.toml"), %(title = "T"\nbase_url = "http://x"\n))
+      anchor_site(dir, {"a" => {"[bad](#gone)", %(<h1 id="intro">A</h1>)}})
+
+      output = with_captured_log do
+        Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.run(["-c", content, "--internal-only", "--ignore-url", "gone"])
+      end
+      output.should contain("1 ignored")
+    end
+  end
 end

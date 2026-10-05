@@ -237,4 +237,39 @@ describe "Broken anchors" do
       end
     end
   end
+
+  it "ignores data-href attributes" do
+    build_site(
+      ANCHOR_LINKS_CONFIG,
+      content_files: {"a.md" => %(---\ntitle: A\n---\n<a data-href="#data-attr">x</a>)},
+      template_files: {"page.html" => "{{ content }}"},
+    ) { }
+  end
+
+  # A fast-start priority page linking into a deferred page: the target has
+  # no output yet at the priority check, so the link must be re-checked by
+  # render_deferred instead of being dropped.
+  it "checks priority-page links to deferred targets in render_deferred" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", ANCHOR_LINKS_CONFIG)
+        FileUtils.mkdir_p("content")
+        File.write("content/_index.md", "---\ntitle: Home\n---\nhome")
+        File.write("content/recent.md", "---\ntitle: Recent\ndate: 2026-06-01\n---\n[old](@/old.md#missing) [ok](@/old.md#there)")
+        File.write("content/old.md", "---\ntitle: Old\ndate: 2020-01-01\n---\n## There\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/index.html", "{{ content }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 1)
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+
+        ex = expect_raises(Hwaro::HwaroError) { builder.render_deferred(options) }
+        ex.message.not_nil!.should contain(%(recent.md → @/old.md#missing → missing id "missing"))
+        ex.message.not_nil!.should_not contain("#there")
+      end
+    end
+  end
 end

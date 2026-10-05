@@ -207,7 +207,9 @@ module Hwaro
               external_links = external_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
               internal_links = internal_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
               ignored_count = before - external_links.size - internal_links.size
+              anchors_before = anchor_links.size
               anchor_links = anchor_links.reject { |l| ignore_patterns.any?(&.matches?(l.url)) }
+              ignored_count += anchors_before - anchor_links.size
             end
 
             if external_links.empty? && internal_links.empty? && anchor_links.empty?

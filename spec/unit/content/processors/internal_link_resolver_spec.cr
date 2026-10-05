@@ -285,6 +285,13 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
     end
   end
 
+  describe "FRAGMENT_LINK_REGEX" do
+    it "ignores data-href and other *href attributes" do
+      html = %(<a data-href="#x">a</a><a xlink:href="#y">b</a><a href="#z">c</a>)
+      html.scan(Hwaro::Content::Processors::InternalLinkResolver::FRAGMENT_LINK_REGEX).map(&.[2]).should eq(["z"])
+    end
+  end
+
   describe ".anchor_exists?" do
     ids = Set{"caf\u00e9", "a&b"}
 
@@ -292,6 +299,16 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       Hwaro::Content::Processors::InternalLinkResolver.anchor_exists?("caf%C3%A9", ids).should be_true
       Hwaro::Content::Processors::InternalLinkResolver.anchor_exists?("a&amp;b", ids).should be_true
       Hwaro::Content::Processors::InternalLinkResolver.anchor_exists?("nope", ids).should be_false
+    end
+
+    it "accepts scroll-to-text fragment directives" do
+      Hwaro::Content::Processors::InternalLinkResolver.anchor_exists?(":~:text=Hello", ids).should be_true
+      Hwaro::Content::Processors::InternalLinkResolver.anchor_exists?("a&amp;b:~:text=x", ids).should be_true
+      Hwaro::Content::Processors::InternalLinkResolver.anchor_exists?("nope:~:text=x", ids).should be_false
+    end
+
+    it "accepts an id that literally contains a percent escape" do
+      Hwaro::Content::Processors::InternalLinkResolver.anchor_exists?("a%20b", Set{"a%20b"}).should be_true
     end
 
     it "always accepts #top" do

@@ -23,7 +23,8 @@ module Hwaro
 
         # Matches a fragment link in not-yet-resolved content HTML: an
         # `href="@/path#frag"` ($1 = "@/path") or a same-page `href="#frag"`.
-        FRAGMENT_LINK_REGEX = /href="(@\/[^"#]*)?#([^"]*)"/
+        # The lookbehind keeps `data-href=` / `xlink:href=` out.
+        FRAGMENT_LINK_REGEX = /(?<![\w:-])href="(@\/[^"#]*)?#([^"]*)"/
 
         # Matches an `id`/`name` attribute (quoted or, after minification,
         # unquoted). The leading whitespace keeps `data-id=` out.
@@ -39,11 +40,15 @@ module Hwaro
         end
 
         # True when `fragment` (as written in an href, possibly percent- and
-        # entity-encoded) names an anchor in `ids`. `#top` always resolves:
-        # browsers scroll to the top when no element carries that id.
+        # entity-encoded) names an anchor in `ids`. Like a browser, the raw
+        # fragment is tried before the percent-decoded one, a `:~:` fragment
+        # directive (scroll-to-text, `#:~:text=…`) is not part of the id, and
+        # `#top` always resolves (scrolls to the top when no element has it).
         def anchor_exists?(fragment : String, ids : Set(String)) : Bool
-          id = URI.decode(HTML.unescape(fragment))
-          ids.includes?(id) || id.compare("top", case_insensitive: true) == 0
+          raw = HTML.unescape(fragment).partition(":~:")[0]
+          return true if raw.empty?
+          id = URI.decode(raw)
+          ids.includes?(raw) || ids.includes?(id) || id.compare("top", case_insensitive: true) == 0
         end
 
         # Matches a plain root-relative href/src value (e.g. href="/posts/").

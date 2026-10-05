@@ -41,10 +41,11 @@ module Hwaro
         # attributes in each target's output file ON DISK, so a target the
         # pass didn't re-render (`--cache`, serve partial rebuilds) is read as
         # last written instead of producing a false positive. A target with no
-        # output file (render: false, a refused URL) is skipped. Consumes the
-        # collected links, so a fast-start continuation doesn't re-report the
-        # priority pass's. "warn" logs each; "error" raises one aggregated
-        # HWARO_E_CONTENT error.
+        # output file (render: false, a refused URL) is skipped — unless it is
+        # a fast-start deferred page not written yet: that link goes back in
+        # the queue for render_deferred to check. Consumes the rest, so the
+        # deferred pass doesn't re-report the priority pass's links. "warn"
+        # logs each; "error" raises one aggregated HWARO_E_CONTENT error.
         private def check_broken_anchors(output_dir : String) : Nil
           links = @broken_links_mutex.synchronize { @anchor_links.dup.tap { @anchor_links.clear } }
           return if links.empty?
@@ -52,15 +53,22 @@ module Hwaro
 
           ids_by_file = {} of String => Set(String)?
           broken = [] of String
-          links.each do |source, link, target, fragment|
+          pending = [] of {String, String, Models::Page, String}
+          deferred = @deferred_pages
+          links.each do |entry|
+            source, link, target, fragment = entry
             next unless file = get_output_path(target, output_dir)
             ids = ids_by_file.put_if_absent(file) do
               File.file?(file) ? Content::Processors::InternalLinkResolver.anchor_ids(File.read(file)) : nil
             end
-            next unless ids
+            unless ids
+              pending << entry if deferred && deferred.includes?(target)
+              next
+            end
             next if Content::Processors::InternalLinkResolver.anchor_exists?(fragment, ids)
             broken << "#{source} → #{link} → missing id \"#{URI.decode(HTML.unescape(fragment))}\""
           end
+          @broken_links_mutex.synchronize { @anchor_links.concat(pending) } unless pending.empty?
           broken.sort!.uniq!
           return if broken.empty?
 
