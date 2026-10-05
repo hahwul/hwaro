@@ -49,6 +49,10 @@ module Hwaro
             next unless File.exists?(canonical_path)
 
             html = File.read(canonical_path)
+            # A `--cache` hit still carries the policy `<meta>` the last
+            # build injected (meta mode, or headers mode for a page no rule
+            # can match); AMP pages get none (see Core::Build::Csp).
+            html = Core::Build::Csp.strip_meta(html) if config.csp.enabled
             amp_html = convert_to_amp(html, page, config)
 
             # Write AMP version
