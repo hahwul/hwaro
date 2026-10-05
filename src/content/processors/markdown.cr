@@ -106,7 +106,7 @@ module Hwaro
 
       # Module-level access to a shared (stateless) Markdown processor.
       @@instance = Content::Processors::Markdown.new
-      delegate render, render_with_anchors, parse, to: @@instance
+      delegate render, render_with_anchors, parse, typo_suggestion, extra_value, to: @@instance
 
       # The site's [markdown] config, published for template filters
       # (currently `markdownify`) that have no per-call config access.

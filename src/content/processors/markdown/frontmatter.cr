@@ -39,19 +39,32 @@ module Hwaro
         private def warn_typo_keys(unknown_keys : Array(String), file_path : String)
           return if file_path.empty?
           unknown_keys.each do |key|
-            best : String? = nil
-            best_distance = Int32::MAX
-            KNOWN_FRONT_MATTER_KEYS.each do |known|
-              dist = Levenshtein.distance(key, known)
-              if dist < best_distance
-                best_distance = dist
-                best = known
-              end
-            end
-            if (suggestion = best) && best_distance > 0 && best_distance <= 2
+            if suggestion = typo_suggestion(key)
               Logger.warn "#{file_path}: unknown front-matter key '#{key}' — did you mean '#{suggestion}'?"
             end
           end
+        end
+
+        # The closest of `candidates` to `key` within Levenshtein distance 2
+        # (but not `key` itself), or nil. Also the "did you mean" of the
+        # `[[content.schema]] strict` unknown-key error.
+        def typo_suggestion(key : String, candidates : Enumerable(String) = KNOWN_FRONT_MATTER_KEYS) : String?
+          best : String? = nil
+          best_distance = Int32::MAX
+          candidates.each do |known|
+            dist = Levenshtein.distance(key, known)
+            if dist < best_distance
+              best_distance = dist
+              best = known
+            end
+          end
+          best if best_distance > 0 && best_distance <= 2
+        end
+
+        # A front-matter value as `page.extra` stores it (see
+        # `extract_extra_value`), for callers outside the parser.
+        def extra_value(value : TOML::Any | YAML::Any | JSON::Any) : Models::ExtraValue
+          extract_extra_value(value)
         end
 
         # Returns parsed metadata and content

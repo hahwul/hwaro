@@ -241,6 +241,11 @@ module Hwaro::Core::Build::Phases::ParseContent
     # _index files) still cascade to their descendants — include them.
     apply_cascades(ctx.all_pages, ctx.sections + ctx.excluded_cascade_sections)
 
+    # [[content.schema]] after cascade (cascaded values count as present)
+    # and before the filters (a `draft` default takes part in them, like a
+    # cascaded one). Only pages that survive the filters fail the build.
+    schema_violations = apply_content_schemas(ctx.pages)
+
     # Single-pass filtering: remove parse-failed, draft, and expired pages.
     # Combines multiple reject! calls into one pass per array to avoid
     # repeated traversals, and calls invalidate_all_pages_cache at most once.
@@ -305,6 +310,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     # Deferred date-token permalink errors: only pages that survived the
     # filters above can publish a URL, so only they can fail the build.
     raise_on_permalink_errors!(ctx.pages)
+    unless schema_violations.empty?
+      published = ctx.pages.map { |p| File.join("content", p.path) }.to_set
+      Content::FrontMatterSchema.raise_if_any!(schema_violations.select { |v| published.includes?(v.file) })
+    end
 
     # The skipped total feeds the receipt's "parse … N skipped" emphasis; the
     # per-reason breakdown stays available under --verbose. Parse errors remain
@@ -556,8 +565,70 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
   end
 
+  # Validate regular pages against `[[content.schema]]` and fill the
+  # defaults of their missing fields. Returns every violation.
+  # ponytail: sequential re-read of each matched page's source; fan out with
+  # ParallelHelper if schema'd sites get large enough to notice.
+  private def apply_content_schemas(pages : Array(Models::Page)) : Array(Content::FrontMatterSchema::Violation)
+    violations = [] of Content::FrontMatterSchema::Violation
+    config = @config
+    return violations if config.nil? || config.content_schema.empty?
+    cascade_map = @cascade_map || build_cascade_map([] of Models::Section)
+    pages.each do |page|
+      violations.concat(apply_content_schema(page, config, cascade_map)) unless page.parse_failed
+    end
+    violations
+  end
+
+  protected def apply_content_schema(page : Models::Page, config : Models::Config, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Array(Content::FrontMatterSchema::Violation)
+    return [] of Content::FrontMatterSchema::Violation if page.is_a?(Models::Section)
+    return [] of Content::FrontMatterSchema::Violation unless rule = Content::FrontMatterSchema.rule_for(config, page.section)
+    source_path = File.join("content", page.path)
+    source = page.synthesis.try(&.markdown) || File.read(source_path)
+    result = Content::FrontMatterSchema.check(rule, source_path, source, page.extra, merged_cascade_for(page, cascade_map), locate: !page.synthesized?)
+    result.defaults.each { |name, value| apply_schema_default(page, name, value) }
+    result.violations
+  end
+
+  # The typed property for a known field (the set
+  # `ContentSchemaField::DEFAULTABLE_KNOWN` allows), else `page.extra`.
+  private def apply_schema_default(page : Models::Page, name : String, value : Models::SchemaValue)
+    extra_value = value.is_a?(Time) ? value.to_s : value
+    if name.starts_with?("extra.") || !Content::FrontMatterSchema::KNOWN_KEYS.includes?(name)
+      page.extra[name.lchop("extra.")] = extra_value
+      return
+    end
+
+    case name
+    when "description"         then page.description = extra_value.as?(String)
+    when "image"               then page.image = extra_value.as?(String)
+    when "template"            then page.template = normalize_template_name(extra_value.as?(String))
+    when "series"              then page.series = extra_value.as?(String)
+    when "draft"               then extra_value.as?(Bool).try { |b| page.draft = b }
+    when "render"              then extra_value.as?(Bool).try { |b| page.render = b }
+    when "toc"                 then extra_value.as?(Bool).try { |b| page.toc = b }
+    when "insert_anchor_links" then extra_value.as?(Bool).try { |b| page.insert_anchor_links = b }
+    when "in_sitemap"          then extra_value.as?(Bool).try { |b| page.in_sitemap = b }
+    when "in_search_index"     then extra_value.as?(Bool).try { |b| page.in_search_index = b }
+    when "weight"              then extra_value.as?(Int64).try { |i| page.weight = i.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32 }
+    when "series_weight"       then extra_value.as?(Int64).try { |i| page.series_weight = i.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32 }
+    when "authors"
+      # Like a cascade: authors/tags given through [taxonomies] are present.
+      cascade_string_array(extra_value).try { |a| page.authors = a } if page.authors.empty?
+    when "tags"
+      if page.tags.empty? && (tags = cascade_string_array(extra_value))
+        page.tags = tags
+        page.taxonomies["tags"] = tags unless tags.empty?
+      end
+    when "updated"
+      page.updated = value.as?(Time) || extra_value.as?(String).try { |s| Utils::DateUtils.parse_content_date(s) }
+    end
+  end
+
   # Build {directory, language} => validated cascade map from sections.
-  protected def build_cascade_map(sections : Array(Models::Section)) : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))
+  # Public: the schema tools (doctor, `tool validate`) resolve cascades
+  # through it too.
+  def build_cascade_map(sections : Array(Models::Section)) : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))
     map = {} of Tuple(String, String) => Hash(String, Models::ExtraValue)
     sections.each do |section|
       next if section.cascade.empty?
@@ -657,7 +728,7 @@ module Hwaro::Core::Build::Phases::ParseContent
 
   # Collect cascades from the page's ancestor directories, shallowest first,
   # restricted to sections in the same language tree.
-  private def merged_cascade_for(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Hash(String, Models::ExtraValue)
+  def merged_cascade_for(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Hash(String, Models::ExtraValue)
     dir = Path[page.path].dirname.to_s
     dir = "" if dir == "."
 
