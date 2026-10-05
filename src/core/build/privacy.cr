@@ -394,7 +394,7 @@ module Hwaro
         end
 
         private def warn_once(key : String, message : String) : Nil
-          Logger.warn message if @warned.add?(key)
+          Logger.warn message if @mutex.synchronize { @warned.add?(key) }
         end
 
         private def index_path : String
