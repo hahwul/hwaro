@@ -3194,14 +3194,14 @@ describe "Hwaro::Models::Config" do
     it "warns about an unknown value and keeps the default" do
       config = nil
       log = with_captured_log do
-        config = load_config("[markdown]\nmath = true\nmath_engine = \"mathjx\"\n[feeds]\ntype = \"json\"")
+        config = load_config("[markdown]\nmath = true\nmath_engine = \"mathjx\"\n[feeds]\ntype = \"jsn\"")
       end
       config.not_nil!.markdown.math_engine.should eq("katex")
       config.not_nil!.markdown.math_tags.should contain("katex")
       config.not_nil!.feeds.type.should eq("rss")
       log.should contain("math_engine")
       log.should contain("mathjx")
-      log.should contain("json")
+      log.should contain("jsn")
     end
   end
 
