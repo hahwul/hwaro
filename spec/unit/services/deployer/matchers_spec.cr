@@ -13,17 +13,21 @@ class Hwaro::Services::Deployer
     metadata_matcher(rel, compile_matchers(deployment), src_rel)
   end
 
+  def test_metadata_percent_warning(url : String, source_dir : String, deployment : Hwaro::Models::DeploymentConfig) : String?
+    metadata_percent_warning(url, metadata_uploads(url, source_dir, compile_matchers(deployment)))
+  end
+
   def test_shell_join(argv : Array(String)) : String
     shell_join(argv)
   end
 end
 
-private def deploy_matcher(pattern : String, cache_control : String? = nil, content_type : String? = nil, gzip : Bool = false, force : Bool = false) : Hwaro::Models::DeploymentMatcher
+private def deploy_matcher(pattern : String, cache_control : String? = nil, content_type : String? = nil, gzip : Bool? = nil, force : Bool = false) : Hwaro::Models::DeploymentMatcher
   matcher = Hwaro::Models::DeploymentMatcher.new
   matcher.pattern = pattern
   matcher.cache_control = cache_control
   matcher.content_type = content_type
-  matcher.gzip = gzip
+  matcher.gzip = gzip unless gzip.nil?
   matcher.force = force
   matcher
 end
@@ -96,7 +100,7 @@ describe "Deployer matchers" do
       html = deployer.test_metadata_matcher("index.html", config.deployment).not_nil!
       html.cache_control.should eq("no-cache")
       html.content_type.should be_nil
-      html.gzip.should be_false
+      html.gzip.should_not be_true
       deployer.test_metadata_matcher("a.css", config.deployment).not_nil!.content_type.should eq("text/plain")
     end
 
@@ -270,6 +274,106 @@ describe "Deployer matchers" do
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], dry_run: true)
         log = with_captured_log { Hwaro::Services::Deployer.new.plan(options, config) }
         log.should contain("cache_control/content_type have no effect on local directory target 't'")
+      end
+    end
+  end
+
+  describe "review regressions" do
+    it "counts unrelated X + X.gz pairs in full against max_deletes" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        Dir.mkdir_p(src)
+        Dir.mkdir_p(dest)
+        File.write(File.join(src, "index.html"), "home")
+        (1..4).each do |i|
+          File.write(File.join(dest, "u#{i}.js"), "user")
+          File.write(File.join(dest, "u#{i}.js.gz"), "user")
+        end
+        config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], max_deletes: 4)
+        err = expect_raises(Hwaro::HwaroError) { with_captured_log { Hwaro::Services::Deployer.new.run(options, config) } }
+        (err.message || "").should contain("Refusing to delete 8 files")
+        File.exists?(File.join(dest, "u1.js.gz")).should be_true
+      end
+    end
+
+    it "clears a stale directory standing at X.gz before writing the sibling" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        Dir.mkdir_p(src)
+        Dir.mkdir_p(File.join(dest, "p.html.gz"))
+        File.write(File.join(src, "p.html"), "page")
+        File.write(File.join(dest, "p.html.gz", "old.txt"), "junk")
+        config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+        with_captured_log { Hwaro::Services::Deployer.new.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"]), config) }
+        gunzip(File.join(dest, "p.html.gz")).should eq("page")
+      end
+    end
+
+    it "never writes a sibling over a .gz the target excludes" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        Dir.mkdir_p(src)
+        Dir.mkdir_p(dest)
+        File.write(File.join(src, "p.html"), "page")
+        File.write(File.join(dest, "p.html.gz"), "hand")
+        config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+        config.deployment.targets[0].exclude = "**/*.gz"
+        with_captured_log { Hwaro::Services::Deployer.new.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"]), config) }
+        File.read(File.join(dest, "p.html.gz")).should eq("hand")
+      end
+    end
+
+    it "lets gzip = false opt a path out of a later gzip matcher" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        Dir.mkdir_p(src)
+        File.write(File.join(src, "i.png"), "png")
+        File.write(File.join(src, "p.html"), "page")
+        config = load_config(<<-TOML)
+          [[deployment.targets]]
+          name = "t"
+          url = "file://#{dest}"
+          [[deployment.matchers]]
+          pattern = '\\.png$'
+          gzip = false
+          [[deployment.matchers]]
+          pattern = ".*"
+          gzip = true
+          TOML
+        with_captured_log { Hwaro::Services::Deployer.new.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"]), config) }
+        File.exists?(File.join(dest, "i.png.gz")).should be_false
+        File.exists?(File.join(dest, "p.html.gz")).should be_true
+      end
+    end
+
+    it "skips gs:// metadata uploads for names gsutil would read as wildcards" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "a[1].html"), "x")
+        File.write(File.join(dir, "b.html"), "x")
+        config = matcher_config("gs://bkt", [deploy_matcher("\\.html$", cache_control: "no-cache")])
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: dir, targets: ["t"], dry_run: true)
+        ops = [] of Hwaro::Services::Deployer::PlannedOp
+        log = with_captured_log { ops = Hwaro::Services::Deployer.new.plan(options, config) }
+        ops.select(&.action.==("upload")).map(&.path).should eq(["b.html"])
+        log.should contain("a[1].html")
+      end
+    end
+
+    it "names the file whose '%' cmd.exe would expand" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "100%25off.html"), "x")
+        File.write(File.join(dir, "plain.html"), "x")
+        config = matcher_config("s3://bkt", [deploy_matcher("\\.html$", cache_control: "no-cache")])
+        warning = Hwaro::Services::Deployer.new.test_metadata_percent_warning("s3://bkt", dir, config.deployment)
+        warning.should_not be_nil
+        warning.not_nil!.should contain("100%25off.html")
+        File.delete(File.join(dir, "100%25off.html"))
+        Hwaro::Services::Deployer.new.test_metadata_percent_warning("s3://bkt", dir, config.deployment).should be_nil
       end
     end
   end

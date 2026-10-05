@@ -59,10 +59,13 @@ module Hwaro
         # bare placeholder gets, so a `%` a value brought in is judged too.
         risky = DANGEROUS_SHELL_PATTERNS.matches?(command) ||
                 (quoted_placeholder?(command) && DANGEROUS_SHELL_PATTERNS.matches?(expanded)) ||
-                ({{ flag?(:windows) }} && expanded.count('%') > command.count('%')) ||
-                risky_metadata_uploads?(target.url, uploads)
+                ({{ flag?(:windows) }} && expanded.count('%') > command.count('%'))
         if !effective.force && risky
           Logger.warn "Deploy command contains shell metacharacters (pipes, redirects, subshells, etc.)."
+          needs_confirm = true
+        end
+        if !effective.force && {{ flag?(:windows) }} && (percent = metadata_percent_warning(target.url, uploads))
+          Logger.warn percent
           needs_confirm = true
         end
 

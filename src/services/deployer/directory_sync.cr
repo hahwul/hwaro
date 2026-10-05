@@ -49,11 +49,11 @@ module Hwaro
 
         validate_strip_index_html_for_filesystem(target, desired.keys)
 
-        stems = gzip_stems(desired, source_dir, matchers)
+        stems = gzip_stems(desired, source_dir, matchers, target)
         to_delete = compute_deletes(existing, desired.keys, target, dest_dir, stems.map { |rel| "#{rel}.gz" }.to_set)
         clear_first = validate_destination_paths(dest_dir, desired.keys, to_delete.to_set)
         check_empty_selection!(desired, to_delete, target, effective)
-        check_max_deletes!(to_delete.size - stale_gzip_siblings(to_delete, existing, desired, matchers), effective)
+        check_max_deletes!(to_delete.size - stale_gzip_siblings(to_delete, matchers, target), effective)
 
         to_copy, skipped = compute_copies(desired, source_dir, dest_dir, effective.force, force_patterns(matchers))
         copied = to_copy.map(&.[0]).to_set
@@ -109,12 +109,6 @@ module Hwaro
           end
         end
 
-        # Precompressed siblings, once the files they compress are in place.
-        sync.to_gzip.each do |rel|
-          unlink_destination_symlinks!(dest_dir, "#{rel}.gz")
-          gzip_file(File.join(dest_dir, rel), File.join(dest_dir, "#{rel}.gz"))
-        end
-
         remaining = early.empty? ? sync.to_delete : sync.to_delete.reject { |rel| early.includes?(rel) }
         remaining.each_with_index do |rel, idx|
           Logger.progress(idx + 1, remaining.size, "Deleting ")
@@ -123,6 +117,13 @@ module Hwaro
         end
 
         prune_emptied_directories(dest_dir, sync.to_delete)
+
+        # Precompressed siblings last: a sibling replaces no page, and a stale
+        # directory standing at `X.gz` is only gone once the deletes ran.
+        sync.to_gzip.each do |rel|
+          unlink_destination_symlinks!(dest_dir, "#{rel}.gz")
+          gzip_file(File.join(dest_dir, rel), File.join(dest_dir, "#{rel}.gz"))
+        end
         counts
       end
 

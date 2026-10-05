@@ -35,7 +35,7 @@ module Hwaro
       end
 
       private def sets_metadata?(matcher : Models::DeploymentMatcher) : Bool
-        !!(matcher.cache_control || matcher.content_type || matcher.gzip)
+        !!(matcher.cache_control || matcher.content_type || !matcher.gzip.nil?)
       end
 
       # The first matcher (config order) that sets metadata and whose
@@ -66,15 +66,26 @@ module Hwaro
       private def metadata_uploads(url : String, source_dir : String, matchers : Array(CompiledMatcher)) : Array(MetadataUpload)
         uploads = [] of MetadataUpload
         return uploads if matchers.none? { |compiled| sets_metadata?(compiled.matcher) }
+        gs = URI.parse(url).scheme == "gs"
 
         each_project_file(source_dir) do |path|
           rel = relative_to(path, source_dir)
           next if rel.empty? || ignored_file?(rel)
           next unless matcher = metadata_matcher(rel, matchers)
+          # `gzip = false` alone claims the file but sets no header.
+          next if metadata_headers(matcher).empty?
+          if gs && GSUTIL_WILDCARD.matches?(path)
+            Logger.warn "deployment.matchers: skipping metadata upload of #{rel} — gsutil reads [ ] * ? in a file name as a wildcard."
+            next
+          end
           uploads << MetadataUpload.new(rel, path, cloud_object_url(url, rel), matcher)
         end
         uploads.sort_by!(&.rel)
       end
+
+      # `gsutil cp` expands these in both the local path and the object URL,
+      # and has no escape for them.
+      private GSUTIL_WILDCARD = /[\[\]*?]/
 
       # `aws s3 sync {source}/ {url}` puts `rel` at `{url}/rel`; gsutil and
       # az do the same with their URL/prefix.
@@ -117,7 +128,7 @@ module Hwaro
 
       # aws and az upload bytes as-is, so gzip means compressing first.
       private def compresses_locally?(url : String, matcher : Models::DeploymentMatcher) : Bool
-        matcher.gzip && URI.parse(url).scheme != "gs"
+        matcher.gzip == true && URI.parse(url).scheme != "gs"
       end
 
       # The argv as one shell command line. Every argument goes through
@@ -129,9 +140,11 @@ module Hwaro
 
       # cmd.exe expands `%NAME%` even inside double quotes, so a `%` in a
       # path or header value is judged like one a placeholder brought in.
-      private def risky_metadata_uploads?(url : String, uploads : Array(MetadataUpload)) : Bool
-        {{ flag?(:windows) }} &&
-          uploads.any? { |upload| metadata_upload_argv(url, upload.source, upload.rel, upload.matcher).any?(&.includes?('%')) }
+      # Returns the warning naming the first offending file, or nil.
+      private def metadata_percent_warning(url : String, uploads : Array(MetadataUpload)) : String?
+        upload = uploads.find { |candidate| metadata_upload_argv(url, candidate.source, candidate.rel, candidate.matcher).any?(&.includes?('%')) }
+        return unless upload
+        "Metadata upload of #{upload.rel} contains '%', which cmd.exe expands even inside quotes."
       end
 
       private def log_planned_uploads(uploads : Array(MetadataUpload)) : Nil
@@ -172,27 +185,36 @@ module Hwaro
 
       # Destination files that get a precompressed `<file>.gz` sibling: the
       # first metadata matcher says `gzip`, the file is not itself a `.gz`,
-      # and the source does not ship its own `<file>.gz` (that one wins).
-      private def gzip_stems(desired : Hash(String, String), source_dir : String, matchers : Array(CompiledMatcher)) : Array(String)
-        return [] of String if matchers.none?(&.matcher.gzip)
+      # the source does not ship its own `<file>.gz` (that one wins), and
+      # the target does not exclude the sibling (excluded paths are never
+      # touched at the destination).
+      private def gzip_stems(desired : Hash(String, String), source_dir : String, matchers : Array(CompiledMatcher), target : Models::DeploymentTarget) : Array(String)
+        return [] of String if matchers.none? { |compiled| compiled.matcher.gzip == true }
         desired.compact_map do |dest_rel, src_path|
           next if dest_rel.ends_with?(".gz") || desired.has_key?("#{dest_rel}.gz")
-          matcher = metadata_matcher(dest_rel, matchers, relative_to(src_path, source_dir))
-          dest_rel if matcher && matcher.gzip
+          next if target_exclude_match?("#{dest_rel}.gz", target)
+          dest_rel if gzip_matched?(dest_rel, matchers, relative_to(src_path, source_dir))
         end
       end
 
-      # Deletes that are `.gz` siblings of a file the sync manages (one it
-      # deploys or deletes): they go with that file and are not counted
-      # against `--max-deletes`. Only while a matcher sets `gzip`, so a
-      # deploy without one counts every delete as before.
-      private def stale_gzip_siblings(to_delete : Array(String), existing : Array(String), desired : Hash(String, String), matchers : Array(CompiledMatcher)) : Int32
-        return 0 if matchers.none?(&.matcher.gzip)
-        existing_set = existing.to_set
+      private def gzip_matched?(rel : String, matchers : Array(CompiledMatcher), src_rel : String = rel) : Bool
+        metadata_matcher(rel, matchers, src_rel).try(&.gzip) == true
+      end
+
+      # Deletes that are the sibling hwaro wrote for a page deleted in the
+      # same sync: the stem is deleted too and is gzip-matched. Those go with
+      # their page and are not counted against `--max-deletes`; every other
+      # `.gz` (another tool's output, a sibling whose page stays) counts.
+      private def stale_gzip_siblings(to_delete : Array(String), matchers : Array(CompiledMatcher), target : Models::DeploymentTarget) : Int32
+        return 0 if matchers.none? { |compiled| compiled.matcher.gzip == true }
+        deleted = to_delete.to_set
         to_delete.count do |rel|
           next false unless rel.ends_with?(".gz")
           stem = rel.rchop(".gz")
-          desired.has_key?(stem) || existing_set.includes?(stem)
+          next false unless deleted.includes?(stem)
+          # A stripped page `foo` was matched by its source spelling.
+          src_rel = target.strip_index_html && File.extname(stem).empty? ? "#{stem}/index.html" : stem
+          gzip_matched?(stem, matchers, src_rel)
         end
       end
 
