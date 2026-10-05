@@ -81,10 +81,17 @@ When the asset is not found in the pipeline manifest (e.g., not configured as a 
 [Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) lets the browser refuse a stylesheet or script whose bytes differ from what the page expects. `asset_integrity()` returns the `sha384-…` value of the file `asset()` points to:
 
 ```html
-<link rel="stylesheet" href="{{ asset(name='main.css') }}" integrity="{{ asset_integrity(name='main.css') }}">
+<link rel="stylesheet" href="{{ asset(name='main.css') }}" integrity="{{ asset_integrity(name='main.css') }}" crossorigin="anonymous">
 ```
 
-The hash covers the bytes Hwaro writes to the output (after minify and fingerprint), so it always matches the published file. It works for pipeline bundles and for any other emitted file, such as `asset_integrity(name='css/site.css')` for a copied `static/css/site.css`. A name with no emitted file fails the build with a template error.
+The hash covers the bytes Hwaro writes to the output (after minify and fingerprint), so it always matches the published file. It works for:
+
+- pipeline bundles
+- files copied from `static/`, such as `asset_integrity(name='css/site.css')` for `static/css/site.css`
+- Sass outputs
+- page-bundle assets and `[content.files]` files, such as `asset_integrity(name='posts/demo/app.js')`. These are copied after rendering, so their source is hashed. The copy is byte-for-byte, except `.json`, `.xml` and `.html` files under `--minify`.
+
+A name with no emitted file fails the build with a template error.
 
 Set `sri = true` to add the attribute to the tags Hwaro generates itself:
 
@@ -96,9 +103,15 @@ sri = true
 - `{{ auto_includes }}`, `{{ auto_includes_css }}` and `{{ auto_includes_js }}` ([Auto Includes](/features/auto-includes/))
 - `{{ highlight_css }}`, `{{ highlight_js }}` and `{{ highlight_tags }}` when `[highlight] use_cdn = false`
 
-CDN tags get no `integrity`, because Hwaro does not know their bytes. Same-origin assets need no `crossorigin` attribute, so none is added. The `?v=` [cache-busting](/features/cache-busting/) query does not affect the hash.
+Each tag gets `integrity` together with `crossorigin="anonymous"`. The URLs start with your absolute `base_url`, so a page viewed from another host (`www` vs the apex domain, a deploy preview that keeps the production `base_url`) loads them cross-origin. The browser can only check the integrity of a CORS response; without `crossorigin` it would block the file. Static hosts and CDNs answer such requests (`Access-Control-Allow-Origin`); on your own server, allow it for CSS and JS. Add `crossorigin="anonymous"` to tags you write with `asset_integrity()` for the same reason.
+
+CDN tags get no `integrity`, because Hwaro does not know their bytes. The `?v=` [cache-busting](/features/cache-busting/) query does not affect the hash.
+
+`hwaro serve` leaves `integrity` off the tags it generates. Its pages carry the dev server's own address, which you may open under another name (`localhost` vs `127.0.0.1`, a LAN address). `asset_integrity()` still returns the value under serve.
 
 A changed CSS or JS file updates the value on every page that prints it, both on `hwaro build --cache` and under `hwaro serve`. A stale value would make the browser block the asset.
+
+Tools that rewrite emitted CSS or JS after the build break the check: a `[build] hooks.post` minifier over `public/` changes the bytes after the hashes were printed. Run such tools in `hooks.pre` (writing into `static/`) or use `[assets] minify`. When a post hook does change a file whose integrity a page carries, the build prints a warning naming the file.
 
 ## Used-selector manifest (Tailwind)
 
@@ -116,7 +129,9 @@ Utility-CSS tools such as Tailwind CSS v4 generate only the classes your HTML us
 
 Values are sorted and de-duplicated. The file is rewritten only when its content changes, and `hwaro serve` never treats it as a source change, so it cannot cause a rebuild loop.
 
-Builds that render every page write the exact set. A partial build (`--cache` hits, `serve --fast-start`, or serve's incremental rebuilds) adds what it rendered to the previous file instead. A class that only an edited or deleted page used then stays listed until the next build that renders every page. Extra entries only mean slightly more generated CSS; no class a page uses is ever missing.
+Builds that render every page write the exact set. A partial build (`--cache` hits, `serve --fast-start`, or serve's incremental rebuilds) adds what it rendered to the previous file instead. A class that only an edited or deleted page used then stays listed until the next build that renders every page. Extra entries only mean slightly more generated CSS; no class a page uses is ever missing. If the file is missing or unreadable when a `--cache` build starts, that build renders every page.
+
+Markup inside `<script>` and `<style>` is not scanned, so classes in client-side templates (`<script type="text/template">`) or added by JavaScript are not listed. Add them to your Tailwind sources yourself.
 
 ### Tailwind v4 recipe
 
@@ -139,6 +154,14 @@ hooks.pre = ["npx @tailwindcss/cli -i assets/tailwind.css -o static/css/tailwind
 ```
 
 The pre-build hook reads the manifest from the previous build, so on a fresh checkout run `hwaro build` twice, or commit `hwaro_stats.json` along with the source.
+
+Under `hwaro serve`, `hooks.pre` runs only on full rebuilds, while content edits update `hwaro_stats.json` incrementally. To pick up new classes as you write, run Tailwind in watch mode next to the server instead of as a hook:
+
+```bash
+npx @tailwindcss/cli -i assets/tailwind.css -o static/css/tailwind.css --watch
+```
+
+Tailwind rewrites `static/css/tailwind.css`, the server copies it and reloads the page, and the stats file does not change, so the loop settles.
 
 ## How It Works
 

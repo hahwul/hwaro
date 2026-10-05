@@ -375,8 +375,10 @@ base_url이 포함된 URL을 생성합니다.
 `asset()`이 가리키는 파일의 [하위 리소스 무결성](/ko/features/asset-pipeline/#sri) 값을 돌려줍니다. 출력에 쓰인 바이트(압축과 핑거프린트 이후)로 계산합니다.
 
 ```jinja
-<script src="{{ asset(name='app.js') }}" integrity="{{ asset_integrity(name='app.js') }}"></script>
+<script src="{{ asset(name='app.js') }}" integrity="{{ asset_integrity(name='app.js') }}" crossorigin="anonymous"></script>
 ```
+
+페이지 번들과 `[content.files]` 에셋은 렌더링 뒤에 복사되므로 원본 파일로 해시를 계산합니다. 페이지를 `base_url`과 다른 호스트에서 열어도 검사가 통과하도록 `crossorigin="anonymous"`를 함께 붙이세요.
 
 **파라미터:**
 
