@@ -42,12 +42,12 @@ module Hwaro
         # (not round-tripped through URI) when no redirect moved it.
         #
         # `guard` vets every hop before it connects: it raises `FetchError`
-        # to refuse the hop, or returns the IP address it vetted, which the
-        # connection is then pinned to (so a second DNS answer can't swap in
-        # another address), or nil to connect normally.
+        # to refuse the hop, or returns the IP addresses it vetted, which the
+        # connection is then pinned to (tried in order, so a second DNS answer
+        # can't swap in another address), or nil to connect normally.
         def fetch(url : String, headers : Hash(String, String), max_bytes : Int64,
                   deadline : Time::Span, user_agent : String = "Hwaro",
-                  guard : (URI -> String?)? = nil) : {String, String?, String}
+                  guard : (URI -> Array(String)?)? = nil) : {String, String?, String}
           original = URI.parse(url)
           current = original
           final_url = url
@@ -112,7 +112,7 @@ module Hwaro
         # the original message: HTTP::Client raises a bare `Exception` for a
         # malformed response ("Invalid HTTP response"), which no caller's
         # rescue list could name.
-        private def exchange(uri : URI, pinned : String?, & : HTTP::Client -> T) : T forall T
+        private def exchange(uri : URI, pinned : Array(String)?, & : HTTP::Client -> T) : T forall T
           client = build_client(uri, pinned)
           begin
             yield client
@@ -122,10 +122,14 @@ module Hwaro
         rescue ex : FetchError
           raise ex
         rescue ex
-          raise FetchError.new(ex.message || ex.class.name, cause: ex)
+          message = ex.message || ex.class.name
+          # A client built on a connected socket reads an early EOF as a
+          # stale keep-alive and "retries" into this; say what happened.
+          message = "Unexpected end of http response" if message == "This HTTP::Client cannot be reconnected"
+          raise FetchError.new(message, cause: ex)
         end
 
-        private def build_client(uri : URI, pinned : String?) : HTTP::Client
+        private def build_client(uri : URI, pinned : Array(String)?) : HTTP::Client
           return pinned_client(uri, pinned) if pinned
           client = HTTP::Client.new(uri)
           client.connect_timeout = CONNECT_TIMEOUT
@@ -133,13 +137,15 @@ module Hwaro
           client
         end
 
-        # Connect to the vetted address but speak to the URL's host: the Host
-        # header, TLS SNI and certificate verification all use the name, as
-        # HTTP::Client itself does.
-        private def pinned_client(uri : URI, ip : String) : HTTP::Client
+        # Connect to a vetted address (each in turn, as TCPSocket does for a
+        # name) but speak to the URL's host: TLS SNI and certificate
+        # verification use the name, as HTTP::Client itself does, and the
+        # Host header is set by `fetch` — the client below is built without a
+        # port, so it can't compute one.
+        private def pinned_client(uri : URI, ips : Array(String)) : HTTP::Client
           host = uri.host.to_s.lchop('[').rchop(']')
           port = effective_port(uri) || 80
-          tcp = TCPSocket.new(ip, port, connect_timeout: CONNECT_TIMEOUT)
+          tcp = connect_any(ips, port)
           tcp.read_timeout = READ_TIMEOUT
           tcp.sync = false
           io = if uri.scheme.try(&.downcase) == "https"
@@ -152,7 +158,17 @@ module Hwaro
                else
                  tcp
                end
-          HTTP::Client.new(io, host, port)
+          HTTP::Client.new(io, host)
+        end
+
+        private def connect_any(ips : Array(String), port : Int32) : TCPSocket
+          error = nil
+          ips.each do |ip|
+            return TCPSocket.new(ip, port, connect_timeout: CONNECT_TIMEOUT)
+          rescue ex : Socket::Error | IO::TimeoutError
+            error = ex
+          end
+          raise(error || FetchError.new("no address to connect to"))
         end
 
         private def host_header(uri : URI) : String
