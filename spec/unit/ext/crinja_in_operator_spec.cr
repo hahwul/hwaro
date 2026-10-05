@@ -26,6 +26,15 @@ describe "Crinja `in` / `not in` operators" do
     render_in(%({{ "a" in xs | map("lower") | list }}|{% for x in xs if x in ["b"] %}{{ x }}{% endfor %}), vars).should eq("true|b")
   end
 
+  it "is false for an undefined container, like Jinja" do
+    render_in(%({{ "x" in missing }}|{{ "x" not in missing }})).should eq("false|true")
+  end
+
+  it "gives not lower precedence than comparisons, like Jinja" do
+    vars = {"tags" => Crinja.value(["b"])}
+    render_in(%({{ not "a" in tags }}|{{ not 1 == 2 }}|{{ not false and true }}|{% if not "b" in tags %}x{% else %}y{% endif %}), vars).should eq("true|true|true|y")
+  end
+
   it "rejects a non-iterable right operand at render time" do
     expect_raises(Crinja::TypeError) { render_in(%({{ 1 in 2 }})) }
   end

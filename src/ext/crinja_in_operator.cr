@@ -7,6 +7,9 @@ class Crinja::Operator
   # Jinja semantics: substring for strings, key lookup for mappings,
   # element equality for any other iterable.
   def self.member?(item : Value, container : Value) : Bool
+    # Jinja's default Undefined iterates as empty: `"x" in page.extra.tags`
+    # is false on a page without the key, not an error.
+    return false if container.undefined?
     if container.string?
       container.to_s.includes?(item.to_s)
     elsif (raw = container.raw).is_a?(Hash)
@@ -43,6 +46,31 @@ class Crinja::Operator
 end
 
 class Crinja::Parser::ExpressionParser
+  # Jinja's precedence puts `not` below the comparisons: `not a in b` and
+  # `not a == b` negate the comparison. Upstream parsed `not` as a tight
+  # unary operator, so they read `(not a) in b`. The `not in` operator is
+  # matched before this when it follows an operand.
+  private def parse_logical_and
+    left = parse_not
+    while current_token.kind == Kind::OPERATOR && current_token.value == Symbol::OP_AND
+      operator = current_token.value
+      next_token
+      right = parse_not
+      left = AST::BinaryExpression.new(operator, left, right).at(left, right)
+    end
+    left
+  end
+
+  private def parse_not
+    if current_token.kind == Kind::OPERATOR && current_token.value == Symbol::OP_NOT
+      start_location = current_token.location
+      next_token
+      value = parse_not
+      return AST::UnaryExpression.new(Symbol::OP_NOT, value).at(start_location, value.location_end)
+    end
+    parse_equal_not
+  end
+
   # Replaces the `parse_operator :equal_not, ...` expansion. The upstream
   # list also accepted a bare binary `not` (`a not b`), which only ever
   # failed at render time with "unreachable: invalid operator".
