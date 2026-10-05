@@ -173,13 +173,27 @@ module Hwaro::Core::Build::Phases::Write
     count
   end
 
+  # `{source, destination}` of each of `page`'s bundle assets. Nil when the
+  # page URL is unpublishable (a traversing segment); empty when its
+  # directory resolves outside the output directory.
+  private def bundle_asset_destinations(page : Models::Page, output_dir : String) : Array({String, String})?
+    return unless safe_url_path = url_output_path(page.url.lchop("/"))
+    dest_dir = File.join(output_dir, safe_url_path)
+    return [] of {String, String} unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
+    # Page bundle directory relative to content/
+    page_bundle_dir = File.dirname(page.path)
+    page.assets.map do |asset_path|
+      # asset_path is relative to content/ (e.g. "blog/post/image.jpg");
+      # the destination keeps its path inside the bundle (e.g. "image.jpg").
+      relative_to_bundle = Path[asset_path].relative_to(page_bundle_dir)
+      {File.join("content", asset_path), File.join(dest_dir, relative_to_bundle.to_s)}
+    end
+  end
+
   # Process co-located assets for pages
   private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new)
     pages.each do |page|
       next if page.assets.empty?
-
-      # Page bundle directory relative to content/
-      page_bundle_dir = File.dirname(page.path)
 
       # Destination directory matches the page's URL structure
       # page.url typically starts with / and ends with /, e.g., /blog/post/
@@ -191,22 +205,13 @@ module Hwaro::Core::Build::Phases::Write
       # the output directory — outside it — on every build, even though the
       # per-file guard below then correctly refused every asset in it.
       # Nothing creates the directory now until an asset is actually copied.
-      safe_url_path = url_output_path(page.url.lchop("/"))
-      unless safe_url_path
+      pairs = bundle_asset_destinations(page, output_dir)
+      unless pairs
         Logger.warn "Skipping bundle assets for #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory."
         next
       end
-      dest_dir = File.join(output_dir, safe_url_path)
-      next unless Hwaro::Utils::OutputGuard.within_output_dir?(dest_dir, output_dir)
 
-      page.assets.each do |asset_path|
-        # asset_path is relative to content/ (e.g. "blog/post/image.jpg")
-        source_path = File.join("content", asset_path)
-
-        # Calculate relative path inside the bundle (e.g. "image.jpg")
-        relative_to_bundle = Path[asset_path].relative_to(page_bundle_dir)
-        dest_path = File.join(dest_dir, relative_to_bundle.to_s)
-
+      pairs.each do |source_path, dest_path|
         next unless File.exists?(source_path)
 
         # A symlinked bundle asset whose target escapes the project would
