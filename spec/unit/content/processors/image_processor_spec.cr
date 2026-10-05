@@ -906,3 +906,21 @@ describe "[image_processing] dimensions" do
     config.image_processing.enabled.should be_false
   end
 end
+
+describe "ImageProcessor.dimensions on hostile SVG" do
+  it "returns nil instead of raising for a backtracking-heavy length attribute" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "x.svg")
+      File.write(path, %(<svg width="1#{" " * 6000}x" height="2">))
+      Hwaro::Content::Processors::ImageProcessor.dimensions(path).should be_nil
+    end
+  end
+
+  it "returns nil instead of raising for a number too long to parse" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "x.svg")
+      File.write(path, %(<svg width="#{"9" * 400}" height="5">))
+      Hwaro::Content::Processors::ImageProcessor.dimensions(path).should be_nil
+    end
+  end
+end

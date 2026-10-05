@@ -59,7 +59,9 @@ module Hwaro
           when ".webp"         then webp_dimensions(path)
           when ".svg"          then svg_dimensions(path)
           end
-        rescue IO::Error | File::Error
+        rescue
+          # A best-effort probe: a hostile or truncated header must never
+          # fail the page that asked (callers fall back to no size).
           nil
         end
 
@@ -429,9 +431,12 @@ module Hwaro
           {width, height}
         end
 
-        SVG_TAG_RE     = /<svg\b[^>]*>/i
-        SVG_WIDTH_RE   = /\swidth\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px)?\s*["']/i
-        SVG_HEIGHT_RE  = /\sheight\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px)?\s*["']/i
+        SVG_TAG_RE = /<svg\b[^>]*>/i
+        # `(?:px\s*)?` rather than `(?:px)?\s*`: the two `\s*` runs must not
+        # be able to split the same whitespace, or a long run backtracks
+        # quadratically into PCRE's match limit.
+        SVG_WIDTH_RE   = /\swidth\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px\s*)?["']/i
+        SVG_HEIGHT_RE  = /\sheight\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px\s*)?["']/i
         SVG_VIEWBOX_RE = /\sviewBox\s*=\s*["']\s*-?[\d.]+[\s,]+-?[\d.]+[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)\s*["']/i
 
         # SVG: the root element's unitless/px `width`/`height`; a missing one
@@ -442,11 +447,11 @@ module Hwaro
           buf = Bytes.new(65_536)
           read = File.open(path, &.read(buf))
           return unless tag = String.new(buf[0, read]).scrub.match(SVG_TAG_RE).try(&.[0])
-          w = tag.match(SVG_WIDTH_RE).try(&.[1].to_f)
-          h = tag.match(SVG_HEIGHT_RE).try(&.[1].to_f)
+          w = tag.match(SVG_WIDTH_RE).try(&.[1].to_f?)
+          h = tag.match(SVG_HEIGHT_RE).try(&.[1].to_f?)
           if vb = tag.match(SVG_VIEWBOX_RE)
-            vb_w, vb_h = vb[1].to_f, vb[2].to_f
-            if vb_w > 0 && vb_h > 0
+            vb_w, vb_h = vb[1].to_f?, vb[2].to_f?
+            if vb_w && vb_h && vb_w > 0 && vb_h > 0
               w ||= h ? h * vb_w / vb_h : vb_w
               h ||= w * vb_h / vb_w
             end
