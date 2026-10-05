@@ -320,6 +320,7 @@ describe Hwaro::Core::Build::Csp do
     end
 
     it "warns when a post hook changes inline bytes after hashing" do
+      posix_only!("the hook is a POSIX shell command")
       log = with_captured_log do
         build_site(
           %(title = "T"\nbase_url = "https://example.com"\n[build]\nhooks.post = ["sed -i.bak 's/hi/bye/' public/a/index.html"]\n[csp]\nenabled = true\n),
@@ -344,6 +345,9 @@ describe Hwaro::Core::Build::Csp do
     end
 
     it "keeps rules for paths a host reads as patterns out of the headers file" do
+      # Windows refuses `:`, `*` and control characters in file and
+      # directory names, so no page there can publish such a path.
+      posix_only!("Windows forbids : and * in file names")
       log = with_captured_log do
         build_site(
           %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
