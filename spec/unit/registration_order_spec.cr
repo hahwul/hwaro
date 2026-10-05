@@ -53,6 +53,7 @@ describe "registration order" do
       "front matter (TOML/YAML parse)",
       "front matter menus (declared in config)",
       "front matter templates (exist)",
+      "front matter schema ([[content.schema]])",
       "section index files (_index.md)",
       "translations (pages in every language)",
     ])
@@ -107,7 +108,7 @@ describe "registration order" do
       pagination highlight auto_includes og menus taxonomies languages
       versions build serve markdown series related git permalinks assets
       sass pwa amp image_processing doctor static deployment
-    ] + [""] + %w[outputs links data content])
+    ] + [""] + %w[outputs links data content content])
   end
 
   it "keeps the config snippet registry" do
