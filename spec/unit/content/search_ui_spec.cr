@@ -47,6 +47,19 @@ describe Hwaro::Content::SearchUi do
       js.should contain("var url = safeUrl(s.url, location.origin);")
     end
 
+    it "returns the checked absolute URL, never a bare path" do
+      # `/.//evil.com` resolves same-origin, but its normalized path
+      # `//evil.com` is protocol-relative: a returned path would leave the
+      # origin again in `href` and `fetch`.
+      guard = js[js.index!("function safeUrl")...js.index!("function hasFacet")]
+      guard.should contain("return u.href;")
+      guard.should_not match(/u\.pathname|u\.search|u\.hash/)
+    end
+
+    it "keeps chip counts free of Object.prototype keys" do
+      js.should contain("var counts = Object.create(null);")
+    end
+
     it "has no inline-script dependency and no external requests" do
       js.should_not match(%r{https?://})
       Hwaro::Content::SearchUi::CSS.should_not match(%r{https?://|@import})
@@ -122,6 +135,16 @@ describe Hwaro::Content::SearchUi do
         html.should contain(%(<script defer src="/assets/hwaro-search/search.js?v=))
         html.should_not contain("<script>")
       end
+    end
+
+    it "warns when it replaces a user file at the same path" do
+      log = with_captured_log do
+        build_site(UI_CONFIG, content_files: {"a.md" => "+++\ntitle = \"A\"\n+++\nx\n"}, static_files: {"assets/hwaro-search/search.css" => "mine"}) do |dir|
+          File.read(File.join(dir, "public/assets/hwaro-search/search.css")).should eq(Hwaro::Content::SearchUi::CSS)
+        end
+      end
+      log.should contain("static/assets/hwaro-search/search.css is replaced by the built-in search UI")
+      log.should_not contain("search.js is replaced")
     end
 
     it "hashes the emitted assets under [assets] sri" do

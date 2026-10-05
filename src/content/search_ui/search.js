@@ -149,13 +149,15 @@
 
   // The index URL only when it resolves to this site's own origin over
   // http(s): rejects `javascript:`/`data:` and any other scheme, and
-  // protocol-relative or backslash tricks that leave the origin.
+  // protocol-relative or backslash tricks that leave the origin. Returns
+  // the resolved absolute URL, never a path: `/.//evil.com` normalizes to
+  // the path `//evil.com`, which a browser would read as another host.
   function safeUrl(url, origin) {
     if (typeof url !== "string" || !url || /[\u0000-\u001f]/.test(url)) return null;
     try {
       var u = new URL(url, origin);
       if ((u.protocol !== "http:" && u.protocol !== "https:") || u.origin !== origin) return null;
-      return u.pathname + u.search + u.hash;
+      return u.href;
     } catch (e) {
       return null;
     }
@@ -182,7 +184,7 @@
 
   var records = null, loading = null;
   var ui = null, overlay = null, inline = false, lastFocus = null;
-  var results = [], active = -1, filters = {};
+  var results = [], active = -1, filters = {}, pending = 0;
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -244,9 +246,8 @@
     bar.appendChild(input);
     var close = null;
     if (!host) {
-      close = el("button", "hwaro-search-close", "Esc");
+      close = el("button", "hwaro-search-close", i18n.close || "Close");
       close.type = "button";
-      close.setAttribute("aria-label", i18n.close || "Close");
       close.addEventListener("click", hide);
       bar.appendChild(close);
     }
@@ -264,7 +265,12 @@
     root.appendChild(chips);
     root.appendChild(status);
     root.appendChild(list);
-    input.addEventListener("input", function () { filters = {}; render(); });
+    // ponytail: a short debounce instead of incremental matching; enough for
+    // tens of thousands of records.
+    input.addEventListener("input", function () {
+      clearTimeout(pending);
+      pending = setTimeout(render, 80);
+    });
     input.addEventListener("keydown", onKey);
     input.addEventListener("focus", load);
     return { root: root, input: input, chips: chips, status: status, list: list };
@@ -287,17 +293,18 @@
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
     dialog.setAttribute("aria-label", ui.input.placeholder);
+    // A click on a non-focusable part keeps focus inside the dialog.
+    dialog.tabIndex = -1;
     dialog.appendChild(ui.root);
     overlay.appendChild(dialog);
     overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) hide(); });
-    dialog.addEventListener("keydown", trapFocus);
     document.body.appendChild(overlay);
   }
 
   function open() {
     mount();
     if (!inline) {
-      if (!overlay.hidden) return;
+      if (!overlay.hidden) { ui.input.focus(); return; }
       lastFocus = document.activeElement;
       overlay.hidden = false;
       document.documentElement.classList.add("hwaro-search-open");
@@ -321,6 +328,8 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
   }
 
+  // Esc and the Tab cycle of the open overlay, wherever focus is: a click
+  // can still leave it on <body>, and keys there must not reach the page.
   function trapFocus(e) {
     if (e.key === "Escape") { e.preventDefault(); hide(); return; }
     if (e.key !== "Tab") return;
@@ -328,12 +337,14 @@
       overlay.querySelectorAll("input, button"),
       function (n) { return !n.disabled && n.offsetParent !== null; });
     if (!nodes.length) return;
-    var first = nodes[0], last = nodes[nodes.length - 1];
-    if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
-    else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+    var i = nodes.indexOf(document.activeElement);
+    var next = e.shiftKey ? (i <= 0 ? nodes[nodes.length - 1] : null) : (i < 0 || i === nodes.length - 1 ? nodes[0] : null);
+    if (next) { next.focus(); e.preventDefault(); }
   }
 
   function onKey(e) {
+    // Arrow keys and Enter act on the query as typed so far.
+    if (pending && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter")) render();
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       if (!results.length) return;
       e.preventDefault();
@@ -372,7 +383,7 @@
     while (box.firstChild) box.removeChild(box.firstChild);
     var any = false;
     facets.forEach(function (facet) {
-      var counts = {};
+      var counts = Object.create(null);
       hits.forEach(function (r) {
         var v = r[facet];
         (Array.isArray(v) ? v : [v]).forEach(function (x) {
@@ -399,6 +410,8 @@
   }
 
   function render() {
+    clearTimeout(pending);
+    pending = 0;
     if (!ui) return;
     var query = ui.input.value;
     var list = ui.list;
@@ -406,6 +419,10 @@
     active = -1;
     ui.input.removeAttribute("aria-activedescendant");
     var hits = records && query.trim() ? search(records, query, !!config.cjk) : [];
+    // A chosen facet survives typing while its value still occurs.
+    Object.keys(filters).forEach(function (facet) {
+      if (!hits.some(function (r) { return hasFacet(r, facet, filters[facet]); })) delete filters[facet];
+    });
     renderChips(hits);
     Object.keys(filters).forEach(function (facet) {
       hits = hits.filter(function (r) { return hasFacet(r, facet, filters[facet]); });
@@ -445,7 +462,8 @@
       results.push(r);
     });
     ui.input.setAttribute("aria-expanded", results.length ? "true" : "false");
-    var count = results.length;
+    // Every match, not just the MAX_RESULTS shown.
+    var count = results.length < MAX_RESULTS ? results.length : hits.length;
     var msg = "";
     if (query.trim() && records) {
       msg = count ? (count === 1 ? i18n.results_one || "{count} result" : i18n.results_other || "{count} results").replace("{count}", String(count))
@@ -457,6 +475,10 @@
   }
 
   document.addEventListener("keydown", function (e) {
+    if (overlay && !overlay.hidden && (e.key === "Escape" || e.key === "Tab")) {
+      trapFocus(e);
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
       e.preventDefault();
       open();
