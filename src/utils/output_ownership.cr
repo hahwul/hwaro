@@ -44,7 +44,8 @@ module Hwaro
         return true if conventional?(output_dir)
         # `.hwaro/` is hwaro's own workspace (`hwaro serve` builds into
         # `.hwaro/serve`); nothing in there is a user's file.
-        return true if resolved.starts_with?(File.join(project_root, HwaroDir::DIR) + File::SEPARATOR)
+        workspace = File.join(project_root, HwaroDir::DIR)
+        return true if resolved != workspace && PathUtils.within?(resolved, workspace)
         # Fail OPEN: `present?` defaults to fail-closed so deploy never
         # ships unreadably-marked output. The same true here would invert
         # into "clearable" and wipe a foreign directory we could not

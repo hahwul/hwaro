@@ -74,11 +74,11 @@ module Hwaro
               "the filesystem root"
             elsif expanded == canonical_dir(Path.home.to_s)
               "the home directory"
-            elsif cwd == expanded || cwd.starts_with?(expanded + File::SEPARATOR)
+            elsif Hwaro::Utils::PathUtils.within?(cwd, expanded)
               "the project directory (or a parent of it)"
             elsif expanded == content_root
               "the content directory (the exporter reads it as input)"
-            elsif content_root.starts_with?(expanded + File::SEPARATOR)
+            elsif content_root != expanded && Hwaro::Utils::PathUtils.within?(content_root, expanded)
               # The exporters build destinations as `<output>/content/<rel>`
               # (Hugo) or `<output>/<rel>` (Jekyll), so an output directory
               # that CONTAINS the content directory writes back over the very
@@ -108,7 +108,7 @@ module Hwaro
         private def self.protected_source_dir(expanded : String, cwd : String) : String?
           PROTECTED_SOURCE_DIRS.find do |dir|
             root = canonical_dir(File.join(cwd, dir))
-            expanded == root || expanded.starts_with?(root + File::SEPARATOR)
+            Hwaro::Utils::PathUtils.within?(expanded, root)
           end
         end
 
@@ -185,7 +185,7 @@ module Hwaro
             # resolved re-check write_file applies.
             resolved_dest = Hwaro::Utils::PathUtils.resolved_real_path(dest)
             resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
-            unless resolved_dest.starts_with?(resolved_root + File::SEPARATOR)
+            unless resolved_dest != resolved_root && Hwaro::Utils::PathUtils.within?(resolved_dest, resolved_root)
               Logger.warn "Skipping bundle asset outside output directory (symlinked destination): #{dest}"
               next false
             end
@@ -358,7 +358,7 @@ module Hwaro
           # `copy_bundle_assets` applies.
           resolved = Hwaro::Utils::PathUtils.resolved_real_path(safe_path)
           resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
-          unless resolved == resolved_root || resolved.starts_with?(resolved_root + File::SEPARATOR)
+          unless Hwaro::Utils::PathUtils.within?(resolved, resolved_root)
             Logger.warn "Skipping output outside output directory (symlinked destination): #{path}"
             return false
           end

@@ -589,13 +589,13 @@ module Hwaro
           rescue File::Error
             File.expand_path(base)
           end
-          resolved == resolved_base || resolved.starts_with?(resolved_base + "/")
+          Hwaro::Utils::PathUtils.within?(resolved, resolved_base)
         end
 
         # Verify destination directory is within output (dest may not exist yet)
         def self.safe_dest_path?(path : String, resolved_output : String) : Bool
           resolved = File.expand_path(path)
-          resolved == resolved_output || resolved.starts_with?(resolved_output + "/")
+          Hwaro::Utils::PathUtils.within?(resolved, resolved_output)
         end
 
         private def safe_path?(path : String, base : String) : Bool

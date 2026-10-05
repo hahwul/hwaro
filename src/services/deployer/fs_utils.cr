@@ -166,7 +166,7 @@ module Hwaro
       end
 
       private def within_real_root?(real : String, root_real : String) : Bool
-        real == root_real || real.starts_with?(root_real + File::SEPARATOR)
+        Hwaro::Utils::PathUtils.within?(real, root_real)
       end
 
       private def relative_to(path : String, root : String) : String

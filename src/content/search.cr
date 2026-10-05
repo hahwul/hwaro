@@ -262,11 +262,11 @@ module Hwaro
         path = File.expand_path(File.join(shards_dir, "#{id}.json"))
         # A hand-edited manifest could smuggle `..` into an id; never delete
         # outside the shard directory.
-        return unless path.starts_with?(root + File::SEPARATOR)
+        return unless path != root && Utils::PathUtils.within?(path, root)
         File.delete?(path)
         # Drop now-empty nested id directories (`search/ko/`) best-effort.
         dir = File.dirname(path)
-        while dir != root && dir.starts_with?(root + File::SEPARATOR)
+        while dir != root && Utils::PathUtils.within?(dir, root)
           break unless Dir.empty?(dir)
           Dir.delete(dir)
           dir = File.dirname(dir)

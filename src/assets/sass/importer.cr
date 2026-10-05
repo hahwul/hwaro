@@ -50,13 +50,8 @@ module Hwaro
         # Path shown in error messages / parsed module ASTs — project-
         # relative when possible.
         def display_path(canonical : String) : String
-          if canonical == @root
-            canonical
-          elsif canonical.starts_with?(@root + File::SEPARATOR)
-            canonical[(@root.size + 1)..]
-          else
-            canonical
-          end
+          relative = Hwaro::Utils::PathUtils.relative_path(canonical, @root)
+          relative && !relative.empty? ? relative : canonical
         end
 
         private def join_url(dir : String, base : String) : String
@@ -78,7 +73,7 @@ module Hwaro
         end
 
         private def guard(expanded : String, url : String, path : String, line : Int32, column : Int32) : String
-          unless expanded == @root || expanded.starts_with?(@root + File::SEPARATOR)
+          unless Hwaro::Utils::PathUtils.within?(expanded, @root)
             raise SyntaxError.new("import \"#{url}\" resolves outside the project directory", path, line, column)
           end
           # A symlinked source whose target escapes the project would leak

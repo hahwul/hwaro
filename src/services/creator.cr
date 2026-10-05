@@ -526,7 +526,7 @@ module Hwaro
         # directory behind (see the note where the path is resolved).
         content_root = Utils::PathUtils.resolved_real_path(CONTENT_DIR)
         resolved_path = Utils::PathUtils.resolved_real_path(full_path)
-        within_content = resolved_path == content_root || resolved_path.starts_with?(content_root + File::SEPARATOR)
+        within_content = Utils::PathUtils.within?(resolved_path, content_root)
         if File.symlink?(full_path) || !within_content
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
