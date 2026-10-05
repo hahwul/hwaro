@@ -113,6 +113,16 @@ describe "include_code" do
       end
     end
   end
+
+  it "yields to a project's own shortcode of the same name" do
+    in_include_project({
+      "templates/shortcodes/include_code.html" => "OWN:{{ path }}",
+      "content/p.md"                           => page(%({{ include_code(path="nope.cr") }})),
+    }) do
+      include_build.should be_true
+      File.read("public/p/index.html").should contain("OWN:nope.cr")
+    end
+  end
 end
 
 describe "include_md" do

@@ -327,6 +327,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       masked, spans = mask_inline_code(chunk)
       masked = mask_raw_blocks(masked, spans)
       masked = masked.gsub(INCLUDE_CALL_RE) do |call, md|
+        # A project's own `templates/shortcodes/include_*.html` wins, as it
+        # does over every built-in; the shortcode pass renders it.
+        next call if @templates.try(&.has_key?("shortcodes/include_#{md[1]}"))
         before = md.pre_match
         prefix = before[((before.rindex('\n') || -1) + 1)..]
         prefix = nil unless INCLUDE_PREFIX_RE.matches?(prefix)
