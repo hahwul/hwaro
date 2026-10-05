@@ -730,9 +730,17 @@ module Hwaro::Core::Build::Phases::Render
   protected def page_relations_hash(page : Models::Page, templates : Hash(String, String), site : Models::Site, link_targets : Hash(String, Models::Page)) : String
     rel = page_template_scan(page, templates, site).relations
     links = internal_link_targets(page)
-    return "" if !rel.reads_any? && links.empty?
+    # An older version's canonical names its latest counterpart (or itself
+    # when there is none), whatever the template reads.
+    latest = page.version.try { |v| v.latest ? nil : page.version_links.find(&.latest) }
+    return "" if !rel.reads_any? && links.empty? && latest.nil?
 
     digest = Digest::MD5.new
+    if latest
+      fp_value(digest, "v")
+      fp_value(digest, latest.url)
+      fp_value(digest, latest.exists ? "1" : "0")
+    end
     if rel.neighbors
       fp_value(digest, "n")
       fp_relation(digest, page.lower, rel.fields)
