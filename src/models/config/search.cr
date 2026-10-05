@@ -102,7 +102,7 @@ module Hwaro
           config.search.facets = facets.uniq
         end
         config.search.ui = bool_value(s["ui"]?, config.search.ui)
-        if config.search.ui && config.search.format.downcase.ends_with?("_javascript")
+        if config.search.ui_enabled? && config.search.format.downcase.ends_with?("_javascript")
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONFIG,
             message: "[search] ui = true needs a JSON index, but format is '#{config.search.format}'. The built-in UI fetches the index on first open; a *_javascript index is a `var searchData = ...` script it cannot load.",

@@ -40,10 +40,15 @@ module Hwaro
       end
 
       # Writes the two assets, leaving a byte-identical file untouched so its
-      # mtime (and the SRI memo keyed on it) survives warm builds.
-      def write_assets(config : Models::Config, output_dir : String, verbose : Bool = false) : Array(String)
+      # mtime (and the SRI memo keyed on it) survives warm builds. They win
+      # over a same-path file under `static_dir`, which is worth a warning.
+      def write_assets(config : Models::Config, output_dir : String, verbose : Bool = false, static_dir : String = "static") : Array(String)
         paths = published_outputs(config, output_dir)
         paths.zip([JS, CSS]) do |path, body|
+          user_file = File.join(static_dir, ASSET_DIR, File.basename(path))
+          if File.exists?(user_file)
+            Logger.warn "#{user_file} is replaced by the built-in search UI's own file ([search] ui = true); theme it with the --hwaro-search-* CSS properties instead."
+          end
           next if File.file?(path) && File.read(path) == body
           Utils::FileSafe.mkdir_p(File.dirname(path))
           Utils::FileSafe.atomic_write(path, body)

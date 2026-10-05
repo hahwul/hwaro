@@ -57,4 +57,11 @@ describe Hwaro::Models::SearchConfig do
     end
     log.should contain("ui = true has no effect")
   end
+
+  it "does not reject a *_javascript format while search is disabled" do
+    log = with_captured_log do
+      load_config(BASE + "[search]\nenabled = false\nformat = \"fuse_javascript\"\nui = true\n").search.ui_enabled?.should be_false
+    end
+    log.should contain("ui = true has no effect")
+  end
 end
