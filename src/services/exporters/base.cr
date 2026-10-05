@@ -2,6 +2,7 @@ require "file_utils"
 require "yaml"
 require "json"
 require "toml"
+require "../content_lister"
 require "../file_action"
 require "../../content/processors/fence_tracker"
 require "../../config/options/export_options"
@@ -143,6 +144,20 @@ module Hwaro
         # manifest marks those rows `overwritten` so the caller can see
         # exactly which pre-existing files a run replaced.
         getter file_actions = [] of FileAction
+
+        # Expanded paths a default build treats as drafts, including pages
+        # under a section's `[cascade] draft = true` (ContentLister is the
+        # publish-state source of truth). Filled by `load_draft_paths`.
+        @draft_paths = Set(String).new
+
+        protected def load_draft_paths(content_dir : String) : Nil
+          @draft_paths = ContentLister.new(content_dir).draft_paths
+        end
+
+        # The page's own `draft = true`, or one cascaded from a section.
+        protected def draft?(file_path : String, fields : Hash(String, YAML::Any)) : Bool
+          fields["draft"]?.try(&.raw) == true || @draft_paths.includes?(File.expand_path(file_path))
+        end
 
         # Scan content directory for markdown files
         protected def scan_content_files(content_dir : String) : Array(String)

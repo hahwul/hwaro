@@ -33,6 +33,7 @@ module Hwaro
           @written_paths.clear
           @unexported_assets = 0
           files = scan_content_files(content_dir)
+          load_draft_paths(content_dir)
 
           if files.empty?
             return ExportResult.new(
@@ -101,7 +102,7 @@ module Hwaro
           # taxonomy it belongs to.
           fields = flatten_taxonomies(fields)
 
-          is_draft = fields["draft"]?.try(&.raw) == true
+          is_draft = draft?(file_path, fields)
           if is_draft && !include_drafts
             return :skipped
           end

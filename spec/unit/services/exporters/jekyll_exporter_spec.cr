@@ -632,3 +632,27 @@ describe "Jekyll export: refused aliases" do
     end
   end
 end
+
+# Regression: a section's `[cascade] draft = true` was ignored — only the
+# page's own `draft` key was read, so a page build/list treat as a draft
+# exported as a published Jekyll page.
+describe "Jekyll export: cascaded drafts" do
+  it "skips a page drafted by its section's cascade, and marks it with --drafts" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "casc"))
+      File.write(File.join(content_dir, "casc", "_index.md"), "+++\ntitle = \"Casc\"\n[cascade]\ndraft = true\n+++\n")
+      File.write(File.join(content_dir, "casc", "c1.md"), "+++\ntitle = \"C1\"\ndate = 2024-01-01\n+++\nx\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      result = Hwaro::Services::Exporters::JekyllExporter.new.run(options)
+      result.skipped_count.should eq(1)
+      File.exists?(File.join(output_dir, "casc", "c1.md")).should be_false
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir, drafts: true)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options)
+      File.read(File.join(output_dir, "casc", "c1.md")).should contain("published: false")
+    end
+  end
+end

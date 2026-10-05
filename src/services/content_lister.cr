@@ -391,6 +391,18 @@ module Hwaro
         Logger.outcome("listed", "#{contents.size} #{contents.size == 1 ? "file" : "files"}")
       end
 
+      # Expanded paths of every authored file a build treats as a draft —
+      # its own `draft` flag or one cascaded from an ancestor section —
+      # without the listing's log output. `tool export` reads this so a
+      # cascaded draft is skipped exactly as `build`/`list` skip it.
+      def draft_paths : Set(String)
+        files = find_content_files
+        cascade = collect_cascade_drafts(files)
+        files.each_with_object(Set(String).new) do |file, set|
+          set << File.expand_path(file) if parse_content_info(file, cascade).try(&.draft)
+        end
+      end
+
       private def find_content_files : Array(String)
         ContentWalk.find_content_files(@content_dir)
       end

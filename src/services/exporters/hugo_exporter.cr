@@ -18,6 +18,7 @@ module Hwaro
           verbose = options.verbose
 
           files = scan_content_files(content_dir)
+          load_draft_paths(content_dir)
           @relative_files = files.map(&.sub(content_dir, "").lstrip('/')).to_set
 
           if files.empty?
@@ -64,7 +65,7 @@ module Hwaro
           fields, body = parse_content(raw)
 
           # Skip drafts unless requested
-          is_draft = fields["draft"]?.try(&.raw) == true
+          is_draft = draft?(file_path, fields)
           if is_draft && !include_drafts
             return :skipped
           end
@@ -135,6 +136,10 @@ module Hwaro
               hugo_fields[key] = value
             end
           end
+
+          # A cascaded draft carries no flag of its own; spell it out so the
+          # exported page stays a draft whatever Hugo makes of `[cascade]`.
+          hugo_fields["draft"] = YAML::Any.new(true) if is_draft && !hugo_fields.has_key?("draft")
 
           frontmatter = generate_toml_frontmatter(hugo_fields)
           body = rewrite_internal_links(body)
