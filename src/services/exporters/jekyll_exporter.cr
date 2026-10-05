@@ -18,12 +18,6 @@ module Hwaro
         # instead of silently overwriting the earlier export.
         @written_paths = Set(String).new
 
-        # Page-bundle assets left behind this run (see
-        # `note_unexported_bundle_assets`), folded into the skipped count so
-        # the summary never reports a clean export of a post whose images
-        # were not written.
-        @unexported_assets = 0
-
         def run(options : Config::Options::ExportOptions) : ExportResult
           content_dir = options.content_dir
           output_dir = options.output_dir
@@ -31,7 +25,6 @@ module Hwaro
           verbose = options.verbose
 
           @written_paths.clear
-          @unexported_assets = 0
           files = scan_content_files(content_dir)
           load_draft_paths(content_dir)
 
@@ -56,10 +49,6 @@ module Hwaro
             errors += 1
             Logger.warn "Error exporting #{file_path}: #{ex.message}"
           end
-
-          # Bundle assets that were not carried across count as skipped: they
-          # are content the user handed the exporter and did not get back.
-          skipped += @unexported_assets
 
           # Any per-file error fails the run: `exported > 0` used to mask
           # errors, so a partial export reported success and exited 0.
@@ -224,7 +213,9 @@ module Hwaro
           # that accompany an exported post, so it is skipped too.
           return :skipped unless write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", output_dir, verbose)
 
-          @unexported_assets += note_unexported_bundle_assets(file_path, content_dir)
+          # Counts cover content documents only (as Hugo's do); assets left
+          # behind are named in a warning instead.
+          note_unexported_bundle_assets(file_path, content_dir)
           :exported
         end
 
@@ -235,34 +226,32 @@ module Hwaro
         # that keeps a bare `![](cover.png)` resolving without ALSO rewriting
         # the exported body, which is a separate change with its own spec.
         #
-        # Until then the assets stay behind, so name them and return the count:
-        # the export used to report `exported: 1 files, 0 skipped` and exit 0
-        # for a post whose every image link was dead.
-        private def note_unexported_bundle_assets(file_path : String, content_dir : String) : Int32
+        # Until then the assets stay behind, so name them in a warning: the
+        # export used to report a clean run for a post whose every image link
+        # was dead.
+        private def note_unexported_bundle_assets(file_path : String, content_dir : String) : Nil
           basename = File.basename(file_path)
-          return 0 unless basename == "index.md" || basename == "index.markdown"
+          return unless basename == "index.md" || basename == "index.markdown"
 
           # The site root is never a bundle: `content/index.md` sits beside
           # every top-level file in the content tree, none of which belongs to
           # it. Same nesting test the Hugo exporter uses before copying.
           relative = file_path.sub(content_dir, "").lstrip('/')
-          return 0 unless relative.includes?('/')
+          return unless relative.includes?('/')
 
           source_dir = File.dirname(file_path)
           assets = Dir.children(source_dir).sort!.reject do |entry|
             entry.ends_with?(".md") || entry.ends_with?(".markdown") ||
               File.directory?(File.join(source_dir, entry))
           end
-          return 0 if assets.empty?
+          return if assets.empty?
 
           Logger.warn "#{assets.size} bundle asset(s) not exported for #{file_path}: #{assets.join(", ")}. " \
                       "Copy them into the Jekyll site and update the links."
-          assets.size
         rescue ex : File::Error
           # The bundle directory vanished or is unreadable between the scan and
           # here — the post itself already exported, so don't fail the run.
           Logger.debug "Could not inspect bundle directory for #{file_path}: #{ex.message}"
-          0
         end
 
         # String form of a scalar front-matter value: strings pass through

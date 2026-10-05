@@ -353,12 +353,12 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
-    it "counts a leaf bundle's un-exported assets as skipped" do
+    it "keeps a leaf bundle's un-exported assets out of the skipped count" do
       # Jekyll's flat `_posts/` layout has no destination that keeps a bare
-      # `![](cover.png)` resolving, so the assets stay behind — but the export
-      # used to report "1 exported, 0 skipped" and exit 0 for a post whose
-      # every image link was dead. The sibling Hugo exporter, whose layout is
-      # preserved, copies them across.
+      # `![](cover.png)` resolving, so the assets stay behind with a warning
+      # (see below). The counts cover content documents only, as documented
+      # and as the Hugo exporter reports them: folding the asset in made a
+      # clean export of one post read "1 exported, 1 skipped".
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
@@ -372,7 +372,7 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         result = exporter.run(options)
 
         result.exported_count.should eq(1)
-        result.skipped_count.should eq(1)
+        result.skipped_count.should eq(0)
       end
     end
 
