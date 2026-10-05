@@ -501,7 +501,8 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Fingerprint the section set — the metadata nav/menus and section-set
-  # consumers render: identity fields plus `date`, `sort_by`, `reverse`,
+  # consumers render: identity fields plus `render`, `redirect_to`, `date`,
+  # `sort_by`, `reverse`,
   # `transparent`, `paginate` and the section's bundle assets, all of which
   # the `site.sections`/`get_section()` Crinja hash exposes.
   # No `fields` parameter: that hash exposes no `extra` key at all, so a
@@ -517,6 +518,10 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, s.description || "")
       fp_value(digest, (s.date.try(&.to_unix) || 0_i64).to_s)
       fp_value(digest, s.draft ? "1" : "0")
+      # A headless or redirecting section leaves its parent's listing and
+      # the sitemap (`fp_page` folds the same gates for pages).
+      fp_value(digest, s.render ? "1" : "0")
+      fp_value(digest, s.redirect_to || "")
       fp_value(digest, s.weight.to_s)
       fp_value(digest, s.sort_by || "-")
       reverse = s.reverse
