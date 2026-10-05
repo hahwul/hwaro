@@ -99,13 +99,14 @@ describe "registration order" do
   end
 
   it "keeps the config section loader order" do
-    # The keys each loader reads, in load order. Three entries are order
+    # The keys each loader reads, in load order. Four entries are order
     # sensitive (languages after menus/taxonomies, sass after auto_includes,
+    # the search facet check after taxonomies,
     # the deployment source-dir resolver after build + deployment); pinning
     # the whole sequence is simpler than pinning the constraints.
     Hwaro::Models::Config::SECTION_LOADERS.map(&.keys.join(",")).should eq(%w[
       sitemap robots llms feeds search plugins content content content content
-      pagination highlight auto_includes og menus taxonomies languages
+      pagination highlight auto_includes og menus taxonomies search languages
       versions build serve markdown series related git permalinks assets
       sass pwa amp image_processing doctor static deployment
     ] + [""] + %w[outputs links data content content])

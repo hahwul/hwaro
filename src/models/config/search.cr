@@ -15,6 +15,13 @@ module Hwaro
       # at a word boundary.
       VALID_SHARDS = %w[none section language section-language]
 
+      # Facet names valid on every site; any taxonomy name is valid too.
+      # `tags` always is: front matter `tags` is parsed without a
+      # `[[taxonomies]]` entry.
+      BUILTIN_FACETS = %w[section lang tags]
+      # Record keys a taxonomy facet may not overwrite.
+      RESERVED_FACETS = %w[url title content description heading version]
+
       property enabled : Bool
       property format : String
       property fields : Array(String)
@@ -24,6 +31,12 @@ module Hwaro
       property shards : String
       property single_file : Bool
       property content_max_length : Int32
+      # `split_by_heading` adds one record per h2/h3 section (`url#id`);
+      # `facets` adds filterable fields to every record; `ui` publishes the
+      # built-in client under `assets/hwaro-search/` (`search_tags`).
+      property split_by_heading : Bool
+      property facets : Array(String)
+      property ui : Bool
 
       def initialize
         @enabled = false
@@ -35,6 +48,14 @@ module Hwaro
         @shards = "none"
         @single_file = true
         @content_max_length = 0
+        @split_by_heading = false
+        @facets = [] of String
+        @ui = false
+      end
+
+      # The built-in UI ships only alongside an index it can fetch.
+      def ui_enabled? : Bool
+        @enabled && @ui
       end
 
       def sharded? : Bool
@@ -76,6 +97,30 @@ module Hwaro
           max_len = 0
         end
         config.search.content_max_length = max_len
+        config.search.split_by_heading = bool_value(s["split_by_heading"]?, config.search.split_by_heading)
+        if facets = string_list?(s["facets"]?, "[search] facets")
+          config.search.facets = facets.uniq
+        end
+        config.search.ui = bool_value(s["ui"]?, config.search.ui)
+        if config.search.ui && config.search.format.downcase.ends_with?("_javascript")
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "[search] ui = true needs a JSON index, but format is '#{config.search.format}'. The built-in UI fetches the index on first open; a *_javascript index is a `var searchData = ...` script it cannot load.",
+            hint: "Set [search] format = \"fuse_json\" or \"elasticlunr_json\", or drop ui = true.",
+          )
+        end
+        Logger.warn "[search] ui = true has no effect while [search] enabled = false" if config.search.ui && !config.search.enabled
+      end
+
+      # Facets name taxonomies, so they are checked after `load_taxonomies`.
+      # An unknown name is dropped with a warning, never an error.
+      private def self.validate_search_facets(config : Config)
+        return if config.search.facets.empty?
+        valid = (SearchConfig::BUILTIN_FACETS + config.taxonomies.map(&.name)).uniq - SearchConfig::RESERVED_FACETS
+        unknown = config.search.facets.reject { |f| valid.includes?(f) }
+        return if unknown.empty?
+        Logger.warn "Ignoring unknown [search] facets #{unknown.join(", ")} (valid: #{valid.join(", ")})"
+        config.search.facets = config.search.facets - unknown
       end
     end
   end
