@@ -140,7 +140,7 @@ module Hwaro
               rule.allow = string_or_array(rule_h["allow"]?)
               rule.disallow = string_or_array(rule_h["disallow"]?)
               if signal = rule_h["content_signal"]?
-                rule.content_signal = robots_content_signal(signal)
+                rule.content_signal = robots_content_signal(signal, user_agent)
               end
               rule
             end
@@ -152,24 +152,26 @@ module Hwaro
       # → ordered (name, value) pairs. Anything but a table of known bool
       # keys is a config error: a typo'd key silently dropping an
       # `ai-train=no` would publish the opposite of what the site asked for.
-      private def self.robots_content_signal(raw : TOML::Any) : Array({String, Bool})
+      private def self.robots_content_signal(raw : TOML::Any, user_agent : String) : Array({String, Bool})
+        where = "[robots] rules (user_agent #{user_agent.inspect}) content_signal"
         table = raw.as_h? || raise Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_CONFIG,
-          message: "Invalid [robots] rules content_signal = #{raw.raw.inspect}: expected a table.",
+          message: "Invalid #{where} = #{raw.raw.inspect}: expected a table.",
           hint: "Use content_signal = { search = true, ai_input = true, ai_train = false }.",
         )
         table.each do |key, value|
           unless RobotsRule::CONTENT_SIGNAL_KEYS.has_key?(key)
+            suggestion = Utils::CommandSuggester.suggest(key, RobotsRule::CONTENT_SIGNAL_KEYS.keys).try { |k| "Did you mean '#{k}'? " } || ""
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_CONFIG,
-              message: "Unknown [robots] rules content_signal key #{key.inspect}.",
-              hint: "Valid keys are search, ai_input and ai_train.",
+              message: "Unknown #{where} key #{key.inspect}.",
+              hint: "#{suggestion}Valid keys are search, ai_input and ai_train.",
             )
           end
           if value.as_bool?.nil?
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_CONFIG,
-              message: "Invalid [robots] rules content_signal #{key} = #{value.raw.inspect}: expected true or false.",
+              message: "Invalid #{where} #{key} = #{value.raw.inspect}: expected true or false.",
               hint: "Set #{key} = true or #{key} = false, or remove it.",
             )
           end

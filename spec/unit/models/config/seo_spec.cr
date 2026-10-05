@@ -925,9 +925,11 @@ describe Hwaro::Models::Config do
       config.robots.rules[1].content_signal.should be_empty
     end
 
-    it "rejects an unknown key" do
-      err = expect_config_error(%([robots]\nrules = [{ user_agent = "*", content_signal = { ai_trian = false } }]\n))
+    it "rejects an unknown key, naming the rule and suggesting the closest key" do
+      err = expect_config_error(%([robots]\nrules = [{ user_agent = "*" }, { user_agent = "GPTBot", content_signal = { ai_trian = false } }]\n))
       err.message.to_s.should contain("ai_trian")
+      err.message.to_s.should contain(%(user_agent "GPTBot"))
+      err.hint.to_s.should contain("Did you mean 'ai_train'?")
     end
 
     it "rejects a non-bool value" do
