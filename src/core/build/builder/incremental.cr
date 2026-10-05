@@ -964,7 +964,7 @@ module Hwaro
                               selected = renderable_pages.select do |page|
                                 entry = determine_template(page, templates, site)
                                 affected_templates.includes?(entry) ||
-                                  deps.shortcodes_used_in(page.raw_content).any? { |sc| affected_templates.includes?(sc) } ||
+                                  page_scan_texts(page).any? { |text| deps.shortcodes_used_in(text).any? { |sc| affected_templates.includes?(sc) } } ||
                                   format_templates_affected?(page, templates, site, affected_templates)
                               end
                               seen = selected.map(&.path).to_set

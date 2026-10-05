@@ -211,20 +211,22 @@ module Hwaro::Core::Build::Phases::Render
     )
   end
 
-  # Shortcode templates (`shortcodes/<name>`) the page's content calls.
-  # Empty without a dependency graph — the closure scan then reads every
-  # template anyway.
+  # Shortcode templates (`shortcodes/<name>`) the page's content calls,
+  # included text counted (`page_scan_texts`). Empty without a dependency
+  # graph — the closure scan then reads every template anyway.
   private def page_shortcode_templates(page : Models::Page) : Set(String)
     deps = @template_deps
     return Set(String).new unless deps
-    raw = page.raw_content
+    texts = page_scan_texts(page)
+    key = texts.last
     @page_template_hash_mutex.synchronize do
-      if (memo = @page_shortcodes_memo[page.path]?) && memo[0].same?(raw) && memo[1].same?(deps)
+      if (memo = @page_shortcodes_memo[page.path]?) && memo[0].same?(key) && memo[1].same?(deps)
         return memo[2]
       end
     end
-    used = deps.shortcodes_used_in(raw)
-    @page_template_hash_mutex.synchronize { @page_shortcodes_memo[page.path] = {raw, deps, used} }
+    used = Set(String).new
+    texts.each { |text| used.concat(deps.shortcodes_used_in(text)) }
+    @page_template_hash_mutex.synchronize { @page_shortcodes_memo[page.path] = {key, deps, used} }
     used
   end
 
@@ -851,12 +853,14 @@ module Hwaro::Core::Build::Phases::Render
       end
   end
 
-  # The `@/` link targets in a page's raw content, sorted and unique.
+  # The `@/` link targets in a page's content (included text counted),
+  # sorted and unique.
   private def internal_link_targets(page : Models::Page) : Array(String)
-    raw = page.raw_content
-    return [] of String unless Utils::ByteScan.includes?(raw, "@/")
     targets = [] of String
-    raw.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << (m[1]? || m[2]) }
+    page_scan_texts(page).each do |text|
+      next unless Utils::ByteScan.includes?(text, "@/")
+      text.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << (m[1]? || m[2]) }
+    end
     targets.uniq!.sort!
   end
 
@@ -865,22 +869,25 @@ module Hwaro::Core::Build::Phases::Render
     page.backlinks.each { |p| fp_relation(digest, p, fields) }
   end
 
-  # `target=resolution` for each distinct wikilink in a page's raw content:
+  # `target=resolution` for each distinct wikilink in a page's content
+  # (raw, and include-expanded, so a transcluded note's links count too):
   # the linked page's path and URL, or an embed's file URL. Empty unless
   # `[markdown] wikilinks`.
   private def wikilink_resolutions(page : Models::Page) : Array(String)
     return [] of String unless index = @wikilink_index
     values = Set(String).new
-    Content::Processors::Wikilinks.each_link(page.raw_content, math: site_math?) do |link|
-      next unless link.is_a?(Content::Processors::Wikilinks::Link)
-      next if link.target.empty?
-      resolved = if link.image?
-                   index.resolve_file(link.target, page) || ""
-                 else
-                   index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } ||
-                     (index.resolve_file(link.target, page) if link.file?) || ""
-                 end
-      values << "#{link.embed ? '!' : ' '}#{link.target}=#{resolved}"
+    page_scan_texts(page).each do |text|
+      Content::Processors::Wikilinks.each_link(text, math: site_math?) do |link|
+        next unless link.is_a?(Content::Processors::Wikilinks::Link)
+        next if link.target.empty?
+        resolved = if link.image?
+                     index.resolve_file(link.target, page) || ""
+                   else
+                     index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } ||
+                       (index.resolve_file(link.target, page) if link.file?) || ""
+                   end
+        values << "#{link.embed ? '!' : ' '}#{link.target}=#{resolved}"
+      end
     end
     values.to_a.sort!
   end

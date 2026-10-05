@@ -171,6 +171,65 @@ to find the dead embed on the published page:
 [WARN] Shortcode `codepen` is missing required argument `user` — it renders a broken embed. Usage: `{{ codepen(user="…", id="…") }}`.
 ```
 
+### include_code
+
+Include a source file, or part of it, as a fenced code block. The block goes through the normal code pipeline: highlighting, [fence options](/features/syntax-highlighting/), the copy button and render-codeblock hooks.
+
+```markdown
+{{ include_code(path="examples/site/config.toml") }}
+{{ include_code(path="examples/site/config.toml", region="feeds", lines="2-8", title="config.toml", hl_lines="3") }}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `path` | (required) | File path, relative to the project root |
+| `region` | (none) | Only the lines between `#region <name>` and `#endregion <name>` |
+| `lines` | (none) | Line range `a-b` or a single line `a` (1-based, inclusive; counted inside `region` when both are set) |
+| `lang` | from the extension | Language of the code block |
+| `title`, `hl_lines`, `hide_lines`, `linenos`, `linenostart`, `copy` | | Passed on as fence options |
+
+Region markers can follow any comment leader, so they stay valid code in the source file:
+
+```crystal
+module App
+  # #region server
+  def run
+    serve
+  end
+  # #endregion server
+end
+```
+
+`//`, `#`, `--`, `<!--`, `/*` and `;` all work, and a bare `#endregion` closes the innermost open region. The markers, and any nested markers inside the selected region, are left out of the output. Without `region`, the file is included as it is. Common leading indentation is removed.
+
+### include_md
+
+Render a Markdown file in place, as if its text were written at that spot.
+
+```markdown
+{{ include_md(path="shared/install.md") }}
+{{ include_md(path="shared/install.md", region="brew") }}
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `path` | (required) | File path, relative to the project root |
+| `region` | (none) | Only the lines between `<!-- #region <name> -->` and `<!-- #endregion <name> -->` |
+
+Shortcodes inside the included file expand, and its headings take part in the page's table of contents and heading ids. Its front matter is dropped. An included file can include others, up to 8 levels deep. A cycle is an error that shows the chain.
+
+#### Paths and errors
+
+Both shortcodes read files under the project root only. Absolute paths, `..`, symlinks that resolve outside the project, the build output directory and `.hwaro/` are refused. A missing file or region, a line range outside the file, or a refused path fails the build with an error that names the page and the file:
+
+```
+Error [HWARO_E_TEMPLATE]: {{ include_code(path="examples/app.cr", region="srv") }} in content/guide.md: region 'srv' not found
+```
+
+An included file is a dependency of the page that includes it. A warm `--cache` build and `hwaro serve` both re-render the page when the file changes, including files outside `content/`.
+
+A call inside a code span, a fenced code block or a `{% raw %}` region stays literal.
+
 > To override any built-in shortcode, create a file with the same name in `templates/shortcodes/` (e.g., `templates/shortcodes/youtube.html`). User templates always take priority — and define their own contract, so the warning above does not apply to them.
 
 ## Creating Custom Shortcodes

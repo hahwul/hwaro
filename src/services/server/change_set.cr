@@ -256,7 +256,7 @@ module Hwaro
         files.size == 1 && !@config_changed ? files.first : description
       end
 
-      private def all_changed_files : Array(String)
+      def all_changed_files : Array(String)
         @modified_content + @modified_content_files + @modified_templates +
           @modified_static + @modified_data + @added_files + @removed_files
       end

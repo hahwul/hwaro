@@ -235,6 +235,27 @@ module Hwaro
           false
         end
 
+        # Project-relative paths every include call and transclusion has read
+        # since the last full build (see Builder@include_sources).
+        def include_sources : Array(String)
+          @include_sources_mutex.synchronize { @include_sources.keys }
+        end
+
+        # True when the include source `path` no longer holds the bytes the
+        # last build read (`digest` is the watcher's MD5, nil when missing).
+        def include_source_stale?(path : String, digest : String?) : Bool
+          @include_sources_mutex.synchronize { @include_sources.has_key?(path) && @include_sources[path] != digest }
+        end
+
+        # True when one of `paths` (watcher paths) was read by an include call
+        # or a transclusion: the pages that include it must re-render.
+        def include_source_changed?(paths : Array(String)) : Bool
+          return false if paths.empty?
+          @include_sources_mutex.synchronize do
+            paths.any? { |path| @include_sources.has_key?(Path[path].normalize.to_posix.to_s) }
+          end
+        end
+
         # Map source paths that were removed from disk to the output files
         # they produced in the last build. A rebuild rewrites surviving pages
         # but never deletes what's gone, so the serve watcher captures this

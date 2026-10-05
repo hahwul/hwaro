@@ -121,7 +121,7 @@ math_engine = "katex"
 | math_engine | string | "katex" | 수식 렌더링 엔진 (`"katex"` 또는 `"mathjax"`) |
 | smart_punctuation | bool | false | 타이포그래피용 인용부호/대시/줄임표 (`"x"` → “x”, `--` → –, `...` → …) |
 | containers | bool | false | `:::note Title` … `:::` 커스텀 컨테이너 (admonition 마크업) |
-| wikilinks | bool | false | Obsidian 문법: `[[위키링크]]`, `![[이미지]]` 임베드, 접을 수 있는 `> [!type]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
+| wikilinks | bool | false | Obsidian 문법: `[[위키링크]]`, `![[이미지]]` 임베드, `![[노트]]` 트랜스클루전, 접을 수 있는 `> [!type]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
 | insert_anchor_links | string | "none" | 사이트 전역 헤딩 앵커 링크: `"none"`, `"left"`, `"right"` (페이지 프론트 매터가 우선) |
 | external_links_target_blank | bool | false | 절대 http(s) 링크에 `target="_blank" rel="noopener"` 추가 |
 | external_links_no_follow | bool | false | 절대 http(s) 링크에 `rel="nofollow"` 추가 |

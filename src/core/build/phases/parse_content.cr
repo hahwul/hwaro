@@ -93,6 +93,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       end
 
       shortcode_results = {} of String => String
+      summary_md = expand_includes(summary_md, page, site)
       processed = if content_may_contain_shortcodes?(summary_md)
                     context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
                     process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
@@ -134,8 +135,11 @@ module Hwaro::Core::Build::Phases::ParseContent
       # phase — fall back to plain-Markdown rendering (same config flags,
       # critically including safe mode). Still resolve `@/` links: body
       # render never sees render:false summaries, and strict mode would
-      # otherwise miss broken links that ship in listings.
-      Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
+      # otherwise miss broken links that ship in listings. An include
+      # failure on a rendered page is the body render's to report (once).
+      unless page.render && ex.is_a?(Content::Processors::Includes::IncludeError)
+        Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
+      end
       fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
       pbp = (pages_by_path ||= begin
         map = {} of String => Models::Page
@@ -200,6 +204,13 @@ module Hwaro::Core::Build::Phases::ParseContent
     return had if page.description
     raw = page.raw_content
     return had if raw.strip.empty?
+    raw = begin
+      expanded_raw_content(page, site)
+    rescue ex : Content::Processors::Includes::IncludeError
+      # The body render reports it; only a page that never renders warns.
+      raise ex unless page.render
+      return had
+    end
 
     md_config = site.config.markdown
     shortcode_results = {} of String => String
@@ -299,6 +310,217 @@ module Hwaro::Core::Build::Phases::ParseContent
       end
     end
     result
+  end
+
+  # `{{ include_code(…) }}` / `{{ include_md(…) }}`, plus an own-line
+  # `![[note]]` / `![[note#Heading]]` under `[markdown] wikilinks`.
+  INCLUDE_CALL_RE    = /\{\{-?\s*include_(code|md)\s*\((.*?)\)\s*-?\}\}/
+  TRANSCLUDE_LINE_RE = /\A([ \t>]*)!\[\[([^\[\]\n]+)\]\][ \t]*\r?\n?\z/
+  # What may precede a call alone on its line: indentation, blockquote
+  # markers and one list marker. The spliced lines repeat it (the marker as
+  # spaces), so an include stays inside its list item or quote.
+  INCLUDE_PREFIX_RE = /\A[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?\z/
+  LIST_MARKER_RE    = /[-*+]|\d{1,9}[.)]/
+
+  # `content` with its include calls and transclusions replaced by the text
+  # they name (see Content::Processors::Includes). Runs before shortcodes,
+  # with the shortcode pass's own fence walk and code-span / `{% raw %}`
+  # masks, so the spliced Markdown is processed as if written in place and
+  # a call shown in code stays literal. One pass per line: spliced text is
+  # never scanned again here (nested calls were expanded by the recursion
+  # that produced it). Every file read is recorded as a render input
+  # (`--cache`) and an include source (serve). `chain` lists what is being
+  # expanded, outermost first: project-relative paths, `path#slug` for a
+  # heading section.
+  private def expand_includes(content : String, page : Models::Page, site : Models::Site, chain : Array(String)? = nil) : String
+    transclude = !@wikilink_index.nil? && Utils::ByteScan.includes?(content, "![[")
+    return content unless transclude || Utils::ByteScan.includes?(content, "include_")
+    chain ||= [File.join("content", page.path)]
+    math = transclude && site.config.markdown.math
+    map_shortcode_chunks(content) do |chunk|
+      masked, spans = mask_inline_code(chunk)
+      masked = mask_raw_blocks(masked, spans)
+      # With `[markdown] math`, math is stashed out first, as the wikilink
+      # walk does, so an embed inside display math stays literal.
+      expanded = if math && masked.includes?('$')
+                   Content::Processors::MarkdownExtensions.protect_math(masked) do |stashed, sources|
+                     expand_include_lines(stashed, sources, spans, transclude, page, site, chain)
+                   end
+                 else
+                   expand_include_lines(masked, [] of String, spans, transclude, page, site, chain)
+                 end
+      unmask_inline_code(expanded, spans)
+    end
+  end
+
+  # The line pass of `expand_includes` over one masked chunk (math stashed
+  # as `math_sources` when on; include calls see the math restored).
+  private def expand_include_lines(text : String, math_sources : Array(String), spans : Array(String), transclude : Bool,
+                                   page : Models::Page, site : Models::Site, chain : Array(String)) : String
+    # The chunk walk does not split at a fence inside a block-shortcode
+    # body; this tracker sees only body lines and keeps those literal.
+    body_lines = block_body_lines(text)
+    body_fences = Content::Processors::FenceTracker.new(raw_html_code: false)
+    # What the wikilink rewrite leaves alone: raw HTML blocks (and code).
+    verbatim_lines = Content::Processors::FenceTracker.new
+    String.build(text.bytesize) do |io|
+      text.each_line(chomp: false).with_index do |line, i|
+        fenced = (body_lines[i]? || false) && body_fences.fence_line?(line)
+        verbatim = verbatim_lines.fence_line?(line) || verbatim_lines.html_block_line?
+        if fenced
+          io << line
+        elsif transclude && !verbatim && (m = TRANSCLUDE_LINE_RE.match(line)) &&
+              (spliced = transclusion(m[2], m[1], page, site, chain))
+          io << spliced
+          io << '\n' if line.ends_with?('\n')
+        else
+          line = Content::Processors::MarkdownExtensions.restore_math(line, math_sources) unless math_sources.empty?
+          io << expand_include_calls(line, spans, page, site, chain)
+        end
+      end
+    end
+  end
+
+  # One masked line with its `include_*` calls replaced.
+  private def expand_include_calls(line : String, spans : Array(String), page : Models::Page, site : Models::Site, chain : Array(String)) : String
+    return line unless line.includes?("include_")
+    line.gsub(INCLUDE_CALL_RE) do |call, md|
+      # A project's own `templates/shortcodes/include_*.html` wins, as it
+      # does over every built-in; the shortcode pass renders it.
+      next call if @templates.try(&.has_key?("shortcodes/include_#{md[1]}"))
+      prefix = INCLUDE_PREFIX_RE.matches?(md.pre_match) ? md.pre_match : nil
+      own_line = prefix && md.post_match.blank?
+      args = parse_shortcode_args_jinja(unmask_inline_code(md[2], spans))
+      text = begin
+        md[1] == "code" ? include_code_text(args) : include_md_text(args, page, site, chain)
+      rescue ex : Content::Processors::Includes::Error
+        raise Content::Processors::Includes::IncludeError.new("#{unmask_inline_code(call, spans)} in #{chain.last}: #{ex.message}")
+      end
+      text = text.rstrip('\n') if own_line || md[1] == "md"
+      text = "\n#{text}" if md[1] == "code" && !own_line
+      prefix ? text.gsub('\n', "\n#{prefix.gsub(LIST_MARKER_RE) { |marker| " " * marker.size }}") : text
+    end
+  end
+
+  # The page's raw content with includes and transclusions expanded,
+  # memoised per build (see @expanded_raw_memo). Raises like
+  # expand_includes; a failure is not memoised, so the render re-raises it.
+  private def expanded_raw_content(page : Models::Page, site : Models::Site) : String
+    raw = page.raw_content
+    index = @wikilink_index
+    unless Utils::ByteScan.includes?(raw, "include_") || (index && Utils::ByteScan.includes?(raw, "![["))
+      return raw
+    end
+    @include_sources_mutex.synchronize do
+      memo = @expanded_raw_memo[page.path]?
+      return memo[2] if memo && memo[0].same?(raw) && memo[1] == index
+    end
+    expanded = expand_includes(raw, page, site)
+    @include_sources_mutex.synchronize { @expanded_raw_memo[page.path] = {raw, index, expanded} }
+    expanded
+  end
+
+  # What a per-page scan reads (shortcodes used, `@/` targets, wikilinks):
+  # the raw content, plus its include-expanded form when that differs, so
+  # what an included file brings in counts for the includer. A failing
+  # include scans as raw; the render reports it.
+  private def page_scan_texts(page : Models::Page) : Array(String)
+    raw = page.raw_content
+    return [raw] unless site = @site
+    expanded = begin
+      expanded_raw_content(page, site)
+    rescue Hwaro::HwaroError
+      raw
+    end
+    expanded == raw ? [raw] : [raw, expanded]
+  end
+
+  private def include_code_text(args : Hash(String, String)) : String
+    relative = include_relative_path(args)
+    text = read_include(relative)
+    text = Content::Processors::Includes.region(text, args["region"], markdown: false) if args["region"]?
+    text = Content::Processors::Includes.lines(text, args["lines"]) if args["lines"]?
+    lang = args["lang"]? || Content::Processors::Includes.language_for(relative)
+    Content::Processors::Includes.fenced(Content::Processors::Includes.dedent(text), lang, args)
+  end
+
+  private def include_md_text(args : Hash(String, String), page : Models::Page, site : Models::Site, chain : Array(String)) : String
+    relative = include_relative_path(args)
+    check_include_chain(relative, chain)
+    text = Content::Processors::Includes.strip_front_matter(read_include(relative))
+    text = Content::Processors::Includes.region(text, args["region"], markdown: true) if args["region"]?
+    expand_includes(text, page, site, chain + [relative])
+  end
+
+  # The `path` argument (or the first positional one).
+  private def include_relative_path(args : Hash(String, String)) : String
+    Content::Processors::Includes.relative_path(args["path"]? || args["_0"]? || "")
+  end
+
+  # The file's text, recorded as a dependency when it was read or is
+  # missing (a page rendered while it is missing changes once it appears).
+  # A refused path is never recorded: watching one inside the output would
+  # be a serve rebuild loop.
+  private def read_include(relative : String) : String
+    raw = Content::Processors::Includes.read(relative, include_output_dir)
+    record_include_source(relative, Digest::MD5.hexdigest(raw))
+    Content::Processors::Includes.clean(raw)
+  rescue ex : Content::Processors::Includes::MissingFile
+    record_include_source(relative)
+    raise ex
+  end
+
+  private def check_include_chain(relative : String, chain : Array(String)) : Nil
+    if chain.includes?(relative)
+      raise Content::Processors::Includes::Error.new("include cycle: #{(chain + [relative]).join(" → ")}")
+    end
+    if chain.size > Content::Processors::Includes::MAX_DEPTH
+      raise Content::Processors::Includes::Error.new("include depth limit (#{Content::Processors::Includes::MAX_DEPTH}) exceeded: #{(chain + [relative]).join(" → ")}")
+    end
+  end
+
+  # The resolved page's Markdown (or its `#Heading` section) for an
+  # own-line `![[inner]]`, wrapped in a `.transclusion` div; nil leaves the
+  # line to the wikilink rewrite (an image or file embed, an unresolved
+  # target — reported there — or a heading the page does not have). The
+  # cycle check is per section, so a note may embed its own other heading.
+  private def transclusion(inner : String, prefix : String, page : Models::Page, site : Models::Site, chain : Array(String)) : String?
+    return unless index = @wikilink_index
+    link = Content::Processors::Wikilinks.parse(inner, true)
+    return if link.nil? || link.target.empty? || link.image? || link.file?
+    return unless target = index.resolve(link.target, page)
+    relative = File.join("content", target.path)
+    record_include_source(relative)
+    body = Content::Processors::Includes.clean(target.raw_content)
+    key = relative
+    if heading = link.heading
+      unless body = Content::Processors::Includes.heading_section(body, heading)
+        if @wikilink_warnings.first?(page.path, inner)
+          Logger.warn "Transclusion '![[#{inner}]]' in '#{page.path}': '#{target.path}' has no heading '#{heading}'; rendering a link."
+        end
+        return
+      end
+      key = "#{relative}##{Utils::TextUtils.slugify(heading)}"
+    end
+    begin
+      check_include_chain(key, chain)
+    rescue ex : Content::Processors::Includes::Error
+      raise Content::Processors::Includes::IncludeError.new("![[#{inner}]] in #{chain.last}: #{ex.message}")
+    end
+    body = expand_includes(body, page, site, chain + [key]).rstrip('\n')
+    source = HTML.escape(site.config.with_base_path(target.url))
+    # The closing blank line ends the `</div>` HTML block, so the next line
+    # is Markdown again (otherwise it is raw HTML, dropped under `safe`).
+    %(<div class="transclusion" data-source="#{source}">\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
+  end
+
+  private def include_output_dir : String?
+    @context.try(&.options.output_dir)
+  end
+
+  private def record_include_source(relative : String, digest : String? = nil) : Nil
+    Content::Processors::TemplateEngine.record_file_read(relative)
+    @include_sources_mutex.synchronize { @include_sources[relative] = digest }
   end
 
   # Default parsing when no hooks are registered.
