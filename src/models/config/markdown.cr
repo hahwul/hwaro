@@ -101,13 +101,25 @@ module Hwaro
       # the browser as literal TeX. Templates can opt out by overriding the
       # `{{ math_tags }}` variable or by leaving `math = false` and inlining
       # their own includes via [auto_includes].
-      def math_tags : String
+      #
+      # `csp` (`[csp]` on) starts KaTeX from an inline script instead of an
+      # `onload=` attribute, which a hash-based policy cannot allow.
+      def math_tags(csp : Bool = false) : String
         return "" unless @math
         case @math_engine
         when "katex"
           # auto-render finds class="math math-{inline,display}" automatically
           # and replaces the inner TeX with rendered KaTeX. Pinned KaTeX 0.16.x
           # to avoid surprise major-version churn in build outputs.
+          if csp
+            # Deferred scripts run before DOMContentLoaded fires.
+            return <<-HTML.gsub('\n', "")
+              <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"></script>
+              <script>document.addEventListener("DOMContentLoaded",function(){renderMathInElement(document.body);});</script>
+              HTML
+          end
           <<-HTML.gsub('\n', "")
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
             <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>

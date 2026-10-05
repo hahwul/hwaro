@@ -26,6 +26,7 @@ require "./parallel"
 require "./data_disk"
 require "./remote_data"
 require "./privacy"
+require "./csp"
 require "./content_generate"
 require "./template_deps"
 require "./template_loader"
@@ -168,6 +169,9 @@ module Hwaro
         # build renders them again instead of keeping the external URL.
         # Guarded by @page_derived_mutex.
         @privacy_incomplete : Set(String) = Set(String).new
+        # `[csp]`: each HTML file's policy as the Finalize pass emitted it,
+        # checked again after `[build] hooks.post` (nil when CSP is off).
+        @csp_policies : Hash(String, String)? = nil
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
@@ -881,6 +885,7 @@ module Hwaro
               Logger.warn "Post-build hooks failed, but build was successful."
             end
             warn_integrity_changed_by_post_hooks(stale_before)
+            warn_csp_changed_by_post_hooks(config)
           end
 
           if options.debug
@@ -899,6 +904,14 @@ module Hwaro
           Utils::SriCache.stale.each do |path|
             next if stale_before.includes?(path)
             Logger.warn "[build] hooks.post changed #{path} after its integrity was printed into pages; browsers will block it. Rewrite it in hooks.pre (into static/) instead."
+          end
+        end
+
+        # Same for `[csp]`: the policies hash the inline bytes Finalize saw.
+        private def warn_csp_changed_by_post_hooks(config : Models::Config)
+          return unless policies = @csp_policies
+          Csp.changed_pages(config.csp, policies).each do |path|
+            Logger.warn "[build] hooks.post changed inline scripts or styles in #{path} after its Content-Security-Policy was computed; browsers will block them. Make the change in hooks.pre or a template instead."
           end
         end
 

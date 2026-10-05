@@ -9,6 +9,8 @@ module Hwaro::Core::Build::Phases::Finalize
     profiler.start_phase("Finalize")
     result = @lifecycle.run_phase(Lifecycle::Phase::Finalize, ctx) do
       build_cache = @cache || raise "Cache not initialized"
+      # Claimed before the prune so a `--cache` build keeps the headers file.
+      claim_csp_headers_file(ctx)
       # Serve rebuilds keep their output directory; see
       # `sweep_stale_derived_outputs` (a no-op on the first build).
       sweep_stale_derived_outputs(ctx.options.output_dir)
@@ -20,6 +22,9 @@ module Hwaro::Core::Build::Phases::Finalize
       end
       # Files a failed serve pass relocated away from (a no-op otherwise).
       settle_page_outputs(ctx.options.output_dir)
+      # After the prune, so only live pages are hashed; after every writer,
+      # so the hashes cover the final bytes.
+      apply_csp(ctx)
       # Cache hits and fast-start's deferred pages were not rendered here.
       write_html_stats(complete: ctx.stats.cache_hits == 0 && @deferred_pages.try(&.empty?) != false)
     end
@@ -192,5 +197,27 @@ module Hwaro::Core::Build::Phases::Finalize
     return [] of String if previous.empty?
     current = claimed.to_set
     previous.reject(&.in?(current)).map { |relative| File.join(output_dir, relative) }
+  end
+
+  # `[csp]` is on for this build: enabled, and never under `hwaro serve`,
+  # whose live-reload client and error overlay are inline.
+  private def csp_config(ctx : Lifecycle::BuildContext) : Models::CspConfig?
+    return if ctx.options.serve_mode
+    @config.try(&.csp).try { |csp| csp if csp.enabled }
+  end
+
+  private def claim_csp_headers_file(ctx : Lifecycle::BuildContext) : Nil
+    csp = csp_config(ctx)
+    return if csp.nil? || csp.meta?
+    claim_generated_output(File.join(ctx.options.output_dir, csp.headers_file))
+  end
+
+  private def apply_csp(ctx : Lifecycle::BuildContext) : Nil
+    @csp_policies = nil
+    return unless csp_config(ctx) && (config = @config)
+    output_dir = ctx.options.output_dir
+    # `[content.files]` HTML is published verbatim, like `static/`.
+    raw = ctx.raw_files.map { |file| File.expand_path(File.join(output_dir, file.relative_path)) }.to_set
+    @csp_policies = Csp.apply(config, output_dir, raw).policies
   end
 end
