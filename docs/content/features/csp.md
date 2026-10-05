@@ -132,7 +132,8 @@ Anything else your templates load from another host needs its own entry in
 
 `mode = "headers"` writes one rule per page to `headers_file`, in the
 format Netlify and Cloudflare Pages read. Paths are the page URLs and include
-the `base_url` subpath: `/`, `/blog/hello/`, `/404.html`.
+the `base_url` subpath: `/`, `/blog/hello/`, `/404.html`. Non-ASCII paths are
+percent-encoded, as browsers request them.
 
 If `static/_headers` exists, it is not replaced. Hwaro writes your file
 first, unchanged, and appends its own rules after a
@@ -157,8 +158,10 @@ A host serves `404.html` at the missing URL, where no rule matches, so the
 ## Meta Mode
 
 `mode = "meta"` injects the policy into each page as the first child of
-`<head>`, right after a leading `<meta charset>` (which must stay within the
-first 1024 bytes):
+`<head>`. When a charset declaration (`<meta charset>` or
+`<meta http-equiv="Content-Type">`) comes before any script, style or link,
+the policy goes right after it, because the declaration must stay within the
+first 1024 bytes:
 
 ```html
 <head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &apos;self&apos;; …">
@@ -166,7 +169,11 @@ first 1024 bytes):
 
 Browsers ignore `frame-ancestors`, `report-uri` and `sandbox` in a `<meta>`
 policy, so Hwaro leaves them out, and warns when you set one of them
-yourself. Pages without a `<head>` get no policy.
+yourself. Pages without a `<head>` get no policy, and Hwaro warns about them.
+
+Hwaro treats a `<meta http-equiv="Content-Security-Policy">` at that position
+as its own and replaces it on every build. Do not add a CSP `<meta>` of your
+own to templates while `[csp]` is on.
 
 ## Builds, Cache and Serve
 
