@@ -259,16 +259,36 @@ module Hwaro
         # replace the global one (no per-language override ⇒ `menus` is
         # `nil`, inheriting the global set already checked), so each is
         # validated independently against its OWN identifiers.
-        check_menu_parent_undefined(issues, "", config.menus)
+        #
+        # `[menus] auto_sections` adds one entry per top-level section, keyed
+        # by its directory, so those directories are valid parents there.
+        auto = config.menus_auto_sections.try { |name| {name, auto_section_identifiers(config)} }
+        check_menu_parent_undefined(issues, "", config.menus, auto)
         config.languages.keys.sort!.each do |code|
           lang_menus = config.languages[code].menus
-          check_menu_parent_undefined(issues, code, lang_menus) if lang_menus
+          check_menu_parent_undefined(issues, code, lang_menus, auto) if lang_menus
         end
       end
 
-      private def check_menu_parent_undefined(issues : Array(Issue), lang_code : String, menus : Hash(String, Array(Models::MenuItemConfig)))
+      # Every directory an auto section entry can be keyed by: the top-level
+      # directory of each `_index` file. Lenient (any language, drafts too):
+      # it only decides which parents count as declared.
+      private def auto_section_identifiers(config : Models::Config) : Set(String)
+        ids = Set(String).new
+        return ids unless Dir.exists?(@content_dir)
+        ContentWalk.find_content_files(@content_dir).each do |path|
+          next unless File.basename(path).starts_with?("_index.")
+          dir = Path[File.dirname(path)].relative_to(@content_dir).to_posix.to_s
+          dir = "" if dir == "."
+          Content::Menus.top_level_dir(dir, config.versions.for_path(dir)).try { |id| ids << id }
+        end
+        ids
+      end
+
+      private def check_menu_parent_undefined(issues : Array(Issue), lang_code : String, menus : Hash(String, Array(Models::MenuItemConfig)), auto : {String, Set(String)}?)
         menus.each do |menu_name, items|
           identifiers = items.map(&.identifier).to_set
+          identifiers.concat(auto[1]) if auto && auto[0] == menu_name
           scope = lang_code.empty? ? "[[menus.#{menu_name}]]" : "[[languages.#{lang_code}.menus.#{menu_name}]]"
           items.each do |item|
             parent = item.parent
