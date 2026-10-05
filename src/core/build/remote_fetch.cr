@@ -7,6 +7,8 @@
 # is ever sent back.
 
 require "http/client"
+require "openssl"
+require "socket"
 require "uri"
 
 module Hwaro
@@ -38,8 +40,14 @@ module Hwaro
         # Returns the body, the response Content-Type, and the FINAL url —
         # the one the last hop actually served. `url` is returned verbatim
         # (not round-tripped through URI) when no redirect moved it.
+        #
+        # `guard` vets every hop before it connects: it raises `FetchError`
+        # to refuse the hop, or returns the IP address it vetted, which the
+        # connection is then pinned to (so a second DNS answer can't swap in
+        # another address), or nil to connect normally.
         def fetch(url : String, headers : Hash(String, String), max_bytes : Int64,
-                  deadline : Time::Span, user_agent : String = "Hwaro") : {String, String?, String}
+                  deadline : Time::Span, user_agent : String = "Hwaro",
+                  guard : (URI -> String?)? = nil) : {String, String?, String}
           original = URI.parse(url)
           current = original
           final_url = url
@@ -56,10 +64,12 @@ module Hwaro
           loop do
             check_deadline!(started, deadline)
             validate_hop!(current)
+            pinned = guard.try(&.call(current))
             credentials &&= same_origin?(original, current)
-            client = build_client(current)
-            outcome = begin
-              client.get(current.request_target, headers: request_headers(headers, credentials, user_agent)) do |response|
+            outcome = exchange(current, pinned) do |client|
+              hop_headers = request_headers(headers, credentials, user_agent)
+              hop_headers["Host"] = host_header(current) if pinned
+              client.get(current.request_target, headers: hop_headers) do |response|
                 if response.status.redirection?
                   location = response.headers["Location"]? ||
                              raise FetchError.new("redirect (HTTP #{response.status_code}) without a Location header")
@@ -70,8 +80,6 @@ module Hwaro
                   raise FetchError.new("HTTP #{response.status_code}")
                 end
               end
-            ensure
-              client.close
             end
 
             location, body, content_type = outcome
@@ -100,11 +108,57 @@ module Hwaro
           raise FetchError.new("URL is not absolute http(s) (#{sanitized_url(uri.to_s)})")
         end
 
-        private def build_client(uri : URI) : HTTP::Client
+        # One hop's request. Every failure surfaces as `FetchError`, keeping
+        # the original message: HTTP::Client raises a bare `Exception` for a
+        # malformed response ("Invalid HTTP response"), which no caller's
+        # rescue list could name.
+        private def exchange(uri : URI, pinned : String?, & : HTTP::Client -> T) : T forall T
+          client = build_client(uri, pinned)
+          begin
+            yield client
+          ensure
+            client.close
+          end
+        rescue ex : FetchError
+          raise ex
+        rescue ex
+          raise FetchError.new(ex.message || ex.class.name, cause: ex)
+        end
+
+        private def build_client(uri : URI, pinned : String?) : HTTP::Client
+          return pinned_client(uri, pinned) if pinned
           client = HTTP::Client.new(uri)
           client.connect_timeout = CONNECT_TIMEOUT
           client.read_timeout = READ_TIMEOUT
           client
+        end
+
+        # Connect to the vetted address but speak to the URL's host: the Host
+        # header, TLS SNI and certificate verification all use the name, as
+        # HTTP::Client itself does.
+        private def pinned_client(uri : URI, ip : String) : HTTP::Client
+          host = uri.host.to_s.lchop('[').rchop(']')
+          port = effective_port(uri) || 80
+          tcp = TCPSocket.new(ip, port, connect_timeout: CONNECT_TIMEOUT)
+          tcp.read_timeout = READ_TIMEOUT
+          tcp.sync = false
+          io = if uri.scheme.try(&.downcase) == "https"
+                 begin
+                   OpenSSL::SSL::Socket::Client.new(tcp, context: OpenSSL::SSL::Context::Client.new, sync_close: true, hostname: host.rchop('.'))
+                 rescue ex
+                   tcp.close
+                   raise ex
+                 end
+               else
+                 tcp
+               end
+          HTTP::Client.new(io, host, port)
+        end
+
+        private def host_header(uri : URI) : String
+          host = uri.host.to_s
+          port = uri.port
+          port && port != (uri.scheme.try(&.downcase) == "https" ? 443 : 80) ? "#{host}:#{port}" : host
         end
 
         # Configured headers usually carry credentials; a redirect that

@@ -1194,3 +1194,40 @@ describe "[[data.remote]] serve-session memo" do
     end
   end
 end
+
+describe "[[data.remote]] malformed responses" do
+  # HTTP::Client raises a bare Exception ("Invalid HTTP response") for a
+  # response it cannot parse; on_error must still decide what happens.
+  it "follows on_error instead of crashing" do
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.local_address.port
+    spawn do
+      while client = server.accept?
+        spawn do
+          while (line = client.gets) && !line.empty?
+          end
+          client << "GARBAGE\r\n\r\n"
+          client.close
+        rescue IO::Error
+        end
+      end
+    end
+    Fiber.yield
+
+    begin
+      Dir.mktmpdir do |dir|
+        cache_dir = File.join(dir, "cache")
+        url = "http://127.0.0.1:#{port}/team.json"
+        log = with_captured_log do
+          RemoteData.load(remote_entry(url, on_error: "warn-and-skip"), cache_dir: cache_dir).should be_nil
+        end
+        log.should contain("Invalid HTTP response")
+        err = expect_raises(Hwaro::HwaroError) { RemoteData.load(remote_entry(url), cache_dir: cache_dir) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+        err.message.to_s.should contain("Invalid HTTP response")
+      end
+    ensure
+      server.close
+    end
+  end
+end
