@@ -280,7 +280,10 @@ module Hwaro
       # whole-build failure produces no new HTML to inject into. The
       # overlay clears on the next `reload` or `clear-error` message.
       # `css:<json>` swaps the matching stylesheets in place (see
-      # LiveReloadHandler#notify_css); the script opts in on connect.
+      # LiveReloadHandler#notify_css); the script opts in on connect. A swap
+      # still loading when the next `css:` arrives is retired and re-cloned
+      # from the original link, so overlapping saves never leave duplicates;
+      # a clone that fails to load falls back to a full reload.
       LIVE_RELOAD_SCRIPT = <<-JS
         <script>
         (function() {
@@ -312,16 +315,28 @@ module Hwaro
             if (existing) existing.remove();
           }
           function swapLink(link, href) {
+            var pending = link.__hwaroNext;
+            if (pending) {
+              pending.onload = pending.onerror = null;
+              pending.remove();
+            }
             var next = link.cloneNode();
+            next.removeAttribute('integrity');
             next.href = href;
-            next.onload = function() { link.remove(); };
-            next.onerror = function() { next.remove(); };
+            next.__hwaroPending = true;
+            next.onload = function() {
+              next.__hwaroPending = false;
+              link.remove();
+            };
+            next.onerror = function() { location.reload(); };
+            link.__hwaroNext = next;
             link.parentNode.insertBefore(next, link.nextSibling);
           }
           function swapCss(paths) {
             var links = document.querySelectorAll('link[rel~="stylesheet"][href]');
             var swapped = 0;
             for (var i = 0; i < links.length; i++) {
+              if (links[i].__hwaroPending) continue;
               var url = new URL(links[i].href, location.href);
               if (url.origin !== location.origin) continue;
               var path = url.pathname;
