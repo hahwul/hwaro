@@ -22,9 +22,9 @@ module Hwaro
           # The space-separated forms include `Time#to_s` output
           # ("2024-03-05 08:00:00 UTC"), which is how front matter and data
           # file datetimes reach templates.
-          T_ZONED     = {"%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%N%z"}
+          T_ZONED     = {"%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%N%z", "%Y-%m-%dT%H:%M%z"}
           T_LOCAL     = {"%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"}
-          SPACE_ZONED = {"%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d %H:%M:%S.%N %z"}
+          SPACE_ZONED = {"%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d %H:%M:%S.%N %z", "%Y-%m-%d %H:%M %z", "%Y-%m-%d %H:%M%z"}
           SPACE_LOCAL = {"%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"}
 
           # No date-only fallback for longer strings: `%Y-%m-%d` consumes only
@@ -33,7 +33,8 @@ module Hwaro
           def self.parse_string(value : String) : Time?
             return try_parse(value, "%Y-%m-%d") if value.size <= 10
             zoned, local = value[10] == 'T' ? {T_ZONED, T_LOCAL} : {SPACE_ZONED, SPACE_LOCAL}
-            if value.size > 19
+            # Longer than the zone-less minute form ("2024-01-15T10:30").
+            if value.size > 16
               zoned.each { |fmt| try_parse(value, fmt).try { |time| return time } }
             end
             local.each { |fmt| try_parse(value, fmt).try { |time| return time } }

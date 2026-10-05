@@ -258,6 +258,8 @@ describe "DateFilters" do
         "2024-01-15T10:30:00-03:30"  => "10:30 -0330",
         "2024-01-15T10:30:00+0900"   => "10:30 +0900",
         "2024-01-15 10:30:00 +09:00" => "10:30 +0900",
+        "2024-01-15T10:30+09:00"     => "10:30 +0900",
+        "2024-01-15 10:30 -05:00"    => "10:30 -0500",
       }.each do |input, expected|
         vars = {"d" => Crinja::Value.new(input)}
         render_crinja("{{ d | date(format='%H:%M %z') }}", vars).strip.should eq(expected)
