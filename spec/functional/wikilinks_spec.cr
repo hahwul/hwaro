@@ -270,6 +270,23 @@ describe "wikilinks review regressions" do
     end
   end
 
+  it "does not count a link in a block shortcode written on its opener line" do
+    build_site(
+      WIKI_CONFIG,
+      content_files: {
+        "a.md"   => "---\ntitle: A\n---\nA {% note() %}See [[foo]] inline{% end %} B\n",
+        "c.md"   => "---\ntitle: C\n---\n{% note() %}See [[foo]]\nmore\n{% end %}\n",
+        "foo.md" => "---\ntitle: Foo\n---\nfoo\n",
+      },
+      template_files: WIKI_TEMPLATES.merge({"shortcodes/note.html" => "<div class=\"note\">{{ body }}</div>"}),
+    ) do |dir|
+      wiki_main(dir, "a").should contain("See [[foo]] inline")
+      wiki_main(dir, "foo").should contain("|BL:")
+      wiki_main(dir, "foo").should_not contain("A;")
+      wiki_main(dir, "foo").should_not contain("C;")
+    end
+  end
+
   it "warns about an ambiguous wikilink once per serve session" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

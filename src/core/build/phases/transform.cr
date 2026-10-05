@@ -928,18 +928,36 @@ module Hwaro::Core::Build::Phases::Transform
 
   # A shortcode call (`{{ x() }}`) or block tag (`{% x() %}`) on one line.
   SHORTCODE_TAG_RE = /\{\{.*?\}\}|\{%.*?%\}/
+  # A block shortcode opened and closed on one line, body included.
+  SHORTCODE_LINE_BLOCK_RE = Regex.new(
+    "#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_OPEN_RE.source}.*?#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_ANY_CLOSE_RE.source}",
+    Regex::Options::IGNORE_CASE)
 
   # `raw` without its shortcode calls and block bodies, the way the
   # shortcode pass sees them: fenced code stays (FenceTracker, fed outside
   # bodies only, as process_shortcodes_jinja does) and the bodies are the
-  # matched pairs block_body_lines finds.
+  # matched pairs block_body_lines finds. On the other lines a one-line
+  # block goes whole, and an opener whose body runs on takes the rest of
+  # its line with it (that text is body too).
   private def strip_shortcode_spans(raw : String) : String
     body = block_body_lines(raw)
     tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
     String.build(raw.bytesize) do |io|
       raw.each_line(chomp: false).each_with_index do |line, i|
         next if body[i]?
-        io << (tracker.fence_line?(line) ? line : line.gsub(SHORTCODE_TAG_RE, ""))
+        if tracker.fence_line?(line)
+          io << line
+          next
+        end
+        text = line.gsub(SHORTCODE_LINE_BLOCK_RE, "")
+        if body[i + 1]?
+          opener = nil
+          text.scan(ShortcodeProcessor::BLOCK_OPEN_RE) do |m|
+            opener = m unless ShortcodeProcessor::BLOCK_ANY_CLOSE_RE.matches?(m[0])
+          end
+          text = "#{text[0, opener.begin(0)]}\n" if opener
+        end
+        io << text.gsub(SHORTCODE_TAG_RE, "")
       end
     end
   end
