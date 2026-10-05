@@ -86,8 +86,7 @@ module Hwaro
             i = lt + 1
             break if i >= n
             if starts_with?(bytes, lt, "<!--")
-              break unless close = find(bytes, "-->", lt + 4)
-              i = close + 3
+              i = comment_end(bytes, lt)
               next
             end
             # An end tag, `<!DOCTYPE>`, `<?…>` or a stray `<`.
@@ -100,7 +99,7 @@ module Hwaro
             attrs.each do |attr|
               if attr_named?(bytes, attr, "style")
                 value = attr_value(bytes, attr)
-                style_attrs << hash(HTML.unescape(value)) if value
+                style_attrs << hash(decode_attribute(value)) if value
               elsif attr[1] > 2 && name_at?(bytes, attr[0], "on")
                 handlers = true
               end
@@ -131,6 +130,40 @@ module Hwaro
           return true unless type_attr = attrs.find { |attr| attr_named?(bytes, attr, "type") }
           type = (attr_value(bytes, type_attr) || "").strip.downcase
           type.empty? || EXECUTED_SCRIPT_TYPES.includes?(type)
+        end
+
+        # An attribute value as the HTML parser decodes it: a named reference
+        # without `;` stays literal when `=` or an alphanumeric follows it
+        # (`url(a?x=1&copy=2)` keeps its `&copy`), which `HTML.unescape`
+        # alone would decode.
+        def self.decode_attribute(raw : String) : String
+          return raw unless raw.includes?('&') && raw.valid_encoding?
+          raw.gsub(/&(?:#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[a-zA-Z][a-zA-Z0-9]*;?)/) do |ref, match|
+            if ref.ends_with?(';') || ref.byte_at(1) == '#'.ord
+              HTML.unescape(ref)
+            elsif match.post_match.starts_with?('=')
+              ref
+            else
+              decoded = HTML.unescape(ref)
+              decoded == HTML.unescape("#{ref};") ? decoded : ref
+            end
+          end
+        end
+
+        # Offset just past the comment that opens at `lt`, as the tokenizer
+        # ends it: `<!-->` and `<!--->` close at once, otherwise the first
+        # `-->` or `--!>` does (or the end of the document).
+        private def self.comment_end(bytes : Bytes, lt : Int32) : Int32
+          j = lt + 4
+          return j + 1 if j < bytes.size && bytes[j] == '>'.ord
+          return j + 2 if starts_with?(bytes, j, "->")
+          while dash = find(bytes, "--", j)
+            k = dash + 2
+            return k + 1 if k < bytes.size && bytes[k] == '>'.ord
+            return k + 2 if starts_with?(bytes, k, "!>")
+            j = dash + 1
+          end
+          bytes.size
         end
 
         # One attribute as byte offsets: name start, name length, value
@@ -298,34 +331,81 @@ module Hwaro
         # when the page has no `<head>`.
         def self.inject_meta(html : String, policy : String) : String
           return html unless at = meta_position(html)
-          rest = html.byte_slice(at, html.bytesize - at)
-          if rest.starts_with?(META_PREFIX) && (close = rest.index("\">"))
-            rest = rest.byte_slice(close + 2, rest.bytesize - close - 2)
-          end
+          rest = own_meta_end(html, at) || at
           String.build(html.bytesize + policy.bytesize + 64) do |io|
             io.write(html.to_slice[0, at])
             io << META_PREFIX << Utils::TextUtils.escape_xml(policy) << %(">)
-            io << rest
+            io.write(html.to_slice[rest, html.bytesize - rest])
           end
         end
 
+        # `html` without the policy `<meta>` a previous build injected. Hwaro
+        # reads a `--cache` hit's HTML back from disk before Finalize (the
+        # AMP converter, the PWA cache name); stripping it there keeps those
+        # outputs identical to a cold build's.
+        def self.strip_meta(html : String) : String
+          return html unless (at = meta_position(html)) && (close = own_meta_end(html, at))
+          html.byte_slice(0, at) + html.byte_slice(close, html.bytesize - close)
+        end
+
+        # The end of an injected policy `<meta>` starting at `at`, if any.
+        private def self.own_meta_end(html : String, at : Int32) : Int32?
+          return unless starts_with?(html.to_slice, at, META_PREFIX)
+          Utils::ByteScan.byte_index(html, %(">), at + META_PREFIX.bytesize).try(&.+(2))
+        end
+
+        # Where the policy `<meta>` goes: just inside `<head>`, or just after
+        # a charset declaration that only `<title>` and other `<meta>` tags
+        # precede, so the declaration stays within the first 1024 bytes.
+        # Nil without a `<head>` tag.
         private def self.meta_position(html : String) : Int32?
           bytes = html.to_slice
+          return unless pos = head_content_start(bytes)
+          i = pos
+          loop do
+            break unless lt = bytes_index(bytes, '<'.ord.to_u8, i)
+            if starts_with?(bytes, lt, "<!--")
+              i = comment_end(bytes, lt)
+              next
+            end
+            name_end = lt + 1
+            while name_end < bytes.size && !tag_name_end?(bytes[name_end])
+              name_end += 1
+            end
+            attrs, tag_end = parse_attributes(bytes, name_end)
+            if name_end - lt == 5 && name_at?(bytes, lt + 1, "meta")
+              return tag_end if charset_meta?(bytes, attrs)
+              i = tag_end
+            elsif name_end - lt == 6 && name_at?(bytes, lt + 1, "title")
+              close = find_end_tag(bytes, "title", tag_end) || break
+              i = (bytes_index(bytes, '>'.ord.to_u8, close) || break) + 1
+            else
+              break
+            end
+          end
+          pos
+        end
+
+        # The offset just past the `<head>` start tag, skipping comments.
+        private def self.head_content_start(bytes : Bytes) : Int32?
           i = 0
-          while lt = bytes_index(bytes, '<'.ord.to_u8, i)
+          loop do
+            return unless lt = bytes_index(bytes, '<'.ord.to_u8, i)
+            if starts_with?(bytes, lt, "<!--")
+              i = comment_end(bytes, lt)
+              next
+            end
             if name_at?(bytes, lt + 1, "head") && (lt + 5 == bytes.size || tag_name_end?(bytes[lt + 5]))
-              _, pos = parse_attributes(bytes, lt + 5)
-              j = pos
-              while j < bytes.size && space?(bytes[j])
-                j += 1
-              end
-              if name_at?(bytes, j + 1, "meta") && bytes[j] == '<'.ord
-                attrs, after = parse_attributes(bytes, j + 5)
-                pos = after if attrs.any? { |attr| attr_named?(bytes, attr, "charset") }
-              end
-              return pos
+              return parse_attributes(bytes, lt + 5)[1]
             end
             i = lt + 1
+          end
+        end
+
+        private def self.charset_meta?(bytes : Bytes, attrs : Array(Attr)) : Bool
+          attrs.any? do |attr|
+            attr_named?(bytes, attr, "charset") ||
+              (attr_named?(bytes, attr, "http-equiv") && attr_value(bytes, attr).try(&.strip.compare("content-type", case_insensitive: true)) == 0)
           end
         end
 
@@ -385,20 +465,23 @@ module Hwaro
           policies = {} of String => String
           rules = [] of {String, String}
           handler_pages = [] of String
+          headless = [] of String
           html_files(root).each do |path|
             next if excluded.includes?(path)
             html = File.read(path)
             relative = Path[path].relative_to(root).to_posix.to_s
-            next if amp?(html) || static_copy?(relative, html)
+            next if static_copy?(relative, html) || amp?(html)
             scan = scan(html)
             handler_pages << relative if scan.handlers
             policy = policy(csp, html, scan)
             policies[path] = policy
-            if csp.meta?
+            if !csp.meta?
+              rules << {config.with_base_path(Utils::TextUtils.encode_url_path(url_path(relative))), policy}
+            elsif meta_position(html)
               updated = inject_meta(html, policy)
               Utils::FileSafe.atomic_write(path, updated) unless updated == html
             else
-              rules << {config.with_base_path(url_path(relative)), policy}
+              headless << relative
             end
           end
           unless csp.meta?
@@ -419,9 +502,10 @@ module Hwaro
             end
           end
           unless handler_pages.empty?
-            shown = handler_pages.first(5).join(", ")
-            more = handler_pages.size > 5 ? " and #{handler_pages.size - 5} more" : ""
-            Logger.warn "[csp] inline event handlers (onclick=…) are blocked by the policy on #{shown}#{more}. Move them into a script with addEventListener."
+            Logger.warn "[csp] inline event handlers (onclick=…) are blocked by the policy on #{page_list(handler_pages)}. Move them into a script with addEventListener."
+          end
+          unless headless.empty?
+            Logger.warn "[csp] no <head> to put the policy <meta> in, so these pages get no policy: #{page_list(headless)}."
           end
           Result.new(policies, handler_pages)
         end
@@ -435,6 +519,11 @@ module Hwaro
           end.sort!
         end
 
+        private def self.page_list(pages : Array(String)) : String
+          more = pages.size > 5 ? " and #{pages.size - 5} more" : ""
+          "#{pages.first(5).join(", ")}#{more}"
+        end
+
         # A verbatim copy of `static/<relative>` is the user's file, not a
         # page Hwaro rendered: left alone, like `[content.files]` copies.
         private def self.static_copy?(relative : String, html : String) : Bool
@@ -445,10 +534,17 @@ module Hwaro
         # AMP pages are left alone: the AMP runtime injects its styles at
         # run time, which a hash-based policy blocks.
         private def self.amp?(html : String) : Bool
-          return false unless at = html.index(/<html[\s>]/i)
-          close = html.index('>', at) || return false
-          tag = html[at, close - at]
-          tag.includes?('⚡') || tag.matches?(/\samp(?:[\s=>]|\z)/i)
+          bytes = html.to_slice
+          i = 0
+          while lt = bytes_index(bytes, '<'.ord.to_u8, i)
+            if lt + 5 < bytes.size && name_at?(bytes, lt + 1, "html") && tag_name_end?(bytes[lt + 5])
+              return parse_attributes(bytes, lt + 5)[0].any? do |attr|
+                attr_named?(bytes, attr, "amp") || bytes[attr[0], attr[1]] == "⚡".to_slice
+              end
+            end
+            i = lt + 1
+          end
+          false
         end
 
         private def self.html_files(root : String) : Array(String)

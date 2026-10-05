@@ -87,6 +87,24 @@ describe Hwaro::Core::Build::Csp do
       Csp.scan(%(<button type="button" onClick="go()">x</button>)).handlers.should be_true
     end
 
+    it "ends comments where the tokenizer does" do
+      Csp.scan(%(<!--><script>a</script><!-- x -->)).scripts.should eq([sha("a")])
+      Csp.scan(%(<!---><script>b</script>)).scripts.should eq([sha("b")])
+      Csp.scan(%(<!-- x --!><script>c</script>)).scripts.should eq([sha("c")])
+    end
+
+    it "keeps a semicolon-less reference before = or an alphanumeric literal in style attributes" do
+      Csp.scan(%(<p style="background:url(a?x=1&copy=2)">)).style_attrs.should eq([sha("background:url(a?x=1&copy=2)")])
+      Csp.scan(%(<p style="content:'&copyx'">)).style_attrs.should eq([sha("content:'&copyx'")])
+      Csp.scan(%(<p style="content:'&copy &amp; &#65;'">)).style_attrs.should eq([sha("content:'© & A'")])
+    end
+
+    it "does not raise on bytes that are not UTF-8" do
+      html = String.new(Bytes[60, 104, 101, 97, 100, 62, 60, 112, 32, 115, 116, 121, 108, 101, 61, 34, 0xe9, 38, 97, 109, 112, 59, 34, 62, 0xff])
+      Csp.scan(html).style_attrs.size.should eq(1)
+      Csp.inject_meta(html, "p").should start_with(%(<head><meta http-equiv="Content-Security-Policy" content="p">))
+    end
+
     it "does not read attributes inside a script body" do
       scan = Csp.scan(%(<script>var s = '<p style="x" onclick="y">';</script>))
       scan.style_attrs.should be_empty
@@ -157,6 +175,20 @@ describe Hwaro::Core::Build::Csp do
         %(<head>\n  <meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="p">\n<title>t</title>))
     end
 
+    it "goes after a charset declaration that only <title> and <meta> precede" do
+      Csp.inject_meta(%(<head><!-- c --><title>a<b</title><meta name="viewport" content="x"><meta charset="utf-8"><link rel="icon">), "p").should eq(
+        %(<head><!-- c --><title>a<b</title><meta name="viewport" content="x"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="p"><link rel="icon">))
+      Csp.inject_meta(%(<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">), "p").should end_with(%(charset=utf-8"><meta http-equiv="Content-Security-Policy" content="p">))
+      Csp.inject_meta(%(<head><link rel="icon"><meta charset="utf-8">), "p").should eq(%(<head><meta http-equiv="Content-Security-Policy" content="p"><link rel="icon"><meta charset="utf-8">))
+      Csp.inject_meta(%(<!-- <head> --><html><head></head>), "p").should eq(%(<!-- <head> --><html><head><meta http-equiv="Content-Security-Policy" content="p"></head>))
+    end
+
+    it "strips its own meta" do
+      page = %(<head><meta charset="utf-8"><title>t</title></head>)
+      Csp.strip_meta(Csp.inject_meta(page, "p")).should eq(page)
+      Csp.strip_meta(page).should eq(page)
+    end
+
     it "replaces its own earlier meta and leaves a page without <head> alone" do
       once = Csp.inject_meta("<header></header><head><title>t</title></head>", "old")
       Csp.inject_meta(once, "new").should eq(%(<header></header><head><meta http-equiv="Content-Security-Policy" content="new"><title>t</title></head>))
@@ -169,6 +201,16 @@ describe Hwaro::Core::Build::Csp do
       Csp.url_path("index.html").should eq("/")
       Csp.url_path("blog/a/index.html").should eq("/blog/a/")
       Csp.url_path("404.html").should eq("/404.html")
+    end
+
+    it "percent-encodes non-ASCII paths in the headers file" do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
+        content_files: {"한글.md" => "+++\ntitle = \"K\"\n+++\nk"},
+        template_files: {"page.html" => CSP_TEMPLATE},
+      ) do
+        File.read("public/_headers").should contain("\n/%ED%95%9C%EA%B8%80/\n")
+      end
     end
 
     it "appends to the user's file, whose block for the same path and header wins" do
@@ -216,6 +258,34 @@ describe Hwaro::Core::Build::Csp do
         File.read("public/legacy.html").should eq("<head></head><script>x</script>")
         File.exists?("public/_headers").should be_false
       end
+    end
+
+    it "skips a static HTML file that is not UTF-8" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "meta"\n))
+          FileUtils.mkdir_p("templates")
+          FileUtils.mkdir_p("static")
+          File.write("templates/page.html", CSP_TEMPLATE)
+          legacy = Bytes[60, 104, 116, 109, 108, 62, 60, 104, 101, 97, 100, 62, 99, 97, 102, 0xe9, 60, 47, 104, 101, 97, 100, 62]
+          File.write("static/legacy.html", legacy)
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)).should be_true
+          File.read("public/legacy.html").to_slice.should eq(legacy)
+        end
+      end
+    end
+
+    it "warns about pages without <head> in meta mode" do
+      log = with_captured_log do
+        build_site(
+          %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "meta"\n),
+          content_files: {"a.md" => "+++\ntitle = \"A\"\n+++\na"},
+          template_files: {"page.html" => "<p>{{ content }}</p>"},
+        ) { }
+      end
+      log.should contain("[csp] no <head> to put the policy <meta> in, so these pages get no policy: a/index.html")
     end
 
     it "warns about inline event handlers" do
@@ -272,13 +342,15 @@ describe Hwaro::Core::Build::Csp do
 
     {"headers", "meta"}.each do |mode|
       it "gives a warm --cache build the cold build's bytes (#{mode} mode)" do
-        config = %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "#{mode}"\n)
-        content = {"a.md" => "+++\ntitle = \"A\"\n+++\n<p style=\"a:b\">a</p>", "b.md" => "+++\ntitle = \"B\"\n+++\nb"}
+        config = %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "#{mode}"\n[amp]\nenabled = true\n[pwa]\nenabled = true\n)
+        content = {"_index.md" => "+++\ntitle = \"Home\"\n+++\nhome", "a.md" => "+++\ntitle = \"A\"\n+++\n<p style=\"a:b\">a</p>", "b.md" => "+++\ntitle = \"B\"\n+++\nb"}
+        templates = {"page.html" => CSP_TEMPLATE, "section.html" => CSP_TEMPLATE, "index.html" => CSP_TEMPLATE}
         cold = {} of String => String
-        build_site(config, content_files: content, template_files: {"page.html" => CSP_TEMPLATE}) do
+        build_site(config, content_files: content, template_files: templates) do
+          File.exists?("public/sw.js").should be_true
           Dir.glob("public/**/*").each { |path| cold[path] = File.read(path) if File.file?(path) }
         end
-        build_site(config, content_files: content, template_files: {"page.html" => CSP_TEMPLATE}, cache: true) do
+        build_site(config, content_files: content, template_files: templates, cache: true) do
           File.write("content/b.md", "+++\ntitle = \"B\"\n+++\nb")
           builder = Hwaro::Core::Build::Builder.new
           Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
