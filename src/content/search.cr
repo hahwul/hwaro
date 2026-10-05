@@ -29,6 +29,12 @@ module Hwaro
 
       alias Entry = Hash(String, String | Array(String))
 
+      # An h2/h3 element of the rendered page, and the `id` attribute in its
+      # attribute list. `split_by_heading` cuts the page body at these.
+      SPLIT_HEADING_RE = /<h([23])\b([^>]*)>(.*?)<\/h\1\s*>/im
+      HEADING_ID_ATTR  = /\sid\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i
+      HTML_COMMENT     = /<!--.*?-->/m
+
       def self.manifest_path(output_dir : String) : String
         File.join(output_dir, SHARDS_DIR, MANIFEST_FILENAME)
       end
@@ -110,12 +116,14 @@ module Hwaro
           # An empty manifest still tells a sharded client "nothing to
           # load" instead of a 404, and pruning drops shards a previous
           # build wrote for pages that no longer exist.
-          write_shards(search_pages, [] of Entry, config, output_dir, verbose) if sharded
+          write_shards(search_pages, [] of Array(Entry), config, output_dir, verbose) if sharded
           return
         end
 
-        # Build search data based on format
-        search_data = build_search_data(search_pages, config)
+        # One group per page: its own record, then (split_by_heading) one
+        # record per h2/h3 section. Shards keep a page's group together.
+        groups = build_search_data(search_pages, config)
+        search_data = groups.flat_map(&.itself)
 
         if single_file
           # Both libraries use the same array for now, so Hwaro generates a common format and lets the client build the index.
@@ -139,7 +147,7 @@ module Hwaro
           Logger.action :create, search_path if verbose
         end
 
-        write_shards(search_pages, search_data, config, output_dir, verbose) if sharded
+        write_shards(search_pages, groups, config, output_dir, verbose) if sharded
         Logger.info "  Generated search index with #{search_pages.size} pages." if verbose
       end
 
@@ -150,6 +158,8 @@ module Hwaro
         fields = config.search.fields.map(&.downcase).select { |f| KNOWN_FIELDS.includes?(f) }.uniq!
         fields << "url" unless fields.includes?("url")
         fields << "lang" unless fields.includes?("lang")
+        fields << "heading" if config.search.split_by_heading
+        config.search.facets.each { |f| fields << f unless fields.includes?(f) }
         fields
       end
 
@@ -195,7 +205,7 @@ module Hwaro
       # and shards exist to be fetched on demand. Deterministic: shards are
       # written in id order and the manifest lists them the same way;
       # entries keep the order `search.json` uses.
-      private def self.write_shards(pages : Array(Models::Page), entries : Array(Entry), config : Models::Config, output_dir : String, verbose : Bool) : Nil
+      private def self.write_shards(pages : Array(Models::Page), entries : Array(Array(Entry)), config : Models::Config, output_dir : String, verbose : Bool) : Nil
         shards_dir = File.join(output_dir, SHARDS_DIR)
         manifest_file = manifest_path(output_dir)
         previous_ids = previous_shard_ids(manifest_file)
@@ -204,7 +214,7 @@ module Hwaro
         pages.each_with_index do |page, i|
           key = shard_key(page, config)
           group = groups[key[:id]] ||= {language: key[:language], section: key[:section], entries: [] of Entry}
-          group[:entries] << entries[i]
+          group[:entries].concat(entries[i])
         end
 
         base_path = config.base_path
@@ -275,7 +285,7 @@ module Hwaro
         # Best effort: a stale shard is harmless, a failed build is not.
       end
 
-      private def self.build_search_data(pages : Array(Models::Page), config : Models::Config) : Array(Entry)
+      private def self.build_search_data(pages : Array(Models::Page), config : Models::Config) : Array(Array(Entry))
         # Pre-lowercase field names once instead of per-page per-field
         fields = config.search.fields.map(&.downcase)
         cjk = config.search.tokenize_cjk
@@ -287,8 +297,12 @@ module Hwaro
         # and aborted the build) and normalizes a "/" path to "".
         base_path = config.base_path
 
+        split = config.search.split_by_heading
+        facets = config.search.facets
+
         pages.map do |page|
           data = Entry.new
+          html_content = nil
 
           fields.each do |field|
             case field
@@ -303,29 +317,8 @@ module Hwaro
               title = page.title.empty? ? config.title : page.title
               data["title"] = cjk ? Utils::TextUtils.tokenize_cjk(title) : title
             when "content"
-              # Convert markdown to plain text
-              # Optimization: Reuse rendered content if available. The
-              # fallback passes the site's markdown options so cache-hit
-              # pages index the same text a rendered page produces
-              # (safe-mode HTML stripping, emoji, extensions).
-              if !page.content.empty?
-                html_content = page.content
-              else
-                md = config.markdown
-                hooks = Content::Processors::RenderHooks.fallback_context(page, config)
-                html_content = Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, lazy_loading: md.lazy_loading, markdown_config: md,
-                  hooks: hooks, hooks_key: "#{page.url}:#{page.language}")
-              end
-
-              # Strip HTML tags AND decode entities so the index stores
-              # actual characters (`print("hi")`) rather than the HTML-
-              # escaped form (`print(&quot;hi&quot;)`). Client-side
-              # search libraries match on the raw stored string.
-              text_content = HTML.unescape(Utils::TextUtils.strip_html(html_content))
-              text_content = Utils::TextUtils.tokenize_cjk(text_content) if cjk
-              # Truncate the stored value (after CJK tokenization) so the
-              # configured cap bounds what actually lands in the file.
-              data["content"] = truncate_words(text_content, max_content)
+              html_content = page_html(page, config)
+              data["content"] = plain_text(html_content, cjk, max_content)
             when "tags"
               data["tags"] = page.tags
             when "url"
@@ -348,8 +341,81 @@ module Hwaro
             data["version"] = version.name
           end
 
-          data
+          # `lang` is already on every record.
+          facets.each do |facet|
+            case facet
+            when "lang"    then next
+            when "section" then data["section"] = page.section
+            when "tags"    then data["tags"] = page.tags
+            else                data[facet] = page.taxonomies[facet]? || [] of String
+            end
+          end
+
+          group = [data]
+          if split
+            html_content ||= page_html(page, config)
+            title = data["title"]? || begin
+              raw_title = page.title.empty? ? config.title : page.title
+              cjk ? Utils::TextUtils.tokenize_cjk(raw_title) : raw_title
+            end
+            page_url = data["url"].as(String)
+            heading_sections(html_content).each do |section|
+              record = data.dup
+              record["url"] = "#{page_url}##{section[:id]}"
+              record["title"] = title
+              record["heading"] = plain_text(section[:heading], cjk, 0)
+              record["content"] = plain_text(section[:body], cjk, max_content)
+              group << record
+            end
+          end
+          group
         end
+      end
+
+      # The page body as HTML. Reuses the rendered content when available;
+      # the fallback passes the site's markdown options so cache-hit pages
+      # index the same text a rendered page produces (safe-mode HTML
+      # stripping, emoji, extensions).
+      private def self.page_html(page : Models::Page, config : Models::Config) : String
+        return page.content unless page.content.empty?
+        md = config.markdown
+        hooks = Content::Processors::RenderHooks.fallback_context(page, config)
+        Processor::Markdown.render_body_cached(page.raw_content, safe: md.safe, emoji: md.emoji, lazy_loading: md.lazy_loading, markdown_config: md,
+          hooks: hooks, hooks_key: "#{page.url}:#{page.language}")
+      end
+
+      # Strip HTML tags AND decode entities so the index stores actual
+      # characters (`print("hi")`) rather than the HTML-escaped form
+      # (`print(&quot;hi&quot;)`): client-side search matches on the raw
+      # stored string. Truncation runs after CJK tokenization so the cap
+      # bounds what actually lands in the file.
+      private def self.plain_text(html : String, cjk : Bool, max : Int32) : String
+        text = HTML.unescape(Utils::TextUtils.strip_html(html))
+        text = Utils::TextUtils.tokenize_cjk(text) if cjk
+        truncate_words(text, max)
+      end
+
+      # The h2/h3 sections of a rendered page body, in document order: each
+      # heading's real `id` (as the page's own anchor links use it), its
+      # inner HTML, and the HTML up to the next h2/h3. A heading without an
+      # id still ends the previous section but yields no record: it has no
+      # anchor to link to.
+      def self.heading_sections(html : String) : Array({id: String, heading: String, body: String})
+        sections = [] of {id: String, heading: String, body: String}
+        return sections unless html.includes?("<h") || html.includes?("<H")
+        # A heading inside an HTML comment has no anchor on the page.
+        html = html.gsub(HTML_COMMENT, "") if html.includes?("<!--")
+        matches = [] of Regex::MatchData
+        html.scan(SPLIT_HEADING_RE) { |m| matches << m }
+        matches.each_with_index do |m, i|
+          next unless attr = m[2].match(HEADING_ID_ATTR)
+          id = HTML.unescape(attr[1]? || attr[2]? || attr[3]? || "")
+          next if id.empty?
+          start = m.byte_end(0)
+          stop = matches[i + 1]?.try(&.byte_begin(0)) || html.bytesize
+          sections << {id: id, heading: m[3], body: html.byte_slice(start, stop - start)}
+        end
+        sections
       end
 
       private def self.generate_javascript(search_data : Array(Entry)) : String

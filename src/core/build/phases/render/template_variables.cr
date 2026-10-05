@@ -522,6 +522,9 @@ module Hwaro::Core::Build::Phases::Render
     # that don't already exist when we reverse the direction below.
     gv = global_vars || build_global_vars(site)
     gv.each { |k, v| vars[k] = v unless vars.has_key?(k) }
+    if (by_lang = gv["__search_tags__"]?.try(&.raw)).is_a?(Hash) && (own = by_lang[page_language]?)
+      vars["search_tags"] = own.as(Crinja::Value)
+    end
 
     # Per-fence copy opt-in probe — NOTE: for pages WITH shortcodes this
     # hash is built as the shortcode pre-render context with content="",

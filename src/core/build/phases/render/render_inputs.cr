@@ -39,6 +39,11 @@ module Hwaro::Core::Build::Phases::Render
     # `?v=` above is "" under --skip-cache-busting and never covers the
     # highlight files' bytes, so fold the tags themselves.
     Utils::DigestUtils.update_length_prefixed(digest, config.highlight.tags(cache_bust, sri_root)) if sri_root
+    # `search_tags` carries i18n strings and the assets' digests.
+    Content::SearchUi.tags_by_language(config, @i18n_translations, cache_busting, sri_root).each do |lang, tags|
+      Utils::DigestUtils.update_length_prefixed(digest, lang)
+      Utils::DigestUtils.update_length_prefixed(digest, tags)
+    end
     digest.hexfinal
   end
 

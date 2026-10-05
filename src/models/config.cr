@@ -355,10 +355,11 @@ module Hwaro
       # the unknown-key warning, so a section can't be loaded without also
       # being recognised, or vice versa.
       #
-      # Order matters for exactly three entries: `languages` reads the menus
+      # Order matters for exactly four entries: `languages` reads the menus
       # and taxonomies already loaded (per-language overrides), `sass` reads
-      # `auto_includes`, and `resolve_deployment_source_dir` reads `build` and
-      # `deployment`. Everything else only reads `config.raw`.
+      # `auto_includes`, `resolve_deployment_source_dir` reads `build` and
+      # `deployment`, and the search facet check reads the taxonomies.
+      # Everything else only reads `config.raw`.
       record SectionLoader, keys : Array(String), load : Proc(Config, Nil)
 
       SECTION_LOADERS = [
@@ -378,6 +379,7 @@ module Hwaro
         SectionLoader.new(%w[og], ->(c : Config) { load_og(c) }),
         SectionLoader.new(%w[menus], ->(c : Config) { load_menus(c) }),
         SectionLoader.new(%w[taxonomies], ->(c : Config) { load_taxonomies(c) }),
+        SectionLoader.new(%w[search], ->(c : Config) { validate_search_facets(c) }),
         SectionLoader.new(%w[languages], ->(c : Config) { load_languages(c) }),
         SectionLoader.new(%w[versions], ->(c : Config) { load_versions(c) }),
         SectionLoader.new(%w[build], ->(c : Config) { load_build(c) }),

@@ -344,6 +344,15 @@ module Hwaro::Core::Build::Phases::Render
     # headers can include it unconditionally — same contract as math_tags.
     vars["pwa_tags"] = Crinja::Value.new(pwa_tags(config))
 
+    # Built-in search UI (`[search] ui = true`): "" while off. The tags
+    # carry per-language i18n strings, so a multilingual site keeps one
+    # string per language and each page picks its own (template_variables).
+    search_tags = Content::SearchUi.tags_by_language(config, @i18n_translations, cache_busting, sri_root)
+    vars["search_tags"] = Crinja::Value.new(search_tags[config.default_language]? || "")
+    if search_tags.size > 1
+      vars["__search_tags__"] = Crinja::Value.new(search_tags.transform_values { |tags| Crinja::Value.new(tags) })
+    end
+
     # Auto includes
     vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust, sri_root))
     vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust, sri_root))

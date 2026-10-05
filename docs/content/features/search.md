@@ -30,6 +30,9 @@ exclude = ["/private", "/drafts"]
 | shards | string | "none" | Split the index into lazy-loadable shards: `"section"`, `"language"`, or `"section-language"` — see [Sharded index](#sharded-index) |
 | single_file | bool | true | With `shards` on, keep emitting the classic `search.json` alongside the shards; `false` emits shards only |
 | content_max_length | int | 0 | When > 0, truncate each entry's `content` to that many characters at a word boundary; `0` keeps the full text |
+| split_by_heading | bool | false | Also emit one record per h2/h3 section that deep-links to `#heading` — see [Heading-level records](#heading-level-records) |
+| facets | array | [] | Filterable fields added to every record: `"section"`, `"lang"`, `"tags"` or any taxonomy name — see [Facets](#facets) |
+| ui | bool | false | Publish the built-in search UI and fill `{{ search_tags }}` — see [Built-in UI](#built-in-ui). Needs a JSON `format` |
 
 ## Generated Files
 
@@ -60,6 +63,123 @@ Only fields listed in `fields` are emitted (`url` is always included):
 | description | Page description |
 | section | Section name |
 | tags | Page tags |
+
+## Built-in UI
+
+Hwaro ships a small search UI, so a site does not have to write its own client. It has no dependencies and makes no requests to other hosts.
+
+```toml
+[search]
+enabled = true
+format = "fuse_json"        # or "elasticlunr_json"; a *_javascript format is a config error
+ui = true
+split_by_heading = true     # optional: results deep-link to sections
+facets = ["section", "tags"] # optional: filter chips
+```
+
+Put `{{ search_tags }}` in your `<head>`, and add a button that opens the search:
+
+```jinja
+<head>
+  {{ search_tags }}
+</head>
+<body>
+  <button type="button" data-hwaro-search>Search</button>
+  ...
+</body>
+```
+
+With `ui = true`, the build writes `assets/hwaro-search/search.js` and `assets/hwaro-search/search.css`. `search_tags` holds a `<link>` and a `<script defer>` tag for them:
+
+- Both URLs carry the `base_url` subpath and a `?v=` cache-busting hash.
+- With `[assets] sri = true` they also get `integrity` and `crossorigin` (not under `hwaro serve`).
+- The script reads its settings from a `data-hwaro-search-config` attribute, so the page needs no inline script. This keeps it working under a strict Content-Security-Policy.
+
+`search_tags` is an empty string while `ui` is off, so a template can include it unconditionally.
+
+### Behaviour
+
+- **Opening:** press `/` or `Cmd/Ctrl+K`, or click any element with `data-hwaro-search`. The search opens in a modal dialog. If the page has an element with `data-hwaro-search-input`, the UI mounts inside that element instead (inline search box), and the shortcuts focus it.
+- **Loading:** the index is fetched on first open, never on page load. With `shards`, the UI reads `search/index.json` and loads only the current language's shards.
+- **Matching:** case-insensitive prefix and substring matching on every word of the query, all words required. Title matches rank above heading matches, and heading matches above content matches. With `tokenize_cjk = true`, the query is split into the same CJK bigrams as the index. At most 20 results are shown.
+- **Results:** each result shows the title (› heading), plus an excerpt with the matched words highlighted, and links to the page or to `#heading`.
+- **Facets:** with `facets` set, chips for the values found in the results filter the list.
+- **Language:** on a multilingual site, results are limited to the page's language.
+- **Keyboard and accessibility:** ↑/↓ move through results, Enter opens one, Esc closes. The input is an ARIA combobox over a listbox, the dialog traps focus, and the result count is announced through an `aria-live` region.
+- **Security:** index text reaches the page only as text nodes, never as HTML, and only same-origin `http(s)` URLs from the index are linked.
+
+### Styling
+
+The stylesheet uses CSS custom properties and follows `prefers-color-scheme` (and `data-theme="dark"`/`"light"` on `<html>`). Override them in your own CSS:
+
+```css
+.hwaro-search-overlay, .hwaro-search-inline {
+  --hwaro-search-accent: #c2410c;
+  --hwaro-search-radius: 4px;
+  --hwaro-search-font: "Inter", sans-serif;
+}
+```
+
+The other properties are `--hwaro-search-bg`, `-fg`, `-muted`, `-border`, `-active`, `-mark` and `-backdrop`.
+
+The build always writes its own `assets/hwaro-search/` files. A file at the same path under `static/` is replaced, and the build warns about it.
+
+### Translations
+
+The UI text comes from `i18n/<lang>.toml`. English is the built-in default for every key:
+
+```toml
+# i18n/ko.toml
+[search]
+placeholder = "검색"
+no_results = "결과 없음"
+results_count = "{count}개 결과"   # {count} is replaced by the number
+close = "닫기"
+```
+
+For different singular and plural forms, use a table instead (the same one/other rule as the `pluralize` filter):
+
+```toml
+[search.results_count]
+one = "{count} result"
+other = "{count} results"
+```
+
+A missing key falls back to the default language, then to English.
+
+## Heading-Level Records
+
+With `split_by_heading = true`, every page also gets one record per `h2`/`h3` section, so a result can land on the right part of a long page:
+
+```json
+{"title": "Install", "content": "Run the installer...", "url": "/docs/install/", "lang": "en"},
+{"title": "Install", "content": "Download the binary...", "url": "/docs/install/#macos", "lang": "en", "heading": "macOS"}
+```
+
+- The page record is unchanged (byte-identical to a build without the option).
+- `url` uses the heading's real `id` from the rendered page, including custom ids (`## macOS {#mac}`).
+- `content` is the section's text up to the next `h2`/`h3`, with the same HTML stripping, `tokenize_cjk` and `content_max_length` as page content. `h4`–`h6` stay inside their section.
+- The record also carries the page's other configured `fields`, `lang`, `version` and facets.
+- A heading without an id ends the previous section but gets no record of its own.
+- Section records follow the same eligibility as their page (`exclude`, `in_search_index = false`, drafts, `[versions] search`, per-language `build_search_index`). With `shards`, they go to their page's shard. The manifest's `fields` list gains `heading`.
+
+## Facets
+
+`facets` adds filterable fields to every record (page and section records):
+
+```toml
+[search]
+facets = ["section", "lang", "tags", "category"]
+```
+
+| Facet | Value |
+|-------|-------|
+| `section` | The page's section path (`blog/news`) |
+| `lang` | The page language (already on every record) |
+| `tags` | The page's tags |
+| any taxonomy name | That taxonomy's terms for the page (an empty list when it has none) |
+
+An unknown name is ignored with a warning that lists the valid names. The built-in UI turns the facets into filter chips; a custom client can filter on the fields directly.
 
 ## Client-Side Implementation
 

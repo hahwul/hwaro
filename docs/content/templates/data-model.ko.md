@@ -616,6 +616,7 @@ pros = ["Fast", "Reliable"]
 | auto_includes_js | 자동 인클루드된 JS `<script>` 태그 |
 | auto_includes | 모든 자동 인클루드 태그 |
 | pwa_tags | PWA manifest 링크, theme-color 메타, 서비스 워커 등록 태그(`[pwa]` 비활성 시 빈 문자열) |
+| search_tags | [내장 검색 UI](/ko/features/search/#내장-ui)의 스타일시트와 스크립트 태그(`[search] ui = true`가 아니면 빈 문자열) |
 
 ```jinja
 <head>
