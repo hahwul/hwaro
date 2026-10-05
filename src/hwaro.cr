@@ -19,6 +19,7 @@
 
 require "option_parser"
 require "yaml"
+require "./ext/yaml_local_time_fix"
 require "file_utils"
 require "./ext/windows_paths"
 require "crinja"

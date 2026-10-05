@@ -133,7 +133,9 @@ describe Hwaro::Utils::CrinjaUtils do
       yaml = YAML.parse("d: 2021-01-02")
       result = Hwaro::Utils::CrinjaUtils.from_yaml(yaml["d"])
       vars = {"val" => result}
-      render(vars, "{{ val }}").should eq("2021-01-02 00:00:00 UTC")
+      toml = {"val" => Hwaro::Utils::CrinjaUtils.from_toml(TOML.parse("d = 2021-01-02")["d"])}
+      render(vars, "{{ val }}").should start_with("2021-01-02 00:00:00")
+      render(vars, "{{ val }}").should eq(render(toml, "{{ val }}"))
     end
 
     it "converts a nested YAML date" do
