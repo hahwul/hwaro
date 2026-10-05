@@ -171,7 +171,7 @@ module Hwaro
         @privacy_incomplete : Set(String) = Set(String).new
         # `[csp]`: each HTML file's policy as the Finalize pass emitted it,
         # checked again after `[build] hooks.post` (nil when CSP is off).
-        @csp_policies : Hash(String, String)? = nil
+        @csp_result : Csp::Result? = nil
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
@@ -909,8 +909,8 @@ module Hwaro
 
         # Same for `[csp]`: the policies hash the inline bytes Finalize saw.
         private def warn_csp_changed_by_post_hooks(config : Models::Config)
-          return unless policies = @csp_policies
-          Csp.changed_pages(config.csp, policies).each do |path|
+          return unless result = @csp_result
+          Csp.changed_pages(config.csp, result).each do |path|
             Logger.warn "[build] hooks.post changed inline scripts or styles in #{path} after its Content-Security-Policy was computed; browsers will block them. Make the change in hooks.pre or a template instead."
           end
         end

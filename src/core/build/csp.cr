@@ -26,24 +26,33 @@ module Hwaro
           style_attrs : Array(String),
           handlers : Bool
 
-        # The outcome of one build's pass: page file → the policy it got.
-        record Result, policies : Hash(String, String), handler_pages : Array(String)
+        # The outcome of one build's pass: page file → the policy it got,
+        # under the output directory `root`.
+        record Result, root : String, policies : Hash(String, String)
 
-        # Sources a feature Hwaro itself emits needs, keyed by a URL prefix
-        # the feature leaves in the page. A page gets a row's sources only
-        # when its final HTML contains the marker, so a CDN that `[privacy]`
+        # One page's share of the pass, computed on a worker fiber.
+        record PageResult, path : String, relative : String, policy : String, handlers : Bool, headless : Bool
+
+        # Sources a feature Hwaro itself emits needs, keyed by markers the
+        # feature leaves in the page: its URL, and for an embed whose script
+        # `[privacy]` can localize while it still loads more from its host,
+        # the shortcode's own markup. A page gets a row's sources only when
+        # its final HTML contains a marker, so a CDN that `[privacy]` fully
         # localized, or a shortcode the page does not use, adds nothing.
         FEATURE_SOURCES = [
-          {marker: "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/", sources: {"script-src" => "https://cdnjs.cloudflare.com", "style-src" => "https://cdnjs.cloudflare.com"}},
-          {marker: "https://cdn.jsdelivr.net/npm/katex@", sources: {"script-src" => "https://cdn.jsdelivr.net", "style-src" => "https://cdn.jsdelivr.net", "font-src" => "https://cdn.jsdelivr.net"}},
-          {marker: "https://cdn.jsdelivr.net/npm/mathjax@", sources: {"script-src" => "https://cdn.jsdelivr.net", "font-src" => "https://cdn.jsdelivr.net"}},
-          {marker: "https://cdn.jsdelivr.net/npm/mermaid@", sources: {"script-src" => "https://cdn.jsdelivr.net"}},
-          {marker: "https://www.youtube.com/embed/", sources: {"frame-src" => "https://www.youtube.com"}},
-          {marker: "https://player.vimeo.com/video/", sources: {"frame-src" => "https://player.vimeo.com"}},
-          {marker: "https://gist.github.com/", sources: {"script-src" => "https://gist.github.com", "style-src" => "https://github.githubassets.com"}},
-          {marker: "https://platform.twitter.com/widgets.js", sources: {"script-src" => "https://platform.twitter.com", "frame-src" => "https://platform.twitter.com"}},
-          {marker: "https://codepen.io/", sources: {"frame-src" => "https://codepen.io"}},
+          {markers: ["https://cdnjs.cloudflare.com/ajax/libs/highlight.js/"], sources: {"script-src" => "https://cdnjs.cloudflare.com", "style-src" => "https://cdnjs.cloudflare.com"}},
+          {markers: ["https://cdn.jsdelivr.net/npm/katex@"], sources: {"script-src" => "https://cdn.jsdelivr.net", "style-src" => "https://cdn.jsdelivr.net", "font-src" => "https://cdn.jsdelivr.net"}},
+          {markers: ["https://cdn.jsdelivr.net/npm/mathjax@"], sources: {"script-src" => "https://cdn.jsdelivr.net", "font-src" => "https://cdn.jsdelivr.net"}},
+          {markers: ["https://cdn.jsdelivr.net/npm/mermaid@"], sources: {"script-src" => "https://cdn.jsdelivr.net"}},
+          {markers: ["https://www.youtube.com/embed/"], sources: {"frame-src" => "https://www.youtube.com"}},
+          {markers: ["https://player.vimeo.com/video/"], sources: {"frame-src" => "https://player.vimeo.com"}},
+          {markers: ["https://gist.github.com/", %(class="sc-gist")], sources: {"script-src" => "https://gist.github.com", "style-src" => "https://github.githubassets.com"}},
+          {markers: ["https://platform.twitter.com/widgets.js", %(class="twitter-tweet")], sources: {"script-src" => "https://platform.twitter.com", "frame-src" => "https://platform.twitter.com"}},
+          {markers: ["https://codepen.io/"], sources: {"frame-src" => "https://codepen.io"}},
         ]
+
+        # Header lines longer than this are dropped by Cloudflare Pages.
+        CLOUDFLARE_HEADER_LIMIT = 2000
 
         # `<script type>` values the browser executes (and so checks against
         # `script-src`): the JavaScript MIME types, `module`, and the two
@@ -281,24 +290,31 @@ module Hwaro
             value.empty? && dirs.has_key?(name) ? dirs.delete(name) : (dirs[name] = value)
           end
           FEATURE_SOURCES.each do |row|
-            next unless Utils::ByteScan.includes?(html, row[:marker])
+            next unless row[:markers].any? { |marker| Utils::ByteScan.includes?(html, marker) }
             row[:sources].each { |directive, source| add_source(dirs, directive, source) }
           end
-          scan.scripts.each do |h|
-            add_source(dirs, "script-src", h)
-            add_source(dirs, "script-src-elem", h) if dirs.has_key?("script-src-elem")
-          end
-          scan.styles.each do |h|
-            add_source(dirs, "style-src", h)
-            add_source(dirs, "style-src-elem", h) if dirs.has_key?("style-src-elem")
-          end
-          unless scan.style_attrs.empty?
+          add_hashes(dirs, "script-src", scan.scripts)
+          add_hashes(dirs, "script-src-elem", scan.scripts) if dirs.has_key?("script-src-elem")
+          add_hashes(dirs, "style-src", scan.styles)
+          add_hashes(dirs, "style-src-elem", scan.styles) if dirs.has_key?("style-src-elem")
+          unless scan.style_attrs.empty? || unsafe_inline?(dirs["style-src-attr"]? || dirs["style-src"]? || dirs["default-src"]?)
             dirs["style-src-attr"] = "" unless dirs.has_key?("style-src-attr")
             add_source(dirs, "style-src-attr", "'unsafe-hashes'")
             scan.style_attrs.each { |h| add_source(dirs, "style-src-attr", h) }
           end
           META_IGNORED.each { |name| dirs.delete(name) } if meta
           dirs.join("; ") { |name, value| value.empty? ? name : "#{name} #{value}" }
+        end
+
+        # Hashes go into `directive` unless the user opted out with
+        # `'unsafe-inline'`, which browsers ignore as soon as a hash is listed.
+        private def self.add_hashes(dirs : Hash(String, String), directive : String, hashes : Array(String)) : Nil
+          return if unsafe_inline?(dirs[directive]? || fallback_value(dirs, directive))
+          hashes.each { |h| add_source(dirs, directive, h) }
+        end
+
+        private def self.unsafe_inline?(value : String?) : Bool
+          !!value.try(&.split.includes?("'unsafe-inline'"))
         end
 
         # Add `source` to `directive`. An absent directive starts from what
@@ -458,64 +474,119 @@ module Hwaro
         # Hash every HTML page under `output_dir` (except the `excluded`
         # absolute paths: verbatim copies of user files) and emit the
         # policies. Returns what each page got, for the post-hook check.
-        def self.apply(config : Models::Config, output_dir : String, excluded : Set(String)) : Result
+        def self.apply(config : Models::Config, output_dir : String, excluded : Set(String), parallel : Bool = true) : Result
           csp = config.csp
           root = File.expand_path(output_dir)
-          headers_path = File.join(root, csp.headers_file)
-          policies = {} of String => String
-          rules = [] of {String, String}
-          handler_pages = [] of String
-          headless = [] of String
-          html_files(root).each do |path|
-            next if excluded.includes?(path)
-            html = File.read(path)
-            relative = Path[path].relative_to(root).to_posix.to_s
-            next if static_copy?(relative, html) || amp?(html)
-            scan = scan(html)
-            handler_pages << relative if scan.handlers
-            policy = policy(csp, html, scan)
-            policies[path] = policy
-            if !csp.meta?
-              rules << {config.with_base_path(Utils::TextUtils.encode_url_path(url_path(relative))), policy}
-            elsif meta_position(html)
-              updated = inject_meta(html, policy)
-              Utils::FileSafe.atomic_write(path, updated) unless updated == html
-            else
-              headless << relative
-            end
+          # Pages are independent: read, hash and (meta mode) rewrite them on
+          # worker fibers, then collect in file order so output and warnings
+          # stay deterministic.
+          # Wrapped in a tuple: `map` drops nil results. An exception is
+          # carried out and raised below rather than silently skipping a page.
+          outcomes = Build::ParallelHelper.map(html_files(root), parallel) do |path|
+            {apply_to_page(csp, root, path, excluded)}
+          rescue ex
+            ex
           end
-          unless csp.meta?
-            rules.sort_by!(&.[0])
-            user_path = File.join("static", csp.headers_file)
-            user = File.file?(user_path) ? File.read(user_path) : nil
-            header = csp.report_only ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy"
-            Utils::FileSafe.mkdir_p(File.dirname(headers_path))
-            Utils::FileSafe.atomic_write(headers_path, headers_file(rules, header, user))
-            if rules.size > CLOUDFLARE_RULE_LIMIT
-              Logger.warn "[csp] #{csp.headers_file} has #{rules.size} page rules; Cloudflare Pages reads at most #{CLOUDFLARE_RULE_LIMIT}. Netlify has no limit; elsewhere use mode = \"meta\"."
-            end
+          pages = outcomes.compact_map do |outcome|
+            raise outcome if outcome.is_a?(Exception)
+            outcome[0]
           end
+          write_headers_file(config, root, pages) unless csp.meta?
           if csp.meta?
             dropped = csp.directives.keys.select { |name| META_IGNORED.includes?(name) && !csp.directives[name].empty? }
             unless dropped.empty?
               Logger.warn "[csp] mode = \"meta\" drops #{dropped.join(", ")}: browsers ignore #{dropped.size == 1 ? "it" : "them"} in a <meta> policy. Use mode = \"headers\" to send #{dropped.size == 1 ? "it" : "them"}."
             end
           end
+          handler_pages = pages.select(&.handlers).map(&.relative)
           unless handler_pages.empty?
             Logger.warn "[csp] inline event handlers (onclick=…) are blocked by the policy on #{page_list(handler_pages)}. Move them into a script with addEventListener."
           end
+          headless = pages.select(&.headless).map(&.relative)
           unless headless.empty?
             Logger.warn "[csp] no <head> to put the policy <meta> in, so these pages get no policy: #{page_list(headless)}."
           end
-          Result.new(policies, handler_pages)
+          Result.new(root, pages.to_h { |page| {page.path, page.policy} })
         end
 
-        # Pages whose inline bytes a `[build] hooks.post` command changed
-        # after their policy was emitted.
-        def self.changed_pages(config : Models::CspConfig, policies : Hash(String, String)) : Array(String)
-          policies.compact_map do |path, policy|
+        # Hash one page and, in meta mode, write its policy into it. Nil for
+        # a file the pass leaves alone.
+        private def self.apply_to_page(csp : Models::CspConfig, root : String, path : String, excluded : Set(String)) : PageResult?
+          return if excluded.includes?(path)
+          html = File.read(path)
+          relative = Path[path].relative_to(root).to_posix.to_s
+          return if static_copy?(relative, html) || amp?(html)
+          # A `--cache` hit carries the meta a previous pass injected; hash
+          # (and look for markers in) the page without it.
+          clean = csp.meta? ? strip_meta(html) : html
+          scan = scan(clean)
+          policy = policy(csp, clean, scan)
+          headless = false
+          if csp.meta?
+            if meta_position(html)
+              updated = inject_meta(html, policy)
+              Utils::FileSafe.atomic_write(path, updated) unless updated == html
+            else
+              headless = true
+            end
+          end
+          PageResult.new(path, relative, policy, scan.handlers, headless)
+        end
+
+        # Headers mode: the user's file plus one rule per page, with the
+        # warnings about what hosts will make of it.
+        private def self.write_headers_file(config : Models::Config, root : String, pages : Array(PageResult)) : Nil
+          csp = config.csp
+          header = csp.report_only ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy"
+          user_label = File.join("static", csp.headers_file)
+          user = File.file?(user_label) ? File.read(user_label) : nil
+          rules = [] of {String, String}
+          patterned = [] of String
+          long = [] of String
+          pages.each do |page|
+            # `:` and `*` make a path line a placeholder or a splat, and a
+            # control character breaks the file: such a rule would apply its
+            # policy to other pages too.
+            if page.relative.each_char.any? { |c| c.in?(':', '*') || c.control? }
+              patterned << page.relative
+              next
+            end
+            long << page.relative if header.bytesize + 2 + page.policy.bytesize > CLOUDFLARE_HEADER_LIMIT
+            rules << {config.with_base_path(Utils::TextUtils.encode_url_path(url_path(page.relative))), page.policy}
+          end
+          rules.sort_by!(&.[0])
+          headers_path = File.join(root, csp.headers_file)
+          Utils::FileSafe.mkdir_p(File.dirname(headers_path))
+          Utils::FileSafe.atomic_write(headers_path, headers_file(rules, header, user))
+
+          unless patterned.empty?
+            Logger.warn "[csp] no #{csp.headers_file} rule for #{page_list(patterned)}: `:`, `*` and control characters in a path make hosts read it as a pattern. Rename the page or use mode = \"meta\"."
+          end
+          unless long.empty?
+            Logger.warn "[csp] #{header} is longer than #{CLOUDFLARE_HEADER_LIMIT} characters on #{page_list(long)}; Cloudflare Pages drops longer headers. Move inline code into files or use mode = \"meta\" there."
+          end
+          if rules.size > CLOUDFLARE_RULE_LIMIT
+            Logger.warn "[csp] #{csp.headers_file} has #{rules.size} page rules; Cloudflare Pages reads at most #{CLOUDFLARE_RULE_LIMIT}. Netlify has no limit; elsewhere use mode = \"meta\"."
+          end
+          return unless user
+          taken = paths_setting(user, header)
+          replaced = rules.map(&.[0]).select { |path| taken.includes?(path) }
+          unless replaced.empty?
+            Logger.info "[csp] #{user_label} sets #{header} for #{page_list(replaced)}, so Hwaro writes no rule for #{replaced.size == 1 ? "it" : "them"}."
+          end
+          wildcards = taken.select { |path| path.includes?('*') || path.includes?(':') }.sort!
+          unless wildcards.empty?
+            Logger.warn "[csp] #{user_label} sets #{header} for #{wildcards.join(", ")}, which hosts combine with Hwaro's per-page rules: those pages get two policies and their inline code is blocked. Remove it, or turn [csp] off and keep your own policy."
+          end
+        end
+
+        # Pages (output-relative) whose inline bytes a `[build] hooks.post`
+        # command changed after their policy was emitted.
+        def self.changed_pages(config : Models::CspConfig, result : Result) : Array(String)
+          result.policies.compact_map do |path, policy|
             html = File.read(path) rescue next
-            path unless policy(config, html) == policy
+            html = strip_meta(html) if config.meta?
+            Path[path].relative_to(result.root).to_posix.to_s unless policy(config, html) == policy
           end.sort!
         end
 

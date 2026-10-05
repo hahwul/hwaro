@@ -213,11 +213,11 @@ module Hwaro::Core::Build::Phases::Finalize
   end
 
   private def apply_csp(ctx : Lifecycle::BuildContext) : Nil
-    @csp_policies = nil
+    @csp_result = nil
     return unless csp_config(ctx) && (config = @config)
     output_dir = ctx.options.output_dir
     # `[content.files]` HTML is published verbatim, like `static/`.
     raw = ctx.raw_files.map { |file| File.expand_path(File.join(output_dir, file.relative_path)) }.to_set
-    @csp_policies = Csp.apply(config, output_dir, raw).policies
+    @csp_result = Csp.apply(config, output_dir, raw, ctx.options.parallel)
   end
 end

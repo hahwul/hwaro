@@ -150,6 +150,25 @@ describe Hwaro::Core::Build::Csp do
       directive(Csp.policy(csp_config, local), "style-src").should eq("'self'")
     end
 
+    it "recognizes the tweet and gist shortcodes after [privacy] localized their scripts" do
+      tweet = %(<div class="sc-tweet"><blockquote class="twitter-tweet"><a href="https://twitter.com/a/status/1">t</a></blockquote><script async src="/assets/external/1a2b-widgets.js"></script></div>)
+      policy = Csp.policy(csp_config, tweet)
+      directive(policy, "frame-src").should eq("'self' https://platform.twitter.com")
+      directive(policy, "script-src").should eq("'self' https://platform.twitter.com")
+      gist = %(<div class="sc-gist"><script src="/assets/external/3c4d-1.js"></script></div>)
+      directive(Csp.policy(csp_config, gist), "style-src").should eq("'self' https://github.githubassets.com")
+    end
+
+    it "leaves a directive with 'unsafe-inline' without hashes" do
+      config = csp_config(%([csp.directives]\nscript-src = "'self' 'unsafe-inline'"\nstyle-src = "'self' 'unsafe-inline'"))
+      policy = Csp.policy(config, %(<script>x</script><style>y</style><p style="a:b">z</p>))
+      directive(policy, "script-src").should eq("'self' 'unsafe-inline'")
+      directive(policy, "style-src").should eq("'self' 'unsafe-inline'")
+      directive(policy, "style-src-attr").should be_nil
+      only_styles = csp_config(%([csp.directives]\nstyle-src = "'self' 'unsafe-inline'"))
+      directive(Csp.policy(only_styles, "<script>x</script>"), "script-src").should eq("'self' #{sha("x")}")
+    end
+
     it "seeds an unset directive from its fallback before adding a host" do
       youtube = %(<iframe src="https://www.youtube.com/embed/abc"></iframe>)
       directive(Csp.policy(csp_config, youtube), "frame-src").should eq("'self' https://www.youtube.com")
@@ -307,8 +326,62 @@ describe Hwaro::Core::Build::Csp do
           template_files: {"page.html" => CSP_TEMPLATE},
         ) { }
       end
-      log.should contain("hooks.post changed inline scripts or styles in ")
-      log.should contain("a/index.html after its Content-Security-Policy was computed")
+      log.should contain("hooks.post changed inline scripts or styles in a/index.html after its Content-Security-Policy was computed")
+    end
+
+    it "does not warn about a post hook that changes nothing, even when a directive holds a marker" do
+      log = with_captured_log do
+        build_site(
+          %(title = "T"\nbase_url = "https://example.com"\n[build]\nhooks.post = ["true"]\n[csp]\nenabled = true\nmode = "meta"\n[csp.directives]\nframe-src = "'self' https://codepen.io/"\n),
+          content_files: {"a.md" => "+++\ntitle = \"A\"\n+++\na"},
+          template_files: {"page.html" => CSP_TEMPLATE},
+        ) do
+          directive(meta_policy(File.read("public/a/index.html")).not_nil!, "frame-src").should eq("'self' https://codepen.io/")
+        end
+      end
+      log.should_not contain("hooks.post changed")
+    end
+
+    it "keeps rules for paths a host reads as patterns out of the headers file" do
+      log = with_captured_log do
+        build_site(
+          %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
+          content_files: {"notes/a:b.md" => "+++\ntitle = \"A\"\n+++\na", "notes/all*.md" => "+++\ntitle = \"B\"\n+++\nb", "c.md" => "+++\ntitle = \"C\"\n+++\nc"},
+          template_files: {"page.html" => CSP_TEMPLATE},
+        ) do
+          headers = File.read("public/_headers")
+          headers.should contain("\n/c/\n")
+          headers.should_not contain("a:b")
+          headers.should_not contain("all*")
+        end
+      end
+      log.should contain("[csp] no _headers rule for notes/a:b/index.html, notes/all*/index.html")
+    end
+
+    it "warns when a page's header passes Cloudflare's 2000-character limit" do
+      scripts = (1..40).join { |n| "<script>var x#{n} = #{n};</script>" }
+      log = with_captured_log do
+        build_site(
+          %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
+          content_files: {"big.md" => "+++\ntitle = \"Big\"\n+++\n#{scripts}", "small.md" => "+++\ntitle = \"S\"\n+++\ns"},
+          template_files: {"page.html" => CSP_TEMPLATE},
+        ) { }
+      end
+      log.should contain("[csp] Content-Security-Policy is longer than 2000 characters on big/index.html")
+      log.should_not contain("small/index.html")
+    end
+
+    it "says when a user block replaces Hwaro's rule and warns about a wildcard CSP block" do
+      log = with_captured_log do
+        build_site(
+          %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
+          content_files: {"a.md" => "+++\ntitle = \"A\"\n+++\na"},
+          template_files: {"page.html" => CSP_TEMPLATE},
+          static_files: {"_headers" => "/a/\n  Content-Security-Policy: default-src *\n/*\n  Content-Security-Policy: img-src *\n"},
+        ) { }
+      end
+      log.should contain("[csp] static/_headers sets Content-Security-Policy for /a/, so Hwaro writes no rule for it")
+      log.should contain("[csp] static/_headers sets Content-Security-Policy for /*")
     end
 
     it "emits nothing when off" do
@@ -340,13 +413,26 @@ describe Hwaro::Core::Build::Csp do
       end
     end
 
+    it "gives a warm --cache build the cold build's bytes when a directive holds a marker" do
+      config = %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "meta"\n[csp.directives]\nframe-src = "'self' https://codepen.io/"\n)
+      content = {"a.md" => "+++\ntitle = \"A\"\n+++\na"}
+      cold = ""
+      build_site(config, content_files: content, template_files: {"page.html" => CSP_TEMPLATE}) { cold = File.read("public/a/index.html") }
+      build_site(config, content_files: content, template_files: {"page.html" => CSP_TEMPLATE}, cache: true) do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false, cache: true))
+        File.read("public/a/index.html").should eq(cold)
+      end
+    end
+
     {"headers", "meta"}.each do |mode|
       it "gives a warm --cache build the cold build's bytes (#{mode} mode)" do
         config = %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "#{mode}"\n[amp]\nenabled = true\n[pwa]\nenabled = true\n)
         content = {"_index.md" => "+++\ntitle = \"Home\"\n+++\nhome", "a.md" => "+++\ntitle = \"A\"\n+++\n<p style=\"a:b\">a</p>", "b.md" => "+++\ntitle = \"B\"\n+++\nb"}
         templates = {"page.html" => CSP_TEMPLATE, "section.html" => CSP_TEMPLATE, "index.html" => CSP_TEMPLATE}
         cold = {} of String => String
-        build_site(config, content_files: content, template_files: templates) do
+        build_site(config, content_files: content, template_files: templates, parallel: true) do
           File.exists?("public/sw.js").should be_true
           Dir.glob("public/**/*").each { |path| cold[path] = File.read(path) if File.file?(path) }
         end
