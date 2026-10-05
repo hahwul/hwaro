@@ -60,6 +60,7 @@ module Hwaro
         # Elements whose content the parser does not read as markup (with
         # scripting on, `<noscript>` included), skipped without hashing.
         OPAQUE_ELEMENTS = %w[noscript textarea title xmp iframe noembed noframes]
+        TEXT_ELEMENTS   = %w[script style] + OPAQUE_ELEMENTS
 
         # Directives a `<meta>` policy cannot carry (CSP3 §6.1).
         META_IGNORED = %w[frame-ancestors report-uri sandbox]
@@ -94,20 +95,21 @@ module Hwaro
             while name_end < n && !tag_name_end?(bytes[name_end])
               name_end += 1
             end
-            name = String.new(bytes[i, name_end - i]).downcase
             attrs, tag_end = parse_attributes(bytes, name_end)
-            attrs.each do |attr_name, value|
-              if attr_name == "style" && value
-                style_attrs << hash(HTML.unescape(value))
-              elsif attr_name.starts_with?("on") && attr_name.size > 2
+            attrs.each do |attr|
+              if attr_named?(bytes, attr, "style")
+                value = attr_value(bytes, attr)
+                style_attrs << hash(HTML.unescape(value)) if value
+              elsif attr[1] > 2 && name_at?(bytes, attr[0], "on")
                 handlers = true
               end
             end
             i = tag_end
-            next unless name.in?("script", "style") || OPAQUE_ELEMENTS.includes?(name)
+            name = TEXT_ELEMENTS.find { |e| e.bytesize == name_end - lt - 1 && name_at?(bytes, lt + 1, e) }
+            next unless name
             close = find_end_tag(bytes, name, i) || n
             if name == "script"
-              scripts << hash(String.new(bytes[i, close - i])) if executed_inline_script?(attrs)
+              scripts << hash(String.new(bytes[i, close - i])) if executed_inline_script?(bytes, attrs)
             elsif name == "style"
               styles << hash(String.new(bytes[i, close - i]))
             end
@@ -123,18 +125,29 @@ module Hwaro
           "'sha256-#{Base64.strict_encode(OpenSSL::Digest.new("SHA256").update(body).final)}'"
         end
 
-        private def self.executed_inline_script?(attrs : Array({String, String?})) : Bool
-          return false if attrs.any? { |(name, _)| name == "src" }
-          type = attrs.find { |(name, _)| name == "type" }.try(&.[1])
-          return true if type.nil?
-          type = type.strip.downcase
+        private def self.executed_inline_script?(bytes : Bytes, attrs : Array(Attr)) : Bool
+          return false if attrs.any? { |attr| attr_named?(bytes, attr, "src") }
+          return true unless type_attr = attrs.find { |attr| attr_named?(bytes, attr, "type") }
+          type = (attr_value(bytes, type_attr) || "").strip.downcase
           type.empty? || EXECUTED_SCRIPT_TYPES.includes?(type)
         end
 
+        # One attribute as byte offsets: name start, name length, value
+        # start (-1 when valueless) and value length.
+        alias Attr = {Int32, Int32, Int32, Int32}
+
+        private def self.attr_named?(bytes : Bytes, attr : Attr, name : String) : Bool
+          attr[1] == name.bytesize && name_at?(bytes, attr[0], name)
+        end
+
+        private def self.attr_value(bytes : Bytes, attr : Attr) : String?
+          String.new(bytes[attr[2], attr[3]]) if attr[2] >= 0
+        end
+
         # Attributes of the tag whose name ends at `pos`, and the offset just
-        # past its `>`. Names are lowercased; a valueless attribute is nil.
-        private def self.parse_attributes(bytes : Bytes, pos : Int32) : {Array({String, String?}), Int32}
-          attrs = [] of {String, String?}
+        # past its `>`. Byte ranges only: this runs on every tag of every page.
+        private def self.parse_attributes(bytes : Bytes, pos : Int32) : {Array(Attr), Int32}
+          attrs = [] of Attr
           n = bytes.size
           i = pos
           loop do
@@ -149,7 +162,6 @@ module Hwaro
             end
             # A lone `=` (malformed) is consumed as a one-byte name.
             i += 1 if i == start
-            name = String.new(bytes[start, i - start]).downcase
             j = i
             while j < n && space?(bytes[j])
               j += 1
@@ -160,20 +172,19 @@ module Hwaro
                 j += 1
               end
               if j < n && bytes[j].in?('"'.ord, '\''.ord)
-                quote = bytes[j]
-                close = bytes_index(bytes, quote, j + 1) || n
-                attrs << {name, String.new(bytes[j + 1, close - j - 1])}
+                close = bytes_index(bytes, bytes[j], j + 1) || n
+                attrs << {start, i - start, j + 1, close - j - 1}
                 i = Math.min(close + 1, n)
               else
                 v = j
                 while j < n && !space?(bytes[j]) && bytes[j] != '>'.ord
                   j += 1
                 end
-                attrs << {name, String.new(bytes[v, j - v])}
+                attrs << {start, i - start, v, j - v}
                 i = j
               end
             else
-              attrs << {name, nil}
+              attrs << {start, i - start, -1, 0}
             end
           end
         end
@@ -309,7 +320,7 @@ module Hwaro
               end
               if name_at?(bytes, j + 1, "meta") && bytes[j] == '<'.ord
                 attrs, after = parse_attributes(bytes, j + 5)
-                pos = after if attrs.any? { |(name, _)| name == "charset" }
+                pos = after if attrs.any? { |attr| attr_named?(bytes, attr, "charset") }
               end
               return pos
             end
