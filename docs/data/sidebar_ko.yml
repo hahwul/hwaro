@@ -129,6 +129,8 @@
           url: /ko/features/deployment/
         - title: 프라이버시 모드
           url: /ko/features/privacy/
+        - title: 콘텐츠 보안 정책(CSP)
+          url: /ko/features/csp/
 - title: 배포
   section: deploy
   items:
