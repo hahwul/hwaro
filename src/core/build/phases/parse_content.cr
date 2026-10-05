@@ -355,7 +355,7 @@ module Hwaro::Core::Build::Phases::ParseContent
 
   private def include_code_text(args : Hash(String, String)) : String
     relative = include_relative_path(args)
-    text = Content::Processors::Includes.read(relative, include_output_dir)
+    text = read_include(relative)
     text = Content::Processors::Includes.region(text, args["region"], markdown: false) if args["region"]?
     text = Content::Processors::Includes.lines(text, args["lines"]) if args["lines"]?
     lang = args["lang"]? || Content::Processors::Includes.language_for(relative)
@@ -365,18 +365,27 @@ module Hwaro::Core::Build::Phases::ParseContent
   private def include_md_text(args : Hash(String, String), page : Models::Page, site : Models::Site, chain : Array(String)) : String
     relative = include_relative_path(args)
     check_include_chain(relative, chain)
-    text = Content::Processors::Includes.strip_front_matter(Content::Processors::Includes.read(relative, include_output_dir))
+    text = Content::Processors::Includes.strip_front_matter(read_include(relative))
     text = Content::Processors::Includes.region(text, args["region"], markdown: true) if args["region"]?
     expand_includes(text, page, site, chain + [relative])
   end
 
-  # The `path` argument (or the first positional one), recorded as a
-  # dependency BEFORE it is read: a page rendered while the file is missing
-  # changes once it appears.
+  # The `path` argument (or the first positional one).
   private def include_relative_path(args : Hash(String, String)) : String
-    relative = Content::Processors::Includes.relative_path(args["path"]? || args["_0"]? || "")
+    Content::Processors::Includes.relative_path(args["path"]? || args["_0"]? || "")
+  end
+
+  # The file's text, recorded as a dependency when it was read or is
+  # missing (a page rendered while it is missing changes once it appears).
+  # A refused path is never recorded: watching one inside the output would
+  # be a serve rebuild loop.
+  private def read_include(relative : String) : String
+    text = Content::Processors::Includes.read(relative, include_output_dir)
     record_include_source(relative)
-    relative
+    text
+  rescue ex : Content::Processors::Includes::MissingFile
+    record_include_source(relative)
+    raise ex
   end
 
   private def check_include_chain(relative : String, chain : Array(String)) : Nil

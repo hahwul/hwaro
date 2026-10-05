@@ -24,6 +24,11 @@ module Hwaro
         class Error < Exception
         end
 
+        # The file does not exist (yet). Unlike a refusal, the caller still
+        # tracks the path, so creating the file re-renders the page.
+        class MissingFile < Error
+        end
+
         MAX_DEPTH = 8
 
         # `#region name` / `#endregion name` after any comment leader (`//`,
@@ -51,28 +56,33 @@ module Hwaro
           segments.join('/')
         end
 
-        # The text of the project file `relative`. Refused when its real path
-        # (symlinks resolved) leaves the project root, or lands in `.hwaro/`
-        # or the build output — reading the output would be a rebuild loop.
+        # The text of the project file `relative`. Refused when its path —
+        # as written, and with symlinks resolved — leaves the project root or
+        # lands in `.hwaro/` or the build output: reading the output would be
+        # a rebuild loop.
         def read(relative : String, output_dir : String?) : String
           root = File.realpath(Dir.current)
+          refuse_output(File.join(root, relative), relative, root, output_dir)
           real = begin
             File.realpath(File.join(root, relative))
           rescue File::Error
-            raise Error.new("file not found: #{relative}")
+            raise MissingFile.new("file not found: #{relative}")
           end
           unless Utils::PathUtils.within?(real, root)
             raise Error.new("#{relative} resolves outside the project root and is refused")
           end
-          inside = Utils::PathUtils.relative_path(real, root) || ""
-          if inside == ".hwaro" || inside.starts_with?(".hwaro/") ||
-             (output_dir && Utils::PathUtils.within?(real, File.expand_path(output_dir, root)))
-            raise Error.new("#{relative} is inside the build output and is refused")
-          end
+          refuse_output(real, relative, root, output_dir)
           raise Error.new("not a file: #{relative}") unless File.info(real).file?
           clean(File.read(real))
         rescue ex : File::Error | IO::Error
           raise Error.new("cannot read #{relative}: #{ex.message}")
+        end
+
+        private def refuse_output(path : String, relative : String, root : String, output_dir : String?) : Nil
+          if Utils::PathUtils.within?(path, File.join(root, ".hwaro")) ||
+             (output_dir && Utils::PathUtils.within?(path, File.expand_path(output_dir, root)))
+            raise Error.new("#{relative} is inside the build output and is refused")
+          end
         end
 
         # Invalid UTF-8 scrubbed, a BOM dropped, and NUL replaced the way

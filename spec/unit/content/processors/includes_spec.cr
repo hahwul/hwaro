@@ -138,7 +138,10 @@ describe Hwaro::Content::Processors::Includes do
     it "names a missing file" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
-          expect_raises(Includes::Error, "file not found: nope.cr") { Includes.read("nope.cr", nil) }
+          expect_raises(Includes::MissingFile, "file not found: nope.cr") { Includes.read("nope.cr", nil) }
+          # A refusal is not a missing file, even when nothing is there yet.
+          ex = expect_raises(Includes::Error, "build output") { Includes.read(".hwaro/serve/nope.html", nil) }
+          ex.should_not be_a(Includes::MissingFile)
         end
       end
     end

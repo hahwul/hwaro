@@ -69,6 +69,18 @@ describe "serve: include sources" do
     end
   end
 
+  it "never watches a refused path, which could loop on serve's own output" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        include_serve_site
+        File.write("content/p.md", %(+++\ntitle = "P"\n+++\n{{ include_code(path=".hwaro/serve/p/index.html") }}\n))
+        server = Hwaro::Services::Server.new
+        expect_raises(Hwaro::HwaroError, "inside the build output") { server.include_spec_builder.run(include_serve_options) }
+        server.include_spec_builder.include_sources.should be_empty
+      end
+    end
+  end
+
   it "re-renders the transcluding page when the transcluded page is saved" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
