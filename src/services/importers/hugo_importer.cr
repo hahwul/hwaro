@@ -168,13 +168,7 @@ module Hwaro
           end
 
           frontmatter = generate_frontmatter(fields)
-          if source_data && !(carried = carried_fields(source_data, fields)).empty?
-            # TomlBuilder emits scalars before tables, so appending after the
-            # mapped (scalar) lines keeps the document valid TOML.
-            toml = Hwaro::Utils::FrontmatterWriter::TomlBuilder.new.build(carried)
-            toml = "\n#{toml}" if toml.starts_with?('[')
-            frontmatter = "#{frontmatter.rchop("+++")}#{toml}+++"
-          end
+          frontmatter = append_frontmatter(frontmatter, carried_fields(source_data, fields)) if source_data
 
           # Determine section and filename
           section, filename = section_from_path(file_path, content_dir, "")
@@ -245,19 +239,6 @@ module Hwaro
           "aliases", "url", "images", "featured_image", "expirydate", "layout",
         }
 
-        # hwaro front-matter keys Hugo gives no meaning of its own, carried
-        # through as-is: a value there came from `tool export hugo` or a theme
-        # param with the same intent (`toc`). hwaro keys Hugo uses
-        # differently (`menu`, `cascade`, `path`, …) are page params there,
-        # so they join every other unrecognised key in `[extra]`.
-        CARRIED_KEYS = Set{
-          "toc", "template", "page_template", "image", "updated", "expires",
-          "render", "in_sitemap", "in_search_index", "insert_anchor_links",
-          "transparent", "generate_feeds", "paginate", "paginate_by",
-          "pagination_enabled", "paginate_path", "sort_by", "reverse",
-          "redirect_to", "series_weight",
-        }
-
         # The front matter `process_file` does not map: CARRIED_KEYS as-is,
         # and every other key — Hugo page params, top-level or under
         # `[params]` — into `[extra]`, where hwaro templates read custom
@@ -281,7 +262,7 @@ module Hwaro
             next if (lower == "params" && params) || (lower == "extra" && own_extra)
 
             converted = Hwaro::Utils::FrontmatterWriter.toml_to_yaml_any(value)
-            if CARRIED_KEYS.includes?(lower) && !mapped.has_key?(lower)
+            if Base::CARRIED_KEYS.includes?(lower) && !mapped.has_key?(lower)
               carried[lower] = converted
             else
               extra[YAML::Any.new(key)] = converted
