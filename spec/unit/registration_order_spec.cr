@@ -90,7 +90,7 @@ describe "registration order" do
       number odd present sameas sequence startswith string undefined upper
     ])
     env.functions.keys.sort!.should eq(%w[
-      asset asset_url cycler debug dict env get_menu get_page get_section
+      asset asset_integrity asset_url cycler debug dict env get_menu get_page get_section
       get_taxonomy get_taxonomy_url get_url joiner load_data now range
       resize_image super url_for
     ])
