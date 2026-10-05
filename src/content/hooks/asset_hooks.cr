@@ -21,6 +21,10 @@ module Hwaro
         # Absolute output path => source file, for the outputs the Write phase
         # copies verbatim AFTER rendering (page-bundle assets, `[content.files]`).
         @@sources = {} of String => String
+        # Absolute output paths this build publishes and has written by
+        # Render (static copies, Sass outputs, bundles). Nil when unknown (no
+        # build set it): any file on disk then counts.
+        @@published : Set(String)? = nil
 
         def register_hooks(manager : Core::Lifecycle::Manager)
           manager.on(Core::Lifecycle::HookPoint::AfterInitialize, priority: 40, name: "assets:process") do |ctx|
@@ -58,19 +62,29 @@ module Hwaro
           Utils::OutputGuard.within_output_dir?(path, dir) ? path : nil
         end
 
-        def self.sources=(sources : Hash(String, String))
-          @@manifest_mutex.synchronize { @@sources = sources }
+        def self.publish(sources : Hash(String, String), published : Set(String)?)
+          @@manifest_mutex.synchronize do
+            @@sources = sources
+            @@published = published
+          end
         end
 
         # `asset_integrity(name)`: the SRI value of what `asset(name)` serves.
         # A file the Write phase has yet to copy (or, under `--cache`, still
         # holds the previous copy of) is hashed from its source — the copy is
-        # verbatim — so cold and warm builds agree. Nil when nothing is
-        # emitted there.
-        def self.integrity(name : String) : String?
+        # verbatim — so cold and warm builds agree. Any other path counts only
+        # when this build publishes it: a `--cache` build keeps the previous
+        # build's files until Finalize prunes them, and hashing one of those
+        # (a deleted static file, a now-withheld bundle asset) printed the
+        # value of a file about to vanish where a cold build raised. Nil when
+        # nothing is published there.
+        def self.integrity(name : String, record : Bool = true) : String?
           return unless path = output_path(name)
-          source = @@manifest_mutex.synchronize { @@sources[File.expand_path(path)]? }
-          Utils::SriCache.sri(source && File.file?(source) ? source : path)
+          absolute = File.expand_path(path)
+          source, published = @@manifest_mutex.synchronize { {@@sources[absolute]?, @@published} }
+          return Utils::SriCache.sri(source, record) if source
+          return if published && !published.includes?(absolute)
+          Utils::SriCache.sri(path, record)
         end
 
         private def process_assets(ctx : Core::Lifecycle::BuildContext)

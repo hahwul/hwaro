@@ -54,20 +54,18 @@ module Hwaro
         end
       end
 
-      def self.sri(path : String) : String?
+      # `record: false` hashes without counting the value as handed out (the
+      # `--cache` render-inputs probe, which compares and prints nothing).
+      def self.sri(path : String, record : Bool = true) : String?
         info = File.info?(path)
         return unless info && info.file?
         absolute = File.expand_path(path)
         key = {absolute, info.modification_time.to_unix_ms, info.size}
-        if hit = @@mutex.synchronize { @@memo[key]? }
-          @@mutex.synchronize { @@emitted[absolute] = hit }
-          return hit
+        unless sri = @@mutex.synchronize { @@memo[key]? }
+          return unless sri = DigestUtils.sri_file(path)
+          @@mutex.synchronize { @@memo[key] = sri }
         end
-        return unless sri = DigestUtils.sri_file(path)
-        @@mutex.synchronize do
-          @@memo[key] = sri
-          @@emitted[absolute] = sri
-        end
+        @@mutex.synchronize { @@emitted[absolute] = sri } if record
         sri
       rescue File::Error
         nil

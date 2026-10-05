@@ -809,10 +809,13 @@ module Hwaro
 
           # Run post-build hooks
           unless post_hooks.empty?
+            # Files already off their printed value were changed by the build
+            # itself (Write's minify, Finalize's prune), not by the hooks.
+            stale_before = Utils::SriCache.stale.to_set
             unless Utils::CommandRunner.run_post_hooks(post_hooks)
               Logger.warn "Post-build hooks failed, but build was successful."
             end
-            warn_integrity_changed_by_post_hooks
+            warn_integrity_changed_by_post_hooks(stale_before)
           end
 
           if options.debug
@@ -827,8 +830,9 @@ module Hwaro
         # The pages carry `integrity` values hashed during Render; a post hook
         # that rewrote one of those files (a minifier over public/) makes the
         # browser block it. Nothing re-renders after the hooks, so say so.
-        private def warn_integrity_changed_by_post_hooks
+        private def warn_integrity_changed_by_post_hooks(stale_before : Set(String))
           Utils::SriCache.stale.each do |path|
+            next if stale_before.includes?(path)
             Logger.warn "[build] hooks.post changed #{path} after its integrity was printed into pages; browsers will block it. Rewrite it in hooks.pre (into static/) instead."
           end
         end

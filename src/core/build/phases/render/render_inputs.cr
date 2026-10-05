@@ -128,7 +128,7 @@ module Hwaro::Core::Build::Phases::Render
       end
     elsif key.starts_with?(Content::Processors::TemplateEngine::ASSET_READ_PREFIX)
       name = key[Content::Processors::TemplateEngine::ASSET_READ_PREFIX.size..]
-      Content::Hooks::AssetHooks.integrity(name) || "<absent>"
+      Content::Hooks::AssetHooks.integrity(name, record: false) || "<absent>"
     else
       ""
     end

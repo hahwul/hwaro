@@ -90,8 +90,16 @@ module Hwaro::Core::Build::Phases::Render
   # copy does not exist yet) and on a `--cache` build (it still holds the
   # previous copy) alike. Raw files `--minify` rewrites are left out, along
   # with the bundle copies they shadow: their source is not what ships.
+  #
+  # Alongside, the outputs this build has already published by Render: its
+  # claims (static copies, bundles) plus the Sass entries' `.css`, which are
+  # not claimed. Only those count as present — a `--cache` build still holds
+  # the previous build's files until Finalize prunes them. Raw files and
+  # bundle copies are claimed in Write, so a `--minify`-rewritten raw file
+  # resolves to nothing on every build, cold or warm.
   private def publish_asset_sources(ctx : Lifecycle::BuildContext) : Nil
     sources = {} of String => String
+    published = nil
     if asset_integrity_used?
       output_dir = ctx.options.output_dir
       transformed = Set(String).new
@@ -112,8 +120,25 @@ module Hwaro::Core::Build::Phases::Render
           sources[dest] ||= source unless transformed.includes?(dest)
         end
       end
+      published = generated_output_claims.map { |path| File.expand_path(path) }.to_set
+      published.concat(sass_entry_outputs(output_dir))
     end
-    Content::Hooks::AssetHooks.sources = sources
+    Content::Hooks::AssetHooks.publish(sources, published)
+  end
+
+  # Absolute output paths of the `.css` the Sass hook compiles — the same
+  # eligibility as `SassCompiler#compile_all` (non-partial, not excluded).
+  private def sass_entry_outputs(output_dir : String) : Array(String)
+    config = @config
+    source_dir = Assets::SassCompiler::SOURCE_DIR
+    return [] of String unless config && config.sass.enabled && Dir.exists?(source_dir)
+    glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+    Dir.glob(File.join(source_dir, "**", "*.scss"), match: glob_match).compact_map do |src_path|
+      next if File.basename(src_path).starts_with?("_") || !File.file?(src_path)
+      relative = Path[src_path].relative_to(source_dir).to_s
+      next if config.static.excluded?(relative)
+      File.expand_path(File.join(output_dir, relative.sub(/\.scss\z/, ".css")))
+    end
   end
 
   # Compute a content-based cache bust hash from local CSS/JS files.
