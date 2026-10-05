@@ -320,6 +320,43 @@ describe "serve watch-lane regressions" do
     end
   end
 
+  # The content-files lane only copies too; an `asset_integrity()` naming a
+  # `[content.files]` asset must follow its new bytes.
+  it "keeps asset_integrity() current after a content-file save" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML
+          title = "Watch Fixes"
+          base_url = "https://example.com"
+
+          [content.files]
+          allow_extensions = ["js"]
+          TOML
+        )
+        FileUtils.mkdir_p("content/docs")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %(<script integrity="{{ asset_integrity(name='docs/app.js') }}"></script>))
+        File.write("content/page.md", "---\ntitle: Test\n---\nHello")
+        File.write("content/docs/app.js", "one()")
+
+        server = Hwaro::Services::Server.new
+        options = watch_options
+        server.watch_fixes_builder.run(options).should be_true
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("one()"))
+
+        File.write("content/docs/app.js", "two()")
+        changeset = Hwaro::Services::ChangeSet.new(
+          modified_content: [] of String, modified_templates: [] of String, modified_static: [] of String,
+          added_files: [] of String, removed_files: [] of String, config_changed: false,
+          modified_content_files: ["content/docs/app.js"],
+        )
+        server.watch_fixes_apply_changeset(changeset, options)
+        File.read("public/docs/app.js").should eq("two()")
+        File.read("public/page/index.html").should contain(Hwaro::Utils::DigestUtils.sri("two()"))
+      end
+    end
+  end
+
   # `[build] write_stats` must cover the whole site after an incremental pass
   # that re-renders one page, and the watcher must not see the rewrite.
   it "updates hwaro_stats.json on an incremental pass without dropping other pages" do
