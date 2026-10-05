@@ -32,7 +32,7 @@ module Hwaro::Core::Build::Phases::Render
     Utils::DigestUtils.update_length_prefixed(digest, cache_bust)
     # The tag list itself, not just the digest: an empty file added to an
     # auto-include dir adds a `<link>` without moving `?v=`.
-    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust))
+    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust, config.static))
     digest.hexfinal
   end
 

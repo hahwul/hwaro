@@ -344,9 +344,9 @@ module Hwaro::Core::Build::Phases::Render
     vars["pwa_tags"] = Crinja::Value.new(pwa_tags(config))
 
     # Auto includes
-    vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust))
-    vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust))
-    vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url, cache_bust))
+    vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust, config.static))
+    vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust, config.static))
+    vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url, cache_bust, config.static))
 
     # JSON-LD: site-wide WebSite and Organization schemas
     vars["jsonld_website"] = Crinja::Value.new(Content::Seo::JsonLd.website(config))

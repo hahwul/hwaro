@@ -38,7 +38,7 @@ static/
 │       └── 02-app.js
 ```
 
-파일은 `static/{dir}/**/*.css`와 `static/{dir}/**/*.js` 패턴으로 재귀적으로 스캔됩니다.
+파일은 `static/{dir}/**/*.css`와 `static/{dir}/**/*.js` 패턴으로 재귀적으로 스캔됩니다. `[static] exclude`에 걸린 파일은 게시되지 않으므로 건너뜁니다.
 
 ## 파일 순서
 

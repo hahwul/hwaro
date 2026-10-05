@@ -38,7 +38,7 @@ static/
 │       └── 02-app.js
 ```
 
-Files are scanned recursively from `static/{dir}/**/*.css` and `static/{dir}/**/*.js`.
+Files are scanned recursively from `static/{dir}/**/*.css` and `static/{dir}/**/*.js`. Files matched by `[static] exclude` are skipped, since they are never published.
 
 ## File Ordering
 
