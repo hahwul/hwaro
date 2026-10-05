@@ -41,6 +41,9 @@ hwaro tool validate --json
 - Invalid date formats
 - Mixed-case tags (e.g., `Crystal` instead of `crystal`)
 - Draft files (reported as info)
+- Violations of the [front-matter schema](/writing/schema/) when `config.toml`
+  declares `[[content.schema]]`: the build's own check over the pages a default
+  build publishes, so validate and `hwaro build` report the same violations
 
 ## Example Output
 
@@ -86,6 +89,7 @@ says why it failed.
 | `content-read-error` | error | Failed to read content file |
 | `content-tag-mixed-case` | info | Tag has mixed case |
 | `content-draft` | info | File marked as draft |
+| `content-schema-violation` | error | Front matter violates its `[[content.schema]]` |
 
 ## JSON Output
 
@@ -100,5 +104,18 @@ says why it failed.
       "message": "Missing description in frontmatter"
     }
   ]
+}
+```
+
+A schema violation carries its `line` (null for a missing field). When
+`[[content.schema]]` is declared, a `defaults` object lists, per file, the
+defaults a build applies to that page's missing fields:
+
+```json
+{
+  "findings": [],
+  "defaults": {
+    "content/posts/b.md": { "status": "draft" }
+  }
 }
 ```

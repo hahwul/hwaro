@@ -93,6 +93,9 @@ hwaro doctor --json
   기준으로 검사합니다.
 - front matter의 `template`(또는 섹션의 `page_template`, `[cascade] template`)이
   존재하지 않는 템플릿을 가리킴. 빌드는 이를 조용히 기본 템플릿으로 대체합니다.
+- 섹션의 [프론트 매터 스키마](/ko/writing/schema/)(`[[content.schema]]`)를
+  위반하는 페이지. `hwaro build`와 같은 검사를 같은 게시 페이지에 실행합니다
+  (`content-schema-violation`, error, 메시지에 줄 번호 포함)
 
 **구조 진단:**
 
@@ -153,6 +156,7 @@ hwaro: doctor
     [ok]   front matter (TOML/YAML parse)
     [ok]   front matter menus (declared in config)
     [ok]   front matter templates (exist)
+    [ok]   front matter schema ([[content.schema]])
     [info] section index files (_index.md)
     [ok]   translations (pages in every language)
 
@@ -258,6 +262,7 @@ ignore = [
 | `content-read-error` | content | 콘텐츠 파일 읽기 실패 ✗ |
 | `menu-undeclared` | content | front matter의 메뉴 이름이 설정에 선언되지 않음 |
 | `content-template-missing` | content | front matter의 `template` / `page_template` / `[cascade] template`이 없는 템플릿을 가리킴 |
+| `content-schema-violation` | content | front matter가 `[[content.schema]]`를 위반 ✗ |
 | `structure-missing-index` | structure | `_index.md`가 없는 섹션 |
 | `translation-missing` | i18n | 설정된 언어에 대응 페이지가 없는 페이지나 섹션 |
 | `translation-orphan` | i18n | 기본 언어 원본이 없는 번역 |

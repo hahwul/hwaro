@@ -31,6 +31,8 @@
       url: /ko/writing/shortcodes/
     - title: 아키타입
       url: /ko/writing/archetypes/
+    - title: 프론트 매터 스키마
+      url: /ko/writing/schema/
 - title: 템플릿
   section: templates
   items:

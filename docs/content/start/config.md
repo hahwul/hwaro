@@ -143,7 +143,7 @@ summary_ellipsis = "…"
 | summary_length | int | 70 | Automatic summary length for pages without `<!-- more -->` or `description`: words for space-delimited text, characters ×2 for CJK-dominant text. `0` disables the automatic summary |
 | summary_ellipsis | string | "…" | Appended to an automatic summary only when text was cut |
 
-See [Content Summary](/writing/pages/#content-summary) for how `page.summary` is chosen. `[content.files]`, `[content.new]` and `[[content.generate]]` are documented in the feature reference below.
+See [Content Summary](/writing/pages/#content-summary) for how `page.summary` is chosen. `[content.files]`, `[content.new]`, `[[content.generate]]` and `[[content.schema]]` are documented in the feature reference below.
 
 ## Permalinks
 
@@ -331,6 +331,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
 | `[[content.generate]]` | [Content Generation](/features/content-generation/) | Materialize `site.data` records into pages |
+| `[[content.schema]]` | [Front Matter Schema](/writing/schema/) | Per-section front-matter types, required fields, enums, bounds and defaults |
 | `[[data.remote]]` | [Remote Data Sources](/features/remote-data/) | Fetch remote data into `site.data` at build time |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
