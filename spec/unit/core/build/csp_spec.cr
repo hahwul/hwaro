@@ -70,10 +70,14 @@ describe Hwaro::Core::Build::Csp do
     end
 
     it "ignores comments and elements the parser reads as text" do
-      html = %(<!-- <script>a</script> --><textarea><script>b</script></textarea><noscript><style>c</style></noscript><title><style>d</style></title>)
+      html = %(<!-- <script>a</script> --><textarea><script>b</script></textarea><title><style>d</style></title>)
       scan = Csp.scan(html)
       scan.scripts.should be_empty
       scan.styles.should be_empty
+    end
+
+    it "hashes <noscript> styles, which apply when scripting is off" do
+      Csp.scan(%(<noscript><style>.js{display:none}</style></noscript>)).styles.should eq([sha(".js{display:none}")])
     end
 
     it "hashes style attributes by their decoded value and flags event handlers" do

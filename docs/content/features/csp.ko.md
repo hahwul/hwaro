@@ -98,8 +98,9 @@ Hwaro는 다른 출력 처리가 모두 끝난 뒤 자신이 쓴 HTML 페이지�
   코드를 스크립트로 옮기고 `addEventListener`로 연결하세요. Hwaro 자체
   템플릿과 `hwaro init` 스캐폴드에는 없습니다.
 
-HTML 주석, `<noscript>`, `<textarea>`, `<title>` 안의 내용은 브라우저에게
-마크업이 아니므로 해시하지 않습니다.
+HTML 주석, `<textarea>`, `<title>` 안의 내용은 브라우저에게 마크업이
+아니므로 해시하지 않습니다. `<noscript>` 안의 내용은 해시합니다. JavaScript가
+꺼져 있으면 그 스타일이 적용되고, 정책도 여전히 검사하기 때문입니다.
 
 ## Hwaro 기능의 호스트
 

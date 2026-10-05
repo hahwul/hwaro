@@ -57,9 +57,10 @@ module Hwaro
           text/javascript1.5 text/jscript text/livescript text/x-ecmascript text/x-javascript
         ]
 
-        # Elements whose content the parser does not read as markup (with
-        # scripting on, `<noscript>` included), skipped without hashing.
-        OPAQUE_ELEMENTS = %w[noscript textarea title xmp iframe noembed noframes]
+        # Elements whose content the parser does not read as markup, skipped
+        # without hashing. Not `<noscript>`: with scripting off its content
+        # is markup, and a `<style>` in it is checked against the policy.
+        OPAQUE_ELEMENTS = %w[textarea title xmp iframe noembed noframes]
         TEXT_ELEMENTS   = %w[script style] + OPAQUE_ELEMENTS
 
         # Directives a `<meta>` policy cannot carry (CSP3 §6.1).

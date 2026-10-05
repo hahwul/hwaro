@@ -98,8 +98,9 @@ its own hashes.
   `addEventListener`. Hwaro's own templates and the `hwaro init` scaffolds
   contain none.
 
-Content inside HTML comments, `<noscript>`, `<textarea>` and `<title>` is not
-markup to the browser, so nothing in it is hashed.
+Content inside HTML comments, `<textarea>` and `<title>` is not markup to the
+browser, so nothing in it is hashed. `<noscript>` content is hashed: with
+JavaScript off, its styles apply and the policy still checks them.
 
 ## Hosts for Hwaro's Features
 
