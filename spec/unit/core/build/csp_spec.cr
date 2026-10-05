@@ -344,23 +344,73 @@ describe Hwaro::Core::Build::Csp do
       log.should_not contain("hooks.post changed")
     end
 
-    it "keeps rules for paths a host reads as patterns out of the headers file" do
+    it "gives a page with `#` or a space in its path the rule its sitemap URL matches" do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[sitemap]\nenabled = true\n[csp]\nenabled = true\n),
+        content_files: {"notes/a!b#c.md" => "+++\ntitle = \"A\"\n+++\na", "notes/한#글.md" => "+++\ntitle = \"K\"\n+++\nk", "notes/sp ace.md" => "+++\ntitle = \"S\"\n+++\ns"},
+        template_files: {"page.html" => CSP_TEMPLATE},
+      ) do
+        headers = File.read("public/_headers")
+        locs = File.read("public/sitemap.xml").scan(/<loc>https:\/\/example\.com([^<]*)<\/loc>/).map(&.[1])
+        {"/notes/a!b%23c/", "/notes/%ED%95%9C%23%EA%B8%80/", "/notes/sp%20ace/"}.each do |path|
+          locs.should contain(path)
+          headers.should contain("\n#{path}\n  Content-Security-Policy: ")
+        end
+      end
+    end
+
+    it "gives a page with `?` in its path the rule its sitemap URL matches" do
+      posix_only!("Windows forbids ? in file names")
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
+        content_files: {"notes/q?x.md" => "+++\ntitle = \"Q\"\n+++\nq"},
+        template_files: {"page.html" => CSP_TEMPLATE},
+      ) do
+        File.read("public/_headers").should contain("\n/notes/q%3Fx/\n  Content-Security-Policy: ")
+      end
+    end
+
+    it "puts the policy in a <meta> for a page whose path no rule can match (`%`)" do
+      log = with_captured_log do
+        build_site(
+          %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
+          content_files: {"notes/100%.md" => "+++\ntitle = \"P\"\n+++\np", "c.md" => "+++\ntitle = \"C\"\n+++\nc"},
+          template_files: {"page.html" => CSP_TEMPLATE},
+        ) do
+          headers = File.read("public/_headers")
+          headers.should contain("\n/c/\n")
+          headers.should_not contain("100%")
+          policy = meta_policy(File.read("public/notes/100%/index.html")).should_not be_nil
+          policy.should_not contain("frame-ancestors")
+          directive(policy, "script-src").should eq("'self' #{sha(%(console.log("hi");))}")
+          File.read("public/c/index.html").should_not contain("Content-Security-Policy")
+        end
+      end
+      log.should contain(%([csp] no _headers rule can match "notes/100%/index.html"))
+      log.should contain("These pages get their policy as a <meta> tag instead")
+    end
+
+    it "puts the policy in a <meta> for pages whose path a host reads as a pattern (`:`, `*`)" do
       # Windows refuses `:`, `*` and control characters in file and
       # directory names, so no page there can publish such a path.
       posix_only!("Windows forbids : and * in file names")
       log = with_captured_log do
         build_site(
           %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\n),
-          content_files: {"notes/a:b.md" => "+++\ntitle = \"A\"\n+++\na", "notes/all*.md" => "+++\ntitle = \"B\"\n+++\nb", "c.md" => "+++\ntitle = \"C\"\n+++\nc"},
+          content_files: {"notes/a:b.md" => "+++\ntitle = \"A\"\n+++\na", "notes/all*.md" => "+++\ntitle = \"B\"\n+++\nb", "notes/x\ty.md" => "+++\ntitle = \"T\"\n+++\nt", "c.md" => "+++\ntitle = \"C\"\n+++\nc"},
           template_files: {"page.html" => CSP_TEMPLATE},
         ) do
           headers = File.read("public/_headers")
           headers.should contain("\n/c/\n")
           headers.should_not contain("a:b")
           headers.should_not contain("all*")
+          headers.should_not contain("x\ty")
+          meta_policy(File.read("public/notes/a:b/index.html")).should_not be_nil
+          meta_policy(File.read("public/notes/all*/index.html")).should_not be_nil
+          meta_policy(File.read("public/notes/x\ty/index.html")).should_not be_nil
         end
       end
-      log.should contain("[csp] no _headers rule for notes/a:b/index.html, notes/all*/index.html")
+      log.should contain(%([csp] no _headers rule can match "notes/a:b/index.html", "notes/all*/index.html", "notes/x\\ty/index.html"))
     end
 
     it "warns when a page's header passes Cloudflare's 2000-character limit" do
@@ -434,7 +484,7 @@ describe Hwaro::Core::Build::Csp do
     {"headers", "meta"}.each do |mode|
       it "gives a warm --cache build the cold build's bytes (#{mode} mode)" do
         config = %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "#{mode}"\n[amp]\nenabled = true\n[pwa]\nenabled = true\n)
-        content = {"_index.md" => "+++\ntitle = \"Home\"\n+++\nhome", "a.md" => "+++\ntitle = \"A\"\n+++\n<p style=\"a:b\">a</p>", "b.md" => "+++\ntitle = \"B\"\n+++\nb"}
+        content = {"_index.md" => "+++\ntitle = \"Home\"\n+++\nhome", "a.md" => "+++\ntitle = \"A\"\n+++\n<p style=\"a:b\">a</p>", "b.md" => "+++\ntitle = \"B\"\n+++\nb", "100%.md" => "+++\ntitle = \"P\"\n+++\np"}
         templates = {"page.html" => CSP_TEMPLATE, "section.html" => CSP_TEMPLATE, "index.html" => CSP_TEMPLATE}
         cold = {} of String => String
         build_site(config, content_files: content, template_files: templates, parallel: true) do

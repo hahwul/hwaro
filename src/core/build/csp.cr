@@ -26,12 +26,13 @@ module Hwaro
           style_attrs : Array(String),
           handlers : Bool
 
-        # The outcome of one build's pass: page file → the policy it got,
-        # under the output directory `root`.
-        record Result, root : String, policies : Hash(String, String)
+        # The outcome of one build's pass: page file → the policy it got and
+        # whether that went into a `<meta>`, under the output directory `root`.
+        record Result, root : String, policies : Hash(String, {String, Bool})
 
-        # One page's share of the pass, computed on a worker fiber.
-        record PageResult, path : String, relative : String, policy : String, handlers : Bool, headless : Bool
+        # One page's share of the pass, computed on a worker fiber. `fallback`:
+        # a headers-mode page whose path no rule can match, given a `<meta>`.
+        record PageResult, path : String, relative : String, policy : String, handlers : Bool, headless : Bool, fallback : Bool, meta : Bool
 
         # Sources a feature Hwaro itself emits needs, keyed by markers the
         # feature leaves in the page: its URL, and for an embed whose script
@@ -515,7 +516,7 @@ module Hwaro
           unless headless.empty?
             Logger.warn "[csp] no <head> to put the policy <meta> in, so these pages get no policy: #{page_list(headless)}."
           end
-          Result.new(root, pages.to_h { |page| {page.path, page.policy} })
+          Result.new(root, pages.to_h { |page| {page.path, {page.policy, page.meta}} })
         end
 
         # Hash one page and, in meta mode, write its policy into it. Nil for
@@ -527,11 +528,13 @@ module Hwaro
           return if static_copy?(relative, html) || amp?(html)
           # A `--cache` hit carries the meta a previous pass injected; hash
           # (and look for markers in) the page without it.
-          clean = csp.meta? ? strip_meta(html) : html
+          clean = strip_meta(html)
           scan = scan(clean)
-          policy = policy(csp, clean, scan)
+          fallback = !csp.meta? && rule_path(relative).nil?
+          meta = csp.meta? || fallback
+          policy = policy(csp, clean, scan, meta: meta)
           headless = false
-          if csp.meta?
+          if meta
             if meta_position(html)
               updated = inject_meta(html, policy)
               Utils::FileSafe.atomic_write(path, updated) unless updated == html
@@ -539,7 +542,20 @@ module Hwaro
               headless = true
             end
           end
-          PageResult.new(path, relative, policy, scan.handlers, headless)
+          PageResult.new(path, relative, policy, scan.handlers, headless, fallback, meta)
+        end
+
+        # The `_headers` path line for a page file: its URL encoded exactly as
+        # the sitemap `<loc>` is (`#` → `%23` and `?` → `%3F` as
+        # `Page#url=` does, then `encode_url_path`), so the rule matches what
+        # the browser requests. Nil when no path line can match the page:
+        # hosts read `:` and `*` as a placeholder and a splat, a control
+        # character breaks the file, and a `%` in the file name cannot be
+        # traced back to one URL (`a%b` is published for `/a%b/` and
+        # `/a%25b/` alike).
+        def self.rule_path(relative : String) : String?
+          return if relative.each_char.any? { |c| c.in?(':', '*', '%') || c.control? }
+          Utils::TextUtils.encode_url_path(url_path(relative).gsub('#', "%23").gsub('?', "%3F"))
         end
 
         # Headers mode: the user's file plus one rule per page, with the
@@ -550,26 +566,20 @@ module Hwaro
           user_label = File.join("static", csp.headers_file)
           user = File.file?(user_label) ? File.read(user_label) : nil
           rules = [] of {String, String}
-          patterned = [] of String
           long = [] of String
           pages.each do |page|
-            # `:` and `*` make a path line a placeholder or a splat, and a
-            # control character breaks the file: such a rule would apply its
-            # policy to other pages too.
-            if page.relative.each_char.any? { |c| c.in?(':', '*') || c.control? }
-              patterned << page.relative
-              next
-            end
+            next unless path = rule_path(page.relative)
             long << page.relative if header.bytesize + 2 + page.policy.bytesize > CLOUDFLARE_HEADER_LIMIT
-            rules << {config.with_base_path(Utils::TextUtils.encode_url_path(url_path(page.relative))), page.policy}
+            rules << {config.with_base_path(path), page.policy}
           end
           rules.sort_by!(&.[0])
           headers_path = File.join(root, csp.headers_file)
           Utils::FileSafe.mkdir_p(File.dirname(headers_path))
           Utils::FileSafe.atomic_write(headers_path, headers_file(rules, header, user))
 
-          unless patterned.empty?
-            Logger.warn "[csp] no #{csp.headers_file} rule for #{page_list(patterned)}: `:`, `*` and control characters in a path make hosts read it as a pattern. Rename the page or use mode = \"meta\"."
+          fallback = pages.select(&.fallback).map(&.relative.inspect)
+          unless fallback.empty?
+            Logger.warn "[csp] no #{csp.headers_file} rule can match #{page_list(fallback)}: hosts read `:` and `*` in a path as patterns, and `%` or a control character makes it ambiguous. These pages get their policy as a <meta> tag instead, without frame-ancestors, report-uri or sandbox. Rename them to get a rule."
           end
           unless long.empty?
             Logger.warn "[csp] #{header} is longer than #{CLOUDFLARE_HEADER_LIMIT} characters on #{page_list(long)}; Cloudflare Pages drops longer headers. Move inline code into files or use mode = \"meta\" there."
@@ -592,10 +602,9 @@ module Hwaro
         # Pages (output-relative) whose inline bytes a `[build] hooks.post`
         # command changed after their policy was emitted.
         def self.changed_pages(config : Models::CspConfig, result : Result) : Array(String)
-          result.policies.compact_map do |path, policy|
+          result.policies.compact_map do |path, (policy, meta)|
             html = File.read(path) rescue next
-            html = strip_meta(html) if config.meta?
-            Path[path].relative_to(result.root).to_posix.to_s unless policy(config, html) == policy
+            Path[path].relative_to(result.root).to_posix.to_s unless policy(config, strip_meta(html), meta: meta) == policy
           end.sort!
         end
 
