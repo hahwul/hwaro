@@ -51,6 +51,7 @@ require "../../content/seo/og_image"
 require "../../content/search"
 require "../../content/front_matter_schema"
 require "../../content/processors/wikilinks"
+require "../../content/processors/includes"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/digest_utils"
@@ -302,6 +303,13 @@ module Hwaro
         # Ambiguous-wikilink warnings already printed; kept across the index
         # rebuilds of one serve session, cleared by each full build.
         @wikilink_warnings : Content::Processors::Wikilinks::WarnLog = Content::Processors::Wikilinks::WarnLog.new
+        # Project-relative paths of every file an `include_code` /
+        # `include_md` call or a `![[note]]` transclusion read. Only grows
+        # within a session: serve escalates a save of any of them to a full
+        # rebuild (Server#effective_strategy), and a page that stopped
+        # including one costs at most a redundant rebuild.
+        @include_sources : Set(String) = Set(String).new
+        @include_sources_mutex : Mutex = Mutex.new
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve

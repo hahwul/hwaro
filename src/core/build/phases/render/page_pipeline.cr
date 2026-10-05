@@ -132,7 +132,7 @@ module Hwaro::Core::Build::Phases::Render
     # build_template_variables call for the majority of pages that have no
     # shortcodes.
     shortcode_results = {} of String => String
-    raw = page.raw_content
+    raw = expand_includes(page.raw_content, page, site)
     # Use accurate fence + inline-code aware pre-filter instead of naive includes?.
     # This is the main D2 optimization for the shortcode hot path (#562):
     # documentation pages full of example syntax no longer pay the cost of
