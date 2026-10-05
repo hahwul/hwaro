@@ -380,9 +380,9 @@ module Hwaro::Core::Build::Phases::ParseContent
   # A refused path is never recorded: watching one inside the output would
   # be a serve rebuild loop.
   private def read_include(relative : String) : String
-    text = Content::Processors::Includes.read(relative, include_output_dir)
-    record_include_source(relative)
-    text
+    raw = Content::Processors::Includes.read(relative, include_output_dir)
+    record_include_source(relative, Digest::MD5.hexdigest(raw))
+    Content::Processors::Includes.clean(raw)
   rescue ex : Content::Processors::Includes::MissingFile
     record_include_source(relative)
     raise ex
@@ -431,9 +431,9 @@ module Hwaro::Core::Build::Phases::ParseContent
     @context.try(&.options.output_dir)
   end
 
-  private def record_include_source(relative : String) : Nil
+  private def record_include_source(relative : String, digest : String? = nil) : Nil
     Content::Processors::TemplateEngine.record_file_read(relative)
-    @include_sources_mutex.synchronize { @include_sources << relative }
+    @include_sources_mutex.synchronize { @include_sources[relative] = digest }
   end
 
   # Default parsing when no hooks are registered.

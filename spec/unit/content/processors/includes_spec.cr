@@ -112,7 +112,7 @@ describe Hwaro::Content::Processors::Includes do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           File.write("a.md", "\u{FEFF}x\0y")
-          Includes.read("a.md", "public").should eq("x\u{FFFD}y")
+          Includes.clean(Includes.read("a.md", "public")).should eq("x\u{FFFD}y")
         end
       end
     end

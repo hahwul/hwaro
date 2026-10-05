@@ -69,6 +69,27 @@ describe "serve: include sources" do
     end
   end
 
+  it "reports an edit made before the first scan, but not a byte-identical rewrite" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        include_serve_site
+        server = Hwaro::Services::Server.new
+        before = server.include_spec_scan
+        server.include_spec_builder.run(include_serve_options).should be_true
+
+        # Saved between the build's read and the watcher's first stamp.
+        File.write("examples/a.cr", "puts 3\n")
+        first = server.include_spec_scan
+        server.include_spec_detect(before, first).modified_data.should eq(["examples/a.cr"])
+
+        # A hook (or an editor) rewriting the same bytes is not a change.
+        File.write("examples/a.cr", "puts 3\n")
+        File.touch("examples/a.cr", Time.local + 2.seconds)
+        server.include_spec_detect(first, server.include_spec_scan).empty?.should be_true
+      end
+    end
+  end
+
   it "never watches a refused path, which could loop on serve's own output" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

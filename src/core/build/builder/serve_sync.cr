@@ -238,7 +238,13 @@ module Hwaro
         # Project-relative paths every include call and transclusion has read
         # this session (see Builder@include_sources).
         def include_sources : Array(String)
-          @include_sources_mutex.synchronize { @include_sources.to_a }
+          @include_sources_mutex.synchronize { @include_sources.keys }
+        end
+
+        # True when the include source `path` no longer holds the bytes the
+        # last build read (`digest` is the watcher's MD5, nil when missing).
+        def include_source_stale?(path : String, digest : String?) : Bool
+          @include_sources_mutex.synchronize { @include_sources.has_key?(path) && @include_sources[path] != digest }
         end
 
         # True when one of `paths` (watcher paths) was read by an include call
@@ -246,7 +252,7 @@ module Hwaro
         def include_source_changed?(paths : Array(String)) : Bool
           return false if paths.empty?
           @include_sources_mutex.synchronize do
-            paths.any? { |path| @include_sources.includes?(Path[path].normalize.to_posix.to_s) }
+            paths.any? { |path| @include_sources.has_key?(Path[path].normalize.to_posix.to_s) }
           end
         end
 

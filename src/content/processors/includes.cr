@@ -56,7 +56,7 @@ module Hwaro
           segments.join('/')
         end
 
-        # The text of the project file `relative`. Refused when its path —
+        # The bytes of the project file `relative` (see `clean`). Refused when its path —
         # as written, and with symlinks resolved — leaves the project root or
         # lands in `.hwaro/` or the build output: reading the output would be
         # a rebuild loop.
@@ -73,7 +73,7 @@ module Hwaro
           end
           refuse_output(real, relative, root, output_dir)
           raise Error.new("not a file: #{relative}") unless File.info(real).file?
-          clean(File.read(real))
+          File.read(real)
         rescue ex : File::Error | IO::Error
           raise Error.new("cannot read #{relative}: #{ex.message}")
         end

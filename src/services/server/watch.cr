@@ -145,9 +145,12 @@ module Hwaro
           elsif watched_root_path?(path) || watched_config_file?(path)
             # New file (exists now, didn't before)
             added_files << path
+          elsif @builder.include_source_stale?(path, new_stamp[2])
+            # An include source stamped for the first time is a new
+            # dependency, not a change — unless it moved after the build read
+            # it (an edit during the build or before this first scan).
+            classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static, modified_data)
           end
-          # Anything else is an include source stamped for the first time:
-          # it just became a dependency, it did not just change.
         end
 
         # --- Files that existed before but are now gone ---
@@ -441,7 +444,7 @@ module Hwaro
           next if watched_root_path?(path) || Server.watcher_ignored?(path)
           begin
             info = File.info?(path)
-            mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, nil} : MISSING_STAMP
+            mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, watch_digest(path, info, prev)} : MISSING_STAMP
           rescue ex
             Logger.debug "Failed to read file info for #{path}: #{ex.message}"
           end
@@ -552,7 +555,10 @@ module Hwaro
       # for it), and a config.toml that only our own hooks rewrote is dropped
       # by built_config_rewrite?.
       private def digest_watched?(path : String) : Bool
-        path.starts_with?("data/") || path.starts_with?("i18n/")
+        path.starts_with?("data/") || path.starts_with?("i18n/") ||
+          # An include source outside the roots: it rides the data bucket's
+          # full rebuild, so it needs the same byte-identical-rewrite guard.
+          !(watched_root_path?(path) || watched_config_file?(path))
       end
 
       # The digest slot for a scanned file: nil for stamp-only buckets. For

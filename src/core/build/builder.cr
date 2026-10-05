@@ -303,12 +303,13 @@ module Hwaro
         # Ambiguous-wikilink warnings already printed; kept across the index
         # rebuilds of one serve session, cleared by each full build.
         @wikilink_warnings : Content::Processors::Wikilinks::WarnLog = Content::Processors::Wikilinks::WarnLog.new
-        # Project-relative paths of every file an `include_code` /
-        # `include_md` call or a `![[note]]` transclusion read. Only grows
-        # within a session: serve escalates a save of any of them to a full
-        # rebuild (Server#effective_strategy), and a page that stopped
-        # including one costs at most a redundant rebuild.
-        @include_sources : Set(String) = Set(String).new
+        # Project-relative path => MD5 of the bytes read (nil: missing, or a
+        # transcluded page) for every file an `include_code` / `include_md`
+        # call or a `![[note]]` transclusion read. Only grows within a
+        # session: serve escalates a save of any of them to a full rebuild
+        # (Server#effective_strategy), and a page that stopped including one
+        # costs at most a redundant rebuild.
+        @include_sources : Hash(String, String?) = {} of String => String?
         @include_sources_mutex : Mutex = Mutex.new
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
