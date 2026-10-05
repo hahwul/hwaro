@@ -119,7 +119,8 @@ Translations:
   [info] content/notes.ko.md: 'ko' translation has no 'en' original
 ```
 
-`--json`에서는 이 항목들에 `language` 필드가 추가됩니다. 두 종류 모두
+언어마다 처음 10개 항목만 보여 주고 나머지는 `… and N more (use --json for all)`로
+줄입니다. `--json`에는 모든 항목이 `language` 필드와 함께 들어갑니다. 두 종류 모두
 `[doctor] ignore`로 숨길 수 있습니다.
 
 ## 출력 예시

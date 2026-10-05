@@ -123,7 +123,8 @@ Translations:
   [info] content/notes.ko.md: 'ko' translation has no 'en' original
 ```
 
-In `--json` each of these issues also carries a `language` field. Silence
+Each language lists its first 10 issues, then `… and N more (use --json for
+all)`. In `--json` every issue is included and carries a `language` field. Silence
 either kind with `[doctor] ignore`.
 
 ## Example Output

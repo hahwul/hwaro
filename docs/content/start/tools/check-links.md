@@ -126,7 +126,8 @@ Internal links with a fragment (`#intro`, `/guide/#install`, `../b/#faq`,
 `@/posts/hello.md#setup`) are checked against the `id` and `name` attributes
 in the target's HTML file in the build output, so every id the page really
 carries counts: headings, `{#id}` attributes, shortcode and template output,
-footnotes. `#top` always resolves. Missing anchors are listed as their own
+footnotes. `#top` and scroll-to-text fragments (`#:~:text=…`) always
+resolve, and an id is matched as written or percent-decoded. Missing anchors are listed as their own
 category (`Anchor not found: #id`, kind `anchor`, under `dead_anchors` in the
 JSON payload) and fail the run like dead links.
 
