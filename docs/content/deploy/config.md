@@ -233,7 +233,9 @@ only when it is missing or older than its file. If the source already ships
 a `<file>.gz`, that file is deployed unchanged. Siblings are never deleted
 as stale while their file is deployed. When a page is removed, its sibling
 is deleted with it and does not count toward `max_deletes`. Any other `.gz`
-file at the destination counts as usual. A sibling the target's `exclude`
+file at the destination counts as usual. hwaro keeps no record of the files
+it wrote, so this is a heuristic: any `X.gz` deleted together with a
+gzip-matched `X` is exempt, even if another tool wrote the pair. A sibling the target's `exclude`
 matches is never written. `--dry-run --json` lists each sibling to write as a
 `gzip` op whose `source` is the destination file being compressed.
 
