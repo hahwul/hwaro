@@ -43,7 +43,9 @@ hwaro tool validate --json
 - 초안 파일 (info로 보고)
 - `config.toml`에 `[[content.schema]]`가 있으면 [프론트 매터 스키마](/ko/writing/schema/)
   위반. 기본 빌드가 게시하는 페이지에 빌드와 같은 검사를 실행하므로 validate와
-  `hwaro build`가 같은 위반을 보고합니다
+  `hwaro build`가 같은 위반을 보고합니다. validate는 콘텐츠 디렉터리 옆의
+  `config.toml`을 스키마가 선언된 경우에만 읽으며, 잘못된 스키마는 설정 오류
+  코드(3)로 종료합니다
 
 ## 출력 예시
 

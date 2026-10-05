@@ -34,7 +34,7 @@ max = 5
 | 키 | 타입 | 설명 |
 |----|------|------|
 | sections | 문자열 또는 배열 | 섹션 경로 glob. 페이지의 섹션은 `content/` 아래 디렉터리입니다(`posts/hello.md` → `posts`, 번들 `posts/hello/index.md` → `posts`, `about.md` → `""`). `"docs/**"`는 `docs`와 그 아래 전부, `"**"`는 모든 페이지와 일치합니다 |
-| strict | bool | true면 [알려진 프론트 매터 필드](/ko/writing/pages/)도 아니고 `fields`에 선언되지도 않은 최상위 키가 오류입니다. `[extra]` 아래 키는 항상 허용됩니다 |
+| strict | bool | true면 [알려진 프론트 매터 필드](/ko/writing/pages/)도, 설정된 택소노미 이름(`genres = [...]`)도 아니고 `fields`에 선언되지도 않은 최상위 키가 오류입니다. `[extra]` 아래 키는 항상 허용됩니다 |
 | fields | 테이블 | 필드마다 `[content.schema.fields.<이름>]` 테이블 하나 |
 
 ### 필드 키
@@ -56,7 +56,7 @@ max = 5
 ## 필드 이름
 
 - `extra.<키>`는 `page.extra`의 키입니다. 한 단계만 중첩할 수 있어 `extra.author.name`은 허용되지 않습니다. 테이블 헤더에서는 점이 든 이름을 따옴표로 감쌉니다: `[content.schema.fields."extra.rating"]`.
-- `extra.`가 없는 이름은 같은 이름의 알려진 프론트 매터 필드(`description`, `weight`, `tags` 등)가 있으면 그 필드입니다. 없으면 같은 이름의 `extra` 키입니다. Hwaro는 `author = "x"` 같은 알 수 없는 최상위 키를 `page.extra`에 저장하므로, `fields.author`는 `author = "x"`와 `[extra] author = "x"` 둘 다와 일치합니다.
+- `extra.`가 없는 이름은 같은 이름의 알려진 프론트 매터 필드(`description`, `weight`, `tags` 등)가 있으면 그 필드입니다. 이때 `type`은 그 필드 고유의 타입이어야 하며(`weight`는 `int`, `tags`는 `array`, `draft`는 `bool`, `date`는 `date`), 다르면 설정이 거부됩니다. 없으면 같은 이름의 `extra` 키입니다. Hwaro는 `author = "x"` 같은 알 수 없는 최상위 키를 `page.extra`에 저장하므로, `fields.author`는 `author = "x"`와 `[extra] author = "x"` 둘 다와 일치합니다.
 
 ## 타입
 
@@ -65,14 +65,14 @@ max = 5
 | string | 문자열 |
 | int | 정수. `4.0`은 int가 **아닙니다** |
 | float | 부동소수점 수. `4`는 float가 **아니므로** `4.0`으로 씁니다 |
-| bool | `true` / `false` |
+| bool | `true` / `false`. 명시한 `false`도 값이므로 `required`를 만족하고 기본값이 덮어쓰지 않습니다 |
 | date | `date` 필드가 받는 값: TOML/YAML 날짜시간, 또는 `2024-01-15`, `2024-01-15 10:00:00`, RFC 3339 같은 문자열 |
 | array | 목록 |
 | table | 테이블 / 매핑 |
 
 ## 기본값
 
-필드가 없으면 렌더링 전에 `default`가 페이지에 설정되어 템플릿에서 보입니다. extra 키는 `{{ page.extra.status }}`, 알려진 필드는 타입이 있는 속성(`{{ page.description }}`)으로 읽습니다. 기본값은 extra 키와 다음 알려진 필드를 채울 수 있습니다: `description`, `image`, `template`, `draft`, `render`, `toc`, `insert_anchor_links`, `in_sitemap`, `in_search_index`, `weight`, `series`, `series_weight`, `tags`, `authors`, `updated`. `slug`, `path`, `date` 같은 필드는 페이지를 파싱하는 동안 결정되므로, 여기에 기본값을 두면 설정 오류입니다.
+필드가 없으면 렌더링 전에 `default`가 페이지에 설정되어 템플릿에서 보입니다. extra 키는 `{{ page.extra.status }}`, 알려진 필드는 타입이 있는 속성(`{{ page.description }}`)으로 읽습니다. 기본값은 extra 키와 다음 알려진 필드를 채울 수 있습니다: `description`, `image`, `template`, `render`, `toc`, `insert_anchor_links`, `in_sitemap`, `in_search_index`, `weight`, `series`, `series_weight`, `tags`, `authors`, `updated`. `slug`, `path`, `date` 같은 필드는 페이지를 파싱하는 동안 결정되므로, 여기에 기본값을 두면 설정 오류입니다. `draft`도 기본값을 가질 수 없습니다. 게시 여부는 프론트 매터와 [`[cascade]`](/ko/writing/sections/#캐스케이드)가 정하며, `doctor`와 `tool list`도 이 둘만 읽기 때문입니다.
 
 기본값은 자기 필드(타입, enum, 범위)를 만족해야 합니다. 기본값이 있는 필드는 누락으로 보고되지 않습니다.
 
@@ -96,7 +96,7 @@ Error [HWARO_E_CONTENT]: 4 front-matter schema violations:
 
 ## Doctor와 Validate
 
-[`hwaro doctor`](/ko/start/tools/doctor/)와 [`hwaro tool validate`](/ko/start/tools/validate/)는 기본 빌드가 게시하는 페이지에 같은 검사를 실행하고, 빌드와 같은 위반을 `content-schema-violation` 오류로 보고합니다. `tool validate --json`은 각 페이지가 받는 기본값도 나열합니다:
+[`hwaro doctor`](/ko/start/tools/doctor/)와 [`hwaro tool validate`](/ko/start/tools/validate/)는 기본 빌드가 게시하는 페이지에 같은 검사를 실행하고, 빌드와 같은 위반을 `content-schema-violation` 오류로 보고합니다. `tool validate`는 콘텐츠 디렉터리 옆의 `config.toml`(`-c site/content` → `site/config.toml`)을, 그것이 `[[content.schema]]`를 선언할 때만 읽습니다. `tool validate --json`은 각 페이지가 받는 기본값도 나열합니다:
 
 ```json
 {

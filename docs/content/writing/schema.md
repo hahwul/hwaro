@@ -34,7 +34,7 @@ max = 5
 | Key | Type | Description |
 |-----|------|-------------|
 | sections | string or array | Section path globs. A page's section is its directory under `content/` (`posts/hello.md` → `posts`, a bundle `posts/hello/index.md` → `posts`, `about.md` → `""`). `"docs/**"` matches `docs` and everything below it; `"**"` matches every page |
-| strict | bool | When true, a top-level key that is neither a [known front-matter field](/writing/pages/) nor declared in `fields` is an error. Keys under `[extra]` are always allowed |
+| strict | bool | When true, a top-level key that is neither a [known front-matter field](/writing/pages/), a configured taxonomy name (`genres = [...]`) nor declared in `fields` is an error. Keys under `[extra]` are always allowed |
 | fields | table | One `[content.schema.fields.<name>]` table per field |
 
 ### Field keys
@@ -56,7 +56,7 @@ Validation runs after front matter and [cascade](/writing/sections/#cascade) are
 ## Field Names
 
 - `extra.<key>` names a key in `page.extra`. Only one level nests: `extra.author.name` is not allowed. Quote the dotted name in the table header: `[content.schema.fields."extra.rating"]`.
-- A name without `extra.` names a known front-matter field (`description`, `weight`, `tags`, …) when there is one. Otherwise it names the `extra` key of that name: Hwaro stores an unknown top-level key such as `author = "x"` in `page.extra`, so `fields.author` matches both `author = "x"` and `[extra] author = "x"`.
+- A name without `extra.` names a known front-matter field (`description`, `weight`, `tags`, …) when there is one; its `type` must then be that field's own type (`weight` is `int`, `tags` is `array`, `draft` is `bool`, `date` is `date`), or the config is rejected. Otherwise it names the `extra` key of that name: Hwaro stores an unknown top-level key such as `author = "x"` in `page.extra`, so `fields.author` matches both `author = "x"` and `[extra] author = "x"`.
 
 ## Types
 
@@ -65,14 +65,14 @@ Validation runs after front matter and [cascade](/writing/sections/#cascade) are
 | string | A string |
 | int | An integer. `4.0` is **not** an int |
 | float | A floating-point number. `4` is **not** a float; write `4.0` |
-| bool | `true` / `false` |
+| bool | `true` / `false`. An explicit `false` is a value: it meets `required` and keeps a default out |
 | date | What the `date` field accepts: a TOML/YAML datetime, or a string such as `2024-01-15`, `2024-01-15 10:00:00` or RFC 3339 |
 | array | A list |
 | table | A table / mapping |
 
 ## Defaults
 
-When a field is missing, its `default` is set on the page before rendering, so templates see it: `{{ page.extra.status }}` for an extra key, or the typed property (`{{ page.description }}`) for a known field. Defaults can fill extra keys and these known fields: `description`, `image`, `template`, `draft`, `render`, `toc`, `insert_anchor_links`, `in_sitemap`, `in_search_index`, `weight`, `series`, `series_weight`, `tags`, `authors`, `updated`. Fields such as `slug`, `path` and `date` are resolved while the page is parsed, so a default on them is a config error.
+When a field is missing, its `default` is set on the page before rendering, so templates see it: `{{ page.extra.status }}` for an extra key, or the typed property (`{{ page.description }}`) for a known field. Defaults can fill extra keys and these known fields: `description`, `image`, `template`, `render`, `toc`, `insert_anchor_links`, `in_sitemap`, `in_search_index`, `weight`, `series`, `series_weight`, `tags`, `authors`, `updated`. Fields such as `slug`, `path` and `date` are resolved while the page is parsed, so a default on them is a config error. `draft` can't take a default either: what publishes is decided by front matter and [`[cascade]`](/writing/sections/#cascade), which `doctor` and `tool list` read too.
 
 A default must satisfy its own field (type, enum, bounds). A field with a default is never reported missing.
 
@@ -96,7 +96,7 @@ In `hwaro serve`, a violation shows in the browser error overlay like other cont
 
 ## Doctor and Validate
 
-[`hwaro doctor`](/start/tools/doctor/) and [`hwaro tool validate`](/start/tools/validate/) run the same check over the pages a default build publishes and report the same violations as `content-schema-violation` errors. `tool validate --json` also lists the defaults each page takes:
+[`hwaro doctor`](/start/tools/doctor/) and [`hwaro tool validate`](/start/tools/validate/) run the same check over the pages a default build publishes and report the same violations as `content-schema-violation` errors. `tool validate` reads the `config.toml` next to the content directory (`-c site/content` → `site/config.toml`), and only when it declares `[[content.schema]]`. `tool validate --json` also lists the defaults each page takes:
 
 ```json
 {

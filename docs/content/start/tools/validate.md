@@ -43,7 +43,9 @@ hwaro tool validate --json
 - Draft files (reported as info)
 - Violations of the [front-matter schema](/writing/schema/) when `config.toml`
   declares `[[content.schema]]`: the build's own check over the pages a default
-  build publishes, so validate and `hwaro build` report the same violations
+  build publishes, so validate and `hwaro build` report the same violations.
+  validate reads the `config.toml` next to the content directory, and only when
+  it declares a schema; a malformed schema exits with the config error code (3)
 
 ## Example Output
 
