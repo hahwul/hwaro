@@ -34,7 +34,7 @@ mermaid = true
 | sub | bool | false | Subscript (`~text~` → `<sub>text</sub>`) |
 | sup | bool | false | Superscript (`^text^` → `<sup>text</sup>`) |
 | attributes | bool | false | Generalized `{#id .class key=val}` blocks on headings and inline images |
-| safe | bool | false | Strip raw HTML from output (replaced with comments) |
+| safe | bool | false | Strip raw HTML from output (replaced with comments); shortcode output is kept |
 | lazy_loading | bool | false | Add `loading="lazy"` to `<img>` tags |
 | emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
 | smart_punctuation | bool | false | Typographic quotes/dashes/ellipses |

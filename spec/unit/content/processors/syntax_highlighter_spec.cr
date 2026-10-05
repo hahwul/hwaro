@@ -40,6 +40,13 @@ describe Hwaro::Content::Processors::SyntaxHighlighter do
       html.should_not contain("<script>")
     end
 
+    it "keeps shortcode placeholders in safe mode but omits raw HTML around them" do
+      ph = "<!--HWARO-SHORTCODE-PLACEHOLDER-0-->"
+      content = "Inline #{ph} <i>x</i>.\n\n#{ph}\n\n#{ph} <script>y</script>\n"
+      html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: true)
+      html.should eq("<p>Inline #{ph} <!-- raw HTML omitted -->x<!-- raw HTML omitted -->.</p>\n#{ph}\n#{ph}<!-- raw HTML omitted -->\n")
+    end
+
     it "passes through HTML when safe mode is disabled" do
       content = "<div>custom</div>"
       html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: false)

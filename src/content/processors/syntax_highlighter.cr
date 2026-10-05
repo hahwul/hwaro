@@ -582,6 +582,35 @@ module Hwaro
           super(options)
         end
 
+        # Safe mode replaces every raw-HTML node with an omission comment —
+        # including the `<!--HWARO-SHORTCODE-PLACEHOLDER-N-->` comments the
+        # shortcode pass leaves for its (trusted, template-rendered) output,
+        # which silently erased every shortcode. Keep exactly those
+        # placeholders; everything else in the node is still omitted.
+        def html_block(node : Markd::Node, entering : Bool)
+          return super unless @options.safe? && node.text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
+          newline
+          literal(keep_shortcode_placeholders(node.text))
+          newline
+        end
+
+        def html_inline(node : Markd::Node, entering : Bool)
+          return super unless @options.safe? && node.text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
+          literal(keep_shortcode_placeholders(node.text))
+        end
+
+        private def keep_shortcode_placeholders(text : String) : String
+          String.build do |io|
+            last = 0
+            text.scan(InlineMarkdown::SHORTCODE_PLACEHOLDER_RE) do |m|
+              io << "<!-- raw HTML omitted -->" unless text[last...m.begin(0)].blank?
+              io << m[0]
+              last = m.end(0)
+            end
+            io << "<!-- raw HTML omitted -->" unless text[last..].blank?
+          end
+        end
+
         # In server mode, emit pre-highlighted spans instead of plain escaped
         # text. Falls back to the default escaped output when the language has
         # no lexer (the `language-*` class is still present for styling).

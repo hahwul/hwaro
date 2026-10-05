@@ -34,7 +34,7 @@ mermaid = true
 | sub | bool | false | 아래 첨자(`~text~` → `<sub>text</sub>`) |
 | sup | bool | false | 위 첨자(`^text^` → `<sup>text</sup>`) |
 | attributes | bool | false | 헤딩과 인라인 이미지에 붙는 일반화된 `{#id .class key=val}` 블록 |
-| safe | bool | false | 출력에서 원시 HTML 제거(주석으로 대체) |
+| safe | bool | false | 출력에서 원시 HTML 제거(주석으로 대체). 쇼트코드 출력은 유지 |
 | lazy_loading | bool | false | `<img>` 태그에 `loading="lazy"` 추가 |
 | emoji | bool | false | 이모지 숏코드(예: `:smile:`)를 이모지 문자로 변환 |
 | smart_punctuation | bool | false | 타이포그래피 따옴표/대시/줄임표 |
