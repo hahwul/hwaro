@@ -43,24 +43,29 @@ module Hwaro
       # cascaded keys — `cascade`, the merged ancestor cascade, fills in
       # whatever it lacks). A field name without the `extra.` prefix names a
       # known front-matter field, or else the `extra` key the parser stores
-      # an unknown top-level key under.
+      # an unknown top-level key under. `taxonomies` are the configured
+      # taxonomy names, which `strict` accepts as top-level keys.
+      #
+      # Lookups test presence (`fetch`), never truthiness: an explicit
+      # `false` is a value, so it meets `required` and keeps its default out.
       def check(rule : Models::ContentSchemaConfig, file : String, source : String,
                 extra : Hash(String, Models::ExtraValue), cascade : Hash(String, Models::ExtraValue),
-                locate : Bool = true) : Result
+                locate : Bool = true, taxonomies : Array(String) = [] of String) : Result
         source = Utils::TextUtils.strip_bom(source)
         top, own_extra = own_front_matter(source)
         cascade_extra = cascade["extra"]?.as?(Hash(String, Models::ExtraValue)) || {} of String => Models::ExtraValue
-        line_for = ->(key : String) { locate ? line_of(source, key) : nil }
+        line_for = ->(key : String, extra_first : Bool?) { locate ? line_of(source, key, extra_first) : nil }
 
         violations = [] of Violation
         defaults = {} of String => Models::SchemaValue
         rule.fields.each do |field|
-          value = if (key = field.extra_key) || !KNOWN_KEYS.includes?(field.name)
-                    key ||= field.name
-                    own_extra[key]? || extra[key]? || cascade_extra[key]?
-                  else
+          known = field.extra_key.nil? && KNOWN_KEYS.includes?(field.name)
+          value = if known
                     # `build_cascade_map` already dropped non-cascadable keys.
-                    top[field.name]? || cascade[field.name]? || taxonomy_terms(top, field.name)
+                    top.fetch(field.name) { cascade.fetch(field.name) { taxonomy_terms(top, cascade, field.name) } }
+                  else
+                    key = field.extra_key || field.name
+                    own_extra.fetch(key) { extra.fetch(key) { cascade_extra[key]? } }
                   end
           if value.nil?
             if default = field.default
@@ -69,22 +74,32 @@ module Hwaro
               violations << Violation.new(file, nil, field.name, "required but missing")
             end
           elsif problem = field.problem(value)
-            violations << Violation.new(file, line_for.call(field.extra_key || field.name), field.name, problem)
+            # extra.<key> looks in [extra] first; a bare unknown name at the
+            # top level first; a known field only at the top level.
+            extra_first = known ? nil : !field.extra_key.nil?
+            violations << Violation.new(file, line_for.call(field.extra_key || field.name, extra_first), field.name, problem)
           end
         end
 
         if rule.strict
           declared = rule.fields.map { |f| f.extra_key || f.name }
-          candidates = KNOWN_KEYS.to_a + declared
+          candidates = KNOWN_KEYS.to_a + declared + taxonomies
           top.each_key do |key|
-            next if key == "extra" || KNOWN_KEYS.includes?(key) || declared.includes?(key)
+            next if key == "extra" || KNOWN_KEYS.includes?(key) || declared.includes?(key) || taxonomies.includes?(key)
             hint = Processor::Markdown.typo_suggestion(key, candidates)
             message = hint ? "unknown front-matter key — did you mean \"#{hint}\"?" : "unknown front-matter key (declare it in the schema or move it under [extra])"
-            violations << Violation.new(file, line_for.call(key), key, message)
+            violations << Violation.new(file, line_for.call(key, nil), key, message)
           end
         end
 
         Result.new(violations, defaults)
+      end
+
+      # Every taxonomy name the site configures, any language.
+      def taxonomy_names(config : Models::Config) : Array(String)
+        names = config.taxonomies.map(&.name)
+        config.languages.each_value { |lang| names.concat(lang.taxonomies) }
+        names.uniq
       end
 
       # Fail the build (HWARO_E_CONTENT) with every violation, sorted by file.
@@ -135,10 +150,13 @@ module Hwaro
         {({} of String => Models::SchemaValue), ({} of String => Models::SchemaValue)}
       end
 
-      # `tags`/`authors` may also be given as a `[taxonomies]` entry.
-      private def taxonomy_terms(top : Hash(String, Models::SchemaValue), name : String) : Models::SchemaValue?
+      # `tags`/`authors` may also be given as a `[taxonomies]` entry, the
+      # page's own or a cascaded `[cascade.taxonomies]` one.
+      private def taxonomy_terms(top : Hash(String, Models::SchemaValue), cascade : Hash(String, Models::ExtraValue), name : String) : Models::SchemaValue?
         return unless name.in?("tags", "authors")
-        top["taxonomies"]?.as?(Hash(String, Models::ExtraValue)).try(&.[name]?)
+        own = top["taxonomies"]?.as?(Hash(String, Models::ExtraValue))
+        cascaded = cascade["taxonomies"]?.as?(Hash(String, Models::ExtraValue))
+        own.try(&.[name]?) || cascaded.try(&.[name]?)
       end
 
       private def value_of(any : TOML::Any | YAML::Any | JSON::Any) : Models::SchemaValue
@@ -146,17 +164,50 @@ module Hwaro
         raw.is_a?(Time) ? raw : Processor::Markdown.extra_value(any)
       end
 
-      # 1-based line of `key` (as `key =`, `key:` or `"key":`) inside the
-      # front-matter block; nil when it is not written there.
-      private def line_of(source : String, key : String) : Int32?
+      # 1-based line of `key` in the front matter: written at the top level,
+      # or inside the `extra` table. `extra_first` picks which wins (nil:
+      # top level only). Bare, quoted and escaped (`"q\"k"`) spellings are
+      # recognised; nil when the key is not on a line of its own (an inline
+      # table, a dotted key).
+      private def line_of(source : String, key : String, extra_first : Bool?) : Int32?
         return unless fm = Utils::FrontmatterScanner.detect(source)
-        block = fm[1]
+        dialect, block = fm
         first = source[0, source.index(block) || 0].count('\n') + 1
-        pattern = /^\s*["']?#{Regex.escape(key)}["']?\s*[=:]/
+        quoted = Regex.escape(key)
+        key_re = /\A(?:#{quoted}|"#{quoted}"|'#{quoted}'|#{Regex.escape(key.to_json)})\s*[=:]/
+        top_line = extra_line = nil
+        scope = ""       # "" top level, "extra", or another table
+        top_indent = nil # YAML/JSON: the top-level keys' indentation
         block.each_line.with_index do |line, i|
-          return first + i if line.matches?(pattern)
+          stripped = line.lstrip
+          next if stripped.empty? || stripped.starts_with?('#')
+          if dialect == :toml
+            # A `[table]` header switches scope until the next one.
+            if stripped.starts_with?('[')
+              scope = stripped.starts_with?("[[") ? "[[" : stripped.lchop('[').split(']', 2).first.strip.strip('"')
+              next
+            end
+          else
+            indent = line.size - stripped.size
+            next if stripped.starts_with?('{') # JSON's opening brace
+            top_indent ||= indent
+            if indent <= top_indent
+              scope = ""
+            elsif scope.empty? || scope == "open-extra"
+              scope = scope == "open-extra" ? "extra" : "nested"
+            end
+          end
+          if key_re.matches?(stripped)
+            top_line ||= first + i if scope.empty?
+            extra_line ||= first + i if scope == "extra"
+          end
+          scope = "open-extra" if dialect != :toml && scope.empty? && stripped.matches?(/\A["']?extra["']?\s*:/)
         end
-        nil
+        case extra_first
+        when nil  then top_line
+        when true then extra_line || top_line
+        else           top_line || extra_line
+        end
       end
     end
   end

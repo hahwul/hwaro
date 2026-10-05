@@ -127,6 +127,60 @@ describe Hwaro::Content::FrontMatterSchema do
       .should eq([%(j.md:3: field "rating": expected int, got string "2")])
   end
 
+  it "counts an explicit false as present: required is met and no default replaces it" do
+    rule = schema(<<-TOML)
+      [content.schema.fields.flag]
+      type = "bool"
+      required = true
+      [content.schema.fields.toc]
+      type = "bool"
+      default = true
+      [content.schema.fields."extra.featured"]
+      type = "bool"
+      default = true
+      TOML
+    result = check(rule, "flag = false\ntoc = false\n[extra]\nfeatured = false")
+    result.violations.should be_empty
+    result.defaults.should be_empty
+  end
+
+  it "sees tags a section cascades through [cascade.taxonomies]" do
+    rule = schema("[content.schema.fields.tags]\ntype = \"array\"\nrequired = true\n")
+    terms = {} of String => Hwaro::Models::ExtraValue
+    terms["tags"] = ["c"]
+    cascade = {} of String => Hwaro::Models::ExtraValue
+    cascade["taxonomies"] = terms
+    check(rule, "title = \"x\"", cascade).violations.should be_empty
+  end
+
+  it "points at the top-level or [extra] key, not a nested one of the same name" do
+    rule = schema("[content.schema.fields.n]\ntype = \"int\"\n[content.schema.fields.\"extra.rating\"]\ntype = \"int\"\n")
+    yaml = "---\nmeta:\n  n: 1\nn: \"x\"\n---\n"
+    FMS.check(rule, "y.md", yaml, {} of String => Hwaro::Models::ExtraValue, {} of String => Hwaro::Models::ExtraValue).violations.map(&.to_s)
+      .should eq([%(y.md:4: field "n": expected int, got string "x")])
+    messages(check(rule, "n = 1\n[meta]\nrating = 1\n[extra]\nrating = \"bad\""))
+      .should eq([%(content/p.md:6: field "extra.rating": expected int, got string "bad")])
+  end
+
+  it "gives the line of a quoted key with escapes" do
+    rule = schema("", strict: true)
+    messages(check(rule, "title = \"x\"\n\"q\\\"k\" = 1")).first.should start_with(%(content/p.md:3: field "q\\"k"))
+  end
+
+  it "truncates long values in messages" do
+    rule = schema("[content.schema.fields.status]\ntype = \"string\"\nenum = [\"a\"]\n[content.schema.fields.n]\ntype = \"int\"\n")
+    long = "x" * 5000
+    messages(check(rule, "status = \"#{long}\"\nn = \"#{long}\"")).each do |message|
+      message.size.should be < 200
+      message.should contain("…")
+    end
+  end
+
+  it "treats NaN as outside min/max" do
+    rule = schema("[content.schema.fields.n]\ntype = \"float\"\nmax = 1.0\n")
+    messages(check(rule, "n = nan")).should eq([%(content/p.md:2: field "n": NaN is outside the bounds)])
+  end
+
   it "fails once with every violation, sorted by file" do
     violations = [
       FMS::Violation.new("content/b.md", 2, "x", "bad"),

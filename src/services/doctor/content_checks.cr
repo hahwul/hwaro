@@ -262,11 +262,13 @@ module Hwaro
 
           builder = Core::Build::Builder.new
           cascade_map = builder.build_cascade_map(sections)
-          pages.sort_by!(&.[1]).each do |page, file, source, extra, generated|
-            next unless rule = Content::FrontMatterSchema.rule_for(config, page.section)
+          taxonomies = Content::FrontMatterSchema.taxonomy_names(config)
+          checked = Hwaro::Core::Build::ParallelHelper.map(pages.sort_by!(&.[1])) do |page, file, source, extra, generated|
+            rule = Content::FrontMatterSchema.rule_for(config, page.section)
             cascade = builder.merged_cascade_for(page, cascade_map)
-            results << {file, Content::FrontMatterSchema.check(rule, file, source, extra, cascade, locate: !generated)}
+            {file, rule.try { |r| Content::FrontMatterSchema.check(r, file, source, extra, cascade, locate: !generated, taxonomies: taxonomies) }}
           end
+          checked.each { |file, result| results << {file, result} if result }
         ensure
           Logger.level = previous
         end

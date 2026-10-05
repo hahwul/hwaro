@@ -241,10 +241,9 @@ module Hwaro::Core::Build::Phases::ParseContent
     # _index files) still cascade to their descendants — include them.
     apply_cascades(ctx.all_pages, ctx.sections + ctx.excluded_cascade_sections)
 
-    # [[content.schema]] after cascade (cascaded values count as present)
-    # and before the filters (a `draft` default takes part in them, like a
-    # cascaded one). Only pages that survive the filters fail the build.
-    schema_violations = apply_content_schemas(ctx.pages)
+    # [[content.schema]] after cascade (cascaded values count as present).
+    # Only pages that survive the filters below fail the build.
+    schema_violations = apply_content_schemas(ctx.pages, ctx.options.parallel)
 
     # Single-pass filtering: remove parse-failed, draft, and expired pages.
     # Combines multiple reject! calls into one pass per array to avoid
@@ -566,26 +565,41 @@ module Hwaro::Core::Build::Phases::ParseContent
   end
 
   # Validate regular pages against `[[content.schema]]` and fill the
-  # defaults of their missing fields. Returns every violation.
-  # ponytail: sequential re-read of each matched page's source; fan out with
-  # ParallelHelper if schema'd sites get large enough to notice.
-  private def apply_content_schemas(pages : Array(Models::Page)) : Array(Content::FrontMatterSchema::Violation)
+  # defaults of their missing fields. Returns every violation, in page
+  # order. The check (a source re-read and front-matter parse per page) is
+  # pure and fans out; defaults are applied afterwards, on this fiber.
+  private def apply_content_schemas(pages : Array(Models::Page), parallel : Bool) : Array(Content::FrontMatterSchema::Violation)
     violations = [] of Content::FrontMatterSchema::Violation
     config = @config
     return violations if config.nil? || config.content_schema.empty?
     cascade_map = @cascade_map || build_cascade_map([] of Models::Section)
-    pages.each do |page|
-      violations.concat(apply_content_schema(page, config, cascade_map)) unless page.parse_failed
+    taxonomies = Content::FrontMatterSchema.taxonomy_names(config)
+    checked = ParallelHelper.map(pages.reject(&.parse_failed), parallel) do |page|
+      {page, content_schema_result(page, config, cascade_map, taxonomies)}
+    end
+    checked.each do |page, result|
+      violations.concat(apply_schema_result(page, result)) if result
     end
     violations
   end
 
+  # Check one page and apply its defaults (the serve incremental path).
   protected def apply_content_schema(page : Models::Page, config : Models::Config, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue))) : Array(Content::FrontMatterSchema::Violation)
-    return [] of Content::FrontMatterSchema::Violation if page.is_a?(Models::Section)
-    return [] of Content::FrontMatterSchema::Violation unless rule = Content::FrontMatterSchema.rule_for(config, page.section)
+    result = content_schema_result(page, config, cascade_map, Content::FrontMatterSchema.taxonomy_names(config))
+    result ? apply_schema_result(page, result) : [] of Content::FrontMatterSchema::Violation
+  end
+
+  # nil when the page is a section or matches no schema.
+  private def content_schema_result(page : Models::Page, config : Models::Config, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue)), taxonomies : Array(String)) : Content::FrontMatterSchema::Result?
+    return if page.is_a?(Models::Section)
+    return unless rule = Content::FrontMatterSchema.rule_for(config, page.section)
     source_path = File.join("content", page.path)
     source = page.synthesis.try(&.markdown) || File.read(source_path)
-    result = Content::FrontMatterSchema.check(rule, source_path, source, page.extra, merged_cascade_for(page, cascade_map), locate: !page.synthesized?)
+    Content::FrontMatterSchema.check(rule, source_path, source, page.extra, merged_cascade_for(page, cascade_map),
+      locate: !page.synthesized?, taxonomies: taxonomies)
+  end
+
+  private def apply_schema_result(page : Models::Page, result : Content::FrontMatterSchema::Result) : Array(Content::FrontMatterSchema::Violation)
     result.defaults.each { |name, value| apply_schema_default(page, name, value) }
     result.violations
   end
@@ -604,7 +618,6 @@ module Hwaro::Core::Build::Phases::ParseContent
     when "image"               then extra_value.as?(String).try { |v| page.image = v }
     when "template"            then extra_value.as?(String).try { |v| page.template = normalize_template_name(v) }
     when "series"              then extra_value.as?(String).try { |v| page.series = v }
-    when "draft"               then extra_value.as?(Bool).try { |b| page.draft = b }
     when "render"              then extra_value.as?(Bool).try { |b| page.render = b }
     when "toc"                 then extra_value.as?(Bool).try { |b| page.toc = b }
     when "insert_anchor_links" then extra_value.as?(Bool).try { |b| page.insert_anchor_links = b }
