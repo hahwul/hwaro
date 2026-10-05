@@ -122,6 +122,8 @@ facets = ["section", "tags"] # 선택: 필터 칩
 
 그 밖의 속성은 `--hwaro-search-bg`, `-fg`, `-muted`, `-border`, `-active`, `-mark`, `-backdrop`입니다.
 
+빌드는 항상 자체 `assets/hwaro-search/` 파일을 씁니다. `static/` 아래 같은 경로에 파일이 있으면 덮어쓰고 경고를 남깁니다.
+
 ### 번역
 
 UI 문구는 `i18n/<lang>.toml`에서 가져옵니다. 모든 키의 기본값은 영어입니다.

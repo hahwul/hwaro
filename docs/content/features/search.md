@@ -122,6 +122,8 @@ The stylesheet uses CSS custom properties and follows `prefers-color-scheme` (an
 
 The other properties are `--hwaro-search-bg`, `-fg`, `-muted`, `-border`, `-active`, `-mark` and `-backdrop`.
 
+The build always writes its own `assets/hwaro-search/` files. A file at the same path under `static/` is replaced, and the build warns about it.
+
 ### Translations
 
 The UI text comes from `i18n/<lang>.toml`. English is the built-in default for every key:
