@@ -100,6 +100,7 @@ require "./content/seo/robots"
 require "./content/seo/llms"
 require "./content/seo/jsonld"
 require "./content/search"
+require "./content/search_ui"
 require "./content/taxonomies"
 require "./content/menus"
 

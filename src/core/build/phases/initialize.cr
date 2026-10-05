@@ -104,6 +104,9 @@ module Hwaro::Core::Build::Phases::Initialize
       ctx.site = @site
       ctx.config = config
 
+      # Before Render: `search_tags` hashes these files under `[assets] sri`.
+      Content::SearchUi.write_assets(config, output_dir, verbose).each { |path| claim_generated_output(path) }
+
       # Propagate the highlighting mode to the markdown renderer once per
       # build — read-only afterwards, including by parallel render fibers.
       Content::Processors::SyntaxHighlighter.server_mode = config.highlight.server?
