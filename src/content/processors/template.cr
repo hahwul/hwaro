@@ -48,21 +48,9 @@ module Hwaro
           Filters::MenuFilters.register(@env)
         end
 
-        # Shared body for the `empty`/`present` Crinja tests: a value is empty
-        # when it's an empty string/array/hash or nil.
+        # Shared body for the `empty`/`present` Crinja tests.
         private def value_empty?(value : Crinja::Raw) : Bool
-          case value
-          when String
-            value.empty?
-          when Array
-            value.empty?
-          when Hash
-            value.empty?
-          when Nil
-            true
-          else
-            false
-          end
+          Filters::CollectionFilters.blank?(value)
         end
 
         # Register custom tests
@@ -81,11 +69,16 @@ module Hwaro
             target.to_s.ends_with?(suffix)
           end
 
-          # Test if a string contains a substring
+          # Test if a string contains a substring, or a list/mapping an
+          # element/key (the `in` operator's rules, not the list's text)
           # Usage: {% if page_url is containing("products") %}
           @env.tests["containing"] = Crinja.test do
-            substring = arguments.varargs.first?.try(&.to_s) || ""
-            target.to_s.includes?(substring)
+            needle = arguments.varargs.first? || Crinja::Value.new("")
+            if target.iterable?
+              Crinja::Operator.member?(needle, target)
+            else
+              target.to_s.includes?(needle.to_s)
+            end
           end
 
           # Test if value is empty (string, array, hash)
@@ -212,6 +205,8 @@ module Hwaro
           #        {% for page in blog.pages %}
           @env.functions["get_section"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
+            # "blog", "/blog", "blog/" and "/blog/" all name the same section.
+            url_key = "/#{path_arg.strip('/')}/"
 
             # A section name can occur in every language variant. Resolve an
             # ambiguous name in the current page's language before falling
@@ -228,7 +223,7 @@ module Hwaro
                 next unless candidate_map = language_maps[candidate]?
                 next unless candidate_map.raw.is_a?(Hash)
                 raw_candidate_map = candidate_map.raw.as(Hash)
-                if found = raw_candidate_map[path_arg]? || raw_candidate_map["/#{path_arg}/"]?
+                if found = raw_candidate_map[path_arg]? || raw_candidate_map[url_key]?
                   return found
                 end
               end
@@ -238,7 +233,7 @@ module Hwaro
             sections_map = env.resolve("__sections_by_key__")
             if !sections_map.raw.nil? && sections_map.raw.is_a?(Hash)
               raw_map = sections_map.raw.as(Hash)
-              found = raw_map[path_arg]? || raw_map["/#{path_arg}/"]?
+              found = raw_map[path_arg]? || raw_map[url_key]?
               found || Crinja::Value.new(nil)
             else
               # Fallback to linear search O(N) if map is not available
@@ -253,7 +248,7 @@ module Hwaro
                     section_name = section_val["name"]?.try(&.to_s) || ""
                     section_url = section_val["url"]?.try(&.to_s) || ""
 
-                    if section_path == path_arg || section_name == path_arg || section_url == "/#{path_arg}/"
+                    if section_path == path_arg || section_name == path_arg || section_url == url_key
                       result = Crinja::Value.new(section_val)
                       break
                     end
@@ -426,11 +421,24 @@ module Hwaro
 
             base_url = env.resolve("base_url").to_s
 
+            # A remote image (`page.image` is often a full URL) is never
+            # processed; hand it back as written instead of rooting it under
+            # base_url as `/https%3A//cdn…`.
+            if Filters::UrlFilters.has_own_origin?(path)
+              return Crinja::Value.new({
+                "url"            => Crinja::Value.new(path),
+                "width"          => Crinja::Value.new(width),
+                "height"         => Crinja::Value.new(height),
+                "lqip"           => Crinja::Value.new(""),
+                "dominant_color" => Crinja::Value.new(""),
+              })
+            end
+
             # Normalize path to start with /. The resize/LQIP maps are keyed by
             # the decoded filesystem path, so decode any percent-encoding from
             # the incoming URL before the lookup; the returned variant is
             # re-encoded below so the emitted .url is a valid href.
-            normalized = URI.decode(path.starts_with?("/") ? path : "/#{path}")
+            normalized = URI.decode(TemplateEngine.bundle_image_url(env, path) || (path.starts_with?("/") ? path : "/#{path}"))
 
             if op != "fit"
               source = Content::Hooks::ImageHooks.resolve_source(normalized)
@@ -481,6 +489,27 @@ module Hwaro
               "dominant_color" => Crinja::Value.new(dominant_color_value),
             })
           end
+        end
+
+        # A relative `resize_image` path naming one of the current page's
+        # bundle files (`image = "cover.png"` beside `index.md`) is published
+        # under the page's URL, as relative images in its body and its
+        # og:image (`Page#social_image`) are; rooting it at `/cover.png`
+        # found no variant and emitted a 404. nil for anything else.
+        def self.bundle_image_url(env : Crinja, path : String) : String?
+          return if path.empty? || path.starts_with?('/')
+          own = Path.posix(path).normalize.to_s
+          return if own.starts_with?("..")
+          page = env.resolve("page")
+          return unless page.mapping?
+          url = page["url"].to_s
+          source = env.resolve("__page_path__").to_s
+          assets = page["assets"]
+          return if url.empty? || source.empty? || !assets.iterable?
+          dir = File.dirname(source)
+          wanted = dir == "." ? own : "#{dir}/#{own}"
+          assets.each { |asset| return "#{url.rstrip('/')}/#{own}" if asset.to_s == wanted }
+          nil
         end
 
         # Inputs a render read from OUTSIDE the tracked tree, recorded so a
@@ -597,7 +626,7 @@ module Hwaro
                   cached = @@load_data_cache[resolved]?
                   if cached && cached[0] == mtime
                     cached[1]
-                  elsif parsed = parse_data_content(path, File.read(resolved))
+                  elsif parsed = parse_data_content(path, Utils::TextUtils.strip_bom(File.read(resolved)))
                     @@load_data_cache[resolved] = {mtime, parsed}
                     parsed
                   else

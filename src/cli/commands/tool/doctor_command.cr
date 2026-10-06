@@ -238,13 +238,14 @@ module Hwaro
           # success.
           private def render_quiet(issues : Array(Services::Issue), exit_code : Int32)
             # Logger.quiet silences `Logger.info`, but a CI run that fails
-            # still needs *something* on stdout. Use direct STDOUT.puts so
-            # the output bypasses the Logger gate and surfaces the
-            # actionable issues only — no inline check headers, no banner.
+            # still needs *something*. Write past the Logger gate — the
+            # actionable issues only, no inline check headers, no banner —
+            # to stderr, where `--quiet` keeps warnings and errors for every
+            # other command (`tool validate -q` included).
             issues.each do |issue|
               next if issue.level == :info
               file_part = issue.file ? "#{issue.file}: " : ""
-              STDOUT.puts "[#{issue.level}] #{file_part}#{issue.message}"
+              Logger.err_io.puts "[#{issue.level}] #{file_part}#{issue.message}"
             end
           end
 

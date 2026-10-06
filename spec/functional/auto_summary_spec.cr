@@ -82,8 +82,8 @@ describe "Automatic summary fallback" do
     content = {"index.md" => HOME_MD, "posts/rich.md" => "+++\ntitle = \"Rich\"\n+++\n\n#{body}\n"}
     build_site(auto_config, content_files: content, template_files: AUTO_TEMPLATES) do
       listing = File.read("public/index.html")
-      listing.should contain("[Rich=<p>Intro SC-alpha paragraph &amp; more. Trailing prose here.</p>|false]")
-      %w[Page\ Heading CODE alt\ text tag(name inline].each { |leak| listing.should_not contain(leak) }
+      listing.should contain("[Rich=<p>Intro SC-alpha paragraph &amp; more. Trailing inline prose here.</p>|false]")
+      %w[Page\ Heading CODE alt\ text tag(name].each { |leak| listing.should_not contain(leak) }
     end
   end
 

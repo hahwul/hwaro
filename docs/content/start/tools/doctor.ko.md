@@ -44,7 +44,7 @@ hwaro doctor --json
 | --strict | 종료 코드 계산 시 경고를 오류로 취급 |
 | --max-warnings N | 경고 수가 N을 초과하면 0이 아닌 코드로 종료 |
 | -j, --json | 결과를 JSON으로 출력 |
-| -q, --quiet | 정보 출력과 배너 숨김 |
+| -q, --quiet | 정보 출력과 배너 숨김. 경고와 오류는 stderr에 `[level] file: message` 형식으로 한 줄씩 출력 |
 | -h, --help | 도움말 표시 |
 
 ## 검사 항목

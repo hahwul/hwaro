@@ -68,7 +68,9 @@ describe Hwaro::Content::Pagination::Paginator do
       result.paginated_pages.size.should eq(1)
     end
 
-    it "clamps a global per_page of 0 up to 1 (avoids divide-by-zero)" do
+    # The global size follows the section rule: 0 is no page size, so it
+    # disables pagination instead of paging one item at a time.
+    it "treats a global per_page of 0 as pagination disabled" do
       config = Hwaro::Models::Config.new
       config.pagination.enabled = true
       config.pagination.per_page = 0
@@ -78,8 +80,8 @@ describe Hwaro::Content::Pagination::Paginator do
       paginator = Hwaro::Content::Pagination::Paginator.new(config)
       result = paginator.paginate(section, pages)
 
-      result.per_page.should eq(1)
-      result.paginated_pages.size.should eq(3)
+      result.enabled.should be_false
+      result.paginated_pages.size.should eq(1)
     end
   end
 

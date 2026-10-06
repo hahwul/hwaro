@@ -164,8 +164,10 @@ module Hwaro
             return per_page > 0
           end
 
-          # Fall back to global config
-          @config.pagination.enabled
+          # Fall back to global config, under the same rule: a non-positive
+          # global `per_page` is no page size, so it disables pagination
+          # rather than paging one item at a time.
+          @config.pagination.enabled && @config.pagination.per_page > 0
         end
 
         # Get per_page setting for a section (minimum 1 to avoid division by zero)

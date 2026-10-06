@@ -47,7 +47,7 @@ module Hwaro
             dir_parts = parts[0...-1]
             entries << {dir_parts, stem, path}
           end
-          entries.sort_by! { |(dir_parts, _, _)| -dir_parts.size }
+          entries.sort_by! { |(dir_parts, _, path)| {-dir_parts.size, path} }
 
           entries.each do |(dir_parts, stem, path)|
             value = parse_file(path)

@@ -111,10 +111,11 @@ describe Hwaro::CLI::Commands::Tool::ExportCommand do
   end
 
   # Stability audit 2026-08-23. A run with per-file errors used to exit 0 as
-  # long as one file exported; it must fail with the classified IO error the
-  # sibling `tool convert` already uses.
+  # long as one file exported; it must fail with a classified error. A file
+  # whose front matter does not parse is a content error (HWARO_E_CONTENT,
+  # as build and validate report it), not the IO class it used to get.
   describe "#run partial failure" do
-    it "raises a classified IO error when some files fail to export" do
+    it "raises a classified content error when front matter fails to parse" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
@@ -127,7 +128,7 @@ describe Hwaro::CLI::Commands::Tool::ExportCommand do
           with_captured_log { cmd.run(["hugo", "-c", content_dir, "-o", output_dir]) }
         end
 
-        ex.code.should eq(Hwaro::Errors::HWARO_E_IO)
+        ex.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
         # The good file still exported before the failure was reported.
         File.exists?(File.join(output_dir, "content", "good.md")).should be_true
       end

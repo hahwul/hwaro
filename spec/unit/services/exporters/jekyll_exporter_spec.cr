@@ -353,12 +353,12 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
-    it "counts a leaf bundle's un-exported assets as skipped" do
+    it "keeps a leaf bundle's un-exported assets out of the skipped count" do
       # Jekyll's flat `_posts/` layout has no destination that keeps a bare
-      # `![](cover.png)` resolving, so the assets stay behind — but the export
-      # used to report "1 exported, 0 skipped" and exit 0 for a post whose
-      # every image link was dead. The sibling Hugo exporter, whose layout is
-      # preserved, copies them across.
+      # `![](cover.png)` resolving, so the assets stay behind with a warning
+      # (see below). The counts cover content documents only, as documented
+      # and as the Hugo exporter reports them: folding the asset in made a
+      # clean export of one post read "1 exported, 1 skipped".
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
         output_dir = File.join(dir, "export")
@@ -372,7 +372,7 @@ describe Hwaro::Services::Exporters::JekyllExporter do
         result = exporter.run(options)
 
         result.exported_count.should eq(1)
-        result.skipped_count.should eq(1)
+        result.skipped_count.should eq(0)
       end
     end
 
@@ -629,6 +629,30 @@ describe "Jekyll export: refused aliases" do
       b = File.read(File.join(output_dir, "b.md"))
       b.should_not contain("redirect_from")
       b.should_not contain("aliases")
+    end
+  end
+end
+
+# Regression: a section's `[cascade] draft = true` was ignored — only the
+# page's own `draft` key was read, so a page build/list treat as a draft
+# exported as a published Jekyll page.
+describe "Jekyll export: cascaded drafts" do
+  it "skips a page drafted by its section's cascade, and marks it with --drafts" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "casc"))
+      File.write(File.join(content_dir, "casc", "_index.md"), "+++\ntitle = \"Casc\"\n[cascade]\ndraft = true\n+++\n")
+      File.write(File.join(content_dir, "casc", "c1.md"), "+++\ntitle = \"C1\"\ndate = 2024-01-01\n+++\nx\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      result = Hwaro::Services::Exporters::JekyllExporter.new.run(options)
+      result.skipped_count.should eq(1)
+      File.exists?(File.join(output_dir, "casc", "c1.md")).should be_false
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir, drafts: true)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options)
+      File.read(File.join(output_dir, "casc", "c1.md")).should contain("published: false")
     end
   end
 end

@@ -318,9 +318,9 @@ module Hwaro::Core::Build::Phases::Render
     sri_root = sri_root(config)
 
     # Highlight tags
-    vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag(cache_bust, sri_root))
-    vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag(cache_bust, sri_root))
-    vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags(cache_bust, sri_root))
+    vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag(cache_bust, sri_root, config.base_path))
+    vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag(cache_bust, sri_root, config.base_path))
+    vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags(cache_bust, sri_root, config.base_path))
 
     # `use_cdn = false` emits <script src="/assets/js/highlight.min.js"> (+ css),
     # but Hwaro doesn't ship those files — if the user hasn't placed them under
@@ -354,9 +354,9 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     # Auto includes
-    vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust, sri_root))
-    vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust, sri_root))
-    vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url, cache_bust, sri_root))
+    vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust, sri_root, config.static))
+    vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust, sri_root, config.static))
+    vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url, cache_bust, sri_root, config.static))
 
     # JSON-LD: site-wide WebSite and Organization schemas
     vars["jsonld_website"] = Crinja::Value.new(Content::Seo::JsonLd.website(config))

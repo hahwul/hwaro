@@ -159,7 +159,7 @@ describe Hwaro::Services::Scaffolds::Book do
     it "guards the chapter listing so empty chapters don't show an orphan heading" do
       files = Hwaro::Services::Scaffolds::Book.new.template_files
       section = files["section.html"]
-      section.should contain(%q({% if section.pages | rejectattr("is_index") | length %}))
+      section.should contain(%q({% if section.pages | rejectattr("is_section") | length %}))
       # The heading and list live inside the guard.
       section.should match(/{%\s*if\s+section\.pages.*%}.*In This Chapter.*{%\s*endif\s*%}/m)
     end

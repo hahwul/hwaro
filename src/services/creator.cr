@@ -6,6 +6,7 @@ require "../models/config"
 require "../utils/date_utils"
 require "../utils/errors"
 require "../utils/file_safe"
+require "../utils/frontmatter_writer"
 require "../utils/logger"
 require "../utils/path_utils"
 require "../utils/text_utils"
@@ -229,7 +230,7 @@ module Hwaro
 
         # --section overrides the base directory
         if section = resolve_section(options.section, path)
-          if path && path.ends_with?(".md")
+          if path && page_path?(path)
             filename = File.basename(path)
             full_path = File.join("content", section, filename)
           elsif path
@@ -237,7 +238,7 @@ module Hwaro
             # -s posts`), don't join it twice into `content/posts/posts/foo`.
             relative = path.starts_with?("#{section}/") ? path : File.join(section, path)
             full_path = File.join("content", relative)
-            full_path += ".md" unless full_path.ends_with?(".md")
+            full_path += ".md" unless page_path?(full_path)
           else
             # No path given; title must be supplied via --title.
             full_path = nil
@@ -246,15 +247,14 @@ module Hwaro
           if full_path
             base_dir = File.dirname(full_path)
             if title.empty?
-              filename_without_ext = File.basename(full_path, ".md")
-              title = Creator.titleize(filename_without_ext)
+              title = Creator.titleize(page_stem(full_path))
             end
           else
             base_dir = File.join("content", section)
           end
         else
           # Determine if path is a file path or directory
-          is_file_path = path && path.ends_with?(".md")
+          is_file_path = path && page_path?(path)
 
           # When user types something like `posts/my-cool-post` (with a slash, no .md),
           # **and did not pass an explicit --section**, their clear intent is almost
@@ -269,7 +269,7 @@ module Hwaro
           # heuristics below and routes to the container branch instead.
           path_is_dir = options.path_is_dir
 
-          user_intends_file_under_section = !path.nil? && !path.ends_with?(".md") &&
+          user_intends_file_under_section = !path.nil? && !page_path?(path) &&
                                             path.includes?("/") && options.bundle != true &&
                                             !path_is_dir
 
@@ -283,13 +283,13 @@ module Hwaro
           # "the bundle directory name".
           target_dir_for_bare = path && (path.starts_with?("content/") ? path : File.join("content", path))
           bare_dir_exists = target_dir_for_bare ? Dir.exists?(target_dir_for_bare) : false
-          user_intends_bare_flat = !path.nil? && !path.ends_with?(".md") &&
+          user_intends_bare_flat = !path.nil? && !page_path?(path) &&
                                    !path.includes?("/") && options.bundle != true && options.section.nil? &&
                                    !bare_dir_exists && !path_is_dir
 
           # With explicit --no-bundle (or the section-path / bare-path heuristics above), treat the
           # provided path as the desired file location.
-          is_no_bundle_flat = (!path.nil? && options.bundle == false && !path.ends_with?(".md")) || user_intends_file_under_section || user_intends_bare_flat
+          is_no_bundle_flat = (!path.nil? && options.bundle == false && !page_path?(path)) || user_intends_file_under_section || user_intends_bare_flat
 
           if is_file_path && path
             # Honor the path the user typed. Previously a bare `foo.md`
@@ -302,8 +302,7 @@ module Hwaro
 
             # Extract title from filename if not provided
             if title.empty?
-              filename_without_ext = File.basename(path, ".md")
-              title = Creator.titleize(filename_without_ext)
+              title = Creator.titleize(page_stem(path))
             end
 
             full_path = path.starts_with?("content/") ? path : File.join("content", path)
@@ -428,7 +427,7 @@ module Hwaro
         # slug layer and land at `<path>/index.md`.
         path_is_dir_bundle = bundle_mode &&
                              options.section.nil? &&
-                             options.path.try { |p| !p.ends_with?(".md") } == true
+                             options.path.try { |p| !page_path?(p) } == true
 
         if bundle_mode && !bundle_path?(full_path)
           candidate = if path_is_dir_bundle
@@ -481,45 +480,16 @@ module Hwaro
           )
         end
 
-        # Prevent creating a page that would produce a duplicate URL with an
-        # existing section index in the same directory (e.g. posts/index.md
-        # next to posts/_index.md both want to be /posts/).
-        dir = File.dirname(full_path)
-        base = File.basename(full_path, ".md")
-        if base == "index"
-          sibling = File.join(dir, "_index.md")
-          if File.exists?(sibling)
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_IO,
-              message: "Cannot create #{full_path}: would collide with existing section index #{sibling} (both resolve to the same URL).",
-              hint: "Use a different title or path, or remove the _index.md if this is meant to replace the section index.",
-            )
-          end
-        end
-        if base == "_index"
-          sibling = File.join(dir, "index.md")
-          if File.exists?(sibling)
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_IO,
-              message: "Cannot create #{full_path}: would collide with existing page #{sibling}.",
-              hint: "Remove #{sibling} first if you intend to make this the section index.",
-            )
-          end
-        end
-
-        # Mirror of the bundle-over-flat guard above: a flat `<name>.md` next
-        # to an existing `<name>/index.md` bundle (or `<name>/_index.md`
-        # section) renders to the same URL, and the build then drops one of
-        # them with only a warning. Refuse at creation time instead.
-        if base != "index" && base != "_index"
-          {File.join(dir, base, "index.md"), File.join(dir, base, "_index.md")}.each do |nested_sibling|
-            next unless File.exists?(nested_sibling)
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_IO,
-              message: "Cannot create #{full_path}: would collide with existing #{nested_sibling} (both resolve to the same URL).",
-              hint: "Pick a different <path>, or edit #{nested_sibling} directly.",
-            )
-          end
+        # Refuse a page that would render to the same URL as an existing
+        # one: `<name>.md`, `<name>/index.md` and `<name>/_index.md` (in any
+        # page extension) all claim `/<name>/`, and the build then drops one
+        # of them with only a warning.
+        if sibling = url_sibling(full_path)
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_IO,
+            message: "Cannot create #{full_path}: would collide with existing #{sibling} (both resolve to the same URL).",
+            hint: "Pick a different <path>, or edit #{sibling} directly.",
+          )
         end
 
         # Last step before the write, so a rejected create never leaves a
@@ -594,13 +564,35 @@ module Hwaro
       # index. Wrapping either into `<name>/index.md` would be nonsense
       # (`posts/_index/index.md` creates a phantom section).
       private def bundle_path?(path : String) : Bool
-        basename = File.basename(path)
-        basename == "index.md" || basename == "_index.md"
+        {"index", "_index"}.includes?(page_stem(path))
       end
 
       private def bundle_path_for(path : String) : String
-        base = File.basename(path, ".md")
-        File.join(File.dirname(path), base, "index.md")
+        File.join(File.dirname(path), page_stem(path), "index#{File.extname(path)}")
+      end
+
+      private def page_path?(path : String) : Bool
+        Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.includes?(File.extname(path))
+      end
+
+      private def page_stem(path : String) : String
+        File.basename(path, File.extname(path))
+      end
+
+      # An existing page file other than `full_path` that renders to the
+      # same URL, if any.
+      private def url_sibling(full_path : String) : String?
+        stem = page_stem(full_path)
+        dir = File.dirname(full_path)
+        page_dir = bundle_path?(full_path) ? dir : File.join(dir, stem)
+        Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
+          candidates = [File.join(page_dir, "index#{ext}"), File.join(page_dir, "_index#{ext}")]
+          candidates << "#{page_dir}#{ext}" unless page_dir == CONTENT_DIR
+          candidates.each do |candidate|
+            return candidate if candidate != full_path && File.file?(candidate)
+          end
+        end
+        nil
       end
 
       # True when switching `<name>.md` to `<name>/index.md` would
@@ -787,7 +779,7 @@ module Hwaro
           str << "+++\n"
           str << "title = \"#{safe_title}\"\n"
           str << "date = #{date_literal}\n"
-          extra_fields.each { |f| str << "#{f} = \"#{escape_string(field_values[f]? || "")}\"\n" }
+          extra_fields.each { |f| str << "#{Utils::FrontmatterWriter.format_toml_key(f)} = \"#{escape_string(field_values[f]? || "")}\"\n" }
           str << "draft = true\n" if is_draft
           unless tags.empty?
             rendered = tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")
@@ -806,7 +798,7 @@ module Hwaro
           # valid YAML, and a normal date parses back as a String scalar (an
           # unquoted YYYY-MM-DD parses as a Time node and is silently dropped).
           str << "date: \"#{escape_string(date)}\"\n"
-          extra_fields.each { |f| str << "#{f}: \"#{escape_string(field_values[f]? || "")}\"\n" }
+          extra_fields.each { |f| str << "#{Utils::FrontmatterWriter.yaml_scalar(f)}: \"#{escape_string(field_values[f]? || "")}\"\n" }
           str << "draft: true\n" if is_draft
           unless tags.empty?
             str << "tags:\n"

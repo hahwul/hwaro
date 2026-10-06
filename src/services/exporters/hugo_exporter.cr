@@ -18,6 +18,8 @@ module Hwaro
           verbose = options.verbose
 
           files = scan_content_files(content_dir)
+          load_draft_paths(content_dir)
+          @exported_index_dirs.clear
           @relative_files = files.map(&.sub(content_dir, "").lstrip('/')).to_set
 
           if files.empty?
@@ -30,6 +32,7 @@ module Hwaro
           exported = 0
           skipped = 0
           errors = 0
+          content_errors = 0
 
           files.each do |file_path|
             result = export_file(file_path, content_dir, output_dir, include_drafts, verbose)
@@ -39,7 +42,22 @@ module Hwaro
             end
           rescue ex
             errors += 1
+            content_errors += 1 if front_matter_error?(ex)
             Logger.warn "Error exporting #{file_path}: #{ex.message}"
+          end
+
+          # Every non-Markdown file the build publishes keeps its place under
+          # `content/`: beside an exported index Hugo reads it as a (leaf or
+          # branch) bundle resource, so `![](cover.png)` keeps resolving.
+          # Assets are listed in the manifest but not counted.
+          begin
+            each_published_asset(content_dir, files) do |src, relative, _owner|
+              copy_asset(src, File.join(output_dir, "content", relative), output_dir, verbose)
+            end
+          rescue ex : File::Error
+            # The tree changed under the walk after the pages were written —
+            # warn instead of letting the counts/manifest disagree with disk.
+            Logger.warn "Could not export content assets: #{ex.message}"
           end
 
           # Any per-file error fails the run: `exported > 0` used to mask
@@ -49,7 +67,8 @@ module Hwaro
             message: errors > 0 ? "#{errors} file(s) could not be exported (#{exported} exported, #{skipped} skipped)" : "Exported #{exported} items, skipped #{skipped}, errors #{errors}",
             exported_count: exported,
             skipped_count: skipped,
-            error_count: errors
+            error_count: errors,
+            content_error_count: content_errors
           )
         end
 
@@ -64,7 +83,7 @@ module Hwaro
           fields, body = parse_content(raw)
 
           # Skip drafts unless requested
-          is_draft = fields["draft"]?.try(&.raw) == true
+          is_draft = draft?(file_path, fields)
           if is_draft && !include_drafts
             return :skipped
           end
@@ -136,6 +155,10 @@ module Hwaro
             end
           end
 
+          # A cascaded draft carries no flag of its own; spell it out so the
+          # exported page stays a draft whatever Hugo makes of `[cascade]`.
+          hugo_fields["draft"] = YAML::Any.new(true) if is_draft && !hugo_fields.has_key?("draft")
+
           frontmatter = generate_toml_frontmatter(hugo_fields)
           body = rewrite_internal_links(body)
 
@@ -148,20 +171,7 @@ module Hwaro
           # exported post for them to sit next to.
           return :skipped unless write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", output_dir, verbose)
 
-          # Leaf bundle (`posts/my-post/index.md`): Hugo reads the bundle's
-          # co-located resources out of this same directory, so carry them
-          # across instead of exporting a post whose images all 404.
-          if File.basename(relative).in?("index.md", "index.markdown") && relative.includes?('/')
-            begin
-              copy_bundle_assets(File.dirname(file_path), File.dirname(out_path), output_dir, verbose)
-            rescue ex : File::Error
-              # The bundle directory vanished or became unlistable after the
-              # post was written — the post itself exported, so warn instead
-              # of letting the counts/manifest disagree with disk.
-              Logger.warn "Could not export bundle assets for #{file_path}: #{ex.message}"
-            end
-          end
-
+          note_exported_index(file_path, content_dir)
           :exported
         end
 

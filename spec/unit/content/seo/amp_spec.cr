@@ -463,6 +463,25 @@ describe Hwaro::Content::Seo::Amp do
       end
     end
 
+    it "writes no mirror for a redirect_to stub" do
+      Dir.mktmpdir do |dir|
+        config = make_amp_config(<<-TOML)
+          [amp]
+          enabled = true
+          TOML
+        page = Hwaro::Models::Page.new("moved.md")
+        page.url = "/moved/"
+        page.redirect_to = "https://elsewhere.example/"
+        FileUtils.mkdir_p(File.join(dir, "moved"))
+        File.write(File.join(dir, "moved", "index.html"), "<html><head></head><body>stub</body></html>")
+
+        Hwaro::Content::Seo::Amp.generate([page], config, dir)
+
+        File.exists?(File.join(dir, "amp", "moved", "index.html")).should be_false
+        Hwaro::Content::Seo::Amp.mirror_output_for(page, config, dir).should be_nil
+      end
+    end
+
     it "generates AMP page from canonical HTML" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)

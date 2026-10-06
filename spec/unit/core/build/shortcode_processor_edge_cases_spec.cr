@@ -451,6 +451,30 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
     end
   end
 
+  describe "block bodies inside containers" do
+    templates = {"shortcodes/box" => %([{{ body }}])}
+
+    it "strips the blockquote markers the opener line carries" do
+      content = "> {% box %}\n> Use **this**.\n>\n> More.\n> {% end %}\n"
+      result = Hwaro::Core::Build::Builder.new.test_sc_process(content, templates)
+      result.should eq("> [Use **this**.\n\nMore.]\n")
+    end
+
+    it "strips list indentation and list markers from the body" do
+      indented = "- item\n\n    {% box %}\n    First.\n\n    Second.\n    {% end %}\n"
+      Hwaro::Core::Build::Builder.new.test_sc_process(indented, templates)
+        .should eq("- item\n\n    [First.\n\nSecond.]\n")
+      marker = "- {% box %}\n  First.\n\n  Second.\n  {% end %}\n"
+      Hwaro::Core::Build::Builder.new.test_sc_process(marker, templates)
+        .should eq("- [First.\n\nSecond.]\n")
+    end
+
+    it "keeps the body as written when the opener follows other text" do
+      content = "Text {% box %}\n  a\n{% end %}"
+      Hwaro::Core::Build::Builder.new.test_sc_process(content, templates).should eq("Text [a]")
+    end
+  end
+
   describe "argument parsing edge cases" do
     it "preserves spaces inside double-quoted values" do
       builder = Hwaro::Core::Build::Builder.new

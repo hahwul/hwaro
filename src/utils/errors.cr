@@ -70,6 +70,17 @@ module Hwaro
     def self.exit_for(code : String) : Int32
       EXIT_FOR[code]? || EXIT_GENERIC
     end
+
+    # A file-by-file tool run (`convert`, `export`) that failed:
+    # HWARO_E_CONTENT when every failure was unparseable front matter (as
+    # `build` and `tool validate` classify it), HWARO_E_IO otherwise.
+    def self.per_file_failure(message : String, errors : Int32, content_errors : Int32) : HwaroError
+      if errors > 0 && content_errors == errors
+        HwaroError.new(HWARO_E_CONTENT, message, "Fix the front matter errors listed above (hwaro tool validate names them).")
+      else
+        HwaroError.new(HWARO_E_IO, message, "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.")
+      end
+    end
   end
 
   # Exception carrying a classified error code, category and optional hint.

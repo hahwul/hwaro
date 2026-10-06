@@ -192,6 +192,29 @@ module Hwaro
           lines.join("\n")
         end
 
+        # hwaro front-matter keys the source generators give no meaning of
+        # their own, carried through as-is: a value there came from
+        # `tool export` or a theme param with the same intent (`toc`). hwaro
+        # keys Hugo uses differently (`menu`, `cascade`, `path`, …) are page
+        # params there, so they join every other unrecognised key in `[extra]`.
+        CARRIED_KEYS = Set{
+          "toc", "template", "page_template", "image", "updated", "expires",
+          "render", "in_sitemap", "in_search_index", "insert_anchor_links",
+          "transparent", "generate_feeds", "paginate", "paginate_by",
+          "pagination_enabled", "paginate_path", "sort_by", "reverse",
+          "redirect_to", "series_weight",
+        }
+
+        # Append extra keys/tables to a `generate_frontmatter` document.
+        # TomlBuilder emits scalars before tables, so appending after the
+        # mapped (scalar) lines keeps the document valid TOML.
+        protected def append_frontmatter(frontmatter : String, more : Hash(String, YAML::Any)) : String
+          return frontmatter if more.empty?
+          toml = Hwaro::Utils::FrontmatterWriter::TomlBuilder.new.build(more)
+          toml = "\n#{toml}" if toml.starts_with?('[')
+          "#{frontmatter.rchop("+++")}#{toml}+++"
+        end
+
         # Convert title to a URL-safe slug
         # If the imported body's first non-blank line is an H1 matching the
         # front-matter title, drop it. Hwaro page templates render

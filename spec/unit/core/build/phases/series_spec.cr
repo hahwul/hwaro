@@ -3,6 +3,7 @@ require "../../../../../src/models/config"
 require "../../../../../src/models/page"
 require "../../../../../src/models/site"
 require "../../../../../src/core/build/builder"
+require "../../../../support/build_helper"
 
 # Reopen Builder to expose private method for testing
 module Hwaro::Core::Build
@@ -11,8 +12,10 @@ module Hwaro::Core::Build
       compute_series(site)
     end
 
-    def test_recompute_series_for_pages(site, changed)
-      recompute_series_for_pages(site, changed)
+    # Same signature as phases_transform_spec.cr's: both files reopen
+    # Builder, and the later definition wins in a whole-suite build.
+    def test_recompute_series_for_pages(site, changed, old_names = {} of String => String?)
+      recompute_series_for_pages(site, changed, old_names)
     end
   end
 end
@@ -219,5 +222,32 @@ describe "Series language scoping" do
     ko2.series_index.should eq(0)
     en2.series_index.should eq(2)
     en1.series_pages.map(&.path).should eq(["posts/a.md", "posts/b.md"])
+  end
+end
+
+describe "Series navigation in a build" do
+  # A draft built with --drafts keeps its `series` but is left out of the
+  # group (series_index 0). Rendered before a member, it used to seed the
+  # group's shared series list with its own empty one, wiping the nav on
+  # every member.
+  it "keeps the members' list when an excluded page names the series" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n\n[series]\nenabled = true\n",
+      content_files: {
+        "blog/_index.md" => "+++\ntitle = \"Blog\"\n+++\n",
+        "blog/a1.md"     => "+++\ntitle = \"One\"\nseries = \"S\"\nseries_weight = 1\n+++\n",
+        "blog/b2.md"     => "+++\ntitle = \"Two\"\nseries = \"S\"\nseries_weight = 2\ndraft = true\n+++\n",
+        "blog/c3.md"     => "+++\ntitle = \"Three\"\nseries = \"S\"\nseries_weight = 3\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "{{ page.series_index }}:{% for p in page.series_pages %}[{{ p.title }}]{% endfor %}",
+        "section.html" => "S",
+      },
+      drafts: true,
+    ) do
+      File.read("public/blog/a1/index.html").should eq("1:[One][Three]")
+      File.read("public/blog/c3/index.html").should eq("2:[One][Three]")
+      File.read("public/blog/b2/index.html").should eq("0:")
+    end
   end
 end

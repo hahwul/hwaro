@@ -554,6 +554,24 @@ describe Hwaro::Core::Build::Phases::Initialize do
         end
       end
     end
+
+    it "loads files in byte order regardless of directory order" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          %w[zeta 9 Alpha 10 beta _x].each { |stem| File.write("data/#{stem}.yml", "v: 1\n") }
+          File.write("data/dup.yml", "v: yml\n")
+          File.write("data/dup.json", %({"v": "json"}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+          builder.test_load_data_files(site)
+
+          site.data.keys.should eq(%w[10 9 Alpha _x beta dup zeta])
+          site.data["dup"]["v"].raw.should eq("yml")
+        end
+      end
+    end
   end
 
   describe "#create_fresh_crinja_env" do

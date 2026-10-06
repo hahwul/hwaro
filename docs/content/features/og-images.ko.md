@@ -434,9 +434,9 @@ overlay_opacity = 0.55
 
 ## 출력 포맷
 
-PNG가 기본값입니다. stb_truetype과 stb_image_write로 자체 렌더링하므로 외부 도구가 필요 없습니다. 시스템 폰트는 자동 감지되며(macOS는 Helvetica/Arial, Linux는 DejaVu/Liberation/Noto), 최후 수단으로 번들된 DejaVu Sans Bold를 사용합니다.
+PNG가 기본값입니다. stb_truetype과 stb_image_write로 자체 렌더링하므로 외부 도구가 필요 없습니다. 폰트는 바이너리에 번들되어 있으며(Space Grotesk, JetBrains Mono, 넓은 문자 범위를 받쳐 주는 DejaVu Sans Bold), 시스템 폰트는 CJK 텍스트에만 사용합니다.
 
-CJK 문자가 들어간 제목에는 CJK를 지원하는 `font_path`(예: Noto Sans CJK)가 필요합니다. 번들 폰트는 라틴 문자만 지원합니다.
+시스템에 CJK 폰트가 있으면 CJK 제목과 설명에 별도 설정이 필요 없습니다. Hwaro가 처음 찾은 폰트(macOS는 Arial Unicode, Apple SD Gothic Neo, PingFang, Hiragino Sans GB, Linux는 Noto Sans CJK)를 폰트 체인에 추가합니다. 최소 구성의 Linux 컨테이너나 CI 러너처럼 CJK 폰트가 없는 환경에서는 CJK 문자가 이미지에서 빠지므로, Noto Sans CJK를 설치하거나 `font_path`에 CJK를 지원하는 폰트를 지정하세요. `font_path`를 설정하면 이 시스템 폰트 탐색을 대신하므로, 지정한 폰트가 CJK 글리프를 직접 포함해야 합니다.
 
 의존성 없는 SVG 출력이 필요하면 `format = "svg"`로 설정합니다. 다만 소셜 플랫폼은 일반적으로 SVG `og:image`를 렌더링하지 않습니다.
 

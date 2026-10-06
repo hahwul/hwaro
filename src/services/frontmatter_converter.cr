@@ -3,6 +3,7 @@
 # This service provides functionality to convert frontmatter between
 # YAML, TOML, and JSON formats in content files.
 
+require "base64"
 require "json"
 require "yaml"
 require "toml"
@@ -34,6 +35,11 @@ module Hwaro
       # True when the run only previewed: `converted_count` then means
       # "would be converted" and no file was touched.
       property dry_run : Bool
+      # The part of `error_count` caused by unparseable front matter (a run
+      # that failed only on those is a content error, not an IO one). Not
+      # part of the `--json` payload.
+      @[JSON::Field(ignore: true)]
+      property content_error_count : Int32
 
       def initialize(
         @success : Bool = true,
@@ -42,6 +48,7 @@ module Hwaro
         @skipped_count : Int32 = 0,
         @error_count : Int32 = 0,
         @dry_run : Bool = false,
+        @content_error_count : Int32 = 0,
       )
       end
     end
@@ -237,6 +244,7 @@ module Hwaro
         converted = 0
         skipped = 0
         errors = 0
+        content_errors = 0
         skips = {} of SkipReason => Int32
 
         format_name = format_label(target_format)
@@ -249,7 +257,10 @@ module Hwaro
             converted += 1
           when ConversionStatus::Skipped
             skipped += 1
-          when ConversionStatus::Failed, ConversionStatus::Error
+          when ConversionStatus::Failed
+            errors += 1
+            content_errors += 1
+          when ConversionStatus::Error
             errors += 1
           end
         end
@@ -268,7 +279,8 @@ module Hwaro
           converted_count: converted,
           skipped_count: skipped,
           error_count: errors,
-          dry_run: @dry_run
+          dry_run: @dry_run,
+          content_error_count: content_errors
         )
       end
 
@@ -552,6 +564,7 @@ module Hwaro
         when String  then JSON::Any.new(raw)
         when Time    then JSON::Any.new(FrontmatterConverter.serialize_time(raw))
         when Nil     then JSON::Any.new(nil)
+        when Bytes   then JSON::Any.new(Base64.strict_encode(raw))
         when Array
           arr = yaml.as_a.map { |v| yaml_any_to_json_any(v, depth + 1) }
           JSON::Any.new(arr)

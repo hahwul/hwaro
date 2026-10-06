@@ -549,6 +549,20 @@ describe Hwaro::Models::Page do
       result.should eq([] of String)
     end
 
+    it "returns assets in byte order regardless of directory order" do
+      Dir.mktmpdir do |dir|
+        page_dir = File.join(dir, "blog")
+        FileUtils.mkdir_p(File.join(page_dir, "img"))
+        File.write(File.join(page_dir, "index.md"), "# Test")
+        %w[zeta.png 9.png Alpha.png img/b.png 10.png beta.png _x.png].each do |name|
+          File.write(File.join(page_dir, name), "x")
+        end
+        page = Hwaro::Models::Page.new("blog/index.md")
+        page.is_index = true
+        page.collect_assets(dir).should eq(%w[10.png 9.png Alpha.png _x.png beta.png img/b.png zeta.png].map { |n| "blog/#{n}" })
+      end
+    end
+
     it "collects non-markdown files from page directory" do
       Dir.mktmpdir do |dir|
         content_dir = dir
@@ -775,5 +789,16 @@ describe "Hwaro::Models::Page#social_image" do
     end
     page.image = nil
     page.social_image.should be_nil
+  end
+end
+
+describe "Hwaro::Models::Page#home?" do
+  it "is true only for an index file directly under content/" do
+    {"index.md" => true, "index.ko.md" => true, "_index.md" => true, "about/index.md" => false, "blog/_index.md" => false}.each do |path, expected|
+      page = Hwaro::Models::Page.new(path)
+      page.is_index = true
+      page.home?.should eq(expected)
+    end
+    Hwaro::Models::Page.new("about.md").home?.should be_false
   end
 end

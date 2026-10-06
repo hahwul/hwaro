@@ -165,6 +165,55 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    it "keeps redirect_to stubs out of a term feed, like every other feed" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.feed = true
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+      shown = Hwaro::Models::Page.new("shown.md")
+      shown.url = "/blog/shown/"
+      shown.tags = ["x"]
+      moved = Hwaro::Models::Page.new("moved.md")
+      moved.url = "/blog/moved/"
+      moved.tags = ["x"]
+      moved.redirect_to = "https://elsewhere.example/"
+      site.pages = [shown, moved]
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Taxonomies.generate(site, output_dir, {"taxonomy_term" => "{{ content }}"})
+
+        feed = File.read(File.join(output_dir, "tags", "x", "rss.xml"))
+        feed.should contain("/blog/shown/")
+        feed.should_not contain("/blog/moved/")
+      end
+    end
+
+    it "hands the pagination nav to term templates as pagination and pagination_obj.html" do
+      config = Hwaro::Models::Config.new
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.paginate_by = 2
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+      site.pages = (1..3).map do |i|
+        page = Hwaro::Models::Page.new("post#{i}.md")
+        page.title = "Post #{i}"
+        page.url = "/blog/post#{i}/"
+        page.tags = ["crystal"]
+        page
+      end
+
+      Dir.mktmpdir do |output_dir|
+        templates = {"taxonomy_term" => "{{ pagination }}|{{ pagination_obj.html == pagination }}"}
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        html = File.read(File.join(output_dir, "tags", "crystal", "index.html"))
+        html.should contain(%(class="pagination"))
+        html.should end_with("|true")
+      end
+    end
+
     # A term whose name slugifies to empty (all-symbol / emoji) must fall back to
     # the safe_slugify "term-<hex>" token so it never produces a // path segment
     # nor overwrites the /tags/ listing page itself.

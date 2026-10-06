@@ -209,7 +209,7 @@ Tests evaluate conditions in `{% if %}` statements.
 |------|-------------|---------|
 | startswith | Starts with | `{% if page.url is startswith("/blog/") %}` |
 | endswith | Ends with | `{% if page.url is endswith("/") %}` |
-| containing | Contains | `{% if page.url is containing("docs") %}` |
+| containing | Contains a substring (strings) or an element (lists) | `{% if page.url is containing("docs") %}` |
 | matching | Regex match | `{% if asset is matching("[.](jpg\|png)$") %}` |
 | empty | Is empty | `{% if page.description is empty %}` |
 | present | Is not empty | `{% if page.title is present %}` |

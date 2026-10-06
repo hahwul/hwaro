@@ -52,6 +52,7 @@ module Hwaro
         ) : Symbol
           raw = read_text(file_path)
           fm_data, body = extract_frontmatter(raw)
+          source_data = fm_data
           fm_data = fm_data.try { |data| downcase_keys(data) }
           local_keys = toml_local_datetime_keys(raw)
 
@@ -158,9 +159,16 @@ module Hwaro
             if expires = date_string(data, "expirydate", local_keys)
               fields["expires"] = expires
             end
+
+            # Hugo's `layout` picks the page template, hwaro's `template` —
+            # the Jekyll importer's mapping. An authored `template` wins.
+            if (layout = string_value(data, "layout")) && !data.has_key?("template")
+              fields["template"] = layout
+            end
           end
 
           frontmatter = generate_frontmatter(fields)
+          frontmatter = append_frontmatter(frontmatter, carried_fields(source_data, fields)) if source_data
 
           # Determine section and filename
           section, filename = section_from_path(file_path, content_dir, "")
@@ -222,6 +230,49 @@ module Hwaro
 
           return :skipped unless written
           has_shortcodes ? :imported_wrapped : :imported
+        end
+
+        # Keys `process_file` maps explicitly (lowercase).
+        MAPPED_KEYS = Set{
+          "title", "date", "publishdate", "lastmod", "draft", "description",
+          "summary", "tags", "categories", "authors", "series", "weight", "slug",
+          "aliases", "url", "images", "featured_image", "expirydate", "layout",
+        }
+
+        # The front matter `process_file` does not map: CARRIED_KEYS as-is,
+        # and every other key — Hugo page params, top-level or under
+        # `[params]` — into `[extra]`, where hwaro templates read custom
+        # fields. A `[extra]` table (from `tool export hugo`) merges in last.
+        # A key the mapping already filled goes to `[extra]` too. These were
+        # all silently dropped.
+        private def carried_fields(source : Hash(String, TOML::Any), mapped : Hash(String, FieldValue)) : Hash(String, YAML::Any)
+          carried = {} of String => YAML::Any
+          extra = {} of YAML::Any => YAML::Any
+          params = nil
+          own_extra = nil
+          source.each do |key, value|
+            lower = key.downcase
+            # The spelling `downcase_keys` kept wins, as for mapped keys.
+            next if key != lower && source.has_key?(lower)
+            next if MAPPED_KEYS.includes?(lower)
+            case lower
+            when "params" then params = value.as_h?
+            when "extra"  then own_extra = value.as_h?
+            end
+            next if (lower == "params" && params) || (lower == "extra" && own_extra)
+
+            converted = Hwaro::Utils::FrontmatterWriter.toml_to_yaml_any(value)
+            if Base::CARRIED_KEYS.includes?(lower) && !mapped.has_key?(lower)
+              carried[lower] = converted
+            else
+              extra[YAML::Any.new(key)] = converted
+            end
+          end
+          {params, own_extra}.each do |table|
+            table.try &.each { |key, value| extra[YAML::Any.new(key)] = Hwaro::Utils::FrontmatterWriter.toml_to_yaml_any(value) }
+          end
+          carried["extra"] = YAML::Any.new(extra) unless extra.empty?
+          carried
         end
 
         # Hugo front matter keys are case-insensitive (`Title`, `Draft`,
@@ -399,8 +450,9 @@ module Hwaro
         LOCAL_DATETIME_LINE_RE = /\A[ \t]*([A-Za-z0-9_-]+)[ \t]*=[ \t]*\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2}(?:\.\d+)?[ \t]*(?:#.*)?\z/
 
         # The (lowercased) top-level keys of a TOML front matter block whose
-        # value is a local date-time. Empty for YAML/JSON front matter, whose
-        # zone-less timestamps already parse as UTC on every machine.
+        # value is a local date-time. Empty for YAML/JSON front matter: JSON
+        # dates are strings, and a zone-less YAML timestamp parses in the local
+        # zone, which `serialize_time` already writes zone-less.
         private def toml_local_datetime_keys(raw : String) : Set(String)
           keys = Set(String).new
           return keys unless raw.starts_with?("+++") && (match = TOML_FM_REGEX.match(raw))

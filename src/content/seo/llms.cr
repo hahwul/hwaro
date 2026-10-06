@@ -208,7 +208,9 @@ module Hwaro
 
             eligible_pages.each do |page|
               str << "\n---\n\n"
-              str << "Title: " << page.title << "\n"
+              # Same fallback as the llms.txt index: a root index commonly
+              # has `title = ""`.
+              str << "Title: " << (page.title.empty? ? config.title : page.title) << "\n"
 
               url = page.url
               absolute_url = Utils::TextUtils.encode_url_path(base_url.empty? ? url : "#{base_url}#{url}")

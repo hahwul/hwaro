@@ -32,12 +32,24 @@ full_filename = "llms-full.txt"
 
 ### llms.txt
 
-The basic `llms.txt` file contains only the instructions you define in the configuration. This is a lightweight file that tells AI crawlers about your site's policies.
+`llms.txt` follows the [llms.txt format](https://llmstxt.org/): the site title as a heading, the site description as a blockquote, your instructions, then a link list of the site's pages grouped by section (root pages under `## Pages`). It lists the same pages the search index does: no drafts, headless (`render = false`) pages or `redirect_to` stubs.
 
 **Example output (`llms.txt`):**
 
 ```
+# My Site
+
+> A great site about programming
+
 This is my site. Content is provided under the MIT license.
+
+## Pages
+
+- [About](https://example.com/about/): Who writes this site
+
+## Posts
+
+- [Hello World](https://example.com/posts/hello-world/): The first post
 ```
 
 ### llms-full.txt

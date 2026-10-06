@@ -1333,14 +1333,14 @@ module Hwaro
                   {# sec.pages already arrives in the section's sort_by order
                      (weight for chapters), matching the prev/next chain; a
                      second Crinja sort here would be unstable on weight ties. #}
-                  {% for p in sec.pages | rejectattr("is_index") %}
+                  {% for p in sec.pages | rejectattr("is_section") %}
                   <li><a href="{{ base_url }}{{ p.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ p.title | e }}</a></li>
                   {% endfor %}
                   {# Nested subsections render one level deeper, mirroring the
                      prev/next chain's depth-first nesting. #}
                   {% for sub in sec.subsections | sort(attribute="path") | sort(attribute="weight") %}
                   <li><a href="{{ base_url }}{{ sub.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ sub.title | e }}</a></li>
-                  {% for sp in sub.pages | rejectattr("is_index") %}
+                  {% for sp in sub.pages | rejectattr("is_section") %}
                   <li><a href="{{ base_url }}{{ sp.url }}"><span class="num">{{ chapter_index }}.{{ loop.index }}</span> {{ sp.title | e }}</a></li>
                   {% endfor %}
                   {% endfor %}
@@ -1410,7 +1410,7 @@ module Hwaro
                   {# Only render the chapter listing when the section has at
                      least one non-index child page — an empty chapter would
                      otherwise show an orphan heading over an empty list. #}
-                  {% if section.pages | rejectattr("is_index") | length %}
+                  {% if section.pages | rejectattr("is_section") | length %}
                   <h2>In This Chapter</h2>
                   <ul class="section-list">
                     {{ section.list }}

@@ -684,6 +684,19 @@ describe Hwaro::Core::Build::Phases::Render do
       vars["page_language"] = Crinja::Value.new("ko")
       render_crinja("{{ get_section(path='blog').title }}", vars).should eq("한국어 블로그")
     end
+
+    it "resolves a section name written with leading or trailing slashes" do
+      config = Hwaro::Models::Config.new
+      site = Hwaro::Models::Site.new(config)
+      blog = Hwaro::Models::Section.new("blog/_index.md")
+      blog.title = "Blog"
+      blog.section = "blog"
+      blog.url = "/blog/"
+      site.sections << blog
+      vars = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)
+
+      render_crinja("{{ get_section(path='/blog').title }}|{{ get_section(path='blog/').title }}", vars).should eq("Blog|Blog")
+    end
   end
 
   # `split_priority_pages` underpins `--fast-start` — it picks the page

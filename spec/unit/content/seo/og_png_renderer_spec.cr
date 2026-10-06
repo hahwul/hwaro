@@ -1,5 +1,15 @@
 require "../../../spec_helper"
 
+class Hwaro::Content::Seo::OgPngRenderer
+  def self.test_word_wrap_chain(chain, px_size, text, max_width)
+    word_wrap_chain(chain, px_size, text, max_width)
+  end
+
+  def self.test_balanced_wrap_chain(chain, px_size, text, max_width)
+    balanced_wrap_chain(chain, px_size, text, max_width)
+  end
+end
+
 describe Hwaro::Content::Seo::OgPngRenderer do
   describe ".parse_hex_color" do
     it "parses hex color strings" do
@@ -470,6 +480,30 @@ describe Hwaro::Content::Seo::OgPngRenderer do
           result.should be_true
         end
       end
+    end
+  end
+
+  # A title segment wider than the line on its own (a URL, a file path) was
+  # kept whole, so it ran off the canvas — and across the window frame in
+  # `terminal`. The SVG renderer hard-breaks such segments; so must PNG.
+  describe ".word_wrap_chain" do
+    long_title = "Understanding github.com/hahwul/hwaro/src/content/processors/image_processor.cr in depth"
+
+    it "hard-breaks a segment wider than the line" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts.as(Hwaro::Content::Seo::OgPngRenderer::FontContext)
+      lines = Hwaro::Content::Seo::OgPngRenderer.test_word_wrap_chain(ctx.mono, 54_f32, long_title, 900)
+      lines.size.should be > 2
+      lines.each do |line|
+        Hwaro::Content::Seo::OgPngRenderer.chain_measure(ctx.mono, 54_f32, line).should be <= 900
+      end
+      lines.join.delete(' ').should eq(long_title.delete(' '))
+    end
+
+    it "does not split words that fit when balancing" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts.as(Hwaro::Content::Seo::OgPngRenderer::FontContext)
+      title = "Short words wrap only at spaces here"
+      lines = Hwaro::Content::Seo::OgPngRenderer.test_balanced_wrap_chain(ctx.display, 56_f32, title, 700)
+      lines.join(" ").should eq(title)
     end
   end
 

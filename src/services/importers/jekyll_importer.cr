@@ -263,11 +263,39 @@ module Hwaro
           end
 
           frontmatter = generate_frontmatter(fields)
+          frontmatter = append_frontmatter(frontmatter, extra_fields(yaml, fields)) if yaml
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, file_info[:section], slug, frontmatter, body, verbose, force)
 
           return :skipped unless written
           has_liquid ? :imported_wrapped : :imported
+        end
+
+        # Keys `import_file` maps (or consumes) itself.
+        MAPPED_KEYS = Set{
+          "title", "date", "last_modified_at", "permalink", "redirect_from",
+          "layout", "categories", "category", "tags", "published", "excerpt",
+          "description", "image",
+        }
+
+        # Jekyll exposes every other front matter key to templates as
+        # `page.<key>`; hwaro's home for such fields is `[extra]`, as the Hugo
+        # importer does for page params (hwaro's own keys, CARRIED_KEYS, stay
+        # top-level). They were silently dropped.
+        private def extra_fields(yaml : YAML::Any, mapped : Hash(String, FieldValue)) : Hash(String, YAML::Any)
+          carried = {} of String => YAML::Any
+          extra = {} of YAML::Any => YAML::Any
+          yaml.as_h.each do |key, value|
+            name = key.as_s? || ""
+            next if value.raw.nil? || MAPPED_KEYS.includes?(name)
+            if CARRIED_KEYS.includes?(name) && !mapped.has_key?(name)
+              carried[name] = value
+            else
+              extra[key] = value
+            end
+          end
+          carried["extra"] = YAML::Any.new(extra) unless extra.empty?
+          carried
         end
 
         private def extract_slug(filename : String) : String

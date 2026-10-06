@@ -244,6 +244,18 @@ describe Hwaro::Content::Processors::TemplateEngine do
       result.should eq("yes")
     end
 
+    it "tests list containment by element, not by the list's text" do
+      vars = {"tags" => Crinja.value(["C++", "Crystal"])}
+      render_crinja(%({{ tags is containing("Crystal") }}|{{ tags is containing("C") }}|{{ tags is containing(", ") }}), vars)
+        .should eq("true|false|false")
+    end
+
+    it "treats undefined and empty safe strings as empty, not present" do
+      vars = {"extra" => Crinja.value({"a" => "x"})}
+      render_crinja(%({{ extra.missing is present }}|{{ extra.missing is empty }}|{{ ("" | safe) is empty }}|{{ extra.a is present }}), vars)
+        .should eq("false|true|true|true")
+    end
+
     it "processes defined test" do
       vars = {} of String => Crinja::Value
       vars["page_title"] = Crinja::Value.new("A title")
@@ -358,6 +370,18 @@ describe Hwaro::Content::Processors::TemplateEngine do
           template = "{% set d = load_data(path=\"data/menu.csv\") %}{{ d[1][0] }}|{{ d[1][1] }}"
           result = render_crinja(template, vars)
           result.should eq("Tea|3")
+        end
+      end
+    end
+
+    it "load_data reads a data file that starts with a UTF-8 BOM, like site.data" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          File.write("data/bom.json", "\uFEFF{\"bom\": 1}")
+          Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+
+          render_crinja(%({{ load_data(path="data/bom.json").bom }})).should eq("1")
         end
       end
     end

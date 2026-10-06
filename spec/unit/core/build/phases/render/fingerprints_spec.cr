@@ -242,6 +242,72 @@ describe "warm --cache: body edits next to relation readers" do
   end
 end
 
+describe "warm --cache: section-set changes" do
+  it "drops a subsection made headless from its parent listing and the sitemap" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n\n[sitemap]\nenabled = true\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{{ section.list }}")
+        FileUtils.mkdir_p("content/blog/sub")
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n+++\n")
+        File.write("content/blog/post.md", "+++\ntitle = \"Post\"\n+++\n")
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\n")
+        File.write("content/blog/sub/inner.md", "+++\ntitle = \"Inner\"\n+++\n")
+        relations_cached_build
+        File.read("public/blog/index.html").should contain("/blog/sub/")
+
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\nrender = false\n+++\n")
+        relations_cached_build
+
+        File.read("public/blog/index.html").should_not contain("/blog/sub/\"")
+        File.read("public/sitemap.xml").should_not contain("<loc>http://localhost/blog/sub/</loc>")
+      end
+    end
+  end
+end
+
+describe "warm --cache: versioned canonical" do
+  it "re-renders an old version's page when its latest counterpart moves" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+
+          [versions]
+          latest_at_root = true
+
+          [[versions.list]]
+          name = "v2"
+          path = "docs/v2"
+          latest = true
+
+          [[versions.list]]
+          name = "v1"
+          path = "docs/v1"
+          TOML
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ canonical_tag }}")
+        File.write("templates/section.html", "{{ canonical_tag }}")
+        %w[v1 v2].each do |v|
+          FileUtils.mkdir_p("content/docs/#{v}")
+          File.write("content/docs/#{v}/_index.md", "+++\ntitle = \"#{v}\"\n+++\n")
+          File.write("content/docs/#{v}/install.md", "+++\ntitle = \"Install\"\n+++\n")
+        end
+        relations_cached_build
+        File.read("public/docs/v1/install/index.html").should contain(%(href="http://localhost/docs/install/"))
+
+        File.write("content/docs/v2/install.md", "+++\ntitle = \"Install\"\nslug = \"setup\"\n+++\n")
+        relations_cached_build
+
+        File.read("public/docs/v1/install/index.html").should contain(%(href="http://localhost/docs/setup/"))
+      end
+    end
+  end
+end
+
 class Hwaro::Core::Build::Builder
   def test_menu_set_fingerprint(site : Hwaro::Models::Site) : String
     compute_menu_set_fingerprint(site)

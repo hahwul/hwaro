@@ -5,7 +5,8 @@ require "../../../../spec_helper"
 # The generated content itself is exercised in spec/unit/defaults_agents_md_spec.cr;
 # these tests cover the command wrapper: metadata and the `--write` path
 # (local and remote) that persists AGENTS.md. The interactive overwrite prompt
-# (which reads stdin and may `exit`) is intentionally not exercised here.
+# itself (which reads stdin and may `exit`) is not exercised here; only its
+# non-TTY refusal is.
 describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
   describe ".metadata" do
     it "reports the command name and description" do
@@ -149,6 +150,29 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
 
           output.should contain("updated")
           output.should_not contain("created")
+        end
+      end
+    end
+
+    # Regression: without a TTY the overwrite prompt read EOF, printed
+    # "Aborted." and exited 0 — a script could not tell it wrote nothing.
+    it "refuses with a usage error when AGENTS.md exists and stdin is not a TTY" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("AGENTS.md", "stale content")
+          Hwaro::CLI::Prompt.interactive = false
+          Hwaro::CLI::Prompt.input = IO::Memory.new
+          begin
+            ex = expect_raises(Hwaro::HwaroError) do
+              with_captured_log { Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write"]) }
+            end
+            ex.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+            ex.hint.to_s.should contain("--force")
+            File.read("AGENTS.md").should eq("stale content")
+          ensure
+            Hwaro::CLI::Prompt.interactive = nil
+            Hwaro::CLI::Prompt.input = STDIN
+          end
         end
       end
     end

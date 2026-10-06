@@ -34,11 +34,11 @@ module Hwaro::Core::Build::Phases::Render
     # The tag list itself, not just the digest: an empty file added to an
     # auto-include dir adds a `<link>` without moving `?v=`.
     sri_root = sri_root(config)
-    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust, sri_root))
+    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust, sri_root, config.static))
     # `[assets] sri` prints a digest of the emitted bytes into the tags; the
     # `?v=` above is "" under --skip-cache-busting and never covers the
     # highlight files' bytes, so fold the tags themselves.
-    Utils::DigestUtils.update_length_prefixed(digest, config.highlight.tags(cache_bust, sri_root)) if sri_root
+    Utils::DigestUtils.update_length_prefixed(digest, config.highlight.tags(cache_bust, sri_root, config.base_path)) if sri_root
     # `search_tags` carries i18n strings and the assets' digests.
     Content::SearchUi.tags_by_language(config, @i18n_translations, cache_busting, sri_root).each do |lang, tags|
       Utils::DigestUtils.update_length_prefixed(digest, lang)

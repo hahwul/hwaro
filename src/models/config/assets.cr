@@ -23,20 +23,23 @@ module Hwaro
 
       # Generate CSS link tags for files in configured directories.
       # `sri_root` (the build output directory) adds `integrity` attributes.
-      def css_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil) : String
-        collect_tags("css", base_url, cache_bust, sri_root) do |url, integrity|
+      def css_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil, static_config : StaticConfig? = nil) : String
+        collect_tags("css", base_url, cache_bust, sri_root, static_config) do |url, integrity|
           %(<link rel="stylesheet" href="#{url}"#{integrity}>)
         end
       end
 
       # Generate JS script tags for files in configured directories
-      def js_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil) : String
-        collect_tags("js", base_url, cache_bust, sri_root) do |url, integrity|
+      def js_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil, static_config : StaticConfig? = nil) : String
+        collect_tags("js", base_url, cache_bust, sri_root, static_config) do |url, integrity|
           %(<script src="#{url}"#{integrity}></script>)
         end
       end
 
-      private def collect_tags(extension : String, base_url : String, cache_bust : String, sri_root : String?, & : String, String -> String) : String
+      # `static_config` drops files `[static] exclude` keeps out of the build
+      # (for compiled SCSS, the excluded `.scss` source), so no tag points at
+      # a file that is never published.
+      private def collect_tags(extension : String, base_url : String, cache_bust : String, sri_root : String?, static_config : StaticConfig?, & : String, String -> String) : String
         return "" unless @enabled
         return "" if @dirs.empty?
 
@@ -47,6 +50,7 @@ module Hwaro
           next unless Dir.exists?(static_dir)
 
           files = Dir.glob(File.join(static_dir, "**", "*.#{extension}"))
+          files.reject! { |f| static_config.excluded?(Path[f].relative_to("static").to_s) } if static_config
           if extension == "css" && @sass_enabled
             # Compiled SCSS is written to the output tree, not `static/`,
             # so project each entry onto the `.css` it will produce.
@@ -54,6 +58,7 @@ module Hwaro
             # same name is already in `files`.
             Dir.glob(File.join(static_dir, "**", "*.scss")).each do |scss|
               next if File.basename(scss).starts_with?("_")
+              next if static_config && static_config.excluded?(Path[scss].relative_to("static").to_s)
               compiled = scss.sub(/\.scss\z/, ".css")
               files << compiled unless files.includes?(compiled)
             end
@@ -68,9 +73,9 @@ module Hwaro
       end
 
       # Generate both CSS and JS tags
-      def all_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil) : String
-        css = css_tags(base_url, cache_bust, sri_root)
-        js = js_tags(base_url, cache_bust, sri_root)
+      def all_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil, static_config : StaticConfig? = nil) : String
+        css = css_tags(base_url, cache_bust, sri_root, static_config)
+        js = js_tags(base_url, cache_bust, sri_root, static_config)
         Models.join_tags(css, js)
       end
     end

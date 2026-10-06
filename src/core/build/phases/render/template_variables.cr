@@ -42,6 +42,8 @@ module Hwaro::Core::Build::Phases::Render
     vars["page_section"] = Crinja::Value.new(page.section)
     vars["page_date"] = date_crinja
     vars["page_image"] = Crinja::Value.new(page.image || config.og.default_image || "")
+    # Source path, for resize_image's bundle-relative lookup (internal).
+    vars["__page_path__"] = Crinja::Value.new(page.path)
     vars["taxonomy_name"] = Crinja::Value.new(page.taxonomy_name || "")
     vars["taxonomy_term"] = Crinja::Value.new(page.taxonomy_term || "")
     default_lang = config.default_language
@@ -130,6 +132,7 @@ module Hwaro::Core::Build::Phases::Render
       "toc"          => Crinja::Value.new(page.toc),
       "render"       => Crinja::Value.new(page.render),
       "is_index"     => Crinja::Value.new(page.is_index),
+      "is_section"   => Crinja::Value.new(page.is_a?(Models::Section)),
       "generated"    => Crinja::Value.new(page.generated),
       "synthesized"  => Crinja::Value.new(page.synthesized?),
       "in_sitemap"   => Crinja::Value.new(page.in_sitemap),
@@ -154,9 +157,11 @@ module Hwaro::Core::Build::Phases::Render
       "ancestors"         => Crinja::Value.new(ancestors_array),
       "series"            => Crinja::Value.new(page.series || ""),
       "series_index"      => Crinja::Value.new(page.series_index),
-      "series_pages"      => if page.series.nil?
+      "series_pages"      => if page.series.nil? || page.series_index == 0
         # Mirror related_posts below: series-less pages (the default) must not
-        # acquire the cache mutex just to hand back the same empty array.
+        # acquire the cache mutex just to hand back the same empty array. A
+        # page left out of its series (series_index 0) reads no group either:
+        # the shared list belongs to the members.
         Crinja::Value.new([] of Crinja::Value)
       elsif @crinja_caches_frozen
         if cached_series = series_group_key(page, default_lang).try { |k| @series_crinja_cache[k]? }
@@ -472,16 +477,22 @@ module Hwaro::Core::Build::Phases::Render
       # keeps self-canonicalizing (page/2/ of an old listing is not page/2/
       # of the new one).
       canonical_override = page_url_override
+      # Section rendering passes its first page's own URL as an override
+      # too; only a later pager (page/2/ …) really overrides.
+      later_pager = !canonical_override.nil? && canonical_override != page.url
       noindex = false
       if versions_enabled && (page_version = page.version) && !page_version.latest
-        if canonical_override.nil? && (latest_link = page.version_links.find { |l| l.latest && l.exists })
+        if !later_pager && (latest_link = page.version_links.find { |l| l.latest && l.exists })
           canonical_override = latest_link.url
         end
         noindex = config.versions.noindex_old
       end
       canonical_tag = Content::Seo::Tags.canonical_tag(page, config, canonical_override)
       canonical_tag = "#{canonical_tag}\n  #{Content::Seo::Tags::NOINDEX_TAG}" if noindex
-      hreflang_tags = Content::Seo::Tags.hreflang_tags(page, config)
+      # The alternates are the translations' first pages, so a later pager
+      # (which canonicalizes to itself) would name page 1 as its own
+      # hreflang URL; it gets none.
+      hreflang_tags = later_pager ? "" : Content::Seo::Tags.hreflang_tags(page, config)
       vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
       vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
 

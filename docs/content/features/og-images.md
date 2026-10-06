@@ -434,9 +434,9 @@ The examples below differ only in `overlay_opacity` (same photo, `style = "edito
 
 ## Output Format
 
-PNG is the default. Rendering is built in via stb_truetype and stb_image_write, so no external tools are required. System fonts are auto-detected (Helvetica/Arial on macOS, DejaVu/Liberation/Noto on Linux), with a bundled DejaVu Sans Bold as the last resort.
+PNG is the default. Rendering is built in via stb_truetype and stb_image_write, so no external tools are required. The fonts are bundled into the binary (Space Grotesk, JetBrains Mono, and DejaVu Sans Bold as the wide-coverage fallback); system fonts are only read for CJK text.
 
-Titles with CJK characters need a CJK-capable `font_path` (e.g. Noto Sans CJK), since the bundled fonts cover Latin scripts only.
+CJK titles and descriptions need no configuration when the system has a CJK font: Hwaro appends the first one it finds (Arial Unicode, Apple SD Gothic Neo, PingFang or Hiragino Sans GB on macOS; Noto Sans CJK on Linux) to the font chain. Where none is installed, such as minimal Linux containers and CI runners, CJK characters are left out of the image, so install Noto Sans CJK or set `font_path` to a CJK-capable font. A `font_path` replaces that system lookup, so it must cover CJK itself.
 
 Set `format = "svg"` for dependency-free SVG output instead. Note that social platforms generally don't render SVG `og:image`.
 

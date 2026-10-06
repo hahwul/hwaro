@@ -89,17 +89,22 @@ module Hwaro
 
           group_pages.each do |current_page|
             current_code = language_code(current_page, config)
-            current_page.translations = order.compact_map do |code|
-              if target = by_code[code]?
-                Models::TranslationLink.new(
-                  code: code,
-                  url: target.url,
-                  title: target.title,
-                  is_current: code == current_code,
-                  is_default: code == default
-                )
-              end
+            links = order.compact_map do |code|
+              next unless target = by_code[code]?
+              # A headless (`render = false`) translation is never written
+              # and a `redirect_to` stub only bounces elsewhere: linking
+              # either from the switcher or hreflang advertises a 404 or a
+              # non-canonical URL (the sitemap already filters both).
+              next if !target.same?(current_page) && (!target.render || target.has_redirect?)
+              Models::TranslationLink.new(
+                code: code,
+                url: target.url,
+                title: target.title,
+                is_current: code == current_code,
+                is_default: code == default
+              )
             end
+            current_page.translations = links.size > 1 ? links : [] of Models::TranslationLink
           end
         end
       end

@@ -110,20 +110,18 @@ module Hwaro
           # at all in human mode, with the reason only ever reachable via
           # `--json`.
           #
-          # BOTH modes exit `HWARO_E_IO`. The `--json` payload was already
+          # BOTH modes exit with the same class: `HWARO_E_CONTENT` when every
+          # failure was unparseable front matter (as `build` and `tool
+          # validate` classify it), `HWARO_E_IO` otherwise. The `--json` payload was already
           # printed by the caller, so this path only needs the status code —
           # but it has to be the SAME code, or a machine consumer branching on
           # exit status gets a different (and less classified) answer for the
           # identical failure purely because it asked for JSON. The payload
           # shape is untouched; only the process exit code changes.
           private def fail_conversion(result : Services::ConversionResult, json_output : Bool) : NoReturn
-            exit(Hwaro::Errors::EXIT_IO) if json_output
-
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_IO,
-              message: result.message,
-              hint: "Pass -c DIR if your content lives outside 'content'; per-file errors are listed above.",
-            )
+            error = Hwaro::Errors.per_file_failure(result.message, result.error_count, result.content_error_count)
+            exit(error.exit_code) if json_output
+            raise error
           end
         end
       end

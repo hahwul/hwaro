@@ -209,7 +209,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 |------|-------------|---------|
 | startswith | ~로 시작 | `{% if page.url is startswith("/blog/") %}` |
 | endswith | ~로 끝남 | `{% if page.url is endswith("/") %}` |
-| containing | 포함 | `{% if page.url is containing("docs") %}` |
+| containing | 부분 문자열(문자열) 또는 요소(리스트) 포함 | `{% if page.url is containing("docs") %}` |
 | matching | 정규식 일치 | `{% if asset is matching("[.](jpg\|png)$") %}` |
 | empty | 비어 있음 | `{% if page.description is empty %}` |
 | present | 비어 있지 않음 | `{% if page.title is present %}` |

@@ -250,6 +250,26 @@ describe "DateFilters" do
       result = render_crinja("{{ d | date(format='%Y-%m-%d') }}", vars)
       result.strip.should eq("2024-06-15")
     end
+
+    it "keeps the offset of every zoned string form" do
+      {
+        "2024-03-05 08:00:00 UTC"    => "08:00 +0000",
+        "2024-03-05 08:00:00 -05:00" => "08:00 -0500",
+        "2024-01-15T10:30:00-03:30"  => "10:30 -0330",
+        "2024-01-15T10:30:00+0900"   => "10:30 +0900",
+        "2024-01-15 10:30:00 +09:00" => "10:30 +0900",
+        "2024-01-15T10:30+09:00"     => "10:30 +0900",
+        "2024-01-15 10:30 -05:00"    => "10:30 -0500",
+      }.each do |input, expected|
+        vars = {"d" => Crinja::Value.new(input)}
+        render_crinja("{{ d | date(format='%H:%M %z') }}", vars).strip.should eq(expected)
+      end
+    end
+
+    it "formats the Time#to_s form front matter datetimes reach templates as" do
+      vars = {"d" => Crinja::Value.new("2024-03-05 08:00:00 UTC")}
+      render_crinja("{{ d | date(format='%B %d, %Y') }}", vars).strip.should eq("March 05, 2024")
+    end
   end
 end
 
@@ -926,6 +946,11 @@ describe "UrlFilters" do
       result = render_crinja(%({{ resize_image(path="/img/a.png", width="999999999999").width }}), vars).strip
       result.should eq(Int32::MAX.to_s)
     end
+
+    it "resize_image hands a remote image URL back unchanged" do
+      vars = {"base_url" => Crinja::Value.new("https://example.com")}
+      render_crinja(%({{ resize_image(path="https://cdn.x/a.png", width=100).url }}), vars).strip.should eq("https://cdn.x/a.png")
+    end
   end
 
   describe "empty base_url (pre-deploy state)" do
@@ -1069,6 +1094,11 @@ describe "CollectionFilters (extended)" do
       vars = {"items" => items}
       result = render_crinja("{% for i in items | compact %}{{ i }},{% endfor %}", vars)
       result.should eq("a,b,")
+    end
+
+    it "removes empty lists and mappings" do
+      vars = {"items" => Crinja.value([1, [] of String, {} of String => String, [2]])}
+      render_crinja("{{ items | compact | length }}", vars).should eq("2")
     end
   end
 end
@@ -1357,6 +1387,11 @@ describe "I18nFilters" do
       vars = {"count" => Crinja::Value.new(1.0)}
       result = render_crinja("{{ count | pluralize(\"item\", \"items\") }}", vars)
       result.should eq("item")
+    end
+
+    it "reads a numeric string as its number" do
+      vars = {"one" => Crinja::Value.new("1"), "two" => Crinja::Value.new(" 2 ")}
+      render_crinja(%({{ one | pluralize("item", "items") }}|{{ two | pluralize("item", "items") }}), vars).should eq("item|items")
     end
   end
 end

@@ -383,7 +383,7 @@ module Hwaro
           seo_links = renderer.render_seo_links(paginated_page)
           html_content = list_html + pagination_html
 
-          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name, pagination_seo_links: seo_links)
+          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name, pagination: pagination_html, pagination_seo_links: seo_links)
 
           if paginated_page.page_number == 1
             write_output(index_page, output_dir, final_html, verbose, builder)
@@ -479,6 +479,7 @@ module Hwaro
         builder : Core::Build::Builder? = nil,
         global_vars : Hash(String, Crinja::Value)? = nil,
         template_name : String? = nil,
+        pagination : String = "",
         pagination_seo_links : String = "",
       ) : String
         return html_content unless template_content
@@ -503,7 +504,9 @@ module Hwaro
           section_list: "",
           toc: "",
           templates: templates,
-          pagination: "", # We don't pass pre-rendered pagination here as it is embedded in content? Wait.
+          # Also appended to `content` (the term list), which templates
+          # have always printed; `pagination` serves custom listings.
+          pagination: pagination,
           page_url_override: current_url,
           paginator: paginator,
           global_vars: global_vars,
@@ -539,9 +542,10 @@ module Hwaro
 
         # No caller-side sort/limit: process_feed itself sorts date-desc
         # (SortUtils.compare_by_date) and applies feeds.limit. Dedupe by URL
-        # so collision losers (not written as HTML) never appear in the feed.
+        # so collision losers (not written as HTML) never appear in the feed,
+        # and keep `redirect_to` stubs out like every other feed does.
         Content::Seo::Feeds.process_feed(
-          Content::Seo::Feeds.dedupe_by_output_url(pages),
+          Content::Seo::Feeds.dedupe_by_output_url(pages.select(&.published_content?)),
           site.config,
           feed_output_dir,
           "",

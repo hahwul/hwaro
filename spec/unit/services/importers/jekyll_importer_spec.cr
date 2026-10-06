@@ -172,6 +172,38 @@ describe Hwaro::Services::Importers::JekyllImporter do
       end
     end
 
+    it "keeps unmapped front matter in [extra]" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        FileUtils.mkdir_p(posts_dir)
+        File.write(File.join(posts_dir, "2024-02-01-custom.md"), <<-JEKYLL)
+          ---
+          title: "Custom"
+          layout: post
+          toc: true
+          author: Jane
+          gallery:
+            - a.png
+            - b.png
+          ---
+          Body.
+          JEKYLL
+
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(source_type: "jekyll", path: dir, output_dir: output_dir)
+        Hwaro::Services::Importers::JekyllImporter.new.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "custom.md"))
+        content.should contain(%(template = "post"))
+        fm = TOML.parse(content.split("+++")[1])
+        extra = fm["extra"].as_h
+        extra["author"].as_s.should eq("Jane")
+        fm["toc"].as_bool.should be_true
+        extra["gallery"].as_a.map(&.as_s).should eq(["a.png", "b.png"])
+        extra.has_key?("layout").should be_false
+      end
+    end
+
     it "imports drafts when options.drafts is true" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "_posts")

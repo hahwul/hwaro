@@ -1034,3 +1034,17 @@ describe "hwaro tool review-fix regressions (2026-08 batch)" do
     end
   end
 end
+
+# Regression: `doctor -q` printed its `[warning] …` lines on stdout, while
+# `--quiet` keeps warnings and errors on stderr for every other command
+# (`tool validate -q` included), as the CLI docs promise.
+describe "hwaro doctor --quiet" do
+  it "prints findings on stderr, leaving stdout empty" do
+    with_initialized_project do |project_dir|
+      # The fresh scaffold still carries its placeholder title: a warning.
+      _, output, error = run_hwaro(["doctor", "-q"], chdir: project_dir)
+      output.should be_empty
+      error.should contain("[warning] config.toml: title is still the placeholder value")
+    end
+  end
+end

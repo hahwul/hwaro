@@ -42,6 +42,8 @@ module Hwaro
             next if page.draft
             next if page.generated
             next unless page.render
+            # A `redirect_to` stub is a meta-refresh bounce, not content.
+            next if page.has_redirect?
             next unless amp_config.section_enabled?(page.section)
 
             # Read the canonical rendered HTML
@@ -432,13 +434,13 @@ module Hwaro
         end
 
         # The mirror `generate` writes for `page`, or nil when it writes none
-        # (AMP off, section not enabled, draft/generated/unrendered page, or
+        # (AMP off, section not enabled, draft/generated/unrendered/redirect page, or
         # a refused prefix). Same gates as `generate`, so the builder can
         # count the mirror among the files a page owns — and delete it with
         # the page.
         def self.mirror_output_for(page : Models::Page, config : Models::Config, output_dir : String) : String?
           return unless config.amp.enabled
-          return if page.draft || page.generated || !page.render
+          return if page.draft || page.generated || !page.render || page.has_redirect?
           return unless config.amp.section_enabled?(page.section)
           prefix = effective_prefix(config)
           return unless prefix

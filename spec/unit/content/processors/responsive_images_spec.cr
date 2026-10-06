@@ -56,6 +56,16 @@ describe "Responsive content images" do
     end
   end
 
+  it "resolves ./ and ../ relative srcs like the plain relative path" do
+    map = SAMPLE_MAP.merge({"/posts/bar/z.png" => {400 => "/posts/bar/z_400w.png"}})
+    with_resize_map(map) do
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+        %(<img src="./photo.png"><img src="../bar/z.png">), bundle_page, enabled_config)
+      out.should contain(%(srcset="/posts/foo/photo_400w.png 400w, /posts/foo/photo_800w.png 800w"))
+      out.should contain(%(srcset="/posts/bar/z_400w.png 400w"))
+    end
+  end
+
   it "resolves an absolute src against the resize map" do
     with_resize_map(SAMPLE_MAP) do
       out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(

@@ -165,6 +165,7 @@ module Hwaro
 
             # Compute dominant color from the tiny thumbnail (cheap)
             dom_color = dominant_color(thumb_pixels, out_w, out_h, channels)
+            flatten_onto_white(thumb_pixels, pixel_count, channels)
 
             jpg_buf = Pointer(UInt8).null
             jpg_len = 0_i32
@@ -188,6 +189,11 @@ module Hwaro
 
         # Compute dominant color as a hex string (e.g., "#a3b2c1").
         # Channels: 1=gray, 2=gray+alpha, 3=RGB, 4=RGBA
+        #
+        # Pixels are weighted by alpha: a transparent pixel's color bytes are
+        # invisible (usually black), so averaging them in darkened every logo
+        # on a transparent background. A fully transparent image has no color
+        # and gets the white its LQIP is flattened onto.
         def dominant_color(pixels : UInt8*, w : Int32, h : Int32, channels : Int32) : String
           return "#000000" if w <= 0 || h <= 0 || channels <= 0
 
@@ -197,23 +203,48 @@ module Hwaro
           sum_r = 0_i64
           sum_g = 0_i64
           sum_b = 0_i64
+          weight = 0_i64
 
           is_rgb = channels >= 3 # 3=RGB, 4=RGBA
+          has_alpha = channels == 2 || channels == 4
 
           total.times do |i|
             offset = i * channels
-            sum_r += pixels[offset]
+            a = has_alpha ? pixels[offset + channels - 1].to_i64 : 1_i64
+            weight += a
+            sum_r += pixels[offset].to_i64 * a
             if is_rgb
-              sum_g += pixels[offset + 1]
-              sum_b += pixels[offset + 2]
+              sum_g += pixels[offset + 1].to_i64 * a
+              sum_b += pixels[offset + 2].to_i64 * a
             end
           end
+          return "#ffffff" if weight == 0
 
-          r = (sum_r // total).clamp(0, 255)
-          g = is_rgb ? (sum_g // total).clamp(0, 255) : r
-          b = is_rgb ? (sum_b // total).clamp(0, 255) : r
+          r = (sum_r // weight).clamp(0, 255)
+          g = is_rgb ? (sum_g // weight).clamp(0, 255) : r
+          b = is_rgb ? (sum_b // weight).clamp(0, 255) : r
 
           "#%02x%02x%02x" % {r, g, b}
+        end
+
+        # Composite gray+alpha / RGBA pixels onto white in place. JPEG has no
+        # alpha, so the LQIP kept the (usually black) color bytes under
+        # transparent pixels. White, not the dominant color: the documented
+        # blur-up keeps the LQIP as the <img> background, so it shows through
+        # the loaded image's transparent areas, and a flat dominant-color fill
+        # would swallow a one-color logo drawn over it. Opaque pixels are
+        # left untouched.
+        private def flatten_onto_white(pixels : UInt8*, count : Int64, channels : Int32) : Nil
+          return unless channels == 2 || channels == 4
+          alpha_at = channels - 1
+          count.times do |i|
+            px = pixels + i * channels
+            a = px[alpha_at].to_i32
+            next if a == 255
+            alpha_at.times do |c|
+              px[c] = ((px[c].to_i32 * a + 255 * (255 - a) + 127) // 255).to_u8
+            end
+          end
         end
 
         # Combined resize + LQIP in a single decode pass.

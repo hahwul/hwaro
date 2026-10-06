@@ -325,6 +325,15 @@ module Hwaro
         "#{base}#{img}"
       end
 
+      # Is this the site (or per-language) homepage — the root `index.md` /
+      # `_index.md`? Its source sits directly under `content/`, so `path` has
+      # no `/` (`index.md`, `index.ko.md`, `_index.md`, …). Not
+      # `is_index && section.empty?`: a one-level page bundle like
+      # `content/about/index.md` also has an empty section (gh#601).
+      def home? : Bool
+        @is_index && !@path.includes?('/')
+      end
+
       # Check if page has redirect
       def has_redirect? : Bool
         !@redirect_to.nil? && !@redirect_to.try(&.empty?)
@@ -418,7 +427,7 @@ module Hwaro
         return [] of String unless Dir.exists?(page_dir)
         return [] of String if Path[page_dir].normalize == Path[content_dir].normalize
 
-        @assets = Dir.glob(File.join(page_dir, "**", "*")).compact_map do |file|
+        @assets = Dir.glob(File.join(page_dir, "**", "*")).sort!.compact_map do |file|
           next unless File.file?(file)
           next if file.ends_with?(".md") || file.ends_with?(".markdown")
           next if nested_bundle?(page_dir, file, content_dir, bundle_dirs)

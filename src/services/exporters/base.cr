@@ -2,7 +2,9 @@ require "file_utils"
 require "yaml"
 require "json"
 require "toml"
+require "../content_lister"
 require "../file_action"
+require "../../models/config"
 require "../../content/processors/fence_tracker"
 require "../../config/options/export_options"
 require "../../utils/errors"
@@ -23,6 +25,9 @@ module Hwaro
         property exported_count : Int32
         property skipped_count : Int32
         property error_count : Int32
+        # The part of `error_count` caused by unparseable front matter: a
+        # run that failed only on those is a content error, not an IO one.
+        property content_error_count : Int32
 
         def initialize(
           @success : Bool = true,
@@ -30,6 +35,7 @@ module Hwaro
           @exported_count : Int32 = 0,
           @skipped_count : Int32 = 0,
           @error_count : Int32 = 0,
+          @content_error_count : Int32 = 0,
         )
         end
       end
@@ -133,6 +139,13 @@ module Hwaro
 
         abstract def run(options : Config::Options::ExportOptions) : ExportResult
 
+        # A per-file failure raised by `parse_content` (malformed TOML, YAML
+        # or JSON front matter, or front matter nested too deep).
+        protected def front_matter_error?(ex : Exception) : Bool
+          ex.is_a?(TOML::ParseException) || ex.is_a?(YAML::ParseException) ||
+            ex.is_a?(JSON::ParseException) || ex.is_a?(ArgumentError) || ex.is_a?(Utils::Nesting::TooDeep)
+        end
+
         # When set, the run resolves and reports every destination (counts,
         # manifest) but writes nothing to disk.
         property dry_run : Bool = false
@@ -143,6 +156,20 @@ module Hwaro
         # manifest marks those rows `overwritten` so the caller can see
         # exactly which pre-existing files a run replaced.
         getter file_actions = [] of FileAction
+
+        # Expanded paths a default build treats as drafts, including pages
+        # under a section's `[cascade] draft = true` (ContentLister is the
+        # publish-state source of truth). Filled by `load_draft_paths`.
+        @draft_paths = Set(String).new
+
+        protected def load_draft_paths(content_dir : String) : Nil
+          @draft_paths = ContentLister.new(content_dir).draft_paths
+        end
+
+        # The page's own `draft = true`, or one cascaded from a section.
+        protected def draft?(file_path : String, fields : Hash(String, YAML::Any)) : Bool
+          fields["draft"]?.try(&.raw) == true || @draft_paths.includes?(File.expand_path(file_path))
+        end
 
         # Scan content directory for markdown files
         protected def scan_content_files(content_dir : String) : Array(String)
@@ -171,34 +198,92 @@ module Hwaro
           Hwaro::Utils::TextUtils.strip_bom(File.read(path))
         end
 
-        # Copy a page bundle's co-located assets — every non-Markdown sibling
-        # of the bundle's `index.md` — into the bundle's export directory.
-        # The exporter preserves the bundle layout, so without this every
-        # `![](cover.png)` in the exported post points at a file that was
-        # never written. Symlinks are skipped and every destination is
-        # re-checked against `output_dir` (see BundleAssets.copy).
-        protected def copy_bundle_assets(source_dir : String, dest_dir : String, output_dir : String, verbose : Bool = false) : Int32
-          BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "export") do |src, dest|
-            # The directory was resolve-checked, but the destination FILE
-            # itself can be a pre-existing symlink leaf: File.copy follows it
-            # and would write through it to a path outside the tree. Same
-            # resolved re-check write_file applies.
-            resolved_dest = Hwaro::Utils::PathUtils.resolved_real_path(dest)
-            resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
-            unless resolved_dest != resolved_root && Hwaro::Utils::PathUtils.within?(resolved_dest, resolved_root)
-              Logger.warn "Skipping bundle asset outside output directory (symlinked destination): #{dest}"
-              next false
+        # `index.md`, `_index.md` and their translations: the pages whose
+        # directory is a bundle (or section) with files of its own.
+        INDEX_PAGE_RE = /\A_?index(?:\.[^.\/]+)?\.(?:md|markdown)\z/
+
+        # Expanded directories of the index pages this run exported. A build
+        # publishes a bundle's or section's files beside a page it renders,
+        # so a skipped draft index leaves its files behind too.
+        @exported_index_dirs = Set(String).new
+
+        # Record an exported page that owns its directory's files. The
+        # content root is never a bundle (`Page#collect_assets`).
+        protected def note_exported_index(file_path : String, content_dir : String) : Nil
+          return unless File.basename(file_path).matches?(INDEX_PAGE_RE)
+          dir = File.expand_path(File.dirname(file_path))
+          @exported_index_dirs << dir unless dir == File.expand_path(content_dir)
+        end
+
+        # Yields `{source, content-relative path, owning index directory}` for
+        # every non-Markdown file under `content_dir` that a build publishes:
+        #   - a file of a bundle or section whose index page this run
+        #     exported — its nearest index directory owns it, as
+        #     `Page#collect_assets` stops at nested bundles — filtered by
+        #     `[content.files]` when that is configured;
+        #   - anywhere, a `[content.files]` match or a raw `.json`/`.xml`
+        #     file (`ReadContent#collect_content_paths`).
+        # Only leaf-bundle siblings used to be exported, so a section's or the
+        # root's published images were silently dropped. Symlinks are
+        # skipped, as bundle copies always have been.
+        protected def each_published_asset(content_dir : String, pages : Array(String), & : String, String, String? ->) : Nil
+          root = File.expand_path(content_dir)
+          index_dirs = pages.compact_map do |page|
+            next unless File.basename(page).matches?(INDEX_PAGE_RE)
+            dir = File.expand_path(File.dirname(page))
+            dir unless dir == root
+          end.to_set
+          rules = content_files_rules(content_dir)
+
+          Dir.glob(File.join(content_dir, "**", "*")).sort!.each do |src|
+            info = File.info?(src, follow_symlinks: false)
+            next unless info && info.file?
+            next if ContentWalk.markdown?(src)
+
+            relative = src.sub(content_dir, "").lstrip('/')
+            owner = nil
+            dir = File.dirname(File.expand_path(src))
+            while dir.size > root.size
+              if index_dirs.includes?(dir)
+                owner = dir
+                break
+              end
+              dir = File.dirname(dir)
             end
 
-            action = File.exists?(dest) ? "overwritten" : "exported"
-            unless @dry_run
-              Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
-              File.copy(src, dest)
-            end
-            @file_actions << FileAction.new(dest, action)
-            Logger.debug "#{@dry_run ? "Would export" : "Exported"} bundle asset: #{dest}" if verbose
-            true
+            ext = File.extname(src).downcase
+            standalone = (rules.enabled? && rules.publish?(relative)) ||
+                         ((ext == ".json" || ext == ".xml") && !rules.denied?(relative))
+            bundled = !owner.nil? && @exported_index_dirs.includes?(owner) &&
+                      (!rules.enabled? || rules.publish?(relative))
+            yield src, relative, owner if standalone || bundled
           end
+        end
+
+        # Copy one content asset to `dest` through `write_file`'s guards.
+        protected def copy_asset(src : String, dest : String, output_dir : String, verbose : Bool) : Nil
+          write_file(dest, File.read(src), output_dir, verbose)
+        rescue ex : File::Error
+          Logger.warn "Could not export asset #{src}: #{ex.message}"
+        end
+
+        # The project's `[content.files]` rules: `config.toml` beside the
+        # content directory, else the working directory's (ContentLister's
+        # lookup). Defaults (disabled) when there is none or it won't load.
+        private def content_files_rules(content_dir : String) : Models::ContentFilesConfig
+          parent = File.dirname(content_dir.rstrip(File::SEPARATOR))
+          path = {File.join(parent, "config.toml"), "config.toml"}.find { |candidate| File.exists?(candidate) }
+          return Models::ContentFilesConfig.new unless path
+          # The build owns config diagnostics; here they would only repeat.
+          previous = Logger.level
+          Logger.level = Logger::Level::Error
+          begin
+            Models::Config.load(path).content_files
+          ensure
+            Logger.level = previous
+          end
+        rescue Exception
+          Models::ContentFilesConfig.new
         end
 
         # Parse frontmatter from content, returns {fields_hash, body}.
@@ -338,10 +423,10 @@ module Hwaro
         # CONTENT-derived relative path (`<output>/content/<rel>` for Hugo,
         # `<output>/<rel>` for Jekyll), so a `..` surviving in that relative
         # path still resolves outside the export root no matter how safe the
-        # `-o` was. This is the same containment check `copy_bundle_assets`
-        # above and the build's own page writer already apply, and it is the
-        # last line before `File.write` — an exporter cannot write outside its
-        # destination whatever the caller passed.
+        # `-o` was. This is the same containment check the build's own page
+        # writer applies, and it is the last line before `File.write` — an
+        # exporter cannot write outside its destination whatever the caller
+        # passed. Content assets are copied through here too.
         #
         # Returns false when the write was refused (`safe_output_path` has
         # already warned), so the caller reports the file as skipped instead
@@ -354,8 +439,7 @@ module Hwaro
           # pre-existing symlinked directory (or file) inside the destination,
           # routing the write outside `output_dir`. Re-check the RESOLVED
           # destination — deepest-existing-ancestor resolution, so a
-          # not-yet-created path still resolves — the same containment rule
-          # `copy_bundle_assets` applies.
+          # not-yet-created path still resolves.
           resolved = Hwaro::Utils::PathUtils.resolved_real_path(safe_path)
           resolved_root = Hwaro::Utils::PathUtils.resolved_real_path(output_dir)
           unless Hwaro::Utils::PathUtils.within?(resolved, resolved_root)

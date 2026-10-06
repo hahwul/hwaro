@@ -652,6 +652,34 @@ describe Hwaro::Services::Creator do
         end
       end
 
+      it "refuses an explicit index.md or _index.md whose URL a flat page already claims" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            File.write("content/zz.md", "+++\ntitle = \"Z\"\n+++\n")
+            File.write("content/mm.markdown", "+++\ntitle = \"M\"\n+++\n")
+            {"zz/index.md", "zz/_index.md", "mm/index.md", "mm.md"}.each do |path|
+              options = Hwaro::Config::Options::NewOptions.new(path: path, title: "T")
+              err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+              err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+            end
+            Dir.exists?("content/zz").should be_false
+            File.exists?("content/mm.md").should be_false
+          end
+        end
+      end
+
+      it "keeps a .markdown path's extension" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content")
+            options = Hwaro::Config::Options::NewOptions.new(path: "x.markdown")
+            Hwaro::Services::Creator.new.run(options).should eq("content/x.markdown")
+            File.read("content/x.markdown").should contain(%(title = "X"))
+          end
+        end
+      end
+
       it "classifies a file squatting on a parent directory segment as HWARO_E_IO" do
         # Previously this unwound as a bare File::AlreadyExistsError — no
         # error code, no exit taxonomy, and an empty stdout in --json mode.
@@ -788,6 +816,28 @@ describe Hwaro::Services::Creator do
           content.should contain("description = \"\"")
           content.should contain("author = \"\"")
           content.should contain("summary = \"\"")
+        end
+      end
+    end
+
+    it "quotes default_fields keys that are not bare keys, so the page parses" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          config = Hwaro::Models::Config.new
+          config.content_new.default_fields = ["my key", "x: y", "ok"]
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "t.md", title: "T")
+          toml = File.read(Hwaro::Services::Creator.new.run(options, config))
+          parsed = TOML.parse(toml.split("+++")[1])
+          parsed["my key"].as_s.should eq("")
+          parsed["x: y"].as_s.should eq("")
+          toml.should contain("ok = \"\"")
+
+          config.content_new.front_matter_format = "yaml"
+          options = Hwaro::Config::Options::NewOptions.new(path: "y.md", title: "Y")
+          yaml = YAML.parse(File.read(Hwaro::Services::Creator.new.run(options, config)).split("---")[1])
+          yaml["x: y"].as_s.should eq("")
         end
       end
     end
