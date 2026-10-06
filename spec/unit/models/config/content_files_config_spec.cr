@@ -299,8 +299,8 @@ describe Hwaro::Models::HighlightConfig do
       config = Hwaro::Models::HighlightConfig.new
       config.use_cdn = false
       config.mode = "client"
-      config.css_tag("", "/sub").should contain(%(href="/sub/assets/css/highlight/github.min.css"))
-      config.tags("", "/sub").should contain(%(src="/sub/assets/js/highlight.min.js"))
+      config.css_tag("", base_path: "/sub").should contain(%(href="/sub/assets/css/highlight/github.min.css"))
+      config.tags("", base_path: "/sub").should contain(%(src="/sub/assets/js/highlight.min.js"))
     end
 
     it "does not add cache bust to CDN URL" do

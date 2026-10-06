@@ -317,6 +317,7 @@ describe Hwaro::Content::Hooks::ImageHooks do
         dest_dir = File.join(dir, "out")
         Dir.mkdir_p(dest_dir)
         File.write(File.join(dest_dir, "B_320w.jpg"), "320")
+        File.touch(source, Time.utc - 1.hour)
 
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320])
         result.should_not be_nil
