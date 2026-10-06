@@ -139,14 +139,24 @@ module Hwaro
           # edit to any precached page/asset changes the hash and busts the
           # cache on deploy (correct invalidation). The PWA hook runs after the
           # render/write phase, so the precached output files already exist.
+          #
+          # `[csp]` injects its `<meta>` (every page in meta mode, a page no
+          # `_headers` rule can match in headers mode) after this runs, so a
+          # `--cache` hit's page still carries the previous build's: hash the
+          # pages without it, and fold the policy config in instead so a
+          # directive change still busts the cache.
+          csp = config.csp.enabled
           cache_hash = Digest::SHA1.hexdigest do |ctx|
             ctx.update(pwa.cache_strategy)
+            ctx.update("\ncsp:#{config.csp.directives.to_a}") if csp
             precache_urls.each do |u|
               ctx.update("\n")
               ctx.update(u)
               next if external_url?(u)
               fpath = precache_file_path(u, output_dir, base_path)
-              ctx.update(File.read(fpath)) if File.file?(fpath)
+              next unless File.file?(fpath)
+              bytes = File.read(fpath)
+              ctx.update(csp ? Core::Build::Csp.strip_meta(bytes) : bytes)
             end
           end
           cache_version = cache_hash[0, 12]

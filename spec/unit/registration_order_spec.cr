@@ -109,7 +109,7 @@ describe "registration order" do
       pagination highlight auto_includes og menus taxonomies search languages
       versions build serve markdown series related git permalinks assets
       sass pwa amp image_processing doctor static deployment
-    ] + [""] + %w[outputs links data privacy content content])
+    ] + [""] + %w[outputs links data privacy csp content content])
   end
 
   it "keeps the config snippet registry" do
@@ -123,7 +123,7 @@ describe "registration order" do
   it "keeps the known top-level config keys (scalars first, then sorted sections)" do
     Hwaro::Models::Config::KNOWN_TOP_LEVEL_KEYS.should eq(%w[
       title description base_url default_language
-      amp assets auto_includes build content data deployment doctor feeds
+      amp assets auto_includes build content csp data deployment doctor feeds
       git highlight image_processing languages links llms markdown menus og
       outputs pagination permalinks plugins privacy pwa related robots sass search
       series serve sitemap static taxonomies versions

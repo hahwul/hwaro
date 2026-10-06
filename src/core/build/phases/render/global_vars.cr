@@ -334,7 +334,7 @@ module Hwaro::Core::Build::Phases::Render
     # only literal TeX / DOT source. Templates can pull them in via
     # `{{ math_tags }}` and `{{ mermaid_tags }}`; the default header partials
     # include them so the feature flags work out of the box.
-    vars["math_tags"] = Crinja::Value.new(config.markdown.math_tags)
+    vars["math_tags"] = Crinja::Value.new(config.markdown.math_tags(config.csp.enabled))
     vars["mermaid_tags"] = Crinja::Value.new(config.markdown.mermaid_tags)
 
     # PWA wiring. `[pwa] enabled = true` writes manifest.json + sw.js into

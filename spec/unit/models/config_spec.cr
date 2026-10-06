@@ -2794,6 +2794,15 @@ describe Hwaro::Models::MarkdownConfig do
       tags.should contain("renderMathInElement")
     end
 
+    it "starts KaTeX from an inline script, not onload=, under [csp]" do
+      config = Hwaro::Models::MarkdownConfig.new
+      config.math = true
+      tags = config.math_tags(csp: true)
+      tags.should_not contain("onload=")
+      tags.should contain(%(<script>document.addEventListener("DOMContentLoaded",function(){renderMathInElement(document.body);});</script>))
+      config.math_tags.should contain(%(onload="renderMathInElement(document.body);"))
+    end
+
     it "emits MathJax tags when math_engine = mathjax" do
       config = Hwaro::Models::MarkdownConfig.new
       config.math = true

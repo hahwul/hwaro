@@ -55,7 +55,8 @@ describe Hwaro::Services::Scaffolds::Docs do
       scaffold = Hwaro::Services::Scaffolds::Docs.new
       nav = scaffold.template_files["partials/nav.html"]
       nav.should contain("search-trigger")
-      nav.should contain("openSearch()")
+      nav.should contain("data-search-open")
+      nav.should_not contain("onclick=")
       nav.should contain("header-right")
     end
 

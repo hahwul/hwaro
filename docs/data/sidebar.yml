@@ -131,6 +131,8 @@
           url: /features/deployment/
         - title: Privacy Mode
           url: /features/privacy/
+        - title: Content Security Policy
+          url: /features/csp/
 - title: Deploy
   section: deploy
   items:
