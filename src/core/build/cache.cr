@@ -263,17 +263,6 @@ module Hwaro
           now_ms - mtime_ms >= RACY_WINDOW_MS
         end
 
-        # The mtime to stamp on a copy of a file whose mtime is `src`, with
-        # `now_ms` read before the copy. A stable `src` is stamped as-is, so
-        # the copy-skip checks match it exactly. A racy one must not be: a
-        # same-size rewrite in its tick keeps `src`. Nor may the copy keep
-        # its own write time: a rewrite in the copy's tick gets exactly that.
-        # A day older than `src` is a time no later rewrite can carry, so the
-        # next build recopies and then stamps the settled mtime.
-        def self.copy_mtime(src : Time, now_ms : Int64) : Time
-          stable_mtime?(src.to_unix_ms, now_ms) ? src : src - 1.day
-        end
-
         # The cache file a build with these settings reads and writes.
         def self.path_for(serve_mode : Bool) : String
           serve_mode ? SERVE_CACHE_FILE : CACHE_FILE

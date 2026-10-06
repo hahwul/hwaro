@@ -259,11 +259,11 @@ module Hwaro::Core::Build::Phases::Write
         # The mtime stamp below still lands on the renamed-in destination, so
         # the skip-unchanged check above keeps working.
         Hwaro::Utils::FileSafe.atomic_copy(source_path, dest_path)
-        # A source mtime still inside its timestamp tick is not stamped
-        # as-is (racy-git, see Cache.copy_mtime).
-        if src_info
+        # Not stamped while the source mtime is inside its timestamp tick
+        # (racy-git, see Cache.stable_mtime?): the next build recopies.
+        if src_info && Cache.stable_mtime?(src_info.modification_time.to_unix_ms, now)
           begin
-            File.utime(Time.utc, Cache.copy_mtime(src_info.modification_time, now), dest_path)
+            File.utime(Time.utc, src_info.modification_time, dest_path)
           rescue File::Error
             # Stamping is an optimization; a failure just means the next
             # build recopies this asset.
