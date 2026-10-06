@@ -525,11 +525,9 @@ module Hwaro::Core::Build::Phases::Initialize
       # tripled the stat count over static/ on watch rebuilds.
       #
       # Racy-git (#857): a source mtime still inside its timestamp tick is
-      # not stamped — a same-size rewrite in that tick keeps it, and the
-      # exact match would skip the copy. The copy keeps its own mtime, so
-      # the next build compares bytes or recopies.
+      # not stamped as-is (see Cache.copy_mtime).
       begin
-        File.utime(Time.utc, src_mtime, dest) if Cache.stable_mtime?(src_mtime.to_unix_ms, now)
+        File.utime(Time.utc, Cache.copy_mtime(src_mtime, now), dest)
       rescue ex : File::Error
         # Stamping is an optimization; a failure just means the next
         # build recopies this file. It must NOT be reported as a copy

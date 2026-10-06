@@ -417,6 +417,8 @@ describe "cache: static files edited inside the mtime tolerance" do
         File.write("templates/index.html", "{{ content }}")
         File.write("templates/page.html", "{{ content }}")
         File.write("static/app.css", "body { color: #fff; }\n")
+        # Settled, so the copy is stamped with the source mtime (#857).
+        File.touch("static/app.css", Time.utc - 1.hour)
 
         cached_build
         # A coarse destination filesystem stores a truncated copy of the
