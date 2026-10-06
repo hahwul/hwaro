@@ -12,7 +12,75 @@ module Hwaro
         # link doesn't keep failing (and a new one is attributed to the
         # right build). Called at every build entry point.
         private def clear_broken_internal_links
-          @broken_links_mutex.synchronize { @broken_internal_links.clear }
+          @broken_links_mutex.synchronize do
+            @broken_internal_links.clear
+            @anchor_links.clear
+          end
+        end
+
+        # Record every fragment link in `html` (content HTML BEFORE `@/`
+        # resolution, so the target page is still known by its source path)
+        # for check_broken_anchors. An `@/` link whose page doesn't exist is
+        # skipped: [links] broken_internal already reports it.
+        private def collect_anchor_links(page : Models::Page, html : String, pages_by_path : Hash(String, Models::Page)) : Nil
+          found = [] of {String, String, Models::Page, String}
+          html.scan(Content::Processors::InternalLinkResolver::FRAGMENT_LINK_REGEX) do |m|
+            fragment = m[2]
+            next if fragment.empty?
+            if link_path = m[1]?
+              next unless target = Content::Processors::InternalLinkResolver.page_for(pages_by_path, link_path.lchop("@/").partition('?')[0])
+            else
+              target = page
+            end
+            found << {page.path, "#{link_path}##{fragment}", target, fragment}
+          end
+          @broken_links_mutex.synchronize { @anchor_links.concat(found) } unless found.empty?
+        end
+
+        # Check the collected fragment links against the `id`/`name`
+        # attributes in each target's output file ON DISK, so a target the
+        # pass didn't re-render (`--cache`, serve partial rebuilds) is read as
+        # last written instead of producing a false positive. A target with no
+        # output file (render: false, a refused URL) is skipped — unless it is
+        # a fast-start deferred page not written yet: that link goes back in
+        # the queue for render_deferred to check. Consumes the rest, so the
+        # deferred pass doesn't re-report the priority pass's links. "warn"
+        # logs each; "error" raises one aggregated HWARO_E_CONTENT error.
+        private def check_broken_anchors(output_dir : String) : Nil
+          links = @broken_links_mutex.synchronize { @anchor_links.dup.tap { @anchor_links.clear } }
+          return if links.empty?
+          return unless site = @site
+
+          ids_by_file = {} of String => Set(String)?
+          broken = [] of String
+          pending = [] of {String, String, Models::Page, String}
+          deferred = @deferred_pages
+          links.each do |entry|
+            source, link, target, fragment = entry
+            next unless file = get_output_path(target, output_dir)
+            ids = ids_by_file.put_if_absent(file) do
+              File.file?(file) ? Content::Processors::InternalLinkResolver.anchor_ids(File.read(file)) : nil
+            end
+            unless ids
+              pending << entry if deferred && deferred.includes?(target)
+              next
+            end
+            next if Content::Processors::InternalLinkResolver.anchor_exists?(fragment, ids)
+            broken << "#{source} → #{link} → missing id \"#{URI.decode(HTML.unescape(fragment))}\""
+          end
+          @broken_links_mutex.synchronize { @anchor_links.concat(pending) } unless pending.empty?
+          broken.sort!.uniq!
+          return if broken.empty?
+
+          if site.config.links.broken_anchors == "error"
+            label = broken.size == 1 ? "1 broken anchor" : "#{broken.size} broken anchors"
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "#{label}:\n  #{broken.join("\n  ")}",
+              hint: "Fix the #fragment links above, or set [links] broken_anchors = \"warn\" to demote them to warnings.",
+            )
+          end
+          broken.each { |entry| Logger.warn "Broken anchor: #{entry}" }
         end
 
         # Fail the build with ONE aggregated error listing every unresolved
@@ -21,18 +89,19 @@ module Hwaro
         # "warn" mode never appends, making this a no-op there. Raising
         # HwaroError(HWARO_E_CONTENT) maps to exit code 5 for CI; under
         # `serve` the watcher rescue surfaces it in the error overlay.
-        private def raise_on_broken_internal_links!
+        private def raise_on_broken_internal_links!(output_dir : String)
           # Dedupe: the same broken @/target repeated within one page (or a
           # page rendered twice in a pass) must produce one line, not N.
           entries = @broken_links_mutex.synchronize { @broken_internal_links.sort.uniq! }
-          return if entries.empty?
-
-          label = entries.size == 1 ? "1 broken internal link" : "#{entries.size} broken internal links"
-          raise Hwaro::HwaroError.new(
-            code: Hwaro::Errors::HWARO_E_CONTENT,
-            message: "#{label}:\n  #{entries.join("\n  ")}",
-            hint: "Fix the @/ links above, or set [links] broken_internal = \"warn\" to demote them to warnings.",
-          )
+          unless entries.empty?
+            label = entries.size == 1 ? "1 broken internal link" : "#{entries.size} broken internal links"
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_CONTENT,
+              message: "#{label}:\n  #{entries.join("\n  ")}",
+              hint: "Fix the @/ links above, or set [links] broken_internal = \"warn\" to demote them to warnings.",
+            )
+          end
+          check_broken_anchors(output_dir)
         end
 
         # Incremental build: only re-parse and re-render pages whose source
@@ -71,6 +140,7 @@ module Hwaro
           # re-parse, so the fan-out below can tell which of them this edit
           # actually moved. See listing_fanout_pages.
           listing_sets = snapshot_listing_sets(site, templates)
+          backlink_digests = snapshot_backlinks(site, templates)
 
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -117,6 +187,10 @@ module Hwaro
           # pass so a page just flipped to draft can't feed its summary's
           # broken @/ links into the strict-mode accumulator (the full build
           # renders summaries post-filter too).
+          # The excluded pages leave site.pages only at
+          # drop_excluded_and_orphaned_outputs below; keep them out of the
+          # index now, or the summaries and renders here still link to them.
+          refresh_wikilink_index((site.pages + site.sections).reject { |p| excluded_paths.includes?(p.path) }, site)
           render_page_summaries(changed_pages, site, templates, highlight,
             link_targets: (site.pages + site.sections).as(Array(Models::Page)))
 
@@ -157,6 +231,7 @@ module Hwaro
           # Recompute related posts selectively (if enabled). Pass the excluded
           # pages' paths so pages that listed a now-removed page as related drop it.
           related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          compute_backlinks(site) if site.config.backlinks
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
@@ -182,6 +257,7 @@ module Hwaro
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+          backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
 
           # Pages that render a listing derived from the GLOBAL page/section
           # set — the homepage's "latest posts", a paginated archive, a nav
@@ -217,7 +293,7 @@ module Hwaro
           else
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
-          raise_on_broken_internal_links!
+          raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
           sweep_stale_derived_outputs(output_dir)
@@ -238,6 +314,7 @@ module Hwaro
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
           regenerate_seo_surfaces(seo_pages, site, output_dir, verbose, options.parallel, include_robots: true, options: options)
+          write_html_stats(complete: false)
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{render_list.size}/#{all_pages.size} pages", :result, elapsed.total_milliseconds)
@@ -270,6 +347,7 @@ module Hwaro
           # `needs_*` answer, and a template edit that changes which
           # projections exist re-renders on its own account anyway.
           listing_sets = snapshot_listing_sets(site, @templates)
+          backlink_digests = snapshot_backlinks(site, @templates)
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
@@ -306,6 +384,8 @@ module Hwaro
                               Set(String).new
                             end
           related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          refresh_wikilink_index((site.pages + site.sections).as(Array(Models::Page)), site)
+          compute_backlinks(site) if site.config.backlinks
 
           # Re-render with reloaded templates. The selective path inside
           # run_rerender only covers template-affected pages, so the content
@@ -323,6 +403,7 @@ module Hwaro
           # membership change this path can see.
           force_pages = relationship_render_set(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+          backlinks_moved_pages(site, @templates, backlink_digests).each { |p| force_pages << p }
           run_rerender(options, force_pages: force_pages.to_a, membership_changed: !excluded_pages.empty?,
             listing_sets: listing_sets)
         end
@@ -441,6 +522,37 @@ module Hwaro
           moved
         end
 
+        # Each backlink-reading page's backlinks digest (fp_backlinks), taken
+        # before a re-parse so backlinks_moved_pages can diff it afterwards.
+        # Empty unless `[content] backlinks`.
+        private def snapshot_backlinks(site : Models::Site, templates : Hash(String, String)?) : Hash(String, String)
+          digests = {} of String => String
+          return digests unless templates && site.config.backlinks
+          (site.pages + site.sections).each do |page|
+            digest = backlinks_digest(page, site, templates)
+            digests[page.path] = digest if digest
+          end
+          digests
+        end
+
+        # Pages whose rendered backlinks this re-parse moved: A adding or
+        # dropping a link to B, or A's listed fields changing, re-renders B.
+        private def backlinks_moved_pages(site : Models::Site, templates : Hash(String, String)?, before : Hash(String, String)) : Array(Models::Page)
+          return [] of Models::Page unless templates && site.config.backlinks
+          (site.pages + site.sections).select do |page|
+            digest = backlinks_digest(page, site, templates)
+            digest && digest != before[page.path]?
+          end
+        end
+
+        private def backlinks_digest(page : Models::Page, site : Models::Site, templates : Hash(String, String)) : String?
+          rel = page_template_scan(page, templates, site).relations
+          return unless rel.backlinks
+          digest = Digest::MD5.new
+          fp_backlinks(digest, page, rel.fields)
+          digest.final.hexstring
+        end
+
         # Digests of every page-set projection the site's templates read,
         # taken before a re-parse so the fan-out can diff them afterwards.
         # `needs_*` records which ones any template actually reads; the rest
@@ -493,8 +605,8 @@ module Hwaro
             needs_menu: needs_menu,
             needs_taxonomy: needs_taxonomy,
             page: needs_page ? compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) : "",
-            section: needs_section ? compute_section_set_fingerprint(site.sections) : "",
-            menu: needs_menu ? compute_menu_set_fingerprint(site.pages, site.sections) : "",
+            section: needs_section ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : "",
+            menu: needs_menu ? compute_menu_set_fingerprint(site) : "",
             taxonomy: needs_taxonomy ? compute_taxonomy_slug_fingerprint(site) : "",
             lookup_targets: lookup_targets,
             lookup_fields: lookup_fields,
@@ -529,9 +641,9 @@ module Hwaro
           page_changed = before.needs_page &&
                          compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) != before.page
           section_changed = before.needs_section &&
-                            compute_section_set_fingerprint(site.sections) != before.section
+                            compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) != before.section
           menu_changed = before.needs_menu &&
-                         compute_menu_set_fingerprint(site.pages, site.sections) != before.menu
+                         compute_menu_set_fingerprint(site) != before.menu
           taxonomy_changed = before.needs_taxonomy &&
                              compute_taxonomy_slug_fingerprint(site) != before.taxonomy
           lookup_changed = !before.lookup_targets.empty? &&
@@ -652,6 +764,12 @@ module Hwaro
             end
 
             apply_cascade_to(page, cascade_map)
+            # A schema violation fails the build: let the full build report
+            # it (every page, sorted) and set the overlay.
+            unless apply_content_schema(page, config, cascade_map).empty?
+              Logger.info "  #{page.path} violates its [[content.schema]] — running full rebuild."
+              return
+            end
 
             changed_pages << page
             affected_sections << page.section
@@ -863,7 +981,7 @@ module Hwaro
                               selected = renderable_pages.select do |page|
                                 entry = determine_template(page, templates, site)
                                 affected_templates.includes?(entry) ||
-                                  deps.shortcodes_used_in(page.raw_content).any? { |sc| affected_templates.includes?(sc) } ||
+                                  page_scan_texts(page).any? { |text| deps.shortcodes_used_in(text).any? { |sc| affected_templates.includes?(sc) } } ||
                                   format_templates_affected?(page, templates, site, affected_templates)
                               end
                               seen = selected.map(&.path).to_set
@@ -950,7 +1068,7 @@ module Hwaro
                   else
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
-          raise_on_broken_internal_links!
+          raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(pages_to_render, site, output_dir, verbose)
 
           # Re-generate the 404 page with the new template — and whenever
@@ -1005,6 +1123,7 @@ module Hwaro
 
           sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
+          write_html_stats(complete: false)
 
           elapsed = Time.instant - start_time
           Logger.outcome("rebuilt", "#{count} #{count == 1 ? "page" : "pages"} · re-render", :result, elapsed.total_milliseconds)
@@ -1135,7 +1254,7 @@ module Hwaro
           # full build, which clears at entry. The server's fast-start fiber
           # rescues this and routes it into the error overlay via
           # notify_build_error; the server keeps running.
-          raise_on_broken_internal_links!
+          raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable, site, output_dir, verbose)
 
           # Refresh feeds / sitemap / search now that every page has rendered
@@ -1157,6 +1276,7 @@ module Hwaro
           # and the next `--cache` cold start has to re-render them.
           sweep_stale_derived_outputs(output_dir)
           cache.save if options.cache
+          write_html_stats(complete: false)
 
           # Clear the stash so a second call is a no-op and subsequent
           # watch-triggered full rebuilds start clean.

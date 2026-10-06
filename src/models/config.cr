@@ -6,6 +6,7 @@ require "../utils/text_utils"
 require "../utils/permalink_resolver"
 require "../utils/env_substitutor"
 require "../utils/path_utils"
+require "../utils/digest_utils"
 require "../content/processors/internal_link_resolver"
 
 require "./config/seo"
@@ -15,7 +16,10 @@ require "./config/highlight"
 require "./config/markdown"
 require "./config/versions"
 require "./config/data_remote"
+require "./config/privacy"
+require "./config/csp"
 require "./config/content_generate"
+require "./config/content_schema"
 require "./config/content"
 require "./config/i18n"
 require "./config/assets"
@@ -28,6 +32,18 @@ module Hwaro
     # Cache-busting query suffix shared by the asset/highlight tag emitters.
     def self.cache_bust_suffix(value : String) : String
       value.empty? ? "" : "?v=#{HTML.escape(value)}"
+    end
+
+    # ` integrity="sha384-…" crossorigin="anonymous"` for the file at `path`
+    # (an output-root URL path) under `sri_root`, the build output directory.
+    # "" when SRI is off (`sri_root` nil) or the file was not emitted.
+    def self.integrity_attr(sri_root : String?, path : String) : String
+      return "" unless sri_root
+      sri = Utils::SriCache.sri(File.join(sri_root, path.lchop('/')))
+      # `crossorigin`: a tag URL under an absolute `base_url` is cross-origin
+      # whenever the page is viewed from another host (www vs apex, a deploy
+      # preview), and an integrity check on a no-cors response always fails.
+      sri ? %( integrity="#{sri}" crossorigin="anonymous") : ""
     end
 
     # Join non-empty tag fragments with newlines.
@@ -48,12 +64,17 @@ module Hwaro
       property content_files : ContentFilesConfig
       property content_new : ContentNewConfig
       property summary : SummaryConfig
+      # `[content] backlinks = true`: fill `page.backlinks`.
+      property backlinks : Bool = false
       property pagination : PaginationConfig
       property highlight : HighlightConfig
       property auto_includes : AutoIncludesConfig
       property og : OpenGraphConfig
       property taxonomies : Array(TaxonomyConfig)
       property menus : Hash(String, Array(MenuItemConfig))
+      # `[menus] auto_sections = "main"`: the menu every top-level section
+      # joins automatically (Hugo's `sectionPagesMenu`). nil = off.
+      property menus_auto_sections : String? = nil
       property default_language : String
       property languages : Hash(String, LanguageConfig)
       property versions : VersionsConfig
@@ -74,7 +95,10 @@ module Hwaro
       property outputs : OutputsConfig
       property links : LinksConfig
       property data_remote : Array(RemoteDataConfig)
+      property privacy : PrivacyConfig
+      property csp : CspConfig
       property content_generate : Array(ContentGenerateConfig)
+      property content_schema : Array(ContentSchemaConfig)
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
       @base_path : String? = nil
@@ -119,7 +143,10 @@ module Hwaro
         @outputs = OutputsConfig.new
         @links = LinksConfig.new
         @data_remote = [] of RemoteDataConfig
+        @privacy = PrivacyConfig.new
+        @csp = CspConfig.new
         @content_generate = [] of ContentGenerateConfig
+        @content_schema = [] of ContentSchemaConfig
         @permalinks = {} of String => String
         @raw = Hash(String, TOML::Any).new
       end
@@ -334,10 +361,11 @@ module Hwaro
       # the unknown-key warning, so a section can't be loaded without also
       # being recognised, or vice versa.
       #
-      # Order matters for exactly three entries: `languages` reads the menus
+      # Order matters for exactly four entries: `languages` reads the menus
       # and taxonomies already loaded (per-language overrides), `sass` reads
-      # `auto_includes`, and `resolve_deployment_source_dir` reads `build` and
-      # `deployment`. Everything else only reads `config.raw`.
+      # `auto_includes`, `resolve_deployment_source_dir` reads `build` and
+      # `deployment`, and the search facet check reads the taxonomies.
+      # Everything else only reads `config.raw`.
       record SectionLoader, keys : Array(String), load : Proc(Config, Nil)
 
       SECTION_LOADERS = [
@@ -350,12 +378,14 @@ module Hwaro
         SectionLoader.new(%w[content], ->(c : Config) { load_content_files(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_new(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_summary(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_backlinks(c) }),
         SectionLoader.new(%w[pagination], ->(c : Config) { load_pagination(c) }),
         SectionLoader.new(%w[highlight], ->(c : Config) { load_highlight(c) }),
         SectionLoader.new(%w[auto_includes], ->(c : Config) { load_auto_includes(c) }),
         SectionLoader.new(%w[og], ->(c : Config) { load_og(c) }),
         SectionLoader.new(%w[menus], ->(c : Config) { load_menus(c) }),
         SectionLoader.new(%w[taxonomies], ->(c : Config) { load_taxonomies(c) }),
+        SectionLoader.new(%w[search], ->(c : Config) { validate_search_facets(c) }),
         SectionLoader.new(%w[languages], ->(c : Config) { load_languages(c) }),
         SectionLoader.new(%w[versions], ->(c : Config) { load_versions(c) }),
         SectionLoader.new(%w[build], ->(c : Config) { load_build(c) }),
@@ -377,7 +407,10 @@ module Hwaro
         SectionLoader.new(%w[outputs], ->(c : Config) { load_outputs(c) }),
         SectionLoader.new(%w[links], ->(c : Config) { load_links(c) }),
         SectionLoader.new(%w[data], ->(c : Config) { load_data_remote(c) }),
+        SectionLoader.new(%w[privacy], ->(c : Config) { load_privacy(c) }),
+        SectionLoader.new(%w[csp], ->(c : Config) { load_csp(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_generate(c) }),
+        SectionLoader.new(%w[content], ->(c : Config) { load_content_schema(c) }),
       ]
 
       # The four scalar keys `load` reads directly, ahead of any section.

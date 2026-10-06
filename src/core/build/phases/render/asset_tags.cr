@@ -64,6 +64,83 @@ module Hwaro::Core::Build::Phases::Render
                 "static/assets/css/highlight/#{config.highlight.theme}.min.css), or set [highlight] use_cdn = true."
   end
 
+  # The build output directory when `[assets] sri` is on: the tag emitters
+  # hash the emitted bytes under it (static copy, Sass and bundles have all
+  # written by the time the Render phase asks). Nil when SRI is off.
+  # Off under `hwaro serve`: its tags carry the dev origin, so viewing the
+  # site from another host name (localhost vs 127.0.0.1, a LAN address)
+  # would make every check fail. `asset_integrity()` still answers there.
+  private def sri_root(config : Models::Config) : String?
+    return unless config.assets.sri
+    ctx = @context
+    return if ctx.nil? || ctx.options.serve_mode
+    ctx.output_dir
+  end
+
+  # True when a template calls `asset_integrity()`. Its value digests an
+  # emitted file, so the serve static lane — which only copies — must
+  # re-render after any static change while one does.
+  def asset_integrity_used? : Bool
+    @templates.try(&.each_value.any?(&.includes?("asset_integrity"))) || false
+  end
+
+  # Hand AssetHooks the source of every output the Write phase copies
+  # verbatim AFTER rendering — `[content.files]` raw files and page-bundle
+  # assets — so `asset_integrity()` hashes those bytes on a cold build (the
+  # copy does not exist yet) and on a `--cache` build (it still holds the
+  # previous copy) alike. Raw files `--minify` rewrites are left out, along
+  # with the bundle copies they shadow: their source is not what ships.
+  #
+  # Alongside, the outputs this build has already published by Render: its
+  # claims (static copies, bundles) plus the Sass entries' `.css`, which are
+  # not claimed. Only those count as present — a `--cache` build still holds
+  # the previous build's files until Finalize prunes them. Raw files and
+  # bundle copies are claimed in Write, so a `--minify`-rewritten raw file
+  # resolves to nothing on every build, cold or warm.
+  private def publish_asset_sources(ctx : Lifecycle::BuildContext) : Nil
+    sources = {} of String => String
+    published = nil
+    if asset_integrity_used?
+      output_dir = ctx.options.output_dir
+      transformed = Set(String).new
+      withheld = withheld_bundle_dirs
+      ctx.raw_files.each do |raw|
+        next if !withheld.empty? && withheld_content_file?(raw.relative_path, withheld)
+        dest = File.expand_path(File.join(output_dir, raw.relative_path))
+        if ctx.options.minify && File.extname(raw.source_path).downcase.in?(".json", ".xml", ".html", ".htm")
+          transformed << dest
+        else
+          sources[dest] = raw.source_path
+        end
+      end
+      ctx.all_pages.each do |page|
+        next if page.assets.empty?
+        bundle_asset_destinations(page, output_dir).try &.each do |source, dest|
+          dest = File.expand_path(dest)
+          sources[dest] ||= source unless transformed.includes?(dest)
+        end
+      end
+      published = generated_output_claims.map { |path| File.expand_path(path) }.to_set
+      published.concat(sass_entry_outputs(output_dir))
+    end
+    Content::Hooks::AssetHooks.publish(sources, published)
+  end
+
+  # Absolute output paths of the `.css` the Sass hook compiles — the same
+  # eligibility as `SassCompiler#compile_all` (non-partial, not excluded).
+  private def sass_entry_outputs(output_dir : String) : Array(String)
+    config = @config
+    source_dir = Assets::SassCompiler::SOURCE_DIR
+    return [] of String unless config && config.sass.enabled && Dir.exists?(source_dir)
+    glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+    Dir.glob(File.join(source_dir, "**", "*.scss"), match: glob_match).compact_map do |src_path|
+      next if File.basename(src_path).starts_with?("_") || !File.file?(src_path)
+      relative = Path[src_path].relative_to(source_dir).to_s
+      next if config.static.excluded?(relative)
+      File.expand_path(File.join(output_dir, relative.sub(/\.scss\z/, ".css")))
+    end
+  end
+
   # Compute a content-based cache bust hash from local CSS/JS files.
   # Returns an 8-character hex digest, or "" if no local files exist.
   private def compute_cache_bust(config : Models::Config) : String

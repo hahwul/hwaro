@@ -31,6 +31,7 @@ quality = 85
 | enabled | bool | false | Enable image resizing |
 | widths | array | [] | Target widths to generate (in pixels) |
 | quality | int | 85 | JPEG output quality (1-100) |
+| dimensions | bool | false | Add intrinsic `width`/`height` to content images (works without `enabled`) |
 
 ### LQIP (Low-Quality Image Placeholders)
 
@@ -50,6 +51,25 @@ quality = 20
 | quality | int | 20 | JPEG quality for placeholder (1-100, lower = smaller) |
 
 A width of 32 and quality of 20 typically produces ~400-800 byte base64 strings per image, small enough to inline directly in HTML.
+
+### Image Dimensions
+
+Set `dimensions = true` to stamp every local image in rendered page content with its intrinsic size, so the browser reserves the right box before the file arrives (no layout shift):
+
+```toml
+[image_processing]
+dimensions = true   # does not need enabled = true
+```
+
+```html
+<!-- ![Logo](/hwaro.png) renders as -->
+<img width="512" height="512" src="/hwaro.png" alt="Logo" />
+```
+
+- Sizes are read from file headers, not by decoding: JPEG, PNG, BMP, GIF, WebP and SVG (`width`/`height` in pixels, falling back to the `viewBox`).
+- Only images that resolve to a local file are touched: page bundle assets, `static/` files and `[content.files]` copies. External URLs and missing or unreadable files are left as they are.
+- A tag that already sets `width` or `height` is left untouched.
+- When responsive `srcset` variants are added, the attributes are still the original image's size.
 
 ## How It Works
 
@@ -144,6 +164,33 @@ When LQIP is enabled, `resize_image()` returns two additional properties: `lqip`
 When LQIP is disabled, `lqip` and `dominant_color` return empty strings, so templates work without changes.
 
 For images with transparency (PNG logos, icons), `dominant_color` is weighted by opacity, so transparent pixels do not darken it, and the `lqip` JPEG (which has no alpha channel) shows transparent areas as white.
+
+### Crop and Fill
+
+`resize_image()` takes an `op` and an `anchor` for thumbnails and fixed-size cards:
+
+```jinja
+{# Cover a 400x300 box and crop the overflow from the centre #}
+{% set card = resize_image(path="/images/hero.jpg", width=400, height=300, op="fill") %}
+<img src="{{ card.url }}" width="{{ card.width }}" height="{{ card.height }}">
+
+{# Cut an unscaled 200x200 region from the top-left corner #}
+{% set corner = resize_image(path="/images/hero.jpg", width=200, height=200, op="crop", anchor="top_left") %}
+```
+
+| op | Behaviour |
+|----|-----------|
+| `fit` | Default. Picks the closest pre-generated width variant (see above). Never upscales. |
+| `fill` | Scales the image to cover `width`x`height`, then crops it to exactly that size around `anchor`. |
+| `crop` | No scaling. Cuts a `width`x`height` region at `anchor` (clamped to the image size). |
+
+`anchor` is one of `center` (default), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right`.
+
+- `fill` and `crop` need both `width` and `height`. A missing size, or an unknown `op` or `anchor`, is a template error.
+- These variants are written the first time a page renders and reused while they are newer than the source. They do not need `enabled = true` or any `widths`. With `--skip-image-processing` the original URL is returned.
+- The file name carries the size, op and anchor, e.g. `hero_400x300_fill_center.jpg`, next to the original.
+- `width`/`height` in the result are the written file's size. `lqip` and `dominant_color` are empty for these variants.
+- Only JPEG, PNG and BMP sources can be cropped. Other formats return the original URL.
 
 ## Live Demo
 

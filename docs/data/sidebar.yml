@@ -33,6 +33,10 @@
       url: /writing/shortcodes/
     - title: Archetypes
       url: /writing/archetypes/
+    - title: Front Matter Schema
+      url: /writing/schema/
+    - title: Wikilinks & Backlinks
+      url: /writing/obsidian/
 - title: Templates
   section: templates
   items:
@@ -125,6 +129,10 @@
           url: /features/amp/
         - title: Deployment
           url: /features/deployment/
+        - title: Privacy Mode
+          url: /features/privacy/
+        - title: Content Security Policy
+          url: /features/csp/
 - title: Deploy
   section: deploy
   items:

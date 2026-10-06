@@ -27,6 +27,9 @@ module Hwaro::Core::Build::Phases::Transform
     # Compute related posts based on taxonomy similarity
     compute_related_posts(site) if site.config.related.enabled
 
+    # Pages linking to each page (`[content] backlinks`)
+    compute_backlinks(site) if site.config.backlinks
+
     # Build optimized lookup indices
     site.build_lookup_index
 
@@ -937,5 +940,118 @@ module Hwaro::Core::Build::Phases::Transform
 
       page.related_posts = top.map { |path, _| page_lookup[path] }
     end
+  end
+
+  # A shortcode call (`{{ x() }}`) or block tag (`{% x() %}`) on one line.
+  SHORTCODE_TAG_RE = /\{\{.*?\}\}|\{%.*?%\}/
+  # A block shortcode opened and closed on one line, body included.
+  SHORTCODE_LINE_BLOCK_RE = Regex.new(
+    "#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_OPEN_RE.source}.*?#{Hwaro::Core::Build::ShortcodeProcessor::BLOCK_ANY_CLOSE_RE.source}",
+    Regex::Options::IGNORE_CASE)
+
+  # `raw` without its shortcode calls and block bodies, the way the
+  # shortcode pass sees them: fenced code stays (FenceTracker, fed outside
+  # bodies only, as process_shortcodes_jinja does) and the bodies are the
+  # matched pairs block_body_lines finds. On the other lines a one-line
+  # block goes whole, and an opener whose body runs on takes the rest of
+  # its line with it (that text is body too).
+  private def strip_shortcode_spans(raw : String) : String
+    body = block_body_lines(raw)
+    tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+    String.build(raw.bytesize) do |io|
+      raw.each_line(chomp: false).each_with_index do |line, i|
+        next if body[i]?
+        if tracker.fence_line?(line)
+          io << line
+          next
+        end
+        text = line.gsub(SHORTCODE_LINE_BLOCK_RE, "")
+        if body[i + 1]?
+          opener = nil
+          text.scan(ShortcodeProcessor::BLOCK_OPEN_RE) do |m|
+            opener = m unless ShortcodeProcessor::BLOCK_ANY_CLOSE_RE.matches?(m[0])
+          end
+          text = "#{text[0, opener.begin(0)]}\n" if opener
+        end
+        io << text.gsub(SHORTCODE_TAG_RE, "")
+      end
+    end
+  end
+
+  private def site_math? : Bool
+    @site.try(&.config.markdown.math) || false
+  end
+
+  # `page.backlinks`: every rendered page in the same language whose SOURCE
+  # Markdown links here through an `@/` link, a wikilink (with `[markdown]
+  # wikilinks`) or a Markdown/HTML link whose URL is a page's URL. Links a
+  # shortcode or template produces are not seen, nor links written inside a
+  # shortcode call or body (the wikilink rewrite never reaches those either).
+  # Sorted by date (newest first, undated last), then path.
+  #
+  # ponytail: rescans every page's raw content on each call (serve calls it
+  # per content save); memoize per-page targets by raw_content if it shows.
+  private def compute_backlinks(site : Models::Site) : Nil
+    pages = (site.pages + site.sections).as(Array(Models::Page))
+    pages_by_path = build_pages_by_path(site)
+    by_url = {} of String => Models::Page
+    pages.each { |p| by_url[p.url] ||= p }
+    incoming = {} of String => Array(Models::Page)
+    pages.each do |source|
+      next unless source.render
+      outbound_link_targets(source, pages_by_path, by_url, site.config.base_path).each do |target|
+        next if target.same?(source) || target.language != source.language
+        (incoming[target.path] ||= [] of Models::Page) << source
+      end
+    end
+    pages.each do |page|
+      page.backlinks = incoming[page.path]?.try(&.sort_by { |p| {p.date ? 0 : 1, -(p.date.try(&.to_unix_ms) || 0_i64), p.path} }) || [] of Models::Page
+    end
+  end
+
+  private def outbound_link_targets(
+    source : Models::Page,
+    pages_by_path : Hash(String, Models::Page),
+    by_url : Hash(String, Models::Page),
+    base_path : String,
+  ) : Set(Models::Page)
+    targets = Set(Models::Page).new
+    index = @wikilink_index
+    raw = source.raw_content
+    raw = strip_shortcode_spans(raw) if content_may_contain_shortcodes?(raw)
+    Content::Processors::Wikilinks.each_link(raw, math: site_math?) do |link|
+      target = case link
+               in Content::Processors::Wikilinks::Link
+                 index.try(&.resolve(link.target, source)) unless link.image? || link.target.empty?
+               in String
+                 page_for_link_url(link, source, pages_by_path, by_url, base_path)
+               end
+      targets << target if target
+    end
+    targets
+  end
+
+  # The page a link URL in `source`'s Markdown points at, if any: an `@/`
+  # content path, or a root- or document-relative URL equal to a page URL.
+  private def page_for_link_url(
+    url : String,
+    source : Models::Page,
+    pages_by_path : Hash(String, Models::Page),
+    by_url : Hash(String, Models::Page),
+    base_path : String,
+  ) : Models::Page?
+    path = url.partition('#')[0].partition('?')[0]
+    return if path.empty?
+    if path.starts_with?("@/")
+      return Content::Processors::InternalLinkResolver.page_for(pages_by_path, path.lchop("@/"))
+    end
+    return if Content::Processors::InternalLinkResolver.has_own_origin?(path)
+    unless path.starts_with?('/')
+      base = source.url.ends_with?('/') ? source.url : "#{source.url}/"
+      path = Path.posix(base, path).normalize.to_s
+      path += "/" if url.partition('#')[0].partition('?')[0].ends_with?('/') && !path.ends_with?('/')
+    end
+    path = path.lchop(base_path) if !base_path.empty? && path.starts_with?("#{base_path}/")
+    by_url[path]? || by_url["#{path}/"]?
   end
 end

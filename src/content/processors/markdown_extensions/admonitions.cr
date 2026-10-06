@@ -47,21 +47,22 @@ module Hwaro
         # confused with a soft-broken body. It used to be `\s*(.*?)`, which
         # swallowed the title into the first body paragraph — `Custom Title`
         # rendered as body text under the default "Note" heading. Obsidian's
-        # optional fold marker (`[!NOTE]+` / `[!NOTE]-`) is accepted and
-        # dropped; folding itself is not modeled.
-        ADMONITION_BLOCKQUOTE_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][+-]?([^\n]*?)(?:\n|(?=<\/p>))\s*(.*?)<\/blockquote>/im
+        # optional fold marker (`[!NOTE]+` / `[!NOTE]-`, group 4) is dropped,
+        # unless `foldable` (`[markdown] wikilinks`) renders it as <details>.
+        ADMONITION_BLOCKQUOTE_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?<fold>[+-]?)([^\n]*?)(?:\n|(?=<\/p>))\s*(.*?)<\/blockquote>/im
 
         # Post-processing: rewrite GitHub `> [!TYPE]` blockquotes as admonition divs.
         # Note: the lazy match against `</blockquote>` means a nested blockquote
         # inside the admonition will close the match early. Acceptable for v1 —
         # GitHub admonitions don't support nested blockquotes either.
-        def postprocess_admonitions(html : String) : String
+        def postprocess_admonitions(html : String, foldable : Bool = false) : String
           return html unless html.includes?("[!")
 
           html.gsub(ADMONITION_BLOCKQUOTE_RE) do |_|
             type = $1
-            title_line = $2
-            rest = $3
+            fold = foldable ? $~["fold"] : ""
+            title_line = $3
+            rest = $4
             # Two or more trailing spaces on the marker line become a hard
             # break in markd (`[!NOTE]  ` → `[!NOTE]<br />\n`), and the break
             # tag sits before the newline group 2 stops at — so it landed in
@@ -96,13 +97,19 @@ module Hwaro
                    end
 
             String.build do |str|
-              str << %(<div class="admonition admonition-#{type_lower}">\n)
-              str << %(<p class="admonition-title">#{type_title}</p>\n)
+              if fold.empty?
+                str << %(<div class="admonition admonition-#{type_lower}">\n)
+                str << %(<p class="admonition-title">#{type_title}</p>\n)
+              else
+                # Obsidian fold: `-` starts collapsed, `+` open.
+                str << %(<details class="admonition admonition-#{type_lower}") << (fold == "+" ? " open>\n" : ">\n")
+                str << %(<summary class="admonition-title">#{type_title}</summary>\n)
+              end
               unless body.empty?
                 str << body
                 str << '\n'
               end
-              str << "</div>"
+              str << (fold.empty? ? "</div>" : "</details>")
             end
           end
         end

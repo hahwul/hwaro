@@ -31,6 +31,10 @@
       url: /ko/writing/shortcodes/
     - title: 아키타입
       url: /ko/writing/archetypes/
+    - title: 프론트 매터 스키마
+      url: /ko/writing/schema/
+    - title: 위키링크와 백링크
+      url: /ko/writing/obsidian/
 - title: 템플릿
   section: templates
   items:
@@ -123,6 +127,10 @@
           url: /ko/features/amp/
         - title: 배포 명령
           url: /ko/features/deployment/
+        - title: 프라이버시 모드
+          url: /ko/features/privacy/
+        - title: 콘텐츠 보안 정책(CSP)
+          url: /ko/features/csp/
 - title: 배포
   section: deploy
   items:

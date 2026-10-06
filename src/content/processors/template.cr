@@ -395,13 +395,29 @@ module Hwaro
           # size. `height` stays the requested value: the resize map is
           # rebuilt from variant FILENAMES on warm builds (`_320w.png`), so a
           # real height is not recoverable without decoding every image.
-          @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0}) do
+          #
+          # `op="fill"` (cover the box, crop to it) and `op="crop"` (cut the
+          # box out unscaled) write a dedicated variant at render time,
+          # positioned by `anchor`; `width`/`height` are then the written
+          # file's. See ImageHooks.op_variant.
+          @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0, op: "fit", anchor: "center"}) do
             path = arguments["path"].to_s
             # Lenient coercion: shortcode arguments are always Strings, so a
             # `width="800"` forwarded from `{% img(width="800") %}` must resize
             # rather than raise Crinja::TypeError and abort the page.
             width = Utils::CrinjaUtils.to_count(arguments["width"])
             height = Utils::CrinjaUtils.to_count(arguments["height"])
+            op = arguments["op"].to_s
+            anchor = arguments["anchor"].to_s
+            unless Processors::ImageProcessor::RESIZE_OPS.includes?(op)
+              raise Crinja::RuntimeError.new("resize_image: unknown op #{op.inspect} (expected one of: #{Processors::ImageProcessor::RESIZE_OPS.join(", ")})")
+            end
+            unless Processors::ImageProcessor::ANCHORS.includes?(anchor)
+              raise Crinja::RuntimeError.new("resize_image: unknown anchor #{anchor.inspect} (expected one of: #{Processors::ImageProcessor::ANCHORS.join(", ")})")
+            end
+            if op != "fit" && (width <= 0 || height <= 0)
+              raise Crinja::RuntimeError.new("resize_image: op=#{op.inspect} needs both width and height")
+            end
 
             base_url = env.resolve("base_url").to_s
 
@@ -423,6 +439,21 @@ module Hwaro
             # the incoming URL before the lookup; the returned variant is
             # re-encoded below so the emitted .url is a valid href.
             normalized = URI.decode(TemplateEngine.bundle_image_url(env, path) || (path.starts_with?("/") ? path : "/#{path}"))
+
+            if op != "fit"
+              source = Content::Hooks::ImageHooks.resolve_source(normalized)
+              TemplateEngine.record_file_read(source || File.join("static", normalized))
+              page_path = env.resolve("__page_path__").raw.as?(String)
+              made = source.try { |src| Content::Hooks::ImageHooks.op_variant(normalized, src, width, height, op, anchor, page_path) }
+              return Crinja::Value.new({
+                "url"    => Crinja::Value.new(base_url.rstrip("/") + URI.encode_path(made.try(&.[0]) || normalized)),
+                "width"  => Crinja::Value.new(made.try(&.[1]) || width),
+                "height" => Crinja::Value.new(made.try(&.[2]) || height),
+                # LQIP describes the whole source image, not the cropped box.
+                "lqip"           => Crinja::Value.new(""),
+                "dominant_color" => Crinja::Value.new(""),
+              })
+            end
 
             # The variant set, width and LQIP colour all follow the SOURCE
             # image's bytes. An image no resize job covered (a missing file)
@@ -495,6 +526,9 @@ module Hwaro
 
         ENV_READ_PREFIX  = "env:"
         FILE_READ_PREFIX = "file:"
+        # `asset_integrity(name)`: the value is the integrity of what the name
+        # resolves to (see AssetHooks.integrity), wherever the output lives.
+        ASSET_READ_PREFIX = "asset:"
 
         def self.record_render_read(key : String) : Nil
           @@render_reads_mutex.synchronize { @@render_reads << key }
@@ -673,6 +707,20 @@ module Hwaro
 
           # asset_url is an alias for asset
           @env.functions["asset_url"] = @env.functions["asset"]
+
+          # asset_integrity() - Subresource Integrity value of the file
+          # asset() points to, over its emitted bytes (after minify and
+          # fingerprint). Recorded as a render read by NAME, so `--cache`
+          # re-renders when the bytes move even if the name does not — for
+          # any output directory, inside the project or not.
+          # Usage: integrity="{{ asset_integrity(name="main.css") }}"
+          @env.functions["asset_integrity"] = Crinja.function({name: ""}) do
+            asset_name = arguments["name"].to_s
+            TemplateEngine.record_render_read(ASSET_READ_PREFIX + asset_name)
+            sri = Content::Hooks::AssetHooks.integrity(asset_name)
+            raise Crinja::RuntimeError.new("asset_integrity: unknown asset '#{asset_name}' (no emitted file)") unless sri
+            Crinja::Value.new(sri)
+          end
         end
 
         private def register_env_function

@@ -43,6 +43,9 @@ module Hwaro
       # rendered with the admonition markup (shared CSS). Unsupported
       # under safe mode (the raw <div> wrapper would be stripped).
       property containers : Bool
+      # If true, enables Obsidian syntax: `[[wikilinks]]`, `![[image]]`
+      # embeds and foldable `> [!type]-` / `> [!type]+` callouts.
+      property wikilinks : Bool
 
       def initialize
         @safe = false
@@ -68,6 +71,7 @@ module Hwaro
         @task_list_classes = false
         @insert_anchor_links = "none"
         @containers = false
+        @wikilinks = false
       end
 
       # Compact fingerprint of every field that changes rendered body HTML.
@@ -86,6 +90,8 @@ module Hwaro
           io << (@external_links_no_referrer ? '1' : '0') << (@task_list_classes ? '1' : '0')
           io << (@containers ? '1' : '0')
           io << @math_engine << ':' << @insert_anchor_links
+          # Appended only when on, so every existing fingerprint is unchanged.
+          io << ":w" if @wikilinks
         end
       end
 
@@ -95,13 +101,25 @@ module Hwaro
       # the browser as literal TeX. Templates can opt out by overriding the
       # `{{ math_tags }}` variable or by leaving `math = false` and inlining
       # their own includes via [auto_includes].
-      def math_tags : String
+      #
+      # `csp` (`[csp]` on) starts KaTeX from an inline script instead of an
+      # `onload=` attribute, which a hash-based policy cannot allow.
+      def math_tags(csp : Bool = false) : String
         return "" unless @math
         case @math_engine
         when "katex"
           # auto-render finds class="math math-{inline,display}" automatically
           # and replaces the inner TeX with rendered KaTeX. Pinned KaTeX 0.16.x
           # to avoid surprise major-version churn in build outputs.
+          if csp
+            # Deferred scripts run before DOMContentLoaded fires.
+            return <<-HTML.gsub('\n', "")
+              <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"></script>
+              <script>document.addEventListener("DOMContentLoaded",function(){renderMathInElement(document.body);});</script>
+              HTML
+          end
           <<-HTML.gsub('\n', "")
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
             <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
@@ -175,6 +193,7 @@ module Hwaro
         config.markdown.external_links_no_referrer = bool_value(s["external_links_no_referrer"]?, config.markdown.external_links_no_referrer)
         config.markdown.task_list_classes = bool_value(s["task_list_classes"]?, config.markdown.task_list_classes)
         config.markdown.containers = bool_value(s["containers"]?, config.markdown.containers)
+        config.markdown.wikilinks = bool_value(s["wikilinks"]?, config.markdown.wikilinks)
         if anchors = s["insert_anchor_links"]?.try(&.as_s?)
           if anchors.in?("none", "left", "right", "before", "after")
             config.markdown.insert_anchor_links = anchors

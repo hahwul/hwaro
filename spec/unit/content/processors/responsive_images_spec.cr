@@ -107,3 +107,83 @@ describe "Responsive content images" do
     end
   end
 end
+
+# A project with `static/img/a.png` (6×3) and `static/photo.png` (4×2),
+# cwd'd for the block.
+private def with_image_project(&)
+  Dir.mktmpdir do |dir|
+    Dir.cd(dir) do
+      Dir.mkdir_p("static/img")
+      px = Bytes.new(6 * 3 * 3, 128_u8)
+      LibStb.stbi_write_png("static/img/a.png", 6, 3, 3, px.to_unsafe.as(Void*), 6 * 3)
+      LibStb.stbi_write_png("static/photo.png", 4, 2, 3, px.to_unsafe.as(Void*), 4 * 3)
+      Hwaro::Content::Hooks::ImageHooks.clear_intrinsic_sizes
+      begin
+        yield
+      ensure
+        Hwaro::Content::Hooks::ImageHooks.clear_intrinsic_sizes
+      end
+    end
+  end
+end
+
+private def dimensions_config : Hwaro::Models::Config
+  c = Hwaro::Models::Config.new
+  c.image_processing.dimensions = true
+  c
+end
+
+describe "Content image dimensions" do
+  it "adds intrinsic width/height to a local image without image_processing.enabled" do
+    with_image_project do
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+        %(<p><img src="/img/a.png" alt="A"></p>), bundle_page, dimensions_config)
+      out.should eq(%(<p><img width="6" height="3" src="/img/a.png" alt="A"></p>))
+    end
+  end
+
+  it "leaves a tag alone when the author set width or height" do
+    with_image_project do
+      builder = Hwaro::Core::Build::Builder.new
+      html = %(<img src="/img/a.png" width="10"><img src="/img/a.png" HEIGHT='5'>)
+      builder.test_apply_responsive_images(html, bundle_page, dimensions_config).should eq(html)
+    end
+  end
+
+  it "skips external, missing and unreadable sources" do
+    with_image_project do
+      File.write("static/img/broken.png", "nope")
+      html = %(<img src="https://cdn.example.com/a.png"><img src="/img/none.png"><img src="/img/broken.png">)
+      Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, dimensions_config).should eq(html)
+    end
+  end
+
+  it "strips base_path before resolving a subpath-prefixed src" do
+    with_image_project do
+      config = dimensions_config
+      config.base_url = "https://example.com/blog"
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+        %(<img src="/blog/img/a.png">), bundle_page, config)
+      out.should eq(%(<img width="6" height="3" src="/blog/img/a.png">))
+    end
+  end
+
+  it "uses the original's size alongside generated srcset variants" do
+    with_image_project do
+      config = dimensions_config
+      config.image_processing.enabled = true
+      with_resize_map({"/photo.png" => {2 => "/photo_2w.png"}}) do
+        out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+          %(<img src="/photo.png">), bundle_page, config)
+        out.should eq(%(<img srcset="/photo_2w.png 2w" sizes="100vw" width="4" height="2" src="/photo.png">))
+      end
+    end
+  end
+
+  it "is a no-op when dimensions is off" do
+    with_image_project do
+      html = %(<img src="/img/a.png">)
+      Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, Hwaro::Models::Config.new).should eq(html)
+    end
+  end
+end

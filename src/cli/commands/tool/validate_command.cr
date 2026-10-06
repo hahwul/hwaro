@@ -7,8 +7,10 @@
 
 require "json"
 require "option_parser"
+require "toml"
 require "../../metadata"
 require "../../../services/content_validator"
+require "../../../content/front_matter_schema"
 require "../../../utils/errors"
 require "../../../utils/logger"
 require "../../../utils/text_utils"
@@ -80,8 +82,17 @@ module Hwaro
             Runner.enable_json_mode! if json_output
 
             validator = Services::ContentValidator.new(content_dir: content_dir)
+            schema_results = [] of {String, Content::FrontMatterSchema::Result}
             begin
               issues = validator.run
+              # `[[content.schema]]`: the build's own check (see
+              # Doctor.content_schema_results), so validate and build agree.
+              if config = load_schema_config(content_dir)
+                schema_results = Services::Doctor.content_schema_results(content_dir, config)
+                schema_results.each do |_, result|
+                  issues.concat(result.violations.map { |v| Services::Doctor.schema_issue(v) })
+                end
+              end
             rescue ex
               if json_output
                 # Keep a classified failure's own code and hint instead of
@@ -100,13 +111,20 @@ module Hwaro
               findings = issues.map do |issue|
                 {
                   "file"     => issue.file,
-                  "line"     => nil.as(Int32?),
+                  "line"     => issue.line,
                   "rule"     => issue.id,
                   "severity" => issue.level.to_s,
                   "message"  => issue.message,
                 }
               end
-              puts({"findings" => findings}.to_json)
+              if schema_results.empty?
+                puts({"findings" => findings}.to_json)
+              else
+                # The defaults each schema'd page takes for its missing fields.
+                defaults = {} of String => Hash(String, Models::SchemaValue)
+                schema_results.each { |file, result| defaults[file] = result.defaults unless result.defaults.empty? }
+                puts({"findings" => findings, "defaults" => defaults}.to_json)
+              end
               # Exit non-zero on hard errors so CI can gate on broken content
               # (mirrors `tool doctor`'s exit-code behavior).
               exit(exit_code_for(issues, strict: strict_mode, max_warnings: max_warnings))
@@ -165,6 +183,30 @@ module Hwaro
             # Gate CI on hard errors (matches `tool doctor`).
             code = exit_code_for(issues, strict: strict_mode, max_warnings: max_warnings)
             exit(code) if code != Hwaro::Errors::EXIT_SUCCESS
+          end
+
+          # The config of the project `content_dir` belongs to (the
+          # `config.toml` beside it), loaded only when it declares
+          # `[[content.schema]]`: validate is a content linter, so a config
+          # problem unrelated to schemas stays `hwaro build`'s to report. A
+          # declared but malformed schema still raises (HWARO_E_CONFIG). Load
+          # warnings belong to `hwaro build` / `doctor`.
+          private def load_schema_config(content_dir : String) : Models::Config?
+            path = File.join(File.dirname(File.expand_path(content_dir)), "config.toml")
+            declared = begin
+              # Substituted like Config.load: an unquoted `${VAR}` is not TOML.
+              TOML.parse(Utils::EnvSubstitutor.substitute_toml(File.read(path))[0])["content"]?.try(&.as_h?).try(&.has_key?("schema"))
+            rescue
+              nil
+            end
+            return unless declared
+            previous = Logger.level
+            Logger.level = Logger::Level::Error
+            begin
+              Models::Config.load(path)
+            ensure
+              Logger.level = previous
+            end
           end
 
           # Mirrors `tool doctor`'s exit policy: hard errors keep their

@@ -348,6 +348,7 @@ john-doe:
 | page.series_index | Int | 시리즈 안에서 1부터 시작하는 순번(`[series]` 활성화 필요) |
 | page.series_pages | Array<Page> | 같은 시리즈의 모든 페이지(`series_weight` 순 정렬) |
 | page.related_posts | Array<Page> | 택소노미 항목을 공유하는 페이지(`[related]` 활성화 필요) |
+| page.backlinks | Array<Page> | 이 페이지로 링크하는 같은 언어의 게시된 페이지, 최신순(`[content] backlinks = true` 필요, [백링크](/ko/writing/obsidian/#백링크) 참고) |
 | page.git | Object? | 소스 파일의 커밋 메타데이터(`[git]` 활성화 필요, 커밋되지 않았거나 생성된 페이지는 `nil`). 필드: `hash`, `short_hash`, `lastmod`(Time), `first_commit`(Time), `author_name`, `author_email` — [Git 메타데이터](/ko/features/git-info/) 참고 |
 
 ### 불리언 플래그
@@ -616,6 +617,7 @@ pros = ["Fast", "Reliable"]
 | auto_includes_js | 자동 인클루드된 JS `<script>` 태그 |
 | auto_includes | 모든 자동 인클루드 태그 |
 | pwa_tags | PWA manifest 링크, theme-color 메타, 서비스 워커 등록 태그(`[pwa]` 비활성 시 빈 문자열) |
+| search_tags | [내장 검색 UI](/ko/features/search/#내장-ui)의 스타일시트와 스크립트 태그(`[search] ui = true`가 아니면 빈 문자열) |
 
 ```jinja
 <head>

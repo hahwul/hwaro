@@ -1,6 +1,7 @@
 require "../../../spec_helper"
 require "../../../../src/content/hooks/image_hooks"
 require "../../../../src/content/processors/template"
+require "../../../support/build_helper"
 
 # =============================================================================
 # Unit specs for ImageHooks. Covers:
@@ -300,6 +301,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640])
         result.should_not be_nil
         result.not_nil![320].should eq("photo_320w.jpg")
@@ -336,6 +339,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
         File.write(File.join(dest_dir, "photo_9999999999w.jpg"), "bogus")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640])
         result.should_not be_nil
         result.not_nil!.keys.sort!.should eq([320, 640])
@@ -379,6 +384,28 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
+    # Racy-git (#857): a variant written inside the source's timestamp tick
+    # cannot prove it was made from the current bytes — a same-size rewrite
+    # of the source in that tick keeps `dest >= source`. Both mtimes are
+    # pinned, so the spec does not depend on the clock.
+    it "returns nil when a destination was written inside the source's mtime tick" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        dest = File.join(dest_dir, "photo_320w.jpg")
+        File.write(source, "src")
+        File.write(dest, "320")
+        tick = Time.utc - 1.hour
+        File.touch(source, tick)
+        File.touch(dest, tick + 1.millisecond)
+
+        Hwaro::Content::Hooks::ImageHooks
+          .reusable_widths(source, dest_dir, [320])
+          .should be_nil
+      end
+    end
+
     it "returns nil when the source file is missing" do
       Dir.mktmpdir do |dir|
         Hwaro::Content::Hooks::ImageHooks
@@ -400,6 +427,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640, 9999])
         result.should_not be_nil
         result.not_nil!.should eq({320 => "photo_320w.jpg", 640 => "photo_640w.jpg"})
@@ -416,6 +445,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Dir.mkdir_p(dest_dir)
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [640, 1280])
         result.should_not be_nil
         result.not_nil!.should eq({640 => "photo_640w.jpg"})
@@ -474,6 +505,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.png"), "320")
         File.write(File.join(dest_dir, "photo_1024w.png"), "1024")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 1024])
         result.should_not be_nil
         result.not_nil!.should eq({320 => "photo_320w.png", 1024 => "photo_1024w.png"})
@@ -493,10 +526,118 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.png"), "320")
         File.write(File.join(dest_dir, "photo_640w.png"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 1280])
         result.should_not be_nil
         result.not_nil!.should eq({320 => "photo_320w.png", 640 => "photo_640w.png"})
       end
+    end
+  end
+end
+
+# Raw bytes of a w×h grey PNG, for build_site file maps.
+private def png_body(w : Int32, h : Int32) : String
+  Dir.mktmpdir do |dir|
+    path = File.join(dir, "x.png")
+    px = Bytes.new(w * h * 3, 90_u8)
+    LibStb.stbi_write_png(path, w, h, 3, px.to_unsafe.as(Void*), w * 3)
+    File.read(path)
+  end
+end
+
+private def png_size(path : String) : {Int32, Int32}?
+  Hwaro::Content::Processors::ImageProcessor.dimensions(path)
+end
+
+describe "resize_image fill/crop variants and content image dimensions (build)" do
+  it "writes op variants at render time, sizes content images, and keeps both on warm builds" do
+    page_tpl = <<-HTML
+      {{ content }}
+      {% set f = resize_image(path=page.url ~ "pic.png", width=20, height=20, op="fill", anchor="bottom_right") %}F={{ f.url }} {{ f.width }}x{{ f.height }}
+      {% set c = resize_image(path="/img/a.png", width=8, height=50, op="crop") %}C={{ c.url }} {{ c.width }}x{{ c.height }}
+      HTML
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com/sub"\n[image_processing]\ndimensions = true\n),
+      content_files: {"posts/b/index.md" => "+++\ntitle = \"B\"\n+++\n![p](pic.png) ![a](/img/a.png)\n", "posts/b/pic.png" => png_body(40, 10)},
+      template_files: {"page.html" => page_tpl, "section.html" => "{{ content }}", "index.html" => "{{ content }}"},
+      static_files: {"img/a.png" => png_body(12, 30)},
+      cache: true,
+    ) do
+      html = File.read("public/posts/b/index.html")
+      html.should contain(%(<img width="40" height="10" src="pic.png"))
+      html.should contain(%(<img width="12" height="30" src="/sub/img/a.png"))
+      html.should contain("F=https://example.com/sub/posts/b/pic_20x20_fill_bottom_right.png 20x20")
+      html.should contain("C=https://example.com/sub/img/a_8x50_crop_center.png 8x30")
+      png_size("public/posts/b/pic_20x20_fill_bottom_right.png").should eq({20, 20})
+      png_size("public/img/a_8x50_crop_center.png").should eq({8, 30})
+
+      # A warm build skips the page; its variants must survive the prune.
+      2.times do
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true, highlight: false, parallel: false))
+      end
+      File.exists?("public/posts/b/pic_20x20_fill_bottom_right.png").should be_true
+      File.exists?("public/img/a_8x50_crop_center.png").should be_true
+    end
+  end
+end
+
+private def rebuild_cached : Nil
+  builder = Hwaro::Core::Build::Builder.new
+  Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+  builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true, highlight: false, parallel: false))
+end
+
+describe "ImageHooks render-time lookups (review fixes)" do
+  it "never publishes a fill variant of a withheld (draft) bundle's image" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n[content.files]\nallow_extensions = ["png"]\n),
+      content_files: {
+        "posts/dr/index.md"   => "+++\ntitle = \"Draft\"\ndraft = true\n+++\nhidden\n",
+        "posts/dr/secret.png" => png_body(20, 20),
+        "about.md"            => "+++\ntitle = \"About\"\n+++\nabout\n",
+      },
+      template_files: {
+        "page.html" => %({% set v = resize_image(path="/posts/dr/secret.png", width=10, height=10, op="fill") %}V={{ v.url }}),
+        "section.html" => "{{ content }}", "index.html" => "{{ content }}",
+      },
+    ) do
+      File.read("public/about/index.html").should contain("V=https://example.com/posts/dr/secret.png")
+      Dir.exists?("public/posts/dr").should be_false
+    end
+  end
+
+  it "re-reads an image's size when its bytes change at the same path" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Hwaro::Content::Hooks::ImageHooks.clear_intrinsic_sizes
+        File.write("a.png", png_body(6, 3))
+        Hwaro::Content::Hooks::ImageHooks.intrinsic_size("a.png").should eq({6, 3})
+        File.write("a.png", png_body(9, 5))
+        File.touch("a.png", Time.local + 2.seconds)
+        Hwaro::Content::Hooks::ImageHooks.intrinsic_size("a.png").should eq({9, 5})
+        Hwaro::Content::Hooks::ImageHooks.clear_intrinsic_sizes
+      end
+    end
+  end
+
+  it "does not pass off a static file that sits on the variant's name as the variant" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n),
+      content_files: {"about.md" => "+++\ntitle = \"About\"\n+++\nabout\n"},
+      template_files: {
+        "page.html" => %({% set v = resize_image(path="/img/a.png", width=10, height=10, op="fill") %}V={{ v.width }}x{{ v.height }}),
+        "section.html" => "{{ content }}", "index.html" => "{{ content }}",
+      },
+      static_files: {"img/a.png" => png_body(12, 30), "img/a_10x10_fill_center.png" => png_body(4, 4)},
+      cache: true,
+    ) do
+      File.read("public/about/index.html").should contain("V=10x10")
+      png_size("public/img/a_10x10_fill_center.png").should eq({10, 10})
+      rebuild_cached
+      png_size("public/img/a_10x10_fill_center.png").should eq({10, 10})
     end
   end
 end

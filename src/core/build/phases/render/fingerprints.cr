@@ -106,11 +106,14 @@ module Hwaro::Core::Build::Phases::Render
   RELATION_RELATED_MARKER      = "related_posts"
   RELATION_TRANSLATION_MARKERS = ["translations", "hreflang"]
   RELATION_ANCESTOR_MARKERS    = ["ancestors", "jsonld"]
+  RELATION_BACKLINKS_MARKER    = "backlinks"
 
   # `@/path.md` internal links in raw content (Markdown destination, raw
   # `href="@/…"`, reference definition). Stops where the resolver's own
-  # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters.
-  INTERNAL_LINK_TARGET_RE = /@\/([^\s()"'#?<>\[\]]+)/
+  # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters. An
+  # angle-bracket destination (`<@/a b.md>`) may hold spaces and runs to its
+  # `>` (group 1); the bare form is group 2.
+  INTERNAL_LINK_TARGET_RE = /<@\/([^>\n#?]+)|@\/([^\s()"'#?<>\[\]]+)/
 
   # A content-derived field or `[extra]` read straight off a relation —
   # `page.higher.summary`, `get_page(path="x").extra.badge` — where the
@@ -128,7 +131,10 @@ module Hwaro::Core::Build::Phases::Render
     translations : Bool,
     ancestors : Bool,
     get_page_targets : Array(String),
-    fields : Builder::ListingPageFields do
+    fields : Builder::ListingPageFields,
+    # Folded only under `[content] backlinks` (see page_relations_hash),
+    # so it stays out of `reads_any?`.
+    backlinks : Bool = false do
     def reads_any? : Bool
       neighbors || series || related || translations || ancestors || !get_page_targets.empty?
     end
@@ -179,6 +185,7 @@ module Hwaro::Core::Build::Phases::Render
         ancestors: RELATION_ANCESTOR_MARKERS.any? { |m| blob.includes?(m) },
         get_page_targets: get_page_targets(blob),
         fields: relation_page_fields(blob),
+        backlinks: blob.includes?(RELATION_BACKLINKS_MARKER),
       ),
     )
     @page_template_scan_mutex.synchronize do
@@ -204,20 +211,22 @@ module Hwaro::Core::Build::Phases::Render
     )
   end
 
-  # Shortcode templates (`shortcodes/<name>`) the page's content calls.
-  # Empty without a dependency graph — the closure scan then reads every
-  # template anyway.
+  # Shortcode templates (`shortcodes/<name>`) the page's content calls,
+  # included text counted (`page_scan_texts`). Empty without a dependency
+  # graph — the closure scan then reads every template anyway.
   private def page_shortcode_templates(page : Models::Page) : Set(String)
     deps = @template_deps
     return Set(String).new unless deps
-    raw = page.raw_content
+    texts = page_scan_texts(page)
+    key = texts.last
     @page_template_hash_mutex.synchronize do
-      if (memo = @page_shortcodes_memo[page.path]?) && memo[0].same?(raw) && memo[1].same?(deps)
+      if (memo = @page_shortcodes_memo[page.path]?) && memo[0].same?(key) && memo[1].same?(deps)
         return memo[2]
       end
     end
-    used = deps.shortcodes_used_in(raw)
-    @page_template_hash_mutex.synchronize { @page_shortcodes_memo[page.path] = {raw, deps, used} }
+    used = Set(String).new
+    texts.each { |text| used.concat(deps.shortcodes_used_in(text)) }
+    @page_template_hash_mutex.synchronize { @page_shortcodes_memo[page.path] = {key, deps, used} }
     used
   end
 
@@ -509,7 +518,11 @@ module Hwaro::Core::Build::Phases::Render
   # section's `[extra]` is unreachable from any section-set listing.
   # Fingerprinting it could only ever cause spurious invalidation, never
   # fix staleness.
-  private def compute_section_set_fingerprint(sections : Array(Models::Section)) : String
+  #
+  # `auto_sections_menu` (`[menus] auto_sections` is on) also folds the
+  # other gates that menu applies to a section; off, the digest keeps its
+  # old value so existing caches stay warm.
+  private def compute_section_set_fingerprint(sections : Array(Models::Section), auto_sections_menu : Bool = false) : String
     digest = Digest::MD5.new
     sections.each do |s|
       fp_value(digest, s.path)
@@ -527,6 +540,11 @@ module Hwaro::Core::Build::Phases::Render
       reverse = s.reverse
       fp_value(digest, reverse.nil? ? "-" : (reverse ? "1" : "0"))
       fp_value(digest, s.transparent ? "1" : "0")
+      if auto_sections_menu
+        fp_value(digest, s.render ? "1" : "0")
+        fp_value(digest, s.unpublished ? "1" : "0")
+        fp_value(digest, s.redirect_to || "")
+      end
       fp_value(digest, s.paginate.try(&.to_s) || "-")
       fp_list(digest, s.assets.sort)
       fp_menus(digest, s.menus)
@@ -544,10 +562,22 @@ module Hwaro::Core::Build::Phases::Render
   # applies: `render`, language, version). A page gaining or losing a
   # registration changes the number of folded entries, so membership moves
   # too. Config `[[menus.*]]` entries are not folded: a config edit forces a
-  # full rebuild before this is ever consulted.
-  private def compute_menu_set_fingerprint(pages : Array(Models::Page), sections : Array(Models::Section)) : String
+  # full rebuild before this is ever consulted. With `[menus] auto_sections`
+  # every top-level section feeds the menu, registered or not.
+  private def compute_menu_set_fingerprint(site : Models::Site) : String
     digest = Digest::MD5.new
-    (pages + sections).each do |p|
+    auto_sections = !site.config.menus_auto_sections.nil?
+    (site.pages + site.sections).each do |p|
+      if auto_sections && p.is_a?(Models::Section) && Content::Menus.top_level_dir(p.section, p.version)
+        fp_value(digest, p.path)
+        fp_value(digest, p.url)
+        fp_value(digest, p.title)
+        fp_value(digest, p.weight.to_s)
+        fp_value(digest, p.excluded_from_listings? || p.transparent ? "1" : "0")
+        fp_value(digest, p.redirect_to || "")
+        fp_value(digest, p.language || "")
+        fp_value(digest, p.version.try(&.name) || "")
+      end
       next if p.menus.empty?
       fp_value(digest, p.path)
       fp_value(digest, p.url)
@@ -681,6 +711,7 @@ module Hwaro::Core::Build::Phases::Render
     # serve builder can prune what a later render stops writing. Sorted so a
     # re-render in a different fiber order can't make the entry look changed.
     derived = take_page_derived_outputs(page.path).sort!
+    privacy_incomplete = @page_derived_mutex.synchronize { @privacy_incomplete.delete(page.path) }
     return unless cache.enabled?
     # A `[[content.generate]]` page has no source file to stat or hash —
     # `cache.update` would raise on the missing path. Skipping keeps it
@@ -693,6 +724,9 @@ module Hwaro::Core::Build::Phases::Render
     # No output file was written for an escaping page, so recording it as
     # up-to-date would let filter_changed_pages skip it forever.
     return unless output_path
+    # A failed `[privacy]` download is transient: forget the entry so the
+    # next warm build retries instead of keeping the external URL forever.
+    return cache.invalidate(source_path) if privacy_incomplete
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
     relations_hash = @page_template_hash_mutex.synchronize { @filter_relations_hashes.delete(page.path) } ||
                      page_relations_hash(page, templates, site, @pages_by_path || build_pages_by_path(site))
@@ -733,7 +767,9 @@ module Hwaro::Core::Build::Phases::Render
     # An older version's canonical names its latest counterpart (or itself
     # when there is none), whatever the template reads.
     latest = page.version.try { |v| v.latest ? nil : page.version_links.find(&.latest) }
-    return "" if !rel.reads_any? && links.empty? && latest.nil?
+    backlinks = rel.backlinks && site.config.backlinks
+    wikilinks = wikilink_resolutions(page)
+    return "" if !rel.reads_any? && links.empty? && !backlinks && wikilinks.empty? && latest.nil?
 
     digest = Digest::MD5.new
     if latest
@@ -786,8 +822,16 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, "l#{links.size}")
       links.each do |target|
         fp_value(digest, target)
-        fp_value(digest, link_targets[target]?.try(&.url) || "")
+        fp_value(digest, Content::Processors::InternalLinkResolver.page_for(link_targets, target).try(&.url) || "")
       end
+    end
+    # B lists A when A links to B: A adding or dropping the link, or A's
+    # listed fields moving, re-renders B.
+    fp_backlinks(digest, page, rel.fields) if backlinks
+    # What each wikilink resolves to ("" while unresolved), like `@/` above.
+    unless wikilinks.empty?
+      fp_value(digest, "w#{wikilinks.size}")
+      wikilinks.each { |value| fp_value(digest, value) }
     end
     digest.final.hexstring
   end
@@ -826,13 +870,43 @@ module Hwaro::Core::Build::Phases::Render
       end
   end
 
-  # The `@/` link targets in a page's raw content, sorted and unique.
+  # The `@/` link targets in a page's content (included text counted),
+  # sorted and unique.
   private def internal_link_targets(page : Models::Page) : Array(String)
-    raw = page.raw_content
-    return [] of String unless Utils::ByteScan.includes?(raw, "@/")
     targets = [] of String
-    raw.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << m[1] }
+    page_scan_texts(page).each do |text|
+      next unless Utils::ByteScan.includes?(text, "@/")
+      text.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << (m[1]? || m[2]) }
+    end
     targets.uniq!.sort!
+  end
+
+  private def fp_backlinks(digest : ::Digest, page : Models::Page, fields : Builder::ListingPageFields) : Nil
+    fp_value(digest, "b#{page.backlinks.size}")
+    page.backlinks.each { |p| fp_relation(digest, p, fields) }
+  end
+
+  # `target=resolution` for each distinct wikilink in a page's content
+  # (raw, and include-expanded, so a transcluded note's links count too):
+  # the linked page's path and URL, or an embed's file URL. Empty unless
+  # `[markdown] wikilinks`.
+  private def wikilink_resolutions(page : Models::Page) : Array(String)
+    return [] of String unless index = @wikilink_index
+    values = Set(String).new
+    page_scan_texts(page).each do |text|
+      Content::Processors::Wikilinks.each_link(text, math: site_math?) do |link|
+        next unless link.is_a?(Content::Processors::Wikilinks::Link)
+        next if link.target.empty?
+        resolved = if link.image?
+                     index.resolve_file(link.target, page) || ""
+                   else
+                     index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } ||
+                       (index.resolve_file(link.target, page) if link.file?) || ""
+                   end
+        values << "#{link.embed ? '!' : ' '}#{link.target}=#{resolved}"
+      end
+    end
+    values.to_a.sort!
   end
 
   # Fingerprint of the page's `[git]` metadata (see CacheEntry#git_hash):

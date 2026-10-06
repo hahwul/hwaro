@@ -19,6 +19,9 @@ hwaro tool check-links --timeout 30 --concurrency 4
 hwaro tool check-links --external-only
 hwaro tool check-links --internal-only
 
+# Don't check #fragment links
+hwaro tool check-links --skip-anchors
+
 # Silence a known-flaky host, and accept bot-blocking status codes
 hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 ```
@@ -34,6 +37,7 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 | --internal-only | Check internal links only |
 | --ignore-url PATTERN | Skip links whose URL matches PATTERN (repeatable) |
 | --allow-status CODES | Treat these HTTP status codes as healthy (comma-separated) |
+| --skip-anchors | Do not check `#fragment` links against the built HTML |
 | -j, --json | Output result as JSON |
 | -h, --help | Show help |
 
@@ -61,7 +65,9 @@ failing CI.
 5. Accepts routes the build generates rather than reads from disk
 6. Accepts pipeline-emitted assets found in the last build's output (see
    [Build output as evidence](#build-output-as-evidence))
-7. Reports broken or unreachable links
+7. Checks the `#fragment` of internal links against the built HTML (see
+   [Anchors](#anchors))
+8. Reports broken or unreachable links
 
 External links that resolve to private or internal addresses (localhost,
 RFC 1918 ranges, `.local`/`.internal` hosts) are never contacted. They are
@@ -98,7 +104,7 @@ build (the order a lint-then-build CI pipeline uses):
 
 - `/sitemap.xml`, `/robots.txt`, `/llms.txt`, the search index, and `404.html`,
   each honouring its configured `filename`
-- Feeds (`/rss.xml`, `/atom.xml`), including the per-language copies
+- Feeds (`/rss.xml`, `/atom.xml`, `/feed.json`), including the per-language copies
   (`/ko/rss.xml`) and the per-section ones (`/posts/rss.xml`). A section feed
   only counts when the section's `_index.md` sets `generate_feeds = true`,
   since that is what makes the build write it
@@ -109,10 +115,29 @@ build (the order a lint-then-build CI pipeline uses):
 
 Content-root links such as `@/posts/hello.md` are looked up the way the build
 resolves them: by the exact source path under `content/` (case-sensitive,
-never percent-decoded, no `./` or `../` normalization), among the pages a
+percent-decoded first, so `@/my%20post.md` finds `my post.md`, no `./` or
+`../` normalization), among the pages a
 default build publishes. Include the source file extension and link sections
 through their `_index.md`; `@/posts/hello` and `@/posts/` are reported, and so
 is a link to a draft, future-dated or expired page.
+
+### Anchors
+
+Internal links with a fragment (`#intro`, `/guide/#install`, `../b/#faq`,
+`@/posts/hello.md#setup`) are checked against the `id` and `name` attributes
+in the target's HTML file in the build output, so every id the page really
+carries counts: headings, `{#id}` attributes, shortcode and template output,
+footnotes. `#top` and scroll-to-text fragments (`#:~:text=…`) always
+resolve, and an id is matched as written or percent-decoded. Missing anchors are listed as their own
+category (`Anchor not found: #id`, kind `anchor`, under `dead_anchors` in the
+JSON payload) and fail the run like dead links.
+
+The check needs a `hwaro build` tree (see
+[Build output as evidence](#build-output-as-evidence)); without one, or when
+the target page has no HTML file in it, fragments are not checked. Pass
+`--skip-anchors` to turn the check off. To catch the same mistakes during the
+build itself, set `[links] broken_anchors` (see
+[Configuration](/start/config/#links)).
 
 ## Link Types
 
@@ -121,6 +146,7 @@ is a link to a draft, future-dated or expired page.
 | External | `http://` and `https://` links — checked via HTTP HEAD |
 | Internal | Relative and absolute path links — checked on filesystem |
 | Images | `![alt](path)` image references — checked on filesystem |
+| Anchors | `#fragment` of an internal link — checked against the built HTML |
 
 ## Example Output
 
@@ -168,6 +194,17 @@ printed to stderr as one `file: url  status` line.
       },
       "status": 404,
       "error": null
+    }
+  ],
+  "dead_anchors": [
+    {
+      "link": {
+        "file": "content/guide.md",
+        "url": "/install/#linux",
+        "kind": "anchor"
+      },
+      "status": -1,
+      "error": "Anchor not found: #linux"
     }
   ],
   "skipped_external": [

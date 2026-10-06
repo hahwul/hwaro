@@ -76,6 +76,7 @@ hooks.post = ["npm run minify"]
 | parallel | bool | true | Parallel processing |
 | cache | bool | false | Enable build caching |
 | template_deps | bool | true | Track template dependencies so a template edit only rebuilds the pages that render it |
+| write_stats | bool | false | Write `hwaro_stats.json` (tags, classes and ids used by the rendered pages) at the project root for Tailwind and similar tools. See [Asset Pipeline](/features/asset-pipeline/#used-selector-manifest-tailwind) |
 | hooks.pre | array | [] | Commands to run before build |
 | hooks.post | array | [] | Commands to run after build |
 
@@ -122,6 +123,7 @@ math_engine = "katex"
 | math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |
 | smart_punctuation | bool | false | Typographic quotes/dashes/ellipses (`"x"` → “x”, `--` → –, `...` → …) |
 | containers | bool | false | `:::note Title` … `:::` custom containers (admonition markup) |
+| wikilinks | bool | false | Obsidian syntax: `[[wikilinks]]`, `![[image]]` embeds, `![[note]]` transclusion and foldable `> [!type]-` callouts (see [Wikilinks & Backlinks](/writing/obsidian/)) |
 | insert_anchor_links | string | "none" | Site-wide heading anchor links: `"none"`, `"left"`, or `"right"` (page front matter overrides) |
 | external_links_target_blank | bool | false | Add `target="_blank" rel="noopener"` to absolute http(s) links |
 | external_links_no_follow | bool | false | Add `rel="nofollow"` to absolute http(s) links |
@@ -135,14 +137,16 @@ See [Markdown Extensions](/features/markdown-extensions/) for syntax details and
 [content]
 summary_length = 70
 summary_ellipsis = "…"
+backlinks = false
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | summary_length | int | 70 | Automatic summary length for pages without `<!-- more -->` or `description`: words for space-delimited text, characters ×2 for CJK-dominant text. `0` disables the automatic summary |
 | summary_ellipsis | string | "…" | Appended to an automatic summary only when text was cut |
+| backlinks | bool | false | Fill `page.backlinks` with the pages linking to each page (see [Wikilinks & Backlinks](/writing/obsidian/#backlinks)) |
 
-See [Content Summary](/writing/pages/#content-summary) for how `page.summary` is chosen. `[content.files]`, `[content.new]` and `[[content.generate]]` are documented in the feature reference below.
+See [Content Summary](/writing/pages/#content-summary) for how `page.summary` is chosen. `[content.files]`, `[content.new]`, `[[content.generate]]` and `[[content.schema]]` are documented in the feature reference below.
 
 ## Permalinks
 
@@ -197,13 +201,17 @@ Control how unresolved `@/path.md` internal links are treated during the build.
 ```toml
 [links]
 broken_internal = "error"
+broken_anchors = "warn"
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | broken_internal | string | "warn" | `"warn"` logs each unresolved `@/` link and keeps the raw markup; `"error"` fails the build (exit code 5) with one aggregated list of every offender |
+| broken_anchors | string | "ignore" | `"warn"` or `"error"` checks `@/page.md#id` and same-page `#id` links in page content against the `id`/`name` attributes in the target's rendered HTML (headings, `{#id}`, shortcodes, templates, footnotes); `"error"` fails the build listing `source → link → missing id`. `"ignore"` skips the check |
 
 See [Internal Links](/writing/pages/#internal-links) for the `@/` link syntax and the `--cache` caveat in strict mode.
+
+The anchor check reads each target page's output file after the render phase, so on `--cache` and `serve` rebuilds a target that was not re-rendered is checked as last written (no false positives). Only links in pages rendered in that pass are checked; run a cold build in CI for a complete check.
 
 ## Taxonomies
 
@@ -257,6 +265,17 @@ weight = 2
 
 Pages/sections can also join a menu from their own front matter (`menus = ["main"]`) without touching this file. A `[languages.<code>]` block with no menus table inherits this global set; declaring `[[languages.<code>.menus.<name>]]` replaces it for that language. See [Menus](/features/menus/) for the full reference (hierarchy, per-language behavior, `active_path` styling).
 
+To fill a menu from the top-level sections automatically (Hugo's `sectionPagesMenu`), name it under `[menus]`:
+
+```toml
+[menus]
+auto_sections = "main"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| auto_sections | string | none (off) | Menu that every top-level section joins (`identifier` = directory name, `name` = title, `url`, `weight`). Draft, unpublished, headless, `transparent` and off-site `redirect_to` sections are skipped, as is a directory without `_index.md`; an explicit entry with the same `identifier` wins. Reserved key: a non-string or blank value is a config error. See [Automatic Section Menus](/features/menus/#automatic-section-menus). |
+
 ## Static Files
 
 Everything under `static/` is copied verbatim into the site root, preserving its directory structure, so `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.
@@ -300,22 +319,25 @@ Each feature has its own documentation with full configuration details. Below is
 
 | Config Section | Documentation | Description |
 |----------------|---------------|-------------|
-| `[feeds]` | [SEO](/features/seo/) | RSS/Atom feed generation |
+| `[feeds]` | [SEO](/features/seo/) | RSS/Atom/JSON Feed generation |
 | `[sitemap]` | [SEO](/features/seo/) | Sitemap XML generation |
-| `[robots]` | [SEO](/features/seo/) | Robots.txt generation |
+| `[robots]` | [SEO](/features/seo/) | Robots.txt generation (including Content-Signal lines) |
 | `[og]` | [SEO](/features/seo/) | OpenGraph & Twitter Card meta tags |
 | `[og.auto_image]` | [Auto OG Images](/features/og-images/) | Auto-generate OG preview images (including `lazy_generate` for fast dev server) |
 | `[search]` | [Search](/features/search/) | Client-side search index |
 | `[highlight]` | [Syntax Highlighting](/features/syntax-highlighting/) | Code syntax highlighting |
 | `[pagination]` | [Pagination](/features/pagination/) | Section pagination |
 | `[auto_includes]` | [Auto Includes](/features/auto-includes/) | Auto-include CSS/JS files |
-| `[assets]` | [Asset Pipeline](/features/asset-pipeline/) | CSS/JS minification & fingerprinting |
+| `[assets]` | [Asset Pipeline](/features/asset-pipeline/) | CSS/JS minification & fingerprinting, Subresource Integrity (`sri`) |
 | `[sass]` | [Sass/SCSS](/features/sass/) | Built-in SCSS compilation (pure Crystal) |
 | `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing & LQIP |
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
 | `[[content.generate]]` | [Content Generation](/features/content-generation/) | Materialize `site.data` records into pages |
+| `[[content.schema]]` | [Front Matter Schema](/writing/schema/) | Per-section front-matter types, required fields, enums, bounds and defaults |
 | `[[data.remote]]` | [Remote Data Sources](/features/remote-data/) | Fetch remote data into `site.data` at build time |
+| `[privacy]` | [Privacy Mode](/features/privacy/) | Self-host third-party fonts, scripts and images at build time |
+| `[csp]` | [Content Security Policy](/features/csp/) | Content-Security-Policy from inline script/style hashes (`_headers` or `<meta>`) |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
 | `[links]` | [Links](#links) | Broken internal `@/` link handling (warn or fail the build) |

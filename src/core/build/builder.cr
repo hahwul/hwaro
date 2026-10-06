@@ -25,6 +25,8 @@ require "./cache_manager"
 require "./parallel"
 require "./data_disk"
 require "./remote_data"
+require "./privacy"
+require "./csp"
 require "./content_generate"
 require "./template_deps"
 require "./template_loader"
@@ -49,9 +51,14 @@ require "../../content/seo/jsonld"
 require "../../content/seo/pwa"
 require "../../content/seo/og_image"
 require "../../content/search"
+require "../../content/search_ui"
+require "../../content/front_matter_schema"
+require "../../content/processors/wikilinks"
+require "../../content/processors/includes"
 require "../../content/pagination/paginator"
 require "../../content/pagination/renderer"
 require "../../utils/digest_utils"
+require "../../utils/html_stats"
 require "../../utils/errors"
 require "../../utils/file_safe"
 require "../../utils/logger"
@@ -153,6 +160,18 @@ module Hwaro
         # config.toml misses the memo and refetches, exactly like the disk
         # cache.
         @remote_data_memo : Hash({String, String}, {RemoteData::Result, Time}) = {} of {String, String} => {RemoteData::Result, Time}
+        # `[privacy]` localizer for this build (nil when the feature is off).
+        # Rebuilt by every Initialize phase; serve's incremental passes reuse
+        # the last one, and its disk cache keeps them off the network.
+        @privacy : Privacy? = nil
+        # Pages whose `[privacy]` rewrite left a reference external because a
+        # download failed: their cache entry is dropped, so the next `--cache`
+        # build renders them again instead of keeping the external URL.
+        # Guarded by @page_derived_mutex.
+        @privacy_incomplete : Set(String) = Set(String).new
+        # `[csp]`: each HTML file's policy as the Finalize pass emitted it,
+        # checked again after `[build] hooks.post` (nil when CSP is off).
+        @csp_result : Csp::Result? = nil
         @lifecycle : Lifecycle::Manager
         @context : Lifecycle::BuildContext?
         @profiler : Profiler?
@@ -293,6 +312,26 @@ module Hwaro
         # filter-time one. Cleared after the render fan-out; guarded by
         # @page_template_hash_mutex.
         @filter_relations_hashes : Hash(String, String) = {} of String => String
+        # `[markdown] wikilinks` lookup over the current published page set;
+        # rebuilt whenever that set may have changed (refresh_wikilink_index).
+        @wikilink_index : Content::Processors::Wikilinks::Index? = nil
+        # Ambiguous-wikilink warnings already printed; kept across the index
+        # rebuilds of one serve session, cleared by each full build.
+        @wikilink_warnings : Content::Processors::Wikilinks::WarnLog = Content::Processors::Wikilinks::WarnLog.new
+        # Project-relative path => MD5 of the bytes read (nil: missing, or a
+        # transcluded page) for every file an `include_code` / `include_md`
+        # call or a `![[note]]` transclusion read. Serve escalates a save
+        # of any of them to a full rebuild (Server#effective_strategy). Rebuilt by every full build, so a file
+        # nothing includes any more stops escalating.
+        @include_sources : Hash(String, String?) = {} of String => String?
+        @include_sources_mutex : Mutex = Mutex.new
+        # page path => {raw content, wikilink index, include-expanded raw}:
+        # `expanded_raw_content`, shared by the render and the per-page scans
+        # (fingerprints, serve's template-change selection). Valid while the
+        # page's raw string and the index are the same objects; cleared with
+        # @include_sources by every full build, the only strategy serve runs
+        # after an include source changed. Guarded by @include_sources_mutex.
+        @expanded_raw_memo : Hash(String, {String, Content::Processors::Wikilinks::Index?, String}) = {} of String => {String, Content::Processors::Wikilinks::Index?, String}
         @unpublished_pages : Atomic(Int32) = Atomic(Int32).new(0)
         # Pages that actually wrote a file. `process_files_*` returns a delta of
         # this, so every caller (render phase, incremental rebuild, serve
@@ -312,6 +351,11 @@ module Hwaro
         # every auto-include asset — O(site) work for one page — and silently
         # used cache_busting defaults instead of the build's options.
         @render_global_vars : Hash(String, Crinja::Value)? = nil
+        # `[build] write_stats`: tags/classes/ids of every HTML page this
+        # Builder wrote, flushed to `hwaro_stats.json`. Nil when the feature
+        # is off. Replaced per full build; serve's incremental passes keep
+        # adding to it.
+        @html_stats : Utils::HtmlStats? = nil
         # Pages stashed by `--fast-start` during the initial build so the
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
@@ -336,6 +380,12 @@ module Hwaro
         # into one classified error by raise_on_broken_internal_links!.
         @broken_internal_links : Array(String) = [] of String
         @broken_links_mutex : Mutex = Mutex.new
+        # Fragment links (`@/x.md#id`, same-page `#id`) found in rendered page
+        # content, collected only when `[links] broken_anchors` is not
+        # "ignore": {source path, link as written, target page, fragment}.
+        # Same mutex and lifetime as @broken_internal_links; checked against
+        # the target's output file by check_broken_anchors.
+        @anchor_links : Array({String, String, Models::Page, String}) = [] of {String, String, Models::Page, String}
         # Output files this build claims that no content source backs — the
         # taxonomy index/term pages, their pagination pages and their feeds.
         # A page's own output is recorded in its cache entry; these have no
@@ -565,11 +615,36 @@ module Hwaro
           info.modification_time >= epoch
         end
 
-        # Record an alias stub / pagination page `page` just wrote.
+        # Record an alias stub / pagination page / localized `[privacy]`
+        # file `page` just wrote.
         def record_page_derived_output(page_path : String, output_path : String) : Nil
           @page_derived_mutex.synchronize do
-            (@page_derived_outputs[page_path] ||= [] of String) << output_path
+            list = @page_derived_outputs[page_path] ||= [] of String
+            list << output_path unless list.includes?(output_path)
           end
+        end
+
+        # `[privacy]`: the local URL for one external URL (the PWA precache
+        # list), or nil to keep it external.
+        def privacy_url(url : String) : String?
+          return unless localized = @privacy.try(&.localize(url))
+          localized.files.each { |path| claim_generated_output(path) }
+          localized.url
+        end
+
+        # `[privacy]`: point `html`'s external assets at local copies. The
+        # files they now load are claimed, and recorded against `owner` (a
+        # page path) so a `--cache` hit, which skips the render, keeps them.
+        # Public: the taxonomy generator writes through it too.
+        def privacy_rewrite(html : String, owner : String? = nil) : String
+          return html unless privacy = @privacy
+          html, files, incomplete = privacy.rewrite_html(html)
+          files.each do |path|
+            claim_generated_output(path)
+            record_page_derived_output(owner, path) if owner
+          end
+          @page_derived_mutex.synchronize { @privacy_incomplete << owner } if incomplete && owner
+          html
         end
 
         # Start this page's list over — called at the top of every render so a
@@ -681,6 +756,7 @@ module Hwaro
           # command line left at its default. Applied before the BuildContext is
           # built so every phase (and the output guard) sees the same values.
           options.apply_build_config!(config.build)
+          @html_stats = config.build.write_stats ? Utils::HtmlStats.new : nil
           pre_hooks = config.build.hooks.pre
           post_hooks = config.build.hooks.post
 
@@ -731,6 +807,15 @@ module Hwaro
           # one filesystem timestamp tick does not move; a build must read
           # the data files as they are now, not as a previous build saw them.
           Content::Processors::TemplateEngine.clear_load_data_cache
+          # Same for the SRI digests (keyed on mtime + size, so this is
+          # belt-and-braces) and the record `hooks.post` is checked against.
+          Utils::SriCache.clear
+          # Include sources and the expanded-content memo are re-learned by
+          # this build's render.
+          @include_sources_mutex.synchronize do
+            @include_sources = {} of String => String?
+            @expanded_raw_memo.clear
+          end
           # Same lifetime for the once-per-BUILD shortcode warnings (missing
           # template, unclosed block): a `serve` session that never cleared them
           # reported each name only for the first rebuild it appeared in.
@@ -793,9 +878,14 @@ module Hwaro
 
           # Run post-build hooks
           unless post_hooks.empty?
+            # Files already off their printed value were changed by the build
+            # itself (Write's minify, Finalize's prune), not by the hooks.
+            stale_before = Utils::SriCache.stale.to_set
             unless Utils::CommandRunner.run_post_hooks(post_hooks)
               Logger.warn "Post-build hooks failed, but build was successful."
             end
+            warn_integrity_changed_by_post_hooks(stale_before)
+            warn_csp_changed_by_post_hooks(config)
           end
 
           if options.debug
@@ -805,6 +895,24 @@ module Hwaro
           end
 
           true
+        end
+
+        # The pages carry `integrity` values hashed during Render; a post hook
+        # that rewrote one of those files (a minifier over public/) makes the
+        # browser block it. Nothing re-renders after the hooks, so say so.
+        private def warn_integrity_changed_by_post_hooks(stale_before : Set(String))
+          Utils::SriCache.stale.each do |path|
+            next if stale_before.includes?(path)
+            Logger.warn "[build] hooks.post changed #{path} after its integrity was printed into pages; browsers will block it. Rewrite it in hooks.pre (into static/) instead."
+          end
+        end
+
+        # Same for `[csp]`: the policies hash the inline bytes Finalize saw.
+        private def warn_csp_changed_by_post_hooks(config : Models::Config)
+          return unless result = @csp_result
+          Csp.changed_pages(config.csp, result).each do |path|
+            Logger.warn "[build] hooks.post changed inline scripts or styles in #{path} after its Content-Security-Policy was computed; browsers will block them. Make the change in hooks.pre or a template instead."
+          end
         end
 
         # Emit the end-of-build cache statistics at the requested verbosity.

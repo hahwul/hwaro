@@ -169,6 +169,12 @@ Configure per-file deployment settings using pattern matchers:
 ```toml
 [[deployment.matchers]]
 pattern = "^.+\\.html$"
+cache_control = "max-age=0, no-cache"
+gzip = true
+
+[[deployment.matchers]]
+pattern = "^assets/.+\\.(css|js)$"
+cache_control = "max-age=31536000, immutable"
 force = true
 ```
 
@@ -176,14 +182,72 @@ force = true
 |-----|------|---------|-------------|
 | pattern | string | — | Regex matched against the source-relative path and the destination name (they differ under `strip_index_html`) |
 | force | bool | false | Always copy matched files, even when identical at the destination |
-| cache_control | string | — | Reserved — not applied by the built-in sync (see below) |
-| content_type | string | — | Reserved — not applied by the built-in sync (see below) |
-| gzip | bool | false | Reserved — not applied by the built-in sync (see below) |
+| cache_control | string | — | `Cache-Control` header for matched files (cloud targets) |
+| content_type | string | — | `Content-Type` header for matched files (cloud targets) |
+| gzip | bool | — | Upload gzip-compressed with `Content-Encoding: gzip` (cloud), or write a `.gz` sibling (local) |
 
-The built-in sync copies files and runs external CLIs; it does not talk to
-an object-store API, so it can only honor `force`. Setting `cache_control`,
-`content_type`, or `gzip` prints a warning. Configure headers and
-compression at your host or CDN instead.
+`force` is honored by every matcher whose pattern matches. For the
+metadata keys (`cache_control`, `content_type`, `gzip`), the **first**
+matcher in config order that sets any of them and matches the file wins,
+and it supplies all three. Matchers are not merged, so put specific
+patterns before general ones. An explicit `gzip = false` counts as set, so
+it opts a path out of a later, broader gzip matcher:
+
+```toml
+[[deployment.matchers]]
+pattern = "\\.(png|jpg|woff2)$"
+gzip = false
+
+[[deployment.matchers]]
+pattern = ".*"
+gzip = true
+```
+
+### Cloud targets (`s3://`, `gs://`, `az://`)
+
+After the main sync, each matched file is uploaded again with its headers,
+using the cloud CLI's own flags:
+
+| Target | Command |
+|--------|---------|
+| `s3://` | `aws s3 cp FILE s3://… --cache-control … --content-type … --content-encoding gzip` |
+| `gs://` | `gsutil -h "Cache-Control:…" -h "Content-Type:…" cp -Z FILE gs://…` |
+| `az://` | `az storage blob upload --container-name … --file FILE --name … --overwrite --content-cache-control … --content-type … --content-encoding gzip` |
+
+With `gzip = true`, `gsutil -Z` compresses on its own. For `aws` and `az`,
+hwaro compresses the file into a temporary copy with the same name and
+uploads that. `--dry-run` lists the planned uploads, and `--dry-run --json`
+adds an `upload` op per file with a `headers` object. Matched files are
+re-uploaded on every deploy.
+
+`gsutil cp` reads `[`, `]`, `*` and `?` in a file name as wildcards, and
+has no way to escape them. On `gs://` targets, a matched file whose path
+contains one of them is skipped with a warning (it is still deployed by the
+main sync, without the extra headers). If the source directory's own path
+contains one of them, the target's metadata uploads are skipped with one
+warning.
+
+### Local directory targets (`file://`, `path`)
+
+`gzip = true` writes a precompressed `<file>.gz` next to each matched file,
+for nginx `gzip_static` or Caddy `precompressed`. A sibling is rewritten
+only when it is missing or older than its file. If the source already ships
+a `<file>.gz`, that file is deployed unchanged. Siblings are never deleted
+as stale while their file is deployed. When a page is removed, its sibling
+is deleted with it and does not count toward `max_deletes`. Any other `.gz`
+file at the destination counts as usual. hwaro keeps no record of the files
+it wrote, so this is a heuristic: any `X.gz` deleted together with a
+gzip-matched `X` is exempt, even if another tool wrote the pair. A sibling the target's `exclude`
+matches is never written. `--dry-run --json` lists each sibling to write as a
+`gzip` op whose `source` is the destination file being compressed.
+
+A local copy has no HTTP headers, so `cache_control` and `content_type`
+print a warning there. Set those in your web server.
+
+### Custom `command` targets
+
+Matchers are not applied to a target with an explicit `command`; setting
+metadata keys prints a warning. Pass headers in the command itself.
 
 ## See Also
 

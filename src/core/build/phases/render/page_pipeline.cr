@@ -132,7 +132,7 @@ module Hwaro::Core::Build::Phases::Render
     # build_template_variables call for the majority of pages that have no
     # shortcodes.
     shortcode_results = {} of String => String
-    raw = page.raw_content
+    raw = expanded_raw_content(page, site)
     # Use accurate fence + inline-code aware pre-filter instead of naive includes?.
     # This is the main D2 optimization for the shortcode hot path (#562):
     # documentation pages full of example syntax no longer pay the cost of
@@ -152,6 +152,7 @@ module Hwaro::Core::Build::Phases::Render
                         else
                           raw
                         end
+    processed_content = rewrite_wikilinks(processed_content, page, site)
 
     lazy_loading = site.config.markdown.lazy_loading
     emoji = site.config.markdown.emoji
@@ -189,6 +190,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Resolve internal @/ links to actual page URLs
     if pages_by_path = @pages_by_path
+      collect_anchor_links(page, html_content, pages_by_path) unless site.config.links.broken_anchors == "ignore"
       if site.config.links.broken_internal == "error"
         # Strict mode: collect unresolved links in a local array, then fold
         # them into the builder-wide accumulator under the mutex (render

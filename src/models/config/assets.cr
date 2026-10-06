@@ -21,24 +21,25 @@ module Hwaro
         @sass_enabled = false
       end
 
-      # Generate CSS link tags for files in configured directories
-      def css_tags(base_url : String = "", cache_bust : String = "", static_config : StaticConfig? = nil) : String
-        collect_tags("css", base_url, cache_bust, static_config) do |url|
-          %(<link rel="stylesheet" href="#{url}">)
+      # Generate CSS link tags for files in configured directories.
+      # `sri_root` (the build output directory) adds `integrity` attributes.
+      def css_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil, static_config : StaticConfig? = nil) : String
+        collect_tags("css", base_url, cache_bust, sri_root, static_config) do |url, integrity|
+          %(<link rel="stylesheet" href="#{url}"#{integrity}>)
         end
       end
 
       # Generate JS script tags for files in configured directories
-      def js_tags(base_url : String = "", cache_bust : String = "", static_config : StaticConfig? = nil) : String
-        collect_tags("js", base_url, cache_bust, static_config) do |url|
-          %(<script src="#{url}"></script>)
+      def js_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil, static_config : StaticConfig? = nil) : String
+        collect_tags("js", base_url, cache_bust, sri_root, static_config) do |url, integrity|
+          %(<script src="#{url}"#{integrity}></script>)
         end
       end
 
       # `static_config` drops files `[static] exclude` keeps out of the build
       # (for compiled SCSS, the excluded `.scss` source), so no tag points at
       # a file that is never published.
-      private def collect_tags(extension : String, base_url : String, cache_bust : String, static_config : StaticConfig?, & : String -> String) : String
+      private def collect_tags(extension : String, base_url : String, cache_bust : String, sri_root : String?, static_config : StaticConfig?, & : String, String -> String) : String
         return "" unless @enabled
         return "" if @dirs.empty?
 
@@ -65,16 +66,16 @@ module Hwaro
 
           files.sort.each do |file|
             relative_path = file.sub(/^static\/?/, "/")
-            tags << yield(HTML.escape("#{base_url}#{relative_path}#{suffix}"))
+            tags << yield(HTML.escape("#{base_url}#{relative_path}#{suffix}"), Models.integrity_attr(sri_root, relative_path))
           end
         end
         tags.join("\n")
       end
 
       # Generate both CSS and JS tags
-      def all_tags(base_url : String = "", cache_bust : String = "", static_config : StaticConfig? = nil) : String
-        css = css_tags(base_url, cache_bust, static_config)
-        js = js_tags(base_url, cache_bust, static_config)
+      def all_tags(base_url : String = "", cache_bust : String = "", sri_root : String? = nil, static_config : StaticConfig? = nil) : String
+        css = css_tags(base_url, cache_bust, sri_root, static_config)
+        js = js_tags(base_url, cache_bust, sri_root, static_config)
         Models.join_tags(css, js)
       end
     end
@@ -96,8 +97,14 @@ module Hwaro
       property source_dir : String
       property output_dir : String
       property bundles : Array(AssetBundleConfig)
+      # Subresource Integrity: the local `<link>`/`<script>` tags Hwaro emits
+      # (auto-includes, self-hosted highlight assets) carry
+      # `integrity="sha384-…"` over the emitted bytes. Independent of
+      # `enabled`; `asset_integrity()` works either way.
+      property sri : Bool
 
       def initialize
+        @sri = false
         @enabled = false
         @minify = true
         @fingerprint = true
@@ -138,10 +145,13 @@ module Hwaro
     #   enabled = true
     #   widths = [320, 640, 1024, 1280]
     #   quality = 85
+    #   dimensions = true   # intrinsic width/height on content <img>
+    #                       # (independent of `enabled`)
     class ImageProcessingConfig
       property enabled : Bool
       property widths : Array(Int32)
       property quality : Int32
+      property dimensions : Bool
       property lqip_enabled : Bool
       property lqip_width : Int32
       property lqip_quality : Int32
@@ -150,6 +160,7 @@ module Hwaro
         @enabled = false
         @widths = [] of Int32
         @quality = 85
+        @dimensions = false
         @lqip_enabled = false
         @lqip_width = 32
         @lqip_quality = 20
@@ -229,6 +240,7 @@ module Hwaro
         config.assets.enabled = bool_value(s["enabled"]?, config.assets.enabled)
         config.assets.minify = bool_value(s["minify"]?, config.assets.minify)
         config.assets.fingerprint = bool_value(s["fingerprint"]?, config.assets.fingerprint)
+        config.assets.sri = bool_value(s["sri"]?, config.assets.sri)
         config.assets.source_dir = s["source_dir"]?.try(&.as_s?) || config.assets.source_dir
         config.assets.output_dir = s["output_dir"]?.try(&.as_s?) || config.assets.output_dir
 
@@ -302,6 +314,7 @@ module Hwaro
 
         config.image_processing.enabled = bool_value(s["enabled"]?, config.image_processing.enabled)
         config.image_processing.quality = int_value(s["quality"]?, config.image_processing.quality).clamp(1, 100)
+        config.image_processing.dimensions = bool_value(s["dimensions"]?, config.image_processing.dimensions)
         if widths = s["widths"]?.try(&.as_a?)
           config.image_processing.widths = widths.compact_map { |w|
             val = int_or_nil(w)

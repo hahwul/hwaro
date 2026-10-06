@@ -11,21 +11,28 @@ module Hwaro::Core::Build::Phases::Render
   # e.g. `/posts/foo/photo.png`); absolute `src` is used as-is. External
   # (http/protocol-relative/data:) sources and tags that already carry a
   # `srcset` (e.g. emitted by the `resize_image()` helper) are left untouched.
-  IMG_TAG_RE = /<img\b[^>]*>/
-  IMG_SRC_RE = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
+  #
+  # With `[image_processing] dimensions = true` (independent of `enabled`),
+  # the same pass also stamps the original's intrinsic `width`/`height` on
+  # every local image that sets neither, so the browser reserves its box
+  # before the bytes arrive (no layout shift).
+  IMG_TAG_RE  = /<img\b[^>]*>/
+  IMG_SRC_RE  = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
+  IMG_SIZE_RE = /\s(?:width|height)\s*=/i
 
   private def apply_responsive_images(html : String, page : Models::Page, config : Models::Config) : String
-    return html unless config.image_processing.enabled
+    dimensions = config.image_processing.dimensions
+    return html unless config.image_processing.enabled || dimensions
     return html unless html.includes?("<img")
 
     # Read-only view: apply_responsive_images only looks up keys, never
     # mutates. Using the live map avoids a per-page full-map copy plus a
     # contended global mutex on the parallel render hot path.
-    resize_map = Content::Hooks::ImageHooks.resize_map_readonly
-    return html if resize_map.empty?
+    resize_map = config.image_processing.enabled ? Content::Hooks::ImageHooks.resize_map_readonly : {} of String => Hash(Int32, String)
+    return html if resize_map.empty? && !dimensions
 
     html.gsub(IMG_TAG_RE) do |tag|
-      next tag if tag.includes?("srcset")
+      next tag if tag.includes?("srcset") && !dimensions
       m = tag.match(IMG_SRC_RE)
       next tag unless m
       src = m[2]? || m[3]? || ""
@@ -51,17 +58,25 @@ module Hwaro::Core::Build::Phases::Render
       bp = config.base_path
       key = key[bp.size..] if !bp.empty? && key.starts_with?("#{bp}/")
 
+      additions = ""
       widths = resize_map[key]?
-      next tag unless widths
-      next tag if widths.empty?
-
-      # Prefix each candidate with the subpath (base_path) so responsive
-      # images resolve on subpath deployments; the resize map stores bare
-      # root-relative paths. Mirrors the resize_image() template helper.
-      srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{URI.encode_path(config.with_base_path(url))} #{w}w" }.join(", ")
-      additions = %( srcset="#{srcset}")
-      additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
-      tag.sub("<img", "<img#{additions}")
+      if widths && !widths.empty? && !tag.includes?("srcset")
+        # Prefix each candidate with the subpath (base_path) so responsive
+        # images resolve on subpath deployments; the resize map stores bare
+        # root-relative paths. Mirrors the resize_image() template helper.
+        srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{URI.encode_path(config.with_base_path(url))} #{w}w" }.join(", ")
+        additions = %( srcset="#{srcset}")
+        additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
+      end
+      if dimensions && !tag.matches?(IMG_SIZE_RE) && (source = Content::Hooks::ImageHooks.resolve_source(key, config))
+        # The bytes decide the size, so a cached page must re-render when
+        # they change.
+        Content::Processors::TemplateEngine.record_file_read(source)
+        if size = Content::Hooks::ImageHooks.intrinsic_size(source)
+          additions += %( width="#{size[0]}" height="#{size[1]}")
+        end
+      end
+      additions.empty? ? tag : tag.sub("<img", "<img#{additions}")
     end
   end
 

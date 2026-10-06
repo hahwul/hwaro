@@ -244,6 +244,25 @@ module Hwaro
         # regenerate every OG image and resized image variant.
         SERVE_CACHE_FILE = ".hwaro/serve_cache.json"
 
+        # Racy-git: an mtime only stands in for a file's bytes once it is
+        # safely older than the moment the stamp was taken. Filesystems stamp
+        # with a coarse clock (ext4 uses the kernel tick, 1-10ms; HFS+ 1s,
+        # FAT 2s), so a same-size rewrite inside the tick a stamp was taken
+        # in keeps the stamped mtime, and the next warm build served the old
+        # output (#857: two builds in one tick, as specs, `serve` and scripts
+        # run them). A stamp that is not `stable_mtime?` is not kept; the
+        # next build re-hashes the file instead.
+        RACY_WINDOW_MS = 2_000_i64
+
+        # Stored in place of an mtime that was not stable when recorded.
+        # Never a real mtime, so the next check re-hashes the file.
+        UNSTABLE_MTIME = Int64::MIN
+
+        # `now_ms` must be read BEFORE the file is stat'ed and hashed.
+        def self.stable_mtime?(mtime_ms : Int64, now_ms : Int64) : Bool
+          now_ms - mtime_ms >= RACY_WINDOW_MS
+        end
+
         # The cache file a build with these settings reads and writes.
         def self.path_for(serve_mode : Bool) : String
           serve_mode ? SERVE_CACHE_FILE : CACHE_FILE
@@ -480,6 +499,7 @@ module Hwaro
 
           # Fast path: check modification time first
           begin
+            now = Time.utc.to_unix_ms
             current_mtime = File.info(file_path).modification_time.to_unix_ms
             if current_mtime != entry.mtime
               # mtime changed — verify with content hash to catch false positives
@@ -494,7 +514,7 @@ module Hwaro
               # back keeps every other field intact without a hand-maintained
               # field-by-field reconstruction.
               refreshed = entry
-              refreshed.mtime = current_mtime
+              refreshed.mtime = Cache.stable_mtime?(current_mtime, now) ? current_mtime : UNSTABLE_MTIME
               @mutex.synchronize do
                 @entries[file_path] = refreshed
                 @dirty = true
@@ -599,6 +619,7 @@ module Hwaro
           effective_template_hash = template_hash || @current_template_hash
 
           begin
+            now = Time.utc.to_unix_ms
             mtime = File.info(file_path).modification_time.to_unix_ms
 
             # Fast path: skip update if entry is unchanged (protected by mutex)
@@ -618,7 +639,7 @@ module Hwaro
 
             entry = CacheEntry.new(
               path: file_path,
-              mtime: mtime,
+              mtime: Cache.stable_mtime?(mtime, now) ? mtime : UNSTABLE_MTIME,
               hash: content_hash,
               output_path: output_path,
               template_hash: effective_template_hash,

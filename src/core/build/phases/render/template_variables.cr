@@ -220,11 +220,19 @@ module Hwaro::Core::Build::Phases::Render
         end
       end,
     }
+    # Only with `[content] backlinks`, so templates of sites without it see
+    # exactly the page object they always did.
+    if config.backlinks
+      page_obj["backlinks"] = Crinja::Value.new(page.backlinks.map { |bp| cached_page_crinja_value(bp, default_lang) })
+    end
     if versions_enabled
       page_obj["version"] = cached_raw["version"].as(Crinja::Value)
       page_obj["version_links"] = cached_raw["version_links"].as(Crinja::Value)
     end
     vars["page"] = Crinja::Value.new(page_obj)
+    # Which source file is rendering: `resize_image(op=…)` records the
+    # variant it writes as this page's derived output (ImageHooks.op_variant).
+    vars["__page_path__"] = Crinja::Value.new(page.path)
 
     # Flat variables for new properties
     vars["page_summary"] = Crinja::Value.new(page.summary_html || page.effective_summary || "")
@@ -525,6 +533,9 @@ module Hwaro::Core::Build::Phases::Render
     # that don't already exist when we reverse the direction below.
     gv = global_vars || build_global_vars(site)
     gv.each { |k, v| vars[k] = v unless vars.has_key?(k) }
+    if (by_lang = gv["__search_tags__"]?.try(&.raw)).is_a?(Hash) && (own = by_lang[page_language]?)
+      vars["search_tags"] = own.as(Crinja::Value)
+    end
 
     # Per-fence copy opt-in probe — NOTE: for pages WITH shortcodes this
     # hash is built as the shortcode pre-render context with content="",

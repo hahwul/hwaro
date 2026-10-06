@@ -11,7 +11,8 @@
 #
 #   * build-derived globals — the fingerprinted `asset()` bundle names (the
 #     AfterInitialize asset hook produces them AFTER the key is set) and the
-#     `[auto_includes]` / local-highlight tags with their `?v=` digest;
+#     `[auto_includes]` / local-highlight tags with their `?v=` digest and,
+#     under `[assets] sri`, their `integrity` digests;
 #   * reads made mid-render — `env()`, `load_data()` of a file outside data/,
 #     and the source image behind `resize_image()`.
 #
@@ -32,7 +33,17 @@ module Hwaro::Core::Build::Phases::Render
     Utils::DigestUtils.update_length_prefixed(digest, cache_bust)
     # The tag list itself, not just the digest: an empty file added to an
     # auto-include dir adds a `<link>` without moving `?v=`.
-    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust, config.static))
+    sri_root = sri_root(config)
+    Utils::DigestUtils.update_length_prefixed(digest, config.auto_includes.all_tags(config.base_url, cache_bust, sri_root, config.static))
+    # `[assets] sri` prints a digest of the emitted bytes into the tags; the
+    # `?v=` above is "" under --skip-cache-busting and never covers the
+    # highlight files' bytes, so fold the tags themselves.
+    Utils::DigestUtils.update_length_prefixed(digest, config.highlight.tags(cache_bust, sri_root, config.base_path)) if sri_root
+    # `search_tags` carries i18n strings and the assets' digests.
+    Content::SearchUi.tags_by_language(config, @i18n_translations, cache_busting, sri_root).each do |lang, tags|
+      Utils::DigestUtils.update_length_prefixed(digest, lang)
+      Utils::DigestUtils.update_length_prefixed(digest, tags)
+    end
     digest.hexfinal
   end
 
@@ -44,7 +55,9 @@ module Hwaro::Core::Build::Phases::Render
   # photos went from 0.03s to 2.5s for a build that rendered nothing. A
   # touched-but-identical file (a fresh CI checkout) is re-hashed once and
   # still matches, because only the digest — never the stamp — reaches the
-  # render-inputs hash.
+  # render-inputs hash. A file whose mtime was not yet `Cache.stable_mtime?`
+  # gets no stamp (racy-git), so a same-size rewrite inside that timestamp
+  # tick is re-hashed rather than masked.
   private RENDER_INPUT_STAMP_PREFIX = "stamp:"
   # In-memory memo key for the CURRENT stamp of a file (NUL keeps it apart
   # from every real read key).
@@ -105,6 +118,7 @@ module Hwaro::Core::Build::Phases::Render
     elsif key.starts_with?(Content::Processors::TemplateEngine::FILE_READ_PREFIX)
       path = key[Content::Processors::TemplateEngine::FILE_READ_PREFIX.size..]
       begin
+        now = Time.utc.to_unix_ms
         info = File.info?(path)
         return "<absent>" unless info && info.file?
         mtime = info.modification_time.to_unix_ms
@@ -115,11 +129,16 @@ module Hwaro::Core::Build::Phases::Render
               else
                 Digest::MD5.new.file(path).hexfinal
               end
-        values[RENDER_INPUT_STAMP_MEMO + path] = "#{RENDER_INPUT_STAMP_PREFIX}#{mtime}:#{size}:#{md5}:#{path}"
+        if Cache.stable_mtime?(mtime, now)
+          values[RENDER_INPUT_STAMP_MEMO + path] = "#{RENDER_INPUT_STAMP_PREFIX}#{mtime}:#{size}:#{md5}:#{path}"
+        end
         md5
       rescue File::Error | IO::Error
         "<unreadable>"
       end
+    elsif key.starts_with?(Content::Processors::TemplateEngine::ASSET_READ_PREFIX)
+      name = key[Content::Processors::TemplateEngine::ASSET_READ_PREFIX.size..]
+      Content::Hooks::AssetHooks.integrity(name, record: false) || "<absent>"
     else
       ""
     end

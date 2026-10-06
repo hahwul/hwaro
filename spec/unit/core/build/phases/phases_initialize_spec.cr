@@ -160,8 +160,9 @@ describe Hwaro::Core::Build::Phases::Initialize do
           File.write("public/a.txt", "dest")
           # A copy carries the SOURCE's mtime, so matching mtimes is what marks
           # the destination as already up to date. (A merely *newer* mtime is
-          # not enough — see the regression below.)
-          File.utime(Time.utc, Time.utc, "static/a.txt")
+          # not enough — see the regression below.) Settled: a match on an
+          # mtime still inside its timestamp tick is byte-compared (#857).
+          File.utime(Time.utc, Time.utc - 1.hour, "static/a.txt")
           src_mtime = File.info("static/a.txt").modification_time
           File.utime(src_mtime, src_mtime, "public/a.txt")
 

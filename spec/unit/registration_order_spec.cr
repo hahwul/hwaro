@@ -53,9 +53,11 @@ describe "registration order" do
       "front matter (TOML/YAML parse)",
       "front matter menus (declared in config)",
       "front matter templates (exist)",
+      "front matter schema ([[content.schema]])",
       "section index files (_index.md)",
+      "translations (pages in every language)",
     ])
-    Hwaro::Services::Doctor::KNOWN_ISSUE_IDS.size.should eq(36)
+    Hwaro::Services::Doctor::KNOWN_ISSUE_IDS.size.should eq(39)
     Hwaro::Services::ALL_BLOCKING_IDS.to_a.sort.should eq(
       ["config-not-found", "config-parse-error", "content-dir-missing", "template-dir-missing"]
     )
@@ -90,23 +92,24 @@ describe "registration order" do
       number odd present sameas sequence startswith string undefined upper
     ])
     env.functions.keys.sort!.should eq(%w[
-      asset asset_url cycler debug dict env get_menu get_page get_section
+      asset asset_integrity asset_url cycler debug dict env get_menu get_page get_section
       get_taxonomy get_taxonomy_url get_url joiner load_data now range
       resize_image super url_for
     ])
   end
 
   it "keeps the config section loader order" do
-    # The keys each loader reads, in load order. Three entries are order
+    # The keys each loader reads, in load order. Four entries are order
     # sensitive (languages after menus/taxonomies, sass after auto_includes,
+    # the search facet check after taxonomies,
     # the deployment source-dir resolver after build + deployment); pinning
     # the whole sequence is simpler than pinning the constraints.
     Hwaro::Models::Config::SECTION_LOADERS.map(&.keys.join(",")).should eq(%w[
-      sitemap robots llms feeds search plugins content content content
-      pagination highlight auto_includes og menus taxonomies languages
+      sitemap robots llms feeds search plugins content content content content
+      pagination highlight auto_includes og menus taxonomies search languages
       versions build serve markdown series related git permalinks assets
       sass pwa amp image_processing doctor static deployment
-    ] + [""] + %w[outputs links data content])
+    ] + [""] + %w[outputs links data privacy csp content content])
   end
 
   it "keeps the config snippet registry" do
@@ -120,9 +123,9 @@ describe "registration order" do
   it "keeps the known top-level config keys (scalars first, then sorted sections)" do
     Hwaro::Models::Config::KNOWN_TOP_LEVEL_KEYS.should eq(%w[
       title description base_url default_language
-      amp assets auto_includes build content data deployment doctor feeds
+      amp assets auto_includes build content csp data deployment doctor feeds
       git highlight image_processing languages links llms markdown menus og
-      outputs pagination permalinks plugins pwa related robots sass search
+      outputs pagination permalinks plugins privacy pwa related robots sass search
       series serve sitemap static taxonomies versions
     ])
   end

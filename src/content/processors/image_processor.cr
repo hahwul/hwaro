@@ -42,9 +42,10 @@ module Hwaro
 
         # Read the intrinsic {width, height} of an image from its file header
         # without decoding pixel data (pure Crystal, no stb round-trip).
-        # Supports the formats `image?` accepts (PNG/JPEG/BMP); returns nil
-        # for anything unreadable so callers can fall back to other
-        # heuristics. Used by the warm-build variant-reuse check: inferring
+        # Supports the formats `image?` accepts (PNG/JPEG/BMP) plus GIF, WebP
+        # and SVG (read-only formats, measured for content `<img>` sizes);
+        # returns nil for anything unreadable so callers can fall back to
+        # other heuristics. Used by the warm-build variant-reuse check: inferring
         # the source width from the largest on-disk variant silently ignored
         # newly configured LARGER widths (the variant set "matched" after
         # clamping to the stale inferred width).
@@ -54,9 +55,85 @@ module Hwaro
           when ".png"          then png_dimensions(path)
           when ".jpg", ".jpeg" then jpeg_dimensions(path)
           when ".bmp"          then bmp_dimensions(path)
+          when ".gif"          then gif_dimensions(path)
+          when ".webp"         then webp_dimensions(path)
+          when ".svg"          then svg_dimensions(path)
           end
-        rescue IO::Error | File::Error
+        rescue ex
+          # A best-effort probe: a hostile or truncated header must never
+          # fail the page that asked (callers fall back to no size).
+          Logger.debug "image dimensions: #{path}: #{ex.message}"
           nil
+        end
+
+        # `resize_image(op=…)` operations and crop anchors.
+        RESIZE_OPS = {"fit", "fill", "crop"}
+        ANCHORS    = {"center", "top", "bottom", "left", "right", "top_left", "top_right", "bottom_left", "bottom_right"}
+
+        # One `fill` / `crop` variant of `source` written to `dest`.
+        #   fill: scale to cover width×height, then crop to exactly that box
+        #         around `anchor` (may upscale — the box is the contract).
+        #   crop: no scaling; cut a width×height region at `anchor`, clamped
+        #         to the source size.
+        # Returns the written {width, height}, or nil when the source cannot
+        # be decoded or the variant cannot be written.
+        def transform(source : String, dest : String, width : Int32, height : Int32,
+                      op : String, anchor : String, quality : Int32 = 85) : {Int32, Int32}?
+          return unless width > 0 && height > 0
+          src_w = uninitialized LibC::Int
+          src_h = uninitialized LibC::Int
+          channels = uninitialized LibC::Int
+          pixels = LibStb.stbi_load(source, pointerof(src_w), pointerof(src_h), pointerof(channels), 0)
+          return if pixels.null?
+
+          begin
+            return if src_w <= 0 || src_h <= 0 || channels <= 0
+            # Source region to read, and the output size it maps onto.
+            if op == "fill"
+              scale = Math.max(width / src_w, height / src_h)
+              region_w = (width / scale).round.to_i32.clamp(1, src_w)
+              region_h = (height / scale).round.to_i32.clamp(1, src_h)
+              out_w, out_h = width, height
+            else
+              region_w = out_w = Math.min(width, src_w.to_i32)
+              region_h = out_h = Math.min(height, src_h.to_i32)
+            end
+            return if out_w.to_i64 * out_h.to_i64 > MAX_PIXELS
+
+            x, y = anchor_offset(anchor, src_w - region_w, src_h - region_h)
+            stride = src_w * channels
+            region = pixels + (y.to_i64 * stride + x.to_i64 * channels)
+            out_pixels = LibC.malloc(out_w.to_i64 * out_h * channels).as(UInt8*)
+            return if out_pixels.null?
+
+            begin
+              if region_w == out_w && region_h == out_h
+                row = out_w * channels
+                out_h.times { |r| (out_pixels + r.to_i64 * row).copy_from(region + r.to_i64 * stride, row) }
+              else
+                resized = LibStb.stbir_resize_uint8_srgb(
+                  region, region_w, region_h, stride,
+                  out_pixels, out_w, out_h, 0,
+                  stbir_layout(channels)
+                )
+                return if resized.null?
+              end
+              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
+              return unless write_image(dest, File.extname(source).downcase, out_w, out_h, channels.to_i32, out_pixels, quality.clamp(1, 100))
+              {out_w, out_h}
+            ensure
+              LibC.free(out_pixels.as(Void*))
+            end
+          ensure
+            LibStb.stbi_image_free(pixels.as(Void*))
+          end
+        end
+
+        # Top-left corner of a region inside `slack_x`×`slack_y` spare pixels.
+        private def anchor_offset(anchor : String, slack_x : Int32, slack_y : Int32) : {Int32, Int32}
+          x = anchor.ends_with?("left") ? 0 : anchor.ends_with?("right") ? slack_x : slack_x // 2
+          y = anchor.starts_with?("top") ? 0 : anchor.starts_with?("bottom") ? slack_y : slack_y // 2
+          {x, y}
         end
 
         # Generate LQIP data URI and dominant color from the thumbnail in one pass.
@@ -345,6 +422,76 @@ module Hwaro
           height = height.abs
           return if width <= 0 || height == 0
           {width, height}
+        end
+
+        # GIF: "GIF87a"/"GIF89a"; logical screen width/height are
+        # little-endian UInt16s at offsets 6/8.
+        private def gif_dimensions(path : String) : {Int32, Int32}?
+          header = Bytes.new(10)
+          return if File.open(path, &.read(header)) < 10
+          return unless String.new(header[0, 6]).in?("GIF87a", "GIF89a")
+          width = IO::ByteFormat::LittleEndian.decode(UInt16, header[6, 2]).to_i32
+          height = IO::ByteFormat::LittleEndian.decode(UInt16, header[8, 2]).to_i32
+          return if width == 0 || height == 0
+          {width, height}
+        end
+
+        # WebP: "RIFF"…"WEBP", then the first chunk decides the layout —
+        #   VP8  (lossy):    14-bit LE width/height at 26/28;
+        #   VP8L (lossless): 14-bit (value - 1) fields packed from offset 21;
+        #   VP8X (extended): 24-bit LE (value - 1) canvas size at 24/27.
+        private def webp_dimensions(path : String) : {Int32, Int32}?
+          header = Bytes.new(30)
+          return if File.open(path, &.read(header)) < 30
+          return unless String.new(header[0, 4]) == "RIFF" && String.new(header[8, 4]) == "WEBP"
+          width, height = case String.new(header[12, 4])
+                          when "VP8 "
+                            return unless header[23] == 0x9D && header[24] == 0x01 && header[25] == 0x2A
+                            {IO::ByteFormat::LittleEndian.decode(UInt16, header[26, 2]).to_i32 & 0x3FFF,
+                             IO::ByteFormat::LittleEndian.decode(UInt16, header[28, 2]).to_i32 & 0x3FFF}
+                          when "VP8L"
+                            return unless header[20] == 0x2F
+                            bits = IO::ByteFormat::LittleEndian.decode(UInt32, header[21, 4])
+                            {(bits & 0x3FFF).to_i32 + 1, ((bits >> 14) & 0x3FFF).to_i32 + 1}
+                          when "VP8X"
+                            {(header[24].to_i32 | header[25].to_i32 << 8 | header[26].to_i32 << 16) + 1,
+                             (header[27].to_i32 | header[28].to_i32 << 8 | header[29].to_i32 << 16) + 1}
+                          else
+                            return
+                          end
+          return if width == 0 || height == 0
+          {width, height}
+        end
+
+        SVG_TAG_RE = /<svg\b[^>]*>/i
+        # `(?:px\s*)?` rather than `(?:px)?\s*`: the two `\s*` runs must not
+        # be able to split the same whitespace, or a long run backtracks
+        # quadratically into PCRE's match limit.
+        SVG_WIDTH_RE   = /\swidth\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px\s*)?["']/i
+        SVG_HEIGHT_RE  = /\sheight\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px\s*)?["']/i
+        SVG_VIEWBOX_RE = /\sviewBox\s*=\s*["']\s*-?[\d.]+[\s,]+-?[\d.]+[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)\s*["']/i
+
+        # SVG: the root element's unitless/px `width`/`height`; a missing one
+        # follows the `viewBox` aspect ratio, and with neither the viewBox
+        # size itself is used. Percentages, ems and other units are skipped.
+        # Only the first 64 KiB are read — the root tag sits at the top.
+        private def svg_dimensions(path : String) : {Int32, Int32}?
+          buf = Bytes.new(65_536)
+          read = File.open(path, &.read(buf))
+          return unless tag = String.new(buf[0, read]).scrub.match(SVG_TAG_RE).try(&.[0])
+          w = tag.match(SVG_WIDTH_RE).try(&.[1].to_f?)
+          h = tag.match(SVG_HEIGHT_RE).try(&.[1].to_f?)
+          if vb = tag.match(SVG_VIEWBOX_RE)
+            vb_w, vb_h = vb[1].to_f?, vb[2].to_f?
+            if vb_w && vb_h && vb_w > 0 && vb_h > 0
+              w ||= h ? h * vb_w / vb_h : vb_w
+              h ||= w * vb_h / vb_w
+            end
+          end
+          return unless w && h
+          width, height = w.round, h.round
+          return unless width.in?(1.0..Int32::MAX.to_f) && height.in?(1.0..Int32::MAX.to_f)
+          {width.to_i32, height.to_i32}
         end
 
         # Calculate output dimensions preserving aspect ratio.

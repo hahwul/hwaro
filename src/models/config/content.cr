@@ -14,9 +14,14 @@ module Hwaro
       # unchanged; "error" fails the build with a single aggregated list of
       # every offender. Unknown values fall back to "warn".
       property broken_internal : String
+      # How `@/page.md#id` and same-page `#id` links in page content whose
+      # fragment matches no `id`/`name` in the target's rendered HTML are
+      # treated: "ignore" (default, not checked), "warn" or "error".
+      property broken_anchors : String
 
       def initialize
         @broken_internal = "warn"
+        @broken_anchors = "ignore"
       end
     end
 
@@ -298,6 +303,11 @@ module Hwaro
         end
       end
 
+      private def self.load_content_backlinks(config : Config)
+        return unless content_section = config.raw["content"]?.try(&.as_h?)
+        config.backlinks = bool_value(content_section["backlinks"]?, config.backlinks)
+      end
+
       private def self.load_series(config : Config)
         return unless s = config.raw["series"]?.try(&.as_h?)
 
@@ -339,6 +349,14 @@ module Hwaro
             config.links.broken_internal = mode
           else
             Logger.warn "Unknown [links] broken_internal value '#{mode}' — expected \"warn\" or \"error\"; keeping \"warn\"."
+          end
+        end
+
+        if mode = s["broken_anchors"]?.try(&.as_s?)
+          if mode.in?("ignore", "warn", "error")
+            config.links.broken_anchors = mode
+          else
+            Logger.warn "Unknown [links] broken_anchors value '#{mode}' — expected \"ignore\", \"warn\" or \"error\"; keeping \"ignore\"."
           end
         end
       end

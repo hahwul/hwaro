@@ -33,3 +33,4 @@ Start with **Pages** to learn the basics of content files and front matter. Then
 - **Taxonomies** — Classify pages by tags, categories, or custom groups
 - **Shortcodes** — Embed reusable components (YouTube, alerts, galleries) inside Markdown
 - **Archetypes** — Define templates for `hwaro new` to scaffold content quickly
+- **Wikilinks & Backlinks** — Build Obsidian-style notes with `[[links]]`, embeds and `page.backlinks`

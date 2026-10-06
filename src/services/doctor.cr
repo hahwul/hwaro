@@ -11,12 +11,17 @@ require "../models/config"
 require "../utils/errors"
 require "../utils/logger"
 require "../utils/build_output"
+require "../content/menus"
 require "../content/processors/markdown"
 require "../content/processors/internal_link_resolver"
+require "../content/multilingual"
 require "../core/build/parallel"
 require "../core/build/shortcode_processor"
 require "./config_snippets"
 require "./content_lister"
+require "./generated_content"
+require "../content/front_matter_schema"
+require "../core/build/builder"
 require "./scaffolds/registry"
 
 require "./doctor/registry"
@@ -98,6 +103,8 @@ module Hwaro
         check_directory_structure(issues, config)
         check_content_frontmatter(issues, config, template_names)
         if config
+          check_content_schema(issues, config)
+          check_translations(issues, config)
           check_referenced_paths(issues, config)
           check_sass(issues, config)
         end

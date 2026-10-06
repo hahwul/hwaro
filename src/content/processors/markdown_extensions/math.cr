@@ -36,7 +36,9 @@ module Hwaro
         HTML_BLOCK_START_RE = /^ {0,3}<\/?(?:address|article|aside|blockquote|caption|center|col|colgroup|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|menu|nav|ol|p|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)(?:[\s>\/]|\r?$)/i
 
         # A math span captured by `stash_math`, awaiting `expand_math`.
-        record MathSpan, display : Bool, body : String
+        # `source` is the span as written (delimiters included), for
+        # `protect_math`.
+        record MathSpan, display : Bool, body : String, source : String = ""
 
         MATH_PLACEHOLDER_RE = /\x00MATH(\d+)\x00/
         # A line whose sole content is one math placeholder — the standalone
@@ -110,19 +112,39 @@ module Hwaro
             end
           end
 
-          result = stashed.gsub(DISPLAY_MATH_RE) do |_|
-            store << MathSpan.new(display: true, body: restore_code_spans($~[1], code_spans))
+          result = stashed.gsub(DISPLAY_MATH_RE) do |match|
+            store << MathSpan.new(display: true, body: restore_code_spans($~[1], code_spans), source: restore_code_spans(match, code_spans))
             "\x00MATH#{store.size - 1}\x00"
           end
 
           if result.includes?('$')
-            result = result.gsub(INLINE_MATH_RE) do |_|
-              store << MathSpan.new(display: false, body: restore_code_spans($~[1], code_spans))
+            result = result.gsub(INLINE_MATH_RE) do |match|
+              store << MathSpan.new(display: false, body: restore_code_spans($~[1], code_spans), source: restore_code_spans(match, code_spans))
               "\x00MATH#{store.size - 1}\x00"
             end
           end
 
           restore_code_spans(result, code_spans)
+        end
+
+        # `content` through the block with its math spans (as the math pass
+        # sees them) stashed out, then put back as written — for passes that
+        # run before `preprocess` (wikilinks) and must not touch formulas.
+        # The block also gets the spans' sources, for `restore_math` on any
+        # piece it lifts out (a placeholder must never reach Markd).
+        def protect_math(content : String, & : String, Array(String) -> String) : String
+          stashed, store = stash_math(content)
+          return yield(content, [] of String) if store.empty?
+          sources = store.map(&.source)
+          restore_math(yield(stashed, sources), sources)
+        end
+
+        # `text` with each math placeholder put back as written.
+        def restore_math(text : String, sources : Array(String)) : String
+          return text if sources.empty? || !text.includes?('\0')
+          text.gsub(MATH_PLACEHOLDER_RE) do |match|
+            $~[1].to_i?.try { |idx| sources[idx]? } || match
+          end
         end
 
         private def restore_code_spans(text : String, code_spans : Array(String)) : String

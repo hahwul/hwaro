@@ -348,6 +348,7 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.series_index | Int | 1-based position within the series (requires `[series]` enabled) |
 | page.series_pages | Array<Page> | All pages in the same series, sorted by `series_weight` |
 | page.related_posts | Array<Page> | Pages sharing taxonomy terms (requires `[related]` enabled) |
+| page.backlinks | Array<Page> | Published pages in the same language linking here, newest first (requires `[content] backlinks = true`; see [Backlinks](/writing/obsidian/#backlinks)) |
 | page.git | Object? | Commit metadata for the source file (requires `[git]` enabled; `nil` for uncommitted or generated pages). Fields: `hash`, `short_hash`, `lastmod` (Time), `first_commit` (Time), `author_name`, `author_email` — see [Git Metadata](/features/git-info/) |
 
 ### Boolean Flags
@@ -619,6 +620,7 @@ Pre-rendered `<link>` and `<script>` tags for convenience. These are generated f
 | auto_includes_js | Auto-included JS `<script>` tags |
 | auto_includes | All auto-include tags |
 | pwa_tags | PWA manifest link, theme-color meta, and service-worker registration (empty unless `[pwa]` is enabled) |
+| search_tags | Stylesheet and script tags of the [built-in search UI](/features/search/#built-in-ui) (empty unless `[search] ui = true`) |
 
 ```jinja
 <head>

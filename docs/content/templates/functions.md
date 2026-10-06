@@ -370,6 +370,26 @@ Alias for `asset()`. Use whichever reads better in your templates.
 
 ---
 
+### asset_integrity()
+
+Return the [Subresource Integrity](/features/asset-pipeline/#subresource-integrity) value of the file `asset()` points to, computed over the bytes written to the output (after minify and fingerprint).
+
+```jinja
+<script src="{{ asset(name='app.js') }}" integrity="{{ asset_integrity(name='app.js') }}" crossorigin="anonymous"></script>
+```
+
+Page-bundle and `[content.files]` assets are copied after rendering, so their source file is hashed. Add `crossorigin="anonymous"` so the check also passes when the page is viewed from another host than `base_url`.
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| name | String | Bundle name or output path (e.g. `main.css`, `css/site.css`) |
+
+**Returns:** String, such as `sha384-…`. A name that this build does not publish raises a template error, as does a raw `.json`/`.xml`/`.html` file under `--minify` (it is rewritten after rendering).
+
+---
+
 ### now()
 
 Get current datetime:
@@ -424,6 +444,8 @@ Returns a resized image variant. When [image processing](/features/image-process
 | path | String | Image path (e.g., `/images/photo.jpg`) |
 | width | Int | Requested width in pixels (0 = original) |
 | height | Int | Requested height in pixels (0 = original) |
+| op | String | `fit` (default), `fill` or `crop` — see [Crop and Fill](/features/image-processing/#crop-and-fill) |
+| anchor | String | Where `fill`/`crop` keep the image: `center` (default), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right` |
 
 **Returns:** Object with properties:
 
@@ -443,6 +465,11 @@ to a 900px file — and `img.width` reports `900`, so
 is only ever the value you passed (`0` when you passed none): the variant map
 is rebuilt from filenames on incremental builds, so a real height is not
 available without decoding every image.
+
+With `op="fill"` or `op="crop"`, both `width` and `height` are required, the
+variant is written at render time (named like `hero_400x300_fill_center.jpg`),
+and `width`/`height` report the written file's size. An unknown `op` or
+`anchor` is a template error.
 
 The `lqip` and `dominant_color` properties require `[image_processing.lqip]` to be enabled. When disabled, they return empty strings.
 

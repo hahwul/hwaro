@@ -136,6 +136,16 @@ module Hwaro
             end
           end
 
+          # Remember an internal page link that carries a `#fragment`
+          # (`#id`, `/x/#id`, `../x/#id`, `@/x.md#id`) for check_anchor_links.
+          # `url` is the fragment-less target clean_link_target produced.
+          private def note_anchor_link(file : String, raw : String, url : String) : Nil
+            return if !url.empty? && skip_internal?(url)
+            fragment = clean_external_target(raw).partition('#')[2]
+            return if fragment.empty?
+            @anchor_links << Link.new(file: file, url: "#{url}##{fragment}", kind: :anchor)
+          end
+
           private def find_internal_links(dir : String) : Array(Link)
             links = [] of Link
             link_re = /(?<!!)\[([^\]]*)\]\(#{LINK_DEST.source}\)/
@@ -147,6 +157,7 @@ module Hwaro
               # Regular links (exclude images by using negative lookbehind)
               content.scan(link_re) do |match|
                 url = clean_link_target(match[2])
+                note_anchor_link(file, match[2], url)
                 next if skip_internal?(url)
                 links << Link.new(file: file, url: url, kind: :internal)
               end
@@ -163,6 +174,7 @@ module Hwaro
               # written that way used to get a clean bill of health.
               scan_reference_definitions(content) do |raw|
                 url = clean_link_target(raw)
+                note_anchor_link(file, raw, url)
                 next if skip_internal?(url)
                 links << Link.new(file: file, url: url, kind: :internal)
               end
@@ -172,9 +184,15 @@ module Hwaro
                 tag[2].scan(HTML_ATTR_RE) do |attr|
                   raw = attr[2]? || attr[3]? || attr[4]?
                   next unless raw
+                  # `\b` lets `data-href=` through; a real link attribute
+                  # is not glued to a `-` or `:` (see FRAGMENT_LINK_REGEX).
+                  start = attr.begin(0)
+                  real_attr = start == 0 || !tag[2][start - 1].in?('-', ':')
                   html_link_targets(attr[1], raw).each do |candidate|
                     url = clean_link_target(candidate)
-                    next if skip_internal?(url) || url.includes?("{{") || url.includes?("{%")
+                    next if url.includes?("{{") || url.includes?("{%")
+                    note_anchor_link(file, candidate, url) if kind == :internal && real_attr
+                    next if skip_internal?(url)
                     links << Link.new(file: file, url: url, kind: kind)
                   end
                 end

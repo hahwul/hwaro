@@ -74,6 +74,7 @@ hooks.post = ["npm run minify"]
 | parallel | bool | true | 병렬 처리 |
 | cache | bool | false | 빌드 캐시 사용 |
 | template_deps | bool | true | 템플릿 의존성을 추적해 템플릿 편집 시 해당 템플릿을 렌더링하는 페이지만 재빌드 |
+| write_stats | bool | false | 렌더링된 페이지가 쓰는 태그·클래스·id를 담은 `hwaro_stats.json`을 프로젝트 루트에 기록(Tailwind 등에서 사용). [에셋 파이프라인](/ko/features/asset-pipeline/#used-selector-manifest-tailwind) 참고 |
 | hooks.pre | array | [] | 빌드 전에 실행할 명령 |
 | hooks.post | array | [] | 빌드 후에 실행할 명령 |
 
@@ -120,6 +121,7 @@ math_engine = "katex"
 | math_engine | string | "katex" | 수식 렌더링 엔진 (`"katex"` 또는 `"mathjax"`) |
 | smart_punctuation | bool | false | 타이포그래피용 인용부호/대시/줄임표 (`"x"` → “x”, `--` → –, `...` → …) |
 | containers | bool | false | `:::note Title` … `:::` 커스텀 컨테이너 (admonition 마크업) |
+| wikilinks | bool | false | Obsidian 문법: `[[위키링크]]`, `![[이미지]]` 임베드, `![[노트]]` 트랜스클루전, 접을 수 있는 `> [!type]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
 | insert_anchor_links | string | "none" | 사이트 전역 헤딩 앵커 링크: `"none"`, `"left"`, `"right"` (페이지 프론트 매터가 우선) |
 | external_links_target_blank | bool | false | 절대 http(s) 링크에 `target="_blank" rel="noopener"` 추가 |
 | external_links_no_follow | bool | false | 절대 http(s) 링크에 `rel="nofollow"` 추가 |
@@ -133,14 +135,16 @@ math_engine = "katex"
 [content]
 summary_length = 70
 summary_ellipsis = "…"
+backlinks = false
 ```
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
 | summary_length | int | 70 | `<!-- more -->`도 `description`도 없는 페이지의 자동 요약 길이. 공백으로 구분되는 텍스트는 단어 수, CJK 위주 텍스트는 글자 수 ×2. `0`이면 자동 요약 비활성화 |
 | summary_ellipsis | string | "…" | 자동 요약이 잘린 경우에만 끝에 추가되는 문자열 |
+| backlinks | bool | false | 각 페이지로 링크하는 페이지를 `page.backlinks`에 채움 ([위키링크와 백링크](/ko/writing/obsidian/#백링크) 참고) |
 
-`page.summary`가 선택되는 방식은 [콘텐츠 요약](/ko/writing/pages/#콘텐츠-요약)을 참고하세요. `[content.files]`, `[content.new]`, `[[content.generate]]`는 아래 기능 설정 레퍼런스에 있습니다.
+`page.summary`가 선택되는 방식은 [콘텐츠 요약](/ko/writing/pages/#콘텐츠-요약)을 참고하세요. `[content.files]`, `[content.new]`, `[[content.generate]]`, `[[content.schema]]`는 아래 기능 설정 레퍼런스에 있습니다.
 
 ## 퍼머링크
 
@@ -195,13 +199,17 @@ summary_ellipsis = "…"
 ```toml
 [links]
 broken_internal = "error"
+broken_anchors = "warn"
 ```
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
 | broken_internal | string | "warn" | `"warn"`은 해석되지 않은 `@/` 링크를 하나씩 로그로 남기고 원본 마크업을 유지; `"error"`는 위반 전체를 하나의 목록으로 모아 빌드를 실패시킴 (종료 코드 5) |
+| broken_anchors | string | "ignore" | `"warn"` 또는 `"error"`는 페이지 본문의 `@/page.md#id` 및 같은 페이지 `#id` 링크를 대상 페이지의 렌더링된 HTML에 있는 `id`/`name` 속성(제목, `{#id}`, 숏코드, 템플릿, 각주)과 대조; `"error"`는 `source → link → missing id` 목록으로 빌드를 실패시킴. `"ignore"`는 검사하지 않음 |
 
 `@/` 링크 문법과 strict 모드의 `--cache` 주의 사항은 [페이지](/ko/writing/pages/#내부-링크)를 참고합니다.
+
+앵커 검사는 렌더 단계가 끝난 뒤 대상 페이지의 출력 파일을 읽으므로, `--cache` 빌드나 `serve` 재빌드에서 다시 렌더링되지 않은 대상도 마지막으로 쓰인 내용으로 검사됩니다 (오탐 없음). 해당 패스에서 렌더링된 페이지의 링크만 검사하므로 CI에서는 캐시 없는 빌드로 전체를 검사하세요.
 
 ## 택소노미
 
@@ -255,6 +263,17 @@ weight = 2
 
 페이지/섹션은 이 파일을 건드리지 않고도 자기 프론트 매터(`menus = ["main"]`)로 메뉴에 참여할 수 있습니다. 메뉴 테이블이 없는 `[languages.<code>]` 블록은 이 전역 메뉴를 상속하고, `[[languages.<code>.menus.<name>]]`을 선언하면 그 언어에서는 전역 메뉴를 대체합니다. 전체 레퍼런스(계층 구조, 언어별 동작, `active_path` 스타일링)는 [메뉴](/ko/features/menus/)를 참고합니다.
 
+최상위 섹션으로 메뉴를 자동으로 채우려면(Hugo의 `sectionPagesMenu`) `[menus]` 아래에 메뉴 이름을 지정합니다.
+
+```toml
+[menus]
+auto_sections = "main"
+```
+
+| 키 | 타입 | 기본값 | 설명 |
+|-----|------|---------|-------------|
+| auto_sections | string | 없음(꺼짐) | 모든 최상위 섹션이 들어갈 메뉴(`identifier` = 디렉터리 이름, `name` = 제목, `url`, `weight`). 초안, 게시 전, 헤드리스, `transparent`, 외부 `redirect_to` 섹션과 `_index.md`가 없는 디렉터리는 제외하며, `identifier`가 같은 명시적 엔트리가 우선합니다. 예약된 키이므로 문자열이 아니거나 빈 값이면 설정 오류입니다. [섹션 메뉴 자동 생성](/ko/features/menus/#섹션-메뉴-자동-생성)을 참고합니다. |
+
 ## 정적 파일
 
 `static/` 아래의 모든 것은 디렉터리 구조를 유지한 채 사이트 루트로 그대로 복사되므로 `static/css/app.css`는 `/css/app.css`로 서빙됩니다. 숨김 항목도 포함되므로 `static/.well-known/security.txt`는 `/.well-known/security.txt`로 게시됩니다. 기본적으로 Hwaro는 흔한 OS·에디터·VCS 잔여 파일을 걸러내 프로덕션에 실려 가지 않게 합니다.
@@ -298,22 +317,25 @@ Cache-Control = "no-store"
 
 | 설정 섹션 | 문서 | 설명 |
 |----------------|---------------|-------------|
-| `[feeds]` | [SEO](/ko/features/seo/) | RSS/Atom 피드 생성 |
+| `[feeds]` | [SEO](/ko/features/seo/) | RSS/Atom/JSON Feed 생성 |
 | `[sitemap]` | [SEO](/ko/features/seo/) | 사이트맵 XML 생성 |
-| `[robots]` | [SEO](/ko/features/seo/) | robots.txt 생성 |
+| `[robots]` | [SEO](/ko/features/seo/) | robots.txt 생성 (Content-Signal 줄 포함) |
 | `[og]` | [SEO](/ko/features/seo/) | OpenGraph & Twitter Card 메타 태그 |
 | `[og.auto_image]` | [자동 OG 이미지](/ko/features/og-images/) | OG 미리보기 이미지 자동 생성 (빠른 개발 서버용 `lazy_generate` 포함) |
 | `[search]` | [검색](/ko/features/search/) | 클라이언트 사이드 검색 인덱스 |
 | `[highlight]` | [구문 강조](/ko/features/syntax-highlighting/) | 코드 구문 강조 |
 | `[pagination]` | [페이지네이션](/ko/features/pagination/) | 섹션 페이지네이션 |
 | `[auto_includes]` | [자동 인클루드](/ko/features/auto-includes/) | CSS/JS 파일 자동 인클루드 |
-| `[assets]` | [에셋 파이프라인](/ko/features/asset-pipeline/) | CSS/JS 압축(minify) & 핑거프린팅 |
+| `[assets]` | [에셋 파이프라인](/ko/features/asset-pipeline/) | CSS/JS 압축(minify) & 핑거프린팅, 하위 리소스 무결성(`sri`) |
 | `[sass]` | [Sass/SCSS](/ko/features/sass/) | 내장 SCSS 컴파일 (순수 Crystal) |
 | `[image_processing]` | [이미지 처리](/ko/features/image-processing/) | 이미지 리사이즈 & LQIP |
 | `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | Base64 블러업 플레이스홀더 |
 | `[content.files]` | [콘텐츠 파일](/ko/features/content-files/) | 마크다운이 아닌 파일 게시 |
 | `[[content.generate]]` | [콘텐츠 생성](/ko/features/content-generation/) | `site.data` 레코드를 페이지로 구체화 |
+| `[[content.schema]]` | [프론트 매터 스키마](/ko/writing/schema/) | 섹션별 프론트 매터 타입, 필수 필드, enum, 범위, 기본값 |
 | `[[data.remote]]` | [원격 데이터 소스](/ko/features/remote-data/) | 빌드 시 원격 데이터를 `site.data`로 가져오기 |
+| `[privacy]` | [프라이버시 모드](/ko/features/privacy/) | 외부 폰트, 스크립트, 이미지를 빌드 시 직접 호스팅하기 |
+| `[csp]` | [콘텐츠 보안 정책(CSP)](/ko/features/csp/) | 인라인 스크립트/스타일 해시로 Content-Security-Policy 생성(`_headers` 또는 `<meta>`) |
 | `[static]` | [정적 파일](#정적-파일) | `static/` 복사에서 잔여 파일 필터링 / 경로 제외 |
 | `[serve]` | [개발 서버](#개발-서버) | 개발 서버 응답 헤더 & 빠른 모드 |
 | `[links]` | [링크](#링크) | 깨진 내부 `@/` 링크 처리 (경고 또는 빌드 실패) |

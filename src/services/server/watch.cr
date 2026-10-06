@@ -142,17 +142,23 @@ module Hwaro
             else
               classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static, modified_data)
             end
-          else
+          elsif watched_root_path?(path) || watched_config_file?(path)
             # New file (exists now, didn't before)
             added_files << path
+          elsif @builder.include_source_stale?(path, new_stamp[2])
+            # An include source stamped for the first time is a new
+            # dependency, not a change — unless it moved after the build read
+            # it (an edit during the build or before this first scan).
+            classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static, modified_data)
           end
         end
 
         # --- Files that existed before but are now gone ---
         old_mtimes.each_key do |path|
-          unless new_mtimes.has_key?(path)
-            removed_files << path
-          end
+          next if new_mtimes.has_key?(path)
+          # An include source outside the roots leaves the snapshot when no
+          # page includes it any more; a deleted one keeps a MISSING_STAMP.
+          removed_files << path if watched_root_path?(path) || watched_config_file?(path)
         end
 
         ChangeSet.new(
@@ -207,6 +213,11 @@ module Hwaro
           static << path
         elsif path.starts_with?("data/") || path.starts_with?("i18n/")
           data << path
+        elsif !watched_root_path?(path)
+          # A file outside every root that an include call or a transclusion
+          # read (see scan_mtimes). The data bucket's full rebuild re-renders
+          # the pages that include it.
+          data << path
         elsif extra_watch_root?(path)
           # An `[assets] source_dir` outside static/. The static bucket is the
           # right home: its strategy is the one that reruns the Sass and
@@ -242,6 +253,14 @@ module Hwaro
 
         if @rebuild_failed
           Logger.info "  Previous rebuild failed — running a full rebuild to recover."
+          return :full
+        end
+
+        # A file an include call or a transclusion read, wherever it lives:
+        # the cheap strategies re-render only the saved page itself, never
+        # the pages that include it.
+        if @builder.include_source_changed?(changeset.all_changed_files)
+          Logger.info "  An included file changed — running a full rebuild to re-render the pages that include it."
           return :full
         end
 
@@ -289,6 +308,11 @@ module Hwaro
       ]
 
       protected def self.watcher_ignored?(path : String) : Bool
+        # `[build] write_stats` rewrites the project-root stats file on every
+        # build; a Tailwind hook reads it. Watching it would make each
+        # rebuild schedule the next one. Matched by full path only: a
+        # same-named file under data/ or static/ is a real source.
+        return true if path == Utils::HtmlStats::FILE || path == "./#{Utils::HtmlStats::FILE}"
         basename = File.basename(path)
         WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
       end
@@ -338,6 +362,11 @@ module Hwaro
         roots
       end
 
+      # Is `path` under a fixed or config-resolved watch root?
+      private def watched_root_path?(path : String) : Bool
+        Server::WATCH_ROOTS.any? { |root| path.starts_with?("#{root}/") } || extra_watch_root?(path)
+      end
+
       # Is `path` under one of the config-resolved extra roots?
       private def extra_watch_root?(path : String) : Bool
         @extra_watch_roots.any? { |root| path.starts_with?("#{root}/") }
@@ -362,6 +391,8 @@ module Hwaro
       # forward without re-reading files whose stamps are unchanged (see
       # watch_digest). Passing nil — the baseline scan, or a caller without a
       # previous snapshot — computes them fresh.
+      MISSING_STAMP = {Time::UNIX_EPOCH, -1_i64, nil}
+
       private def scan_mtimes(prev : Hash(String, FileStamp)? = nil) : Hash(String, FileStamp)
         mtimes = {} of String => FileStamp
         dirs_to_watch = Server::WATCH_ROOTS + @extra_watch_roots
@@ -403,6 +434,20 @@ module Hwaro
             rescue ex
               Logger.debug "Failed to read file info for #{file}: #{ex.message}"
             end
+          end
+        end
+
+        # Files an include call or a transclusion read from outside the roots
+        # (`examples/site/config.toml`), learned from the last build. Stamped
+        # one by one; a missing one gets MISSING_STAMP, so creating it later
+        # registers as a change.
+        @builder.include_sources.each do |path|
+          next if watched_root_path?(path) || Server.watcher_ignored?(path)
+          begin
+            info = File.info?(path)
+            mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, watch_digest(path, info, prev)} : MISSING_STAMP
+          rescue ex
+            Logger.debug "Failed to read file info for #{path}: #{ex.message}"
           end
         end
 
@@ -511,7 +556,10 @@ module Hwaro
       # for it), and a config.toml that only our own hooks rewrote is dropped
       # by built_config_rewrite?.
       private def digest_watched?(path : String) : Bool
-        path.starts_with?("data/") || path.starts_with?("i18n/")
+        path.starts_with?("data/") || path.starts_with?("i18n/") ||
+          # An include source outside the roots: it rides the data bucket's
+          # full rebuild, so it needs the same byte-identical-rewrite guard.
+          !(watched_root_path?(path) || watched_config_file?(path))
       end
 
       # The digest slot for a scanned file: nil for stamp-only buckets. For

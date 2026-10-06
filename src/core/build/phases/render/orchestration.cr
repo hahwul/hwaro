@@ -23,6 +23,8 @@ module Hwaro::Core::Build::Phases::Render
     # fingerprint of those sets into the rebuild decision.
     @unpublished_pages.set(0)
     @published_pages.set(0)
+    publish_asset_sources(ctx)
+
     # What templates read outside the tracked files (see render_inputs.cr):
     # compared BEFORE the filter, so a change re-renders every page.
     render_globals = ""
@@ -31,12 +33,15 @@ module Hwaro::Core::Build::Phases::Render
       # Reads from before this render (a serve session's incremental passes)
       # are not this build's.
       Content::Processors::TemplateEngine.take_render_reads
+      # Except this build's include reads: the summaries expanded (and
+      # memoised, see expanded_raw_content) them before the render started.
+      include_sources.each { |path| Content::Processors::TemplateEngine.record_file_read(path) }
       render_globals = render_globals_digest(site.config, ctx.options.cache_busting)
       build_cache.check_render_inputs(render_inputs_digest(render_globals, build_cache.render_input_keys, render_input_values))
     end
     listing_fields = cache_enabled ? listing_page_fields(templates) : Builder::ListingPageFields.new(false, false)
     page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages, listing_fields) : ""
-    section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections) : ""
+    section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
                        # Publish the set-change signal for the Generate phase
@@ -47,7 +52,14 @@ module Hwaro::Core::Build::Phases::Render
                        # render in a later pass, so persisting the new fingerprint
                        # now would let the next build skip them while stale.
                        build_cache.record_set_fingerprints(page_set_fp, section_set_fp) unless ctx.options.fast_start
-                       filtered
+                       # `[build] write_stats` extends the previous stats file
+                       # with what a partial build renders; with that file gone
+                       # or corrupt, only a full render can list every page.
+                       if @html_stats && !Utils::HtmlStats.valid_file?(Utils::HtmlStats::FILE)
+                         all_pages
+                       else
+                         filtered
+                       end
                      else
                        all_pages
                      end
@@ -167,7 +179,7 @@ module Hwaro::Core::Build::Phases::Render
         # aggregated error after the whole fan-out so every offender is
         # listed. The lifecycle manager re-raises HwaroError unchanged
         # (exit code 5 for build/CI; serve's watcher surfaces the overlay).
-        raise_on_broken_internal_links!
+        raise_on_broken_internal_links!(output_dir)
       ensure
         @crinja_caches_frozen = false
       end

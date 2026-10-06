@@ -10,12 +10,17 @@ require "../../../../../../src/ext/stb_bindings"
 # `data/`. None of them was in any cache key, so every cached page kept the
 # old value — a 404ing stylesheet, the previous analytics ID.
 
-private def render_inputs_build
+private def render_inputs_build(cache_busting : Bool = true, output_dir : String = "public")
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
   builder.run(Hwaro::Config::Options::BuildOptions.new(
-    output_dir: "public", parallel: false, cache: true, highlight: false,
+    output_dir: output_dir, parallel: false, cache: true, highlight: false,
+    cache_busting: cache_busting,
   )).should be_true
+end
+
+private def integrity_in(html : String) : String
+  html.match!(/integrity="(sha384-[^"]+)"/)[1]
 end
 
 # A cached page is not rewritten, so a marker appended to its output survives
@@ -135,11 +140,16 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     head = %({% set im = resize_image(path="/img.png", width=640) %}<img src="{{ im.url }}">)
     with_render_inputs_site(config, head) do
       write_solid_png("static/img.png", 900, 30, 255_u8, 0_u8, 0_u8)
+      # A photo, not a file written a moment ago: a stamp taken inside the
+      # file's mtime tick is not trusted (#857).
+      File.touch("static/img.png", Time.utc - 1.hour)
       render_inputs_build
       render_inputs_build
       mark_outputs(["public/a/index.html"])
+      posix_only!("chmod can't make a file unreadable on Windows")
       File.chmod("static/img.png", 0o000)
       begin
+        pending!("a 0o000 file is still readable (root)") if File.readable?("static/img.png")
         render_inputs_build
       ensure
         File.chmod("static/img.png", 0o644)
@@ -192,11 +202,17 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     head = %({% set x = load_data(path="extdata/x.json") %}<meta content="{{ x.v }}">)
     with_render_inputs_site("", head) do
       FileUtils.mkdir_p("extdata")
+      # A future mtime is never safely old, whatever the clock does.
+      tick = Time.utc + 1.hour
       File.write("extdata/x.json", %({"v":"old"}))
+      File.touch("extdata/x.json", tick)
       render_inputs_build
       File.read("public/a/index.html").should contain(%(content="old"))
 
+      # Same size and, pinned, the same mtime: a rewrite inside the
+      # timestamp tick the warm build's stamp was taken in (#857).
       File.write("extdata/x.json", %({"v":"new"}))
+      File.touch("extdata/x.json", tick)
       render_inputs_build
       File.read("public/a/index.html").should contain(%(content="new"))
     end
@@ -240,6 +256,75 @@ describe "warm --cache builds and template inputs outside the tracked files" do
       end
     ensure
       ENV.delete(name)
+    end
+  end
+
+  # A stale `integrity` makes the browser refuse the asset, so a warm build
+  # must re-render every page that prints one when the emitted bytes move —
+  # also when nothing else in the tag (no `?v=`) changes.
+  it "updates [assets] sri integrity on cached pages when an auto-include changes" do
+    config = "[assets]\nsri = true\n[auto_includes]\nenabled = true\ndirs = [\"inc\"]\n"
+    with_render_inputs_site(config, "{{ auto_includes_css }}") do
+      FileUtils.mkdir_p("static/inc")
+      File.write("static/inc/a.css", "a{}")
+      render_inputs_build(cache_busting: false)
+      integrity_in(File.read("public/a/index.html")).should eq(Hwaro::Utils::DigestUtils.sri("a{}"))
+
+      File.write("static/inc/a.css", "a{color:green}")
+      render_inputs_build(cache_busting: false)
+
+      integrity_in(File.read("public/a/index.html")).should eq(Hwaro::Utils::DigestUtils.sri("a{color:green}"))
+      integrity_in(File.read("public/b/index.html")).should eq(Hwaro::Utils::DigestUtils.sri_file("public/inc/a.css"))
+    end
+  end
+
+  it "updates asset_integrity() on cached pages when an unfingerprinted bundle changes" do
+    config = <<-TOML
+      [assets]
+      enabled = true
+      fingerprint = false
+      [[assets.bundles]]
+      name = "main.css"
+      files = ["css/s.css"]
+      TOML
+    head = %(<link href="{{ asset(name="main.css") }}" integrity="{{ asset_integrity(name="main.css") }}">)
+    with_render_inputs_site(config, head) do
+      FileUtils.mkdir_p("static/css")
+      File.write("static/css/s.css", "body { color: red; }")
+      render_inputs_build
+      before = integrity_in(File.read("public/a/index.html"))
+      # Over the emitted (minified) bytes, not the source.
+      before.should eq(Hwaro::Utils::DigestUtils.sri_file("public/assets/main.css"))
+      before.should_not eq(Hwaro::Utils::DigestUtils.sri("body { color: red; }"))
+
+      File.write("static/css/s.css", "body { color: blue; }")
+      render_inputs_build
+
+      after = integrity_in(File.read("public/a/index.html"))
+      after.should_not eq(before)
+      after.should eq(Hwaro::Utils::DigestUtils.sri_file("public/assets/main.css"))
+    end
+  end
+
+  # The read is keyed by asset NAME, not by the output file's path: a path
+  # outside the project (`-o ../site`, an absolute `-o`) is never recorded
+  # as a file read, so those pages stayed cached with the old hash.
+  it "updates asset_integrity() on cached pages for an output dir outside the project" do
+    Dir.mktmpdir do |outside|
+      [File.join(outside, "abs-out"), "../#{File.basename(outside)}/rel-out"].each do |output_dir|
+        with_render_inputs_site("", %(<link integrity="{{ asset_integrity(name='css/site.css') }}">)) do
+          FileUtils.mkdir_p("static/css")
+          File.write("static/css/site.css", "a{}")
+          render_inputs_build(output_dir: output_dir)
+          page = File.join(output_dir, "a/index.html")
+          integrity_in(File.read(page)).should eq(Hwaro::Utils::DigestUtils.sri("a{}"))
+
+          File.write("static/css/site.css", "a{color:red}")
+          render_inputs_build(output_dir: output_dir)
+
+          integrity_in(File.read(page)).should eq(Hwaro::Utils::DigestUtils.sri("a{color:red}"))
+        end
+      end
     end
   end
 end

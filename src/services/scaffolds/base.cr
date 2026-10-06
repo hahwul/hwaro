@@ -1187,12 +1187,12 @@ module Hwaro
         # scaffold (e.g. "Search posts...", "Search documentation...").
         protected def search_overlay_html(placeholder : String) : String
           <<-HTML
-            <div class="search-overlay" id="searchOverlay" onclick="if(event.target===this)closeSearch()">
+            <div class="search-overlay" id="searchOverlay">
               <div class="search-modal">
                 <div class="search-input-wrap">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                   <input type="search" id="searchInput" aria-label="Search" placeholder="#{placeholder}" autocomplete="off">
-                  <kbd onclick="closeSearch()">ESC</kbd>
+                  <kbd data-search-close>ESC</kbd>
                 </div>
                 <div class="search-results" id="searchResults"></div>
               </div>
@@ -1291,6 +1291,16 @@ module Hwaro
                 overlay.classList.remove('active');
                 activeIndex = -1;
               };
+
+              overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) closeSearch();
+              });
+              document.querySelectorAll('[data-search-open]').forEach(function (el) {
+                el.addEventListener('click', function () { openSearch(); });
+              });
+              document.querySelectorAll('[data-search-close]').forEach(function (el) {
+                el.addEventListener('click', function () { closeSearch(); });
+              });
 
               document.addEventListener('keydown', function (e) {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'k') {

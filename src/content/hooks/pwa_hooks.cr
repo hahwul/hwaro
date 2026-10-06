@@ -26,7 +26,8 @@ module Hwaro
           site = ctx.site
           return unless site
 
-          Content::Seo::Pwa.generate(site, ctx.output_dir, ctx.options.verbose)
+          localize = ctx.builder.try { |builder| ->(url : String) { builder.privacy_url(url) } }
+          Content::Seo::Pwa.generate(site, ctx.output_dir, ctx.options.verbose, localize)
         end
       end
     end

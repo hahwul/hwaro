@@ -8,7 +8,10 @@ private def run_doctor(config_content : String, content_files = {} of String => 
     content_dir = File.join(dir, "content")
     unless content_files.empty?
       FileUtils.mkdir_p(content_dir)
-      content_files.each { |name, body| File.write(File.join(content_dir, name), body) }
+      content_files.each do |name, body|
+        FileUtils.mkdir_p(File.dirname(File.join(content_dir, name)))
+        File.write(File.join(content_dir, name), body)
+      end
     end
     doctor = Hwaro::Services::Doctor.new(content_dir: content_dir, config_path: config_path)
     doctor.run
@@ -1427,6 +1430,22 @@ describe Hwaro::Services::Doctor do
           {"post.md" => %(+++\ntitle = "Post"\nmenus = ["main"]\n+++\nBody\n)}
         )
         issues.any?(&.id.==("menu-undeclared")).should be_false
+      end
+
+      it "treats the [menus] auto_sections menu as declared" do
+        issues = run_doctor(
+          base_config(%(\n[menus]\nauto_sections = "main"\n\n[[menus.footer]]\nname = "Privacy"\nurl = "/privacy/"\n)),
+          {"post.md" => %(+++\ntitle = "Post"\nmenus = ["main"]\n+++\nBody\n)}
+        )
+        issues.any?(&.id.==("menu-undeclared")).should be_false
+      end
+
+      it "accepts an auto_sections entry's directory as a config parent" do
+        config = base_config(%(\n[menus]\nauto_sections = "main"\n\n[[menus.main]]\nname = "API"\nurl = "/docs/api/"\nparent = "docs"\n\n[[menus.main]]\nname = "Typo"\nurl = "/x/"\nparent = "dcos"\n))
+        issues = run_doctor(config, {"docs/_index.md" => %(+++\ntitle = "Docs"\n+++\n)})
+        parents = issues.select(&.id.==("menu-parent-undefined"))
+        parents.map(&.message).join.should_not contain("\"API\"")
+        parents.map(&.message).join.should contain("\"Typo\"")
       end
 
       it "does not warn about undeclared front-matter menus when config declares no menus at all" do

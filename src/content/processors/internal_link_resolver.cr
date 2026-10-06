@@ -21,6 +21,36 @@ module Hwaro
         # Matches href="@/path" and href="@/path#anchor"
         INTERNAL_LINK_REGEX = /href="@\/([^"#]*)(?:#([^"]*))?"/
 
+        # Matches a fragment link in not-yet-resolved content HTML: an
+        # `href="@/path#frag"` ($1 = "@/path") or a same-page `href="#frag"`.
+        # The lookbehind keeps `data-href=` / `xlink:href=` out.
+        FRAGMENT_LINK_REGEX = /(?<![\w:-])href="(@\/[^"#]*)?#([^"]*)"/
+
+        # Matches an `id`/`name` attribute (quoted or, after minification,
+        # unquoted). The leading whitespace keeps `data-id=` out.
+        ANCHOR_ATTR_REGEX = /\s(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
+
+        # Every anchor target (`id` / `name` value, entity-decoded) in `html`.
+        def anchor_ids(html : String) : Set(String)
+          ids = Set(String).new
+          html.scan(ANCHOR_ATTR_REGEX) do |m|
+            ids << HTML.unescape(m[1]? || m[2]? || m[3])
+          end
+          ids
+        end
+
+        # True when `fragment` (as written in an href, possibly percent- and
+        # entity-encoded) names an anchor in `ids`. Like a browser, the raw
+        # fragment is tried before the percent-decoded one, a `:~:` fragment
+        # directive (scroll-to-text, `#:~:text=…`) is not part of the id, and
+        # `#top` always resolves (scrolls to the top when no element has it).
+        def anchor_exists?(fragment : String, ids : Set(String)) : Bool
+          raw = HTML.unescape(fragment).partition(":~:")[0]
+          return true if raw.empty?
+          id = URI.decode(raw)
+          ids.includes?(raw) || ids.includes?(id) || id.compare("top", case_insensitive: true) == 0
+        end
+
         # Matches a plain root-relative href/src value (e.g. href="/posts/").
         # `\/[^\/"]` excludes protocol-relative `//host` URLs; the alternation
         # also allows a bare `/` (the homepage link).
@@ -46,6 +76,16 @@ module Hwaro
         # letters "http" (`http-guide/cover.png`), leaving it un-absolutized.
         def has_own_origin?(value : String) : Bool
           value.starts_with?("//") || value.matches?(SCHEME_PREFIX_REGEX)
+        end
+
+        # The page an `@/` path names. Markd percent-encodes a destination
+        # (`@/my note.md` arrives as `@/my%20note.md`), so the decoded path is
+        # tried first: `%20` means a space, as it does to Markd. A literal
+        # `%` file name is still reached when nothing decodes to it (or as
+        # `%25`).
+        def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          return pages_by_path[path]? unless path.includes?('%')
+          pages_by_path[URI.decode(path)]? || pages_by_path[path]?
         end
 
         # Resolve internal `@/` links in HTML to actual page URLs.
@@ -102,7 +142,7 @@ module Hwaro
               next match
             end
 
-            if page = pages_by_path[path_part]?
+            if page = page_for(pages_by_path, path_part)
               page_url = page.url.starts_with?("/") ? page.url : "/#{page.url}"
               url = HTML.escape("#{base_path}#{page_url}")
               # `query`/`anchor` are usually captured out of already-rendered

@@ -516,3 +516,25 @@ describe Hwaro::Content::Processors::TemplateEngine do
     end
   end
 end
+
+describe "resize_image op/anchor validation" do
+  it "rejects an unknown op or anchor with a clear template error" do
+    expect_raises(Crinja::Error, /unknown op "stretch"/) do
+      render_crinja(%({{ resize_image(path="/a.png", width=10, height=10, op="stretch") }}))
+    end
+    expect_raises(Crinja::Error, /unknown anchor "middle"/) do
+      render_crinja(%({{ resize_image(path="/a.png", width=10, height=10, op="fill", anchor="middle") }}))
+    end
+  end
+
+  it "requires both width and height for fill and crop" do
+    expect_raises(Crinja::Error, /op="crop" needs both width and height/) do
+      render_crinja(%({{ resize_image(path="/a.png", width=10, op="crop") }}))
+    end
+  end
+
+  it "keeps the default fit call unchanged" do
+    render_crinja(%({{ resize_image(path="/a.png", width=10).url }}|{{ resize_image(path="/a.png", width=10, op="fit", anchor="top").width }}),
+      {"base_url" => Crinja::Value.new("https://example.com")}).should eq("https://example.com/a.png|10")
+  end
+end

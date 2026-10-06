@@ -26,7 +26,8 @@ module Hwaro
 
             links.each do |link|
               # `@/` page links resolve exactly as the build resolves them:
-              # the raw (never percent-decoded) content path looked up among
+              # the content path (percent-decoded first, as Markd encodes
+              # destinations, then as written) looked up among
               # the pages a default build publishes. `@/` images are plain
               # files under content/ and take the path route below.
               if link.kind != :image && (key = Services::InternalLinkIndex.key(link.url))
@@ -105,6 +106,63 @@ module Hwaro
               results << Result.new(link: link, status: -1, error: "Invalid link target: #{ex.message}")
             end
             results
+          end
+
+          # Fragment links whose `#id` names no `id`/`name` attribute in the
+          # target's built HTML. The target page is found the way the
+          # dead-link pass finds it (base_path stripped, relative links
+          # resolved against the page's URL, `@/` through the route index);
+          # a target with no HTML file in a usable build tree is skipped — a
+          # missing page is the dead-link pass's finding, and without build
+          # output there is nothing to read ids from.
+          private def check_anchor_links(links : Array(Link), content_dir : String, base_path : String, language_codes : Array(String), oracle : Utils::BuildOutput::Oracle, config : Models::Config?) : Array(Result)
+            results = [] of Result
+            return results if links.empty? || !oracle.usable?
+            routes = Services::PageRouteIndex.new(content_dir, config || route_config(language_codes))
+            ids_by_file = {} of String => Set(String)
+
+            links.each do |link|
+              path, _, fragment = link.url.partition('#')
+              url = if path.empty?
+                      routes.url_for(link.file)
+                    elsif key = Services::InternalLinkIndex.key(path)
+                      routes.url_for(File.join(content_dir, key))
+                    else
+                      decoded = URI.decode(path)
+                      if decoded.starts_with?("/")
+                        if decoded == base_path
+                          "/"
+                        elsif !base_path.empty? && decoded.starts_with?(base_path + "/")
+                          decoded[base_path.size..]
+                        else
+                          decoded
+                        end
+                      elsif page_url = routes.url_for(link.file)
+                        resolve_against_page(page_url, decoded)
+                      end
+                    end
+              next unless url && (file = built_html_file(url, oracle))
+              ids = ids_by_file.put_if_absent(file) { Content::Processors::InternalLinkResolver.anchor_ids(File.read(file)) }
+              next if Content::Processors::InternalLinkResolver.anchor_exists?(fragment, ids)
+              results << Result.new(link: link, status: -1, error: "Anchor not found: ##{fragment}")
+            rescue ex : ArgumentError | File::Error
+              # Same per-link degradation as check_internal_links: a NUL from
+              # percent-decoding or an unreadable file is not a missing anchor.
+              Logger.debug "check-links: skipped anchor #{link.url}: #{ex.message}"
+            end
+            results
+          end
+
+          # The HTML file the build tree serves for `url` (`/x/` →
+          # `x/index.html`, `/x.html` → itself), or nil when there is none.
+          private def built_html_file(url : String, oracle : Utils::BuildOutput::Oracle) : String?
+            relative = url.lchop('/')
+            candidates = relative.empty? || relative.ends_with?('/') ? ["#{relative}index.html"] : [relative, "#{relative}/index.html"]
+            candidates.each do |candidate|
+              next unless candidate.ends_with?(".html") || candidate.ends_with?(".htm")
+              file = File.join(oracle.base, candidate)
+              return file if File.file?(file) && oracle.exists?(candidate)
+            end
           end
 
           # Routes the BUILD writes that have no source file to check against:
@@ -260,7 +318,11 @@ module Hwaro
 
           # Mirrors `Seo::Feeds.safe_feed_filename` for an unset filename.
           private def default_feed_filename(feed_type : String) : String
-            feed_type.downcase == "atom" ? "atom.xml" : "rss.xml"
+            case feed_type.downcase
+            when "atom" then "atom.xml"
+            when "json" then "feed.json"
+            else             "rss.xml"
+            end
           end
 
           # `/posts/page/2/` — a paginated listing route. It exists only in the

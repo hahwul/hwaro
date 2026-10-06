@@ -27,6 +27,10 @@ module Hwaro::Core::Build
     def test_run_parse_content(ctx : Lifecycle::BuildContext, profiler : Profiler)
       execute_parse_content_phase(ctx, profiler)
     end
+
+    def test_apply_content_schemas(pages : Array(Models::Page), parallel : Bool)
+      apply_content_schemas(pages, parallel)
+    end
   end
 end
 
@@ -344,6 +348,24 @@ describe Hwaro::Core::Build::Phases::ParseContent do
         result = builder.test_run_parse_content(ctx, profiler)
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
         ctx.pages.first.title.should eq("P")
+      end
+    end
+  end
+end
+
+describe "ParseContent [[content.schema]] check" do
+  it "re-raises a page's check failure instead of dropping the page" do
+    config = load_config("[[content.schema]]\nsections = [\"posts\"]\n[content.schema.fields.author]\ntype = \"string\"\nrequired = true\n")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_parse_config(config)
+        # Parsed, then gone: the check's source re-read raises.
+        page = Hwaro::Models::Page.new("posts/gone.md")
+        page.section = "posts"
+        [false, true].each do |parallel|
+          expect_raises(File::NotFoundError) { builder.test_apply_content_schemas([page], parallel) }
+        end
       end
     end
   end

@@ -78,6 +78,7 @@ require "./content/processors/image_processor"
 require "./content/processors/template"
 require "./content/multilingual"
 require "./content/versions"
+require "./content/front_matter_schema"
 
 # Load lifecycle system
 require "./core/lifecycle"
@@ -103,6 +104,7 @@ require "./content/seo/robots"
 require "./content/seo/llms"
 require "./content/seo/jsonld"
 require "./content/search"
+require "./content/search_ui"
 require "./content/taxonomies"
 require "./content/menus"
 
