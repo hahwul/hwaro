@@ -222,6 +222,9 @@ describe "cache: static files whose mtime moves backwards" do
         File.write("templates/index.html", "{{ content }}")
         File.write("templates/page.html", "{{ content }}")
         File.write("static/app.js", "VERSION_A")
+        # Settled, not written a moment ago: a source mtime inside its
+        # timestamp tick is not stamped onto the copy (racy-git, #857).
+        File.touch("static/app.js", Time.utc - 1.hour)
 
         cached_build
         source_mtime = File.info("static/app.js").modification_time
@@ -370,6 +373,35 @@ describe "cache: static files edited inside the mtime tolerance" do
 
         cached_build
         File.read("public/app.css").should eq("body { color: #eee; }\n")
+      end
+    end
+  end
+
+  # Racy-git (#857): the copy stamped the destination with the source mtime,
+  # so a same-size rewrite inside the source's timestamp tick (serve rebuilds
+  # within ms of a save) matched exactly and was skipped. A future mtime is
+  # never safely old, so the pinned rewrite is clock-independent.
+  it "re-copies a same-size static edit that kept the source mtime" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHome")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+        tick = Time.utc + 1.hour
+        File.write("static/s.css", "body{color:#fff}\n")
+        File.touch("static/s.css", tick)
+
+        cached_build
+        File.read("public/s.css").should eq("body{color:#fff}\n")
+
+        File.write("static/s.css", "body{color:#eee}\n")
+        File.touch("static/s.css", tick)
+        cached_build
+        File.read("public/s.css").should eq("body{color:#eee}\n")
       end
     end
   end

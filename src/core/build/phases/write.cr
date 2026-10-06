@@ -252,13 +252,16 @@ module Hwaro::Core::Build::Phases::Write
         end
 
         Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
+        now = Time.utc.to_unix_ms
         # Atomic copy: bundle assets are re-copied on every serve rebuild while
         # HTTP fibers stream them to the browser, and a truncate-and-stream
         # copy hands out zero-length or partial images that nothing retries.
         # The mtime stamp below still lands on the renamed-in destination, so
         # the skip-unchanged check above keeps working.
         Hwaro::Utils::FileSafe.atomic_copy(source_path, dest_path)
-        if src_info
+        # Not stamped while the source mtime is inside its timestamp tick
+        # (racy-git, see Cache.stable_mtime?): the next build recopies.
+        if src_info && Cache.stable_mtime?(src_info.modification_time.to_unix_ms, now)
           begin
             File.utime(Time.utc, src_info.modification_time, dest_path)
           rescue File::Error

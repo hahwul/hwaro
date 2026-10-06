@@ -509,6 +509,7 @@ module Hwaro::Core::Build::Phases::Initialize
     worker_count = config.calculate_workers(files_to_copy.size)
 
     ParallelHelper.each_concurrently(files_to_copy, worker_count) do |(src, dest, src_mtime), _worker_id|
+      now = Time.utc.to_unix_ms
       FileUtils.cp(src, dest)
       # A page can render to this very path; the render runs after this
       # copy and must win, which it only does if it is not skipped as a
@@ -522,8 +523,13 @@ module Hwaro::Core::Build::Phases::Initialize
       # pop, rsync --times) still count as changed. `src_mtime` comes
       # from the stat collect_static_files already did; re-stating here
       # tripled the stat count over static/ on watch rebuilds.
+      #
+      # Racy-git (#857): a source mtime still inside its timestamp tick is
+      # not stamped — a same-size rewrite in that tick keeps it, and the
+      # exact match would skip the copy. The copy keeps its own mtime, so
+      # the next build compares bytes or recopies.
       begin
-        File.utime(Time.utc, src_mtime, dest)
+        File.utime(Time.utc, src_mtime, dest) if Cache.stable_mtime?(src_mtime.to_unix_ms, now)
       rescue ex : File::Error
         # Stamping is an optimization; a failure just means the next
         # build recopies this file. It must NOT be reported as a copy
