@@ -406,6 +406,30 @@ describe "cache: static files edited inside the mtime tolerance" do
     end
   end
 
+  # Sync tools (rsync, `aws s3 sync`) decide on size + mtime, so a copy must
+  # carry its source's true mtime — also when that mtime is still inside its
+  # timestamp tick, where the racy-git rule applies at check time instead.
+  it "stamps static and bundle copies with the source mtime, even a just-written one" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content/bund")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHome")
+        File.write("content/bund/index.md", "---\ntitle: B\n---\nb")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("static/s.css", "body{}\n")
+        File.write("content/bund/app.js", "one()")
+
+        cached_build
+        File.info("public/s.css").modification_time.should eq(File.info("static/s.css").modification_time)
+        File.info("public/bund/app.js").modification_time.should eq(File.info("content/bund/app.js").modification_time)
+      end
+    end
+  end
+
   it "still skips a byte-identical static file whose mtime drifted inside the tolerance" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

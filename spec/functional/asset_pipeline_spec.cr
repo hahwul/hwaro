@@ -173,10 +173,18 @@ describe "Asset Pipeline: asset_integrity() on content-copied files" do
         File.write("content/bund/app.js", "one()")
         File.write("templates/page.html", %(<s i="{{ asset_integrity(name='bund/app.js') }}">))
 
+        started = Time.utc
         integrity_build(cache: true)
         File.read("public/bund/index.html").should eq(%(<s i="#{Hwaro::Utils::DigestUtils.sri("one()")}">))
 
+        # Worst case for the copy's size + mtime skip (#857): the same-size
+        # rewrite lands in the newest timestamp tick already on disk — the
+        # source's own, or the copy's when the copy kept its write time.
+        # Only reachable while that tick is recent.
+        pending!("cold build outlasted the racy window") if Time.utc - started >= 2.seconds
+        tick = {File.info("content/bund/app.js").modification_time, File.info("public/bund/app.js").modification_time}.max
         File.write("content/bund/app.js", "two()")
+        File.touch("content/bund/app.js", tick)
         integrity_build(cache: true)
         File.read("public/bund/index.html").should eq(%(<s i="#{Hwaro::Utils::DigestUtils.sri("two()")}">))
         Hwaro::Utils::DigestUtils.sri_file("public/bund/app.js").should eq(Hwaro::Utils::DigestUtils.sri("two()"))
