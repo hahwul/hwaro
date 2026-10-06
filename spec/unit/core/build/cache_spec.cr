@@ -228,18 +228,40 @@ describe Hwaro::Core::Build::Cache do
     # Racy-git (#857): an entry stamped while the file's mtime was still
     # inside its timestamp tick cannot vouch for the bytes — a same-size
     # rewrite in that tick keeps the mtime. Pinning the rewrite's mtime to
-    # the original is that rewrite, without depending on the clock.
+    # the original is that rewrite; a future mtime is never safely old, so
+    # neither depends on the clock.
     it "re-hashes a file whose stamp was recorded inside its mtime tick" do
       Dir.mktmpdir do |dir|
         test_file = File.join(dir, "test.md")
+        tick = Time.utc + 1.hour
         File.write(test_file, "one")
-        written = File.info(test_file).modification_time
+        File.touch(test_file, tick)
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
         cache.update(test_file)
 
         File.write(test_file, "two")
-        File.utime(written, written, test_file)
+        File.touch(test_file, tick)
+        cache.changed?(test_file).should be_true
+      end
+    end
+
+    # The refresh after a touch (same bytes, new mtime) is a stamp too.
+    it "does not refresh a stored mtime to one inside its tick" do
+      Dir.mktmpdir do |dir|
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "one")
+        File.touch(test_file, Time.utc - 1.hour)
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
+        cache.update(test_file)
+
+        tick = Time.utc + 1.hour
+        File.touch(test_file, tick)
+        cache.changed?(test_file).should be_false
+
+        File.write(test_file, "two")
+        File.touch(test_file, tick)
         cache.changed?(test_file).should be_true
       end
     end
@@ -253,8 +275,10 @@ describe Hwaro::Core::Build::Cache do
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
         cache.update(test_file)
         # Unreadable: re-hashing would fail and report a change.
+        posix_only!("chmod can't make a file unreadable on Windows")
         File.chmod(test_file, 0o000)
         begin
+          pending!("a 0o000 file is still readable (root)") if File.readable?(test_file)
           cache.changed?(test_file).should be_false
         ensure
           File.chmod(test_file, 0o644)

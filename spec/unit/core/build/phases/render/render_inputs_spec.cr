@@ -146,8 +146,10 @@ describe "warm --cache builds and template inputs outside the tracked files" do
       render_inputs_build
       render_inputs_build
       mark_outputs(["public/a/index.html"])
+      posix_only!("chmod can't make a file unreadable on Windows")
       File.chmod("static/img.png", 0o000)
       begin
+        pending!("a 0o000 file is still readable (root)") if File.readable?("static/img.png")
         render_inputs_build
       ensure
         File.chmod("static/img.png", 0o644)
@@ -200,15 +202,17 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     head = %({% set x = load_data(path="extdata/x.json") %}<meta content="{{ x.v }}">)
     with_render_inputs_site("", head) do
       FileUtils.mkdir_p("extdata")
+      # A future mtime is never safely old, whatever the clock does.
+      tick = Time.utc + 1.hour
       File.write("extdata/x.json", %({"v":"old"}))
-      written = File.info("extdata/x.json").modification_time
+      File.touch("extdata/x.json", tick)
       render_inputs_build
       File.read("public/a/index.html").should contain(%(content="old"))
 
       # Same size and, pinned, the same mtime: a rewrite inside the
       # timestamp tick the warm build's stamp was taken in (#857).
       File.write("extdata/x.json", %({"v":"new"}))
-      File.utime(written, written, "extdata/x.json")
+      File.touch("extdata/x.json", tick)
       render_inputs_build
       File.read("public/a/index.html").should contain(%(content="new"))
     end
