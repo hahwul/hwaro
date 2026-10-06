@@ -422,6 +422,7 @@ module Hwaro::Core::Build::Phases::Initialize
   ) : Array({String, String, Time})
     files_to_copy = [] of {String, String, Time}
     glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+    now = Time.utc.to_unix_ms
 
     Dir.glob(File.join(src_dir, "**", "*"), match: glob_match) do |src_path|
       # lstat first: for the common regular-file case one syscall covers
@@ -470,7 +471,10 @@ module Hwaro::Core::Build::Phases::Initialize
       if incremental && (dest_info = File.info?(dest_path)) &&
          info.size == dest_info.size
         delta = (info.modification_time - dest_info.modification_time).abs
-        next if delta.zero?
+        # Racy-git (#857): an exact match proves nothing while the source
+        # mtime is inside its timestamp tick — a same-size rewrite in that
+        # tick keeps it. Such a match falls through to the byte compare.
+        next if delta.zero? && Cache.stable_mtime?(info.modification_time.to_unix_ms, now)
         next if delta <= MTIME_SKIP_TOLERANCE && same_contents?(src_path, dest_path)
       end
 
@@ -521,7 +525,8 @@ module Hwaro::Core::Build::Phases::Initialize
       # makes a source whose mtime moved BACKWARDS (git checkout, stash
       # pop, rsync --times) still count as changed. `src_mtime` comes
       # from the stat collect_static_files already did; re-stating here
-      # tripled the stat count over static/ on watch rebuilds.
+      # tripled the stat count over static/ on watch rebuilds. Always the
+      # true source mtime: sync tools (rsync, `aws s3 sync`) decide on it.
       begin
         File.utime(Time.utc, src_mtime, dest)
       rescue ex : File::Error

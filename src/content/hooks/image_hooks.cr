@@ -255,7 +255,11 @@ module Hwaro
                      memo[1]
                    else
                      dest_info = File.info?(dest)
-                     fresh = !authored && dest_info && dest_info.file? && dest_info.size > 0 && dest_info.modification_time >= source_mtime
+                     # Fresh only if written safely after the source's
+                     # timestamp tick (racy-git, Cache.stable_mtime?): a
+                     # same-tick rewrite of the source keeps `dest >= source`.
+                     fresh = !authored && dest_info && dest_info.file? && dest_info.size > 0 &&
+                             Core::Build::Cache.stable_mtime?(source_mtime.to_unix_ms, dest_info.modification_time.to_unix_ms)
                      made = (Processors::ImageProcessor.dimensions(dest) if fresh) ||
                             Processors::ImageProcessor.transform(source, dest, width, height, op, anchor, @@op_quality)
                      @@op_variants[dest] = {source_mtime, made}
@@ -511,7 +515,9 @@ module Hwaro
             filename = on_disk[w]?
             return unless filename
             dest_info = File.info(File.join(dest_dir, filename))
-            return if dest_info.modification_time < source_mtime
+            # Written safely after the source's timestamp tick, not merely
+            # at or after it (racy-git, see Cache.stable_mtime?).
+            return unless Core::Build::Cache.stable_mtime?(source_mtime.to_unix_ms, dest_info.modification_time.to_unix_ms)
             return if dest_info.size == 0
             result[w] = filename
           end

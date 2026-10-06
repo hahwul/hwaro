@@ -193,6 +193,7 @@ module Hwaro::Core::Build::Phases::Write
 
   # Process co-located assets for pages
   private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new)
+    now = Time.utc.to_unix_ms
     pages.each do |page|
       next if page.assets.empty?
 
@@ -247,7 +248,10 @@ module Hwaro::Core::Build::Phases::Write
         src_info = File.info?(source_path)
         if src_info && (dest_info = File.info?(dest_path))
           if src_info.size == dest_info.size && src_info.modification_time == dest_info.modification_time
-            next
+            # Racy-git (#857): while the source mtime is inside its
+            # timestamp tick a same-size rewrite keeps it, so compare bytes.
+            next if Cache.stable_mtime?(src_info.modification_time.to_unix_ms, now) ||
+                    same_contents?(source_path, dest_path)
           end
         end
 

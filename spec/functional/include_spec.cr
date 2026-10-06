@@ -195,9 +195,15 @@ end
 describe "include dependencies under --cache" do
   it "re-renders the includer when an included file outside content/ changes" do
     in_include_project({"examples/a.cr" => "puts 1\n", "content/p.md" => page(%({{ include_code(path="examples/a.cr") }}))}) do
+      # A future mtime is never safely old, whatever the clock does.
+      tick = Time.utc + 1.hour
+      File.touch("examples/a.cr", tick)
       include_build(cache: true).should be_true
       File.read("public/p/index.html").should contain("puts 1")
+      # Same size and, pinned, the same mtime: a rewrite inside the
+      # timestamp tick the warm build's stamp was taken in (#857).
       File.write("examples/a.cr", "puts 2\n")
+      File.touch("examples/a.cr", tick)
       include_build(cache: true).should be_true
       File.read("public/p/index.html").should contain("puts 2")
     end
@@ -205,9 +211,12 @@ describe "include dependencies under --cache" do
 
   it "re-renders the transcluding page when the transcluded page changes" do
     in_include_project({"content/note.md" => page("first"), "content/p.md" => page("![[note]]")}, wikilinks: true) do
+      tick = Time.utc + 1.hour
+      File.touch("content/note.md", tick)
       include_build(cache: true).should be_true
       File.read("public/p/index.html").should contain("first")
       File.write("content/note.md", page("second"))
+      File.touch("content/note.md", tick)
       include_build(cache: true).should be_true
       File.read("public/p/index.html").should contain("second")
     end

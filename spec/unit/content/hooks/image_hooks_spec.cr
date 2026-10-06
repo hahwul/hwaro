@@ -301,6 +301,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640])
         result.should_not be_nil
         result.not_nil![320].should eq("photo_320w.jpg")
@@ -323,6 +325,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
         File.write(File.join(dest_dir, "photo_9999999999w.jpg"), "bogus")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640])
         result.should_not be_nil
         result.not_nil!.keys.sort!.should eq([320, 640])
@@ -366,6 +370,28 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
+    # Racy-git (#857): a variant written inside the source's timestamp tick
+    # cannot prove it was made from the current bytes — a same-size rewrite
+    # of the source in that tick keeps `dest >= source`. Both mtimes are
+    # pinned, so the spec does not depend on the clock.
+    it "returns nil when a destination was written inside the source's mtime tick" do
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "photo.jpg")
+        dest_dir = File.join(dir, "out")
+        Dir.mkdir_p(dest_dir)
+        dest = File.join(dest_dir, "photo_320w.jpg")
+        File.write(source, "src")
+        File.write(dest, "320")
+        tick = Time.utc - 1.hour
+        File.touch(source, tick)
+        File.touch(dest, tick + 1.millisecond)
+
+        Hwaro::Content::Hooks::ImageHooks
+          .reusable_widths(source, dest_dir, [320])
+          .should be_nil
+      end
+    end
+
     it "returns nil when the source file is missing" do
       Dir.mktmpdir do |dir|
         Hwaro::Content::Hooks::ImageHooks
@@ -387,6 +413,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.jpg"), "320")
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 640, 9999])
         result.should_not be_nil
         result.not_nil!.should eq({320 => "photo_320w.jpg", 640 => "photo_640w.jpg"})
@@ -403,6 +431,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Dir.mkdir_p(dest_dir)
         File.write(File.join(dest_dir, "photo_640w.jpg"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [640, 1280])
         result.should_not be_nil
         result.not_nil!.should eq({640 => "photo_640w.jpg"})
@@ -461,6 +491,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.png"), "320")
         File.write(File.join(dest_dir, "photo_1024w.png"), "1024")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 1024])
         result.should_not be_nil
         result.not_nil!.should eq({320 => "photo_320w.png", 1024 => "photo_1024w.png"})
@@ -480,6 +512,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         File.write(File.join(dest_dir, "photo_320w.png"), "320")
         File.write(File.join(dest_dir, "photo_640w.png"), "640")
 
+        # Variants made safely after the source (racy-git).
+        File.touch(source, Time.utc - 1.hour)
         result = Hwaro::Content::Hooks::ImageHooks.reusable_widths(source, dest_dir, [320, 1280])
         result.should_not be_nil
         result.not_nil!.should eq({320 => "photo_320w.png", 640 => "photo_640w.png"})
