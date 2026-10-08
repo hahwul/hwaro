@@ -199,6 +199,22 @@ module Hwaro
           ""
         end
 
+        # Tartrazine lexer names highlight.js knows under another name. Client
+        # mode puts the lexer in the fence's class; server mode needs it as is.
+        HLJS_NAMES = {
+          "react" => "jsx", "mysql" => "sql", "cassandra_cql" => "sql", "protocol_buffer" => "protobuf",
+          "txtpb" => "protobuf", "c#" => "csharp", "c++" => "cpp", "batchfile" => "dos",
+          "bash_session" => "shell", "viml" => "vim", "vb_net" => "vbnet", "common_lisp" => "lisp",
+          "emacslisp" => "lisp", "systemverilog" => "verilog", "objectpascal" => "delphi",
+          "nginx_configuration_file" => "nginx", "apacheconf" => "apache", "standard_ml" => "sml",
+          "docker" => "dockerfile",
+        }
+
+        # The highlight.js language for a Tartrazine lexer name.
+        def hljs_language(lexer : String) : String
+          HLJS_NAMES[lexer]? || lexer
+        end
+
         # A fenced code block of `code`, longer than any backtick run inside
         # it. `options` are fence options (`title`, `hl_lines`, …); a value
         # loses the characters the fence-option grammar cannot hold.

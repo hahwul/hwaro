@@ -468,10 +468,11 @@ module Hwaro
       # Calculate word count from raw content
       # Note: @raw_content already has front matter stripped during parsing,
       # so we only need to remove HTML tags and markdown syntax.
-      def calculate_word_count : Int32
+      def calculate_word_count(text : String = @raw_content) : Int32
         # Shared with `hwaro tool stats` via TextUtils so the CLI report and
-        # the published `page.word_count` can never drift apart.
-        @word_count = Utils::TextUtils.count_words(@raw_content)
+        # the published `page.word_count` can never drift apart. `text` is
+        # the include-expanded body once the build has expanded it.
+        @word_count = Utils::TextUtils.count_words(text)
         @word_count
       end
 

@@ -339,7 +339,7 @@ Rendered HTML content is available as the top-level `content` variable.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| page.word_count | Int | Word count |
+| page.word_count | Int | Word count, including text pulled in by `include_md`, `include_code` and `![[note]]` |
 | page.reading_time | Int | Reading time (minutes) |
 | page.summary | String? | Summary HTML: the chunk before `<!-- more -->`, else `page.description`, else an automatic excerpt of the rendered body (`[content] summary_length`, one escaped `<p>`). Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
 | page.summary_truncated | Bool | `true` only when `page.summary` is an automatic excerpt that was cut short (useful for a "Read more" link). |

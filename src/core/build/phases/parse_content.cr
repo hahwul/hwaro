@@ -80,6 +80,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     recomputed_paths = [] of String
 
     pages.each do |page|
+      recomputed_paths << page.path if recount_included_words(page, site)
       # parse_single_page already extracted the chunk into page.summary;
       # extract_summary is only a fallback for hook-based parse paths that
       # skipped it (it re-scans the whole raw_content, so don't repeat it).
@@ -173,6 +174,24 @@ module Hwaro::Core::Build::Phases::ParseContent
         @section_pages_url_index_cache.clear
       end
     end
+  end
+
+  # `page.word_count` / `reading_time` count the text the page renders, so a
+  # page built from `include_md` / `include_code` / `![[note]]` counts what
+  # they bring in (parse counted the call text only). A failing include keeps
+  # the raw count; the body render reports it. True when the counts changed.
+  private def recount_included_words(page : Models::Page, site : Models::Site) : Bool
+    raw = page.raw_content
+    expanded = begin
+      expanded_raw_content(page, site)
+    rescue Hwaro::HwaroError
+      return false
+    end
+    return false if expanded.same?(raw)
+    before = page.word_count
+    page.calculate_word_count(expanded)
+    page.calculate_reading_time
+    page.word_count != before
   end
 
   # Automatic summary for a page with neither `<!-- more -->` nor a
@@ -392,7 +411,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       own_line = prefix && md.post_match.blank?
       args = parse_shortcode_args_jinja(unmask_inline_code(md[2], spans))
       text = begin
-        md[1] == "code" ? include_code_text(args) : include_md_text(args, page, site, chain)
+        md[1] == "code" ? include_code_text(args, site) : include_md_text(args, page, site, chain)
       rescue ex : Content::Processors::Includes::Error
         raise Content::Processors::Includes::IncludeError.new("#{unmask_inline_code(call, spans)} in #{chain.last}: #{ex.message}")
       end
@@ -416,8 +435,30 @@ module Hwaro::Core::Build::Phases::ParseContent
       return memo[2] if memo && memo[0].same?(raw) && memo[1] == index
     end
     expanded = expand_includes(raw, page, site)
+    warn_duplicate_labels(page, expanded) unless expanded == raw
     @include_sources_mutex.synchronize { @expanded_raw_memo[page.path] = {raw, index, expanded} }
     expanded
+  end
+
+  LABEL_DEF_RE = /\A {0,3}\[(\^?[^\]\s][^\]]*)\]:/
+
+  # Footnote labels and link reference labels are document-global, and
+  # includes splice raw text, so two notes (or a note and the page) that use
+  # `[^1]` or `[ref]` collide: one definition wins for all. Said once per
+  # page and label; each definition is only counted outside code fences.
+  private def warn_duplicate_labels(page : Models::Page, expanded : String) : Nil
+    counts = {} of String => Int32
+    tracker = Content::Processors::FenceTracker.new
+    expanded.each_line do |line|
+      next if tracker.fence_line?(line)
+      next unless md = LABEL_DEF_RE.match(line)
+      counts[md[1].downcase] = (counts[md[1].downcase]? || 0) + 1
+    end
+    counts.each do |label, count|
+      next if count < 2
+      next unless @wikilink_warnings.first?(page.path, "[#{label}]:")
+      Logger.warn "'#{page.path}': [#{label}] is defined #{count} times once its includes and transclusions are spliced in; one definition is used for every reference."
+    end
   end
 
   # What a per-page scan reads (shortcodes used, `@/` targets, wikilinks):
@@ -435,12 +476,16 @@ module Hwaro::Core::Build::Phases::ParseContent
     expanded == raw ? [raw] : [raw, expanded]
   end
 
-  private def include_code_text(args : Hash(String, String)) : String
+  private def include_code_text(args : Hash(String, String), site : Models::Site) : String
     relative = include_relative_path(args)
     text = read_include(relative)
     text = Content::Processors::Includes.region(text, args["region"], markdown: false) if args["region"]?
     text = Content::Processors::Includes.lines(text, args["lines"]) if args["lines"]?
-    lang = args["lang"]? || Content::Processors::Includes.language_for(relative)
+    lang = args["lang"]? || begin
+      lexer = Content::Processors::Includes.language_for(relative)
+      # highlight.js reads the class, and does not know every lexer's name.
+      site.config.highlight.server? ? lexer : Content::Processors::Includes.hljs_language(lexer)
+    end
     Content::Processors::Includes.fenced(Content::Processors::Includes.dedent(text), lang, args)
   end
 

@@ -490,3 +490,62 @@ describe "page.backlinks sources" do
     end
   end
 end
+
+# The linker is no neighbour of the edited page and the templates read no
+# relationship, so only a link-aware render set can reach it.
+private def write_linker_site
+  File.write("config.toml", WIKI_CONFIG.sub("backlinks = true", "backlinks = false"))
+  FileUtils.mkdir_p("templates")
+  File.write("templates/page.html", "{{ content }}")
+  FileUtils.mkdir_p("content")
+  File.write("content/target.md", "---\ntitle: Target\ndate: 2024-01-01\n---\nT\n")
+  3.times { |i| File.write("content/pad#{i}.md", "---\ntitle: Pad #{i}\ndate: 2024-01-0#{i + 3}\n---\npad\n") }
+  File.write("content/x.md", "---\ntitle: X\ndate: 2024-03-01\n---\nlinks [[target]] and [r](@/target.md) and [u](/target/) end\n")
+end
+
+describe "serve incremental rebuild and the pages that link to a moved page" do
+  it "re-renders a linker when its target is drafted" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_linker_site
+        builder, options = wiki_build(serve: true)
+        File.read("public/x/index.html").should contain(%(<a href="/target/">target</a>))
+
+        File.write("content/target.md", "---\ntitle: Target\ndate: 2024-01-01\ndraft: true\n---\nT\n")
+        with_captured_log { builder.run_incremental(["content/target.md"], options).should be_true }
+        html = File.read("public/x/index.html")
+        html.should contain(%(<span class="wikilink wikilink-missing">target</span>))
+        html.should_not contain(%(<a href="/target/">target</a>))
+      end
+    end
+  end
+
+  it "re-renders a linker when its target is re-slugged" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_linker_site
+        builder, options = wiki_build(serve: true)
+
+        File.write("content/target.md", "---\ntitle: Target\ndate: 2024-01-01\nslug: renamed\n---\nT\n")
+        with_captured_log { builder.run_incremental(["content/target.md"], options).should be_true }
+        html = File.read("public/x/index.html")
+        html.should contain(%(<a href="/renamed/">target</a>))
+        html.should contain(%(<a href="/renamed/">r</a>))
+      end
+    end
+  end
+
+  it "leaves a linker alone when a body edit moves nothing" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_linker_site
+        builder, options = wiki_build(serve: true)
+        File.write("content/x.md", "---\ntitle: X\ndate: 2024-03-01\n---\nlinks [[target]] and [r](@/target.md) and [u](/target/) end\n")
+        File.delete("public/x/index.html")
+        File.write("content/target.md", "---\ntitle: Target\ndate: 2024-01-01\n---\nT edited\n")
+        with_captured_log { builder.run_incremental(["content/target.md"], options).should be_true }
+        File.exists?("public/x/index.html").should be_false
+      end
+    end
+  end
+end

@@ -171,6 +171,26 @@ describe "include_md" do
   end
 end
 
+describe "page.word_count with includes" do
+  it "counts the text include_md, include_code and ![[note]] bring in" do
+    words = (["word"] * 1000).join(' ')
+    in_include_project({
+      "templates/page.html" => "WC:{{ page.word_count }} RT:{{ page.reading_time }}",
+      "docs/big.md"         => words,
+      "content/wc.md"       => page(%({{ include_md(path="docs/big.md") }})),
+      "content/wc2.md"      => page("![[wc]]"),
+      "content/plain.md"    => page(words),
+      "content/small.md"    => page("five words in this page"),
+    }, wikilinks: true) do
+      include_build.should be_true
+      File.read("public/wc/index.html").should eq("WC:1000 RT:5")
+      File.read("public/wc2/index.html").should eq("WC:1000 RT:5")
+      File.read("public/plain/index.html").should eq("WC:1000 RT:5")
+      File.read("public/small/index.html").should eq("WC:5 RT:1")
+    end
+  end
+end
+
 describe "include_code option values" do
   it "renders a title that holds backticks as a normal code block" do
     in_include_project({
@@ -181,6 +201,28 @@ describe "include_code option values" do
       html = File.read("public/p/index.html")
       html.should contain(%(<div class="code-filename">main.rs</div>))
       html.should_not contain("```")
+    end
+  end
+
+  it "names the language the way highlight.js does in client mode, and the lexer in server mode" do
+    in_include_project({
+      "src/a.jsx"    => "x\n",
+      "src/q.sql"    => "x\n",
+      "src/m.proto"  => "x\n",
+      "content/p.md" => page(%({{ include_code(path="src/a.jsx") }}\n\n{{ include_code(path="src/q.sql") }}\n\n{{ include_code(path="src/m.proto") }})),
+    }) do
+      File.write("config.toml", File.read("config.toml") + "[highlight]\nmode = \"client\"\n")
+      include_build(highlight: true).should be_true
+      html = File.read("public/p/index.html")
+      html.should contain("language-jsx")
+      html.should contain("language-sql")
+      html.should contain("language-protobuf")
+      html.should_not contain("language-react")
+      File.write("config.toml", File.read("config.toml").sub("client", "server"))
+      include_build(highlight: true).should be_true
+      html = File.read("public/p/index.html")
+      html.should contain("language-react")
+      html.should contain("language-mysql")
     end
   end
 
@@ -235,6 +277,17 @@ describe "transclusion" do
       html.should contain(%(<p>BOLDBODY</p>\n</div>))
       html.should contain(%(<h2 id="setext-head">Setext Head</h2>\n<p>SETEXTBODY</p>\n</div>))
       html.should contain(%(<p>LINKBODY</p>\n</div>))
+    end
+  end
+
+  it "warns when transcluded notes define the same footnote or reference label" do
+    n1 = page("N1 claim[^1] and [ref].\n\n[^1]: footnote of N1\n\n[ref]: https://one.example/\n\n```\n[code]: ignored\n```")
+    n2 = page("N2 claim[^1] and [ref].\n\n[^1]: footnote of N2\n\n[ref]: https://two.example/\n\n```\n[code]: ignored\n```")
+    in_include_project({"content/n1.md" => n1, "content/n2.md" => n2, "content/p.md" => page("![[n1]]\n\n![[n2]]")}, wikilinks: true) do
+      log = with_captured_log { include_build.should be_true }
+      log.should contain("'p.md': [^1] is defined 2 times")
+      log.should contain("'p.md': [ref] is defined 2 times")
+      log.should_not contain("[code]")
     end
   end
 
