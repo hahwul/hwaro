@@ -41,6 +41,11 @@ module Hwaro
 
       CONTENT_EXTENSIONS = Set{".md", ".markdown"}
 
+      # Files browsers request by a well-known root URL with no markup
+      # reference (`/favicon.ico`, `/apple-touch-icon[-precomposed][-WxH].png`),
+      # so the textual scan can never see them used.
+      IMPLICIT_ROOT_ASSET = /\A(?:favicon\.ico|apple-touch-icon(?:-precomposed)?(?:-\d+x\d+)?\.png)\z/i
+
       # Template files that may reference an asset. `.html` alone was not
       # enough: `Builder::TEMPLATE_EXTENSION_REGEX` also accepts `.j2`,
       # `.jinja`, `.jinja2` and `.ecr`, and feed/manifest templates are
@@ -146,6 +151,8 @@ module Hwaro
             next
           end
           next if referenced.includes?(basename)
+          # Only the copy at the root of the static dir is served at that URL.
+          next if basename.matches?(IMPLICIT_ROOT_ASSET) && File.dirname(asset_path) == File.dirname(File.join(@static_dir, basename))
           # Safety net against the `delete_unused` data-loss path: the
           # reference regex only captures filenames built from [\w\-.], so a
           # referenced asset whose name contains a space or parenthesis (e.g.

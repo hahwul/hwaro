@@ -58,7 +58,12 @@ hwaro tool unused-assets --delete --force --json
 미사용으로 보고되고 `--delete`로 삭제될 수 있습니다.
 명시적으로 전달한 `--templates-dir`은 반드시 존재해야 하며(경로는 현재
 디렉터리 기준), 없는 경로면 템플릿 0개를 조용히 스캔하는 대신 실행을
-거부합니다.
+거부합니다. 명시적으로 전달한 `--content-dir`, `--static-dir`도 마찬가지입니다.
+
+마크업에서 참조하지 않아도 브라우저가 고정 URL로 요청하는 파일은 미사용으로
+보고하지 않습니다. 정적 디렉터리 루트에 있는 `favicon.ico`,
+`apple-touch-icon.png`, `apple-touch-icon-precomposed.png`와 그 `-WxH` 크기
+변형이 해당합니다.
 
 **지원 에셋 확장자:**
 이미지(png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff, tif), 스타일시트(css), 스크립트(js), 폰트(woff, woff2, ttf, eot, otf), 미디어(mp4, webm, ogg, mp3, wav), 문서(pdf, zip).
