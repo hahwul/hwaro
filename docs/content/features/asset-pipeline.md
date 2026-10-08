@@ -167,7 +167,7 @@ Tailwind rewrites `static/css/tailwind.css`, the server copies it and reloads th
 
 1. During the Initialize phase, the pipeline reads source files from `source_dir`
 2. Files listed in each bundle are concatenated in order
-3. If `minify` is enabled, CSS/JS-specific minification is applied
+3. If `minify` is enabled, CSS/JS-specific minification is applied (`.css`, `.js` and `.mjs` bundles; a UTF-8 BOM at the start of an entry is dropped)
 4. If `fingerprint` is enabled, an 8-character SHA-256 hash is inserted before the extension
 5. The output is written to `{output_dir}/{output_name}` in the build directory
 6. A manifest mapping original names to output paths is stored for template resolution

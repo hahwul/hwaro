@@ -186,7 +186,10 @@ Error [HWARO_E_CONTENT]: Sass: static/css/style.scss:14:3: @forward ... with (..
 - 값은 평가 사이에 CSS 텍스트로 저장되고 사용 시점에 타입이 다시 유도됩니다. 리스트처럼 *보이는* 따옴표 없는 문자열(`"a, b"`를 unquote한 값)은 리스트로 취급됩니다.
 - 단위 산술은 표준 그룹(길이, 각도, 시간, 주파수, 해상도) 안에서 변환되며, 왼쪽 피연산자의 단위가 결과 단위가 됩니다. 복합 단위(`1px * 1em`, `math.div(1px, 1s)`)는 모델링하지 않고 원문 텍스트로 남습니다.
 - *값* 위치의 `and`/`or`는 실제 불리언에만 동작하므로 `font-family: Franklin and Marshall`은 텍스트로 남습니다. 조건식에서는 Sass의 완전한 truthiness를 따릅니다.
-- 전역 `min()`/`max()`/`round()`/`abs()`는 모든 인자가 정적으로 비교 가능한 숫자일 때만 평가됩니다. CSS 형태(`min(5vw, 100px)`, `round(up, 101px, 10px)`)는 그대로 통과합니다.
+- 전역 `min()`/`max()`/`round()`/`abs()`는 모든 인자가 정적으로 비교 가능한 숫자일 때만 평가됩니다. CSS 형태(`min(5vw, 100px)`, `round(up, 101px, 10px)`)는 그대로 통과합니다. 호환되지 않는 단위를 섞은 `min()`/`max()`/`clamp()`(`clamp(2rem, 1rem + 3vw, 4rem)`)는 불투명한 CSS 계산식으로 유지되므로 맵과 리스트에 담거나 `@function`에서 반환하고, 다른 함수에 넘길 수 있습니다.
+- 숫자 비교와 동등 검사는 dart-sass처럼 1e-11 이내의 차이를 같은 값으로 봅니다(`0.1 * 3 == 0.3`은 `true`). `math.floor()`/`ceil()`/`round()`는 정확한 값으로 계산합니다.
+- `@import`의 따옴표 없는 `url(...)`과 커스텀 프로퍼티 값 안의 `//`(`--api: https://example.com`)는 주석이 아닌 원문 그대로 처리됩니다.
+- 선택자 의사 클래스 인자(`:not(.a)`, `:is(.a)`) 안의 대상을 `@extend`하면 원래 선택자를 유지하고, 모든 extender를 인자 목록에 한 번에 덧붙인 선택자 하나를 추가합니다. dart-sass는 원래 선택자를 대체하고 `:not()`을 연쇄 `:not()`으로 바꿉니다.
 - `rgb()`/`rgba()`/`hsl()`/`hsla()`는 CSS 형태 그대로 두고 접지 **않습니다**. dart-sass는 `rgb(0, 0, 0)`을 `black`으로 내보내지만 여기서는 원문이 유지됩니다(색상 *함수*가 그런 리터럴을 받으면 색상으로 읽기는 합니다). 유효한 CSS가 아닌 Sass 전용 `rgba($color, $alpha)` 철자만 평가됩니다. 마찬가지로 `grayscale()`, `invert()`, `saturate()`, `opacity()`는 색상을 받으면 색상 함수, 숫자를 받으면 순수 CSS 필터로 취급됩니다(`filter: grayscale(50%)`는 그대로 통과).
 - 계산된 색상은 정수 채널로 직렬화됩니다. 반올림한 채널이 CSS 키워드와 정확히 일치하면 키워드로(`mix(red, blue)` → `purple`, 별칭은 dart의 표기를 따라 `aqua`, `gray`, `fuchsia`), 그렇지 않으면 hex/`rgba()`로 출력합니다. dart-sass 1.79+는 대신 소수 채널을 유지하므로(거기서 `mix(red, blue)`는 `rgb(50%, 0%, 50%)`) 키워드 형태는 계산 결과가 정확한 정수로 떨어질 때만 dart와 일치하며, 어느 쪽이든 채널당 최대 1 차이입니다.
 - 내장 함수는 문서화된 키워드 이름을 받습니다(`list.append($l, x, $separator: comma)`, `string.slice($string: …, $start-at: 2)`, `darken($c, $amount: 10%)`, `map.get($map: …, $key: …)`). 가변 인자 내장 함수(`math.min`, `list.zip`, `map.set`, `selector.nest`)는 위치 인자만 받습니다. 사용자 정의 `@mixin`/`@function`의 키워드 인자는 정상 동작합니다.

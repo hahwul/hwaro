@@ -165,7 +165,7 @@ module Hwaro
           # `.btn:hover` is `.icon:hover::before` — a pseudo-class after a
           # pseudo-element matches nothing.
           (ext + rest).each do |s|
-            next unless pseudo?(s) && !pseudo_element?(s)
+            next if !pseudo?(s) || pseudo_element?(s)
             merged << s unless merged.includes?(s)
           end
           (ext + rest).each do |s|
