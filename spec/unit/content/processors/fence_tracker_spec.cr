@@ -242,6 +242,11 @@ describe Hwaro::Content::Processors::FenceTracker do
     end
   end
 
+  it "does not raise when a blockquote marker closes an empty item before its blank line" do
+    feed(["* ", "> > "]).should eq [false, false]
+    feed(["  - ", ">", "    - text"]).size.should eq 3
+  end
+
   describe "fences inside list items" do
     it "sees a fence indented four columns under an ordered item" do
       feed(["1. a", "    ```", "    {{ x }}", "    ```", "after"])

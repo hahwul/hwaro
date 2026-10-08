@@ -391,6 +391,15 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain("<iframe></iframe>")
     end
 
+    it "survives a stray backtick above a very long paragraph (PCRE2 JIT stack)" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe></iframe>)}
+      body = (1..4000).map { |i| "word#{i} lorem ipsum dolor sit amet" }.join("\n")
+      content = %(A stray ` tick.\n#{body}\n\n{{ youtube(id="x") }})
+      result = builder.test_sc_process(content, templates)
+      result.should contain("<iframe></iframe>")
+    end
+
     # Regression: inline code spans used to SPLIT the content into chunks,
     # so a block shortcode whose body contained `code` had its opener and
     # closer land in different chunks — the pair never matched and both

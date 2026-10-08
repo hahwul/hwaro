@@ -206,7 +206,9 @@ module Hwaro
           @open_quote_depth = depth if blank || quote_opened
           close_items_left_of_quote_markers(line, depth) unless depth.zero? || in_html_block
           if @empty_item_open
-            @list_items.pop if blank
+            # `pop?`: a blockquote marker on this same line may already have
+            # closed the empty item (`*` then `> >`), leaving nothing to pop.
+            @list_items.pop? if blank
             @empty_item_open = false
           end
 
