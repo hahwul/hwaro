@@ -455,6 +455,75 @@ describe Hwaro::Content::Taxonomies do
       tags_raw.has_key?(Crinja::Value.new("C#")).should be_false
     end
 
+    it "lists a page once per term even when its front matter repeats the term" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.feed = true
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("dup.md")
+      page.title = "Dup"
+      page.url = "/blog/dup/"
+      page.tags = ["rust", "rust", "go"]
+      site.pages = [page]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {"taxonomy" => "<html>{{ content }}</html>", "taxonomy_term" => "<html>{{ content }}</html>"}
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        site.taxonomies["tags"]["rust"].size.should eq(1)
+        File.read(File.join(output_dir, "tags", "rust", "rss.xml")).scan("<item>").size.should eq(1)
+      end
+    end
+
+    it "disambiguates slugs within one language, not across languages" do
+      # `Zeta` (ko only) used to take the base slug site-wide and push the
+      # English `zeta` to `/tags/zeta-2/`, although no root `Zeta` page exists.
+      config = Hwaro::Models::Config.new
+      config.default_language = "en"
+      ko_config = Hwaro::Models::LanguageConfig.new("ko")
+      ko_config.taxonomies = ["tags"]
+      config.languages["ko"] = ko_config
+      config.base_url = "https://example.com"
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.feed = true
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+
+      en = Hwaro::Models::Page.new("en.md")
+      en.title = "En"
+      en.url = "/blog/en/"
+      en.tags = ["zeta"]
+      en.language = "en"
+      ko = Hwaro::Models::Page.new("ko.md")
+      ko.title = "Ko"
+      ko.url = "/ko/blog/ko/"
+      ko.tags = ["Zeta", "Zeta"]
+      ko.language = "ko"
+      site.pages = [en, ko]
+      site.taxonomies["tags"] = {
+        "zeta" => [en] of Hwaro::Models::Page,
+        "Zeta" => [ko] of Hwaro::Models::Page,
+      }
+
+      vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
+      root = vars["__taxonomy_slugs__"].raw.as(Hash(Crinja::Value, Crinja::Value))["tags"].raw.as(Hash(Crinja::Value, Crinja::Value))
+      root["zeta"].to_s.should eq("zeta")
+      ko_slugs = vars["__taxonomy_lang_slugs__"].raw.as(Hash(Crinja::Value, Crinja::Value))["ko"].raw.as(Hash(Crinja::Value, Crinja::Value))["tags"].raw.as(Hash(Crinja::Value, Crinja::Value))
+      ko_slugs["Zeta"].to_s.should eq("zeta")
+
+      Dir.mktmpdir do |output_dir|
+        templates = {"taxonomy" => "<html>{{ content }}</html>", "taxonomy_term" => "<html>{{ content }}</html>"}
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        File.exists?(File.join(output_dir, "tags", "zeta", "index.html")).should be_true
+        File.exists?(File.join(output_dir, "ko", "tags", "zeta", "index.html")).should be_true
+        Dir.exists?(File.join(output_dir, "tags", "zeta-2")).should be_false
+        Dir.exists?(File.join(output_dir, "ko", "tags", "zeta-2")).should be_false
+        File.read(File.join(output_dir, "ko", "tags", "zeta", "rss.xml")).scan("<item>").size.should eq(1)
+      end
+    end
+
     it "still renders a configured taxonomy's index when it has zero terms (no 404)" do
       config = Hwaro::Models::Config.new
       config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
