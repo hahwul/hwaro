@@ -45,6 +45,7 @@ module Hwaro
 
           def run(args : Array(String))
             content_dir = "content"
+            content_dir_given = false
             static_dir = "static"
             static_dir_given = false
             templates_dir = "templates"
@@ -55,7 +56,10 @@ module Hwaro
 
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: hwaro tool unused-assets [options]"
-              CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
+              CLI.register_flag(parser, CONTENT_DIR_FLAG) do |v|
+                content_dir = v
+                content_dir_given = true
+              end
               parser.on("-s DIR", "--static-dir DIR", "Static files directory (default: static)") do |v|
                 static_dir = v
                 static_dir_given = true
@@ -87,6 +91,22 @@ module Hwaro
             # would come back "unused", and `--delete --force` would then
             # remove files the build still needs. The default "templates" is
             # exempt — projects without a templates directory are legitimate.
+            # The same hazard applies to an explicit --content-dir (a typo
+            # makes every referenced asset look unused) and --static-dir.
+            if content_dir_given && !Dir.exists?(content_dir)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONTENT,
+                message: "Content directory '#{content_dir}' does not exist",
+                hint: "Create it or pass --content-dir DIR to point at your content root.",
+              )
+            end
+            if static_dir_given && !Dir.exists?(static_dir)
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_IO,
+                message: "Static directory '#{static_dir}' does not exist",
+                hint: "The path is resolved relative to the current directory. Pass an existing directory to --static-dir.",
+              )
+            end
             if templates_dir_given && !Dir.exists?(templates_dir)
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_IO,
