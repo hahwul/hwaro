@@ -300,16 +300,22 @@ module Hwaro
         others = Content::Multilingual.ordered_language_codes(config) - [default]
         menus = MenuScope.new(config)
         entries = ContentLister.new(@content_dir).list_all.select(&.published?).sort_by!(&.path).map do |info|
-          page = Models::Page.new(Path[info.path].relative_to(@content_dir).to_s)
+          relative = Path[info.path].relative_to(@content_dir).to_s
+          # `_index` files are sections: their own `[cascade]` skips them.
+          page = File.basename(relative).starts_with?("_index.") ? Models::Section.new(relative) : Models::Page.new(relative)
           language = menus.filename_language(info.path)
           page.language = language == default ? nil : language
           {page, info.path}
         end
+        apply_render_state(entries)
         Content::Multilingual.link_translations!(entries.map(&.[0]), config)
 
         # Grouped per language, in configured order.
         others.each do |other|
           entries.each do |page, file|
+            # A page the build never writes (or that only redirects) needs no
+            # translation, and is no one's missing counterpart.
+            next if !page.render || page.has_redirect?
             code = Content::Multilingual.language_code(page, config)
             codes = page.translations.empty? ? [code] : page.translations.map(&.code)
             if code == default && !codes.includes?(other)
@@ -320,6 +326,44 @@ module Hwaro
                 message: "'#{other}' translation has no '#{default}' original", language: other)
             end
           end
+        end
+      end
+
+      # Fill in what `link_translations!` reads besides the path: `render`
+      # (front matter, or a section `[cascade]`, as the build resolves it) and
+      # `redirect_to`. Without them every page looks renderable and linkable.
+      private def apply_render_state(entries : Array({Models::Page, String})) : Nil
+        previous = Logger.level
+        Logger.level = Logger::Level::Error # the build reports front-matter warnings
+        begin
+          parsed = entries.map do |page, file|
+            data = begin
+              Processor::Markdown.parse(File.read(file), file)
+            rescue Hwaro::HwaroError | File::Error
+              next # doctor's parse check and the build report it
+            end
+            page.render = data[:render]
+            page.redirect_to = data[:redirect_to]
+            page.front_matter_keys = data[:front_matter_keys]
+            {page, data[:cascade]}
+          end.compact
+
+          sections = parsed.compact_map do |page, cascade|
+            next unless page.is_a?(Models::Section)
+            page.cascade = cascade
+            page
+          end
+          builder = Core::Build::Builder.new
+          cascade_map = builder.build_cascade_map(sections)
+          return if cascade_map.empty?
+          parsed.each do |page, _|
+            next if page.front_matter_keys.includes?("render")
+            # `if inherited = …` would drop a cascaded `false`.
+            inherited = builder.merged_cascade_for(page, cascade_map)["render"]?.try(&.as?(Bool))
+            page.render = inherited unless inherited.nil?
+          end
+        ensure
+          Logger.level = previous
         end
       end
 

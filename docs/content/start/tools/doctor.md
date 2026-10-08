@@ -115,6 +115,9 @@ Pages are paired exactly as the build pairs `page.translations` (same base
 name without the language suffix, so `about.md`, `about.en.md` and
 `about.ko.md` belong together), and only pages a default build publishes
 count: a draft or future-dated page neither has nor provides a translation.
+A headless (`render = false`, also from a section `[cascade]`) or `redirect_to`
+page is never asked for a translation and does not count as one, because the
+build leaves it out of `page.translations` and hreflang.
 Both are `info` level, so `--strict` never fails on a partial translation.
 The human report groups them per language with counts:
 

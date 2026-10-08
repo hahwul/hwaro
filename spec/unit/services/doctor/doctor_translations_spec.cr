@@ -82,6 +82,30 @@ describe "Hwaro::Services::Doctor translations" do
     ])
   end
 
+  it "pairs only what the build links: headless and redirect pages are neither asked for nor counted" do
+    headless = "+++\ntitle = \"T\"\nrender = false\n+++\nbody\n"
+    redirect = "+++\ntitle = \"T\"\nredirect_to = \"/x/\"\n+++\nbody\n"
+    cascaded = "+++\ntitle = \"S\"\n[cascade]\nrender = false\n+++\n"
+    issues = translation_issues({
+      "nr.md"            => headless,
+      "pub.md"           => PAGE,
+      "pub.ko.md"        => headless,
+      "pub.ja.md"        => PAGE,
+      "rd.md"            => PAGE,
+      "rd.ko.md"         => redirect,
+      "rd.ja.md"         => PAGE,
+      "hidden/_index.md" => cascaded,
+      "hidden/p.md"      => PAGE,
+    })
+
+    summarize(issues).should eq([
+      "ko translation-missing hidden/_index.md",
+      "ko translation-missing pub.md",
+      "ko translation-missing rd.md",
+      "ja translation-missing hidden/_index.md",
+    ])
+  end
+
   it "reports nothing on a single-language site" do
     translation_issues({"a.md" => PAGE, "a.ko.md" => PAGE}, %(title = "T"\nbase_url = "https://example.com"\n)).should be_empty
   end
