@@ -35,6 +35,17 @@ describe Hwaro::Content::I18n do
       end
     end
 
+    it "parses a translation file saved with a UTF-8 BOM" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "en.toml"), "﻿hello = \"Hello BOM\"\n")
+
+        config = Hwaro::Models::Config.new
+        config.default_language = "en"
+
+        Hwaro::Content::I18n.load_translations(dir, config)["en"]["hello"].should eq("Hello BOM")
+      end
+    end
+
     it "returns empty hash when i18n directory does not exist" do
       config = Hwaro::Models::Config.new
       translations = Hwaro::Content::I18n.load_translations("/nonexistent/path", config)

@@ -1,6 +1,7 @@
 require "toml"
 require "../models/config"
 require "../utils/logger"
+require "../utils/text_utils"
 
 module Hwaro
   module Content
@@ -23,7 +24,7 @@ module Hwaro
           next unless File.exists?(path)
 
           begin
-            data = TOML.parse(File.read(path))
+            data = TOML.parse(Utils::TextUtils.strip_bom(File.read(path)))
             flat = {} of String => String
             flatten_toml(data, "", flat)
             translations[code] = flat

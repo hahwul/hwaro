@@ -303,6 +303,25 @@ describe Hwaro::Assets::Pipeline do
       end
     end
 
+    it "strips UTF-8 BOMs so they never glue onto a later file's first selector" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+
+        File.write(File.join(static_dir, "a.css"), "﻿body{color:red}\n")
+        File.write(File.join(static_dir, "b.css"), "﻿h1{color:blue}\n")
+
+        config = make_config(source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["a.css", "b.css"])
+
+        Hwaro::Assets::Pipeline.new(config).process(output_dir)
+
+        File.read(File.join(output_dir, "assets", "main.css")).should eq("body{color:red}\n\nh1{color:blue}\n")
+      end
+    end
+
     it "handles source file that is empty (0 bytes)" do
       Dir.mktmpdir do |dir|
         static_dir = File.join(dir, "static")
