@@ -241,4 +241,41 @@ describe Hwaro::Content::Processors::FenceTracker do
         .should eq [false, false, false, false, false, false, false]
     end
   end
+
+  describe "fences inside list items" do
+    it "sees a fence indented four columns under an ordered item" do
+      feed(["1. a", "    ```", "    {{ x }}", "    ```", "after"])
+        .should eq [false, true, true, true, false]
+    end
+
+    it "sees a fence indented four columns under a bullet item" do
+      feed(["- Bullet", "    ```", "    B", "    ```", "", "- Bullet 2"])
+        .should eq [false, true, true, true, false, false]
+    end
+
+    it "sees a fence two columns beyond a nested item's content" do
+      feed(["- a", "  - b", "      ```", "      x", "      ```", "tail"])
+        .should eq [false, false, true, true, true, false]
+    end
+
+    it "sees a tab-indented fence under an item" do
+      feed(["- a", "\t```", "\tcode", "\t```", "x"]).should eq [false, true, true, true, false]
+    end
+
+    it "measures the closer against the item too" do
+      # Four columns beyond the item's content is content, not a closer.
+      feed(["1. a", "   ```", "   x", "       ```", "   y", "   ```", "z"])
+        .should eq [false, true, true, true, true, true, false]
+      feed(["1. a", "    ```", "    x", "    ```", "z"]).should eq [false, true, true, true, false]
+    end
+
+    it "keeps a delimiter four columns beyond the item as indented code" do
+      feed(["- a", "", "      ```", "text"]).should eq [false, false, true, false]
+    end
+
+    it "keeps a fence inside a quoted item" do
+      feed(["> - a", ">     ```", ">     x", ">     ```", "after"])
+        .should eq [false, true, true, true, false]
+    end
+  end
 end

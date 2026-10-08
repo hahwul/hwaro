@@ -102,6 +102,9 @@ module Hwaro
         @fence_char = '`'
         @fence_len = 0
         @fence_bq_depth = 0
+        # Content column of the list item holding the open fence (0 outside
+        # one): the closer is indented relative to it, like the opener.
+        @fence_base = 0
         @in_raw_html_code = false
         @raw_html_code_bq_depth = 0
         @in_indented_code = false
@@ -173,7 +176,7 @@ module Hwaro
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
             if depth == @fence_bq_depth
-              @in_fence = false if !indented?(content) && closes_fence?(content.lstrip)
+              @in_fence = false if !indented_beyond?(line, content, depth, @fence_base) && closes_fence?(content.lstrip)
               @prev_blank = false
               return true
             end
@@ -277,7 +280,7 @@ module Hwaro
           @html_block_line = in_html_block || opened_html
           stripped = content.lstrip
           heading = !blank && ATX_HEADING_RE.matches?(content)
-          fence_run = indented?(content) ? nil : opener_run(stripped)
+          fence_run = column - container_column >= 4 ? nil : opener_run(stripped)
           if heading || fence_run
             # Headings and fences are never lazy continuations: one left of
             # an item's content closes it, like a line after a blank.
@@ -289,6 +292,7 @@ module Hwaro
             @fence_char = stripped[0]
             @fence_len = run
             @fence_bq_depth = depth
+            @fence_base = container_column
             @prev_blank = false
             true
           else
@@ -305,6 +309,14 @@ module Hwaro
 
         private def indented?(content : String) : Bool
           content.starts_with?("    ") || content.starts_with?('\t')
+        end
+
+        # Whether `content` sits 4+ columns beyond `base`, the content column
+        # of the enclosing list item (0 outside one: plain 4+ indentation).
+        private def indented_beyond?(line : String, content : String, depth : Int32, base : Int32) : Bool
+          return indented?(content) if base.zero?
+          prefix, tab_consumed = depth.zero? ? {0, false} : blockquote_prefix_column(line, depth)
+          leading_columns(content, prefix, tab_consumed)[0] - base >= 4
         end
 
         # Consumes up to `max_depth` leading blockquote markers (each up to
