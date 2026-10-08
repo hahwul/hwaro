@@ -283,6 +283,19 @@ module Hwaro
           {variant_url, size[0], size[1]}
         end
 
+        # Forget every variant/LQIP/source the previous run recorded. The maps
+        # live for the whole `hwaro serve` process; a run that resizes nothing
+        # (config reloaded with `enabled = false` / `widths = []`, or the last
+        # image removed) must not keep serving URLs of files the build then
+        # prunes — a cold build starts from empty maps and so must this.
+        private def clear_variant_maps : Nil
+          @@resize_map_mutex.synchronize do
+            @@resize_map = {} of String => Hash(Int32, String)
+            @@source_map = {} of String => String
+          end
+          @@lqip_map_mutex.synchronize { @@lqip_map = {} of String => Hash(String, String) }
+        end
+
         # Describes a single image to be resized
         private record ImageJob,
           source_path : String,
@@ -296,10 +309,13 @@ module Hwaro
           return unless config
           if ctx.options.skip_image_processing
             Logger.debug "  Skipping image processing (--skip-image-processing)"
+            clear_variant_maps
             return
           end
-          return unless config.image_processing.enabled
-          return if config.image_processing.widths.empty?
+          unless config.image_processing.enabled && !config.image_processing.widths.empty?
+            clear_variant_maps
+            return
+          end
           @@resize_map_mutex.synchronize { @@processing_active = true }
 
           start = ctx.profiler ? Time.instant : nil
@@ -331,7 +347,14 @@ module Hwaro
             collect_static_jobs(config, output_dir, resolved_output, jobs, seen)
           end
 
-          return if jobs.empty?
+          if jobs.empty?
+            # Nothing to resize (the last image was deleted): the previous
+            # run's variants are pruned, so their URLs must stop resolving.
+            # A `--fast-start` priority pass is partial by design — it keeps
+            # what the full pass will fill in.
+            clear_variant_maps if fast_start_priority.nil?
+            return
+          end
 
           # Phase 2: Split jobs into "already fresh" (reuse from previous
           # rebuild's maps) and "needs work". Snapshot previous maps first

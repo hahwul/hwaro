@@ -62,6 +62,32 @@ describe Hwaro::Content::Hooks::AssetHooks do
       end
     end
 
+    # Regression: the manifest outlives the build in a `hwaro serve` process,
+    # so turning [assets] off kept asset() printing the fingerprinted URL of a
+    # bundle the build had just pruned.
+    it "drops the previous build's manifest when assets are disabled" do
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Hooks::AssetHooks.replace_manifest({"main.css" => "/assets/main.15c42ab7.css"})
+        begin
+          config = Hwaro::Models::Config.new
+          config.assets.enabled = false
+
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: output_dir)
+          ctx = Hwaro::Core::Lifecycle::BuildContext.new(options: options)
+          ctx.output_dir = output_dir
+          ctx.config = config
+
+          manager = Hwaro::Core::Lifecycle::Manager.new
+          Hwaro::Content::Hooks::AssetHooks.new.register_hooks(manager)
+          manager.trigger(Hwaro::Core::Lifecycle::HookPoint::AfterInitialize, ctx)
+
+          Hwaro::Content::Hooks::AssetHooks.manifest.should be_empty
+        ensure
+          Hwaro::Content::Hooks::AssetHooks.replace_manifest({} of String => String)
+        end
+      end
+    end
+
     it "skips when config is nil" do
       Dir.mktmpdir do |output_dir|
         options = Hwaro::Config::Options::BuildOptions.new(output_dir: output_dir)
