@@ -615,6 +615,11 @@ module Hwaro
         false
       end
 
+      # The attribute run of an opening tag: anything but `>`, except that a
+      # quoted value may contain `>` (`alt="Home > Docs"`). Possessive, so a
+      # long data: URI value is one cheap step, not one per character.
+      HTML_TAG_ATTRS = %q((?:[^>"']++|"[^"]*"|'[^']*')*)
+
       # Raw-text HTML elements whose *content* is code, not display text.
       # `<style>`/`<script>` bodies must be dropped along with their tags;
       # otherwise the CSS/JS source survives tag-stripping and pollutes
@@ -624,7 +629,7 @@ module Hwaro
       # relying on a dotall flag; `\1` ties the close tag to the open tag.
       # A self-closing or unterminated tag won't match and is left to the
       # tag stripper below.
-      RAW_TEXT_ELEMENT = /<(script|style)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
+      RAW_TEXT_ELEMENT = /<(script|style)(?:\s#{HTML_TAG_ATTRS})?>[\s\S]*?<\/\1\s*>/i
 
       # Elements the author marked `aria-hidden="true"` are decoration, not
       # text: a screen reader skips them and so must every plain-text
@@ -770,8 +775,8 @@ module Hwaro
       # `[\s\S]*?` so multi-line blocks are removed whole; the `<code>`
       # inside `<pre>` is consumed by the outer match. Unterminated tags
       # fall through to the generic tag stripper.
-      EXCERPT_SKIP_ELEMENT = /<(pre|script|style|figure|h[1-6])(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
-      EXCERPT_SKIP_VOID    = /<img(?:\s[^>]*)?\/?>/i
+      EXCERPT_SKIP_ELEMENT = /<(pre|script|style|figure|h[1-6])(?:\s#{HTML_TAG_ATTRS})?>[\s\S]*?<\/\1\s*>/i
+      EXCERPT_SKIP_VOID    = /<img(?:\s#{HTML_TAG_ATTRS})?\/?>/i
       # Markup the Markdown extensions emit whose text is not prose either:
       # display math (TeX source until KaTeX/MathJax runs in the browser),
       # footnote reference markers (`[1]`) and the trailing footnotes
