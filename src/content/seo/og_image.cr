@@ -604,10 +604,20 @@ module Hwaro
         # a short stable hash of the URL so each distinct URL owns a path.
         # `seen_slugs` (slug => owning page.url) carries that disambiguation
         # state across calls within one pass.
+        # Longest bare slug: + ".svg"/".png" (4) + "-<8 hex>" collision suffix (9)
+        # stays under the 255-byte NAME_MAX.
+        MAX_SLUG_BYTES = 240
+
         def self.slug_for(page : Models::Page, seen_slugs : Hash(String, String)) : String
           url_slug = page.url.gsub("/", "-").strip("-")
           slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
           slug = "page" if slug.empty?
+          # The slug is the whole URL, so a deep one can exceed NAME_MAX once
+          # the extension (4) and a collision suffix (9) are added; the page
+          # then silently lost its og:image. Longer slugs are cut and tagged
+          # with a digest of the full URL; every slug that already worked is
+          # untouched.
+          slug = Utils::TextUtils.bound_slug(slug, page.url, MAX_SLUG_BYTES)
 
           if (owner = seen_slugs[slug]?) && owner != page.url
             slug = "#{slug}-#{Digest::SHA256.hexdigest(page.url)[0, 8]}"

@@ -432,11 +432,13 @@ module Hwaro
         s.bytesize > MAX_SLUG_BYTES
       end
 
-      private def bound_slug(slug : String, source : String) : String
-        return slug if slug.bytesize <= MAX_SLUG_BYTES
+      # Other generated file names (OG images) bound theirs with a tighter
+      # *max_bytes* that leaves room for their extension.
+      def bound_slug(slug : String, source : String, max_bytes : Int32 = MAX_SLUG_BYTES) : String
+        return slug if slug.bytesize <= max_bytes
 
         suffix = "-#{Digest::SHA1.hexdigest(source)[0, SLUG_DIGEST_CHARS]}"
-        head = truncate_bytes(slug, MAX_SLUG_BYTES - suffix.bytesize)
+        head = truncate_bytes(slug, max_bytes - suffix.bytesize)
         # The cut can land right after a separator ("...-word-"); dropping it
         # keeps the result shaped like any other slug, which never ends in "-".
         "#{head.rstrip('-')}#{suffix}"

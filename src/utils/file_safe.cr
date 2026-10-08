@@ -111,7 +111,7 @@ module Hwaro
       # workers writing sibling outputs can't collide on it.
       def self.atomic_write(path : String | Path, content : String) : Nil
         target = path.to_s
-        tmp = "#{target}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+        tmp = temp_path_for(target)
         begin
           File.write(tmp, content)
           File.rename(tmp, target)
@@ -122,6 +122,15 @@ module Hwaro
           raise directory_in_the_way_error(target, ex) if Dir.exists?(target)
           raise ex
         end
+      end
+
+      # A same-directory temp file for *target*, so the rename stays atomic.
+      # The name is short and independent of the target's: appending a suffix to
+      # the target's own name pushed a valid 233..255-byte file name over
+      # NAME_MAX ("File name too long"). One fiber writes one file at a time,
+      # so pid + fiber id is unique without the target in it.
+      private def self.temp_path_for(target : String) : String
+        File.join(File.dirname(target), "hwaro-#{Process.pid}-#{Fiber.current.object_id}.tmp")
       end
 
       # A directory where a FILE must go is almost always a content page
@@ -171,7 +180,7 @@ module Hwaro
           return
         end
 
-        tmp = "#{target}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+        tmp = temp_path_for(target)
         begin
           File.copy(source, tmp)
           File.rename(tmp, target)

@@ -148,6 +148,34 @@ describe Hwaro::Models::AutoImageConfig do
 end
 
 describe Hwaro::Content::Seo::OgImage do
+  describe ".slug_for" do
+    # Regression: the slug is the whole URL joined by '-' with no byte cap, so
+    # a deep or long URL produced an image file name over NAME_MAX and the
+    # page silently lost its og:image.
+    it "keeps long URL slugs inside a safe file name length, stable and distinct" do
+      long = "b" * 400
+      a = Hwaro::Models::Page.new("a.md")
+      a.url = "/posts/#{long}1/"
+      b = Hwaro::Models::Page.new("b.md")
+      b.url = "/posts/#{long}2/"
+
+      seen = {} of String => String
+      slug_a = Hwaro::Content::Seo::OgImage.slug_for(a, seen)
+      slug_b = Hwaro::Content::Seo::OgImage.slug_for(b, seen)
+
+      slug_a.bytesize.should be <= 240
+      slug_b.bytesize.should be <= 240
+      slug_a.should_not eq(slug_b)
+      slug_a.should eq(Hwaro::Content::Seo::OgImage.slug_for(a, {} of String => String))
+    end
+
+    it "does not touch slugs that already fit" do
+      page = Hwaro::Models::Page.new("a.md")
+      page.url = "/posts/#{"b" * 200}/"
+      Hwaro::Content::Seo::OgImage.slug_for(page, {} of String => String).should eq("posts-#{"b" * 200}")
+    end
+  end
+
   describe ".render_svg" do
     it "renders a valid SVG with page title" do
       page = Hwaro::Models::Page.new("test.md")
