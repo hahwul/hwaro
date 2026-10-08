@@ -84,7 +84,7 @@ module Hwaro
             # Classified usage error. The "Did you mean …" suggestion prints
             # to stderr here (text mode only) so the final error line emitted
             # by the rescue block below is the `Error [CODE]: …` form.
-            if args.any? { |a| a == "--json" }
+            if Runner.json_flag?(args)
               @@json_mode = true
             else
               if suggestion = Utils::CommandSuggester.suggest(command, CommandRegistry.names)
@@ -153,7 +153,7 @@ module Hwaro
       # from `Runner.json_mode?` (set by commands that saw `--json`) or from
       # the raw ARGV (unknown-command path, before any parser runs).
       def self.emit_hwaro_error(err : Hwaro::HwaroError, io : IO = STDERR)
-        json = @@json_mode || flag_args(ARGV).includes?("--json")
+        json = @@json_mode || json_flag?(ARGV)
         if json
           STDOUT.puts err.to_error_payload.to_json
         else
@@ -163,6 +163,12 @@ module Hwaro
             io.puts hint unless hint.empty?
           end
         end
+      end
+
+      # `--json` or its documented short form `-j`, before any `--`. The
+      # raw-argv check for errors raised before a command's parser ran.
+      def self.json_flag?(argv : Array(String)) : Bool
+        flag_args(argv).any? { |a| a == "--json" || a == "-j" }
       end
 
       # The arguments that can be flags: everything before a `--` separator.
