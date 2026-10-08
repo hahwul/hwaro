@@ -223,6 +223,15 @@ module Hwaro
         segments.join("/")
       end
 
+      # NFC form of `value` (the identity for ASCII, which is nearly every
+      # path). Config patterns are typed precomposed while macOS, zip and
+      # Dropbox hand out decomposed (NFD) file names, so every
+      # pattern-versus-path comparison folds both sides first. Comparison
+      # only: never use it to spell an output path or URL.
+      def nfc(value : String) : String
+        value.ascii_only? ? value : value.unicode_normalize(:nfc)
+      end
+
       # Case- and Unicode-folded form of an `output_file_key`. APFS/HFS+ and
       # NTFS treat `Foo/index.html` and `foo/index.html` as the same file, and
       # APFS additionally folds the NFD and NFC spellings of one accented name
@@ -231,8 +240,7 @@ module Hwaro
       def output_fold_key(key : String) : String
         # NFC is the identity for ASCII, which is nearly every URL, and this
         # runs once per page per build.
-        return key.downcase if key.ascii_only?
-        key.unicode_normalize(:nfc).downcase
+        nfc(key).downcase
       end
 
       # Does the filesystem that `reference` lives on fold letter case in file
@@ -412,7 +420,7 @@ module Hwaro
       # raising File::BadPatternError, so a single config typo can't crash a
       # build or deploy.
       def glob_match?(pattern : String, path : String) : Bool
-        File.match?(pattern, path)
+        File.match?(nfc(pattern), nfc(path))
       rescue File::BadPatternError
         false
       end

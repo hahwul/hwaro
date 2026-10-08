@@ -445,6 +445,11 @@ describe Hwaro::Utils::PathUtils do
     it "returns false for an empty pattern" do
       Hwaro::Utils::PathUtils.glob_match?("", "a").should be_false
     end
+
+    it "matches across Unicode normalization forms" do
+      Hwaro::Utils::PathUtils.glob_match?("가*.txt", "가x.txt").should be_true
+      Hwaro::Utils::PathUtils.glob_match?("가*.txt", "가x.txt").should be_true
+    end
   end
 
   describe ".glob_escape" do

@@ -1,4 +1,5 @@
 require "../models/page"
+require "../utils/path_utils"
 
 # Shared page-list shaping for the public discovery surfaces (sitemap,
 # search index): URL dedupe and config-driven path exclusion.
@@ -31,11 +32,13 @@ module Hwaro
         return pages if exclude.empty?
 
         excluded_paths = exclude.map do |path|
+          path = Utils::PathUtils.nfc(path)
           path.starts_with?('/') ? path : "/#{path}"
         end
 
         pages.reject! do |page|
-          page_url = page.url.starts_with?('/') ? page.url : "/#{page.url}"
+          url = Utils::PathUtils.nfc(page.url)
+          page_url = url.starts_with?('/') ? url : "/#{url}"
           excluded_paths.any? { |excluded| page_url == excluded || page_url.starts_with?(excluded.ends_with?("/") ? excluded : excluded + "/") }
         end
         pages
