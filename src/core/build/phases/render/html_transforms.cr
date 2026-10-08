@@ -19,8 +19,10 @@ module Hwaro::Core::Build::Phases::Render
   IMG_TAG_RE  = /<img\b[^>]*>/
   IMG_SRC_RE  = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
   IMG_SIZE_RE = /\s(?:width|height)\s*=/i
-  # An actual `srcset` attribute — not alt/title text that merely says "srcset".
-  IMG_SRCSET_RE = /\ssrcset\s*=/i
+  # An actual `srcset` attribute (or a lazy-loader's `data-srcset`) — not
+  # alt/title text that merely says "srcset". A `data-srcset` image is the
+  # lazy-loader's to size; a real `srcset` beside it would load eagerly.
+  IMG_SRCSET_RE = /[\s\-]srcset\s*=/i
 
   private def apply_responsive_images(html : String, page : Models::Page, config : Models::Config) : String
     dimensions = config.image_processing.dimensions

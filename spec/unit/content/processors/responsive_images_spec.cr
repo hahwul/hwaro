@@ -228,6 +228,9 @@ describe "Responsive content image lookup keys" do
       # A real attribute (any case, spaced `=`) still wins.
       html = %(<img src="photo.png" SRCSET ="a.png 1x">)
       builder.test_apply_responsive_images(html, bundle_page, enabled_config).should eq(html)
+      # A lazy-loader's data-srcset stays the loader's: no eager srcset beside it.
+      html = %(<img src="photo.png" data-srcset="a.png 1x">)
+      builder.test_apply_responsive_images(html, bundle_page, enabled_config).should eq(html)
     end
   end
 
