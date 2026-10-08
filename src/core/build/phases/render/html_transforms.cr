@@ -37,6 +37,9 @@ module Hwaro::Core::Build::Phases::Render
       next tag unless m
       src = m[2]? || m[3]? || ""
       next tag if src.empty?
+      # Markdown HTML-escapes `&` in a URL; the resize map and the filesystem
+      # use the literal name.
+      src = HTML.unescape(src)
       next tag if src.starts_with?("http://") || src.starts_with?("https://") ||
                   src.starts_with?("//") || src.starts_with?("data:")
 

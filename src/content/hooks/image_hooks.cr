@@ -157,6 +157,8 @@ module Hwaro
         # then a `static/` file — the order the resize jobs claim URLs in.
         # `config` defaults to the running build's.
         def self.resolve_source(url : String, config : Models::Config? = nil) : String?
+          # A decoded `%00` can never name a file, and File.file? raises on it.
+          return if url.includes?('\0')
           url = Path.posix(url).normalize.to_s
           if source = source_path_for(url) || bundle_source_for(url)
             return source
