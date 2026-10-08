@@ -27,12 +27,14 @@ module Hwaro
 
         # Tokens kept verbatim, matched over one paragraph-sized chunk: a
         # code span (which may cross a line break), an HTML comment, an HTML
-        # tag (Markd's grammar, so attribute values are never rewritten) and
-        # a backslash escape (`\[[x]]` stays literal).
+        # tag (Markd's grammar, so attribute values are never rewritten), an
+        # autolink (`<https://x/[[y]]>`) and a backslash escape (`\[[x]]`
+        # stays literal).
         VERBATIM_TOKENS = [
           /(?<code>`+)(?s:.*?)(?<!`)\k<code>(?!`)/.source,
           /(?<comment><!--(?s:.*?)-->)/.source,
           "(?<tag>#{MarkdownExtensions::HTML_TAG_RE.source})",
+          /(?<autolink><[A-Za-z][A-Za-z0-9+.-]*:[^\s<>]*>)/.source,
         ].join('|')
         ESC_TOKEN = /(?<esc>\\[^\n])/.source
         # `\(…\)` TeX math, kept verbatim with `[markdown] math` (the `$`
@@ -40,15 +42,17 @@ module Hwaro
         # ESC_TOKEN, which would otherwise take its `\(`.
         TEX_TOKEN      = /(?<tex>\\\((?s:.*?)\\\))/.source
         WIKILINK_TOKEN = /(?<bang>!?)\[\[(?<inner>[^\[\]\n]+)\]\]/.source
-        # The other link form backlinks count: a Markdown destination. HTML
-        # `href`s are read out of the `tag` token.
+        # The other link forms backlinks count: a Markdown destination
+        # (`](url`, which `rewrite` also keeps verbatim, so a `[[x]]` inside
+        # a URL is never rewritten) and a link reference definition
+        # (`[label]: url`, not a footnote). HTML `href`s are read out of the
+        # `tag` token.
         URL_TOKEN = /\]\(\s*<?(?<url>[^\s)>]+)/.source
+        DEF_TOKEN = /(?m:^) {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*<?(?<def>[^\s>]+)/.source
         HREF_RE   = /\bhref\s*=\s*["']([^"']*)["']/i
 
-        WIKILINK_TOKEN_RE      = Regex.new("#{VERBATIM_TOKENS}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}")
-        WIKILINK_MATH_TOKEN_RE = Regex.new("#{VERBATIM_TOKENS}|#{TEX_TOKEN}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}")
-        LINK_TOKEN_RE          = Regex.new("#{VERBATIM_TOKENS}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}|#{URL_TOKEN}")
-        LINK_MATH_TOKEN_RE     = Regex.new("#{VERBATIM_TOKENS}|#{TEX_TOKEN}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}|#{URL_TOKEN}")
+        LINK_TOKEN_RE      = Regex.new("#{VERBATIM_TOKENS}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}|#{URL_TOKEN}|#{DEF_TOKEN}")
+        LINK_MATH_TOKEN_RE = Regex.new("#{VERBATIM_TOKENS}|#{TEX_TOKEN}|#{ESC_TOKEN}|#{WIKILINK_TOKEN}|#{URL_TOKEN}|#{DEF_TOKEN}")
 
         IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp|ico|tiff?)\z/i
         SIZE_RE      = /\A(\d+)(?:x(\d+))?\z/
@@ -232,63 +236,91 @@ module Hwaro
         def rewrite(content : String, source : Models::Page, index : Index, safe : Bool = false,
                     misses : Array({String, String})? = nil, warn : Bool = true, math : Bool = false) : String
           return content unless Utils::ByteScan.includes?(content, "[[")
-          scan(content, math, math ? WIKILINK_MATH_TOKEN_RE : WIKILINK_TOKEN_RE) do |md, sources|
+          scan(content, math, math ? LINK_MATH_TOKEN_RE : LINK_TOKEN_RE) do |md, sources, inline|
             next unless inner = md["inner"]?
             # `[[foo|cost $x$]]`: the math inside is the link's own text.
             next unless link = parse(MarkdownExtensions.restore_math(inner, sources), md["bang"] == "!")
-            render(link, MarkdownExtensions.restore_math(md[0], sources), source, index, safe, misses, warn)
+            render(link, MarkdownExtensions.restore_math(md[0], sources), source, index, safe, misses, warn, math, inline)
           end
         end
 
         # Yields every link-ish token where `rewrite` would see one: a parsed
-        # wikilink, or the URL of a Markdown destination / HTML href.
+        # wikilink, or the URL of a Markdown destination / link reference
+        # definition / HTML href. Hrefs in raw HTML blocks count too (the
+        # build renders them as links), though `rewrite` leaves those lines
+        # alone.
         def each_link(content : String, math : Bool = false, & : Link | String ->) : Nil
           return unless Utils::ByteScan.includes?(content, "[[") || Utils::ByteScan.includes?(content, "](") ||
-                        Utils::ByteScan.includes?(content, "href")
+                        Utils::ByteScan.includes?(content, "]:") || Utils::ByteScan.includes?(content, "href")
           scan(content, math, math ? LINK_MATH_TOKEN_RE : LINK_TOKEN_RE) do |md, sources|
             if inner = md["inner"]?
               parse(MarkdownExtensions.restore_math(inner, sources), md["bang"] == "!").try { |link| yield link }
-            elsif url = md["url"]?
+            elsif url = md["url"]? || md["def"]?
               yield MarkdownExtensions.restore_math(url, sources)
             elsif tag = md["tag"]?
               MarkdownExtensions.restore_math(tag, sources).scan(HREF_RE) { |m| yield m[1] }
             end
             nil
           end
+          return unless Utils::ByteScan.includes?(content, "href")
+          tracker = FenceTracker.new
+          in_comment = false
+          content.each_line(chomp: false) do |line|
+            next if tracker.fence_line?(line) || !tracker.html_block_line?
+            # Not inside an HTML comment, which renders no link.
+            if in_comment
+              close = line.index("-->") || next
+              line = line[(close + 3)..]
+              in_comment = false
+            end
+            line = line.gsub(/<!--.*?-->/, "")
+            if open = line.index("<!--")
+              line = line[0, open]
+              in_comment = true
+            end
+            line.scan(HREF_RE) { |m| yield m[1] }
+          end
         end
 
+        # `inline`: the text lands in a table cell, a definition list or a
+        # footnote body, which InlineMarkdown renders. It has no backslash
+        # escapes, raw HTML or image attribute blocks, so there the link
+        # text is written as is, a missing link is plain text, and the
+        # size block is one it understands.
         private def render(link : Link, source_text : String, source : Models::Page, index : Index, safe : Bool,
-                           misses : Array({String, String})?, warn : Bool) : String
+                           misses : Array({String, String})?, warn : Bool, math : Bool, inline : Bool) : String
           if link.image?
             if url = index.resolve_file(link.target, source)
-              return image(link, url)
+              return image(link, url, inline)
             end
           elsif link.target.empty?
-            return "[#{escape_text(link.text)}](##{encode(slug(link.heading))})"
+            return "[#{text(link.text, inline)}](##{encode(slug(link.heading))})"
           elsif page = index.resolve(link.target, source)
             dest = "@/#{encode(page.path)}"
             dest += "##{encode(slug(link.heading))}" if link.heading
-            return "[#{escape_text(link.text)}](#{dest})"
+            return "[#{text(link.text, inline)}](#{dest})"
           elsif link.file? && (url = index.resolve_file(link.target, source))
             # An attachment (`[[doc.pdf]]`, `![[doc.pdf]]`): a plain link.
-            return "[#{escape_text(link.text)}](#{encode(url)})"
+            return "[#{text(link.text, inline)}](#{encode(url)})"
           end
 
           reason = link.file? ? "file not found" : "page not found"
           Logger.warn "Wikilink '#{source_text}' in '#{source.path}' could not be resolved: #{reason}." if warn
           misses << {source_text, reason} if misses
-          safe ? escape_text(link.text) : %(<span class="wikilink wikilink-missing">#{HTML.escape(link.text)}</span>)
+          return text(link.text, inline) if safe || inline
+          body = math && link.text.includes?('$') ? MarkdownExtensions.protect_math(link.text) { |stashed, _| escape_span_text(stashed) } : escape_span_text(link.text)
+          %(<span class="wikilink wikilink-missing">#{body}</span>)
         end
 
         # `|300` / `|300x200` sizes the image through an attribute block
         # (MarkdownExtensions enables image attributes with wikilinks); any
         # other alias is the alt text, which otherwise is the file name.
-        private def image(link : Link, url : String) : String
+        private def image(link : Link, url : String, inline : Bool) : String
           label = link.label
           size = label.try(&.match(SIZE_RE))
           alt = label && !size ? label : File.basename(link.target)
           String.build do |io|
-            io << "![" << escape_text(alt) << "](" << encode(url) << ')'
+            io << "![" << text(alt, inline) << "](" << encode(url) << ')'
             if size
               io << "{width=" << size[1]
               size[2]?.try { |h| io << " height=" << h }
@@ -302,6 +334,19 @@ module Hwaro
         private def slug(heading : String?) : String
           s = Utils::TextUtils.slugify(heading || "")
           s.empty? ? "heading" : s
+        end
+
+        # Link text as the target context reads it (see `render`).
+        private def text(text : String, inline : Bool) : String
+          inline ? text : escape_text(text)
+        end
+
+        # The text of a missing-link `<span>`, which Markd still reads for
+        # emphasis, code spans and backslash escapes between the tags (a
+        # trailing `\` would swallow the `<` of `</span>`): HTML-escaped,
+        # with those Markdown characters backslash-escaped.
+        private def escape_span_text(text : String) : String
+          HTML.escape(text).gsub(/[\\*_`\[\]~]/) { |char| "\\#{char}" }
         end
 
         # Backslash-escapes ASCII punctuation so link text stays literal.
@@ -334,11 +379,11 @@ module Hwaro
         # pass is on.
         # The block also gets the stashed math sources (empty without math),
         # for `MarkdownExtensions.restore_math` on what it lifts out.
-        private def scan(content : String, math : Bool, re : Regex, & : Regex::MatchData, Array(String) -> String?) : String
+        private def scan(content : String, math : Bool, re : Regex, & : Regex::MatchData, Array(String), Bool -> String?) : String
           none = [] of String
-          return walk(content, re) { |md| yield md, none } unless math && content.includes?('$')
+          return walk(content, re) { |md, inline| yield md, none, inline } unless math && content.includes?('$')
           MarkdownExtensions.protect_math(content) do |stashed, sources|
-            walk(stashed, re) { |md| yield md, sources }
+            walk(stashed, re) { |md, inline| yield md, sources, inline }
           end
         end
 
@@ -365,13 +410,17 @@ module Hwaro
         # build are chunks of their own), so a code span can cross a line
         # break but not a block.
         # Code/comment matches pass through; every other match is replaced
-        # by the block's result (nil keeps it).
-        private def walk(content : String, re : Regex, & : Regex::MatchData -> String?) : String
+        # by the block's result (nil keeps it). The block also learns whether
+        # the match sits where InlineMarkdown, not Markd, renders it: a table
+        # row, a footnote body, or a chunk holding a `: definition` line
+        # (assumed to be a definition list).
+        private def walk(content : String, re : Regex, & : Regex::MatchData, Bool -> String?) : String
           tracker = FenceTracker.new
           chunk = String::Builder.new
           lines = content.lines(chomp: false)
           in_table = false
           in_footnote = false
+          chunk_inline = false
           chunk_quote = 0
           String.build(content.bytesize) do |io|
             lines.each_with_index do |line, i|
@@ -385,7 +434,7 @@ module Hwaro
               if verbatim || standalone || blank || tracker.list_item_line? || footnote ||
                  (in_footnote && !indented) || (!chunk.empty? && quote > chunk_quote)
                 unless chunk.empty?
-                  io << transform(chunk.to_s, re) { |md| yield md }
+                  io << transform(chunk.to_s, re) { |md| yield md, chunk_inline }
                   chunk = String::Builder.new
                 end
               end
@@ -393,13 +442,17 @@ module Hwaro
               if verbatim || blank
                 io << line
               elsif standalone
-                io << transform(line, re) { |md| yield md }
+                io << transform(line, re) { |md| yield md, in_table }
               else
-                chunk_quote = quote if chunk.empty?
+                if chunk.empty?
+                  chunk_quote = quote
+                  chunk_inline = in_footnote
+                end
+                chunk_inline ||= line.lstrip.starts_with?(": ")
                 chunk << line
               end
             end
-            io << transform(chunk.to_s, re) { |md| yield md } unless chunk.empty?
+            io << transform(chunk.to_s, re) { |md| yield md, chunk_inline } unless chunk.empty?
           end
         end
 

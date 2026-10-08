@@ -82,10 +82,16 @@ module Hwaro
         # (`@/my note.md` arrives as `@/my%20note.md`), so the decoded path is
         # tried first: `%20` means a space, as it does to Markd. A literal
         # `%` file name is still reached when nothing decodes to it (or as
-        # `%25`).
+        # `%25`). A path captured from rendered HTML carries Markd's `&amp;`
+        # for a `&` (`@/odd/a&amp;b.md`), so that spelling is tried first.
         def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
-          return pages_by_path[path]? unless path.includes?('%')
-          pages_by_path[URI.decode(path)]? || pages_by_path[path]?
+          return pages_by_path[path]? unless path.includes?('%') || path.includes?("&amp;")
+          candidates = path.includes?("&amp;") ? [path.gsub("&amp;", "&"), path] : [path]
+          candidates.each do |candidate|
+            page = (candidate.includes?('%') ? pages_by_path[URI.decode(candidate)]? : nil) || pages_by_path[candidate]?
+            return page if page
+          end
+          nil
         end
 
         # Resolve internal `@/` links in HTML to actual page URLs.

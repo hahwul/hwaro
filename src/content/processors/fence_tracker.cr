@@ -84,6 +84,10 @@ module Hwaro
         HTML_BLOCK_TAG_RE      = /\A {0,3}<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|section|source|title|summary|table|tbody|td|tfoot|th|thead|tr|track|ul)(?:\s|\/?>|\z)/i
         HTML_BLOCK_LONE_TAG_RE = /\A {0,3}(?:<[A-Za-z][A-Za-z0-9-]*+(?:\s++[a-zA-Z_:][a-zA-Z0-9:._-]*+(?:\s*+=\s*+(?:[^"'=<>`\x00-\x20]++|'[^']*+'|"[^"]*+"))?+)*+\s*+\/?>|<\/[A-Za-z][A-Za-z0-9-]*+\s*+>)\s*\z/
 
+        # What ends the HTML blocks that run to a marker, not a blank line
+        # (CommonMark types 2-5), keyed by `@html_block`.
+        HTML_BLOCK_END = {2 => "-->", 3 => "?>", 4 => ">", 5 => "]]>"}
+
         # An ATX heading at up to 3 spaces indent: 1-6 `#` followed by a
         # space/tab or nothing but the line ending. Only used to let an
         # indented-code run open on the line right after a heading — the
@@ -121,8 +125,9 @@ module Hwaro
         # one blank line, and an empty one followed by a blank has none.
         @empty_item_open = false
         # An open generic HTML block (0 none, 1 ends at a blank line — the
-        # CommonMark type 6/7 blocks, 2 an HTML comment ending at `-->`) and
-        # the quote depth it lives in. Its lines are raw HTML to Markd, so
+        # CommonMark type 6/7 blocks, 2..5 a comment, processing instruction,
+        # declaration or CDATA section ending at the `HTML_BLOCK_END` marker)
+        # and the quote depth it lives in. Its lines are raw HTML to Markd, so
         # they never open indented code. Only that suppression is modelled:
         # a block tracked too long merely leaves lines unprotected.
         @html_block = 0
@@ -400,7 +405,7 @@ module Hwaro
             @html_block = 0
             return false
           end
-          @html_block = 0 if @html_block == 2 && content.includes?("-->")
+          @html_block = 0 if (close = HTML_BLOCK_END[@html_block]?) && content.includes?(close)
           true
         end
 
@@ -416,6 +421,15 @@ module Hwaro
             # `-->` may close it on the same line — even `<!-->`/`<!--->`.
             return true if stripped.index("-->", 2)
             @html_block = 2
+          elsif stripped.starts_with?("<?")
+            return true if stripped.index("?>", 2)
+            @html_block = 3
+          elsif stripped.starts_with?("<![CDATA[")
+            return true if stripped.index("]]>", 9)
+            @html_block = 5
+          elsif stripped.matches?(/\A<![A-Za-z]/)
+            return true if stripped.index('>', 2)
+            @html_block = 4
           elsif HTML_BLOCK_TAG_RE.matches?(stripped)
             @html_block = 1
           elsif !in_paragraph && HTML_BLOCK_LONE_TAG_RE.matches?(stripped)

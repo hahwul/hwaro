@@ -45,7 +45,7 @@ Titles are not used. When several pages match, Hwaro prefers, in order: a page i
 
 A resolved wikilink turns into an ordinary internal link (`[text](@/path.md#heading)`) before Markdown rendering. Render hooks, `base_path`, the external-link policy and the `[links]` checks therefore treat it exactly like an `@/` link.
 
-A wikilink is left as written wherever Markdown would not make a link either: fenced or indented code, inline code (including a code span over two lines), raw HTML blocks, HTML tags and their attributes, HTML comments, math (`$…$`, `$$…$$` and `\(…\)` with `[markdown] math` on), and after a backslash (`\[[not a link]]`). Wikilinks inside a shortcode call or body are not rewritten either.
+A wikilink is left as written wherever Markdown would not make a link either: fenced or indented code, inline code (including a code span over two lines), raw HTML blocks, HTML tags and their attributes, autolinks and link destinations (`<https://x.example/[[a]]>`, `[x](/a/[[b]])`), HTML comments, math (`$…$`, `$$…$$` and `\(…\)` with `[markdown] math` on), and after a backslash (`\[[not a link]]`). Wikilinks inside a shortcode call or body are not rewritten either.
 
 A target with a file extension other than `.md` (`[[report.pdf]]`, `![[report.pdf]]`) links to that published file, found the same way as an [image embed](#image-embeds).
 
@@ -73,7 +73,7 @@ A note embed on a line of its own pulls the note's Markdown into the page:
 | Syntax | Result |
 |--------|--------|
 | `![[note]]` | the whole note body |
-| `![[note#Setup]]` | the `Setup` heading through the line before the next heading of the same or a higher level |
+| `![[note#Setup]]` | the `Setup` heading (ATX or underlined) through the line before the next heading of the same or a higher level |
 
 The text is rendered as if written in place, like [`include_md`](/writing/shortcodes/#include-md): shortcodes in it expand and its headings join the page's table of contents. It is wrapped in `<div class="transclusion" data-source="/note/">…</div>`, where `data-source` is the note's URL. A note can embed others, including another heading of itself, up to 8 levels deep; a cycle is a build error.
 
@@ -121,7 +121,7 @@ Links are read from each page's Markdown source:
 
 - `@/path.md` links;
 - wikilinks (when `[markdown] wikilinks` is on);
-- Markdown and HTML links whose URL is a page's URL (`[x](/docs/setup/)`, `href="../setup/"`).
+- Markdown and HTML links whose URL is a page's URL (`[x](/docs/setup/)`, `href="../setup/"`), including reference-style links (`[x][ref]` with `[ref]: /docs/setup/`) and links in raw HTML blocks.
 
 Links produced by shortcodes or templates are not counted, and neither are links written inside a shortcode call or body (they are not rewritten, so they are not counted either).
 

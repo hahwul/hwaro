@@ -381,3 +381,112 @@ describe "page.backlinks" do
     end
   end
 end
+
+describe "wikilinks where InlineMarkdown renders the text" do
+  it "writes link text plainly in table cells, definition lists and footnote bodies" do
+    build_site(
+      WIKI_CONFIG,
+      content_files: {
+        "my-page.md" => "---\ntitle: My Page\n---\nx\n",
+        "t.md"       => "---\ntitle: T\n---\n## Sec\n",
+        "p.md"       => "---\ntitle: P\n---\n| name | note |\n|------|------|\n| [[my-page]] | [[my-page\\|Hello, world!]] |\n| [[t#Sec]] | [[nope]] |\n| ![[pic.png\\|300]] | x |\n\nTerm [[my-page]]\n: definition [[my-page|a-b]]\n\nBody[^1]\n\n[^1]: see [[my-page]] and [[nope-x]]\n",
+      },
+      static_files: {"pic.png" => "PNG"},
+      template_files: WIKI_TEMPLATES,
+    ) do |dir|
+      html = wiki_main(dir, "p")
+      html.should contain(%(<td><a href="/my-page/">my-page</a></td>))
+      html.should contain(%(<td><a href="/my-page/">Hello, world!</a></td>))
+      html.should contain(%(<td><a href="/t/#sec">t &gt; Sec</a></td>))
+      html.should contain("<td>nope</td>")
+      html.should contain(%(<td><img src="/pic.png" alt="pic.png" width="300"></td>))
+      html.should contain(%(<dt>Term <a href="/my-page/">my-page</a></dt>))
+      html.should contain(%(<dd>definition <a href="/my-page/">a-b</a></dd>))
+      html.should contain(%(see <a href="/my-page/">my-page</a> and nope-x))
+      html.should_not contain("\\")
+      html.should_not contain("&lt;span")
+    end
+  end
+
+  it "keeps the markdown in a missing link's text literal" do
+    log = with_captured_log do
+      build_site(
+        WIKI_CONFIG,
+        content_files: {"p.md" => "---\ntitle: P\n---\nA [[__init__]] B [[*todo*]] C [[`code`]] D [[a\\]] E\n"},
+        template_files: WIKI_TEMPLATES,
+      ) do |dir|
+        html = wiki_main(dir, "p")
+        html.should contain(%(<span class="wikilink wikilink-missing">__init__</span>))
+        html.should contain(%(<span class="wikilink wikilink-missing">*todo*</span>))
+        html.should contain(%(<span class="wikilink wikilink-missing">`code`</span>))
+        html.should contain(%(<span class="wikilink wikilink-missing">a\\</span> E</p>))
+      end
+    end
+    log.should contain("[[__init__]]")
+  end
+end
+
+describe "wikilinks next to URLs and raw HTML" do
+  it "leaves a [[x]] inside an autolink, a link destination, a processing instruction and CDATA alone" do
+    build_site(
+      WIKI_CONFIG,
+      content_files: {
+        "t.md" => "---\ntitle: T\n---\nt\n",
+        "p.md" => "---\ntitle: P\n---\nAutolink <https://example.com/[[t]]> and [a](http://x.y/[[t]])\n\n<?php [[t]] ?>\n\n<![CDATA[ [[t]] ]]>\n",
+      },
+      template_files: WIKI_TEMPLATES,
+    ) do |dir|
+      html = wiki_main(dir, "p")
+      html.should contain(%(href="https://example.com/%5B%5Bt%5D%5D"))
+      html.should contain(%(href="http://x.y/%5B%5Bt%5D%5D"))
+      html.should contain("<?php [[t]] ?>")
+      html.should contain("<![CDATA[ [[t]] ]]>")
+      html.should_not contain("@/t.md")
+    end
+  end
+
+  it "resolves a link to a page whose path holds a &" do
+    build_site(
+      WIKI_CONFIG + "\n[links]\nbroken_internal = \"error\"\n",
+      content_files: {
+        "odd/a&b.md" => "---\ntitle: AB\n---\nx\n",
+        "p.md"       => "---\ntitle: P\n---\n[[odd/a&b]] [A](@/odd/a&b.md) [[Q&A]]\n",
+        "Q&A.md"     => "---\ntitle: QA\n---\nx\n",
+      },
+      template_files: WIKI_TEMPLATES,
+    ) do |dir|
+      html = wiki_main(dir, "p")
+      html.should contain(%(<a href="/odd/a&amp;b/">odd/a&amp;b</a>))
+      html.should contain(%(<a href="/odd/a&amp;b/">A</a>))
+      html.should contain(%(<a href="/Q&amp;A/">Q&amp;A</a>))
+      html.should_not contain("@/")
+    end
+  end
+end
+
+describe "page.backlinks sources" do
+  it "counts reference-style link definitions and hrefs in raw HTML blocks" do
+    build_site(
+      WIKI_CONFIG,
+      content_files: {
+        "t1.md"  => "---\ntitle: T1\n---\nt\n",
+        "t2.md"  => "---\ntitle: T2\n---\nt\n",
+        "t3.md"  => "---\ntitle: T3\n---\nt\n",
+        "tgt.md" => "---\ntitle: Tgt\n---\nt\n",
+        "ref.md" => "---\ntitle: Ref\n---\nref [x][r] and [y][] and [z] and [^n]\n\n[r]: @/t1.md\n[y]: <@/t2.md> \"title\"\n[z]: /t3/\n\n[^n]: /tgt/\n",
+        "lk.md"  => "---\ntitle: Lk\n---\n<div class=\"card\">\n  <a href=\"/tgt/\">x</a>\n  <!-- <a href=\"/t1/\">hidden</a> -->\n</div>\n",
+        "fig.md" => "---\ntitle: Fig\n---\n<figure>\n<a href=\"@/tgt.md\">x</a>\n</figure>\n",
+      },
+      template_files: WIKI_TEMPLATES,
+    ) do |dir|
+      wiki_main(dir, "t1").should contain("|BL:Ref;")
+      wiki_main(dir, "t2").should contain("|BL:Ref;")
+      wiki_main(dir, "t3").should contain("|BL:Ref;")
+      tgt = wiki_main(dir, "tgt")
+      tgt.should contain("Lk;")
+      tgt.should contain("Fig;")
+      tgt.should_not contain("Ref;")
+      wiki_main(dir, "t1").should_not contain("Lk;")
+    end
+  end
+end

@@ -218,6 +218,16 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["<!--->", "", "Text.", "", "    code"]).should eq [false, false, false, false, true]
     end
 
+    it "tracks processing-instruction, declaration and CDATA blocks as raw HTML up to their marker" do
+      html_lines = ->(lines : Array(String)) do
+        tracker = Hwaro::Content::Processors::FenceTracker.new
+        lines.map { |line| tracker.fence_line?(line); tracker.html_block_line? }
+      end
+      html_lines.call(["<?php a ?>", "text", "<?xml", "", "b", "?>", "text"]).should eq [true, false, true, true, true, true, false]
+      html_lines.call(["<![CDATA[ a ]]>", "text", "<![CDATA[", "", "b", "]]>", "text"]).should eq [true, false, true, true, true, true, false]
+      html_lines.call(["<!DOCTYPE html>", "text", "<!ELEMENT", "b>", "text"]).should eq [true, false, true, true, false]
+    end
+
     it "does not open a lone-tag HTML block inside a paragraph" do
       feed(["para", "<span>", "> >     y"]).should eq [false, false, true]
     end

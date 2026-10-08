@@ -47,8 +47,10 @@ module Hwaro
         # `[\s\S]` (not `.`) because a footnote or definition body may still
         # carry a newline at this point.
         INLINE_CODE_SPAN_RE = /(?<!`)(`++)([\s\S]+?)(?<!`)\1(?!`)/
-        INLINE_IMAGE_RE     = /!\[([^\]]*)\]\(([^)]*)\)/
-        INLINE_LINK_RE      = /\[([^\]]+)\]\(([^)]*)\)/
+        # `{width=300}` / `{width=300 height=200}` right after an image is its
+        # size, the attribute block `![[pic.png|300]]` is rewritten to.
+        INLINE_IMAGE_RE = /!\[([^\]]*)\]\(([^)]*)\)(?:\{width=(\d+)(?: height=(\d+))?\})?/
+        INLINE_LINK_RE  = /\[([^\]]+)\]\(([^)]*)\)/
         # Flanking guards (`(?=\S)` … `(?<=\S)`): a delimiter run that touches
         # whitespace on the inside must NOT open/close emphasis, so literal
         # `2 * 3 and 4 * 5` (arithmetic in a table cell or footnote) is left
@@ -178,7 +180,8 @@ module Hwaro
             # would double-encode `&` into `&amp;amp;`). Matches the link branch
             # below, which already inserts `link_text` without re-escaping.
             if safe_url?(url)
-              %(<img src="#{url}" alt="#{alt}">)
+              size = $3? ? %( width="#{$3}"#{$4? ? %( height="#{$4}") : ""}) : ""
+              %(<img src="#{url}" alt="#{alt}"#{size}>)
             else
               "![#{alt}](#{url})"
             end
