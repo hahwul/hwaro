@@ -358,11 +358,11 @@ module Hwaro
         # escape `output_dir` and plant or overwrite files anywhere the
         # running user can write. Neutralise traversal at this single sink so
         # every current and future importer is protected.
-        protected def resolve_content_path(output_dir : String, section : String, slug : String, verbose : Bool = false) : String?
+        protected def resolve_content_path(output_dir : String, section : String, slug : String, quiet : Bool = false) : String?
           safe_section = Utils::PathUtils.sanitize_path(section)
           safe_slug = safe_filename_component(slug)
           if safe_slug.empty?
-            Logger.warn "Skipped (unsafe slug #{slug.inspect})" if verbose
+            Logger.warn "Skipped (unusable slug #{slug.inspect}; it is empty or only path separators/dots)" unless quiet
             return
           end
 
@@ -373,7 +373,7 @@ module Hwaro
           # Belt-and-suspenders: refuse to write outside output_dir even if a
           # component slipped past the sanitisers above.
           unless Utils::OutputGuard.within_output_dir?(path, output_dir)
-            Logger.warn "Skipped (escapes output directory): #{path}"
+            Logger.warn "Skipped (escapes output directory): #{path}" unless quiet
             return
           end
 
@@ -399,16 +399,23 @@ module Hwaro
         end
 
         private def claim_path(path : String) : String
-          return path if @claimed_paths.add?(path)
+          claim_path_in(@claimed_paths, @claim_suffixes, path)
+        end
+
+        # `claim_path` over caller-owned state, so a pre-pass can predict the
+        # destinations the real run will settle on (links between notes need
+        # them before any note is written).
+        protected def claim_path_in(claimed : Set(String), suffixes : Hash(String, Int32), path : String) : String
+          return path if claimed.add?(path)
 
           ext = File.extname(path)
           stem = path.chomp(ext)
-          n = @claim_suffixes[stem]? || 0
+          n = suffixes[stem]? || 0
           loop do
             n += 1
-            break if @claimed_paths.add?("#{stem}-#{n}#{ext}")
+            break if claimed.add?("#{stem}-#{n}#{ext}")
           end
-          @claim_suffixes[stem] = n
+          suffixes[stem] = n
           "#{stem}-#{n}#{ext}"
         end
 
@@ -448,7 +455,7 @@ module Hwaro
           verbose : Bool = false,
           force : Bool = false,
         ) : {Bool, String?}
-          resolved = resolve_content_path(output_dir, section, slug, verbose)
+          resolved = resolve_content_path(output_dir, section, slug)
           return {false, nil} unless resolved
 
           path = claim_path(resolved)
@@ -595,9 +602,36 @@ module Hwaro
         end
 
         # YAML::Any scalar → String: string scalars pass through, anything
-        # else falls back to its raw representation.
+        # else falls back to its raw representation. An unquoted date
+        # (`title: 2024-05-01`) arrives as a Time; `Time#to_s` would add a
+        # midnight time and the importing machine's zone offset, so it goes
+        # through the front matter date writer (a bare date stays a bare date).
         protected def yaml_string(value : YAML::Any) : String
-          value.as_s? || value.raw.to_s
+          raw = value.raw
+          raw.is_a?(Time) ? Utils::FrontmatterWriter.serialize_time(raw) : (value.as_s? || raw.to_s)
+        end
+
+        # A front matter `title:` as text, or nil when it is blank or null (the
+        # Obsidian Properties template writes a bare `title:`), so callers can
+        # fall back to a filename or heading title instead of storing "".
+        protected def yaml_title(value : YAML::Any) : String?
+          title = yaml_string(value)
+          title.blank? ? nil : title
+        end
+
+        # Words of a file stem as a display title (`my-great_post` → "My Great
+        # Post"), for sources that fall back to the filename.
+        protected def title_from_stem(stem : String) : String
+          stem.gsub(/[-_]/, " ").split.map(&.capitalize).join(" ")
+        end
+
+        # Slug for an output filename. Emoji- or symbol-only names slugify to
+        # "", which `resolve_content_path` rejects, silently dropping the note;
+        # those get `safe_slugify`'s deterministic token instead. Blank text
+        # stays "" so callers keep their own fallback.
+        protected def file_slug(text : String) : String
+          slug = Utils::TextUtils.slugify(text)
+          slug.empty? && !text.blank? ? Utils::TextUtils.safe_slugify(text) : slug
         end
 
         # Assign a date-valued frontmatter field that may be a YAML timestamp

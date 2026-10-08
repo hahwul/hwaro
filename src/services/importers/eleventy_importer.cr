@@ -178,8 +178,8 @@ module Hwaro
           if merged_yaml
             if yaml_hash = YAML.parse(merged_yaml).as_h?
               # Title
-              if title = yaml_hash["title"]?
-                fields["title"] = yaml_string(title)
+              if (title = yaml_hash["title"]?) && (title_text = yaml_title(title))
+                fields["title"] = title_text
               end
 
               # Date
@@ -284,9 +284,9 @@ module Hwaro
                    # structural filename, not a title.
                    "_index"
                  elsif basename == "index" && !is_site_root_index
-                   Utils::TextUtils.slugify(File.basename(File.dirname(file_path)))
+                   file_slug(File.basename(File.dirname(file_path)))
                  else
-                   Utils::TextUtils.slugify(basename)
+                   file_slug(basename)
                  end
 
           # Avoid collision on section/slug path

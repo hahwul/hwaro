@@ -57,7 +57,7 @@ class TOML::Lexer
     end
     next_char
 
-    raise "invalid unicode scalar: #{value.to_s(16)}" unless value <= 0x10FFFF && !(0xD800..0xDFFF).includes?(value)
+    raise "invalid unicode scalar: #{value.to_s(16)}" if value > 0x10FFFF || (0xD800..0xDFFF).includes?(value)
     value.chr
   end
 end

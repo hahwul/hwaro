@@ -6,8 +6,19 @@ module Hwaro
   module Services
     module Importers
       class ObsidianImporter < Base
-        # Obsidian wiki-link pattern: [[Page Name]] or [[Page Name|Display Text]]
-        WIKILINK_PATTERN = /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/
+        # Obsidian wiki-link pattern: [[Page Name]] or [[Page Name|Display Text]].
+        # Inside a table Obsidian requires the alias pipe escaped
+        # (`[[Page\|Text]]`); the backslash belongs to the pipe, not the name.
+        WIKILINK_PATTERN = /\[\[([^\]|]+?)\\?(?:\|([^\]]+?))?\]\]/
+
+        # Spans where `#word`, `[[links]]` and `![[embeds]]` are literal text:
+        # HTML tags (an attribute value like `color: #fff` is not a tag) and
+        # comments, and inline/display math (`$a #b$`). Math follows the pandoc
+        # rules so prose like "$5 and #tag later $6" is not swallowed: the
+        # opening `$` is followed by a non-space, the closing one preceded by
+        # a non-space and not followed by a digit.
+        HTML_SPAN_PATTERN = /<!--.*?-->|<\/?[A-Za-z][^<>\n]*>/
+        MATH_SPAN_PATTERN = /\$\$.+?\$\$|(?<![\\$])\$[^\s$](?:[^$\n]*?[^\s$\\])?\$(?![\d$])/
 
         # Obsidian embed pattern: ![[filename]]
         EMBED_PATTERN = /!\[\[([^\]]+?)\]\]/
@@ -48,7 +59,7 @@ module Hwaro
           # The pass also caches each file's raw bytes so the second pass below
           # reuses them instead of re-reading every note from disk (2N → N reads).
           content_cache = {} of String => String
-          link_map = build_link_map(files, path, options.drafts, content_cache)
+          link_map = build_link_map(files, path, output_dir, options.drafts, content_cache)
 
           import_each(files, "Obsidian") do |file_path|
             import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
@@ -71,10 +82,16 @@ module Hwaro
         private def build_link_map(
           files : Array(String),
           base_path : String,
+          output_dir : String,
           include_drafts : Bool,
           content_cache : Hash(String, String) = {} of String => String,
         ) : Hash(String, String)
           map = Hash(String, String).new
+          # Replays the run's destination claims (`import_file` claims them in
+          # this same order), so notes sharing a title map to the `-1`, `-2`…
+          # file each one will actually be written to.
+          claimed = Set(String).new
+          suffixes = Hash(String, Int32).new
           files.each do |file_path|
             raw = read_text(file_path)
             content_cache[file_path] = raw
@@ -98,8 +115,8 @@ module Hwaro
                 end
               end
 
-              if t = yaml["title"]?
-                title = yaml_string(t)
+              if (t = yaml["title"]?) && (title_text = yaml_title(t))
+                title = title_text
               end
               if a = yaml["aliases"]?
                 case a.raw
@@ -117,7 +134,10 @@ module Hwaro
             # stem that itself contains ".md" (`a.md.old.md` → `a.old.md`).
             relative_path_no_ext = relative_path.rchop(File.extname(relative_path))
 
-            slug = Utils::TextUtils.slugify(title)
+            slug = file_slug(title)
+            if resolved = resolve_content_path(output_dir, section, slug, quiet: true)
+              slug = File.basename(claim_path_in(claimed, suffixes, resolved), ".md")
+            end
             url = "/#{section}/#{slug}/"
 
             # Register every name a wiki-link could plausibly use.
@@ -177,8 +197,8 @@ module Hwaro
 
           if frontmatter_yaml
             if yaml = YAML.parse(frontmatter_yaml).as_h?
-              if title = yaml["title"]?
-                fields["title"] = yaml_string(title)
+              if (title = yaml["title"]?) && (title_text = yaml_title(title))
+                fields["title"] = title_text
               end
 
               if date_val = yaml["date"]?
@@ -254,7 +274,7 @@ module Hwaro
           section, _ = section_from_path(file_path, base_path, "posts")
           section = section.split('/').reject(&.empty?).map { |s| Utils::TextUtils.slugify(s) }.join('/')
 
-          slug = Utils::TextUtils.slugify(fields["title"].as?(String) || File.basename(file_path, File.extname(file_path)))
+          slug = file_slug(fields["title"].as?(String) || File.basename(file_path, File.extname(file_path)))
 
           frontmatter = generate_frontmatter(fields)
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
@@ -360,12 +380,32 @@ module Hwaro
           ranges
         end
 
+        # `inline_code_ranges` plus HTML tag/comment and math spans.
+        private def protected_ranges(line : String) : Array(Range(Int32, Int32))
+          ranges = inline_code_ranges(line)
+          if line.includes?('<')
+            line.scan(HTML_SPAN_PATTERN) { |m| ranges << (m.begin(0)..(m.end(0) - 1)) }
+          end
+          if line.includes?('$')
+            line.scan(MATH_SPAN_PATTERN) { |m| ranges << (m.begin(0)..(m.end(0) - 1)) }
+          end
+          ranges
+        end
+
         private def extract_inline_tags(body : String) : Array(String)
           tags = [] of String
-          # Skip code blocks when extracting tags
+          # Skip code blocks (and `$$` display math) when extracting tags
           in_code_block = false
+          in_math_block = false
           fence_close_re : Regex? = nil
           body.each_line do |line|
+            if in_math_block
+              in_math_block = false if line.strip == "$$"
+              next
+            elsif !in_code_block && line.strip == "$$"
+              in_math_block = true
+              next
+            end
             if in_code_block
               if fence_close_re.try(&.match(line))
                 in_code_block = false
@@ -383,7 +423,7 @@ module Hwaro
 
             next if line.starts_with?('\t') || line.match(/^ {4,}/)
 
-            ranges = inline_code_ranges(line)
+            ranges = protected_ranges(line)
 
             line.scan(OBSIDIAN_TAG_PATTERN) do |tag_match|
               next if ranges.any?(&.includes?(tag_match.begin(0)))
@@ -397,9 +437,16 @@ module Hwaro
 
         private def convert_obsidian_syntax(body : String, link_map : Hash(String, String) = {} of String => String) : String
           in_code_block = false
+          in_math_block = false
           fence_close_re : Regex? = nil
           lines = body.split("\n").map do |line|
-            if in_code_block
+            if in_math_block
+              in_math_block = false if line.strip == "$$"
+              line
+            elsif !in_code_block && line.strip == "$$"
+              in_math_block = true
+              line
+            elsif in_code_block
               if fence_close_re.try(&.match(line))
                 in_code_block = false
                 fence_close_re = nil
@@ -416,7 +463,7 @@ module Hwaro
               if line.starts_with?('\t') || line.match(/^ {4,}/)
                 line
               else
-                ranges = inline_code_ranges(line)
+                ranges = protected_ranges(line)
 
                 line = line.gsub(EMBED_PATTERN) do |match|
                   if ranges.any?(&.includes?($~.begin(0)))
@@ -424,7 +471,7 @@ module Hwaro
                   else
                     full_match = $1
                     parts = full_match.split('|', 2)
-                    target = parts[0].strip
+                    target = parts[0].rstrip('\\').strip
                     alt_or_width = parts.size > 1 ? parts[1].strip : ""
 
                     if target.matches?(/\.(png|jpg|jpeg|gif|svg|webp|avif)$/i)
@@ -443,7 +490,7 @@ module Hwaro
                   end
                 end
 
-                ranges = inline_code_ranges(line)
+                ranges = protected_ranges(line)
 
                 line = line.gsub(WIKILINK_PATTERN) do |match|
                   if ranges.any?(&.includes?($~.begin(0)))
@@ -456,9 +503,9 @@ module Hwaro
                   end
                 end
 
-                ranges = inline_code_ranges(line)
+                ranges = protected_ranges(line)
 
-                stripped = line.gsub(/(?:^|(?<=\s))#([a-zA-Z][\w\-\/]*)/) do |match|
+                stripped = line.gsub(OBSIDIAN_TAG_PATTERN) do |match|
                   if ranges.any?(&.includes?($~.begin(0)))
                     match
                   else

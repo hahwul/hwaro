@@ -109,8 +109,8 @@ module Hwaro
 
           if yaml
             # Title
-            if title = yaml["title"]?
-              fields["title"] = yaml_string(title)
+            if (title = yaml["title"]?) && (title_text = yaml_title(title))
+              fields["title"] = title_text
             end
 
             # Date from frontmatter (filename fallback below also covers an
@@ -226,6 +226,14 @@ module Hwaro
             fields["draft"] = true
           end
 
+          # Jekyll derives a post's title from its filename slug when front
+          # matter has none; without this every such post built as "Untitled".
+          # Standalone pages get no derived title in Jekyll, so they keep none.
+          if !fields.has_key?("title") && file_info[:section] == "posts"
+            stem = filename_stem(filename)
+            fields["title"] = title_from_stem(stem) unless stem.blank?
+          end
+
           # Track files that contain unconverted Liquid constructs. The
           # per-file warning stays for verbose consumers; the `run`
           # method emits a single summary warning with the total so
@@ -239,7 +247,7 @@ module Hwaro
           # Use slug from filename, or slugify the title
           if slug.empty?
             if title = fields["title"]?.as?(String)
-              slug = Utils::TextUtils.slugify(title)
+              slug = file_slug(title)
             else
               slug = "untitled"
             end
@@ -298,14 +306,20 @@ module Hwaro
           carried
         end
 
-        private def extract_slug(filename : String) : String
+        # The filename without its extension and `YYYY-MM-DD-` prefix.
+        private def filename_stem(filename : String) : String
           if match = FILENAME_PATTERN.match(filename)
             match[2]
           else
-            # Strip extension and use as slug
-            name = File.basename(filename, File.extname(filename))
-            Utils::TextUtils.slugify(name)
+            File.basename(filename, File.extname(filename))
           end
+        end
+
+        # URL-safe slug of the filename. The date-prefixed branch used to return
+        # the raw name, so `2024-01-04-100%.md` published at `/posts/100%/`
+        # (malformed percent-encoding) while undated names were slugified.
+        private def extract_slug(filename : String) : String
+          Utils::TextUtils.slugify(filename_stem(filename))
         end
 
         private def extract_date_from_filename(filename : String) : Time?
