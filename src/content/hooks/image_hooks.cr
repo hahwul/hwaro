@@ -312,7 +312,7 @@ module Hwaro
             clear_variant_maps
             return
           end
-          unless config.image_processing.enabled && !config.image_processing.widths.empty?
+          if !config.image_processing.enabled || config.image_processing.widths.empty?
             clear_variant_maps
             return
           end

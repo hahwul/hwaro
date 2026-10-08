@@ -39,7 +39,7 @@ class TOML::Lexer
     last_is_underscore = false
     has_underscore = false
 
-    while true
+    loop do
       case next_char
       when '0'..'9'
         num = num &* 10 &+ current_char.to_i
@@ -97,7 +97,7 @@ class TOML::Lexer
     fraction_digits = 0
     last_is_underscore = false
     next_char
-    while true
+    loop do
       case current_char
       when '0'..'9'
         text << current_char
@@ -143,7 +143,7 @@ class TOML::Lexer
     end
 
     if '0' <= current_char <= '9'
-      while true
+      loop do
         case current_char
         when '0'..'9'
           text << current_char

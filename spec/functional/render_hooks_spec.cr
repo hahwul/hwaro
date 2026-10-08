@@ -13,13 +13,15 @@ require "../../src/content/hooks/image_hooks"
 # isolation (see spec/unit/render_hooks_spec.cr for that).
 # =============================================================================
 
-private def with_resize_map(map, &)
-  prior = Hwaro::Content::Hooks::ImageHooks.resize_map
-  Hwaro::Content::Hooks::ImageHooks.set_resize_map(map)
-  begin
-    yield
-  ensure
-    Hwaro::Content::Hooks::ImageHooks.set_resize_map(prior)
+# A real `w`x`h` PNG, so the image:resize hook has something to resize (a
+# hand-seeded resize map no longer survives the hook: a run with no jobs forgets
+# the previous run's variants).
+private def png_body(w : Int32, h : Int32) : String
+  Dir.mktmpdir do |dir|
+    path = File.join(dir, "x.png")
+    px = Bytes.new(w * h * 3, 90_u8)
+    LibStb.stbi_write_png(path, w, h, 3, px.to_unsafe.as(Void*), w * 3)
+    File.read(path)
   end
 end
 
@@ -134,25 +136,21 @@ describe "Render hooks: responsive images" do
 
       [image_processing]
       enabled = true
+      widths = [400, 800]
       TOML
 
-    resize_map = {
-      "/photo.png" => {400 => "/photo_400w.png", 800 => "/photo_800w.png"},
-    }
-
-    with_resize_map(resize_map) do
-      build_site(
-        config,
-        content_files: {"index.md" => %(+++\ntitle = "Home"\n+++\n![alt](/photo.png))},
-        template_files: {
-          "page.html"               => "<body>{{ content }}</body>",
-          "hooks/render-image.html" => %(<img src="{{ destination }}" alt="{{ alt }}" />),
-        },
-      ) do
-        html = File.read("public/index.html")
-        html.should contain(%(srcset="/photo_400w.png 400w, /photo_800w.png 800w"))
-        html.should contain(%(loading="lazy"))
-      end
+    build_site(
+      config,
+      content_files: {"index.md" => %(+++\ntitle = "Home"\n+++\n![alt](/photo.png))},
+      template_files: {
+        "page.html"               => "<body>{{ content }}</body>",
+        "hooks/render-image.html" => %(<img src="{{ destination }}" alt="{{ alt }}" />),
+      },
+      static_files: {"photo.png" => png_body(900, 10)},
+    ) do
+      html = File.read("public/index.html")
+      html.should contain(%(srcset="/photo_400w.png 400w, /photo_800w.png 800w"))
+      html.should contain(%(loading="lazy"))
     end
   end
 end

@@ -50,7 +50,7 @@ class TOML::Parser
 
     ary = [] of Any
 
-    while true
+    loop do
       case token.type
       when :NEWLINE
         next_token
@@ -90,7 +90,7 @@ class TOML::Parser
       return table
     end
 
-    while true
+    loop do
       case token.type
       when :KEY, :STRING, :INT
         parse_key_value_after_key(table)
