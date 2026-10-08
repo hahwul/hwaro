@@ -299,4 +299,44 @@ describe "serve orphaned outputs" do
       end
     end
   end
+
+  # The neighbour edit pulled the page's old lower/higher into the render
+  # set, which rewrote the file the exclusion pass had just pruned.
+  it "keeps a page drafted in the same save as its neighbour unpublished (incremental)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/posts/gone/index.html").should be_true
+
+        File.write("content/posts/gone.md", "---\ntitle: Gone\ndraft: true\n---\ngone")
+        File.write("content/posts/keep.md", "---\ntitle: Keep\ntags: [shared]\n---\nkeep edited")
+        server.orphan_builder.run_incremental(["content/posts/gone.md", "content/posts/keep.md"], options).should be_true
+
+        Dir.exists?("public/posts/gone").should be_false
+        File.read("public/posts/keep/index.html").should contain("Keep")
+      end
+    end
+  end
+
+  it "keeps a page drafted in the same save as its neighbour unpublished (content + template)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+
+        File.write("content/posts/gone.md", "---\ntitle: Gone\ndraft: true\n---\ngone")
+        File.write("content/posts/keep.md", "---\ntitle: Keep\ntags: [shared]\n---\nkeep edited")
+        File.write("templates/page.html", "<html><body class=\"v2\">{{ page.title }}</body></html>")
+        server.orphan_builder.run_incremental_then_rerender(["content/posts/gone.md", "content/posts/keep.md"], options).should be_true
+
+        Dir.exists?("public/posts/gone").should be_false
+        File.read("public/posts/keep/index.html").should contain("v2")
+      end
+    end
+  end
 end
