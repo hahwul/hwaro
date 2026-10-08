@@ -47,8 +47,20 @@ module Hwaro
         # `[\s\S]` (not `.`) because a footnote or definition body may still
         # carry a newline at this point.
         INLINE_CODE_SPAN_RE = /(?<!`)(`++)([\s\S]+?)(?<!`)\1(?!`)/
-        INLINE_IMAGE_RE     = /!\[([^\]]*)\]\(([^)]*)\)/
-        INLINE_LINK_RE      = /\[([^\]]+)\]\(([^)]*)\)/
+        # Link/image openers up to and including `(`; the destination and
+        # optional title are read by `scan_link_tail`.
+        INLINE_IMAGE_OPEN_RE = /!\[([^\]]*)\]\(/
+        INLINE_LINK_OPEN_RE  = /\[([^\]]+)\]\(/
+        # A backslash before ASCII punctuation (shown HTML-escaped, so `\"`
+        # is `\&quot;`) is a CommonMark escape: the character is literal.
+        ESCAPE_RE       = /\\(&(?:amp|lt|gt|quot|#39);|[!#$%()*+,\-.\/:;=?@\[\\\]^_`{|}~])/
+        ESCAPE_TOKEN_RE = /\x00ESC(\d+)\x00/
+        # CommonMark allows 32 levels of balanced parentheses in a destination.
+        MAX_DEST_PAREN_DEPTH = 32
+        # ponytail: a title longer than this is not read (keeps a run of
+        # unterminated `[a](x "` openers linear); such a link keeps the
+        # first-`)` fallback.
+        MAX_TITLE_BYTES = 2000
         # Flanking guards (`(?=\S)` … `(?<=\S)`): a delimiter run that touches
         # whitespace on the inside must NOT open/close emphasis, so literal
         # `2 * 3 and 4 * 5` (arithmetic in a table cell or footnote) is left
@@ -163,34 +175,42 @@ module Hwaro
             end
           end
 
-          result = result.gsub(INLINE_IMAGE_RE) do
-            # Placeholder tokens landing in ATTRIBUTE values are restored in
-            # escaped form: substituting rendered shortcode HTML into an
-            # attribute after Markdown would break out of it (the same
-            # in-band channel the HID/footnote neutralization defends), and
-            # the escaped comment matches the pre-stash rendering here.
-            # Link TEXT below keeps raw restore — it's element content,
-            # consistent with paragraph text.
-            alt = escape_placeholder_tokens($1, placeholders)
-            url = escape_placeholder_tokens($2, placeholders)
-            # `result` was already HTML.escaped at the top, so `url`/`alt` are
-            # captured in their escaped form — emit them as-is (re-escaping here
-            # would double-encode `&` into `&amp;amp;`). Matches the link branch
-            # below, which already inserts `link_text` without re-escaping.
-            if safe_url?(url)
-              %(<img src="#{url}" alt="#{alt}">)
-            else
-              "![#{alt}](#{url})"
+          escapes = [] of String
+          if result.includes?('\\')
+            result = result.gsub(ESCAPE_RE) do
+              escapes << $1
+              "\x00ESC#{escapes.size - 1}\x00"
             end
           end
 
-          result = result.gsub(INLINE_LINK_RE) do
-            link_text = $1
-            url = escape_placeholder_tokens($2, placeholders)
+          # Placeholder tokens landing in ATTRIBUTE values are restored in
+          # escaped form: substituting rendered shortcode HTML into an
+          # attribute after Markdown would break out of it (the same
+          # in-band channel the HID/footnote neutralization defends), and
+          # the escaped comment matches the pre-stash rendering here.
+          # Link TEXT keeps raw restore — it's element content,
+          # consistent with paragraph text.
+          # `result` was already HTML.escaped at the top, so label/url/title
+          # are captured in their escaped form — emit them as-is (re-escaping
+          # would double-encode `&` into `&amp;amp;`). Escape tokens are
+          # restored in the URL/title BEFORE the scheme check, so
+          # `javascript\:` cannot hide its colon from `safe_url?`.
+          result = replace_links(result, INLINE_IMAGE_OPEN_RE) do |alt, url, title, rest|
+            alt = escape_placeholder_tokens(alt, placeholders)
+            url = restore_escapes(escape_placeholder_tokens(url, placeholders), escapes)
             if safe_url?(url)
-              %(<a href="#{url}">#{link_text}</a>)
+              %(<img src="#{url}" alt="#{alt}"#{title_attribute(title, placeholders, escapes)}>)
             else
-              "[#{link_text}](#{url})"
+              "![#{alt}](#{escape_placeholder_tokens(rest, placeholders)})"
+            end
+          end
+
+          result = replace_links(result, INLINE_LINK_OPEN_RE) do |link_text, url, title, rest|
+            url = restore_escapes(escape_placeholder_tokens(url, placeholders), escapes)
+            if safe_url?(url)
+              %(<a href="#{url}"#{title_attribute(title, placeholders, escapes)}>#{link_text}</a>)
+            else
+              "[#{link_text}](#{escape_placeholder_tokens(rest, placeholders)})"
             end
           end
 
@@ -218,6 +238,8 @@ module Hwaro
           unless link_tags.empty?
             result = result.gsub(LINK_TAG_TOKEN_RE) { link_tags[$1.to_i]?.try(&.itself) || $0 }
           end
+
+          result = restore_escapes(result, escapes)
 
           # One pass per token kind, not one `gsub` per span: the per-span
           # loop rescanned the whole string for every span, so a cell or
@@ -251,6 +273,130 @@ module Hwaro
           end
 
           result
+        end
+
+        # Rewrites every `[label](destination "title")` match of `open_re`.
+        # The block gets the label, destination, title (nil when absent) and
+        # the raw text after `](` up to the closing `)`, and returns the
+        # replacement. A tail that is not a well-formed destination falls
+        # back to everything up to the first `)`, as before.
+        private def replace_links(text : String, open_re : Regex, & : String, String, String?, String -> String) : String
+          return text unless text.includes?("](")
+          bytes = text.to_slice
+          String.build do |io|
+            pos = 0
+            while m = open_re.match_at_byte_index(text, pos)
+              from = m.byte_begin(0)
+              tail_start = m.byte_end(0)
+              io.write bytes[pos, from - pos]
+              if tail = scan_link_tail(bytes, tail_start)
+                dest, title, finish = tail
+              elsif close = text.byte_index(')', tail_start)
+                dest = String.new(bytes[tail_start, close - tail_start])
+                title = nil
+                finish = close + 1
+              else
+                pos = from
+                break
+              end
+              io << yield(m[1], dest, title, String.new(bytes[tail_start, finish - 1 - tail_start]))
+              pos = finish
+            end
+            io.write bytes[pos, bytes.size - pos]
+          end
+        end
+
+        # Reads `destination "title")` from `start` (just past `](`):
+        # a `<…>` destination or bare text with balanced parentheses, then an
+        # optional title in `"…"`, `'…'` or `(…)`. Returns the destination,
+        # the title and the byte offset just past the closing `)`, or nil.
+        # `bytes` is HTML-escaped, so `<`, `"` and `'` read `&lt;`, `&quot;`
+        # and `&#39;`.
+        private def scan_link_tail(bytes : Bytes, start : Int32) : {String, String?, Int32}?
+          i = skip_space(bytes, start)
+          if bytes_at?(bytes, i, "&lt;")
+            j = i + 4
+            close = nil
+            while j < bytes.size
+              return if bytes[j] === '\n' || bytes_at?(bytes, j, "&lt;")
+              if bytes_at?(bytes, j, "&gt;")
+                close = j
+                break
+              end
+              j += 1
+            end
+            return unless close
+            dest = String.new(bytes[i + 4, close - i - 4]).gsub(' ', "%20")
+            i = close + 4
+          else
+            depth = 0
+            j = i
+            while j < bytes.size
+              byte = bytes[j]
+              break if space?(byte)
+              if byte === '('
+                depth += 1
+                return if depth > MAX_DEST_PAREN_DEPTH
+              elsif byte === ')'
+                break if depth.zero?
+                depth -= 1
+              end
+              j += 1
+            end
+            return unless depth.zero?
+            dest = String.new(bytes[i, j - i])
+            i = j
+          end
+
+          k = skip_space(bytes, i)
+          return {dest, nil, k + 1} if bytes[k]? === ')'
+          return if k == i # a title needs whitespace before it
+
+          opener, closer = if bytes_at?(bytes, k, "&quot;")
+                             {"&quot;", "&quot;"}
+                           elsif bytes_at?(bytes, k, "&#39;")
+                             {"&#39;", "&#39;"}
+                           elsif bytes[k]? === '('
+                             {"(", ")"}
+                           else
+                             return
+                           end
+          title_start = k + opener.bytesize
+          stop = Math.min(bytes.size, title_start + MAX_TITLE_BYTES)
+          j = title_start
+          while j < stop && !bytes_at?(bytes, j, closer)
+            j += 1
+          end
+          return unless j < stop
+          m = skip_space(bytes, j + closer.bytesize)
+          return unless bytes[m]? === ')'
+          {dest, String.new(bytes[title_start, j - title_start]), m + 1}
+        end
+
+        private def space?(byte : UInt8) : Bool
+          byte === ' ' || byte === '\t' || byte === '\n' || byte === '\r'
+        end
+
+        private def skip_space(bytes : Bytes, i : Int32) : Int32
+          while i < bytes.size && space?(bytes[i])
+            i += 1
+          end
+          i
+        end
+
+        private def bytes_at?(bytes : Bytes, i : Int32, needle : String) : Bool
+          return false if i + needle.bytesize > bytes.size
+          needle.to_slice == bytes[i, needle.bytesize]
+        end
+
+        private def title_attribute(title : String?, placeholders : Array(String), escapes : Array(String)) : String
+          return "" unless title
+          %( title="#{restore_escapes(escape_placeholder_tokens(title, placeholders), escapes)}")
+        end
+
+        private def restore_escapes(text : String, escapes : Array(String)) : String
+          return text if escapes.empty? || !text.includes?('\u{0}')
+          text.gsub(ESCAPE_TOKEN_RE) { escapes[$1.to_i]? || $0 }
         end
 
         # CommonMark strips ONE leading and ONE trailing space from a code
