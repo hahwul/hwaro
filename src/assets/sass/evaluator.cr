@@ -134,6 +134,9 @@ module Hwaro
           @load_stack = [] of String
           @in_function = false
           @call_depth = 0
+          # Bumped when text spliced into a quoted string carries that
+          # string's own quote (see `resolve_template`).
+          @quote_conflicts = 0
           @forward_variables = {} of String => String
           @forward_mixins = {} of String => MixinClosure
           @forward_functions = {} of String => SassFn
@@ -1900,7 +1903,8 @@ module Hwaro
             mod = SassModule.new(
               export_members(@forward_variables.merge(module_env.variables)),
               export_members(@forward_mixins.merge(module_env.mixins)),
-              export_members(@forward_functions.merge(module_env.functions)))
+              export_members(@forward_functions.merge(module_env.functions)),
+              module_env)
           ensure
             @load_stack.pop
             @env = saved_env
@@ -2233,7 +2237,7 @@ module Hwaro
             return lookup_var_ref(ref)
           end
           if node = Expr.parse(template)
-            if Expr.computes?(node, self, force_div: true)
+            if Expr.computes?(node, self, force_div: true, amp: true)
               begin
                 return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
               rescue ex : NamespacedEvalError
@@ -2245,7 +2249,17 @@ module Hwaro
               end
             end
           end
-          collapse_ws(resolve_template(template, allow_vars: true))
+          conflicts = @quote_conflicts
+          text = collapse_ws(resolve_template(template, allow_vars: true))
+          if @quote_conflicts != conflicts && (node = Expr.parse(template))
+            # `'#{"Don't"}'`: only the typed path can re-quote the string.
+            begin
+              return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
+            rescue SoftEvalError
+              # keep the verbatim text
+            end
+          end
+          text
         end
 
         # Declaration-value flavour of `resolve_value`: serializes as CSS
@@ -2256,7 +2270,7 @@ module Hwaro
         private def resolve_decl_value(template : Ast::TextTemplate,
                                        fold_calc : Bool = true) : ResolvedValue
           if node = Expr.parse(template)
-            if Expr.computes?(node, self, fold_calc: fold_calc)
+            if Expr.computes?(node, self, fold_calc: fold_calc, amp: true)
               begin
                 value = Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node)
                 return ResolvedValue.new(value.to_css, value.is_a?(NullV))
@@ -2271,16 +2285,28 @@ module Hwaro
           end
           # The verbatim path only has text, where a stored null reads back
           # as "null" (see `value_storage`).
+          conflicts = @quote_conflicts
           text = collapse_ws(resolve_template(template, allow_vars: true))
+          if @quote_conflicts != conflicts && (node = Expr.parse(template))
+            begin
+              return ResolvedValue.new(Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node).to_css, false)
+            rescue SoftEvalError
+              # keep the verbatim text
+            end
+          end
           ResolvedValue.new(text, text == "null")
         end
 
         # Same lenient policy for `#{...}` bodies, minus the whitespace
         # collapsing (interpolation output is spliced into surrounding
         # text exactly as today when nothing computes).
-        private def resolve_interp(template : Ast::TextTemplate) : String
+        #
+        # `amp` is set for value contexts (and quoted selector text), where
+        # `#{&}` is the parent selector list; in a selector it stays the
+        # verbatim `&` that `substitute_parent` rewrites per parent.
+        private def resolve_interp(template : Ast::TextTemplate, amp : Bool = false) : String
           if node = Expr.parse(template)
-            if Expr.computes?(node, self, force_div: true)
+            if Expr.computes?(node, self, force_div: true, amp: amp)
               begin
                 # `interp_css`, not `to_css`: inside `#{...}` dart-sass
                 # unquotes strings at every nesting level, so a list of
@@ -2439,7 +2465,7 @@ module Hwaro
           if ns
             mod = @env.module?(ns)
             raise NamespacedEvalError.new("there is no module namespace \"#{ns}\"") unless mod
-            mod.variables[Sass.normalize_ident(name)]? ||
+            mod.variable?(Sass.normalize_ident(name)) ||
               raise NamespacedEvalError.new("undefined variable: \"#{ns}.$#{name}\"")
           else
             @env.lookup_var(name) ||
@@ -2677,16 +2703,32 @@ module Hwaro
 
         # :nodoc:
         def expr_interp(template : Ast::TextTemplate) : String
-          unquote_interp(resolve_interp(template))
+          unquote_interp(resolve_interp(template, amp: true))
         end
 
         private def resolve_template(template : Ast::TextTemplate, allow_vars : Bool) : String
           pieces = template.pieces
+          # Quote state of the text so far: `[data-x="#{&}"]` interpolates
+          # the parent list into a string, which is never a parent
+          # reference.
+          quote : Char? = nil
           String.build do |io|
             pieces.each_with_index do |piece, idx|
               case piece
               in String
                 io << piece
+                esc = false
+                piece.each_char do |ch|
+                  if esc
+                    esc = false
+                  elsif ch == '\\'
+                    esc = true
+                  elsif quote.nil? && (ch == '"' || ch == '\'')
+                    quote = ch
+                  elsif ch == quote
+                    quote = nil
+                  end
+                end
               in Ast::VarRef
                 unless allow_vars
                   error_at(piece.line, piece.column,
@@ -2704,7 +2746,9 @@ module Hwaro
                   io << var_display_text(var_text) unless var_text == "null"
                 end
               in Ast::Interp
-                io << unquote_interp(resolve_interp(piece.inner))
+                spliced = unquote_interp(resolve_interp(piece.inner, amp: allow_vars || !quote.nil?))
+                @quote_conflicts += 1 if quote && Str.contains_unescaped?(spliced, quote)
+                io << spliced
               end
             end
           end
@@ -2774,7 +2818,7 @@ module Hwaro
           if ns = ref.namespace
             mod = @env.module?(ns)
             error_at(ref.line, ref.column, "there is no module namespace \"#{ns}\"") unless mod
-            mod.variables[Sass.normalize_ident(ref.name)]? ||
+            mod.variable?(Sass.normalize_ident(ref.name)) ||
               error_at(ref.line, ref.column, "undefined variable: \"#{ns}.$#{ref.name}\"")
           else
             @env.lookup_var(ref.name) ||
