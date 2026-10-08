@@ -57,7 +57,7 @@ module Hwaro
         def self.published_outputs(pages : Array(Models::Page), config : Models::Config, output_dir : String) : Array(String)
           outputs = [] of String
           each_feed(pages, config, output_dir) do |feed|
-            outputs << File.join(feed.dir, safe_feed_filename(feed.custom_filename, config.feeds.type))
+            outputs << feed_output_file(feed, config)
           end
           outputs
         end
@@ -86,7 +86,36 @@ module Hwaro
         end
 
         # Walk every feed the config and page set call for, in write order.
+        # Two feeds never share an output file: a section feed that resolves
+        # to the file a main/language feed publishes (a ROOT `_index.md` with
+        # `generate_feeds` lands on `/rss.xml`, `_index.ko.md` on
+        # `/ko/rss.xml`) is dropped with a warning, because written second it
+        # replaced the fuller site/language feed with a subset.
         private def self.each_feed(pages : Array(Models::Page), config : Models::Config, output_dir : String, & : FeedSpec ->) : Nil
+          specs = [] of FeedSpec
+          each_planned_feed(pages, config, output_dir) { |feed| specs << feed }
+
+          claimed = Set(String).new
+          specs.each do |feed|
+            claimed << feed_output_file(feed, config) unless feed.kind == "section"
+          end
+          specs.each do |feed|
+            if feed.kind == "section"
+              file = feed_output_file(feed, config)
+              unless claimed.add?(file)
+                Logger.warn "Skipping the feed of section '#{feed.section_url}': #{file} is already published by another feed"
+                next
+              end
+            end
+            yield feed
+          end
+        end
+
+        private def self.feed_output_file(feed : FeedSpec, config : Models::Config) : String
+          File.join(feed.dir, safe_feed_filename(feed.custom_filename, config.feeds.type))
+        end
+
+        private def self.each_planned_feed(pages : Array(Models::Page), config : Models::Config, output_dir : String, & : FeedSpec ->) : Nil
           # `[versions] feeds = "latest"` (default): older versions publish
           # no feed entries and no section feeds; "all" restores every
           # version. Applied to the whole input so the main, section and
@@ -499,8 +528,10 @@ module Hwaro
           # canonical (base_url + "/") and the per-language branch below. When
           # base_url is empty this yields "/" rather than an empty (invalid)
           # <link> element.
-          return "#{base_url}/" if base_path.empty?
-          Utils::TextUtils.encode_url_path("#{base_url}/#{base_path.strip("/")}/")
+          # A root section's base_path is "/", which strips to empty too.
+          segment = base_path.strip("/")
+          return "#{base_url}/" if segment.empty?
+          Utils::TextUtils.encode_url_path("#{base_url}/#{segment}/")
         end
 
         # Absolutize feed-body links so RSS <content:encoded> / Atom <content>
@@ -870,7 +901,10 @@ module Hwaro
         # section early. Replaces `]]>` with `]]]]><![CDATA[>` (the
         # standard escape) so the run-on CDATA stays valid.
         private def self.escape_cdata(text : String) : String
-          text.gsub("]]>", "]]]]><![CDATA[>")
+          # XML 1.0 forbids these C0 controls even inside CDATA (escape_xml
+          # drops them for every other element), so one stray form feed
+          # would make the whole feed unparseable.
+          text.gsub(/[\x00-\x08\x0B\x0C\x0E-\x1F]/, "").gsub("]]>", "]]]]><![CDATA[>")
         end
 
         private def self.get_content_for_feed(page : Models::Page, config : Models::Config) : String
