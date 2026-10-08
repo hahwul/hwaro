@@ -200,7 +200,7 @@ describe "Responsive content image lookup keys" do
   it "ignores a ?query or #fragment on the src" do
     with_resize_map(SAMPLE_MAP) do
       builder = Hwaro::Core::Build::Builder.new
-      %w(?v=2 #frag ?v=2#frag).each do |suffix|
+      %w[?v=2 #frag ?v=2#frag].each do |suffix|
         out = builder.test_apply_responsive_images(%(<img src="/posts/foo/photo.png#{suffix}">), bundle_page, enabled_config)
         out.should contain(%(srcset="/posts/foo/photo_400w.png 400w, /posts/foo/photo_800w.png 800w"))
         out.should contain(%(src="/posts/foo/photo.png#{suffix}"))

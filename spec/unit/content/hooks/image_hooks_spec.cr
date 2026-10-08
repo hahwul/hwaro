@@ -737,7 +737,7 @@ describe "ImageHooks render-time lookups (review fixes)" do
         Dir.mkdir_p("static")
         File.write("content/index.md", "+++\ntitle = \"Home\"\n+++\nhi\n")
         tpl = %({% set v = resize_image(path="/p.jpg", width=30, height=20, op="fill") %}{{ v.url }}{{ content }})
-        %w(index page section).each { |name| File.write("templates/#{name}.html", tpl) }
+        %w[index page section].each { |name| File.write("templates/#{name}.html", tpl) }
         File.write("static/p.jpg", jpg_body(120, 80, 1))
         File.touch("static/p.jpg", Time.utc - 1.hour)
 
