@@ -152,11 +152,25 @@ module Hwaro
           end
         end
 
+        # The file behind a site-absolute `url` that a render just printed
+        # image-derived data from (a srcset, an LQIP, a dominant colour): the
+        # resize job's source, else the `static/` location an image that does
+        # not exist yet would appear at. Also registers it with the serve
+        # watcher (see `render_image_source_changed?`). The caller records it
+        # as a `--cache` render input.
+        def self.watch_render_source(url : String) : String?
+          return if url.includes?('\0')
+          source = source_path_for(url) || File.join("static", url)
+          @@lookup_mutex.synchronize { @@render_image_sources << Path.posix(source).normalize.to_s }
+          source
+        end
+
         # Source file published at the site-absolute, decoded `url` (no
         # base_path), or nil: a page-bundle asset, a `[content.files]` copy,
         # then a `static/` file — the order the resize jobs claim URLs in.
         # `config` defaults to the running build's.
         def self.resolve_source(url : String, config : Models::Config? = nil) : String?
+          return if url.includes?('\0') # a `%00` in a decoded src: no such file
           url = Path.posix(url).normalize.to_s
           if source = source_path_for(url) || bundle_source_for(url)
             return source
@@ -290,16 +304,28 @@ module Hwaro
           original_url : String,
           url_prefix : String
 
+        # A run that processes nothing must not leave the previous run's
+        # variants behind: in a long-lived process (`serve`) `resize_image()`
+        # kept returning URLs, LQIPs and colours for files no longer written
+        # after processing was switched off or the last image was removed.
+        private def clear_resize_maps : Nil
+          @@resize_map_mutex.synchronize do
+            @@resize_map = {} of String => Hash(Int32, String)
+            @@source_map = {} of String => String
+          end
+          @@lqip_map_mutex.synchronize { @@lqip_map = {} of String => Hash(String, String) }
+        end
+
         private def process_images(ctx : Core::Lifecycle::BuildContext)
           @@resize_map_mutex.synchronize { @@processing_active = false }
           config = ctx.config
           return unless config
           if ctx.options.skip_image_processing
             Logger.debug "  Skipping image processing (--skip-image-processing)"
-            return
+            return clear_resize_maps
           end
-          return unless config.image_processing.enabled
-          return if config.image_processing.widths.empty?
+          return clear_resize_maps unless config.image_processing.enabled
+          return clear_resize_maps if config.image_processing.widths.empty?
           @@resize_map_mutex.synchronize { @@processing_active = true }
 
           start = ctx.profiler ? Time.instant : nil
@@ -331,7 +357,7 @@ module Hwaro
             collect_static_jobs(config, output_dir, resolved_output, jobs, seen)
           end
 
-          return if jobs.empty?
+          return clear_resize_maps if jobs.empty?
 
           # Phase 2: Split jobs into "already fresh" (reuse from previous
           # rebuild's maps) and "needs work". Snapshot previous maps first

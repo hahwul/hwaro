@@ -187,3 +187,85 @@ describe "Content image dimensions" do
     end
   end
 end
+
+describe "Responsive content image lookup keys" do
+  it "decodes an HTML-escaped src before the lookup" do
+    with_resize_map({"/img/a&b.png" => {200 => "/img/a&b_200w.png"}}) do
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+        %(<img src="/img/a&amp;b.png" alt="x">), bundle_page, enabled_config)
+      out.should contain(%(srcset="/img/a%26b_200w.png 200w"))
+    end
+  end
+
+  it "ignores a ?query or #fragment on the src" do
+    with_resize_map(SAMPLE_MAP) do
+      builder = Hwaro::Core::Build::Builder.new
+      %w(?v=2 #frag ?v=2#frag).each do |suffix|
+        out = builder.test_apply_responsive_images(%(<img src="/posts/foo/photo.png#{suffix}">), bundle_page, enabled_config)
+        out.should contain(%(srcset="/posts/foo/photo_400w.png 400w, /posts/foo/photo_800w.png 800w"))
+        out.should contain(%(src="/posts/foo/photo.png#{suffix}"))
+      end
+      builder.test_apply_responsive_images(%(<img src="photo.png?v=1">), bundle_page, enabled_config)
+        .should contain("srcset=")
+    end
+  end
+
+  it "keeps a percent-encoded ? in a filename as part of the path" do
+    with_resize_map({"/posts/foo/what?.png" => {400 => "/posts/foo/what?_400w.png"}}) do
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+        %(<img src="/posts/foo/what%3F.png">), bundle_page, enabled_config)
+      out.should contain("srcset=")
+    end
+  end
+
+  it "only treats a real srcset attribute as existing, not alt or title text" do
+    with_resize_map(SAMPLE_MAP) do
+      builder = Hwaro::Core::Build::Builder.new
+      out = builder.test_apply_responsive_images(%(<img src="photo.png" alt="How srcset works">), bundle_page, enabled_config)
+      out.should contain(%(srcset="/posts/foo/photo_400w.png 400w))
+      out = builder.test_apply_responsive_images(%(<img src="photo.png" title="srcset title">), bundle_page, enabled_config)
+      out.should contain(%(srcset="/posts/foo/photo_400w.png 400w))
+      # A real attribute (any case, spaced `=`) still wins.
+      html = %(<img src="photo.png" SRCSET ="a.png 1x">)
+      builder.test_apply_responsive_images(html, bundle_page, enabled_config).should eq(html)
+    end
+  end
+
+  it "does not fail the page for an src with a percent-encoded NUL when sizing images" do
+    with_image_project do
+      html = %(<img src="/img/a%00.png"><img src="/img/%00.png">)
+      Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, dimensions_config).should eq(html)
+    end
+  end
+end
+
+describe "Responsive content images as render inputs" do
+  it "records the source image of a srcset it injected, for --cache and serve" do
+    with_image_project do
+      Hwaro::Content::Processors::TemplateEngine.take_render_reads
+      Hwaro::Content::Hooks::ImageHooks.set_processing_state(true, {"/photo.png" => "static/photo.png"})
+      begin
+        with_resize_map({"/photo.png" => {2 => "/photo_2w.png"}}) do
+          Hwaro::Core::Build::Builder.new.test_apply_responsive_images(%(<img src="/photo.png"><img src="/later.png">), bundle_page, enabled_config)
+        end
+        reads = Hwaro::Content::Processors::TemplateEngine.take_render_reads
+        reads.should contain("file:static/photo.png")
+        # An image that does not exist yet is watched at its static/ location.
+        reads.should contain("file:static/later.png")
+        Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(["static/photo.png"]).should be_true
+        Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(["static/later.png"]).should be_true
+      ensure
+        Hwaro::Content::Hooks::ImageHooks.set_processing_state(false)
+      end
+    end
+  end
+
+  it "records nothing while image processing is off" do
+    with_image_project do
+      Hwaro::Content::Processors::TemplateEngine.take_render_reads
+      Hwaro::Content::Hooks::ImageHooks.set_processing_state(false)
+      Hwaro::Core::Build::Builder.new.test_apply_responsive_images(%(<img src="/photo.png">), bundle_page, enabled_config)
+      Hwaro::Content::Processors::TemplateEngine.take_render_reads.should be_empty
+    end
+  end
+end

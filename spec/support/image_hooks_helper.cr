@@ -25,4 +25,16 @@ class Hwaro::Content::Hooks::ImageHooks
       @@render_image_sources.clear
     end
   end
+
+  # What `process_images` leaves behind for a build that did process images.
+  def self.set_processing_state(active : Bool, source_map = {} of String => String)
+    @@resize_map_mutex.synchronize do
+      @@processing_active = active
+      @@source_map = source_map
+    end
+  end
+
+  def self.source_map : Hash(String, String)
+    @@resize_map_mutex.synchronize { @@source_map.dup }
+  end
 end
