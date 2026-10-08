@@ -89,13 +89,12 @@ describe Hwaro::Models::Page do
       page.calculate_word_count.should eq(3)
     end
 
-    it "does not raise on an opened-but-never-closed real tag (swallows the tail)" do
-      # `<a` flips into tag mode; with no closing '>' the rest of the document
-      # is swallowed. This pins graceful degradation (count of pre-tag words,
-      # no crash) on truncated/malformed HTML.
+    it "does not raise on an opened-but-never-closed tag, and counts its text" do
+      # `<a` with no closing '>' is not a tag: it used to swallow the rest of
+      # the document, collapsing the count to the pre-tag words.
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = "hello <a href=foo and more text"
-      page.calculate_word_count.should eq(1)
+      page.calculate_word_count.should eq(6)
     end
   end
 
