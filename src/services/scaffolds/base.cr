@@ -1324,9 +1324,15 @@ module Hwaro
 
               function highlightMatch(text, query) {
                 if (!query) return escapeHtml(text);
-                var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                var re = new RegExp('(' + escaped + ')', 'gi');
-                return escapeHtml(text).replace(re, '<mark>$1</mark>');
+                // Match the RAW text and escape each piece, so a query like
+                // `&` or `amp` cannot land inside an HTML entity.
+                var lower = text.toLowerCase(), q = query.toLowerCase();
+                var out = '', pos = 0, i;
+                while ((i = lower.indexOf(q, pos)) !== -1) {
+                  out += escapeHtml(text.slice(pos, i)) + '<mark>' + escapeHtml(text.slice(i, i + q.length)) + '</mark>';
+                  pos = i + q.length;
+                }
+                return out + escapeHtml(text.slice(pos));
               }
 
               function getSnippet(content, query) {
