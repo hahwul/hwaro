@@ -60,7 +60,7 @@ module Hwaro
         # glob patterns omitted `post.MD` and `post.MARKDOWN`, even though the
         # build publishes them; every content tool using this walker then
         # silently disagreed with the build.
-        Dir.glob(File.join(content_dir, "**", "*")) do |file|
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*")) do |file|
           next unless markdown?(file)
           files << file if readable_file?(file)
         end

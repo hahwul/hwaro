@@ -286,7 +286,7 @@ module Hwaro
       # it only decides which parents count as declared.
       private def auto_section_identifiers(config : Models::Config) : Set(String)
         ids = Set(String).new
-        Dir.glob(File.join(@content_dir, "**", "_index.*")) do |path|
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "_index.*")) do |path|
           next unless ContentWalk.markdown?(path)
           dir = Path[File.dirname(path)].relative_to(@content_dir).to_posix.to_s
           dir = "" if dir == "."

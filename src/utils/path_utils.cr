@@ -386,6 +386,28 @@ module Hwaro
         path
       end
 
+      # `Dir.glob` pattern syntax. Windows keeps `\` as a path separator (no
+      # escape syntax there), so it is not escaped on that platform.
+      {% if flag?(:win32) %}
+        GLOB_META = {'*', '?', '[', ']', '{', '}'}
+      {% else %}
+        GLOB_META = {'*', '?', '[', ']', '{', '}', '\\'}
+      {% end %}
+
+      # `path` with glob metacharacters backslash-escaped, so a literal
+      # directory can prefix a glob pattern:
+      # `Dir.glob(File.join(glob_escape(dir), "**", "*"))`. Unescaped, a
+      # bundle directory named `[wip]` or `a{b,c}` matched nothing, silently.
+      def glob_escape(path : String) : String
+        return path unless path.each_char.any? { |c| GLOB_META.includes?(c) }
+        String.build do |io|
+          path.each_char do |c|
+            io << '\\' if GLOB_META.includes?(c)
+            io << c
+          end
+        end
+      end
+
       # File.match? that treats a malformed glob as non-matching instead of
       # raising File::BadPatternError, so a single config typo can't crash a
       # build or deploy.

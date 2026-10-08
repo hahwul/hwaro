@@ -446,4 +446,20 @@ describe Hwaro::Utils::PathUtils do
       Hwaro::Utils::PathUtils.glob_match?("", "a").should be_false
     end
   end
+
+  describe ".glob_escape" do
+    it "leaves plain paths untouched" do
+      Hwaro::Utils::PathUtils.glob_escape("content/posts/a b").should eq("content/posts/a b")
+    end
+
+    it "escapes glob metacharacters so Dir.glob matches the literal directory" do
+      Dir.mktmpdir do |dir|
+        ["[wip]", "a{b,c}", "q?x", "star*"].each do |name|
+          FileUtils.mkdir_p(File.join(dir, name))
+          File.write(File.join(dir, name, "f.txt"), "x")
+          Dir.glob(File.join(Hwaro::Utils::PathUtils.glob_escape(File.join(dir, name)), "*")).should eq([File.join(dir, name, "f.txt")])
+        end
+      end
+    end
+  end
 end

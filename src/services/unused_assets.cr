@@ -215,7 +215,7 @@ module Hwaro
 
         # Co-located assets in content directory
         if Dir.exists?(@content_dir)
-          Dir.glob(File.join(@content_dir, "**", "*")) do |path|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "*")) do |path|
             ext = File.extname(path).downcase
             next if CONTENT_EXTENSIONS.includes?(ext)
             next unless ASSET_EXTENSIONS.includes?(ext)
@@ -270,7 +270,7 @@ module Hwaro
         {"data", "i18n"}.each do |rel_dir|
           dir = File.join(@project_root, rel_dir)
           next unless Dir.exists?(dir)
-          Dir.glob(File.join(dir, "**", "*.{#{DATA_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*.{#{DATA_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         String.build do |sb|
@@ -357,7 +357,7 @@ module Hwaro
         config.auto_includes.dirs.each do |rel_dir|
           dir = File.join(@static_dir, rel_dir)
           next unless Dir.exists?(dir)
-          Dir.glob(File.join(dir, "**", "*")) do |path|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) do |path|
             # `File.directory?` raises on a symlink cycle, and the blanket
             # rescue below would have swallowed it — dropping EVERY
             # config-declared reference, so `--delete` removed bundle and

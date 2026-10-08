@@ -108,7 +108,7 @@ module Hwaro
       # case-insensitively, like `ReadContent`: a `*.{md,markdown}` glob
       # missed `Post.MD`, which the build publishes.
       private def dir_contains_markdown?(dir : String) : Bool
-        Dir.glob(File.join(dir, "**", "*")) { |path| return true if ContentWalk.markdown?(path) }
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) { |path| return true if ContentWalk.markdown?(path) }
         false
       end
 
@@ -119,10 +119,10 @@ module Hwaro
       # bundles rather than true sections.
       private def dir_has_markdown_in_subdirs?(dir : String, index_names : Set(String)) : Bool
         # Any markdown deeper than direct children of this dir?
-        Dir.glob(File.join(dir, "*", "*")) { |path| return true if ContentWalk.markdown?(path) }
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*", "*")) { |path| return true if ContentWalk.markdown?(path) }
 
         # Any direct markdown file that is *not* an index page?
-        Dir.glob(File.join(dir, "*")) do |path|
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*")) do |path|
           next unless ContentWalk.markdown?(path)
           return true unless index_names.includes?(markdown_stem(File.basename(path)))
         end
@@ -139,7 +139,7 @@ module Hwaro
         # then is the extra glob per directory worth paying for.
         return false if index_names.size <= 2
 
-        Dir.glob(File.join(dir, "_index.*.{md,markdown}")) do |path|
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "_index.*.{md,markdown}")) do |path|
           return true if index_names.includes?(markdown_stem(File.basename(path)))
         end
         false

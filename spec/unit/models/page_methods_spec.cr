@@ -585,6 +585,37 @@ describe Hwaro::Models::Page do
       end
     end
 
+    it "collects assets from a bundle directory whose name holds glob metacharacters" do
+      Dir.mktmpdir do |dir|
+        ["[wip]", "a{b,c}", "q?x", "star*", "back\\slash"].each do |name|
+          bundle = File.join(dir, name)
+          FileUtils.mkdir_p(File.join(bundle, "sub"))
+          File.write(File.join(bundle, "index.md"), "# Test")
+          File.write(File.join(bundle, "pic.png"), "x")
+          File.write(File.join(bundle, "sub", "deep.png"), "x")
+
+          page = Hwaro::Models::Page.new("#{name}/index.md")
+          page.is_index = true
+          page.collect_assets(dir).should eq(["#{name}/pic.png", "#{name}/sub/deep.png"])
+        end
+      end
+    end
+
+    it "never collects upper-case page sources (.MD / .Markdown) as assets" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "posts")
+        FileUtils.mkdir_p(bundle)
+        File.write(File.join(bundle, "_index.md"), "# Section")
+        File.write(File.join(bundle, "Wip.MD"), "+++\ndraft = true\n+++\nSECRET")
+        File.write(File.join(bundle, "Hid.Markdown"), "SECRET")
+        File.write(File.join(bundle, "pic.png"), "x")
+
+        page = Hwaro::Models::Page.new("posts/_index.md")
+        page.is_index = true
+        page.collect_assets(dir).should eq(["posts/pic.png"])
+      end
+    end
+
     it "honors [content.files] allow/disallow when content_files is enabled" do
       Dir.mktmpdir do |dir|
         bundle = File.join(dir, "post")
