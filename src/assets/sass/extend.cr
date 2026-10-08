@@ -59,6 +59,11 @@ module Hwaro
           return unless items
           found = false
           results = [] of {String, Int32}
+          # Every pseudo-argument extension lands in ONE rewritten selector
+          # (`.w:not(.a):not(.a)` gets both `:not()`s extended together), so
+          # the caller can fold later requests into it without dropping one.
+          pseudo_items = items.dup
+          pseudo_at : Int32? = nil
           items.each_with_index do |item, idx|
             next unless item.is_a?(Compound)
             if slot = item.simples.index(target)
@@ -86,12 +91,14 @@ module Hwaro
               next unless extended
               found = true
               next if extended == simple
-              new_simples = item.simples.dup
+              new_simples = pseudo_items[idx].as(Compound).simples.dup
               new_simples[si] = extended
-              new_items = items.dup
-              new_items[idx] = Compound.new(new_simples)
-              results << {serialize_items(new_items), -1}
+              pseudo_items[idx] = Compound.new(new_simples)
+              pseudo_at ||= results.size
             end
+          end
+          if at = pseudo_at
+            results.insert(at, {serialize_items(pseudo_items), -1})
           end
           found ? results : nil
         end

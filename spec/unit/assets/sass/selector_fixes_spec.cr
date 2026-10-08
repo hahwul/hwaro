@@ -86,5 +86,12 @@ describe "Sass selector fixes" do
       css = compile_source(".k:not(.a) { u: 6 }\n.a { x: 1 }\n.b { @extend .a }\n.c { @extend .b }")
       css.should contain(".k:not(.a), .k:not(.a, .b, .c) {")
     end
+
+    it "extends every pseudo occurrence of the target in one selector" do
+      extenders = (1..3).map { |n| ".e#{n} { @extend .a; }" }.join("\n")
+      css = compile_source(".a { x: 1 }\n.w:not(.a):not(.a) { u: 6 }\n.v:not(.a):is(.a) { u: 7 }\n#{extenders}")
+      css.should contain(".w:not(.a):not(.a), .w:not(.a, .e1, .e2, .e3):not(.a, .e1, .e2, .e3) {")
+      css.should contain(".v:not(.a):is(.a), .v:not(.a, .e1, .e2, .e3):is(.a, .e1, .e2, .e3) {")
+    end
   end
 end
