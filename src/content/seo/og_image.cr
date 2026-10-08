@@ -359,13 +359,13 @@ module Hwaro
           logo_abs_path = nil
           if logo_path = ai.logo
             abs = File.expand_path(logo_path)
-            logo_abs_path = abs if File.exists?(abs)
+            logo_abs_path = abs if File.file?(abs)
           end
 
           bg_abs_path = nil
           if bg_image_path = ai.background_image
             abs = File.expand_path(bg_image_path)
-            bg_abs_path = abs if File.exists?(abs)
+            bg_abs_path = abs if File.file?(abs)
           end
 
           # Pre-compute base64 data URIs once for SVG rendering.
