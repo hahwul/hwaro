@@ -958,3 +958,144 @@ describe "ImageProcessor.dimensions on hostile SVG" do
     end
   end
 end
+
+# A real JPEG (`w`x`h`, horizontal gradient) with an Exif APP1 block carrying
+# *orientation* inserted right after SOI, like a phone photo.
+private def write_exif_jpeg(path : String, w : Int32, h : Int32, orientation : Int32?, little : Bool = true) : Nil
+  pixels = Bytes.new(w * h * 3) { |i| (((i // 3) % w) * 255 // w).to_u8 }
+  LibStb.stbi_write_jpg(path, w, h, 3, pixels.to_unsafe.as(Void*), 90).should_not eq(0)
+  return unless orientation
+
+  fmt = little ? IO::ByteFormat::LittleEndian : IO::ByteFormat::BigEndian
+  tiff = IO::Memory.new
+  tiff.write(little ? "II".to_slice : "MM".to_slice)
+  tiff.write_bytes(42_u16, fmt)
+  tiff.write_bytes(8_u32, fmt)      # IFD0 offset
+  tiff.write_bytes(1_u16, fmt)      # one entry
+  tiff.write_bytes(0x0112_u16, fmt) # Orientation
+  tiff.write_bytes(3_u16, fmt)      # SHORT
+  tiff.write_bytes(1_u32, fmt)      # count
+  tiff.write_bytes(orientation.to_u16, fmt)
+  tiff.write_bytes(0_u16, fmt) # value padding
+  tiff.write_bytes(0_u32, fmt) # next IFD
+  segment = IO::Memory.new
+  segment.write(Bytes[0xFF, 0xE1])
+  segment.write_bytes((2 + 6 + tiff.size).to_u16, IO::ByteFormat::BigEndian)
+  segment.write("Exif\0\0".to_slice)
+  segment.write(tiff.to_slice)
+
+  jpeg = File.open(path, "rb", &.getb_to_end)
+  File.open(path, "wb") do |io|
+    io.write(jpeg[0, 2])
+    io.write(segment.to_slice)
+    io.write(jpeg[2, jpeg.size - 2])
+  end
+end
+
+# Regression: stb ignores EXIF orientation and the encoder writes no tag, so
+# srcset variants and the LQIP of a phone photo were sideways next to the
+# original (which browsers rotate), and `dimensions = true` stamped the
+# unrotated box on the original.
+describe "ImageProcessor EXIF orientation" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "reads the Orientation tag in both byte orders and defaults to 1" do
+    Dir.mktmpdir do |dir|
+      le = File.join(dir, "le.jpg")
+      be = File.join(dir, "be.jpg")
+      plain = File.join(dir, "plain.jpg")
+      write_exif_jpeg(le, 8, 4, 6)
+      write_exif_jpeg(be, 8, 4, 8, little: false)
+      write_exif_jpeg(plain, 8, 4, nil)
+      processor.exif_orientation(le).should eq(6)
+      processor.exif_orientation(be).should eq(8)
+      processor.exif_orientation(plain).should eq(1)
+      processor.exif_orientation(File.join(dir, "missing.jpg")).should eq(1)
+
+      write_exif_jpeg(File.join(dir, "bad.jpg"), 8, 4, 9) # out of range
+      processor.exif_orientation(File.join(dir, "bad.jpg")).should eq(1)
+
+      File.write(File.join(dir, "junk.jpg"), "\xFF\xD8\xFF\xE1\x00\x20Exif")
+      processor.exif_orientation(File.join(dir, "junk.jpg")).should eq(1)
+    end
+  end
+
+  it "reports the displayed size: width and height swap for orientations 5..8" do
+    Dir.mktmpdir do |dir|
+      {1 => {40, 20}, 3 => {40, 20}, 5 => {20, 40}, 6 => {20, 40}, 7 => {20, 40}, 8 => {20, 40}}.each do |orientation, size|
+        path = File.join(dir, "o#{orientation}.jpg")
+        write_exif_jpeg(path, 40, 20, orientation)
+        processor.dimensions(path).should eq(size)
+      end
+    end
+  end
+
+  it "cuts srcset variants and the LQIP from upright pixels" do
+    Dir.mktmpdir do |dir|
+      photo = File.join(dir, "photo.jpg")
+      write_exif_jpeg(photo, 40, 20, 6)
+      map, lqip, _ = processor.resize_and_lqip(photo, dir, [10], 85, 8)
+      processor.dimensions(map[10]).should eq({10, 20})
+      processor.exif_orientation(map[10]).should eq(1)
+      lqip.should_not be_nil
+
+      upright = File.join(dir, "upright.jpg")
+      write_exif_jpeg(upright, 40, 20, nil)
+      map, _, _ = processor.resize_and_lqip(upright, dir, [10], 85, 0)
+      processor.dimensions(map[10]).should eq({10, 5})
+    end
+  end
+
+  it "applies the orientation to fill/crop variants" do
+    Dir.mktmpdir do |dir|
+      photo = File.join(dir, "photo.jpg")
+      write_exif_jpeg(photo, 40, 20, 6)
+      dest = File.join(dir, "crop.jpg")
+      # Upright the photo is 20x40, so a 20x40 crop is the whole image.
+      processor.transform(photo, dest, 20, 40, "crop", "center").should eq({20, 40})
+    end
+  end
+
+  it "flags a variant cut before orientation was applied as stale" do
+    Dir.mktmpdir do |dir|
+      photo = File.join(dir, "photo.jpg")
+      write_exif_jpeg(photo, 40, 20, 6)
+      sideways = File.join(dir, "photo_10w.jpg")
+      write_exif_jpeg(sideways, 10, 5, nil)
+      processor.variant_current?(photo, sideways, 10).should be_false
+
+      map, _, _ = processor.resize_and_lqip(photo, dir, [10], 85, 0)
+      processor.variant_current?(photo, map[10], 10).should be_true
+      # Widths at or above the source copy the original (tag included).
+      processor.variant_current?(photo, photo, 20).should be_true
+
+      upright = File.join(dir, "up.jpg")
+      write_exif_jpeg(upright, 40, 20, nil)
+      processor.variant_current?(upright, sideways, 10).should be_true
+    end
+  end
+
+  it "maps every orientation to the upright pixel layout" do
+    # 2 wide x 3 tall, ids row-major: [[0,1],[2,3],[4,5]]
+    src = Bytes[0, 1, 2, 3, 4, 5]
+    expected = {
+      1 => {2, 3, [[0, 1], [2, 3], [4, 5]]},
+      2 => {2, 3, [[1, 0], [3, 2], [5, 4]]},
+      3 => {2, 3, [[5, 4], [3, 2], [1, 0]]},
+      4 => {2, 3, [[4, 5], [2, 3], [0, 1]]},
+      5 => {3, 2, [[0, 2, 4], [1, 3, 5]]},
+      6 => {3, 2, [[4, 2, 0], [5, 3, 1]]},
+      7 => {3, 2, [[5, 3, 1], [4, 2, 0]]},
+      8 => {3, 2, [[1, 3, 5], [0, 2, 4]]},
+    }
+    expected.each do |orientation, (w, h, rows)|
+      buf, ow, oh = processor.orient_pixels(src.to_unsafe, 2, 3, 1, orientation).not_nil!
+      begin
+        {ow, oh}.should eq({w, h})
+        Bytes.new(buf, ow * oh).to_a.should eq(rows.flatten.map(&.to_u8))
+      ensure
+        LibC.free(buf.as(Void*))
+      end
+    end
+  end
+end

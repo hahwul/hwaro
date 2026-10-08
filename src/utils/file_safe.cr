@@ -129,7 +129,7 @@ module Hwaro
       # the target's own name pushed a valid 233..255-byte file name over
       # NAME_MAX ("File name too long"). One fiber writes one file at a time,
       # so pid + fiber id is unique without the target in it.
-      private def self.temp_path_for(target : String) : String
+      def self.temp_path_for(target : String) : String
         File.join(File.dirname(target), "hwaro-#{Process.pid}-#{Fiber.current.object_id}.tmp")
       end
 

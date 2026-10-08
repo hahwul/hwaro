@@ -545,6 +545,8 @@ module Hwaro
             # at or after it (racy-git, see Cache.stable_mtime?).
             return unless Core::Build::Cache.stable_mtime?(source_mtime.to_unix_ms, dest_info.modification_time.to_unix_ms)
             return if dest_info.size == 0
+            # A variant cut before EXIF orientation was applied is sideways.
+            return unless Processors::ImageProcessor.variant_current?(source_path, File.join(dest_dir, filename), w)
             result[w] = filename
           end
           result

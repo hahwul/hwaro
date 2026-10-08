@@ -53,7 +53,7 @@ module Hwaro
           return unless File.file?(path)
           case File.extname(path).downcase
           when ".png"          then png_dimensions(path)
-          when ".jpg", ".jpeg" then jpeg_dimensions(path)
+          when ".jpg", ".jpeg" then displayed_jpeg_dimensions(path)
           when ".bmp"          then bmp_dimensions(path)
           when ".gif"          then gif_dimensions(path)
           when ".webp"         then webp_dimensions(path)
@@ -64,6 +64,79 @@ module Hwaro
           # fail the page that asked (callers fall back to no size).
           Logger.debug "image dimensions: #{path}: #{ex.message}"
           nil
+        end
+
+        # EXIF Orientation (1..8) of a JPEG; 1 (upright) when the file is not a
+        # JPEG, carries no Exif block, or the block is unreadable. Phone and
+        # camera photos are stored sideways with this tag, and browsers rotate
+        # the original by it - but stb decodes the raw rows and the encoder
+        # writes no tag, so every derived file has to apply it itself.
+        def exif_orientation(path : String) : Int32
+          return 1 unless File.extname(path).downcase.in?(".jpg", ".jpeg")
+          File.open(path) do |io|
+            return 1 unless io.read_byte == 0xFF && io.read_byte == 0xD8
+            loop do
+              byte = io.read_byte
+              return 1 if byte.nil?
+              next unless byte == 0xFF
+              marker = io.read_byte
+              return 1 if marker.nil?
+              next if marker == 0xFF || marker == 0x00 || (0xD0..0xD9).covers?(marker)
+              return 1 if marker == 0xDA # SOS: entropy-coded data follows, no more metadata
+              length = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+              return 1 if length < 2
+              if marker == 0xE1 && length >= 16
+                segment = Bytes.new(length - 2)
+                io.read_fully(segment)
+                if orientation = exif_orientation_from_app1(segment)
+                  return orientation
+                end
+              else
+                io.skip(length - 2)
+              end
+            end
+          end
+        rescue
+          1
+        end
+
+        # Copy of the `w`x`h` interleaved `pixels` rotated/flipped so that the
+        # image shows upright for EXIF *orientation* (2..8; 1 is a copy). Returns
+        # `{new_buffer, new_w, new_h}`; the buffer is `LibC.malloc`ed and the
+        # caller frees it. 5..8 swap width and height.
+        def orient_pixels(pixels : UInt8*, w : Int32, h : Int32, channels : Int32, orientation : Int32) : {UInt8*, Int32, Int32}?
+          swap = orientation >= 5
+          out_w = swap ? h : w
+          out_h = swap ? w : h
+          out = LibC.malloc(out_w.to_i64 * out_h * channels).as(UInt8*)
+          return if out.null?
+          out_h.times do |dy|
+            out_w.times do |dx|
+              sx, sy = case orientation
+                       when 2 then {w - 1 - dx, dy}
+                       when 3 then {w - 1 - dx, h - 1 - dy}
+                       when 4 then {dx, h - 1 - dy}
+                       when 5 then {dy, dx}
+                       when 6 then {dy, h - 1 - dx}
+                       when 7 then {w - 1 - dy, h - 1 - dx}
+                       when 8 then {w - 1 - dy, dx}
+                       else        {dx, dy}
+                       end
+              (out + (dy.to_i64 * out_w + dx) * channels).copy_from(pixels + (sy.to_i64 * w + sx) * channels, channels)
+            end
+          end
+          {out, out_w, out_h}
+        end
+
+        # Whether the already-written resize *variant* of *source* has the
+        # shape a fresh run would give it for *width*. Variants cut before
+        # orientation was applied are stored sideways (same name, wrong
+        # proportions) and must be regenerated even though their mtime is fine.
+        def variant_current?(source : String, variant : String, width : Int32) : Bool
+          return true if exif_orientation(source) <= 1
+          return true unless src = dimensions(source)
+          return true if width >= src[0] # the unscaled copy keeps its own tag
+          dimensions(variant) == calculate_dimensions(src[0], src[1], width)
         end
 
         # `resize_image(op=…)` operations and crop anchors.
@@ -85,9 +158,16 @@ module Hwaro
           channels = uninitialized LibC::Int
           pixels = LibStb.stbi_load(source, pointerof(src_w), pointerof(src_h), pointerof(channels), 0)
           return if pixels.null?
+          oriented = false
 
           begin
             return if src_w <= 0 || src_h <= 0 || channels <= 0
+            if (orientation = exif_orientation(source)) > 1
+              return unless upright = orient_pixels(pixels, src_w, src_h, channels, orientation)
+              LibStb.stbi_image_free(pixels.as(Void*))
+              pixels, src_w, src_h = upright
+              oriented = true
+            end
             # Source region to read, and the output size it maps onto.
             if op == "fill"
               scale = Math.max(width / src_w, height / src_h)
@@ -125,7 +205,7 @@ module Hwaro
               LibC.free(out_pixels.as(Void*))
             end
           ensure
-            LibStb.stbi_image_free(pixels.as(Void*))
+            oriented ? LibC.free(pixels.as(Void*)) : LibStb.stbi_image_free(pixels.as(Void*))
           end
         end
 
@@ -278,9 +358,19 @@ module Hwaro
           smallest_pixels : UInt8* = Pointer(UInt8).null
           smallest_w = 0_i32
           smallest_h = 0_i32
+          oriented = false
 
           begin
             return {result_map, lqip_uri, dom_color} if src_w <= 0 || src_h <= 0 || channels <= 0
+            # Variants and the LQIP are cut from upright pixels (and carry no
+            # tag), so they match the original a browser rotates by its tag.
+            if (orientation = exif_orientation(source)) > 1
+              upright = orient_pixels(pixels, src_w, src_h, channels, orientation)
+              return {result_map, lqip_uri, dom_color} unless upright
+              LibStb.stbi_image_free(pixels.as(Void*))
+              pixels, src_w, src_h = upright
+              oriented = true
+            end
 
             ext = File.extname(source).downcase
             basename = File.basename(source, File.extname(source))
@@ -356,7 +446,9 @@ module Hwaro
             end
           ensure
             LibC.free(smallest_pixels.as(Void*)) unless smallest_pixels.null?
-            LibStb.stbi_image_free(pixels.as(Void*)) unless pixels.null?
+            unless pixels.null?
+              oriented ? LibC.free(pixels.as(Void*)) : LibStb.stbi_image_free(pixels.as(Void*))
+            end
           end
 
           {result_map, lqip_uri, dom_color}
@@ -376,6 +468,40 @@ module Hwaro
           height = IO::ByteFormat::BigEndian.decode(UInt32, header[20, 4])
           return if width == 0 || height == 0 || width > Int32::MAX || height > Int32::MAX
           {width.to_i32, height.to_i32}
+        end
+
+        # The size a browser shows: the SOF size, width and height swapped for
+        # EXIF orientations 5..8.
+        private def displayed_jpeg_dimensions(path : String) : {Int32, Int32}?
+          return unless dims = jpeg_dimensions(path)
+          exif_orientation(path) >= 5 ? {dims[1], dims[0]} : dims
+        end
+
+        # The Orientation value of an APP1 payload, or nil when it is not an
+        # Exif block or has no (valid) Orientation entry in IFD0.
+        private def exif_orientation_from_app1(seg : Bytes) : Int32?
+          return unless seg.size >= 14 && seg[0, 6] == "Exif\0\0".to_slice
+          tiff = seg[6, seg.size - 6]
+          little = if tiff[0] == 0x49 && tiff[1] == 0x49
+                     true
+                   elsif tiff[0] == 0x4D && tiff[1] == 0x4D
+                     false
+                   else
+                     return
+                   end
+          format = little ? IO::ByteFormat::LittleEndian : IO::ByteFormat::BigEndian
+          return unless format.decode(UInt16, tiff[2, 2]) == 42
+          ifd = format.decode(UInt32, tiff[4, 4]).to_i64
+          return unless ifd >= 8 && ifd + 2 <= tiff.size
+          count = format.decode(UInt16, tiff[ifd, 2]).to_i32
+          count.times do |i|
+            entry = ifd + 2 + i.to_i64 * 12
+            return if entry + 12 > tiff.size
+            next unless format.decode(UInt16, tiff[entry, 2]) == 0x0112
+            value = format.decode(UInt16, tiff[entry + 8, 2]).to_i32
+            return (1..8).covers?(value) ? value : nil
+          end
+          nil
         end
 
         # JPEG: scan the marker stream for the first SOF frame header
@@ -544,7 +670,7 @@ module Hwaro
         # half-written file. The output format still comes from `ext`, never
         # from the temp file's name, so the `.tmp` suffix changes nothing.
         private def write_image(path : String, ext : String, w : Int32, h : Int32, channels : Int32, data : UInt8*, quality : Int32) : Bool
-          tmp = "#{path}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+          tmp = Hwaro::Utils::FileSafe.temp_path_for(path)
           begin
             ok = case ext
                  when ".png"
