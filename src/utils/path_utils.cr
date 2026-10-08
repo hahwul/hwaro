@@ -386,6 +386,19 @@ module Hwaro
         path
       end
 
+      # `path` with glob metacharacters escaped, so a content-derived directory
+      # spliced into a `Dir.glob` pattern (`posts/[WIP] Hello/**/*`) matches
+      # literally instead of as a character class, brace set or wildcard.
+      # Crystal's glob honours backslash escapes; on Windows the backslash is
+      # the path separator, so nothing is escaped there.
+      def glob_escape(path : String) : String
+        {% if flag?(:win32) %}
+          path
+        {% else %}
+          path.gsub(/[\\*?\[\]{},]/) { |char| "\\#{char}" }
+        {% end %}
+      end
+
       # File.match? that treats a malformed glob as non-matching instead of
       # raising File::BadPatternError, so a single config typo can't crash a
       # build or deploy.

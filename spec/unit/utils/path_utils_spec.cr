@@ -446,4 +446,17 @@ describe Hwaro::Utils::PathUtils do
       Hwaro::Utils::PathUtils.glob_match?("", "a").should be_false
     end
   end
+
+  describe ".glob_escape" do
+    it "makes a directory name with glob metacharacters match literally" do
+      Dir.mktmpdir do |dir|
+        ["[x] a", "a{b,c}", "a?b", "a*b", "a\\b"].each do |name|
+          FileUtils.mkdir_p(File.join(dir, name))
+          File.write(File.join(dir, name, "f.txt"), "x")
+          found = Dir.glob(File.join(Hwaro::Utils::PathUtils.glob_escape(File.join(dir, name)), "**", "*"))
+          found.should eq([File.join(dir, name, "f.txt")])
+        end
+      end
+    end
+  end
 end
