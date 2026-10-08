@@ -20,7 +20,7 @@ module Hwaro
         end
 
         begin
-          config = Models::Config.load(@config_path)
+          config = Models::Config.load(@config_path, env: @env)
         rescue ex
           issues << Issue.new(id: "config-parse-error", level: :error, category: "config", file: @config_path, message: "Failed to parse config: #{ex.message}")
           return
