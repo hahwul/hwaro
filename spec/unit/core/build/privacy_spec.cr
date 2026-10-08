@@ -751,4 +751,17 @@ describe "[privacy] builds" do
       end
     end
   end
+
+  it "keeps the local precache URLs when serve regenerates sw.js" do
+    with_cdn do |cdn, _hits, _server|
+      privacy_site(cdn, %([pwa]\nenabled = true\nprecache_urls = ["/", "#{cdn}/js/app.js"])) do
+        builder = run_build(serve_mode: true)
+        full = File.read("public/sw.js")
+        full.should match(/"\/assets\/external\/[0-9a-f]{12}-app\.js"/)
+
+        builder.site.try { |site| builder.regenerate_service_worker(site, "public", false) }
+        File.read("public/sw.js").should eq(full)
+      end
+    end
+  end
 end

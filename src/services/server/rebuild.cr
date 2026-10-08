@@ -211,6 +211,13 @@ module Hwaro
           Logger.info "  An image a page sizes or crops changed — rebuilding the pages that print it."
           return run_full_build(build_options)
         end
+        # The auto OG images embed the logo / background image: only a build
+        # regenerates them.
+        if @builder.og_image_asset_changed?(static_sources, build_options)
+          @static_changed_pages = true
+          Logger.info "  The OG image logo or background changed — rebuilding to regenerate the OG images."
+          return run_full_build(build_options)
+        end
         if static_shadowed_page
           @static_changed_pages = true
           Logger.info "  A static file publishes where a page or generated file is written — rebuilding so the build output wins that path."
@@ -248,7 +255,15 @@ module Hwaro
           @static_changed_pages = true
           return run_full_build(build_options)
         end
+        refresh_service_worker(output_dir, build_options)
         true
+      end
+
+      # sw.js content-hashes the bytes of the files it precaches; a copy lane
+      # that rewrote one must refresh it or registered service workers keep
+      # serving the old bytes (their CACHE_NAME never moves).
+      private def refresh_service_worker(output_dir : String, build_options : Config::Options::BuildOptions) : Nil
+        @builder.site.try { |site| @builder.regenerate_service_worker(site, output_dir, build_options.verbose) }
       end
 
       # Returns false when the escalated full rebuild (a `load_data()`
@@ -273,6 +288,10 @@ module Hwaro
           Logger.info "  A file read by load_data() changed — rebuilding the pages that print it."
           return run_full_build(build_options)
         end
+        if @builder.og_image_asset_changed?(changeset.modified_content_files, build_options)
+          Logger.info "  The OG image logo or background changed — rebuilding to regenerate the OG images."
+          return run_full_build(build_options)
+        end
         if Hwaro::Content::Hooks::ImageHooks.render_image_source_changed?(changeset.modified_content_files)
           Logger.info "  An image a page sizes or crops changed — rebuilding the pages that print it."
           return run_full_build(build_options)
@@ -285,6 +304,7 @@ module Hwaro
           Logger.info "  A content file changed and templates call asset_integrity() — re-rendering pages to update it."
           return @builder.run_rerender(build_options, force_pages: (site.pages + site.sections).as(Array(Models::Page)).select(&.render))
         end
+        refresh_service_worker(output_dir, build_options)
         true
       end
 

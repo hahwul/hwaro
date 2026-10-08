@@ -1114,11 +1114,7 @@ module Hwaro
             # service worker must still be refreshed. Warn-and-continue,
             # matching regenerate_seo_surfaces: a transient failure here
             # must not skip cache.save below.
-            begin
-              Content::Seo::Pwa.generate(site, output_dir, verbose)
-            rescue ex
-              Logger.warn "  PWA regeneration failed: #{ex.message}"
-            end
+            regenerate_service_worker(site, output_dir, verbose)
           end
 
           sweep_stale_derived_outputs(output_dir)
