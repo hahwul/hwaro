@@ -53,12 +53,15 @@ module Hwaro
         # PREFIX/SUFFIX so the two can't drift).
         SHORTCODE_PLACEHOLDER_RE = Content::Processors::InlineMarkdown::SHORTCODE_PLACEHOLDER_RE
 
-        # Matches CommonMark-style inline code spans on a single line
-        # (1 to 3 leading backticks; the same count must close the span).
-        # Multi-line inline spans are rare and intentionally not handled —
-        # those are usually fenced blocks, which the line-based outer
-        # loop in `process_shortcodes_jinja` already skips.
-        INLINE_CODE_RE = /(`{1,3})((?:(?!\1)[^\n])+?)\1/
+        # Matches CommonMark-style inline code spans (1 to 3 leading
+        # backticks; the same count must close the span). A span may wrap
+        # onto the next line, as a hard-wrapped paragraph does, but never
+        # across a blank line or into a fence line: a call on the first line
+        # of a wrapped span was expanded while Markd rendered the span as
+        # `<code>`, leaking the escaped placeholder comment into it. The
+        # per-line scanners only ever see one line, so for them the span
+        # simply has to close there.
+        INLINE_CODE_RE = /(`{1,3})((?:(?!\1)(?:[^\n]|\n(?![ \t]*(?:\r?\n|\r?\z|`{3}|~{3}))))+?)\1/
 
         # Fast pre-filter used by the render hot path (see render.cr).
         # Returns true only when {{ or {% appear *outside* fenced code blocks
