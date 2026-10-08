@@ -102,7 +102,7 @@ module Hwaro
           # PWA sw.js content-hashes the bytes of the files it precaches —
           # including the search index the tasks above just rewrote — so it
           # regenerates AFTER they finish, mirroring the full build's
-          # AfterWrite hook. Without this no serve incremental path ever
+          # AfterFinalize hook. Without this no serve incremental path ever
           # rewrote sw.js and registered service workers kept serving stale
           # bytes through live reloads.
           if site.config.pwa.enabled
