@@ -103,7 +103,9 @@ module Hwaro
         # compute_config_hash). rev 2: 2026-07 typography + style redesign.
         # rev 3: 2026-09 logo keeps its aspect ratio inside the LOGO_SIZE box.
         # rev 4: 2026-10 PNG titles hard-break segments wider than the line.
-        RENDER_REVISION = 4
+        # rev 5: 2026-10 untitled pages headline the site title; the masthead
+        # and editorial kickers are XML-escaped.
+        RENDER_REVISION = 5
 
         # `default` ("masthead"): eyebrow on top, title anchored high.
         MASTHEAD_EYEBROW_Y    =  96 # eyebrow baseline
