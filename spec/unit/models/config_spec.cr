@@ -1512,6 +1512,17 @@ describe Hwaro::Models::Config do
       config.build.output_dir.should be_nil
     end
 
+    it "keeps a [build] output_dir whose name merely starts with .." do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "..public"
+        TOML
+
+      config.build.output_dir.should eq("..public")
+    end
+
     it "keeps an absolute [build] output_dir" do
       config = load_config(<<-TOML)
         title = "Test"

@@ -209,7 +209,7 @@ module Hwaro
         path_part = url.split(/[?#]/, 2).first
         suffix = url[path_part.size..]
         target = Path.posix(source_dir, path_part).normalize
-        return whole if target.to_s.starts_with?("..")
+        return whole if Utils::PathUtils.escapes_parent?(target.to_s)
         return whole unless File.file?(File.join(@config.source_dir, target.to_s))
         rebased = target.relative_to(Path.posix(bundle_dir)).to_s
         "url(#{quote}#{rebased}#{suffix}#{quote})"

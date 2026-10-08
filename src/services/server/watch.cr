@@ -349,7 +349,7 @@ module Hwaro
         return roots unless config && config.assets.enabled
 
         source_dir = Path[config.assets.source_dir].normalize.to_s
-        return roots if source_dir.empty? || source_dir == "." || source_dir.starts_with?("..")
+        return roots if source_dir.empty? || source_dir == "." || Utils::PathUtils.escapes_parent?(source_dir)
         return roots if Utils::PathUtils.absolute?(source_dir)
 
         output = Path[output_dir].normalize.to_s

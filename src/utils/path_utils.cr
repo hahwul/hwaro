@@ -16,6 +16,13 @@ module Hwaro
         path.rstrip(File::SEPARATOR)
       end
 
+      # True when the normalized relative *path* climbs out of its base: its
+      # first segment is exactly `..`. A string-prefix test also matched
+      # legal names such as `..public`.
+      def escapes_parent?(path : String) : Bool
+        Path[path].normalize.parts.first? == ".."
+      end
+
       # `Path#absolute?`, plus a rooted path (`/x`, `\x`) on Windows. The
       # stdlib calls those drive-relative, but they never name something
       # under the current directory: `File.join(root, "/x")` would quietly

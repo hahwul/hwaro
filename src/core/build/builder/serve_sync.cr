@@ -574,7 +574,7 @@ module Hwaro
         # `path` relative to the output directory, or nil when it is outside.
         private def output_relative(path : String, output_dir : String, cwd : String) : String?
           relative = Path[File.expand_path(path, cwd)].relative_to(File.expand_path(output_dir, cwd)).to_s
-          return if relative.starts_with?("..") || relative == "."
+          return if Utils::PathUtils.escapes_parent?(relative) || relative == "."
           relative
         rescue ArgumentError
           nil
