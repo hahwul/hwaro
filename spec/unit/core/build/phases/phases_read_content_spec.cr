@@ -125,8 +125,8 @@ describe Hwaro::Core::Build::Phases::ReadContent do
           ctx = make_ctx(Hwaro::Models::Config.new)
           Hwaro::Core::Build::Builder.new.test_collect_content_paths(ctx)
 
-          ctx.pages.map(&.path).should eq(ctx.pages.map(&.path).sort)
-          ctx.sections.map(&.path).should eq(ctx.sections.map(&.path).sort)
+          ctx.pages.map(&.path).should eq(ctx.pages.map(&.path).sort!)
+          ctx.sections.map(&.path).should eq(ctx.sections.map(&.path).sort!)
         end
       end
     end
