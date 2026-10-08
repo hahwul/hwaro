@@ -128,6 +128,19 @@ describe Hwaro::Content::Processors::Includes do
       Includes.heading_section(note, "A pic and ref b").should eq("## A ![pic](p.png) and [ref][r] <b>b</b>\nIMG\n")
       Includes.heading_section(note, "Tom & Jerry").should eq("## Tom &amp; Jerry\nAMP\n\n[r]: /r\n")
     end
+
+    it "reads the text of a code span as written, even when it looks like a tag" do
+      note = "## `<div>` tag\nCODE\n## Next\nN\n"
+      Includes.heading_section(note, "<div> tag").should eq("## `<div>` tag\nCODE\n")
+      Includes.heading_section(note, "div tag").should eq("## `<div>` tag\nCODE\n")
+    end
+
+    it "takes neither a table nor a reference definition for a setext heading's text" do
+      table = "## T\nA\n\n| a | b |\n|---|---|\n| 1 | 2 |\n---\nafter\n\n## Next\nZ\n"
+      Includes.heading_section(table, "T").should eq("## T\nA\n\n| a | b |\n|---|---|\n| 1 | 2 |\n---\nafter\n\n")
+      ref = "## T\n\n[ref]: /x\n---\nbody\n\n## Next\nZ\n"
+      Includes.heading_section(ref, "T").should eq("## T\n\n[ref]: /x\n---\nbody\n\n")
+    end
   end
 
   describe ".relative_path" do

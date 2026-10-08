@@ -51,6 +51,7 @@ module Hwaro
         MD_REGION_RE = /\A[ \t]*<!--[ \t]*#(end)?region\b[ \t]*([\w.]+(?:-[\w.]+)*)?[ \t]*-->[ \t]*\r?\n?\z/
         LINES_RE     = /\A[ \t]*(\d+)(?:[ \t]*-[ \t]*(\d+))?[ \t]*\z/
         SETEXT_RE    = /\A {0,3}(=+|-+)[ \t]*\r?\n?\z/
+        REF_DEF_RE   = /\A {0,3}\[(?!\^)[^\]]+\]:/
         THEMATIC_RE  = /\A {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})\r?\n?\z/
         ATX_RE       = /\A {0,3}(\#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*\r?\n?\z/
 
@@ -268,6 +269,10 @@ module Hwaro
               text = lines[start...i].join(' ', &.strip)
               heads << {start, u[1].starts_with?('=') ? 1 : 2, visible_text(text)}
               para = nil
+            elsif para && line.includes?('|') && TableParser.separator_row?(line)
+              para, skip = nil, true # a table: its rows are not a heading's text
+            elsif para.nil? && REF_DEF_RE.matches?(line)
+              next # a reference definition is no paragraph: a `---` after it is a rule
             elsif tracker.html_block_line? || tracker.list_item_line? || line.lstrip(' ').starts_with?('>')
               para, skip = nil, true
             elsif THEMATIC_RE.matches?(line)
@@ -282,10 +287,16 @@ module Hwaro
         # A heading's source as the reader sees it: images and links reduced
         # to their text, tags dropped, entities decoded.
         private def visible_text(source : String) : String
-          text = source.gsub(/!\[([^\]]*)\]\([^)]*\)/, "\\1")
+          # Code spans are text as written, so they are set aside first.
+          codes = [] of String
+          text = source.gsub(/(`+)(.+?)(?<!`)\1(?!`)/) do
+            codes << $2.strip
+            "\u{E000}#{codes.size - 1}\u{E001}"
+          end
+          text = text.gsub(/!\[([^\]]*)\]\([^)]*\)/, "\\1")
             .gsub(/\[([^\]]+)\](?:\([^)]*\)|\[[^\]]*\])/, "\\1")
             .gsub(/<(?:([A-Za-z][A-Za-z0-9+.-]*:[^\s<>]*)|\/?[A-Za-z][^<>]*)>/) { $1? || "" }
-          HTML.unescape(text)
+          HTML.unescape(text).gsub(/\x{E000}(\d+)\x{E001}/) { codes[$1.to_i] }
         end
       end
     end
