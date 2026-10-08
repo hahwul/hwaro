@@ -94,6 +94,8 @@ static/hwaro.png
   -> public/hwaro_1280w.png
 ```
 
+A file you publish yourself under one of these names (for example an authored `static/hwaro_320w.png`) is never overwritten: that width is skipped and left out of the `srcset`.
+
 ## Using in Templates
 
 Use the `resize_image()` function to get the URL of a resized variant:
@@ -187,7 +189,7 @@ For images with transparency (PNG logos, icons), `dominant_color` is weighted by
 `anchor` is one of `center` (default), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right`.
 
 - `fill` and `crop` need both `width` and `height`. A missing size, or an unknown `op` or `anchor`, is a template error.
-- These variants are written the first time a page renders and reused while they are newer than the source. They do not need `enabled = true` or any `widths`. With `--skip-image-processing` the original URL is returned.
+- These variants are written the first time a page renders and reused on warm builds while the source and `quality` are unchanged (the record is kept in `.hwaro/`). They do not need `enabled = true` or any `widths`. With `--skip-image-processing` the original URL is returned.
 - The file name carries the size, op and anchor, e.g. `hero_400x300_fill_center.jpg`, next to the original.
 - `width`/`height` in the result are the written file's size. `lqip` and `dominant_color` are empty for these variants.
 - Only JPEG, PNG and BMP sources can be cropped. Other formats return the original URL.

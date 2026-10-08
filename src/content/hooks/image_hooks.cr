@@ -10,6 +10,7 @@
 
 require "../../core/lifecycle"
 require "../processors/image_processor"
+require "./image_variant_stamps"
 
 module Hwaro
   module Content
@@ -269,13 +270,18 @@ module Hwaro
                      memo[1]
                    else
                      dest_info = File.info?(dest)
-                     # Fresh only if written safely after the source's
-                     # timestamp tick (racy-git, Cache.stable_mtime?): a
-                     # same-tick rewrite of the source keeps `dest >= source`.
-                     fresh = !authored && dest_info && dest_info.file? && dest_info.size > 0 &&
+                     # Cut from this very source (exact mtime + size) with
+                     # these encode settings — see ImageVariantStamps — and
+                     # written safely after the source's timestamp tick
+                     # (racy-git, Cache.stable_mtime?): a same-tick rewrite of
+                     # the source keeps `dest >= source`.
+                     stamp = ImageVariantStamps.fingerprint(source, "q#{@@op_quality}")
+                     fresh = !authored && stamp && dest_info && dest_info.file? && dest_info.size > 0 &&
+                             ImageVariantStamps.fresh?(dest, stamp) &&
                              Core::Build::Cache.stable_mtime?(source_mtime.to_unix_ms, dest_info.modification_time.to_unix_ms)
                      made = (Processors::ImageProcessor.dimensions(dest) if fresh) ||
                             Processors::ImageProcessor.transform(source, dest, width, height, op, anchor, @@op_quality)
+                     ImageVariantStamps.record(dest, stamp) if made && stamp
                      @@op_variants[dest] = {source_mtime, made}
                      made
                    end
@@ -381,8 +387,9 @@ module Hwaro
             ->(name : String) { names.includes?(name) }
           end
 
+          encode_settings = ImageHooks.encode_settings(quality, lqip_width, lqip_quality)
           jobs.each do |job|
-            reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths, authored_for.call(job))
+            reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths, authored_for.call(job), encode_settings)
             if reused_widths && (!lqip_enabled || previous_lqip_map.has_key?(job.original_url))
               width_urls = {} of Int32 => String
               reused_widths.each do |width, filename|
@@ -503,6 +510,7 @@ module Hwaro
           dest_dir : String,
           widths : Array(Int32),
           authored : Proc(String, Bool)? = nil,
+          encode_settings : String? = nil,
         ) : Hash(Int32, String)?
           return unless File.exists?(source_path)
           return unless Dir.exists?(dest_dir)
@@ -553,10 +561,16 @@ module Hwaro
           expected.reject! { |w| authored.try(&.call("#{basename}_#{w}w#{ext}")) }
           return unless expected.sort == on_disk.keys.sort!
 
+          # With `encode_settings`, a variant is only reusable when it was
+          # cut from this exact source version with these settings.
+          stamp = encode_settings && ImageVariantStamps.fingerprint(source_path, encode_settings)
+          return if encode_settings && !stamp
+
           result = {} of Int32 => String
           expected.each do |w|
             filename = on_disk[w]?
             return unless filename
+            return if stamp && !ImageVariantStamps.fresh?(File.join(dest_dir, filename), stamp)
             dest_info = File.info(File.join(dest_dir, filename))
             # Written safely after the source's timestamp tick, not merely
             # at or after it (racy-git, see Cache.stable_mtime?).
@@ -567,13 +581,23 @@ module Hwaro
           result
         end
 
+        # The encode settings a width variant set depends on (besides the
+        # source): the JPEG quality and the LQIP knobs.
+        def self.encode_settings(quality : Int32, lqip_width : Int32, lqip_quality : Int32) : String
+          "q#{quality}:l#{lqip_width}:#{lqip_quality}"
+        end
+
         # Resize a single image to all widths + generate LQIP (one decode pass)
         private def resize_one(job : ImageJob, widths : Array(Int32), quality : Int32,
                                lqip_width : Int32, lqip_quality : Int32,
                                authored : Proc(String, Bool)?) : {Hash(Int32, String), Hash(String, String)?}
+          # Fingerprinted BEFORE the decode: a source rewritten mid-run then
+          # mismatches on the next build and is regenerated.
+          stamp = ImageVariantStamps.fingerprint(job.source_path, ImageHooks.encode_settings(quality, lqip_width, lqip_quality))
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
             job.source_path, job.dest_dir, widths, quality, lqip_width, lqip_quality, authored
           )
+          path_map.each_value { |dest| ImageVariantStamps.record(dest, stamp) } if stamp
 
           width_url_map = {} of Int32 => String
           path_map.each do |width, dest_path|
@@ -792,9 +816,11 @@ module Hwaro
           ip = config.image_processing
           lqip_width = ip.lqip_enabled ? ip.lqip_width : 0
           authored = ->(name : String) { !resolve_source(url_prefix + name, config).nil? }
+          stamp = ImageVariantStamps.fingerprint(src_path, encode_settings(ip.quality, lqip_width, ip.lqip_quality))
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
             src_path, dest_dir, ip.widths, ip.quality, lqip_width, ip.lqip_quality, authored
           )
+          path_map.each_value { |dest| ImageVariantStamps.record(dest, stamp) } if stamp
           return 0 if path_map.empty?
 
           width_urls = {} of Int32 => String

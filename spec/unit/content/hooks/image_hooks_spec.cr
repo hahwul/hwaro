@@ -355,6 +355,37 @@ describe Hwaro::Content::Hooks::ImageHooks do
   # exist. These tests cover the pure predicate; end-to-end reuse is
   # exercised by `process_images` via the path through this helper.
   describe ".reusable_widths" do
+    it "reuses stamped variants only for the same source version and encode settings" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          hooks = Hwaro::Content::Hooks::ImageHooks
+          stamps = Hwaro::Content::Hooks::ImageVariantStamps
+          File.write("photo.jpg", "src")
+          File.touch("photo.jpg", Time.utc - 1.hour)
+          Dir.mkdir_p("out")
+          variant = File.join("out", "photo_320w.jpg")
+          File.write(variant, "320")
+          settings = hooks.encode_settings(85, 0, 20)
+
+          # No stamp: not proven fresh (a cache from before stamps existed).
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, settings).should be_nil
+          hooks.reusable_widths("photo.jpg", "out", [320]).should_not be_nil
+
+          stamps.record(variant, stamps.fingerprint("photo.jpg", settings).not_nil!)
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, settings).should_not be_nil
+
+          # A different quality is a different variant.
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, hooks.encode_settings(5, 0, 20)).should be_nil
+
+          # A replaced source whose mtime moved BACKWARDS (still older than
+          # the variant) is a different source version.
+          File.write("photo.jpg", "other")
+          File.touch("photo.jpg", Time.utc - 2.hours)
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, settings).should be_nil
+        end
+      end
+    end
+
     it "returns a width => filename map when all destinations are fresh" do
       Dir.mktmpdir do |dir|
         source = File.join(dir, "photo.jpg")
@@ -610,6 +641,17 @@ private def png_body(w : Int32, h : Int32) : String
   end
 end
 
+# Raw bytes of a noisy w×h JPEG (noise keeps the size sensitive to quality).
+private def jpg_body(w : Int32, h : Int32, seed : Int32) : String
+  Dir.mktmpdir do |dir|
+    path = File.join(dir, "x.jpg")
+    rng = Random.new(seed)
+    px = Bytes.new(w * h * 3) { rng.rand(256).to_u8 }
+    LibStb.stbi_write_jpg(path, w, h, 3, px.to_unsafe.as(Void*), 90)
+    File.read(path)
+  end
+end
+
 private def png_size(path : String) : {Int32, Int32}?
   Hwaro::Content::Processors::ImageProcessor.dimensions(path)
 end
@@ -680,6 +722,45 @@ describe "ImageHooks render-time lookups (review fixes)" do
       File.read("public/about/index.html").should contain("V=https://example.com/img/a_10x10_fill_center.png?v=3")
       png_size("public/img/a_10x10_fill_center.png").should eq({10, 10})
       Dir.exists?("public/sub").should be_false
+    end
+  end
+
+  it "regenerates warm variants after a quality change or a source swapped for an older-mtime file" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        config = ->(quality : Int32) {
+          File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\nenabled = true\nwidths = [40]\nquality = #{quality}\n))
+        }
+        config.call(95)
+        Dir.mkdir_p("content")
+        Dir.mkdir_p("templates")
+        Dir.mkdir_p("static")
+        File.write("content/index.md", "+++\ntitle = \"Home\"\n+++\nhi\n")
+        tpl = %({% set v = resize_image(path="/p.jpg", width=30, height=20, op="fill") %}{{ v.url }}{{ content }})
+        %w(index page section).each { |name| File.write("templates/#{name}.html", tpl) }
+        File.write("static/p.jpg", jpg_body(120, 80, 1))
+        File.touch("static/p.jpg", Time.utc - 1.hour)
+
+        rebuild_cached
+        wide = File.size("public/p_40w.jpg")
+        fill = File.size("public/p_30x20_fill_center.jpg")
+
+        config.call(5)
+        rebuild_cached
+        File.size("public/p_40w.jpg").should be < wide
+        File.size("public/p_30x20_fill_center.jpg").should be < fill
+
+        # Same quality again: nothing is rewritten.
+        before = {File.read("public/p_40w.jpg"), File.info("public/p_40w.jpg").modification_time}
+        rebuild_cached
+        {File.read("public/p_40w.jpg"), File.info("public/p_40w.jpg").modification_time}.should eq(before)
+
+        # rsync -a / tar -x / a restored revision: new bytes, OLDER mtime.
+        File.write("static/p.jpg", jpg_body(120, 80, 2))
+        File.touch("static/p.jpg", Time.utc - 2.hours)
+        rebuild_cached
+        File.read("public/p_40w.jpg").should_not eq(before[0])
+      end
     end
   end
 
