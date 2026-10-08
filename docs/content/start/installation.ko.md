@@ -14,6 +14,16 @@ brew tap hahwul/hwaro
 brew install hwaro
 ```
 
+## Chocolatey (Windows)
+
+```powershell
+choco install hwaro
+```
+
+v0.20.2 다음 릴리스(Windows x86_64 바이너리가 처음 포함되는 릴리스)부터 배포되며,
+새 패키지의 첫 버전은 Chocolatey 커뮤니티 검수를 통과한 뒤 설치할 수 있습니다.
+업데이트는 `choco upgrade hwaro`로 합니다(실행 중인 `hwaro serve`는 먼저 종료하세요).
+
 ## Snapcraft
 
 ```bash

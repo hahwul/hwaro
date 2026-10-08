@@ -93,6 +93,12 @@ brew tap hahwul/hwaro
 brew install hwaro
 ```
 
+### Chocolatey (Windows)
+
+```powershell
+choco install hwaro
+```
+
 ### From source
 
 ```bash
