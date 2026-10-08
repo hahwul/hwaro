@@ -26,15 +26,30 @@ module Hwaro
         # The lookbehind keeps `data-href=` / `xlink:href=` out.
         FRAGMENT_LINK_REGEX = /(?<![\w:-])href="(@\/[^"#]*)?#([^"]*)"/
 
-        # Matches an `id`/`name` attribute (quoted or, after minification,
-        # unquoted). The leading whitespace keeps `data-id=` out.
-        ANCHOR_ATTR_REGEX = /\s(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
+        # An opening tag: `$1` = tag name, `$2` = its attributes. Quoted values
+        # are skipped whole, so a `>` inside `title="a>b"` does not end the tag.
+        TAG_REGEX = /<([a-zA-Z][^\s\/>]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/
 
-        # Every anchor target (`id` / `name` value, entity-decoded) in `html`.
+        # One attribute of a tag (`$1` = name, quoted, or, after minification,
+        # unquoted value in `$2`/`$3`/`$4`). The leading whitespace keeps
+        # `data-id=` out.
+        ATTR_REGEX = /\s([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/
+
+        # Every anchor target in `html`, entity-decoded: an `id` on any element,
+        # or a `name` on `<a>` - the only element a browser scrolls to by name.
+        # `<meta name="description">` and `<input name="q">` are not targets, so
+        # `#description` must not pass as one.
         def anchor_ids(html : String) : Set(String)
           ids = Set(String).new
-          html.scan(ANCHOR_ATTR_REGEX) do |m|
-            ids << HTML.unescape(m[1]? || m[2]? || m[3])
+          html.scan(TAG_REGEX) do |tag|
+            anchor = tag[1].compare("a", case_insensitive: true) == 0
+            tag[2].scan(ATTR_REGEX) do |attr|
+              key = attr[1]
+              next unless key.compare("id", case_insensitive: true) == 0 ||
+                          (anchor && key.compare("name", case_insensitive: true) == 0)
+              value = attr[2]? || attr[3]? || attr[4]?
+              ids << HTML.unescape(value) if value
+            end
           end
           ids
         end

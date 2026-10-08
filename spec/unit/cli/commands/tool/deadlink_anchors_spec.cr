@@ -34,6 +34,14 @@ describe "check-links anchors" do
     end
   end
 
+  it "checks fragments in used reference definitions, not unused ones" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "content"))
+      anchor_site(dir, {"a" => {"[x][ref] [y][ok]\n\n[ref]: #refdef\n[ok]: #intro\n[Note]: #unused\n", %(<h1 id="intro">A</h1>)}})
+      Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.dead_anchors_for_test(dir).should eq(["a.md #refdef"])
+    end
+  end
+
   it "checks nothing without a usable build tree" do
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "content"))

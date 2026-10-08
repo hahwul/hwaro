@@ -285,6 +285,15 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
     end
   end
 
+  describe ".anchor_ids name= targets" do
+    it "accepts name= only on <a>, id= on any element" do
+      html = %(<meta name="description" content="x"><meta name=viewport><form><input name="q" id="search"></form>) +
+             %(<a name=old>o</a><A NAME="Up">u</A><a title="a>b" name='quoted'>q</a><b title=" name=fake">t</b>)
+      ids = Hwaro::Content::Processors::InternalLinkResolver.anchor_ids(html)
+      ids.should eq(Set{"search", "old", "Up", "quoted"})
+    end
+  end
+
   describe "FRAGMENT_LINK_REGEX" do
     it "ignores data-href and other *href attributes" do
       html = %(<a data-href="#x">a</a><a xlink:href="#y">b</a><a href="#z">c</a>)
