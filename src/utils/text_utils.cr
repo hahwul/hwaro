@@ -558,7 +558,10 @@ module Hwaro
       # the first `?`/`#`). A scheme/host prefix and a query are not path.
       private def path_bounds(url : String) : {Int32, Int32}
         start = 0
-        if scheme_end = url.index("://")
+        # `://` only opens an authority when nothing path-like precedes it: a
+        # relative URL whose query carries a URL (`/x?u=http://y/z[1]`) has no
+        # host, and its query must not be mistaken for a path.
+        if (scheme_end = url.index("://")) && !url[0, scheme_end].matches?(%r{[/?#]})
           start = url.index('/', scheme_end + 3) || url.bytesize
         end
         stop = url.index(/[?#]/, start) || url.bytesize

@@ -267,6 +267,9 @@ describe Hwaro::Utils::TextUtils do
       enc.call("/search/?d[]=1&x={y}").should eq("/search/?d[]=1&x={y}")
       enc.call("http://[::1]:8080/posts/").should eq("http://[::1]:8080/posts/")
       enc.call("/posts/[b]/?d[]=1").should eq("/posts/%5Bb%5D/?d[]=1")
+      # A URL inside the query is not an authority: only the path is encoded.
+      enc.call("/x?u=http://y/z[1]").should eq("/x?u=http://y/z[1]")
+      enc.call("/x[1]?u=http://y/z[1]").should eq("/x%5B1%5D?u=http://y/z[1]")
     end
 
     it "leaves plain ASCII URLs unchanged" do
