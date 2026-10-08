@@ -404,7 +404,7 @@ module Hwaro
           # edits too — a default glob never descends into dot-directories,
           # leaving those files permanently stale during serve. Editor/VCS
           # noise stays filtered by watcher_ignored?.
-          Dir.glob(File.join(dir, "**", "*"), match: File::MatchOptions.glob_default | File::MatchOptions::DotFiles) do |file|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*"), match: File::MatchOptions.glob_default | File::MatchOptions::DotFiles) do |file|
             next if Server.watcher_ignored?(file)
             begin
               # Deciding whether an entry is watchable must NOT raise, and it

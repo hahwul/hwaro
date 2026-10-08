@@ -36,6 +36,26 @@ describe Hwaro::Services::UnusedAssets do
       end
     end
 
+    it "scans a project whose own directory name carries glob metacharacters" do
+      # The directory prefix of every glob is literal: `[client]/` or `a{b,c}/`
+      # used to match nothing, so doctor/unused-assets saw an empty project.
+      Dir.mktmpdir do |tmp|
+        dir = File.join(tmp, "[client] a{b,c}")
+        content_dir = File.join(dir, "content")
+        static_dir = File.join(dir, "static")
+        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(static_dir)
+        File.write(File.join(static_dir, "used.png"), "png data")
+        File.write(File.join(static_dir, "unused.png"), "png data")
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\n---\n\n![Image](used.png)\n")
+
+        result = Hwaro::Services::UnusedAssets.new(content_dir: content_dir, static_dir: static_dir, templates_dir: File.join(dir, "templates")).run
+
+        result.total_assets.should eq(2)
+        result.unused_files.should eq([File.join(static_dir, "unused.png")])
+      end
+    end
+
     it "does not flag a referenced asset whose name contains a space" do
       # Regression: the reference regex only matches [\w\-.] filenames, so an
       # asset like `team photo.png` referenced in content was reported unused

@@ -49,14 +49,14 @@ module Hwaro
           static_dir = File.join("static", dir)
           next unless Dir.exists?(static_dir)
 
-          files = Dir.glob(File.join(static_dir, "**", "*.#{extension}"))
+          files = Dir.glob(File.join(Utils::PathUtils.glob_escape(static_dir), "**", "*.#{extension}"))
           files.reject! { |f| static_config.excluded?(Path[f].relative_to("static").to_s) } if static_config
           if extension == "css" && @sass_enabled
             # Compiled SCSS is written to the output tree, not `static/`,
             # so project each entry onto the `.css` it will produce.
             # Partials never produce output; a hand-written sibling of the
             # same name is already in `files`.
-            Dir.glob(File.join(static_dir, "**", "*.scss")).each do |scss|
+            Dir.glob(File.join(Utils::PathUtils.glob_escape(static_dir), "**", "*.scss")).each do |scss|
               next if File.basename(scss).starts_with?("_")
               next if static_config && static_config.excluded?(Path[scss].relative_to("static").to_s)
               compiled = scss.sub(/\.scss\z/, ".css")
