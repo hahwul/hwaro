@@ -786,7 +786,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.git = nil
     return unless info_map = @git_info
     return if page.synthesized?
-    return unless info = info_map[page.path]?
+    return unless info = info_map[GitInfo.key(page.path)]?
 
     page.git = info
     git_config = @config.try(&.git)
