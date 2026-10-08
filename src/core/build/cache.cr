@@ -415,6 +415,36 @@ module Hwaro
           !key.empty? && @metadata.output_dir == key
         end
 
+        # Write-ahead invalidation: the file on disk stops describing the
+        # output directory the moment a build starts rewriting it, and only a
+        # successful Finalize `save` (forced by the dirty flag) vouches for it
+        # again. A build that dies mid-render otherwise leaves the previous
+        # build's hashes next to half-rewritten pages, and reverting the edit
+        # that broke it makes every hash match again — a warm build then
+        # trusts output it never produced.
+        def invalidate_on_disk : Nil
+          return unless @enabled
+          File.delete?(@cache_path)
+          @dirty = true
+        rescue File::Error
+          @dirty = true
+        end
+
+        # A build WITHOUT `--cache` rewrites `output_dir` and never touches the
+        # cache file, which keeps describing the tree as it was: the next
+        # `--cache` build then keeps the new output (drafts, minified or
+        # other-base-url pages) and skips every page whose hashes still match.
+        # Drop the file when it describes this output directory; a cache for
+        # another one is none of this build's business.
+        def self.discard_if_tracking(output_dir : String, cache_path : String = CACHE_FILE) : Nil
+          return unless File.file?(cache_path)
+          key = output_dir_key(output_dir)
+          return if key.empty?
+          File.delete(cache_path) if CacheData.from_json(File.read(cache_path)).metadata.output_dir == key
+        rescue JSON::ParseException | JSON::SerializableError | File::Error | IO::Error
+          # Unreadable or legacy: tracks_output_dir? is already false for it.
+        end
+
         # Has the global page set (content page metadata that listings render —
         # path/url/title/date/weight/draft/section) changed since last build?
         def page_set_changed?(fingerprint : String) : Bool

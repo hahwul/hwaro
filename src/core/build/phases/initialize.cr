@@ -47,6 +47,9 @@ module Hwaro::Core::Build::Phases::Initialize
         # reads.
         Logger.warn "--full has no effect without --cache (a plain build already rebuilds everything); pass --cache --full to discard the existing cache."
       end
+      # Before the wipe below: this build is about to replace what the cache
+      # file describes, and it will not update it.
+      Cache.discard_if_tracking(output_dir) unless cache_enabled || ctx.options.serve_mode
 
       # `preserve_output` keeps existing output files between rebuilds (used
       # by `hwaro serve` watch rebuilds) so mtime-based skip logic in hooks

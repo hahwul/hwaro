@@ -17,6 +17,10 @@ module Hwaro::Core::Build::Phases::Render
 
     all_pages = ctx.all_pages
 
+    # From here this build rewrites the output; see Cache#invalidate_on_disk.
+    # (Serve keeps its own cache and its incremental passes re-save it.)
+    build_cache.invalidate_on_disk if cache_enabled && !ctx.options.serve_mode
+
     # Filter pages for caching. Listing pages (homepage, section indexes,
     # archives, taxonomy widgets) render content derived from the global
     # page/section set even when their own source is unchanged, so fold a
