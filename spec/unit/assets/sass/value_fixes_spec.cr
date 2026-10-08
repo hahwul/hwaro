@@ -50,6 +50,9 @@ describe "Sass value fixes" do
         css = Hwaro::Assets::Sass.compile(File.read(File.join(dir, "t.scss")),
           path: File.join(dir, "t.scss"), root: dir)
         css.should contain("b: 2;")
+        expect_raises(Hwaro::Assets::Sass::SyntaxError) do
+          Hwaro::Assets::Sass.compile("@use \"p\";\n.a { b: p.$-secret }", path: File.join(dir, "u.scss"), root: dir)
+        end
       end
     end
   end
@@ -171,6 +174,13 @@ describe "Sass value fixes" do
       css.should contain("j: false;")
       css.should contain("k: true;")
       css.should contain("l: true;")
+    end
+
+    it "keeps values on opposite sides of a rounding boundary distinct (dart fuzzyEquals)" do
+      css = compile_source(".a { m: 1e-12 < 1e-11; n: 0.4e-11 == 0.6e-11; o: 0.3e-11 == 0.4e-11; }")
+      css.should contain("m: true;")
+      css.should contain("n: false;")
+      css.should contain("o: true;")
     end
   end
 

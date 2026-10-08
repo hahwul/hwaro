@@ -188,8 +188,11 @@ module Hwaro
         # (`0.1 * 3 == 0.3`); floor/ceil/round are exact there.
         EPSILON = 1e-11
 
+        # dart-sass `fuzzyEquals`: within epsilon AND the same value once
+        # scaled and rounded, so `0.4e-11` and `0.6e-11` stay distinct.
         def self.fuzzy_eq?(a : Float64, b : Float64) : Bool
-          a == b || (a - b).abs < EPSILON
+          return true if a == b
+          (a - b).abs <= EPSILON && (a / EPSILON).round == (b / EPSILON).round
         end
 
         def self.fuzzy_lt?(a : Float64, b : Float64) : Bool
