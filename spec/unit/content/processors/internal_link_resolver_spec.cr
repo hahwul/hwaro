@@ -326,4 +326,18 @@ describe "Hwaro::Content::Processors::InternalLinkResolver.page_for" do
     Hwaro::Content::Processors::InternalLinkResolver.page_for(map, "a%2520b.md").should be(pct)
     Hwaro::Content::Processors::InternalLinkResolver.page_for({"a%20b.md" => pct}, "a%20b.md").should be(pct)
   end
+
+  it "matches an NFC link to an NFD file name (and the reverse), preferring the exact spelling" do
+    nfc = "posts/caf\u00E9.md"
+    nfd = "posts/cafe\u0301.md"
+    page = Hwaro::Models::Page.new(nfd)
+    resolver = Hwaro::Content::Processors::InternalLinkResolver
+    resolver.page_for({nfd => page}, nfc).should be(page)
+    resolver.page_for({nfd => page}, URI.encode_path(nfc)).should be(page)
+    resolver.page_for({nfc => page}, nfd).should be(page)
+
+    exact = Hwaro::Models::Page.new(nfc)
+    resolver.page_for({nfd => page, nfc => exact}, nfc).should be(exact)
+    resolver.page_for({nfd => page}, "posts/missing.md").should be_nil
+  end
 end

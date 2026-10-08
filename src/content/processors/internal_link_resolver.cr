@@ -83,9 +83,28 @@ module Hwaro
         # tried first: `%20` means a space, as it does to Markd. A literal
         # `%` file name is still reached when nothing decodes to it (or as
         # `%25`).
+        #
+        # A non-ASCII path that misses verbatim is retried NFC-folded on both
+        # sides: macOS, zip and Dropbox hand out decomposed (NFD) file names
+        # while links are typed precomposed, and the two never compare equal
+        # byte-wise. An exact spelling always wins; the fold scan only runs on
+        # a miss, so resolved links cost nothing extra.
         def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          exact_page_for(pages_by_path, path) || folded_page_for(pages_by_path, path.includes?('%') ? URI.decode(path) : path)
+        end
+
+        private def exact_page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
           return pages_by_path[path]? unless path.includes?('%')
           pages_by_path[URI.decode(path)]? || pages_by_path[path]?
+        end
+
+        private def folded_page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          return if path.ascii_only?
+          folded = path.unicode_normalize(:nfc)
+          pages_by_path.each do |key, page|
+            return page if !key.ascii_only? && key.unicode_normalize(:nfc) == folded
+          end
+          nil
         end
 
         # Resolve internal `@/` links in HTML to actual page URLs.
