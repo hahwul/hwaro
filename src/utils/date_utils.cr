@@ -91,6 +91,18 @@ module Hwaro
         nil
       end
 
+      # The zone-bearing forms of CONTENT_FORMATS (the first four), for a
+      # string whose offset is written without RFC 3339's colon or after a
+      # space. nil when none matches, so zone-less input is never claimed.
+      private def parse_written_offset(str : String) : Time?
+        CONTENT_FORMATS.first(4).each do |fmt|
+          return Time.parse(str, fmt, Time::Location::UTC)
+        rescue Time::Format::Error | ArgumentError
+          next
+        end
+        nil
+      end
+
       # The build's front-matter date parser. Format selection is based on
       # the string's shape to avoid exception-based control flow; zone-less
       # values are interpreted in the machine's local zone.
@@ -99,18 +111,27 @@ module Hwaro
         str = time_str.strip
         return if str.empty?
 
+        # A written UTC offset is honoured, never dropped: `Time.parse` ignores
+        # trailing input, so the zone-less formats below would read
+        # `2024-01-15 10:00:00 +0900` / `…T10:00:00+0900` (no colon, which RFC
+        # 3339 rejects) as local time — a different instant on every machine.
+        # Zone-bearing formats go first, as in CONTENT_FORMATS.
         fmt = if str.includes?('T')
                 # Could be RFC 3339 (with timezone) or plain ISO
                 if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
                   begin
                     return Time.parse_rfc3339(str)
                   rescue Time::Format::Error | ArgumentError
+                    zoned = parse_written_offset(str)
+                    return zoned if zoned
                     "%Y-%m-%dT%H:%M:%S"
                   end
                 else
                   "%Y-%m-%dT%H:%M:%S"
                 end
               elsif str.size > 10
+                zoned = parse_written_offset(str)
+                return zoned if zoned
                 "%Y-%m-%d %H:%M:%S"
               else
                 "%Y-%m-%d"
