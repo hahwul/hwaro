@@ -336,7 +336,7 @@ module Hwaro
         previous = Logger.level
         Logger.level = Logger::Level::Error # the build reports front-matter warnings
         begin
-          parsed = entries.map do |page, file|
+          parsed = entries.compact_map do |page, file|
             data = begin
               Processor::Markdown.parse(File.read(file), file)
             rescue Hwaro::HwaroError | File::Error
@@ -346,7 +346,7 @@ module Hwaro
             page.redirect_to = data[:redirect_to]
             page.front_matter_keys = data[:front_matter_keys]
             {page, data[:cascade]}
-          end.compact
+          end
 
           sections = parsed.compact_map do |page, cascade|
             next unless page.is_a?(Models::Section)
