@@ -408,18 +408,29 @@ module Hwaro
           end
         end
 
-        # BMP: signature "BM"; width/height are little-endian Int32s at
-        # offsets 18/22 (BITMAPINFOHEADER). Height may be negative
-        # (top-down rows) — the magnitude is the pixel height.
+        # BMP: signature "BM"; the DIB header size at offset 14 decides the
+        # layout. BITMAPCOREHEADER (12, OS/2): width/height are little-endian
+        # UInt16s at 18/20. BITMAPINFOHEADER and its larger V4/V5 kin (>= 40):
+        # little-endian Int32s at 18/22, where the height may be negative
+        # (top-down rows) — the magnitude is the pixel height. Any other
+        # header size is not measured.
         private def bmp_dimensions(path : String) : {Int32, Int32}?
           header = Bytes.new(26)
           read = File.open(path, &.read(header))
           return if read < 26
           return unless header[0] == 0x42 && header[1] == 0x4D
-          width = IO::ByteFormat::LittleEndian.decode(Int32, header[18, 4])
-          height = IO::ByteFormat::LittleEndian.decode(Int32, header[22, 4])
-          return if height == Int32::MIN # .abs would overflow
-          height = height.abs
+          dib_size = IO::ByteFormat::LittleEndian.decode(UInt32, header[14, 4])
+          if dib_size == 12
+            width = IO::ByteFormat::LittleEndian.decode(UInt16, header[18, 2]).to_i32
+            height = IO::ByteFormat::LittleEndian.decode(UInt16, header[20, 2]).to_i32
+          elsif dib_size >= 40
+            width = IO::ByteFormat::LittleEndian.decode(Int32, header[18, 4])
+            height = IO::ByteFormat::LittleEndian.decode(Int32, header[22, 4])
+            return if height == Int32::MIN # .abs would overflow
+            height = height.abs
+          else
+            return
+          end
           return if width <= 0 || height == 0
           {width, height}
         end
@@ -478,7 +489,8 @@ module Hwaro
         private def svg_dimensions(path : String) : {Int32, Int32}?
           buf = Bytes.new(65_536)
           read = File.open(path, &.read(buf))
-          return unless tag = String.new(buf[0, read]).scrub.match(SVG_TAG_RE).try(&.[0])
+          text = strip_xml_comments(String.new(buf[0, read]).scrub)
+          return unless text && (tag = text.match(SVG_TAG_RE).try(&.[0]))
           w = tag.match(SVG_WIDTH_RE).try(&.[1].to_f?)
           h = tag.match(SVG_HEIGHT_RE).try(&.[1].to_f?)
           if vb = tag.match(SVG_VIEWBOX_RE)
@@ -492,6 +504,24 @@ module Hwaro
           width, height = w.round, h.round
           return unless width.in?(1.0..Int32::MAX.to_f) && height.in?(1.0..Int32::MAX.to_f)
           {width.to_i32, height.to_i32}
+        end
+
+        # `text` without its `<!-- … -->` comments, so a commented-out `<svg>`
+        # tag is not mistaken for the root. nil when a comment never closes:
+        # everything after it is comment (or cut off by the read limit), so
+        # there is no root to measure. Linear scan — no backtracking regex.
+        private def strip_xml_comments(text : String) : String?
+          return text unless text.includes?("<!--")
+          String.build do |io|
+            pos = 0
+            while start = text.index("<!--", pos)
+              io << text[pos, start - pos]
+              stop = text.index("-->", start + 4)
+              return unless stop
+              pos = stop + 3
+            end
+            io << text[pos..]
+          end
         end
 
         # Calculate output dimensions preserving aspect ratio.

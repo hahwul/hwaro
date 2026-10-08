@@ -299,7 +299,7 @@ module Hwaro
         end
 
         # Extensions whose intrinsic size can be read from the file header.
-        MEASURABLE_ICON_EXTS = {".png", ".jpg", ".jpeg", ".bmp"}
+        MEASURABLE_ICON_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}
 
         # Resolve an icon's declared `sizes`. Prefer the real pixel dimensions
         # read from the image header so a 200x60 logo isn't mislabeled
@@ -363,6 +363,7 @@ module Hwaro
           when ".jpg", ".jpeg" then "image/jpeg"
           when ".svg"          then "image/svg+xml"
           when ".webp"         then "image/webp"
+          when ".gif"          then "image/gif"
           when ".ico"          then "image/x-icon"
           else                      "image/png"
           end

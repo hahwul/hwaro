@@ -811,6 +811,10 @@ private def le24(v : Int32) : Array(UInt8)
   le16(v) + [((v >> 16) & 0xFF).to_u8]
 end
 
+private def le32(v : Int32) : Array(UInt8)
+  le24(v) + [((v >> 24) & 0xFF).to_u8]
+end
+
 private def webp_header(chunk : String, payload : Array(UInt8)) : Bytes
   bytes = "RIFF".bytes + [0_u8, 0_u8, 0_u8, 0_u8] + "WEBP".bytes + chunk.bytes + [0_u8, 0_u8, 0_u8, 0_u8] + payload
   bytes += [0_u8] * (30 - bytes.size) if bytes.size < 30
@@ -880,6 +884,29 @@ describe "ImageProcessor.dimensions (read-only formats)" do
       dims.call(%(<svg width="100" viewBox="0 0 24 12"></svg>)).should eq({100, 50})
       dims.call(%(<svg width="100%" height="100%"></svg>)).should be_nil
       dims.call(%(<html></html>)).should be_nil
+    end
+  end
+
+  it "ignores an <svg> tag inside a comment before the real root" do
+    Dir.mktmpdir do |dir|
+      dims = ->(svg : String) {
+        File.write(File.join(dir, "x.svg"), svg)
+        Hwaro::Content::Processors::ImageProcessor.dimensions(File.join(dir, "x.svg"))
+      }
+      dims.call(%(<?xml version="1.0"?>\n<!-- <svg width="1" height="1"> -->\n<svg viewBox="0 0 24 12">)).should eq({24, 12})
+      dims.call(%(<!-- a --><!-- <svg width="2" height="2"> --><svg width="30" height="20">)).should eq({30, 20})
+      # A comment that never closes swallows the rest: no root, no guess.
+      dims.call(%(<!-- <svg width="1" height="1">)).should be_nil
+    end
+  end
+
+  it "reads the OS/2 (BITMAPCOREHEADER) BMP size from its 16-bit fields" do
+    Dir.mktmpdir do |dir|
+      core = Bytes.new(26) { |i| (("BM".bytes + [0_u8] * 12 + le32(12) + le16(123) + le16(77) + le16(1) + le16(24))[i]) }
+      Hwaro::Content::Processors::ImageProcessor.dimensions(write_bytes(dir, "core.bmp", core)).should eq({123, 77})
+      # An unknown DIB header size is not measured.
+      odd = Bytes.new(26) { |i| (("BM".bytes + [0_u8] * 12 + le32(20) + le16(123) + le16(77) + le16(1) + le16(24))[i]) }
+      Hwaro::Content::Processors::ImageProcessor.dimensions(write_bytes(dir, "odd.bmp", odd)).should be_nil
     end
   end
 
