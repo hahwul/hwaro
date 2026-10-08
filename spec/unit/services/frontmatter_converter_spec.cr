@@ -1157,9 +1157,8 @@ describe Hwaro::Services::ConversionResult do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
         file_path = File.join(dir, "mixed.md")
-        # TOML 1.0 allows mixed-type arrays; the parser Hwaro vendors does
-        # not — whatever the cause, the author has to be told what it was.
-        File.write(file_path, "+++\ntitle = \"T\"\nmixed = [\"a\", 1, true]\n+++\n\nBody")
+        # Whatever the cause, the author has to be told what it was.
+        File.write(file_path, "+++\ntitle = \"T\"\nmixed = [\"a\" 1]\n+++\n\nBody")
 
         captured = IO::Memory.new
         previous = Hwaro::Logger.err_io
@@ -1173,7 +1172,7 @@ describe Hwaro::Services::ConversionResult do
         reported = captured.to_s
         reported.should contain("Failed to convert")
         reported.should contain("mixed.md")
-        reported.should contain("cannot mix types in array")
+        reported.should contain("expected ',', ']' or newline")
       end
     end
 
