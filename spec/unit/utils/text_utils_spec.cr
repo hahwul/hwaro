@@ -618,4 +618,21 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.strip_bom("").should eq("")
     end
   end
+
+  describe ".count_words" do
+    it "does not read a `<` without a closing `>` as a tag" do
+      # `a<b` used to enter tag mode and swallow everything up to the next `>`.
+      Hwaro::Utils::TextUtils.count_words("if a<b then one two three four five six seven eight nine ten.\n\nsecond paragraph with more words.")
+        .should eq(Hwaro::Utils::TextUtils.count_words("if a < b then one two three four five six seven eight nine ten.\n\nsecond paragraph with more words."))
+      Hwaro::Utils::TextUtils.count_words("for (i=0;i<n;i++) { x }").should eq(6)
+      Hwaro::Utils::TextUtils.count_words("x<y and a</b c").should eq(6)
+    end
+
+    it "still skips real tags, multi-line tags and comments" do
+      Hwaro::Utils::TextUtils.count_words("<p>one two</p>").should eq(2)
+      Hwaro::Utils::TextUtils.count_words("a <img\n  src=\"x.png\"\n  alt=\"q\"> b").should eq(2)
+      Hwaro::Utils::TextUtils.count_words("a <!-- hidden words here --> b").should eq(2)
+      Hwaro::Utils::TextUtils.count_words("a <!-- never closed b c d").should eq(7)
+    end
+  end
 end
