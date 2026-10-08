@@ -28,7 +28,9 @@ module Hwaro
 
         # An opening tag: `$1` = tag name, `$2` = its attributes. Quoted values
         # are skipped whole, so a `>` inside `title="a>b"` does not end the tag.
-        TAG_REGEX = /<([a-zA-Z][^\s\/>]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/
+        # Possessive, so a tag with thousands of attributes cannot exhaust the
+        # JIT stack (`Regex::Error`) on backtracking frames.
+        TAG_REGEX = /<([a-zA-Z][^\s\/>]*)((?:"[^"]*+"|'[^']*+'|[^>"']++)*+)>/
 
         # One attribute of a tag (`$1` = name, quoted, or, after minification,
         # unquoted value in `$2`/`$3`/`$4`). The leading whitespace keeps

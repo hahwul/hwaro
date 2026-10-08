@@ -470,7 +470,7 @@ describe "Deployer matchers" do
         dest = File.join(dir, "out")
         Dir.mkdir_p(File.join(src, "v1.2"))
         File.write(File.join(src, "index.html"), "home")
-        File.write(File.join(src, "v1.2", "index.html"), "<p>v</p>")
+        File.write(File.join(src, "v1.2", "index.html"), "<!doctype html><p>v</p>")
         config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
         config.deployment.targets[0].strip_index_html = true
         deployer = Hwaro::Services::Deployer.new

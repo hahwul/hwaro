@@ -167,7 +167,9 @@ name `blog/post/index.html`. If either spelling is excluded, the deployed page
 is never deleted as stale. Only a destination file that opens like HTML is
 read as a stripped page, so a hand-placed `CNAME` or a stale `img/logo.png` is
 judged by its own name alone, while a dotted slug such as `docs/v1.2` still
-gets both readings.
+gets both readings. A name with an extension must also start with a doctype or
+`<html>`, so `logo.svg`, `feed.xml` and hand-placed `about.html` files are
+never read as stripped pages.
 
 ## Matchers
 

@@ -543,6 +543,26 @@ describe Hwaro::Services::Deployer do
     end
   end
 
+  describe "stripped-page detection on files with an extension" do
+    it "spares markup assets and hand-placed .html files an include does not name" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(File.join(dest, "docs"))
+        File.write(File.join(dest, "logo.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>")
+        File.write(File.join(dest, "feed.xml"), "<?xml version=\"1.0\"?><rss/>")
+        File.write(File.join(dest, "about.html"), "<!doctype html><p>hand placed</p>")
+        File.write(File.join(dest, "docs", "v0.9"), "<!doctype html><p>old</p>")
+        config = dest_spec_config(dest, strip: true)
+        config.deployment.targets.first.include = "**/index.html"
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+
+        deletes = Hwaro::Services::Deployer.new.plan(options, config).select { |op| op.action == "delete" }.map(&.path)
+        deletes.should eq(["docs/v0.9"])
+      end
+    end
+  end
+
   describe "aliased and case-renamed paths" do
     it "deploys a real directory and every symlink alias of it" do
       posix_only!("symlinks")

@@ -445,13 +445,18 @@ module Hwaro
 
       # True when the destination file at `path` is a page a strip_index_html
       # deploy wrote: a regular file that opens like HTML. A dotted page slug
-      # (`docs/v1.2`) has an extension and `CNAME` has none, so the name
+      # (`docs/v1.2`) has an extension and `CNAME` has none, so the name alone
       # cannot tell a page from an asset or a hand-placed file; the content can.
       private def stripped_page?(path : String) : Bool
         info = File.info?(path, follow_symlinks: false)
         return false unless info && info.file?
         head = File.open(path, "rb") { |file| file.read_string(Math.min(512_i64, info.size).to_i) }
-        head.lchop('\uFEFF').lstrip.starts_with?('<')
+        head = head.lchop('\uFEFF').lstrip
+        return false unless head.starts_with?('<')
+        # A name with an extension must also say so: `logo.svg` and `feed.xml`
+        # open with `<` too, and `about.html` is a file, not a slug.
+        ext = File.extname(path).downcase
+        ext.empty? || (ext != ".html" && ext != ".htm" && head.matches?(/<!doctype\s+html|<html[\s>]/i))
       rescue File::Error | IO::Error
         false
       end

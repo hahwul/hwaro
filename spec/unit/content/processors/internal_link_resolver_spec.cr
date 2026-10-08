@@ -292,6 +292,11 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       ids = Hwaro::Content::Processors::InternalLinkResolver.anchor_ids(html)
       ids.should eq(Set{"search", "old", "Up", "quoted"})
     end
+
+    it "scans a tag with thousands of attributes without exhausting the regex JIT stack" do
+      html = %(<div ) + (%(a="b" ) * 20_000) + %(id="end">)
+      Hwaro::Content::Processors::InternalLinkResolver.anchor_ids(html).should eq(Set{"end"})
+    end
   end
 
   describe "FRAGMENT_LINK_REGEX" do
