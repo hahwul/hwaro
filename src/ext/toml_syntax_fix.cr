@@ -74,7 +74,7 @@ class TOML::Lexer
     last_is_underscore = false
     has_underscore = false
 
-    while true
+    loop do
       char = next_char
       if leading_zero && count == 1 && !@before_eq_symbol && (base = {'x' => 16, 'o' => 8, 'b' => 2}[char]?)
         return consume_prefixed_integer(base)
@@ -157,7 +157,7 @@ class TOML::Parser
       return table
     end
 
-    while true
+    loop do
       case token.type
       when :KEY, :STRING, :INT
         parse_key_value_after_key(table)
