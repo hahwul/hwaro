@@ -52,13 +52,13 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 
 | 필드 | 타입 | 기본값 | 설명 |
 |-------|------|---------|-------------|
-| date | string | — | 발행일. `YYYY-MM-DD`, 시간 포함 가능(`YYYY-MM-DD HH:MM:SS` 또는 RFC 3339 datetime). 따옴표 없는 TOML/YAML 날짜도 허용. 오프셋이 없는 날짜는 TOML·YAML·JSON 모두 빌드 머신의 로컬 시간대로 해석. 적어 둔 UTC 오프셋(`+09:00`)은 유지되므로 TOML과 YAML 모두 적은 날짜 그대로 표시. 이 수정 이후 TOML 오프셋 날짜는 날짜 퍼머링크 토큰(`:year`/`:month`/`:day`)과 연/월 그룹에도 적은 그대로 쓰이므로, 예전 UTC 날짜로 만든 URL이 바뀔 수 있음(예: `/2024/02/29/` → `/2024/03/01/`). 예전 URL을 유지하려면 `aliases`에 추가 |
+| date | string | — | 발행일. `YYYY-MM-DD`, 시간 포함 가능(`YYYY-MM-DD HH:MM:SS` 또는 RFC 3339 datetime). 따옴표 없는 TOML/YAML 날짜도 허용. 오프셋이 없는 날짜는 TOML·YAML·JSON 모두 빌드 머신의 로컬 시간대로 해석. 적어 둔 UTC 오프셋(`+09:00`, `+0900` 또는 공백 뒤의 `2024-01-15 10:00:00 +0900` 형태도 포함)은 유지되므로 TOML과 YAML 모두 적은 날짜 그대로 표시. 이 수정 이후 TOML 오프셋 날짜는 날짜 퍼머링크 토큰(`:year`/`:month`/`:day`)과 연/월 그룹에도 적은 그대로 쓰이므로, 예전 UTC 날짜로 만든 URL이 바뀔 수 있음(예: `/2024/02/29/` → `/2024/03/01/`). 예전 URL을 유지하려면 `aliases`에 추가 |
 | description | string | — | SEO 설명 |
 | draft | bool | false | 프로덕션 빌드에서 제외 |
 | template | string | "page" | 사용할 템플릿 |
 | weight | int | 0 | 정렬 순서(낮을수록 앞) |
 | image | string | — | 소셜 공유용 대표 이미지. 페이지 번들 안의 파일을 가리키는 상대 경로(`index.md` 옆의 `image = "cover.png"`)는 그 파일로 해석됨 |
-| tags | array | [] | 태그 택소노미 항목 |
+| tags | array | [] | 태그 택소노미 항목. 문자열과 정수(`tags = [2024, "crystal"]`)는 유지되고(`2024`), `3.10` 같은 실수는 경고와 함께 건너뛰므로 따옴표로 감싸세요(`"3.10"`). 항목은 NFC로 정규화되어 NFD와 NFC 표기가 같은 항목이 됨 |
 | categories | array | [] | 카테고리 택소노미 항목 |
 
 ### 전체 필드
@@ -80,6 +80,8 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | series | string | 묶음용 시리즈 이름 |
 | series_weight | int | 시리즈 내 정렬 순서 |
 | extra | table | 커스텀 메타데이터 |
+
+타입이 틀린 필드(`draft = "true"`, `weight = "5"`, `date = 20240315`, `categories = "News"`)는 변환 없이 무시되며, 빌드가 파일과 키를 담아 경고합니다. 특히 `draft = "true"`는 초안이 아니므로 발행됩니다. `draft = true`로 쓰세요.
 
 ## 예시
 
@@ -325,7 +327,7 @@ console.log("Hello");
 | Cell   | Cell   |
 ```
 
-표 셀 안에서도 인라인 마크다운이 동작합니다: **굵게**, *기울임*, `코드 스팬`, `[links](url)`, `![images](url)`, ~~취소선~~.
+표 셀 안에서도 인라인 마크다운이 동작합니다: **굵게**, *기울임*, `코드 스팬`, `[links](url)`, `![images](url)`, ~~취소선~~. 링크와 이미지는 본문과 같은 대상 형식을 받습니다: 괄호가 짝을 이루는 URL(`[W](https://en.wikipedia.org/wiki/Foo_(bar))`), 선택적 제목(`[T](/x/ "the title")`), `<angle>` 대상. 백슬래시는 구두점을 이스케이프합니다(`\*not emphasis\*`). 정의 목록과 각주 본문도 같습니다.
 
 ```markdown
 | Feature        | Example                          |
