@@ -88,6 +88,9 @@ module Hwaro
 
           begin
             return if src_w <= 0 || src_h <= 0 || channels <= 0
+            # Cut from the picture as it is DISPLAYED (EXIF-oriented).
+            return unless upright = reorient(pixels, src_w, src_h, channels, orientation(source))
+            pixels, src_w, src_h = upright
             # Source region to read, and the output size it maps onto.
             if op == "fill"
               scale = Math.max(width / src_w, height / src_h)
@@ -286,6 +289,11 @@ module Hwaro
 
           begin
             return {result_map, lqip_uri, dom_color} if src_w <= 0 || src_h <= 0 || channels <= 0
+            # Variants are cut from the picture as it is DISPLAYED (EXIF-oriented).
+            unless upright = reorient(pixels, src_w, src_h, channels, orientation(source))
+              return {result_map, lqip_uri, dom_color}
+            end
+            pixels, src_w, src_h = upright
 
             ext = File.extname(source).downcase
             basename = File.basename(source, File.extname(source))
@@ -384,10 +392,33 @@ module Hwaro
           {width.to_i32, height.to_i32}
         end
 
-        # JPEG: scan the marker stream for the first SOF frame header
-        # (C0–CF, excluding the non-frame C4/C8/CC markers); height/width are
-        # big-endian UInt16s at offsets 3/5 of its payload.
+        # JPEG: the DISPLAYED size. The SOF frame header holds the stored
+        # pixel size; an EXIF Orientation of 5-8 (a phone photo held upright)
+        # turns the picture a quarter turn, so the stored width is the shown
+        # height — the size a browser lays the original out at and the one
+        # the rotated variants (see `reorient`) come out at.
         private def jpeg_dimensions(path : String) : {Int32, Int32}?
+          return unless frame = jpeg_frame(path)
+          width, height, orientation = frame
+          orientation >= 5 ? {height, width} : {width, height}
+        end
+
+        # EXIF Orientation (1-8) of the picture a decoder returns for `path`:
+        # 1 (upright, or no tag) for everything but a JPEG that carries one.
+        def orientation(path : String) : Int32
+          return 1 unless {".jpg", ".jpeg"}.includes?(File.extname(path).downcase)
+          jpeg_frame(path).try(&.[2]) || 1
+        rescue
+          1
+        end
+
+        # Scan the marker stream for the first SOF frame header (C0–CF,
+        # excluding the non-frame C4/C8/CC markers; height/width are
+        # big-endian UInt16s at offsets 3/5 of its payload), noting the EXIF
+        # Orientation of an APP1 segment on the way. {stored width, stored
+        # height, orientation}.
+        private def jpeg_frame(path : String) : {Int32, Int32, Int32}?
+          orientation = 1
           File.open(path) do |io|
             return unless io.read_byte == 0xFF && io.read_byte == 0xD8
             loop do
@@ -407,11 +438,73 @@ module Hwaro
                 height = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
                 width = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
                 return if width == 0 || height == 0
-                return {width.to_i32, height.to_i32}
+                return {width.to_i32, height.to_i32, orientation}
+              elsif marker == 0xE1 && length >= 16
+                payload = Bytes.new(length - 2)
+                io.read_fully(payload)
+                orientation = exif_orientation(payload) || orientation
+                next
               end
               io.skip(length - 2)
             end
           end
+        end
+
+        # The Orientation (1-8) in an APP1 payload ("Exif\0\0" + TIFF), or
+        # nil when it is not Exif, has no such tag or is malformed.
+        private def exif_orientation(payload : Bytes) : Int32?
+          return unless payload.size >= 14 && payload[0, 6] == "Exif\0\0".to_slice
+          tiff = payload + 6
+          format = case String.new(tiff[0, 2])
+                   when "II" then IO::ByteFormat::LittleEndian
+                   when "MM" then IO::ByteFormat::BigEndian
+                   else           return
+                   end
+          return unless format.decode(UInt16, tiff[2, 2]) == 42
+          ifd = format.decode(UInt32, tiff[4, 4]).to_i64
+          return unless ifd + 2 <= tiff.size
+          count = format.decode(UInt16, tiff[ifd, 2]).to_i32
+          count.times do |i|
+            entry = ifd + 2 + i.to_i64 * 12
+            return unless entry + 12 <= tiff.size
+            next unless format.decode(UInt16, tiff[entry, 2]) == 0x0112
+            # type SHORT, one value, stored in the entry's value field
+            return unless format.decode(UInt16, tiff[entry + 2, 2]) == 3 && format.decode(UInt32, tiff[entry + 4, 4]) == 1
+            value = format.decode(UInt16, tiff[entry + 8, 2]).to_i32
+            return value if value.in?(1..8)
+            return
+          end
+          nil
+        end
+
+        # Turn decoded `pixels` (w×h, `channels` interleaved) upright for
+        # EXIF `orientation` 2-8, into a freshly allocated buffer, and free
+        # the input. stb decodes the stored pixels and the encoders write no
+        # EXIF, so a variant cut from them would show a phone photo on its
+        # side. Orientation 1 (and anything unknown) hands the input back.
+        # Returns {pixels, width, height}; nil if the new buffer cannot be
+        # allocated (the input is then untouched).
+        private def reorient(pixels : UInt8*, w : Int32, h : Int32, channels : Int32, orientation : Int32) : {UInt8*, Int32, Int32}?
+          return {pixels, w, h} unless orientation.in?(2..8)
+          dw, dh = orientation >= 5 ? {h, w} : {w, h}
+          out_pixels = LibC.malloc(dw.to_i64 * dh * channels).as(UInt8*)
+          return if out_pixels.null?
+          dh.times do |y|
+            dw.times do |x|
+              sx, sy = case orientation
+                       when 2 then {w - 1 - x, y}
+                       when 3 then {w - 1 - x, h - 1 - y}
+                       when 4 then {x, h - 1 - y}
+                       when 5 then {y, x}
+                       when 6 then {y, h - 1 - x}
+                       when 7 then {w - 1 - y, h - 1 - x}
+                       else        {w - 1 - y, x}
+                       end
+              (out_pixels + (y.to_i64 * dw + x) * channels).copy_from(pixels + (sy.to_i64 * w + sx) * channels, channels)
+            end
+          end
+          LibStb.stbi_image_free(pixels.as(Void*))
+          {out_pixels, dw, dh}
         end
 
         # BMP: signature "BM"; the DIB header size at offset 14 decides the

@@ -1002,3 +1002,118 @@ describe "ImageProcessor.dimensions on hostile SVG" do
     end
   end
 end
+
+# A 32x16 JPEG whose quadrants are red (top-left), green (top-right), blue
+# (bottom-left) and yellow (bottom-right), carrying an EXIF APP1 Orientation
+# tag when `orientation` is given.
+private def write_quadrant_jpeg(path : String, orientation : Int32? = nil) : Nil
+  w, h = 32, 16
+  colors = [{255_u8, 0_u8, 0_u8}, {0_u8, 255_u8, 0_u8}, {0_u8, 0_u8, 255_u8}, {255_u8, 255_u8, 0_u8}]
+  pixels = Bytes.new(w * h * 3)
+  h.times do |y|
+    w.times do |x|
+      r, g, b = colors[(y < h // 2 ? 0 : 2) + (x < w // 2 ? 0 : 1)]
+      o = (y * w + x) * 3
+      pixels[o] = r
+      pixels[o + 1] = g
+      pixels[o + 2] = b
+    end
+  end
+  LibStb.stbi_write_jpg(path, w, h, 3, pixels.to_unsafe.as(Void*), 100)
+  return unless orientation
+
+  jpeg = File.open(path, &.getb_to_end)
+  tiff = "II".bytes + [0x2A_u8, 0_u8] + le32(8) + le16(1) + le16(0x0112) + le16(3) + le32(1) + le16(orientation) + [0_u8, 0_u8] + le32(0)
+  payload = "Exif\0\0".bytes + tiff
+  app1 = [0xFF_u8, 0xE1_u8] + [((payload.size + 2) >> 8).to_u8, ((payload.size + 2) & 0xFF).to_u8] + payload
+  merged = Bytes.new(jpeg.size + app1.size)
+  merged[0, 2].copy_from(jpeg[0, 2])
+  app1.each_with_index { |byte, i| merged[2 + i] = byte }
+  (merged + 2 + app1.size).copy_from(jpeg + 2)
+  File.write(path, merged)
+end
+
+# The quadrant a pixel belongs to, by its dominant colour.
+private def quadrant_color(rgb : {UInt8, UInt8, UInt8}) : Symbol
+  r, g, b = rgb
+  if r > 150 && g > 150 && b < 100
+    :yellow
+  elsif r > 150 && g < 100 && b < 100
+    :red
+  elsif g > 150 && r < 100 && b < 100
+    :green
+  elsif b > 150 && r < 100 && g < 100
+    :blue
+  else
+    :other
+  end
+end
+
+# Colours at the four corners of a decoded image (a few pixels in, clear of
+# the chroma-subsampled block edges): {top-left, top-right, bottom-left, bottom-right}.
+private def corner_colors(path : String)
+  w = uninitialized LibC::Int
+  h = uninitialized LibC::Int
+  c = uninitialized LibC::Int
+  px = LibStb.stbi_load(path, pointerof(w), pointerof(h), pointerof(c), 3)
+  raise "decode failed" if px.null?
+  begin
+    at = ->(x : Int32, y : Int32) { o = (y * w + x) * 3; quadrant_color({px[o], px[o + 1], px[o + 2]}) }
+    {w.to_i32, h.to_i32, {at.call(2, 2), at.call(w - 3, 2), at.call(2, h - 3), at.call(w - 3, h - 3)}}
+  ensure
+    LibStb.stbi_image_free(px.as(Void*))
+  end
+end
+
+describe "EXIF-oriented JPEGs" do
+  # {orientation => {displayed width, height, corners of the upright image}}
+  upright = {
+    1 => {32, 16, {:red, :green, :blue, :yellow}},
+    2 => {32, 16, {:green, :red, :yellow, :blue}},
+    3 => {32, 16, {:yellow, :blue, :green, :red}},
+    4 => {32, 16, {:blue, :yellow, :red, :green}},
+    5 => {16, 32, {:red, :blue, :green, :yellow}},
+    6 => {16, 32, {:blue, :red, :yellow, :green}},
+    7 => {16, 32, {:yellow, :green, :blue, :red}},
+    8 => {16, 32, {:green, :yellow, :red, :blue}},
+  }
+
+  it "reports the displayed size (swapped for orientations 5-8)" do
+    Dir.mktmpdir do |dir|
+      upright.each do |orientation, (w, h, _)|
+        path = File.join(dir, "o#{orientation}.jpg")
+        write_quadrant_jpeg(path, orientation)
+        Hwaro::Content::Processors::ImageProcessor.dimensions(path).should eq({w, h})
+      end
+      plain = File.join(dir, "plain.jpg")
+      write_quadrant_jpeg(plain)
+      Hwaro::Content::Processors::ImageProcessor.dimensions(plain).should eq({32, 16})
+    end
+  end
+
+  it "bakes the orientation into fill/crop variants" do
+    Dir.mktmpdir do |dir|
+      upright.each do |orientation, (w, h, corners)|
+        path = File.join(dir, "o#{orientation}.jpg")
+        write_quadrant_jpeg(path, orientation)
+        dest = File.join(dir, "o#{orientation}_crop.jpg")
+        Hwaro::Content::Processors::ImageProcessor.transform(path, dest, 100, 100, "crop", "center", 100).should eq({w, h})
+        corner_colors(dest).should eq({w, h, corners})
+      end
+    end
+  end
+
+  it "bakes the orientation into resized width variants" do
+    Dir.mktmpdir do |dir|
+      upright.each do |orientation, (w, h, corners)|
+        path = File.join(dir, "o#{orientation}.jpg")
+        write_quadrant_jpeg(path, orientation)
+        map, _, _ = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(path, dir, [w // 2], 100, 0)
+        dest = map[w // 2]
+        w2, h2, found = corner_colors(dest)
+        {w2, h2}.should eq({w // 2, h // 2})
+        found.should eq(corners)
+      end
+    end
+  end
+end
