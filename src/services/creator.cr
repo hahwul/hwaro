@@ -143,7 +143,10 @@ module Hwaro
       # Creator's title-only fallback and the interactive `new` wizard's
       # recommended-path suggestion.
       def self.slugify(title : String) : String
-        title = title.unicode_normalize(:nfc) unless title.ascii_only?
+        unless title.ascii_only?
+          # Emoji variation selectors / keycap enclosure are not word marks.
+          title = title.unicode_normalize(:nfc).gsub(/[\x{FE00}-\x{FE0F}\x{E0100}-\x{E01EF}\x{20E3}]/, "-")
+        end
         # Marks belong to the word they follow; one with no letter/digit before
         # it (the emoji variation selector after "❤") is a separator.
         title.downcase.gsub(/(?<![\p{L}\p{N}\p{M}])\p{M}+/, "-").gsub(/[^\p{L}\p{M}\p{N}]+/, "-").strip("-")
@@ -220,7 +223,7 @@ module Hwaro
         return true if char == '-' || char == '_' || char == '.' || char == '~'
         return true if Utils::TextUtils.cjk_char?(char)
         return true if !char.ascii? && char.letter?
-        char.mark? && (prev.alphanumeric? || prev.mark?)
+        Utils::TextUtils.word_mark?(char) && (prev.alphanumeric? || Utils::TextUtils.word_mark?(prev))
       end
 
       def run(options : Config::Options::NewOptions, config : Models::Config? = nil)

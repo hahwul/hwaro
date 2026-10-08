@@ -21,6 +21,11 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.slugify("\u0301abc").should eq("abc")
     end
 
+    it "keeps emoji variation selectors and keycap enclosures out of slugs" do
+      Hwaro::Utils::TextUtils.slugify("1\uFE0F\u20E3 Step").should eq("1-step")
+      Hwaro::Utils::TextUtils.slugify("\u2139\uFE0F Info").should eq("\u2139-info")
+    end
+
     it "converts basic text to slug" do
       Hwaro::Utils::TextUtils.slugify("Hello World").should eq("hello-world")
     end

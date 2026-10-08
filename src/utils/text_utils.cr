@@ -347,10 +347,10 @@ module Hwaro
                 io << '-'
                 last_was_sep = true
               end
-            elsif cjk_char?(char) || unicode_letter?(char) || (char.mark? && (prev.alphanumeric? || prev.mark?))
+            elsif cjk_char?(char) || unicode_letter?(char) || (word_mark?(char) && (prev.alphanumeric? || word_mark?(prev)))
               # Combining marks (vowel signs, virama, tone marks) are part of
-              # the word they follow. One after a dropped character (the
-              # emoji variation selector in "❤️") has nothing to attach to.
+              # the word they follow. One after a dropped character has
+              # nothing to attach to.
               io << char.downcase
               last_was_sep = false
             end
@@ -816,6 +816,14 @@ module Hwaro
             end
           end
         end
+      end
+
+      # A combining mark that is part of a word (vowel signs, virama, tone and
+      # accent marks). Emoji presentation machinery is not: variation
+      # selectors and the keycap enclosure stay out of slugs, so "1️⃣ Step"
+      # and "ℹ️ Info" slugify as "1-step" and "ℹ-info" as before.
+      def word_mark?(char : Char) : Bool
+        char.mark? && !(0xFE00..0xFE0F).includes?(char.ord) && !(0xE0100..0xE01EF).includes?(char.ord) && char.ord != 0x20E3
       end
 
       # Check if a character is in a CJK Unicode range

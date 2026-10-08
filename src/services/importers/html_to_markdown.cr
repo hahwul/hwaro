@@ -381,8 +381,6 @@ module Hwaro
         EDGE_SPACE_LEAD_RE  = Regex.new("\\A#{EDGE_SPACE}+", Regex::Options::IGNORE_CASE)
         EDGE_SPACE_TRAIL_RE = Regex.new("#{EDGE_SPACE}+\\z", Regex::Options::IGNORE_CASE)
 
-        # NUL-delimited placeholder: survives every regex pass (no `<>`, no
-        # `&…;`) and can't occur in real exported content (XML forbids NUL).
         # `<tag src="…">` for an embed, from its safe `src` (its own attribute,
         # or a nested `<source>`), or nil when it has none or an unsafe one.
         private def self.rebuild_embed(tag : String, attrs : String, inner : String) : String?
@@ -403,6 +401,8 @@ module Hwaro
           match && (match[1]? || match[2]?)
         end
 
+        # NUL-delimited placeholder: survives every regex pass (no `<>`, no
+        # `&…;`) and can't occur in real exported content (XML forbids NUL).
         private def self.code_placeholder(index : Int32) : String
           "\u0000hwaro-code-#{index}\u0000"
         end

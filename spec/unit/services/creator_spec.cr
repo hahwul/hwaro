@@ -720,6 +720,7 @@ describe Hwaro::Services::Creator do
       it "keeps combining marks that belong to a word" do
         Hwaro::Services::Creator.slugify("हिंदी भाषा").should eq("हिंदी-भाषा")
         Hwaro::Services::Creator.slugify("I \u2764\uFE0F you").should eq("i-you")
+        Hwaro::Services::Creator.slugify("1\uFE0F\u20E3 Step").should eq("1-step")
       end
 
       it "lowercases and hyphenates a title" do
