@@ -654,37 +654,110 @@ module Hwaro
         # Then the decorative ones. Guarded by a substring probe so a page
         # with no aria-hidden markup never pays for the scan.
         text = text.gsub(ARIA_HIDDEN_ELEMENT, " ") if text.includes?("aria-hidden")
-        String.build(text.bytesize) do |io|
-          in_tag = false
+        size = text.bytesize
+        String.build(size) do |io|
           last_was_space = true # suppress leading space
           pending_space = false # deferred space from tag boundary
-          text.each_char do |char|
-            if char == '<'
-              in_tag = true
-              # Mark that we might need a space (tag boundary)
-              pending_space = true unless last_was_space
+          reader = Char::Reader.new(text)
+          while reader.pos < size
+            char = reader.current_char
+            if char == '<' && html_tag_start?(text.byte_at?(reader.pos + 1))
+              tag_end, inline = scan_html_tag(text, reader.pos)
+              # A block/void/unknown tag or a comment may separate words;
+              # inline markup (`H<sub>2</sub>O`, `**한글**은`) must not.
+              pending_space = true unless inline || last_was_space
+              reader.pos = tag_end
+              next
             elsif char == '>'
-              in_tag = false
-            elsif !in_tag
-              if char.ascii_whitespace?
-                unless last_was_space
-                  io << ' '
-                  last_was_space = true
-                  pending_space = false
-                end
-              else
-                # Emit deferred space only if the next char is alphanumeric
-                # (avoids "World !" from "</b>!")
-                if pending_space && char.alphanumeric?
-                  io << ' '
-                end
+              # A bare `>` outside any tag is dropped (pinned by the specs).
+            elsif char.ascii_whitespace?
+              unless last_was_space
+                io << ' '
+                last_was_space = true
                 pending_space = false
-                io << char
-                last_was_space = false
               end
+            else
+              # Emit deferred space only if the next char is alphanumeric
+              # (avoids "World !" from "</b>!")
+              if pending_space && char.alphanumeric?
+                io << ' '
+              end
+              pending_space = false
+              io << char
+              last_was_space = false
             end
+            reader.next_char
           end
         end.strip
+      end
+
+      # A `<` opens a tag/comment only before a letter, `/`, `!` or `?`;
+      # anywhere else ("a < b", "x<3") it is plain text.
+      private def html_tag_start?(byte : UInt8?) : Bool
+        return false unless byte
+        byte.chr.ascii_letter? || byte == '/'.ord || byte == '!'.ord || byte == '?'.ord
+      end
+
+      # Scans the tag or comment starting at the `<` at byte *start* and
+      # returns the byte index just past it plus whether it is inline markup.
+      # Comments run to `-->` (or to the end when unterminated, like a
+      # browser). Inside a tag a `>` does not end it while it sits in a quoted
+      # attribute value (`alt="Home > Docs"`); quotes only count right after
+      # `=`, so a stray apostrophe in an unquoted attribute cannot swallow the
+      # text that follows.
+      private def scan_html_tag(text : String, start : Int32) : {Int32, Bool}
+        size = text.bytesize
+        i = start + 1
+        if text.byte_at?(i) == '!'.ord && text.byte_at?(i + 1) == '-'.ord && text.byte_at?(i + 2) == '-'.ord
+          close = text.byte_index("-->", i + 1)
+          return {close ? close + 3 : size, false}
+        end
+
+        i += 1 if text.byte_at?(i) == '/'.ord
+        name_start = i
+        while i < size && (b = text.byte_at(i)) && (b.chr.ascii_alphanumeric? || b == '-'.ord)
+          i += 1
+        end
+        inline = html_inline_tag?(text.byte_slice(name_start, i - name_start))
+
+        quote = 0_u8
+        after_eq = false
+        while i < size
+          b = text.byte_at(i)
+          if quote != 0
+            quote = 0_u8 if b == quote
+          else
+            case b
+            when '>'.ord
+              return {i + 1, inline}
+            when '='.ord
+              after_eq = true
+            when '"'.ord, '\''.ord
+              quote = b if after_eq
+              after_eq = false
+            when ' '.ord, '\t'.ord, '\n'.ord, '\r'.ord, '\f'.ord
+              # whitespace between `=` and the value is allowed
+            else
+              after_eq = false
+            end
+          end
+          i += 1
+        end
+        {size, inline}
+      end
+
+      # Phrasing elements that sit inside a word's line without a visual
+      # break. Anything else — block, void (`br`, `img`), custom or unknown
+      # — keeps the word-separating space.
+      private def html_inline_tag?(name : String) : Bool
+        case name.downcase
+        when "a", "abbr", "b", "bdi", "cite", "code", "data", "del", "em", "i",
+             "ins", "kbd", "mark", "q", "s", "small", "span", "strong", "sub",
+             "sup", "time", "u", "var", "wbr"
+          true
+        else
+          false
+        end
       end
 
       # Elements whose CONTENT is not prose and must not seed an automatic
