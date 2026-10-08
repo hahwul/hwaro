@@ -227,6 +227,19 @@ describe "importer fidelity" do
       end
     end
 
+    it "still rewrites a page link whose text contains a code span" do
+      Dir.mktmpdir do |dir|
+        id = "0123456789abcdef0123456789abcdef"
+        ImporterFidelitySpec.write("#{dir}/nt/Home #{id}.md", "# Home\n\nSee [`config` page](Config%20#{id.reverse}.md) and `[x](Config%20#{id.reverse}.md)`\n")
+        ImporterFidelitySpec.write("#{dir}/nt/Config #{id.reverse}.md", "# Config\n")
+        dst = "#{dir}/out"
+        ImporterFidelitySpec.run(Hwaro::Services::Importers::NotionImporter.new, "notion", "#{dir}/nt", dst)
+        content = File.read("#{dst}/posts/home.md")
+        content.should contain("[`config` page](/posts/config/)")
+        content.should contain("`[x](Config%20#{id.reverse}.md)`")
+      end
+    end
+
     it "falls back to the heading when the title is blank" do
       Dir.mktmpdir do |dir|
         ImporterFidelitySpec.write("#{dir}/nt/page.md", "---\ntitle:\n---\n# Heading One\n\nbody\n")

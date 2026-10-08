@@ -190,32 +190,33 @@ module Hwaro
                 # Convert Notion callout blocks (> emoji text) to plain
                 # blockquotes. Example: '> 💡 Some tip' -> '> Some tip'
                 line = line.sub(CALLOUT_PREFIX, "> ")
-                io << outside_inline_code(line) { |text| clean_notion_text(text) }
+                io << clean_notion_text(line)
               end
             end
           end
         end
 
-        # Apply the block to the parts of `line` outside inline code spans.
-        private def outside_inline_code(line : String, & : String -> String) : String
-          return yield line unless line.includes?('`')
-          String.build do |io|
-            pos = 0
-            line.scan(/`+[^`]*`+/) do |m|
-              io << yield(line[pos...m.begin(0)])
-              io << m[0]
-              pos = m.end(0)
-            end
-            io << yield(line[pos..])
-          end
+        private def code_spans(line : String) : Array(Range(Int32, Int32))
+          spans = [] of Range(Int32, Int32)
+          line.scan(/`+[^`]*`+/) { |m| spans << (m.begin(0)..(m.end(0) - 1)) } if line.includes?('`')
+          spans
         end
 
-        private def clean_notion_text(segment : String) : String
+        # Rewrites one line. A match that STARTS inside an inline code span is
+        # literal text; one that merely contains a span (`[`code` page](x.md)`)
+        # is still a link.
+        private def clean_notion_text(line : String) : String
+          code = code_spans(line)
+
           # Convert Notion bookmark embeds to links
-          result = segment.gsub(/\[bookmark\]\((.+?)\)/, "[\\1](\\1)")
+          result = line.gsub(/\[bookmark\]\((.+?)\)/) do |match|
+            code.any?(&.includes?($~.begin(0))) ? match : "[#{$1}](#{$1})"
+          end
 
           # Rewrite internal subpage links (relative targets ending in .md containing a 32-hex suffix)
+          code = code_spans(result)
           result.gsub(/\[([^\]]+)\]\(([^)]+)\)/) do |match|
+            next match if code.any?(&.includes?($~.begin(0)))
             text = $1
             target = $2
             if target.ends_with?(".md") && !target.starts_with?("http://") && !target.starts_with?("https://")
