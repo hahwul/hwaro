@@ -83,9 +83,19 @@ module Hwaro
         # tried first: `%20` means a space, as it does to Markd. A literal
         # `%` file name is still reached when nothing decodes to it (or as
         # `%25`).
+        #
+        # A path captured from rendered HTML has Markd's `&` -> `&amp;` escape
+        # on it (`@/Q&A.md` arrives as `@/Q&amp;A.md`), so a miss retries with
+        # `&amp;` collapsed. Only that entity, not a full HTML.unescape, for
+        # the same legacy-entity reason as the query handling in `resolve`.
         def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
-          return pages_by_path[path]? unless path.includes?('%')
-          pages_by_path[URI.decode(path)]? || pages_by_path[path]?
+          if path.includes?('%')
+            found = pages_by_path[URI.decode(path)]? || pages_by_path[path]?
+          else
+            found = pages_by_path[path]?
+          end
+          return found if found || !path.includes?("&amp;")
+          page_for(pages_by_path, path.gsub("&amp;", "&"))
         end
 
         # Resolve internal `@/` links in HTML to actual page URLs.

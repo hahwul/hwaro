@@ -146,6 +146,15 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc">link</a>)
     end
 
+    it "resolves a @/ link to a page whose file name contains '&' (rendered as &amp;)" do
+      pages = {"Q&A.md" => make_page("Q&A.md", "/Q&A/")}
+      misses = [] of {String, String}
+      html = %(<a href="@/Q&amp;A.md">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md", "", misses)
+      result.should eq %(<a href="/Q&amp;A/">link</a>)
+      misses.should be_empty
+    end
+
     it "resolves a @/ link carrying both a query string and an anchor (query before anchor)" do
       pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
       html = %(<a href="@/blog/post.md?page=2&sort=asc#sec">link</a>)
