@@ -202,6 +202,26 @@ describe Hwaro::Models::Page do
       summary.not_nil!.should eq("Intro.\n\n```html\n<!-- more -->\n```\n\nBody.")
     end
 
+    it "ignores a marker shown inside an inline code span" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Intro.\n\nUse the `<!-- more -->` marker to split.\n\nSecond.\n\n<!-- more -->\n\nRest."
+      page.extract_summary.should eq("Intro.\n\nUse the `<!-- more -->` marker to split.\n\nSecond.")
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Only ``<!-- more -->`` here."
+      page.extract_summary.should be_nil
+    end
+
+    it "still splits at a real marker that follows a code span or a stray backtick" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Use `code` first. <!-- more --> Rest."
+      page.extract_summary.should eq("Use `code` first.")
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "A lone ` tick <!-- more --> Rest."
+      page.extract_summary.should eq("A lone ` tick")
+    end
+
     it "returns nil when the only marker sits inside a fence" do
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = "Docs example:\n\n```\n<!-- more -->\n```\n\nNo real marker."
