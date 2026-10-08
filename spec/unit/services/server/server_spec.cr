@@ -3033,6 +3033,15 @@ describe "watcher ignore patterns" do
     Hwaro::Services::Server.test_watcher_ignored?("content/.git/index").should be_true
   end
 
+  # PCRE2 UTF mode raises on invalid UTF-8; a legacy-zip (EUC-KR/Latin-1) file
+  # name used to take down scan_mtimes (serve died at startup).
+  it "does not raise on a non-UTF-8 file name" do
+    bad = String.new(Bytes[0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2f, 0xb0, 0xa1, 0x2e, 0x6d, 0x64])
+    Hwaro::Services::Server.test_watcher_ignored?(bad).should be_false
+    # Still matched on its scrubbed text, so editor temp files stay ignored.
+    Hwaro::Services::Server.test_watcher_ignored?(String.new(Bytes[0xb0, 0xa1, 0x2e, 0x74, 0x6d, 0x70])).should be_true
+  end
+
   it "does NOT ignore publishable dot-directories like .well-known" do
     Hwaro::Services::Server.test_watcher_ignored?("static/.well-known/security.txt").should be_false
   end
