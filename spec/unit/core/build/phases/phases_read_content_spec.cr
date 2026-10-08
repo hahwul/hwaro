@@ -1,5 +1,6 @@
 require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
+require "../../../../support/build_helper"
 
 # Reopen Builder to expose private ReadContent helpers for testing.
 module Hwaro::Core::Build
@@ -298,6 +299,25 @@ describe Hwaro::Core::Build::Phases::ReadContent do
           ctx.all_pages.size.should eq(1)
         end
       end
+    end
+  end
+
+  describe "page file extension case" do
+    # `.MD` is accepted as a page, but `_index`, `index` bundles and `.ko`
+    # suffixes are only recognised in lowercase (dozens of consumers compare
+    # against `_index.md`), so the file silently became an ordinary page. It
+    # now says so.
+    it "warns that a non-lowercase page extension loses its section/bundle/language role" do
+      log = with_captured_log do
+        build_site(
+          BASIC_CONFIG,
+          content_files: {"blog/_index.MD" => "idx", "blog/ok.md" => "ok"},
+          template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+        ) { |_dir| }
+      end
+      log.should contain("content/blog/_index.MD")
+      log.should contain("lowercase")
+      log.should_not contain("content/blog/ok.md")
     end
   end
 end
