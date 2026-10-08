@@ -111,6 +111,7 @@ module Hwaro
 
           compiler = Assets::SassCompiler.new(config.sass, config.static)
           count = compiler.compile_all(output_dir)
+          compiler.written_paths.each { |path| claim_generated_output(path) }
           Logger.outcome("compiled", "#{count} sass #{count == 1 ? "file" : "files"}") if count > 0
 
           # Bundle entries with `.scss` sources only recompile inside the asset

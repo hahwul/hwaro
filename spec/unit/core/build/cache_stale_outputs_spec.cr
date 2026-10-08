@@ -322,6 +322,29 @@ describe "warm --cache builds" do
       end
     end
 
+    it "removes the compiled css of a deleted or renamed sass entry" do
+      with_cached_site do
+        File.write("config.toml", File.read("config.toml") + "\n[sass]\nenabled = true\n")
+        FileUtils.mkdir_p("static/css")
+        File.write("static/css/t.scss", ".a{b:1}")
+        File.write("static/css/keep.scss", ".k{b:1}")
+        cached_build
+        cached_build
+        File.exists?("public/css/t.css").should be_true
+
+        File.rename("static/css/t.scss", "static/css/u.scss")
+        cached_build
+        File.exists?("public/css/t.css").should be_false
+        File.exists?("public/css/u.css").should be_true
+        File.exists?("public/css/keep.css").should be_true
+
+        File.delete("static/css/u.scss")
+        cached_build
+        File.exists?("public/css/u.css").should be_false
+        File.exists?("public/css/keep.css").should be_true
+      end
+    end
+
     it "keeps an unchanged static file that the warm build skipped copying" do
       with_cached_site do
         FileUtils.mkdir_p("static/css")

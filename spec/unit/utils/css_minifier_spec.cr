@@ -818,5 +818,21 @@ describe Hwaro::Utils::CssMinifier do
       Hwaro::Utils::CssMinifier.minify("a{margin:1px/**/2px}b{font:12px/**/Arial;c:d}").should eq("a{margin:1px 2px}b{font:12px Arial;c:d}")
       Hwaro::Utils::CssMinifier.minify("a{font:12px/**/Arial,\"x{y\"}").should eq("a{font:12px Arial,\"x{y\"}")
     end
+
+    # `\'` / `\"` outside a string is an escaped identifier character
+    # (Tailwind `before:content-['']`); it used to open a bogus string that
+    # paired with the next quote and left spans unminified.
+    it "treats escaped quotes and comment openers in selectors as identifier characters" do
+      css = ".before\\:content-\\[\\'\\'\\]::before {\n  --tw-content: '';\n  content: var(--tw-content);\n}\n" \
+            ".a   { color: red }\n" \
+            ".after\\:content-\\[\\\"x\\\"\\]::after { content: \"x\"; }\n" \
+            ".b { color:   blue ; background: url(  x.png  ) }"
+      Hwaro::Utils::CssMinifier.minify(css).should eq(
+        ".before\\:content-\\[\\'\\'\\]::before{--tw-content:'';content:var(--tw-content)}" \
+        ".a{color:red}" \
+        ".after\\:content-\\[\\\"x\\\"\\]::after{content:\"x\"}" \
+        ".b{color:blue;background:url(x.png)}")
+      Hwaro::Utils::CssMinifier.minify(".a\\/* { color : red }\n.b { color : blue }").should eq(".a\\/*{color:red}.b{color:blue}")
+    end
   end
 end

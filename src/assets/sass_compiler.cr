@@ -18,6 +18,11 @@ module Hwaro
     class SassCompiler
       SOURCE_DIR = "static"
 
+      # The `.css` files the last `compile_all` wrote (output-dir paths).
+      # Callers claim them (`Builder#claim_generated_output`) so a `--cache`
+      # build prunes the stylesheet of a deleted or renamed `.scss` entry.
+      getter written_paths : Array(String) = [] of String
+
       def initialize(@config : Models::SassConfig, @static_config : Models::StaticConfig)
       end
 
@@ -26,6 +31,7 @@ module Hwaro
       # sources themselves are excluded from the static copy separately
       # (Models::Config#sass_source?).
       def compile_all(output_dir : String) : Int32
+        @written_paths = [] of String
         return 0 unless @config.enabled
         return 0 unless Dir.exists?(SOURCE_DIR)
 
@@ -62,6 +68,7 @@ module Hwaro
           dest_path = File.join(output_dir, relative.sub(/\.scss\z/i, ".css"))
           Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
           File.write(dest_path, css)
+          @written_paths << dest_path
           Logger.debug "  Sass: #{relative} → #{relative.sub(/\.scss\z/i, ".css")} (#{css.bytesize} bytes)"
           count += 1
         end

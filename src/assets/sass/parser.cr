@@ -841,7 +841,10 @@ module Hwaro
         private def parse_rule_or_declaration : Ast::Node
           line = @s.line
           column = @s.column
-          scan = read_template(stops: "{;}", value_vars: true)
+          # Custom-property values are raw token streams: `//` is text
+          # there (`--api: https://x`), not a silent comment.
+          scan = read_template(stops: "{;}", value_vars: true,
+            line_comments: !(@s.peek == '-' && @s.peek(1) == '-'))
 
           if scan.terminator == '{'
             if colon = scan.first_decl_colon
@@ -943,7 +946,7 @@ module Hwaro
           end
         end
 
-        private def read_template(stops : String, value_vars : Bool) : TemplateScan
+        private def read_template(stops : String, value_vars : Bool, line_comments : Bool = true) : TemplateScan
           start_line = @s.line
           start_col = @s.column
           pieces = [] of Ast::Piece
@@ -972,7 +975,7 @@ module Hwaro
               if @s.peek(1) == '*'
                 @s.read_loud_comment
                 buf << ' '
-              elsif @s.peek(1) == '/'
+              elsif line_comments && @s.peek(1) == '/'
                 @s.advance
                 @s.advance
                 until @s.eof? || @s.peek == '\n'
@@ -1046,6 +1049,15 @@ module Hwaro
                 else
                   buf.append(ident)
                 end
+              elsif @s.ident_start?(c)
+                # Idents are consumed whole so an unquoted `url(` span is
+                # still recognised where `$var` doesn't substitute
+                # (`@import url(//fonts…)`): its `//` is not a comment.
+                ident = @s.read_ident
+                buf.append(ident)
+                if ident.compare("url", case_insensitive: true) == 0 && @s.peek == '('
+                  read_url_span(buf, pieces, vars: false)
+                end
               else
                 buf << @s.advance
               end
@@ -1090,7 +1102,7 @@ module Hwaro
         # is valid plain CSS, so it passes through byte-identical (dart
         # hard-errors there; leniency wins). `url($a + $b)` stays verbatim
         # for the same reason.
-        private def read_url_span(buf : Buf, pieces : Array(Ast::Piece)) : Nil
+        private def read_url_span(buf : Buf, pieces : Array(Ast::Piece), vars : Bool = true) : Nil
           start_line = @s.line
           start_col = @s.column
           buf << @s.advance # '('
@@ -1117,7 +1129,7 @@ module Hwaro
                 ibuf << @s.advance
               end
             when '$'
-              if @s.ident_start?(@s.peek(1))
+              if vars && @s.ident_start?(@s.peek(1))
                 var_line = @s.line
                 var_col = @s.column
                 @s.advance
@@ -1131,7 +1143,7 @@ module Hwaro
             else
               if @s.ident_start?(c)
                 ident = @s.read_ident
-                if @s.peek == '.' && @s.peek(1) == '$'
+                if vars && @s.peek == '.' && @s.peek(1) == '$'
                   var_line = @s.line
                   var_col = @s.column
                   @s.advance # '.'

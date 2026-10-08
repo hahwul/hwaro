@@ -217,4 +217,4 @@ During `hwaro serve`, errors show in the browser overlay and the previous output
 
 - **Asset pipeline** — compiled standalone entries keep stable (non-fingerprinted) URLs and resolve through `asset()`'s passthrough. For fingerprinting, reference the `.scss` file from a bundle instead.
 - **Build hooks** — Tailwind/PostCSS and full dart-sass projects can still run through `[build] hooks.pre` and point Hwaro at the compiled output.
-- **Cache** — Sass recompiles on every full build (it does not participate in the incremental page cache). Deleting an entry `.scss` leaves its previously compiled `.css` in a stale output dir; clean builds remove it.
+- **Cache** — Sass recompiles on every full build (it does not participate in the incremental page cache). Deleting or renaming an entry `.scss` removes its previously compiled `.css` on the next `--cache` build, like any other output.
