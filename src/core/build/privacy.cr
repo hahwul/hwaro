@@ -42,6 +42,7 @@ require "../../utils/file_safe"
 require "../../utils/hwaro_dir"
 require "../../utils/logger"
 require "../../utils/path_utils"
+require "../../utils/text_utils"
 require "./remote_fetch"
 
 module Hwaro
@@ -416,7 +417,7 @@ module Hwaro
         # parentheses. Only the URL spans are replaced, so the rest of the
         # attribute keeps its exact spelling.
         private def rewrite_srcset(value : String, kind : Kind, localized : Array(Localized), pass : Pass) : String?
-          spans = srcset_url_spans(value)
+          spans = Utils::TextUtils.srcset_url_spans(value)
           changed = false
           result = value
           spans.reverse_each do |(start, stop)|
@@ -425,46 +426,6 @@ module Hwaro
             changed = true
           end
           changed ? result : nil
-        end
-
-        # Character ranges of each candidate URL in a srcset value.
-        def srcset_url_spans(value : String) : Array({Int32, Int32})
-          chars = value.chars
-          n = chars.size
-          spans = [] of {Int32, Int32}
-          i = 0
-          while i < n
-            while i < n && (chars[i].ascii_whitespace? || chars[i] == ',')
-              i += 1
-            end
-            break if i >= n
-            start = i
-            while i < n && !chars[i].ascii_whitespace?
-              i += 1
-            end
-            stop = i
-            if chars[stop - 1] == ','
-              while stop > start && chars[stop - 1] == ','
-                stop -= 1
-              end
-              spans << {start, stop} if stop > start
-              next
-            end
-            spans << {start, stop}
-            depth = 0
-            while i < n
-              c = chars[i]
-              i += 1
-              if c == '('
-                depth += 1
-              elsif c == ')'
-                depth -= 1 if depth > 0
-              elsif c == ',' && depth == 0
-                break
-              end
-            end
-          end
-          spans
         end
 
         private def localize_absolute(url : String, kind : Kind, depth : Int32, chain : Array(String)) : Localized?

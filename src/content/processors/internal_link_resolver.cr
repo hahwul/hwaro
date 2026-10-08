@@ -1,5 +1,6 @@
 require "html"
 require "uri"
+require "../../utils/text_utils"
 
 # Internal Link Resolver
 #
@@ -58,6 +59,9 @@ module Hwaro
 
         # Matches any href/src attribute value (relative or absolute).
         ANY_LINK_ATTR_REGEX = /\b(href|src)="([^"]*)"/
+
+        # A `srcset` attribute: comma-separated `url [descriptor]` candidates.
+        SRCSET_ATTR_REGEX = /\bsrcset="([^"]*)"/
 
         # A URI scheme prefix (e.g. `https:`, `mailto:`, `tel:`, `data:`).
         SCHEME_PREFIX_REGEX = /\A[a-zA-Z][a-zA-Z0-9+.\-]*:/
@@ -218,9 +222,14 @@ module Hwaro
         # (`mailto:`/`tel:`/`data:`), and pure in-page anchors (`#x`) are left
         # untouched. A no-op when `page_url` is not an absolute URL (no host
         # to resolve against — e.g. an empty base_url deploy).
+        #
+        # Every candidate of a `srcset` (the responsive-image pass injects
+        # them, authors write them in `<img>`/`<picture>`) is resolved too,
+        # descriptors kept.
         def absolutize_links(html : String, page_url : String) : String
           return html if page_url.empty?
-          return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"")
+          return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"") ||
+                             Utils::ByteScan.includes?(html, "srcset=\"")
 
           base = URI.parse(page_url)
           return html if base.host.nil?
@@ -240,6 +249,20 @@ module Hwaro
                 match
               end
             end
+          end.gsub(SRCSET_ATTR_REGEX) do |match|
+            value = $1
+            spans = Utils::TextUtils.srcset_url_spans(value)
+            result = value
+            spans.reverse_each do |(start, stop)|
+              url = value[start...stop]
+              next if absolute_or_anchor?(url)
+              begin
+                result = result[0, start] + base.resolve(url).to_s + result[stop..]
+              rescue URI::Error
+                next
+              end
+            end
+            result == value ? match : %(srcset="#{result}")
           end
         rescue URI::Error
           html

@@ -269,6 +269,20 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/").should eq(html)
     end
 
+    it "absolutizes every srcset candidate and keeps the descriptors" do
+      html = %(<img srcset="/sub/img/a_200w.png 200w, ../b.png 2x,https://cdn.com/c.png 3x, //cdn.com/d.png" sizes="100vw" src="/sub/img/a.png">)
+      result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/sub/p/q/")
+      result.should contain(%(srcset="https://h.com/sub/img/a_200w.png 200w, https://h.com/sub/p/b.png 2x,https://cdn.com/c.png 3x, //cdn.com/d.png"))
+      result.should contain(%(src="https://h.com/sub/img/a.png"))
+      result.should contain(%(sizes="100vw"))
+    end
+
+    it "absolutizes a srcset that is the only link attribute" do
+      html = %(<picture><source srcset="/a.webp 1x, /b.webp 2x"></picture>)
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/")
+        .should eq(%(<picture><source srcset="https://h.com/a.webp 1x, https://h.com/b.webp 2x"></picture>))
+    end
+
     it "resolves a relative link carrying an encoded entity without double-encoding it" do
       html = %(<a href="sub/?a=1&amp;b=2">q</a>)
       result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/")
