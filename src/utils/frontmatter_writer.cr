@@ -77,9 +77,8 @@ module Hwaro
 
       # Escape a string for a double-quoted TOML basic string. Unlike Crystal's
       # `String#inspect`, this never emits TOML-invalid escapes (`\a`, `\e`,
-      # `\v`) and leaves non-ASCII text raw — toml.cr's `\uXXXX` reader greedily
-      # consumes a following hex digit, so escaping U+200B in "Auto​build" would
-      # produce an unparseable file.
+      # `\v`) and leaves non-ASCII text raw (`\u` is exactly four digits —
+      # ext/toml_unicode_escape_fix.cr — so a following hex digit is literal).
       def self.escape_toml_string(str : String) : String
         str
           .gsub("\\", "\\\\")

@@ -11,7 +11,14 @@
 # Both now read the whole quote run: fewer than three quotes are content,
 # three to five close the string (the extras are content), more is an error.
 #
-# Remove when: upstream lexes quote runs inside multi-line strings correctly.
+# CRLF files (git autocrlf, Windows editors) were only half understood: a
+# `\r\n` right after the opening delimiter was kept (so a `description = """`
+# meta tag began with a stray CRLF), and a line-ending backslash before `\r\n`
+# was "unknown escape: \". Both consumers now read `\r\n` as one newline and
+# store it as `\n`, like the LF twin of the file (and Python's tomllib).
+#
+# Remove when: upstream lexes quote runs and CRLF inside multi-line strings
+# correctly.
 
 require "toml"
 
@@ -35,11 +42,22 @@ class TOML::Lexer
     count >= 3
   end
 
-  private def consume_multine_basic_string
-    if next_char == '\n'
+  # Skips the newline (`\n` or `\r\n`) right after an opening `"""` / `'''`;
+  # `current_char` is the last delimiter char on entry.
+  private def hwaro_skip_opening_newline
+    case next_char
+    when '\n'
+      newline
+      next_char
+    when '\r'
+      raise "expected '\\n' after '\\r'" unless next_char == '\n'
       newline
       next_char
     end
+  end
+
+  private def consume_multine_basic_string
+    hwaro_skip_opening_newline
 
     @token.string_value = String.build do |io|
       loop do
@@ -47,7 +65,15 @@ class TOML::Lexer
         when '"'
           break if hwaro_quote_run(io, '"')
         when '\\'
-          if next_char == '\n'
+          continuation = false
+          case next_char
+          when '\n'
+            continuation = true
+          when '\r'
+            raise "unknown escape: \\\r" unless next_char == '\n'
+            continuation = true
+          end
+          if continuation
             newline
             next_char
             loop do
@@ -57,6 +83,15 @@ class TOML::Lexer
               when '\n'
                 newline
                 next_char
+              when '\r'
+                # CRLF is a newline; a lone CR is content.
+                if next_char == '\n'
+                  newline
+                  next_char
+                else
+                  io << '\r'
+                  break
+                end
               else
                 break
               end
@@ -68,6 +103,15 @@ class TOML::Lexer
           newline
           io << '\n'
           next_char
+        when '\r'
+          # CRLF is stored as LF; a lone CR stays content.
+          if next_char == '\n'
+            newline
+            io << '\n'
+            next_char
+          else
+            io << '\r'
+          end
         when '\0'
           raise "unterminated string literal"
         else
@@ -79,10 +123,7 @@ class TOML::Lexer
   end
 
   private def consume_multine_literal_string
-    if next_char == '\n'
-      newline
-      next_char
-    end
+    hwaro_skip_opening_newline
 
     @token.string_value = String.build do |io|
       loop do
@@ -93,6 +134,15 @@ class TOML::Lexer
         when '\n'
           newline
           io << '\n'
+        when '\r'
+          # CRLF is stored as LF; a lone CR stays content.
+          if next_char == '\n'
+            newline
+            io << '\n'
+          else
+            io << '\r'
+            next
+          end
         when '\0'
           raise "unterminated string literal"
         else
