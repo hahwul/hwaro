@@ -214,7 +214,7 @@ module Hwaro
       # same sync: the stem is deleted too and is gzip-matched. Those go with
       # their page and are not counted against `--max-deletes`; every other
       # `.gz` (another tool's output, a sibling whose page stays) counts.
-      private def stale_gzip_siblings(to_delete : Array(String), matchers : Array(CompiledMatcher), target : Models::DeploymentTarget) : Int32
+      private def stale_gzip_siblings(to_delete : Array(String), matchers : Array(CompiledMatcher), target : Models::DeploymentTarget, dest_dir : String) : Int32
         return 0 if matchers.none? { |compiled| compiled.matcher.gzip == true }
         deleted = to_delete.to_set
         to_delete.count do |rel|
@@ -222,8 +222,7 @@ module Hwaro
           stem = rel.rchop(".gz")
           next false unless deleted.includes?(stem)
           # A stripped page `foo` was matched by its source spelling.
-          src_rel = target.strip_index_html && File.extname(stem).empty? ? "#{stem}/index.html" : stem
-          gzip_matched?(stem, matchers, src_rel)
+          gzip_matched?(stem, matchers, stem_source_rel(stem, target, dest_dir))
         end
       end
 
