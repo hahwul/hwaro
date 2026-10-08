@@ -699,7 +699,9 @@ module Hwaro::Core::Build::Phases::Initialize
         Logger.warn "Template #{path} contains invalid UTF-8; the offending bytes were replaced."
         source = source.scrub
       end
-      return source
+      # Windows editors prepend a BOM; a BOM'd partial or shortcode template
+      # would inject an invisible U+FEFF wherever it is expanded.
+      return Utils::TextUtils.strip_bom(source)
     rescue ex : IO::Error
       attempts += 1
       if attempts >= TEMPLATE_READ_RETRIES
