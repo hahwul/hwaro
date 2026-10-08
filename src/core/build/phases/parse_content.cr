@@ -1116,9 +1116,9 @@ module Hwaro::Core::Build::Phases::ParseContent
   # on the page renders a term link to a 404.
   private def cascade_string_array(value : Models::ExtraValue) : Array(String)?
     if value.is_a?(Array(String))
-      value.map(&.strip).reject(&.empty?)
+      value.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
     elsif value.is_a?(Array(Models::ExtraValue))
-      value.compact_map(&.as?(String)).map(&.strip).reject(&.empty?)
+      value.compact_map(&.as?(String)).map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
     end
   end
 

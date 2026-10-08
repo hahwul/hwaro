@@ -13,8 +13,23 @@ module Hwaro
           raw = val.raw
           if raw.is_a?(Time)
             raw
+          elsif str = val.as_s?
+            parse_time(str, key, file_path)
           else
-            parse_time(val.as_s?, key, file_path)
+            warn_mistyped(key, "a date", val, file_path)
+            nil
+          end
+        end
+
+        # JSON has no native date type: a string, or a mistyped value to warn
+        # about.
+        private def parse_json_time(val : JSON::Any?, key : String = "date", file_path : String = "") : Time?
+          return unless val
+          if str = val.as_s?
+            parse_time(str, key, file_path)
+          else
+            warn_mistyped(key, "a date", val, file_path)
+            nil
           end
         end
 
@@ -26,8 +41,11 @@ module Hwaro
           return unless val
           if t = val.as_time?
             t
+          elsif str = val.as_s?
+            parse_time(str, key, file_path)
           else
-            parse_time(val.as_s?, key, file_path)
+            warn_mistyped(key, "a date", val, file_path)
+            nil
           end
         end
 
@@ -110,21 +128,34 @@ module Hwaro
         # These are excluded from automatic taxonomy extraction.
         NON_TAXONOMY_ARRAY_KEYS = Set{"tags", "aliases", "authors"}
 
-        private def extract_taxonomies(front_matter : TOML::Table | YAML::Any | JSON::Any, keys : Array(String)) : Hash(String, Array(String))
+        # A scalar where a taxonomy wants a list is not coerced (that would
+        # invent term pages for sites that build fine today), but it is named.
+        private def warn_bare_taxonomy(key : String, val : TOML::Any | YAML::Any | JSON::Any, file_path : String) : Nil
+          return if file_path.empty? || val.raw.nil?
+          Logger.warn "#{file_path}: `#{key}` must be a list of strings — ignored."
+        end
+
+        private def extract_taxonomies(front_matter : TOML::Table | YAML::Any | JSON::Any, keys : Array(String), file_path : String = "") : Hash(String, Array(String))
           taxonomies = {} of String => Array(String)
 
           # Iterate all keys: TOML::Table yields {String, TOML::Any},
           # YAML::Any#as_h yields {YAML::Any, YAML::Any}. Unify via keys list.
-          # Terms are stripped and blank-dropped for the same reasons as
-          # `fm_string_array`: whitespace-padded terms must not become
-          # distinct taxonomy terms or leak padded strings into term-page
-          # titles and feeds, and a term that strips to "" never gets a
-          # written page, so exposing it renders a link to a 404.
+          # Terms go through `fm_terms` — stripped, NFC-normalised and
+          # blank-dropped for the same reasons as `fm_string_array`:
+          # whitespace-padded terms must not become distinct taxonomy terms or
+          # leak padded strings into term-page titles and feeds, and a term
+          # that strips to "" never gets a written page, so exposing it
+          # renders a link to a 404.
           keys.each do |key|
             next if NON_TAXONOMY_ARRAY_KEYS.includes?(key)
-            if arr = front_matter[key]?.try(&.as_a?)
-              values = arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
-              taxonomies[key] = values
+            next unless val = front_matter[key]?
+            if arr = val.as_a?
+              taxonomies[key] = fm_terms(arr, key, file_path)
+            elsif key == "categories"
+              # The one taxonomy name that is also a KNOWN key (so it never
+              # reaches `extra` or the typo hint): a bare value vanished
+              # without a trace.
+              warn_bare_taxonomy(key, val, file_path)
             end
           end
 
@@ -139,14 +170,18 @@ module Hwaro
             when TOML::Any, JSON::Any
               table.as_h?.try &.each do |k, v|
                 if arr = v.as_a?
-                  taxonomies[k] = arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
+                  taxonomies[k] = fm_terms(arr, k, file_path)
+                else
+                  warn_bare_taxonomy("taxonomies.#{k}", v, file_path)
                 end
               end
             when YAML::Any
               table.as_h?.try &.each do |k, v|
                 next unless key_str = k.as_s?
                 if arr = v.as_a?
-                  taxonomies[key_str] = arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
+                  taxonomies[key_str] = fm_terms(arr, key_str, file_path)
+                else
+                  warn_bare_taxonomy("taxonomies.#{key_str}", v, file_path)
                 end
               end
             end

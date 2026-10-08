@@ -283,7 +283,7 @@ module Hwaro
           warn_typo_keys(unknown_keys, file_path)
 
           front_matter_keys = toml_fm.keys
-          taxonomies = extract_taxonomies(toml_fm, front_matter_keys)
+          taxonomies = extract_taxonomies(toml_fm, front_matter_keys, file_path)
           tags = fm_string_array(toml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
@@ -362,7 +362,7 @@ module Hwaro
           warn_typo_keys(unknown_keys, file_path)
 
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
-          taxonomies = extract_taxonomies(yaml_fm, front_matter_keys)
+          taxonomies = extract_taxonomies(yaml_fm, front_matter_keys, file_path)
           tags = fm_string_array(yaml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
@@ -405,9 +405,9 @@ module Hwaro
           fm_hash = json_fm.as_h?
           return unless fm_hash
 
-          date = parse_time(json_fm["date"]?.try(&.as_s?), "date", file_path)
-          updated = parse_time(json_fm["updated"]?.try(&.as_s?), "updated", file_path)
-          expires = parse_time(json_fm["expires"]?.try(&.as_s?), "expires", file_path)
+          date = parse_json_time(json_fm["date"]?, "date", file_path)
+          updated = parse_json_time(json_fm["updated"]?, "updated", file_path)
+          expires = parse_json_time(json_fm["expires"]?, "expires", file_path)
 
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
@@ -425,7 +425,7 @@ module Hwaro
           warn_typo_keys(unknown_keys, file_path)
 
           front_matter_keys = fm_hash.keys
-          taxonomies = extract_taxonomies(json_fm, front_matter_keys)
+          taxonomies = extract_taxonomies(json_fm, front_matter_keys, file_path)
           tags = fm_string_array(json_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
@@ -449,23 +449,40 @@ module Hwaro
           )
         end
 
+        # A typed key (bool/int/date) holding another type is ignored, never
+        # coerced — `draft = "true"` is not a draft, and that is pinned for the
+        # publish-state parity with `ContentLister` — but it is no longer
+        # silent: a draft written that way used to publish, in feeds and the
+        # search index too, with no diagnostic anywhere. An explicitly empty
+        # key (`draft:`) is a placeholder rather than a type mistake, and
+        # library callers (no file_path) keep the quiet default.
+        private def warn_mistyped(key : String, kind : String, val : TOML::Any | YAML::Any | JSON::Any, file_path : String) : Nil
+          return if file_path.empty? || val.raw.nil?
+          Logger.warn "#{file_path}: `#{key}` must be #{kind} — ignored."
+        end
+
         # Shared helper: extract a Bool from a front matter value, returning the
-        # given default when the key is absent or not a boolean.
-        private def fm_bool(fm : TOML::Table | YAML::Any | JSON::Any, key : String, default : Bool) : Bool
-          val = fm[key]?
-          return default unless val
-          bool_val = val.as_bool?
+        # given default when the key is absent or not a boolean (warning about
+        # the latter, see `warn_mistyped`).
+        private def fm_bool(fm : TOML::Table | YAML::Any | JSON::Any, key : String, default : Bool, file_path : String = "") : Bool
+          bool_val = fm_bool?(fm, key, file_path)
           bool_val.nil? ? default : bool_val
         end
 
         # Shared helper: extract a nilable Bool from a front matter value.
-        private def fm_bool?(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Bool?
-          fm[key]?.try(&.as_bool?)
+        private def fm_bool?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : Bool?
+          return unless val = fm[key]?
+          bool_val = val.as_bool?
+          warn_mistyped(key, "a boolean", val, file_path) if bool_val.nil?
+          bool_val
         end
 
         # Shared helper: extract a nilable Int32 from a front matter value.
-        private def fm_int?(fm : TOML::Table | YAML::Any | JSON::Any, key : String) : Int32?
-          fm[key]?.try { |val| fm_int_value?(val) }
+        private def fm_int?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : Int32?
+          return unless val = fm[key]?
+          int_val = fm_int_value?(val)
+          warn_mistyped(key, "an integer", val, file_path) if int_val.nil?
+          int_val
         end
 
         # Narrow a single front matter number to Int32.
@@ -554,10 +571,31 @@ module Hwaro
           val = fm[key]?
           return [] of String unless val
           if arr = val.as_a?
-            return arr.compact_map(&.as_s?).map(&.strip).reject(&.empty?)
+            return fm_terms(arr, key, file_path)
           end
           Logger.warn "#{file_path}: `#{key}` must be a list of strings — ignored." unless file_path.empty? || val.raw.nil?
           [] of String
+        end
+
+        # The terms of a front matter list (`tags`, `authors`, `aliases`,
+        # taxonomy arrays): strings and integers (`tags: [2024]`, a year or a
+        # version major) are kept in string form, each stripped and
+        # NFC-normalised (`TextUtils.normalize_term`), blanks dropped. Anything
+        # else is skipped — a float cannot round-trip (`3.10` parses as 3.1),
+        # so it is named in a warning (quote it to keep it) instead of
+        # vanishing silently.
+        private def fm_terms(arr : Array(TOML::Any) | Array(YAML::Any) | Array(JSON::Any), key : String, file_path : String = "") : Array(String)
+          terms = [] of String
+          arr.each do |item|
+            if str = item.as_s?
+              terms << str
+            elsif int = item.as_i64?
+              terms << int.to_s
+            elsif !file_path.empty? && !item.raw.nil?
+              Logger.warn "#{file_path}: `#{key}` has a non-string value (#{item.raw.inspect}) — ignored; quote it to keep it as a term."
+            end
+          end
+          terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
         end
 
         # Build the front matter result NamedTuple from any front matter source.
@@ -591,35 +629,35 @@ module Hwaro
             title:          fm_string?(fm, "title", file_path) || "Untitled",
             description:    fm_string?(fm, "description", file_path),
             image:          fm_string?(fm, "image", file_path),
-            draft:          fm_bool(fm, "draft", false),
+            draft:          fm_bool(fm, "draft", false, file_path),
             template:       fm_string?(fm, "template", file_path),
-            in_sitemap:     fm_bool(fm, "in_sitemap", true),
-            toc:            fm_bool(fm, "toc", false),
+            in_sitemap:     fm_bool(fm, "in_sitemap", true, file_path),
+            toc:            fm_bool(fm, "toc", false, file_path),
             date:           date,
             updated:        updated,
-            render:         fm_bool(fm, "render", true),
+            render:         fm_bool(fm, "render", true, file_path),
             slug:           fm_string?(fm, "slug", file_path),
             custom_path:    fm_string?(fm, "path", file_path),
             aliases:        fm_string_array(fm, "aliases", file_path),
-            transparent:    fm_bool(fm, "transparent", false),
-            generate_feeds: fm_bool(fm, "generate_feeds", false),
+            transparent:    fm_bool(fm, "transparent", false, file_path),
+            generate_feeds: fm_bool(fm, "generate_feeds", false, file_path),
             # `paginate_by` is Zola's spelling (also exposed on `paginator` in
             # templates); accept it as an alias so migrated sites paginate
             # instead of silently rendering one unbounded page.
-            paginate:            fm_int?(fm, "paginate") || fm_int?(fm, "paginate_by"),
-            pagination_enabled:  fm_bool?(fm, "pagination_enabled"),
+            paginate:            fm_int?(fm, "paginate", file_path) || fm_int?(fm, "paginate_by", file_path),
+            pagination_enabled:  fm_bool?(fm, "pagination_enabled", file_path),
             sort_by:             fm_string?(fm, "sort_by", file_path),
-            reverse:             fm_bool?(fm, "reverse"),
+            reverse:             fm_bool?(fm, "reverse", file_path),
             authors:             authors,
             extra:               extra,
-            in_search_index:     fm_bool(fm, "in_search_index", true),
-            insert_anchor_links: fm_bool?(fm, "insert_anchor_links"),
+            in_search_index:     fm_bool(fm, "in_search_index", true, file_path),
+            insert_anchor_links: fm_bool?(fm, "insert_anchor_links", file_path),
             page_template:       fm_string?(fm, "page_template", file_path),
             paginate_path:       fm_paginate_path(fm, file_path),
             redirect_to:         fm_string?(fm, "redirect_to", file_path),
-            weight:              fm_int?(fm, "weight") || 0,
+            weight:              fm_int?(fm, "weight", file_path) || 0,
             series:              fm_string?(fm, "series", file_path),
-            series_weight:       fm_int?(fm, "series_weight") || 0,
+            series_weight:       fm_int?(fm, "series_weight", file_path) || 0,
             expires:             nil.as(Time?),
             front_matter_keys:   front_matter_keys,
             taxonomies:          taxonomies,

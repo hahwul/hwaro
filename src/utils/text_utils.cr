@@ -74,6 +74,16 @@ module Hwaro
         content.lchop('\uFEFF')
       end
 
+      # A taxonomy term as the build identifies it: stripped and NFC-normalised.
+      # macOS filenames, IMEs and the clipboard produce NFD text, and `slugify`
+      # drops the combining marks of an NFD `\u00E9` (so `/tags/cafe/` next to
+      # `/tags/caf\u00E9/`) while NFD and NFC Hangul share one directory on APFS \u2014
+      # visually identical tags must be one term. NFC is the identity for ASCII.
+      def normalize_term(term : String) : String
+        term = term.strip
+        term.ascii_only? ? term : term.unicode_normalize(:nfc)
+      end
+
       # Remove terminal control characters (ANSI escapes, CR, BEL, \u2026) plus the
       # Unicode line/paragraph separators.
       #

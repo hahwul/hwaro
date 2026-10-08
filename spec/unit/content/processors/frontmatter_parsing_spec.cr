@@ -1956,6 +1956,96 @@ describe Hwaro::Content::Processors::Markdown do
       end
       log.should_not contain("must be a string")
     end
+
+    it "warns when a boolean key holds another type, without coercing it" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = \"T\"\ndraft = \"true\"\nrender = 1\n+++\nbody", "content/d.md")
+        result[:draft].should be_false
+        result[:render].should be_true
+      end
+      log.should contain("content/d.md: `draft` must be a boolean")
+      log.should contain("content/d.md: `render` must be a boolean")
+
+      log = with_captured_log do
+        processor.parse("---\ntitle: T\ndraft: \"true\"\nreverse: 1\n---\nbody", "content/y.md")
+      end
+      log.should contain("content/y.md: `draft` must be a boolean")
+      log.should contain("content/y.md: `reverse` must be a boolean")
+
+      log = with_captured_log do
+        processor.parse(%({"title": "T", "toc": "yes"}\nbody), "content/j.md")
+      end
+      log.should contain("content/j.md: `toc` must be a boolean")
+    end
+
+    it "warns when an integer key holds another type" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = \"T\"\nweight = \"5\"\npaginate = \"10\"\n+++\nbody", "content/w.md")
+        result[:weight].should eq(0)
+        result[:paginate].should be_nil
+      end
+      log.should contain("content/w.md: `weight` must be an integer")
+      log.should contain("content/w.md: `paginate` must be an integer")
+    end
+
+    it "warns when a date key holds a non-date, non-string value" do
+      log = with_captured_log do
+        result = processor.parse("---\ntitle: T\ndate: 20240315\n---\nbody", "content/dt.md")
+        result[:date].should be_nil
+      end
+      log.should contain("content/dt.md: `date` must be a date")
+
+      log = with_captured_log do
+        processor.parse("+++\ntitle = \"T\"\nupdated = true\n+++\nbody", "content/dt2.md")
+      end
+      log.should contain("content/dt2.md: `updated` must be a date")
+    end
+
+    it "stays silent for well-typed values, empty YAML keys and library use" do
+      log = with_captured_log do
+        processor.parse("---\ntitle: T\ndraft: yes\nweight: 3\ndate: 2024-03-15\nrender:\n---\nbody", "content/ok.md")
+        processor.parse("+++\ntitle = \"T\"\ndraft = \"true\"\nweight = \"5\"\n+++\nbody")
+      end
+      log.should_not contain("must be a")
+    end
+
+    it "keeps integer tags and categories as strings" do
+      result = processor.parse("---\ntitle: Y\ntags: [2024, python]\ncategories: [1, 2]\n---\nbody", "content/y.md")
+      result[:tags].should eq(["2024", "python"])
+      result[:taxonomies]["categories"].should eq(["1", "2"])
+
+      result = processor.parse("+++\ntitle = \"T\"\ntags = [2024, 2025]\n[taxonomies]\ntech = [7]\n+++\nbody", "content/t.md")
+      result[:tags].should eq(["2024", "2025"])
+      result[:taxonomies]["tech"].should eq(["7"])
+    end
+
+    it "warns about list elements it cannot keep as terms" do
+      log = with_captured_log do
+        result = processor.parse("---\ntitle: Y\ntags: [3.10, python, true]\n---\nbody", "content/f.md")
+        result[:tags].should eq(["python"])
+      end
+      log.should contain("content/f.md: `tags` has a non-string value (3.1)")
+      log.should contain("content/f.md: `tags` has a non-string value (true)")
+    end
+
+    it "warns when categories or a [taxonomies] entry is a bare value" do
+      log = with_captured_log do
+        result = processor.parse("+++\ntitle = \"T\"\ncategories = \"News\"\n[taxonomies]\ntech = \"x\"\n+++\nbody", "content/c.md")
+        result[:taxonomies].has_key?("categories").should be_false
+        result[:taxonomies].has_key?("tech").should be_false
+      end
+      log.should contain("content/c.md: `categories` must be a list of strings")
+      log.should contain("content/c.md: `taxonomies.tech` must be a list of strings")
+    end
+
+    it "NFC-normalises taxonomy terms" do
+      nfd = "café"
+      nfc = "café"
+      result = processor.parse("+++\ntitle = \"T\"\ntags = [\"#{nfd}\"]\ncategories = [\"#{nfd}\"]\nauthors = [\"#{nfd}\"]\n+++\nbody", "content/n.md")
+      result[:tags].should eq([nfc])
+      result[:taxonomies]["categories"].should eq([nfc])
+      result[:authors].should eq([nfc])
+    end
   end
 
   # ---------------------------------------------------------------------------
