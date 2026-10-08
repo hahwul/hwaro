@@ -354,6 +354,10 @@ describe Hwaro::Content::Seo::Amp do
         Hwaro::Content::Seo::Amp.same_origin_src?("https://example.com:8443/a", "https://example.com").should be_false
       end
 
+      it "treats a src whose port overflows Int32 as unknown (same-origin)" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("http://a.example:99999999999999999999/x", "https://example.com").should be_true
+      end
+
       it "treats an explicit default port as equal to an implicit one" do
         Hwaro::Content::Seo::Amp.same_origin_src?("https://example.com:443/a", "https://example.com").should be_true
       end

@@ -33,7 +33,7 @@ module Hwaro
           uri = URI.parse(url)
           port = uri.port ? ":#{uri.port}" : ""
           "#{uri.scheme}://#{uri.host}#{port}#{uri.path}"
-        rescue URI::Error
+        rescue URI::Error | OverflowError
           "<unparseable url>"
         end
 
@@ -48,7 +48,11 @@ module Hwaro
         def fetch(url : String, headers : Hash(String, String), max_bytes : Int64,
                   deadline : Time::Span, user_agent : String = "Hwaro",
                   guard : (URI -> Array(String)?)? = nil) : {String, String?, String}
-          original = URI.parse(url)
+          original = begin
+            URI.parse(url)
+          rescue OverflowError
+            raise FetchError.new("invalid URL (port out of range)")
+          end
           current = original
           final_url = url
           redirects = 0
@@ -69,7 +73,7 @@ module Hwaro
             outcome = exchange(current, pinned) do |client|
               hop_headers = request_headers(headers, credentials, user_agent)
               hop_headers["Host"] = host_header(current) if pinned
-              client.get(current.request_target, headers: hop_headers) do |response|
+              client.get(request_target(current), headers: hop_headers) do |response|
                 if response.status.redirection?
                   location = response.headers["Location"]? ||
                              raise FetchError.new("redirect (HTTP #{response.status_code}) without a Location header")
@@ -86,11 +90,28 @@ module Hwaro
             if location
               redirects += 1
               raise FetchError.new("too many redirects (limit #{MAX_REDIRECTS})") if redirects > MAX_REDIRECTS
-              current = current.resolve(location)
+              # `URI.parse` raises OverflowError, not URI::Error, for a port
+              # beyond Int32; a hostile Location must not escape `on_error`.
+              current = begin
+                current.resolve(location)
+              rescue OverflowError
+                raise FetchError.new("invalid redirect target (port out of range)")
+              end
               final_url = current.to_s
             else
               return {body.as(String), content_type, final_url}
             end
+          end
+        end
+
+        # The request line carries what a browser or curl would send: bytes
+        # outside printable ASCII (raw UTF-8, spaces) are percent-encoded,
+        # existing `%XX` escapes and reserved characters stay as they are.
+        private def request_target(uri : URI) : String
+          target = uri.request_target
+          return target unless target.to_slice.any? { |b| b <= 0x20 || b >= 0x7f }
+          String.build(target.bytesize + 8) do |io|
+            target.each_byte { |b| b <= 0x20 || b >= 0x7f ? io << '%' << (b < 0x10 ? "0" : "") << b.to_s(16, upcase: true) : io.write_byte(b) }
           end
         end
 
