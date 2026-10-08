@@ -370,7 +370,7 @@ content_max_length = 500    # optional: cap each entry's content
 | `"language"` | One per language (multilingual sites); the default language uses its code | `en`, `ko` |
 | `"section-language"` | Language, then section | `en/blog`, `ko/blog`, `ko/_root` |
 
-Nested sections fold into their top-level section: `blog/news/post.md` lands in the `blog` shard. Every eligibility rule of the classic index applies unchanged (`fields`, `exclude`, `in_search_index = false`, drafts, `render = false`, per-language `build_search_index`, `tokenize_cjk`).
+Nested sections fold into their top-level section: `blog/news/post.md` lands in the `blog` shard. A section literally named `index` is stored as shard `_index`, because `search/index.json` is the manifest. Every eligibility rule of the classic index applies unchanged (`fields`, `exclude`, `in_search_index = false`, drafts, `render = false`, per-language `build_search_index`, `tokenize_cjk`).
 
 ### Generated Files
 

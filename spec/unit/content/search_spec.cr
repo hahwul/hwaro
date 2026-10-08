@@ -453,6 +453,28 @@ describe Hwaro::Content::Search do
       end
     end
 
+    it "removes a stale search.json when no page is eligible any more" do
+      config = Hwaro::Models::Config.new
+      config.search.enabled = true
+      config.search.fields = ["title", "content"]
+
+      page = Hwaro::Models::Page.new("a.md")
+      page.title = "OnlyPage"
+      page.url = "/a/"
+      page.raw_content = "STALEMARK"
+
+      Dir.mktmpdir do |output_dir|
+        path = File.join(output_dir, "search.json")
+        Hwaro::Content::Search.generate([page], config, output_dir)
+        File.read(path).should contain("STALEMARK")
+
+        # The page turned into a draft: a warm build must not keep serving it.
+        page.draft = true
+        Hwaro::Content::Search.generate([page], config, output_dir)
+        File.exists?(path).should be_false
+      end
+    end
+
     it "handles description field when nil" do
       config = Hwaro::Models::Config.new
       config.search.enabled = true
