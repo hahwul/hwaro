@@ -121,7 +121,7 @@ module Hwaro
           # Path & URL
           input_dir = nil.as(String?)
           base_url = nil.as(String?)
-          env_name = ENV["HWARO_ENV"]? || nil
+          env_name = ENV["HWARO_ENV"]?.presence
 
           # Content filtering
           drafts = false
@@ -133,7 +133,7 @@ module Hwaro
           workers = 0
           cache = false
           stream = false
-          memory_limit = ENV["HWARO_MEMORYLIMIT"]? || nil
+          memory_limit = ENV["HWARO_MEMORYLIMIT"]?.presence
           fast_start = false
           fast_start_count = 20
 

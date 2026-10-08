@@ -17,6 +17,19 @@ end
 
 describe Hwaro::CLI::Commands::ServeCommand do
   describe "#parse_options" do
+    it "treats empty HWARO_MEMORYLIMIT / HWARO_ENV as unset" do
+      ENV["HWARO_MEMORYLIMIT"] = ""
+      ENV["HWARO_ENV"] = ""
+      begin
+        _, options = Hwaro::CLI::Commands::ServeCommand.new.test_parse_options([] of String)
+        options.memory_limit.should be_nil
+        options.env.should be_nil
+      ensure
+        ENV.delete("HWARO_MEMORYLIMIT")
+        ENV.delete("HWARO_ENV")
+      end
+    end
+
     it "defaults error_overlay to true" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options([] of String)
