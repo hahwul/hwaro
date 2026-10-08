@@ -90,6 +90,40 @@ describe Hwaro::Core::Build::Phases::Finalize do
       end
     end
 
+    # Regression: on a case-insensitive filesystem a `--cache` build writes a
+    # case-renamed page (`Foo.md` -> `foo.md`) into the EXISTING `Foo/`
+    # directory, which keeps its old spelling, so the tree no longer matches
+    # the page URL and 404s once deployed to a case-sensitive host.
+    it "respells an output directory to the page URL's case on a case-insensitive filesystem" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Dir.mkdir_p("public/posts/Foo")
+          File.write("public/posts/Foo/index.html", "<p>post</p>")
+          if !Hwaro::Utils::PathUtils.case_folding_fs?(File.join(dir, "public"))
+            pending!("needs a case-insensitive filesystem")
+          end
+
+          builder = Hwaro::Core::Build::Builder.new
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: ".hwaro_cache.json")
+          Dir.mkdir_p("content/posts")
+          File.write("content/posts/foo.md", "# post")
+          cache.update("content/posts/foo.md", "public/posts/foo/index.html")
+          builder.test_set_cache(cache)
+
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
+          ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+          page = Hwaro::Models::Page.new("posts/foo.md")
+          page.url = "/posts/foo/"
+          ctx.pages = [page]
+
+          builder.test_run_finalize(ctx, Hwaro::Profiler.new(enabled: false))
+
+          Dir.children("public/posts").should eq(["foo"])
+          File.read("public/posts/foo/index.html").should eq("<p>post</p>")
+        end
+      end
+    end
+
     # Regression: the source survives but the page moved (`slug`, `path`,
     # a permalink rule), so the entry is rewritten with the new output and
     # the file at the old URL used to stay published forever.
