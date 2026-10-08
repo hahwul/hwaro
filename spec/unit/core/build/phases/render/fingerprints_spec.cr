@@ -386,3 +386,124 @@ describe "menu-set fingerprint with [menus] auto_sections" do
     builder.test_menu_set_fingerprint(site).should_not eq(before)
   end
 end
+
+private def write_section_meta_site
+  File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+  FileUtils.mkdir_p("templates")
+  File.write("templates/page.html",
+    "SECT={{ section.title }} SECD={{ section.description }} FLAT={{ section_title }}|" \
+    "ORDER={% for p in section.pages %}{{ p.title }},{% endfor %}")
+  File.write("templates/section.html", "<h1>{{ section.title }}</h1>{{ content }}")
+  FileUtils.mkdir_p("content/posts")
+  File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\ndescription = \"old desc\"\nsort_by = \"title\"\n+++\nSection body.")
+  %w[a b c].each { |x| File.write("content/posts/#{x}.md", "+++\ntitle = \"#{x.upcase}\"\n+++\nBody #{x}") }
+end
+
+# A regular page's `section` object comes from its parent `_index.md`: title,
+# description, assets and the `sort_by`/`reverse` order of `section.pages`.
+describe "warm --cache: pages printing their parent section's metadata" do
+  it "re-renders the children when the section is retitled, redescribed or reversed" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_section_meta_site
+        relations_cached_build
+        File.read("public/posts/a/index.html").should eq("SECT=Posts SECD=old desc FLAT=Posts|ORDER=B,C,")
+
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts RENAMED\"\ndescription = \"NEW desc\"\nsort_by = \"title\"\nreverse = true\n+++\nSection body.")
+        relations_cached_build
+        File.read("public/posts/a/index.html").should eq("SECT=Posts RENAMED SECD=NEW desc FLAT=Posts RENAMED|ORDER=C,B,")
+      end
+    end
+  end
+
+  it "leaves the children alone when only the section body changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_section_meta_site
+        relations_cached_build
+        File.write("public/posts/a/index.html", "SENTINEL")
+
+        File.write("content/posts/_index.md", File.read("content/posts/_index.md").sub("Section body.", "Edited body."))
+        relations_cached_build
+        File.read("public/posts/a/index.html").should eq("SENTINEL")
+      end
+    end
+  end
+end
+
+# `p.in_sitemap` / `p.in_search_index` are exposed to listings and edited in
+# front matter, so a listing printing them must follow the edit.
+describe "warm --cache: listings printing sitemap/search flags" do
+  it "re-renders the section listing when another page flips them" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html",
+          "{% for p in section.pages %}[{{ p.title }} s={{ p.in_sitemap }} i={{ p.in_search_index }}]{% endfor %}")
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\n+++\nA")
+        relations_cached_build
+        File.read("public/posts/index.html").should eq("[A s=true i=true]")
+
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\nin_sitemap = false\nin_search_index = false\n+++\nA")
+        relations_cached_build
+        File.read("public/posts/index.html").should eq("[A s=false i=false]")
+      end
+    end
+  end
+end
+
+# The clock is a template input like env(): a page printing it must follow it
+# on a warm build instead of freezing the first render's value.
+describe "warm --cache: pages printing the clock" do
+  it "re-renders a page that calls now() on every warm build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %(NOW={{ now(format="%N") }}))
+        FileUtils.mkdir_p("content")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nA")
+        relations_cached_build
+        first = File.read("public/a/index.html")
+        relations_cached_build
+        File.read("public/a/index.html").should_not eq(first)
+      end
+    end
+  end
+
+  it "records a clock read for each current_* variable a template prints" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "(c) {{ current_year }}")
+        FileUtils.mkdir_p("content")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nA")
+        relations_cached_build
+        keys = JSON.parse(File.read(".hwaro_cache.json"))["metadata"]["render_input_keys"].as_a.map(&.as_s)
+        keys.should contain("clock:%Y")
+        keys.should_not contain("clock:%Y-%m-%d")
+      end
+    end
+  end
+
+  it "keeps a site that never prints the clock free of clock reads" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        FileUtils.mkdir_p("content")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nA")
+        relations_cached_build
+        File.write("public/a/index.html", "SENTINEL")
+        relations_cached_build
+        File.read("public/a/index.html").should eq("SENTINEL")
+      end
+    end
+  end
+end

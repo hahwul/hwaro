@@ -108,6 +108,12 @@ module Hwaro::Core::Build::Phases::Render
   RELATION_ANCESTOR_MARKERS    = ["ancestors", "jsonld"]
   RELATION_BACKLINKS_MARKER    = "backlinks"
 
+  # A regular page's `section` object (title, description, assets, the
+  # section's page list in its `sort_by`/`reverse` order) and the flat
+  # `section_title`/`section_description`, all read off the PARENT section's
+  # `_index.md`. `section[...]` is the subscript spelling.
+  RELATION_SECTION_META_RE = /\bsection\.(?:title|description|assets|pages|pages_count|list)\b|\bsection_(?:title|description)\b|\bsection\s*\[/
+
   # `@/path.md` internal links in raw content (Markdown destination, raw
   # `href="@/…"`, reference definition). Stops where the resolver's own
   # match stops (`#`, `?`, a quote) and at Markdown/HTML delimiters. An
@@ -134,7 +140,10 @@ module Hwaro::Core::Build::Phases::Render
     fields : Builder::ListingPageFields,
     # Folded only under `[content] backlinks` (see page_relations_hash),
     # so it stays out of `reads_any?`.
-    backlinks : Bool = false do
+    backlinks : Bool = false,
+    # Folded only for a regular page with a parent section (see
+    # page_relations_hash), so it stays out of `reads_any?` too.
+    section_meta : Bool = false do
     def reads_any? : Bool
       neighbors || series || related || translations || ancestors || !get_page_targets.empty?
     end
@@ -186,6 +195,7 @@ module Hwaro::Core::Build::Phases::Render
         get_page_targets: get_page_targets(blob),
         fields: relation_page_fields(blob),
         backlinks: blob.includes?(RELATION_BACKLINKS_MARKER),
+        section_meta: blob.matches?(RELATION_SECTION_META_RE),
       ),
     )
     @page_template_scan_mutex.synchronize do
@@ -476,6 +486,10 @@ module Hwaro::Core::Build::Phases::Render
     # `draft` does.
     fp_value(digest, p.render ? "1" : "0")
     fp_value(digest, p.toc ? "1" : "0")
+    # Exposed to listings (`p.in_sitemap`, `p.in_search_index`) and
+    # hand-edited in front matter, so flipping one must refresh them.
+    fp_value(digest, p.in_sitemap ? "1" : "0")
+    fp_value(digest, p.in_search_index ? "1" : "0")
     fp_value(digest, p.section)
     fp_value(digest, p.image || "")
     fp_value(digest, p.series || "")
@@ -769,13 +783,24 @@ module Hwaro::Core::Build::Phases::Render
     latest = page.version.try { |v| v.latest ? nil : page.version_links.find(&.latest) }
     backlinks = rel.backlinks && site.config.backlinks
     wikilinks = wikilink_resolutions(page)
-    return "" if !rel.reads_any? && links.empty? && !backlinks && wikilinks.empty? && latest.nil?
+    parent = rel.section_meta && !page.is_a?(Models::Section) && !page.section.empty? ? site.section_for(page.section, page.language) : nil
+    return "" if !rel.reads_any? && links.empty? && !backlinks && wikilinks.empty? && latest.nil? && parent.nil?
 
     digest = Digest::MD5.new
     if latest
       fp_value(digest, "v")
       fp_value(digest, latest.url)
       fp_value(digest, latest.exists ? "1" : "0")
+    end
+    if parent
+      # Metadata only: the section's body must not re-render its children.
+      fp_value(digest, "m")
+      fp_value(digest, parent.title)
+      fp_value(digest, parent.description || "")
+      fp_value(digest, parent.sort_by || "-")
+      reverse = parent.reverse
+      fp_value(digest, reverse.nil? ? "-" : (reverse ? "1" : "0"))
+      fp_list(digest, parent.assets)
     end
     if rel.neighbors
       fp_value(digest, "n")
