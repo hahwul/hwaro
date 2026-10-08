@@ -112,6 +112,25 @@ describe Hwaro::Core::Build::Phases::ReadContent do
       end
     end
 
+    it "discovers pages and sections in byte order, whatever the directory order" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          # APFS returns these in hash order (b z m q a ...), ext4 in another.
+          %w[b z m q a x c y k].each do |name|
+            FileUtils.mkdir_p("content/#{name}")
+            File.write("content/#{name}.md", "---\ntitle: #{name}\n---\nbody")
+            File.write("content/#{name}/_index.md", "---\ntitle: #{name}\n---\n")
+          end
+
+          ctx = make_ctx(Hwaro::Models::Config.new)
+          Hwaro::Core::Build::Builder.new.test_collect_content_paths(ctx)
+
+          ctx.pages.map(&.path).should eq(ctx.pages.map(&.path).sort)
+          ctx.sections.map(&.path).should eq(ctx.sections.map(&.path).sort)
+        end
+      end
+    end
+
     it "marks index pages with is_index" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

@@ -32,7 +32,11 @@ module Hwaro::Core::Build::Phases::ReadContent
     @content_index_dirs = Set(String).new
 
     # Single pass over content directory for both markdown and raw files
-    Dir.glob("content/**/*") do |file_path|
+    # Sorted (byte-wise): glob order is the filesystem's, and everything that
+    # follows the page order — related-post ties, sitemap.xml, search.json,
+    # `site.pages` loops, which of two colliding pages wins — would otherwise
+    # differ between an APFS laptop and an ext4 CI runner.
+    Dir.glob("content/**/*").sort!.each do |file_path|
       # lstat, not `File.directory?`: that follows symlinks, and following a
       # symlink cycle (`ln -s loop content/loop`) fails with ELOOP, which
       # `File.info?` raises as `File::Error` — aborting the whole build with a
