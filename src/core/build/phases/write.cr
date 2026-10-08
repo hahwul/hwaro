@@ -111,55 +111,7 @@ module Hwaro::Core::Build::Phases::Write
     count = 0
 
     raw_files.each do |raw_file|
-      output_path = File.join(output_dir, raw_file.relative_path)
-
-      # Validate output path stays within output directory
-      unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
-        Logger.warn "Skipping raw file outside output directory: #{raw_file.relative_path}"
-        next
-      end
-
-      # The copy below (and File.read) follows symlinks, so a raw-file symlink
-      # whose target escapes the project would publish a file from outside
-      # the site. Skip it — mirrors the bundle-asset guard in process_assets
-      # and the static copy guard. In-repo symlinks resolve within and pass.
-      if File.symlink?(raw_file.source_path) && !Hwaro::Utils::PathUtils.resolves_within?(raw_file.source_path, Dir.current)
-        Logger.warn "Skipping raw file symlink pointing outside the project: #{raw_file.source_path}"
-        next
-      end
-
-      ext = File.extname(raw_file.source_path).downcase
-
-      Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
-
-      # JSON and XML are minified; HTML is rewritten unchanged.
-      if minify && ext.in?(".json", ".xml", ".html", ".htm")
-        content = File.read(raw_file.source_path)
-        error = nil
-        begin
-          content = JSON.parse(content).to_json if ext == ".json"
-          content = Content::Processors::Xml.minify(content) if ext == ".xml"
-        rescue ex : JSON::ParseException
-          error = "JSON parsing failed: #{ex.message}"
-        rescue ex
-          error = "#{ext == ".json" ? "JSON" : "XML"} processing failed: #{ex.message}"
-        end
-        if error
-          Logger.warn "Failed to process #{raw_file.relative_path}: #{error}"
-          Hwaro::Utils::FileSafe.atomic_copy(raw_file.source_path, output_path)
-        else
-          Hwaro::Utils::FileSafe.atomic_write(output_path, content)
-        end
-      else
-        # Copy as-is (binary-safe) when not minifying or no processor exists.
-        #
-        # Atomic (temp file + rename) for the same reason the processed branch
-        # above uses `atomic_write`: `hwaro serve` rebuilds while HTTP fibers
-        # stream these very paths, and a plain `FileUtils.cp` truncates the
-        # destination and then streams, so a request landing mid-copy is
-        # answered with a zero-length or half-written file.
-        Hwaro::Utils::FileSafe.atomic_copy(raw_file.source_path, output_path)
-      end
+      next unless output_path = publish_raw_file(raw_file.source_path, raw_file.relative_path, output_dir, minify)
 
       written << File.expand_path(output_path)
       # A raw/content file has no cache entry, so nothing else remembers that
@@ -172,6 +124,64 @@ module Hwaro::Core::Build::Phases::Write
     end
 
     count
+  end
+
+  # Publish one raw / `[content.files]` file to `output_dir/<relative_path>`,
+  # minifying JSON / XML when `minify` is on. The destination, or nil when the
+  # file was refused. Shared with serve's content-file republish so an edited
+  # file gets the bytes a full build would write.
+  def publish_raw_file(source_path : String, relative_path : String, output_dir : String, minify : Bool) : String?
+    output_path = File.join(output_dir, relative_path)
+
+    # Validate output path stays within output directory
+    unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
+      Logger.warn "Skipping raw file outside output directory: #{relative_path}"
+      return
+    end
+
+    # The copy below (and File.read) follows symlinks, so a raw-file symlink
+    # whose target escapes the project would publish a file from outside
+    # the site. Skip it — mirrors the bundle-asset guard in process_assets
+    # and the static copy guard. In-repo symlinks resolve within and pass.
+    if File.symlink?(source_path) && !Hwaro::Utils::PathUtils.resolves_within?(source_path, Dir.current)
+      Logger.warn "Skipping raw file symlink pointing outside the project: #{source_path}"
+      return
+    end
+
+    ext = File.extname(source_path).downcase
+
+    Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
+
+    # JSON and XML are minified; HTML is rewritten unchanged.
+    if minify && ext.in?(".json", ".xml", ".html", ".htm")
+      content = File.read(source_path)
+      error = nil
+      begin
+        content = JSON.parse(content).to_json if ext == ".json"
+        content = Content::Processors::Xml.minify(content) if ext == ".xml"
+      rescue ex : JSON::ParseException
+        error = "JSON parsing failed: #{ex.message}"
+      rescue ex
+        error = "#{ext == ".json" ? "JSON" : "XML"} processing failed: #{ex.message}"
+      end
+      if error
+        Logger.warn "Failed to process #{relative_path}: #{error}"
+        Hwaro::Utils::FileSafe.atomic_copy(source_path, output_path)
+      else
+        Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+      end
+    else
+      # Copy as-is (binary-safe) when not minifying or no processor exists.
+      #
+      # Atomic (temp file + rename) for the same reason the processed branch
+      # above uses `atomic_write`: `hwaro serve` rebuilds while HTTP fibers
+      # stream these very paths, and a plain `FileUtils.cp` truncates the
+      # destination and then streams, so a request landing mid-copy is
+      # answered with a zero-length or half-written file.
+      Hwaro::Utils::FileSafe.atomic_copy(source_path, output_path)
+    end
+
+    output_path
   end
 
   # `{source, destination}` of each of `page`'s bundle assets. Nil when the

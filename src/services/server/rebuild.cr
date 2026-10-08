@@ -270,7 +270,7 @@ module Hwaro
       # source changed) failed; true otherwise.
       private def copy_content_files(changeset : ChangeSet, build_options : Config::Options::BuildOptions) : Bool
         output_dir = sanitize_output_dir(build_options.output_dir)
-        @builder.copy_changed_content_files(changeset.modified_content_files, output_dir, build_options.verbose)
+        @builder.copy_changed_content_files(changeset.modified_content_files, output_dir, build_options.verbose, build_options.minify)
         # Mirror copy_static: modified image bytes under content/ (published
         # via [content.files] or as page-bundle assets) must refresh their
         # resized variants/LQIP too (A12).

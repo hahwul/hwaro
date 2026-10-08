@@ -2149,6 +2149,98 @@ describe "Builder incremental methods" do
         end
       end
     end
+
+    # Bundle assets publish under the page URL regardless of [content.files]
+    # (Write#process_assets); the incremental lane used to cover only the
+    # content.files raw copy, so edits stayed stale.
+    it "republishes an edited page-bundle asset when content.files is disabled" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content", "posts", "foo"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+        File.write(File.join(dir, "config.toml"), "title = \"Test\"\nbase_url = \"http://localhost\"\n")
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "posts", "foo", "index.md"), "+++\ntitle = \"Foo\"\n+++\nx\n")
+        File.write(File.join(dir, "content", "posts", "foo", "pic.png"), "AAAA")
+        File.write(File.join(dir, "content", "posts", "foo", "notes.txt"), "notes")
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new)
+
+          published = File.join(dir, "public", "posts", "foo", "pic.png")
+          File.read(published).should eq("AAAA")
+
+          File.write(File.join(dir, "content", "posts", "foo", "pic.png"), "BBBB")
+          builder.copy_changed_content_files(["content/posts/foo/pic.png"], File.join(dir, "public"), false)
+
+          File.read(published).should eq("BBBB")
+        end
+      end
+    end
+
+    it "republishes an edited bundle asset at the page URL when a slug moves the page" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content", "posts", "foo"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+        File.write(File.join(dir, "config.toml"), <<-TOML
+          title = "Test"
+          base_url = "http://localhost"
+
+          [content.files]
+          allow_extensions = ["png"]
+          TOML
+        )
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "posts", "foo", "index.md"), "+++\ntitle = \"Foo\"\nslug = \"bar\"\n+++\nx\n")
+        File.write(File.join(dir, "content", "posts", "foo", "pic.png"), "AAAA")
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new)
+
+          at_url = File.join(dir, "public", "posts", "bar", "pic.png")
+          File.read(at_url).should eq("AAAA")
+
+          File.write(File.join(dir, "content", "posts", "foo", "pic.png"), "BBBB")
+          builder.copy_changed_content_files(["content/posts/foo/pic.png"], File.join(dir, "public"), false)
+
+          File.read(at_url).should eq("BBBB")
+        end
+      end
+    end
+
+    it "minifies an edited content.files JSON like the full build when minify is on" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content", "posts", "foo"))
+        FileUtils.mkdir_p(File.join(dir, "templates"))
+        File.write(File.join(dir, "config.toml"), <<-TOML
+          title = "Test"
+          base_url = "http://localhost"
+
+          [content.files]
+          allow_extensions = ["json"]
+          TOML
+        )
+        File.write(File.join(dir, "templates", "page.html"), "{{ content }}")
+        File.write(File.join(dir, "content", "posts", "foo", "data.json"), %({"a":1}))
+
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new(minify: true))
+
+          published = File.join(dir, "public", "posts", "foo", "data.json")
+          File.read(published).should eq(%({"a":1}))
+
+          File.write(File.join(dir, "content", "posts", "foo", "data.json"), "{\n  \"a\": 2\n}")
+          builder.copy_changed_content_files(["content/posts/foo/data.json"], File.join(dir, "public"), false, minify: true)
+
+          File.read(published).should eq(%({"a":2}))
+        end
+      end
+    end
   end
 
   describe "#run_incremental" do
