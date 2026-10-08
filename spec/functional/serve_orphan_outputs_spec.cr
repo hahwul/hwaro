@@ -339,4 +339,42 @@ describe "serve orphaned outputs" do
       end
     end
   end
+
+  # A failed build never reaches Finalize, and the next build's "previous"
+  # baselines were taken from its half-built state, so a source deleted while
+  # the site was broken stayed published after the recovery build.
+  it "prunes the output of sources deleted while a build was failing" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        FileUtils.mkdir_p("static")
+        File.write("static/f.zip", "zip")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        server.orphan_builder.run(options).should be_true
+        File.exists?("public/posts/gone/index.html").should be_true
+        File.exists?("public/f.zip").should be_true
+
+        good_template = File.read("templates/page.html")
+        File.write("templates/page.html", "{% if %}")
+        File.delete("content/posts/gone.md")
+        File.delete("static/f.zip")
+        failed = begin
+          with_captured_log { server.orphan_builder.run(options) }
+          false
+        rescue
+          true
+        end
+        # Whether it raised or returned false, it must not have recovered.
+        File.exists?("public/posts/gone/index.html").should be_true if failed
+
+        File.write("templates/page.html", good_template)
+        server.orphan_builder.run(options).should be_true
+
+        Dir.exists?("public/posts/gone").should be_false
+        File.exists?("public/f.zip").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+  end
 end
