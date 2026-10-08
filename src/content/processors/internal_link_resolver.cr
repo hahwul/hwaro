@@ -218,17 +218,23 @@ module Hwaro
         # (`mailto:`/`tel:`/`data:`), and pure in-page anchors (`#x`) are left
         # untouched. A no-op when `page_url` is not an absolute URL (no host
         # to resolve against — e.g. an empty base_url deploy).
-        def absolutize_links(html : String, page_url : String) : String
+        #
+        # `document_relative_only` is for a page that is moved verbatim to a
+        # different directory (the AMP mirror under `/amp/…`): only the values
+        # that resolve against the document's own location ("cover.png",
+        # "../b2/") are rewritten, root-relative ones keep their bytes, and a
+        # host-less `page_url` ("/posts/b1/") yields root-relative results.
+        def absolutize_links(html : String, page_url : String, document_relative_only : Bool = false) : String
           return html if page_url.empty?
           return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"")
 
           base = URI.parse(page_url)
-          return html if base.host.nil?
+          return html if base.host.nil? && !document_relative_only
 
           html.gsub(ANY_LINK_ATTR_REGEX) do |match|
             attr = $1
             value = $2
-            if value.empty? || absolute_or_anchor?(value)
+            if value.empty? || absolute_or_anchor?(value) || (document_relative_only && value.starts_with?('/'))
               match
             else
               begin

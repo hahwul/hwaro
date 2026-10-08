@@ -43,6 +43,7 @@ The AMP converter automatically applies these transformations:
 | `style="..."` attributes | Removed |
 | `onclick` handlers | Removed |
 | `loading="lazy"` attributes | Removed (AMP elements do their own lazy loading and reject the attribute) |
+| Relative `src` / `href` (`cover.png`, `../other/`) | Resolved against the original page's URL, because the AMP copy lives one directory deeper |
 
 Additionally injected:
 - AMP boilerplate CSS
