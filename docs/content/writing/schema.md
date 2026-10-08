@@ -74,7 +74,7 @@ Validation runs after front matter and [cascade](/writing/sections/#cascade) are
 
 When a field is missing, its `default` is set on the page before rendering, so templates see it: `{{ page.extra.status }}` for an extra key, or the typed property (`{{ page.description }}`) for a known field. Defaults can fill extra keys and these known fields: `description`, `image`, `template`, `render`, `toc`, `insert_anchor_links`, `in_sitemap`, `in_search_index`, `weight`, `series`, `series_weight`, `tags`, `authors`, `updated`. Fields such as `slug`, `path` and `date` are resolved while the page is parsed, so a default on them is a config error. `draft` can't take a default either: what publishes is decided by front matter and [`[cascade]`](/writing/sections/#cascade), which `doctor` and `tool list` read too.
 
-A default must satisfy its own field (type, enum, bounds). A field with a default is never reported missing.
+A default must satisfy its own field (type, enum, bounds). A field with a default is never reported missing. A taxonomy field is found wherever the page gives its terms: a top-level key or the Zola-style `[taxonomies]` table (the page's own or a cascaded one).
 
 ## Errors
 

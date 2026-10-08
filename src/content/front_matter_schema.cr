@@ -67,13 +67,14 @@ module Hwaro
                     top.fetch(field.name) { cascade.fetch(field.name) { taxonomy_terms(top, cascade, field.name) } }
                   else
                     key = field.extra_key || field.name
-                    own_extra.fetch(key) { extra.fetch(key) { cascade_extra[key]? } }
+                    own_extra.fetch(key) { extra.fetch(key) { cascade_extra.fetch(key) { field.extra_key ? nil : taxonomy_terms(top, cascade, key) } } }
                   end
           if value.nil?
-            if default = field.default
+            # `nil`, not truthiness: a `false` default is a value too.
+            if (default = field.default).nil?
+              violations << Violation.new(file, nil, field.name, "required but missing") if field.required
+            else
               defaults[field.name] = default
-            elsif field.required
-              violations << Violation.new(file, nil, field.name, "required but missing")
             end
           elsif problem = field.problem(value)
             # extra.<key> looks in [extra] first; a bare unknown name at the
@@ -152,10 +153,10 @@ module Hwaro
         {({} of String => Models::SchemaValue), ({} of String => Models::SchemaValue)}
       end
 
-      # `tags`/`authors` may also be given as a `[taxonomies]` entry, the
-      # page's own or a cascaded `[cascade.taxonomies]` one.
+      # A taxonomy's terms may also be given as a `[taxonomies]` entry (the
+      # parser accepts any taxonomy name there), the page's own or a cascaded
+      # `[cascade.taxonomies]` one.
       private def taxonomy_terms(top : Hash(String, Models::SchemaValue), cascade : Hash(String, Models::ExtraValue), name : String) : Models::SchemaValue?
-        return unless name.in?("tags", "authors")
         own = top["taxonomies"]?.as?(Hash(String, Models::ExtraValue))
         cascaded = cascade["taxonomies"]?.as?(Hash(String, Models::ExtraValue))
         own.try(&.[name]?) || cascaded.try(&.[name]?)
