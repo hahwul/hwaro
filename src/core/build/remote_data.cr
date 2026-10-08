@@ -109,7 +109,7 @@ module Hwaro
 
           path = begin
             URI.parse(url).path
-          rescue URI::Error
+          rescue URI::Error | OverflowError
             url
           end
           case File.extname(path).downcase

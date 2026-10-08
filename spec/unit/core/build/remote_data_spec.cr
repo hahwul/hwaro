@@ -191,6 +191,15 @@ describe "[[data.remote]] config parsing" do
     (err.message || "").should contain("http")
   end
 
+  it "rejects a url whose port overflows Int32 as a config error" do
+    err = expect_config_error(<<-TOML)
+      [[data.remote]]
+      key = "team"
+      url = "http://example.com:99999999999999999999/t.json"
+      TOML
+    (err.message || "").should contain("invalid url")
+  end
+
   it "rejects an unknown format value" do
     err = expect_config_error(<<-TOML)
       [[data.remote]]
