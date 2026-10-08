@@ -171,6 +171,33 @@ describe "include_md" do
   end
 end
 
+describe "include_code option values" do
+  it "renders a title that holds backticks as a normal code block" do
+    in_include_project({
+      "snippets/a.txt" => "a\n\tb\n",
+      "content/p.md"   => page(%({{ include_code(path="snippets/a.txt", title="`main.rs`") }}\n\n{{ include_code(path="snippets/a.txt") }})),
+    }) do
+      include_build(highlight: true).should be_true
+      html = File.read("public/p/index.html")
+      html.should contain(%(<div class="code-filename">main.rs</div>))
+      html.should_not contain("```")
+    end
+  end
+
+  it "highlights capitalised build files by name" do
+    in_include_project({
+      "src/Makefile" => "all:\n\ttrue\n",
+      "src/Gemfile"  => "gem 'a'\n",
+      "content/p.md" => page(%({{ include_code(path="src/Makefile") }}\n\n{{ include_code(path="src/Gemfile") }})),
+    }) do
+      include_build(highlight: true).should be_true
+      html = File.read("public/p/index.html")
+      html.should contain("language-makefile")
+      html.should contain("language-ruby")
+    end
+  end
+end
+
 describe "transclusion" do
   note = "+++\ntitle = \"Note\"\n+++\nIntro.\n\n## Setup\n\nsetup body\n\n### Deep\n\ndeep\n\n## Other\n\nother\n"
 
@@ -181,6 +208,33 @@ describe "transclusion" do
       html.should contain(%(<div class="transclusion" data-source="/note/">\n<p>Intro.</p>))
       html.should contain(%(<blockquote>\n<div class="transclusion" data-source="/note/">\n<h2 id="setup-1">Setup</h2>\n<p>setup body</p>\n<h3 id="deep-1">Deep</h3>\n<p>deep</p>\n</div>\n</blockquote>))
       html.should contain(%(<span class="wikilink wikilink-missing">missing</span>))
+    end
+  end
+
+  it "transcludes a note whose name holds a dot, and leaves an attachment embed to the wikilink rewrite" do
+    in_include_project({
+      "content/notes/v1.2 plan.md"  => page("VERSION BODY"),
+      "content/notes/2026.10.05.md" => page("DATED BODY"),
+      "content/notes/t.md"          => page("![[v1.2 plan]]\n\n![[2026.10.05]]\n\n![[doc.pdf]]"),
+      "static/doc.pdf"              => "PDF",
+    }, wikilinks: true) do
+      include_build.should be_true
+      html = File.read("public/notes/t/index.html")
+      html.should contain(%(<div class="transclusion" data-source="/notes/v1.2 plan/">\n<p>VERSION BODY</p>))
+      html.should contain(%(<div class="transclusion" data-source="/notes/2026.10.05/">\n<p>DATED BODY</p>))
+      html.should contain(%(<a href="/doc.pdf">doc.pdf</a>))
+    end
+  end
+
+  it "cuts a section out by setext headings and by the text a heading renders" do
+    note = "+++\ntitle = \"N\"\n+++\n## **Bold** Title\nBOLDBODY\n\nSetext Head\n-----------\nSETEXTBODY\n\n## See [Foo](https://x.y) bar\nLINKBODY\n"
+    in_include_project({"content/n.md" => note, "content/p.md" => page("![[n#Bold Title]]\n\n![[n#Setext Head]]\n\n![[n#See Foo bar]]")}, wikilinks: true) do
+      log = with_captured_log { include_build.should be_true }
+      log.should_not contain("has no heading")
+      html = File.read("public/p/index.html")
+      html.should contain(%(<p>BOLDBODY</p>\n</div>))
+      html.should contain(%(<h2 id="setext-head">Setext Head</h2>\n<p>SETEXTBODY</p>\n</div>))
+      html.should contain(%(<p>LINKBODY</p>\n</div>))
     end
   end
 

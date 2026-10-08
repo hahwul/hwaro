@@ -70,6 +70,17 @@ describe Hwaro::Content::Processors::Includes do
     Includes.language_for("notes.zzz-unknown").should eq("")
   end
 
+  it ".language_for matches capitalised file names against the lowercase table" do
+    Includes.language_for("src/Makefile").should eq("makefile")
+    Includes.language_for("Dockerfile").should eq("docker")
+    Includes.language_for("Dockerfile.dev").should eq("docker")
+    Includes.language_for("Gemfile").should eq("ruby")
+    Includes.language_for("Rakefile").should eq("ruby")
+    # The whole-name entry beats the generic `*.txt` one.
+    Includes.language_for("CMakeLists.txt").should eq("cmake")
+    Includes.language_for("notes.txt").should eq("plaintext")
+  end
+
   describe ".fenced" do
     it "writes the language and the fence options" do
       Includes.fenced("x\n", "toml", {"title" => "config.toml", "hl_lines" => "3", "lang" => "ignored"})
@@ -78,6 +89,10 @@ describe Hwaro::Content::Processors::Includes do
 
     it "outgrows any backtick run in the code and drops what the option grammar cannot hold" do
       Includes.fenced("a ```` b", "", {"title" => %(a"{b}")}).should eq(%(`````{title="ab"}\na ```` b\n`````\n))
+    end
+
+    it "drops backticks from option values, which a backtick fence's info string cannot hold" do
+      Includes.fenced("x\n", "rust", {"title" => "`main.rs`"}).should eq(%(```rust {title="main.rs"}\nx\n```\n))
     end
   end
 
@@ -91,6 +106,27 @@ describe Hwaro::Content::Processors::Includes do
 
     it "is nil for a heading the page does not have" do
       Includes.heading_section(md, "not a heading").should be_nil
+    end
+
+    it "reads setext headings as sections and as terminators" do
+      note = "## **Bold** Title\nBOLD\n\nSetext Head\n-----------\nSETEXT\n\nTop\n===\nTOP\n"
+      Includes.heading_section(note, "Bold Title").should eq("## **Bold** Title\nBOLD\n\n")
+      Includes.heading_section(note, "Setext Head").should eq("Setext Head\n-----------\nSETEXT\n\n")
+      Includes.heading_section(note, "Top").should eq("Top\n===\nTOP\n")
+      # Several paragraph lines before the underline are one heading.
+      Includes.heading_section("a\nb\n---\nx\n", "a b").should eq("a\nb\n---\nx\n")
+    end
+
+    it "does not take a thematic break after a list item, quote or blank line for a setext underline" do
+      note = "## S\n- item\n---\nafter\n\n> quote\n---\nmore\n\ntext\n\n---\nlast\n"
+      Includes.heading_section(note, "S").should eq(note)
+    end
+
+    it "matches a heading by the text it renders" do
+      note = "## See [Foo](https://x.y) bar\nLINK\n## A ![pic](p.png) and [ref][r] <b>b</b>\nIMG\n## Tom &amp; Jerry\nAMP\n\n[r]: /r\n"
+      Includes.heading_section(note, "See Foo bar").should eq("## See [Foo](https://x.y) bar\nLINK\n")
+      Includes.heading_section(note, "A pic and ref b").should eq("## A ![pic](p.png) and [ref][r] <b>b</b>\nIMG\n")
+      Includes.heading_section(note, "Tom & Jerry").should eq("## Tom &amp; Jerry\nAMP\n\n[r]: /r\n")
     end
   end
 

@@ -7,6 +7,7 @@
 # render hooks, shortcodes, the TOC and heading ids — as if it were written
 # at that spot.
 
+require "html"
 require "./fence_tracker"
 require "./syntax_highlighter"
 require "../../utils/frontmatter_scanner"
@@ -49,6 +50,8 @@ module Hwaro
         # (or code inside a fence) in a Markdown file.
         MD_REGION_RE = /\A[ \t]*<!--[ \t]*#(end)?region\b[ \t]*([\w.]+(?:-[\w.]+)*)?[ \t]*-->[ \t]*\r?\n?\z/
         LINES_RE     = /\A[ \t]*(\d+)(?:[ \t]*-[ \t]*(\d+))?[ \t]*\z/
+        SETEXT_RE    = /\A {0,3}(=+|-+)[ \t]*\r?\n?\z/
+        THEMATIC_RE  = /\A {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})\r?\n?\z/
         ATX_RE       = /\A {0,3}(\#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*\r?\n?\z/
 
         # The fence-option keys `include_code` passes through, in the order
@@ -173,11 +176,17 @@ module Hwaro
           a[0, n]
         end
 
-        # The highlighter's lexer for `path`: its `*.ext` entry in Tartrazine's
-        # filename table, else the first glob matching the base name
-        # (`Dockerfile`, `Makefile`). "" when nothing matches.
+        # The highlighter's lexer for `path`: the whole-name entry in
+        # Tartrazine's filename table (`Makefile`, `CMakeLists.txt`), else its
+        # `*.ext` entry, else the first glob matching the base name
+        # (`Dockerfile.dev`). The table's names are lowercase, so the base
+        # name is matched lowercased. "" when nothing matches.
         def language_for(path : String) : String
           base = File.basename(path)
+          low = base.downcase
+          if names = Tartrazine::LEXERS_BY_FILENAME[low]?
+            return names.first
+          end
           ext = File.extname(base)
           unless ext.empty?
             if names = Tartrazine::LEXERS_BY_FILENAME["*#{ext}"]? || Tartrazine::LEXERS_BY_FILENAME["*#{ext.downcase}"]?
@@ -185,7 +194,7 @@ module Hwaro
             end
           end
           Tartrazine::LEXERS_BY_FILENAME.each do |glob, lexers|
-            return lexers.first if File.match?(glob, base)
+            return lexers.first if File.match?(glob, low)
           end
           ""
         end
@@ -200,34 +209,67 @@ module Hwaro
           fence = "`" * Math.max(3, longest + 1)
           info = lang.gsub(/[\s`{}]/, "")
           pairs = FENCE_OPTION_KEYS.compact_map do |key|
-            value = options[key]?.try(&.gsub(/["{}\r\n]/, ""))
+            value = options[key]?.try(&.gsub(/["{}`\r\n]/, ""))
             %(#{key}="#{value}") if value && !value.empty?
           end
           info += "#{info.empty? ? "" : " "}{#{pairs.join(", ")}}" unless pairs.empty?
           "#{fence}#{info}\n#{code}#{fence}\n"
         end
 
-        # The section of `markdown` under the ATX heading whose slug matches
-        # `heading`'s, through the line before the next heading of the same or
-        # a higher level. Headings inside code fences do not count.
+        # The section of `markdown` under the heading (ATX or setext) whose
+        # slug matches `heading`'s, through the line before the next heading
+        # of the same or a higher level. A heading is matched by the text it
+        # renders (link and image syntax, tags and entities reduced to what
+        # the reader sees), the id the build gives it. Headings inside code
+        # fences do not count.
         def heading_section(markdown : String, heading : String) : String?
           want = Utils::TextUtils.slugify(heading)
+          lines = markdown.lines(chomp: false)
+          heads = section_headings(lines)
+          found = heads.index { |_, _, text| Utils::TextUtils.slugify(text) == want }
+          return unless found
+          first, level, _ = heads[found]
+          stop = heads[(found + 1)..].find { |_, other, _| other <= level }.try(&.[0]) || lines.size
+          lines[first...stop].join
+        end
+
+        # `{first line, level, visible text}` of every heading outside code.
+        private def section_headings(lines : Array(String)) : Array({Int32, Int32, String})
           tracker = FenceTracker.new
-          level = nil
-          String.build do |io|
-            markdown.each_line(chomp: false) do |line|
-              fenced = tracker.fence_line?(line)
-              m = fenced ? nil : ATX_RE.match(line)
-              if m && level && m[1].size <= level
-                return io.to_s
-              elsif m && level.nil?
-                text = (m[2]? || "").sub(/[ \t]*\{[^{}]*\}\z/, "")
-                level = m[1].size if Utils::TextUtils.slugify(text) == want
-              end
-              io << line if level
+          heads = [] of {Int32, Int32, String}
+          para = nil.as(Int32?) # first line of the paragraph being read
+          skip = false          # inside a list item, quote or HTML block: no setext heading
+          lines.each_with_index do |line, i|
+            if tracker.fence_line?(line)
+              para, skip = nil, false
+            elsif m = ATX_RE.match(line)
+              text = (m[2]? || "").sub(/[ \t]*\{[^{}]*\}\z/, "")
+              heads << {i, m[1].size, visible_text(text)}
+              para, skip = nil, false
+            elsif line.blank?
+              para, skip = nil, false
+            elsif (start = para) && (u = SETEXT_RE.match(line))
+              text = lines[start...i].join(' ', &.strip)
+              heads << {start, u[1].starts_with?('=') ? 1 : 2, visible_text(text)}
+              para = nil
+            elsif tracker.html_block_line? || tracker.list_item_line? || line.lstrip(' ').starts_with?('>')
+              para, skip = nil, true
+            elsif THEMATIC_RE.matches?(line)
+              para = nil
+            elsif !skip
+              para ||= i
             end
-            return unless level
           end
+          heads
+        end
+
+        # A heading's source as the reader sees it: images and links reduced
+        # to their text, tags dropped, entities decoded.
+        private def visible_text(source : String) : String
+          text = source.gsub(/!\[([^\]]*)\]\([^)]*\)/, "\\1")
+            .gsub(/\[([^\]]+)\](?:\([^)]*\)|\[[^\]]*\])/, "\\1")
+            .gsub(/<(?:([A-Za-z][A-Za-z0-9+.-]*:[^\s<>]*)|\/?[A-Za-z][^<>]*)>/) { $1? || "" }
+          HTML.unescape(text)
         end
       end
     end

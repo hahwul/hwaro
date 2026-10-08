@@ -487,7 +487,9 @@ module Hwaro::Core::Build::Phases::ParseContent
   private def transclusion(inner : String, prefix : String, page : Models::Page, site : Models::Site, chain : Array(String)) : String?
     return unless index = @wikilink_index
     link = Content::Processors::Wikilinks.parse(inner, true)
-    return if link.nil? || link.target.empty? || link.image? || link.file?
+    # Not `link.file?`: a note named `v1.2 plan` or `2026.10.05` has an
+    # "extension" too, and an attachment (`doc.pdf`) resolves to no page here.
+    return if link.nil? || link.target.empty? || link.image?
     return unless target = index.resolve(link.target, page)
     relative = File.join("content", target.path)
     record_include_source(relative)
