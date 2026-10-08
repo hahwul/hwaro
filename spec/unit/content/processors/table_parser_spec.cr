@@ -860,8 +860,8 @@ describe Hwaro::Content::Processors::TableParser do
       ].each do |md|
         html, _ = Hwaro::Processor::Markdown.render(md)
         (html.scan(/<ol|<ul/).size).should eq(1)
-        html.index("</table>").not_nil!.should be < html.index("More text.").not_nil!
-        html.index("More text.").not_nil!.should be < html.index("</li>").not_nil!
+        html.index!("</table>").should be < html.index!("More text.")
+        html.index!("More text.").should be < html.index!("</li>")
       end
     end
 

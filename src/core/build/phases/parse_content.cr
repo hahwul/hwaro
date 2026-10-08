@@ -238,7 +238,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     had || false # nil when the raise preceded the assignment above
   end
 
-  SUMMARY_LINK_DEFINITION_RE = /\A {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*\S/
+  SUMMARY_LINK_DEFINITION_RE     = /\A {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*\S/
   SUMMARY_FOOTNOTE_DEFINITION_RE = /\A {0,3}\[\^([^\]\s]+)\]:/
   SUMMARY_FOOTNOTE_REF_RE        = /\[\^([^\]\s]+)\](?!:)/
 
@@ -252,7 +252,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     rest_start = raw.byte_index(chunk)
     rest = rest_start ? raw.byte_slice(rest_start + chunk.bytesize) : ""
     definitions = [] of String
-    unless rest.empty? || !rest.includes?("]:")
+    if !rest.empty? && rest.includes?("]:")
       tracker = Content::Processors::FenceTracker.new
       rest.each_line(chomp: true) do |line|
         next if tracker.fence_line?(line)
@@ -274,7 +274,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     String.build do |io|
       chunk.each_line(chomp: false) do |line|
         fenced = tracker.fence_line?(line)
-        unless fenced || !line.includes?("[^")
+        if !fenced && line.includes?("[^")
           # Refs inside inline code spans are literal text: blank the spans
           # out (byte offsets preserved) before looking.
           probe = line.includes?('`') ? line.gsub(Content::Processors::InlineMarkdown::INLINE_CODE_SPAN_RE) { |span| " " * span.bytesize } : line
@@ -286,9 +286,9 @@ module Hwaro::Core::Build::Phases::ParseContent
             pos = match.byte_end(0)
           end
           io.write bytes[pos, bytes.size - pos]
-          next
+        else
+          io << line
         end
-        io << line
       end
     end
   end

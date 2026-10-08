@@ -70,7 +70,7 @@ describe Hwaro::Content::Processors::InlineMarkdown do
     it "honours backslash escapes of ASCII punctuation" do
       render.call("\\*not em\\*").should eq "*not em*"
       render.call("snake\\_case\\_name and \\[x\\](y)").should eq "snake_case_name and [x](y)"
-      render.call("[a](/u\\)v)").should eq %q[<a href="/u)v">a</a>]
+      render.call("[a](/u\\)v)").should eq "<a href=\"/u)v\">a</a>"
     end
 
     it "leaves a backslash before other characters alone" do
@@ -79,7 +79,7 @@ describe Hwaro::Content::Processors::InlineMarkdown do
 
     it "keeps simple links and the unbalanced-paren fallback as they were" do
       render.call("[a](/x)").should eq %(<a href="/x">a</a>)
-      render.call("[a](foo(bar)").should eq %q[<a href="foo(bar">a</a>]
+      render.call("[a](foo(bar)").should eq "<a href=\"foo(bar\">a</a>"
       render.call("[a]()").should eq %(<a href="">a</a>)
     end
 
