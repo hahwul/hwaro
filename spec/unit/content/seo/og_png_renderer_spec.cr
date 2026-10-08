@@ -89,6 +89,22 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       ctx.should_not be_nil
     end
 
+    # Regression: the memo was keyed on the path string only, so a `serve`
+    # session kept the old font after the file was replaced in place.
+    it "reloads a custom font whose file was replaced at the same path" do
+      Dir.mktmpdir do |dir|
+        font = File.join(dir, "custom.ttf")
+        fonts_dir = File.expand_path("../../../../src/ext/fonts", __DIR__)
+        File.copy(File.join(fonts_dir, "SpaceGrotesk-Bold.ttf"), font)
+        first = Hwaro::Content::Seo::OgPngRenderer.load_fonts(font).not_nil!
+        Hwaro::Content::Seo::OgPngRenderer.load_fonts(font).should be(first)
+
+        File.delete(font)
+        File.copy(File.join(fonts_dir, "DejaVuSans-Bold.ttf"), font)
+        Hwaro::Content::Seo::OgPngRenderer.load_fonts(font).should_not be(first)
+      end
+    end
+
     it "falls back when custom font path does not exist" do
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts("/nonexistent/font.ttf")
       ctx.should_not be_nil
@@ -170,6 +186,58 @@ describe Hwaro::Content::Seo::OgPngRenderer do
         data[1].should eq(0x50_u8) # 'P'
         data[2].should eq(0x4E_u8) # 'N'
         data[3].should eq(0x47_u8) # 'G'
+      end
+    end
+
+    # Regression: the base-layer memo was keyed on the background image PATH
+    # only, so replacing the file in a long-lived `serve` process re-rendered
+    # the cards (the config hash flagged them) over the stale baked background.
+    it "rebuilds the base layer when the background image is replaced at the same path" do
+      Dir.mktmpdir do |dir|
+        bg = File.join(dir, "bg.png")
+        write_solid = ->(r : UInt8, b : UInt8) {
+          pixel = Pointer(UInt8).malloc(4)
+          pixel[0] = r; pixel[1] = 0_u8; pixel[2] = b; pixel[3] = 255_u8
+          LibStb.stbi_write_png(bg, 1, 1, 4, pixel.as(Void*), 4)
+          GC.free(pixel.as(Void*))
+        }
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.background_image = bg
+        config.og.auto_image.overlay_opacity = 0.0
+
+        write_solid.call(255_u8, 0_u8)
+        red = Hwaro::Content::Seo::OgPngRenderer.build_base_layer(
+          config, bg, Hwaro::Content::Seo::OgPngRenderer.load_image(bg, 1200, 630)).dup
+
+        write_solid.call(0_u8, 255_u8)
+        blue = Hwaro::Content::Seo::OgPngRenderer.build_base_layer(
+          config, bg, Hwaro::Content::Seo::OgPngRenderer.load_image(bg, 1200, 630))
+
+        blue.should_not eq(red)
+      end
+    end
+
+    # Regression: an empty page title left the headline block blank; it now
+    # renders exactly like a page titled with the site title.
+    it "falls back to the site title for an empty page title" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "Fallback Site"
+        config.og.auto_image.enabled = true
+
+        untitled = Hwaro::Models::Page.new("a.md")
+        untitled.title = ""
+        untitled.description = "same description"
+        titled = Hwaro::Models::Page.new("b.md")
+        titled.title = "Fallback Site"
+        titled.description = "same description"
+
+        ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+        a = File.join(dir, "a.png")
+        b = File.join(dir, "b.png")
+        Hwaro::Content::Seo::OgPngRenderer.render_png(untitled, config, a, font_ctx: ctx).should be_true
+        Hwaro::Content::Seo::OgPngRenderer.render_png(titled, config, b, font_ctx: ctx).should be_true
+        File.read(a).should eq(File.read(b))
       end
     end
 

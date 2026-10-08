@@ -334,7 +334,7 @@ module Hwaro
             # system font (which also covers Latin) so titles don't render as
             # blank "tofu" boxes. A user-set font_path always takes precedence.
             needs_cjk = ai.font_path.nil? &&
-                        pages.any? { |p| contains_cjk?(p.title) || contains_cjk?(p.description || "") }
+                        pages.any? { |p| contains_cjk?(display_title(p, config)) || contains_cjk?(p.description || "") }
 
             font_ctx = OgPngRenderer.load_fonts(ai.font_path, prefer_cjk: needs_cjk)
             png_available = !font_ctx.nil?
@@ -584,6 +584,13 @@ module Hwaro
           image.starts_with?("/#{ai.output_dir.strip("/")}/")
         end
 
+        # The headline of a card: the page title, or the site title for an
+        # untitled page (the blog scaffold's home page has `title = ""`) —
+        # the fallback og:title, feeds and llms.txt already apply.
+        def self.display_title(page : Models::Page, config : Models::Config) : String
+          page.title.strip.empty? ? config.title : page.title
+        end
+
         # The OG image slug for a page. Uses the URL-based slug to avoid
         # collisions between pages with the same title in different sections
         # (e.g. /posts/hello/ and /guides/hello/).
@@ -709,7 +716,8 @@ module Hwaro
           chars_per_line = Math.max((text_w / (font_size * 0.55)).to_i, 1)
           desc_chars = Math.max((text_w / (desc_size * 0.55)).to_i, 1)
 
-          title_lines = balanced_word_wrap(page.title, chars_per_line)
+          title = display_title(page, config)
+          title_lines = balanced_word_wrap(title, chars_per_line)
           # The band style draws the title inside a fixed-height color band;
           # cap the lines so a long title can't overflow the band invisibly.
           title_cap = case style
@@ -811,7 +819,7 @@ module Hwaro
             # the composition for poster-style depth. Kept on-canvas and
             # width-capped so a long first word can't run off both sides.
             if style == "hero"
-              if ghost = page.title.split(/\s+/).first?
+              if ghost = title.split(/\s+/).first?
                 unless ghost.empty?
                   ghost_size = (font_size * 2.6).to_i
                   approx_w = (ghost.size * ghost_size * 0.62).to_i
@@ -844,7 +852,7 @@ module Hwaro
               if ai.show_title && !site_name.empty?
                 svg << %(<text x="#{MARGIN_X}" y="#{MASTHEAD_EYEBROW_Y}" font-family="#{SVG_DISPLAY_FONT}" )
                 svg << %(font-size="#{MASTHEAD_EYEBROW_SIZE}" font-weight="700" letter-spacing="2" fill="#{accent}">)
-                svg << site_name.upcase
+                svg << Utils::TextUtils.escape_xml(config.title.upcase)
                 svg << %(</text>\n)
               else
                 svg << %(<rect x="#{MARGIN_X}" y="#{MASTHEAD_EYEBROW_Y - 6}" width="48" height="6" fill="#{accent}" />\n)
@@ -855,7 +863,7 @@ module Hwaro
             if style == "editorial" && ai.show_title && !site_name.empty?
               svg << %(<text x="#{MARGIN_X}" y="#{EDITORIAL_KICKER_Y}" font-family="#{SVG_DISPLAY_FONT}" )
               svg << %(font-size="#{EDITORIAL_KICKER_SIZE}" font-weight="700" letter-spacing="2" fill="#{accent}">)
-              svg << site_name.upcase
+              svg << Utils::TextUtils.escape_xml(config.title.upcase)
               svg << %(</text>\n)
             end
 

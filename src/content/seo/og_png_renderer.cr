@@ -275,7 +275,9 @@ module Hwaro
         # deferred passes, or watch rebuilds) do not re-scan the filesystem
         # or re-parse TTF data.
         def self.load_fonts(custom_font_path : String? = nil, prefer_cjk : Bool = false) : FontContext?
-          key = "#{custom_font_path}|#{prefer_cjk}"
+          # The file's content digest is part of the key: a font replaced in
+          # place must not be served from the memo for the rest of a `serve`.
+          key = "#{custom_font_path}|#{prefer_cjk}|#{OgImage.asset_digest(custom_font_path)}"
 
           if @@cached_font_key == key && (cached = @@cached_font_ctx)
             return cached
@@ -466,7 +468,8 @@ module Hwaro
           # accent_bars gates the baked-in top accent bar, so it must be part of
           # the key — otherwise a serve-session toggle reuses a stale base layer.
           key = "#{ai.background}|#{ai.accent_color}|#{ai.secondary_color}|#{ai.style}|#{ai.pattern_opacity}|" \
-                "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{ai.logo_position}|#{ai.accent_bars}"
+                "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{OgImage.asset_digest(bg_image_path)}|" \
+                "#{ai.logo_position}|#{ai.accent_bars}"
 
           if @@last_base_key == key && (cached = @@last_base_layer)
             return cached
@@ -666,7 +669,7 @@ module Hwaro
           # Sanitize every string the fonts will draw: codepoints without a
           # glyph in any chain font (emoji, mostly) would render as tofu
           # boxes otherwise.
-          title_text = drop_missing_glyphs(title_chain, page.title)
+          title_text = drop_missing_glyphs(title_chain, OgImage.display_title(page, config))
           site_title = drop_missing_glyphs(brand_chain, config.title)
 
           title_lines = balanced_wrap_chain(title_chain, font_size, title_text, wrap_width)
