@@ -1,0 +1,7 @@
+$ErrorActionPreference = 'Stop'
+$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+
+Get-ChocolateyWebFile -PackageName 'hwaro' `
+  -FileFullPath (Join-Path $toolsDir 'hwaro.exe') `
+  -Url64bit 'https://github.com/hahwul/hwaro/releases/download/v__VERSION__/hwaro-v__VERSION__-windows-x86_64.exe' `
+  -Checksum64 '__SHA256__' -ChecksumType64 'sha256'

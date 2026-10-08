@@ -114,6 +114,7 @@
 - The sitemap, feed, llms and search files are now recorded in the `--cache` metadata. Rolling back to an older dev binary with the same version number after a `--cache` build can therefore drop those files for one build; they regenerate on the next.
 
 ### Added
+- Windows: the release ships a static `hwaro-<tag>-windows-x86_64.exe`, and each release is published to Chocolatey (`choco install hwaro`).
 - Shortcodes: add optional `start` parameter (timestamp in seconds) to built-in `youtube` shortcode (#629).
 
 
