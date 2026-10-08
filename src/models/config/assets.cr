@@ -66,7 +66,11 @@ module Hwaro
 
           files.sort.each do |file|
             relative_path = file.sub(/^static\/?/, "/")
-            tags << yield(HTML.escape("#{base_url}#{relative_path}#{suffix}"), Models.integrity_attr(sri_root, relative_path))
+            # Only the characters that end or corrupt a URL path are escaped
+            # (a file really named `a#b.css` is requested as `a%23b.css`);
+            # the SRI lookup keeps the on-disk name.
+            href_path = relative_path.gsub(/[ %#?]/) { |c| "%%%02X" % c[0].ord }
+            tags << yield(HTML.escape("#{base_url}#{href_path}#{suffix}"), Models.integrity_attr(sri_root, relative_path))
           end
         end
         tags.join("\n")
