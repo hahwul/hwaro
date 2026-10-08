@@ -190,6 +190,27 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Regression: placeholders were substituted one after another, so a title
+    # about templating (`Using {{ date }} and {{ tags }}`) was re-expanded by
+    # the later passes, injecting the raw tags array into a quoted string.
+    it "keeps placeholder text inside user values verbatim" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/custom.md", "+++\ntitle = \"{{ title }}\"\ndate = \"{{ date }}\"\ntags = {{ tags }}\n+++\n")
+
+          options = Hwaro::Config::Options::NewOptions.new(
+            path: "post.md", title: "Using {{ date }} and {{ tags }} in {{draft}}", archetype: "custom", tags: ["a", "b"])
+          Hwaro::Services::Creator.new.run(options)
+
+          parsed = TOML.parse(File.read("content/post.md").lines.reject { |l| l.strip == "+++" }.join("\n"))
+          parsed["title"].as_s.should eq("Using {{ date }} and {{ tags }} in {{draft}}")
+          parsed["tags"].as_a.map(&.as_s).should eq(["a", "b"])
+        end
+      end
+    end
+
     it "uses an implicit archetype based on directory" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
@@ -696,6 +717,11 @@ describe Hwaro::Services::Creator do
     end
 
     describe ".slugify" do
+      it "keeps combining marks that belong to a word" do
+        Hwaro::Services::Creator.slugify("हिंदी भाषा").should eq("हिंदी-भाषा")
+        Hwaro::Services::Creator.slugify("I \u2764\uFE0F you").should eq("i-you")
+      end
+
       it "lowercases and hyphenates a title" do
         Hwaro::Services::Creator.slugify("My First Post!").should eq("my-first-post")
       end
@@ -1501,6 +1527,12 @@ describe Hwaro::Services::Creator do
   end
 
   describe ".sanitize_url_path" do
+    it "keeps combining marks in Indic and Thai file names" do
+      Hwaro::Services::Creator.sanitize_url_path("ไทย/สวัสดี.md").should eq("ไทย/สวัสดี.md")
+      Hwaro::Services::Creator.sanitize_url_path("posts/हिंदी भाषा.md").should eq("posts/हिंदी-भाषा.md")
+      Hwaro::Services::Creator.sanitize_url_path("posts/a \u2764\uFE0F b.md").should eq("posts/a-b.md")
+    end
+
     it "is a no-op for already-safe paths" do
       Hwaro::Services::Creator.sanitize_url_path("posts/hello.md").should eq("posts/hello.md")
       Hwaro::Services::Creator.sanitize_url_path("한글/포스트.md").should eq("한글/포스트.md")
@@ -1589,6 +1621,50 @@ describe Hwaro::Services::Creator do
 
     it "keeps a hyphen-only stem verbatim rather than producing an empty title" do
       Hwaro::Services::Creator.titleize("---").should eq("---")
+    end
+  end
+end
+
+describe Hwaro::Services::Creator, "translation suffix" do
+  multilingual = Hwaro::Models::Config.new
+  multilingual.default_language = "en"
+  multilingual.languages = {
+    "en" => Hwaro::Models::LanguageConfig.new("en"),
+    "ko" => Hwaro::Models::LanguageConfig.new("ko"),
+  }
+
+  it "does not leak the language into the title" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        Hwaro::Services::Creator.new.run(Hwaro::Config::Options::NewOptions.new(path: "posts/hello.ko.md"), multilingual)
+        File.read("content/posts/hello.ko.md").should contain(%(title = "Hello"))
+      end
+    end
+  end
+
+  it "creates a translated bundle as index.<lang>.md next to the default one" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        creator = Hwaro::Services::Creator.new
+        creator.run(Hwaro::Config::Options::NewOptions.new(path: "posts/bund.md", bundle: true), multilingual)
+        creator.run(Hwaro::Config::Options::NewOptions.new(path: "posts/bund.ko.md", bundle: true), multilingual)
+        File.exists?("content/posts/bund/index.md").should be_true
+        File.exists?("content/posts/bund/index.ko.md").should be_true
+        File.exists?("content/posts/bund.ko").should be_false
+        File.read("content/posts/bund/index.ko.md").should contain(%(title = "Bund"))
+      end
+    end
+  end
+
+  it "treats a dotted name that is not a configured language literally" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        Hwaro::Services::Creator.new.run(Hwaro::Config::Options::NewOptions.new(path: "posts/v1.fr.md"), multilingual)
+        File.read("content/posts/v1.fr.md").should contain(%(title = "V1.fr"))
+      end
     end
   end
 end

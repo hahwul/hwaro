@@ -327,8 +327,12 @@ module Hwaro
       def slugify(text : String) : String
         # Single-pass: directly emit hyphens for separators, collapsing runs.
         # Avoids intermediate String allocation + regex gsub.
+        # NFC first: macOS file names and copy-paste often carry NFD text, and
+        # "cafe\u0301" must land on the same slug as "café".
+        text = text.unicode_normalize(:nfc) unless text.ascii_only?
         String.build(text.bytesize) do |io|
           last_was_sep = true # suppress leading hyphen
+          prev = ' '
           # Separator test is `whitespace?`, not `ascii_whitespace?`: the
           # ideographic space U+3000 is the ordinary word separator in CJK
           # titles, and an `&nbsp;` in a title decodes to U+00A0. Neither is
@@ -343,11 +347,15 @@ module Hwaro
                 io << '-'
                 last_was_sep = true
               end
-            elsif cjk_char?(char) || unicode_letter?(char)
+            elsif cjk_char?(char) || unicode_letter?(char) || (char.mark? && (prev.alphanumeric? || prev.mark?))
+              # Combining marks (vowel signs, virama, tone marks) are part of
+              # the word they follow. One after a dropped character (the
+              # emoji variation selector in "❤️") has nothing to attach to.
               io << char.downcase
               last_was_sep = false
             end
             # All other characters (punctuation, symbols) are dropped
+            prev = char
           end
         end.rstrip('-')
       end

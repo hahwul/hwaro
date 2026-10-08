@@ -2,6 +2,25 @@ require "../../spec_helper"
 
 describe Hwaro::Utils::TextUtils do
   describe ".slugify" do
+    # Regression: combining vowel signs/virama (Mn/Mc) were dropped, so Indic
+    # and Thai words came out as consonant skeletons and NFD text lost its
+    # accent (colliding with the plain word).
+    it "keeps combining marks that belong to a word" do
+      Hwaro::Utils::TextUtils.slugify("हिंदी भाषा").should eq("हिंदी-भाषा")
+      Hwaro::Utils::TextUtils.slugify("สวัสดี ชาวโลก").should eq("สวัสดี-ชาวโลก")
+      Hwaro::Utils::TextUtils.slugify("நன்றி").should eq("நன்றி")
+    end
+
+    it "slugifies NFD text like NFC" do
+      Hwaro::Utils::TextUtils.slugify("cafe\u0301").should eq("café")
+      Hwaro::Utils::TextUtils.slugify("café").should eq("café")
+    end
+
+    it "does not keep marks that follow dropped characters" do
+      Hwaro::Utils::TextUtils.slugify("I \u2764\uFE0F you").should eq("i-you")
+      Hwaro::Utils::TextUtils.slugify("\u0301abc").should eq("abc")
+    end
+
     it "converts basic text to slug" do
       Hwaro::Utils::TextUtils.slugify("Hello World").should eq("hello-world")
     end
