@@ -187,7 +187,16 @@ module Hwaro
               # Try to parse the table
               table, consumed = parse_table(lines, i)
               if table
-                result << table.to_html(flags: effective, hooks: hooks)
+                html = table.to_html(flags: effective, hooks: hooks)
+                # A table inside a list item is indented by the item's content
+                # column. The HTML block must carry the same indent, or it
+                # ends the item (and the list), orphaning what follows. (A
+                # 4+ indent outside a list is indented code, never reaching
+                # here, so this is at most a list item's own indent.)
+                if indent = lines[i][/\A[ \t]+/]?
+                  html = html.split('\n').map { |html_line| html_line.empty? ? html_line : "#{indent}#{html_line}" }.join('\n')
+                end
+                result << html
                 i += consumed
                 next
               end
