@@ -28,6 +28,11 @@ describe "scaffold search highlightMatch" do
     run_highlight(js, "a < b > c", "lt").should eq("a &lt; b &gt; c")
   end
 
+  it "does not misplace marks when lowercasing changes the text length" do
+    pending!("node not installed") unless node
+    run_highlight(js, "\u0130stanbul guide", "guide").should eq("\u0130stanbul guide")
+  end
+
   it "highlights case-insensitively and escapes every segment" do
     pending!("node not installed") unless node
     run_highlight(js, "<b>Hello</b> hello", "HELLO").should eq("&lt;b&gt;<mark>Hello</mark>&lt;/b&gt; <mark>hello</mark>")

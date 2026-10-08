@@ -1327,6 +1327,8 @@ module Hwaro
                 // Match the RAW text and escape each piece, so a query like
                 // `&` or `amp` cannot land inside an HTML entity.
                 var lower = text.toLowerCase(), q = query.toLowerCase();
+                // Lowercasing can change the length (e.g. `İ`), which would shift every offset.
+                if (lower.length !== text.length) return escapeHtml(text);
                 var out = '', pos = 0, i;
                 while ((i = lower.indexOf(q, pos)) !== -1) {
                   out += escapeHtml(text.slice(pos, i)) + '<mark>' + escapeHtml(text.slice(i, i + q.length)) + '</mark>';
