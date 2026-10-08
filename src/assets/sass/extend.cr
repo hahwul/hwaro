@@ -161,8 +161,15 @@ module Hwaro
             next if element?(s) || pseudo?(s)
             merged << s unless merged.includes?(s)
           end
+          # Pseudo-classes before pseudo-elements: `.icon::before` extending
+          # `.btn:hover` is `.icon:hover::before` — a pseudo-class after a
+          # pseudo-element matches nothing.
           (ext + rest).each do |s|
-            next unless pseudo?(s)
+            next unless pseudo?(s) && !pseudo_element?(s)
+            merged << s unless merged.includes?(s)
+          end
+          (ext + rest).each do |s|
+            next unless pseudo_element?(s)
             merged << s unless merged.includes?(s)
           end
           merged
@@ -263,6 +270,11 @@ module Hwaro
           i = start
           while i < chars.size
             c = chars[i]
+            if c == '\\'
+              # An escaped character (`.sm\:flex`, `.a\ b`) is part of the name.
+              i = {i + 2, chars.size}.min
+              next
+            end
             break if c.ascii_whitespace? || c == '>' || c == '+' || c == '~'
             case c
             when '['
@@ -291,6 +303,8 @@ module Hwaro
           start = 0
           while i < chars.size
             case c = chars[i]
+            when '\\'
+              i += 2
             when '['
               j = skip_bracket(chars, i)
               return unless j
@@ -338,6 +352,13 @@ module Hwaro
 
         private def pseudo?(simple : String) : Bool
           simple.starts_with?(':')
+        end
+
+        # `::x` plus the four legacy single-colon pseudo-elements.
+        private def pseudo_element?(simple : String) : Bool
+          return true if simple.starts_with?("::")
+          return false unless simple.starts_with?(':')
+          {":before", ":after", ":first-line", ":first-letter"}.includes?(simple.downcase)
         end
 
         private def skip_string(chars : Array(Char), start : Int32) : Int32?

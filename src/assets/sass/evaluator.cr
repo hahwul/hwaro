@@ -361,6 +361,10 @@ module Hwaro
           end
           parent_breaks = @parent_breaks
 
+          # A `&` inside a selector pseudo's argument (`:not(&)`) takes the
+          # WHOLE parent list once instead of expanding per parent.
+          pseudo_resolved = parts.map { |part| pseudo_parent_refs(part, parents) }
+          parts = parts.map_with_index { |part, i| pseudo_resolved[i] || part }
           amps_by_part = parts.map { |part| count_parent_refs(part) }
           amps_by_part.each do |amps|
             next unless amps > 0
@@ -406,7 +410,9 @@ module Hwaro
                 result_breaks << (result.size != 1 && flag)
               end
               amps = amps_by_part[pi]
-              if amps == 0
+              if amps == 0 && pseudo_resolved[pi]
+                push.call(part) if parent_i == 0
+              elsif amps == 0
                 push.call("#{parent} #{part}")
               elsif amps > MAX_PARENT_REF_SLOTS
                 # Degraded single-combo expansion; emit once, on the first
@@ -458,6 +464,125 @@ module Hwaro
           combos
         end
 
+        # Pseudo-classes whose argument is a selector list: a `&` inside
+        # resolves to the whole parent list (dart-sass), not per parent.
+        SELECTOR_PSEUDOS = {"not", "is", "where", "has", "matches", "any", "-webkit-any", "-moz-any",
+                            "host", "host-context", "slotted", "current"}
+
+        # Rewrites every `&` sitting inside a selector pseudo's parentheses
+        # (`:not(&)`, `:is(&, .h)`, `:not(&-x)`) with the parent list
+        # substituted into that argument once. dart-sass interleaves the
+        # per-argument expansions (`:is(&, .h)` over `.a, .b` is
+        # `:is(.a, .h, .b)`). nil when the selector has no such `&`.
+        private def pseudo_parent_refs(selector : String, parents : Array(String)) : String?
+          return unless selector.includes?('&') && selector.includes?('(')
+          chars = selector.chars
+          changed = false
+          out = String.build do |io|
+            i = 0
+            while i < chars.size
+              c = chars[i]
+              case c
+              when '\\'
+                io << c
+                i += 1
+                io << chars[i] if i < chars.size
+              when '"', '\''
+                io << c
+                i += 1
+                while i < chars.size
+                  io << chars[i]
+                  if chars[i] == '\\' && i + 1 < chars.size
+                    i += 1
+                    io << chars[i]
+                  elsif chars[i] == c
+                    break
+                  end
+                  i += 1
+                end
+              when '['
+                while i < chars.size && chars[i] != ']'
+                  io << chars[i]
+                  i += 1
+                end
+                io << ']' if i < chars.size
+              when ':'
+                io << c
+                j = i + 1
+                if chars[j]? == ':'
+                  io << ':'
+                  j += 1
+                end
+                name_start = j
+                while (nc = chars[j]?) && (nc.ascii_alphanumeric? || nc == '-' || nc == '_')
+                  j += 1
+                end
+                name = chars[name_start...j].join
+                close = chars[j]? == '(' ? matching_paren(chars, j) : nil
+                if close && SELECTOR_PSEUDOS.includes?(name.downcase) &&
+                   (inner = chars[(j + 1)...close].join).includes?('&')
+                  io << name << '(' << expand_pseudo_argument(inner, parents) << ')'
+                  changed = true
+                  i = close
+                else
+                  io << name
+                  i = j - 1
+                end
+              else
+                io << c
+              end
+              i += 1
+            end
+          end
+          changed ? out : nil
+        end
+
+        private def expand_pseudo_argument(inner : String, parents : Array(String)) : String
+          lists = Parser.split_top_level_commas(inner).map(&.strip).reject(&.empty?).map do |arg|
+            next [arg] unless arg.includes?('&')
+            arg = pseudo_parent_refs(arg, parents) || arg
+            refs = count_parent_refs(arg)
+            if refs == 0
+              [arg]
+            elsif refs > MAX_PARENT_REF_SLOTS || parents.size.to_i64 ** refs > MAX_RULE_SELECTORS
+              [substitute_parent(arg, parents)]
+            else
+              parent_combinations(parents, refs).map { |combo| substitute_parent(arg, combo) }
+            end
+          end
+          interleaved = [] of String
+          (lists.max_of?(&.size) || 0).times do |k|
+            lists.each { |list| interleaved << list[k] if k < list.size }
+          end
+          interleaved.join(", ")
+        end
+
+        # Index of the `)` closing the `(` at `open`, skipping strings and
+        # escapes; nil when unbalanced.
+        private def matching_paren(chars : Array(Char), open : Int32) : Int32?
+          depth = 0
+          i = open
+          while i < chars.size
+            case c = chars[i]
+            when '\\'
+              i += 1
+            when '"', '\''
+              i += 1
+              while i < chars.size && chars[i] != c
+                i += 1 if chars[i] == '\\'
+                i += 1
+              end
+            when '('
+              depth += 1
+            when ')'
+              depth -= 1
+              return i if depth == 0
+            end
+            i += 1
+          end
+          nil
+        end
+
         # Counts `&` occurrences outside quoted strings and attribute
         # brackets — a scan-only twin of substitute_parent.
         private def count_parent_refs(selector : String) : Int32
@@ -466,6 +591,8 @@ module Hwaro
           i = 0
           while i < chars.size
             case c = chars[i]
+            when '\\'
+              i += 1 # an escaped `\&` is a literal character
             when '"', '\''
               quote = c
               i += 1
@@ -502,6 +629,10 @@ module Hwaro
             while i < chars.size
               c = chars[i]
               case c
+              when '\\'
+                io << c
+                i += 1
+                io << chars[i] if i < chars.size
               when '"', '\''
                 quote = c
                 io << c
@@ -1372,6 +1503,9 @@ module Hwaro
             push = ->(sel : String) do
               selectors << sel
               breaks << (selectors.size != 1 && (part_breaks[part_i]? || false))
+            end
+            if parents && (resolved = pseudo_parent_refs(part, parents))
+              part = resolved
             end
             amps = count_parent_refs(part)
             if amps == 0

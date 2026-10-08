@@ -81,6 +81,13 @@ module Hwaro
           while i < chars.size
             c = chars[i]
             case c
+            when '\\'
+              # `.c\,d` — an escaped character is part of the identifier.
+              current << c
+              if i + 1 < chars.size
+                i += 1
+                current << chars[i]
+              end
             when '(', '['
               depth += 1
               current << c
