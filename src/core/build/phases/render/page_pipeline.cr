@@ -273,13 +273,16 @@ module Hwaro::Core::Build::Phases::Render
     Logger.debug "Rendering #{page.path} (section=#{page.section.empty? ? "<root>" : page.section}, index=#{page.is_index}) using template '#{template_name}'" if verbose
 
     # Handle section pages with pagination. A section that names its own
-    # template (`template = "blogindex"`, or one cascaded in) is a section
-    # all the same — gating on the literal "section" silently dropped its
-    # `section_list` and `paginator`. The homepage keeps its own `index`
-    # template, and a section that fell back to the plain `page` template
-    # (no section template at all) is left alone.
+    # template (`template = "blogindex"`, or one cascaded in) and asks for
+    # pagination itself (`paginate_by`, `pagination_enabled = true`) is a
+    # section all the same — gating on the literal "section" silently dropped
+    # its `section_list` and `paginator`. Only that explicit opt-in counts: a
+    # custom template under the site-wide `[pagination]` default keeps listing
+    # every page, as it always has. The homepage keeps its own `index`
+    # template, and a section on the plain `page` fallback is left alone.
     if page.is_a?(Models::Section) &&
-       (template_name == "section" || page.template == "section" || (template_name != "page" && !page.home?))
+       (template_name == "section" || page.template == "section" ||
+       (template_name != "page" && !page.home? && (page.pagination_enabled == true || (page.paginate || 0) > 0)))
       render_section_with_pagination(page.as(Models::Section), site, templates, template_content, output_dir, minify, html_content, toc_html, toc_headers, verbose, global_vars,
         crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, error_overlay: error_overlay,
         template_name: template_name)

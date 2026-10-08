@@ -40,6 +40,8 @@ paginate_path = "page"
 | paginate | int | — | Items per page; `0` (or less) turns pagination off for the section |
 | paginate_path | string | "page" | URL pattern for pages |
 
+A section that names its own `template` paginates too once it sets `paginate` (or `pagination_enabled = true`); its template then receives `section_list`, `pagination` and `paginator`. Without that, a custom template keeps listing every page even when `[pagination]` is enabled site-wide.
+
 ### Generated URLs
 
 For a section at `/blog/`:
