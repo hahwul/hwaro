@@ -538,7 +538,10 @@ module Hwaro
       # already present are stepped over so pre-encoded URLs don't get
       # double-encoded.
       def encode_url_path(url : String) : String
-        return url if url.ascii_only? && !url.includes?(' ')
+        if url.ascii_only? && !url.includes?(' ')
+          return url unless illegal_ascii_in_path?(url)
+          return encode_illegal_ascii_path(url)
+        end
 
         if scheme_end = url.index("://")
           host_end = url.index('/', scheme_end + 3)
@@ -549,6 +552,44 @@ module Hwaro
         else
           encode_path_preserving_escapes(url)
         end
+      end
+
+      # Byte index where the path of `url` starts and where it ends (before
+      # the first `?`/`#`). A scheme/host prefix and a query are not path.
+      private def path_bounds(url : String) : {Int32, Int32}
+        start = 0
+        if scheme_end = url.index("://")
+          start = url.index('/', scheme_end + 3) || url.bytesize
+        end
+        stop = url.index(/[?#]/, start) || url.bytesize
+        {start, stop}
+      end
+
+      # RFC 3986 forbids these ASCII characters in a path, and a `%` that does
+      # not start a `%XX` escape. `100%`, `[b]`, `{c}` and `a|b` file names
+      # used to reach a sitemap `<loc>` / RSS `<link>` raw, while the same
+      # characters beside a non-ASCII one were encoded.
+      private def illegal_ascii_in_path?(url : String) : Bool
+        start, stop = path_bounds(url)
+        bytes = url.to_slice
+        i = start
+        while i < stop
+          case bytes[i]
+          when '"'.ord, '<'.ord, '>'.ord, '['.ord, ']'.ord, '{'.ord, '}'.ord, '|'.ord, '^'.ord, '`'.ord, '\\'.ord
+            return true
+          when '%'.ord
+            return true unless i + 2 < stop && bytes[i + 1].unsafe_chr.hex? && bytes[i + 2].unsafe_chr.hex?
+          end
+          i += 1
+        end
+        false
+      end
+
+      # Encode only the path of an all-ASCII URL; the host and any
+      # `?query`/`#fragment` stay as written (`?d[]=1` is a working link).
+      private def encode_illegal_ascii_path(url : String) : String
+        start, stop = path_bounds(url)
+        url[0, start] + encode_path_preserving_escapes(url[start, stop - start]) + url[stop..]
       end
 
       # `encode_url_path` for a URL that may carry a `?query` or `#fragment`

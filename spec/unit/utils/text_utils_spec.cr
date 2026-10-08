@@ -249,6 +249,26 @@ describe Hwaro::Utils::TextUtils do
   end
 
   describe ".encode_url_path" do
+    it "encodes RFC 3986-illegal ASCII in the path, with or without a non-ASCII neighbour" do
+      enc = ->(u : String) { Hwaro::Utils::TextUtils.encode_url_path(u) }
+      enc.call("https://e.com/sub/posts/100%/").should eq("https://e.com/sub/posts/100%25/")
+      enc.call("https://e.com/sub/posts/[b]/").should eq("https://e.com/sub/posts/%5Bb%5D/")
+      enc.call("https://e.com/posts/{c}/").should eq("https://e.com/posts/%7Bc%7D/")
+      enc.call("/posts/a|b/").should eq("/posts/a%7Cb/")
+      enc.call("/posts/x^y/").should eq("/posts/x%5Ey/")
+      enc.call("/posts/\"q\"/").should eq("/posts/%22q%22/")
+      enc.call("/posts/[b]/한글/").should eq("/posts/%5Bb%5D/%ED%95%9C%EA%B8%80/")
+    end
+
+    it "leaves valid escapes, queries and IPv6 hosts alone" do
+      enc = ->(u : String) { Hwaro::Utils::TextUtils.encode_url_path(u) }
+      enc.call("/posts/a%20b/").should eq("/posts/a%20b/")
+      enc.call("/posts/100%25/").should eq("/posts/100%25/")
+      enc.call("/search/?d[]=1&x={y}").should eq("/search/?d[]=1&x={y}")
+      enc.call("http://[::1]:8080/posts/").should eq("http://[::1]:8080/posts/")
+      enc.call("/posts/[b]/?d[]=1").should eq("/posts/%5Bb%5D/?d[]=1")
+    end
+
     it "leaves plain ASCII URLs unchanged" do
       Hwaro::Utils::TextUtils.encode_url_path("https://example.com/posts/hello/").should eq("https://example.com/posts/hello/")
     end
