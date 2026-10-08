@@ -73,4 +73,18 @@ describe "Sass selector fixes" do
       css.should contain(".i:hover:after")
     end
   end
+
+  describe "@extend into selector pseudo arguments" do
+    it "folds every extender into one rewritten selector (no factorial blow-up)" do
+      extenders = (1..8).map { |n| ".e#{n} { @extend .a; }" }.join("\n")
+      css = compile_source(".a { x: 1 }\n.k:not(.a) { u: 6 }\n:is(.a, .z) .q { v: 1 }\n#{extenders}")
+      css.should contain(".k:not(.a), .k:not(.a, .e1, .e2, .e3, .e4, .e5, .e6, .e7, .e8) {")
+      css.should contain(":is(.a, .z) .q, :is(.a, .z, .e1, .e2, .e3, .e4, .e5, .e6, .e7, .e8) .q {")
+    end
+
+    it "still resolves chained extends through a pseudo argument" do
+      css = compile_source(".k:not(.a) { u: 6 }\n.a { x: 1 }\n.b { @extend .a }\n.c { @extend .b }")
+      css.should contain(".k:not(.a), .k:not(.a, .b, .c) {")
+    end
+  end
 end

@@ -1675,6 +1675,15 @@ module Hwaro
             breaks << false
           end
           seen = selectors.to_set
+          # A target inside a selector pseudo's argument (`:not(.a)`) is
+          # extended by appending to the argument list, so every request
+          # for it must land in ONE rewritten selector. `variants` are the
+          # rewrites made so far (later requests update them in place) and
+          # `rewritten` the originals that already produced one — without
+          # this each request spawned its own variant and the variants fed
+          # each other, giving every ordered subset of the extenders.
+          variants = Set(String).new
+          rewritten = Set(String).new
           i = 0
           while i < selectors.size
             sel = selectors[i]
@@ -1691,6 +1700,18 @@ module Hwaro
               offset = 1
               results.each do |(added, ext_i)|
                 next if seen.includes?(added)
+                if ext_i < 0
+                  if variants.includes?(sel)
+                    seen << added
+                    variants << added
+                    selectors[i] = added
+                    sel = added
+                    next
+                  end
+                  next if rewritten.includes?(sel)
+                  rewritten << sel
+                  variants << added
+                end
                 seen << added
                 # Insert right after the selector that was extended —
                 # dart-sass keeps the additions in place (the placeholder
