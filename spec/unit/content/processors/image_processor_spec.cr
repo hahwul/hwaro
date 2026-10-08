@@ -68,6 +68,23 @@ describe Hwaro::Content::Processors::ImageProcessor do
       end
     end
 
+    it "leaves a width variant alone when the site publishes a file under its name" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "hero.png")
+        pixels = Bytes.new(8 * 4 * 3, 128_u8)
+        LibStb.stbi_write_png(src, 8, 4, 3, pixels.to_unsafe.as(Void*), 8 * 3)
+        File.write(File.join(dir, "hero_2w.png"), "authored")
+
+        authored = ->(name : String) { name == "hero_2w.png" || name == "hero_8w.png" }
+        map, _, _ = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(src, dir, [2, 4, 16], 85, 0, 20, authored)
+
+        map.keys.should eq([4])
+        File.read(File.join(dir, "hero_2w.png")).should eq("authored")
+        # The no-upscale copy (named after the true width) is guarded too.
+        File.exists?(File.join(dir, "hero_8w.png")).should be_false
+      end
+    end
+
     it "resizes a JPG image" do
       Dir.mktmpdir do |dir|
         src = File.join(dir, "test.jpg")

@@ -249,6 +249,10 @@ module Hwaro
 
         # Combined resize + LQIP in a single decode pass.
         # Returns {width_map, lqip_data_uri_or_nil, dominant_color_hex}
+        #
+        # `authored` (when given) is asked about each `<name>_<w>w.<ext>` this
+        # would write: true means a file the site itself publishes under that
+        # name, which is left alone — that width is simply not generated.
         def resize_and_lqip(
           source : String,
           dest_dir : String,
@@ -256,6 +260,7 @@ module Hwaro
           quality : Int32 = 85,
           lqip_width : Int32 = 32,
           lqip_quality : Int32 = 20,
+          authored : Proc(String, Bool)? = nil,
         ) : {Hash(Int32, String), String?, String}
           result_map = {} of Int32 => String
           lqip_uri = nil
@@ -299,7 +304,7 @@ module Hwaro
                 # srcset descriptor is honest (never a "1280w" pointing at a
                 # 500px file) and no byte-identical duplicates are emitted.
                 actual = src_w.to_i32
-                unless result_map.has_key?(actual)
+                unless result_map.has_key?(actual) || authored.try(&.call("#{basename}_#{actual}w#{ext}"))
                   dest = File.join(dest_dir, "#{basename}_#{actual}w#{ext}")
                   # Atomic: a serve rebuild must never expose a truncated
                   # variant to an in-flight request for that path.
@@ -309,6 +314,7 @@ module Hwaro
                 next
               end
 
+              next if authored.try(&.call("#{basename}_#{width}w#{ext}"))
               dest = File.join(dest_dir, "#{basename}_#{width}w#{ext}")
               pixel_count = out_w.to_i64 * out_h.to_i64
               next if pixel_count > MAX_PIXELS

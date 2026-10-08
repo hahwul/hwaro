@@ -683,6 +683,30 @@ describe "ImageHooks render-time lookups (review fixes)" do
     end
   end
 
+  it "never overwrites a published file that sits on a width variant's name" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\nenabled = true\nwidths = [20, 40]\n),
+      content_files: {"index.md" => "+++\ntitle = \"Home\"\n+++\n![h](/hero.png)\n"},
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}", "index.html" => "{{ content }}"},
+      static_files: {"hero.png" => png_body(100, 50), "hero_20w.png" => png_body(60, 30)},
+      cache: true,
+    ) do
+      check = -> {
+        png_size("public/hero_20w.png").should eq({60, 30})
+        png_size("public/hero_40w.png").should eq({40, 20})
+        html = File.read("public/index.html")
+        html.should contain("hero_40w.png 40w")
+        html.should_not contain("hero_20w.png 20w")
+      }
+      check.call
+      # Warm builds reuse the variant set without regenerating the authored name.
+      2.times do
+        rebuild_cached
+        check.call
+      end
+    end
+  end
+
   it "never publishes a fill variant of a withheld (draft) bundle's image" do
     build_site(
       %(title = "t"\nbase_url = "https://example.com"\n[content.files]\nallow_extensions = ["png"]\n),

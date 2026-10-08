@@ -371,8 +371,18 @@ module Hwaro
           jobs_to_process = [] of ImageJob
           reused_count = 0
 
+          # Files the site publishes itself: a generated `<name>_<w>w.<ext>`
+          # must never replace one (exports from other tools often ship such
+          # names). Keyed by URL directory, then file name.
+          authored_names = {} of String => Set(String)
+          jobs.each { |job| (authored_names[job.url_prefix] ||= Set(String).new) << File.basename(job.original_url) }
+          authored_for = ->(job : ImageJob) do
+            names = authored_names[job.url_prefix]
+            ->(name : String) { names.includes?(name) }
+          end
+
           jobs.each do |job|
-            reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths)
+            reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths, authored_for.call(job))
             if reused_widths && (!lqip_enabled || previous_lqip_map.has_key?(job.original_url))
               width_urls = {} of Int32 => String
               reused_widths.each do |width, filename|
@@ -411,7 +421,7 @@ module Hwaro
             spawn do
               while job = work_channel.receive?
                 begin
-                  width_map, lqip_data = resize_one(job, widths, quality, lqip_width, lqip_quality)
+                  width_map, lqip_data = resize_one(job, widths, quality, lqip_width, lqip_quality, authored_for.call(job))
                   map_mutex.synchronize do
                     new_map[job.original_url] = width_map unless width_map.empty?
                     new_lqip_map[job.original_url] = lqip_data if lqip_data
@@ -492,6 +502,7 @@ module Hwaro
           source_path : String,
           dest_dir : String,
           widths : Array(Int32),
+          authored : Proc(String, Bool)? = nil,
         ) : Hash(Int32, String)?
           return unless File.exists?(source_path)
           return unless Dir.exists?(dest_dir)
@@ -521,7 +532,9 @@ module Hwaro
               # was found and deleted. A width that doesn't fit Int32 can
               # never match a configured width, so ignoring it is exactly
               # right: the image simply gets reprocessed.
-              if width = m[1].to_i?
+              # A file the site publishes itself under a variant's name is
+              # not a variant (resize_and_lqip leaves it alone).
+              if (width = m[1].to_i?) && !authored.try(&.call(name))
                 on_disk[width] = name
               end
             end
@@ -537,6 +550,7 @@ module Hwaro
           # stays as the fallback for headers we can't read.
           src_w = Processors::ImageProcessor.dimensions(source_path).try(&.[0]) || on_disk.keys.max
           expected = widths.map { |w| Math.min(w, src_w) }.uniq!
+          expected.reject! { |w| authored.try(&.call("#{basename}_#{w}w#{ext}")) }
           return unless expected.sort == on_disk.keys.sort!
 
           result = {} of Int32 => String
@@ -555,9 +569,10 @@ module Hwaro
 
         # Resize a single image to all widths + generate LQIP (one decode pass)
         private def resize_one(job : ImageJob, widths : Array(Int32), quality : Int32,
-                               lqip_width : Int32, lqip_quality : Int32) : {Hash(Int32, String), Hash(String, String)?}
+                               lqip_width : Int32, lqip_quality : Int32,
+                               authored : Proc(String, Bool)?) : {Hash(Int32, String), Hash(String, String)?}
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
-            job.source_path, job.dest_dir, widths, quality, lqip_width, lqip_quality
+            job.source_path, job.dest_dir, widths, quality, lqip_width, lqip_quality, authored
           )
 
           width_url_map = {} of Int32 => String
@@ -776,8 +791,9 @@ module Hwaro
         private def self.run_targeted_resize(src_path : String, dest_dir : String, original_url : String, url_prefix : String, config : Models::Config) : Int32
           ip = config.image_processing
           lqip_width = ip.lqip_enabled ? ip.lqip_width : 0
+          authored = ->(name : String) { !resolve_source(url_prefix + name, config).nil? }
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
-            src_path, dest_dir, ip.widths, ip.quality, lqip_width, ip.lqip_quality
+            src_path, dest_dir, ip.widths, ip.quality, lqip_width, ip.lqip_quality, authored
           )
           return 0 if path_map.empty?
 
