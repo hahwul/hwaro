@@ -102,16 +102,35 @@ module Hwaro
           # PWA sw.js content-hashes the bytes of the files it precaches —
           # including the search index the tasks above just rewrote — so it
           # regenerates AFTER they finish, mirroring the full build's
-          # AfterWrite hook. Without this no serve incremental path ever
+          # AfterFinalize hook. Without this no serve incremental path ever
           # rewrote sw.js and registered service workers kept serving stale
           # bytes through live reloads.
-          if site.config.pwa.enabled
-            begin
-              Content::Seo::Pwa.generate(site, output_dir, verbose)
-            rescue ex
-              Logger.warn "  PWA regeneration failed: #{ex.message}"
-            end
-          end
+          regenerate_service_worker(site, output_dir, verbose)
+        end
+
+        # Rewrite manifest.json + sw.js for a serve pass, like the full build's
+        # PWA hook (same `[privacy]` localizer, or precache URLs revert to the
+        # external ones). Public: serve's static / content-file lanes call it
+        # after copying bytes sw.js content-hashes. Warn-and-continue — a
+        # transient failure must not skip cache.save / the reload.
+        def regenerate_service_worker(site : Models::Site, output_dir : String, verbose : Bool) : Nil
+          return unless site.config.pwa.enabled
+          Content::Seo::Pwa.generate(site, output_dir, verbose, ->(url : String) { privacy_url(url) })
+        rescue ex
+          Logger.warn "  PWA regeneration failed: #{ex.message}"
+        end
+
+        # True when one of `paths` (project-relative, as the watcher reports
+        # them) is the logo or background image that auto OG images embed and
+        # whose digest keys their manifest. The static / content-file lanes
+        # copy bytes only, so serve escalates to a build that regenerates the
+        # images. Never true where no image is generated eagerly (disabled,
+        # `--skip-og-image`, lazy serve mode regenerates on request).
+        def og_image_asset_changed?(paths : Array(String), options : Config::Options::BuildOptions) : Bool
+          return false unless ai = @config.try(&.og.auto_image)
+          return false if !ai.enabled || options.skip_og_image || (ai.lazy_generate && options.serve_mode)
+          assets = [ai.logo, ai.background_image].compact.map { |path| File.expand_path(path) }
+          paths.any? { |path| assets.includes?(File.expand_path(path)) }
         end
       end
     end

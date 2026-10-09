@@ -20,6 +20,7 @@ module Hwaro::Core::Build::Phases::Finalize
       else
         prune_unclaimed_generated_outputs(ctx)
       end
+      @prune_baselines_pending = false
       # Files a failed serve pass relocated away from (a no-op otherwise).
       settle_page_outputs(ctx.options.output_dir)
       # After the prune, so only live pages are hashed; after every writer,

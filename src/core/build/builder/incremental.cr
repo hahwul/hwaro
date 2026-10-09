@@ -256,7 +256,7 @@ module Hwaro
 
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
-            relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+            relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
           backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
 
           # Pages that render a listing derived from the GLOBAL page/section
@@ -402,7 +402,7 @@ module Hwaro
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
           force_pages = relationship_render_set(site, pages_map, reparsed, changed_pages,
-            relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+            relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
           backlinks_moved_pages(site, @templates, backlink_digests).each { |p| force_pages << p }
           run_rerender(options, force_pages: force_pages.to_a, membership_changed: !excluded_pages.empty?,
             listing_sets: listing_sets)
@@ -426,6 +426,7 @@ module Hwaro
           renav_pages : Enumerable(Models::Page),
           affected_series : Set(String),
           related_pages_updated : Enumerable(String),
+          excluded_paths : Set(String),
         ) : Set(Models::Page)
           pages_to_render = Set(Models::Page).new(changed_pages)
           # Translations / other versions whose switcher (or canonical) moved.
@@ -490,6 +491,11 @@ module Hwaro
               pages_to_render << p
             end
           end
+          # A page this pass just drafted / expired / future-dated is already
+          # pruned and out of site.pages, but the OLD neighbours captured
+          # before the re-parse still reference it — rendering it would write
+          # the file straight back.
+          pages_to_render.reject! { |p| excluded_paths.includes?(p.path) } unless excluded_paths.empty?
           pages_to_render
         end
 
@@ -1114,11 +1120,7 @@ module Hwaro
             # service worker must still be refreshed. Warn-and-continue,
             # matching regenerate_seo_surfaces: a transient failure here
             # must not skip cache.save below.
-            begin
-              Content::Seo::Pwa.generate(site, output_dir, verbose)
-            rescue ex
-              Logger.warn "  PWA regeneration failed: #{ex.message}"
-            end
+            regenerate_service_worker(site, output_dir, verbose)
           end
 
           sweep_stale_derived_outputs(output_dir)

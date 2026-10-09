@@ -313,6 +313,10 @@ module Hwaro
         # rebuild schedule the next one. Matched by full path only: a
         # same-named file under data/ or static/ is a real source.
         return true if path == Utils::HtmlStats::FILE || path == "./#{Utils::HtmlStats::FILE}"
+        # PCRE2 UTF mode raises on invalid UTF-8 (a legacy EUC-KR/Latin-1 file
+        # name); match on the scrubbed text so the scan survives it. Callers
+        # keep the raw path for stat calls.
+        path = path.scrub unless path.valid_encoding?
         basename = File.basename(path)
         WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
       end

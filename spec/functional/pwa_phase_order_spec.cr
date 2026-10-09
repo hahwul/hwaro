@@ -6,7 +6,7 @@ require "../spec_helper"
 #   write 404.html (Write) and search_index/search.json (AfterGenerate) — so a
 #   CLEAN build dropped those URLs from the precache list ("no matching output
 #   file"), while a warm build hashed the PREVIOUS build's bytes. Generation
-#   now runs at AfterWrite, over the final output tree.
+#   now runs at AfterFinalize, over the pruned (final) output tree.
 # - A10: serve's incremental rebuild paths (run_incremental / run_rerender)
 #   never regenerated sw.js, so registered service workers kept serving stale
 #   bytes through live reloads. regenerate_seo_surfaces now rewrites it.
@@ -126,6 +126,35 @@ describe "PWA generation phase order (A3/A10)" do
 
         File.read("public/index.html").should contain("v2")
         cache_name(File.read("public/sw.js")).should_not eq(before)
+      end
+    end
+  end
+
+  # sw.js hashes and existence-checks the output tree, so it must run after
+  # Finalize prunes the outputs of removed pages — or a `--cache` build ships
+  # a service worker whose cache.addAll() 404s on the deleted page.
+  it "drops a deleted page from the precache on a --cache build, like a cold build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_pwa_site
+        File.write("config.toml", PWA_CONFIG.sub("\"/search.json\"]", "\"/search.json\", \"/about/\"]"))
+        options = pwa_options
+        options.cache = true
+        builder = pwa_builder
+        builder.run(options).should be_true
+        precache_urls(File.read("public/sw.js")).should contain("/about/")
+
+        File.delete("content/about.md")
+        warm = pwa_options(preserve: true)
+        warm.cache = true
+        pwa_builder.run(warm).should be_true
+        File.exists?("public/about/index.html").should be_false
+        warm_sw = File.read("public/sw.js")
+        precache_urls(warm_sw).should_not contain("/about/")
+
+        FileUtils.rm_rf("public")
+        pwa_builder.run(pwa_options).should be_true
+        File.read("public/sw.js").should eq(warm_sw)
       end
     end
   end
