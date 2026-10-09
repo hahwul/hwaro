@@ -42,6 +42,14 @@ describe Hwaro::Content::Processors::InlineMarkdown do
       out = Hwaro::Content::Processors::InlineMarkdown.render("![a](/caf%E9.png)")
       out.should contain(%(<img src="/caf%E9.png" alt="a">))
     end
+
+    it "reads a {width=…} / {width=… height=…} block after an image as its size" do
+      render = ->(text : String) { Hwaro::Content::Processors::InlineMarkdown.render(text) }
+      render.call("![a](/p.png){width=300}").should eq(%(<img src="/p.png" alt="a" width="300">))
+      render.call("![a](/p.png){width=300 height=200}!").should eq(%(<img src="/p.png" alt="a" width="300" height="200">!))
+      # Any other block stays text.
+      render.call("![a](/p.png){.big}").should eq(%(<img src="/p.png" alt="a">{.big}))
+    end
   end
 
   # Code spans in this renderer used to be single-backtick-only, so a

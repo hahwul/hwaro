@@ -160,6 +160,15 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc">link</a>)
     end
 
+    it "resolves a page whose path holds a & that Markd rendered as &amp;" do
+      pages = {"odd/a&b.md" => make_page("odd/a&b.md", "/odd/a&b/")}
+      misses = [] of {String, String}
+      html = %(<a href="@/odd/a&amp;b.md">A</a> <a href="@/odd/a&amp;b.md#s">B</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md", misses: misses)
+      result.should eq %(<a href="/odd/a&amp;b/">A</a> <a href="/odd/a&amp;b/#s">B</a>)
+      misses.should be_empty
+    end
+
     it "does not decode semicolon-less legacy entities in query params" do
       pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
       # `&copy` is a legacy no-semicolon entity — a full HTML.unescape would
