@@ -26,6 +26,7 @@ describe Hwaro::Models::AutoIncludesConfig do
   end
 
   it "percent-encodes file names that would otherwise end the URL path" do
+    posix_only!("Windows forbids ? in file names")
     config = <<-TOML
       title = "t"
       base_url = "http://x.test/sub"

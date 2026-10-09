@@ -401,17 +401,28 @@ module Hwaro
         path
       end
 
-      # `path` with glob metacharacters escaped, so a content-derived directory
-      # spliced into a `Dir.glob` pattern (`posts/[WIP] Hello/**/*`) matches
-      # literally instead of as a character class, brace set or wildcard.
-      # Crystal's glob honours backslash escapes; on Windows the backslash is
-      # the path separator, so nothing is escaped there.
+      # `Dir.glob` pattern syntax. Crystal's glob reads `\` as an escape on
+      # every platform (patterns always use `/`), but a Windows path may still
+      # carry `\` separators, so the backslash itself is only escaped off
+      # Windows.
+      {% if flag?(:win32) %}
+        GLOB_META = {'*', '?', '[', ']', '{', '}', ','}
+      {% else %}
+        GLOB_META = {'*', '?', '[', ']', '{', '}', ',', '\\'}
+      {% end %}
+
+      # `path` with glob metacharacters backslash-escaped, so a content-derived
+      # directory can prefix a glob pattern
+      # (`Dir.glob(File.join(glob_escape(dir), "**", "*"))`) and match
+      # literally: unescaped, `posts/[WIP] Hello` or `a{b,c}` matched nothing.
       def glob_escape(path : String) : String
-        {% if flag?(:win32) %}
-          path
-        {% else %}
-          path.gsub(/[\\*?\[\]{},]/) { |char| "\\#{char}" }
-        {% end %}
+        return path unless path.each_char.any? { |c| GLOB_META.includes?(c) }
+        String.build do |io|
+          path.each_char do |c|
+            io << '\\' if GLOB_META.includes?(c)
+            io << c
+          end
+        end
       end
 
       # File.match? that treats a malformed glob as non-matching instead of

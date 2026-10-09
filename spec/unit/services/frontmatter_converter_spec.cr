@@ -93,6 +93,7 @@ describe Hwaro::Services::FrontmatterConverter do
     # Regression: the temp file was "<name>.hwaro-convert.tmp", which pushed
     # a valid file name close to NAME_MAX past it ("File name too long").
     it "converts a file whose name is close to the file-name limit" do
+      posix_only!("Windows caps the whole path at 260 characters")
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
         file_path = File.join(dir, "#{"a" * 247}.md")

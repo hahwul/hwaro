@@ -194,6 +194,7 @@ describe Hwaro::Utils::FileSafe do
     # longer than the target, so a file whose own name fit NAME_MAX (255) but
     # was over ~233 bytes failed with "File name too long".
     it "writes a file whose name is close to NAME_MAX" do
+      posix_only!("Windows caps the whole path at 260 characters")
       Dir.mktmpdir do |root|
         path = File.join(root, "#{"b" * 250}.svg")
         Hwaro::Utils::FileSafe.atomic_write(path, "<svg/>")
@@ -222,6 +223,7 @@ describe Hwaro::Utils::FileSafe do
     end
 
     it "copies to a destination whose name is close to NAME_MAX" do
+      posix_only!("Windows caps the whole path at 260 characters")
       Dir.mktmpdir do |root|
         src = File.join(root, "src.bin")
         dest = File.join(root, "#{"c" * 250}.bin")
@@ -297,6 +299,7 @@ describe Hwaro::Utils::FileSafe do
   # whole Write phase for a file whose own name was fine.
   describe "long file names" do
     it "atomic_write publishes a name close to NAME_MAX" do
+      posix_only!("Windows caps the whole path at 260 characters")
       Dir.mktmpdir do |root|
         path = File.join(root, "#{"a" * 240}.png")
         Hwaro::Utils::FileSafe.atomic_write(path, "x")
@@ -306,6 +309,7 @@ describe Hwaro::Utils::FileSafe do
     end
 
     it "atomic_copy publishes a name close to NAME_MAX" do
+      posix_only!("Windows caps the whole path at 260 characters")
       Dir.mktmpdir do |root|
         src = File.join(root, "src.png")
         File.write(src, "x")

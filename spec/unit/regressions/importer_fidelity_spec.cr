@@ -278,6 +278,7 @@ describe "importer fidelity" do
 
   describe "Jekyll and Hexo date-prefixed slugs" do
     it "slugifies the name so URLs are safe" do
+      posix_only!("Windows forbids ? in file names")
       Dir.mktmpdir do |dir|
         ImporterFidelitySpec.write("#{dir}/s/_posts/2024-01-01-Hello World.md", "---\ntitle: a\n---\nx\n")
         ImporterFidelitySpec.write("#{dir}/s/_posts/2024-01-04-100%.markdown", "---\ntitle: b\n---\nx\n")
