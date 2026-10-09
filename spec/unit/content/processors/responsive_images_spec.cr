@@ -180,6 +180,26 @@ describe "Content image dimensions" do
     end
   end
 
+  it "resolves an entity-escaped '&' in the src (markdown emits &amp;)" do
+    with_image_project do
+      File.copy("static/photo.png", "static/S&T.png")
+      config = dimensions_config
+      config.image_processing.enabled = true
+      with_resize_map({"/S&T.png" => {2 => "/S&T_2w.png"}}) do
+        out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+          %(<img src="/S&amp;T.png">), bundle_page, config)
+        out.should eq(%(<img srcset="/S%26T_2w.png 2w" sizes="100vw" width="4" height="2" src="/S&amp;T.png">))
+      end
+    end
+  end
+
+  it "leaves a src with a percent-encoded NUL alone instead of aborting" do
+    with_image_project do
+      html = %(<img src="/x%00y.png">)
+      Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, dimensions_config).should eq(html)
+    end
+  end
+
   it "is a no-op when dimensions is off" do
     with_image_project do
       html = %(<img src="/img/a.png">)

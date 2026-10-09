@@ -14,13 +14,27 @@
 #     `[auto_includes]` / local-highlight tags with their `?v=` digest and,
 #     under `[assets] sri`, their `integrity` digests;
 #   * reads made mid-render — `env()`, `load_data()` of a file outside data/,
-#     and the source image behind `resize_image()`.
+#     the source image behind `resize_image()`, and the wall clock behind
+#     `now()` and the `current_year`/`current_date`/`current_datetime`
+#     variables.
 #
 # The second group is only knowable by rendering, so the render records it
 # (`TemplateEngine.record_render_read`) and the cache keeps the read KEYS;
 # the next warm build re-reads those keys and compares one digest over all
 # of it before any page is filtered.
 module Hwaro::Core::Build::Phases::Render
+  # `current_year`/`current_date`/`current_datetime` are computed once per
+  # build (build_global_vars) and read by plain name, so the render cannot
+  # tell which pages print them: record the clock read when any template
+  # mentions one. A footer's copyright year then re-renders every page once
+  # per year, not never.
+  private def record_clock_variable_reads(templates : Hash(String, String)) : Nil
+    Content::Processors::TemplateEngine::CLOCK_VARIABLE_FORMAT.each do |name, format|
+      next unless templates.each_value.any? { |source| Utils::ByteScan.includes?(source, name) }
+      Content::Processors::TemplateEngine.record_clock_read(format)
+    end
+  end
+
   # Digest of the build-derived template globals. Computed once per build.
   private def render_globals_digest(config : Models::Config, cache_busting : Bool) : String
     digest = Digest::SHA256.new
@@ -136,6 +150,9 @@ module Hwaro::Core::Build::Phases::Render
       rescue File::Error | IO::Error
         "<unreadable>"
       end
+    elsif key.starts_with?(Content::Processors::TemplateEngine::CLOCK_READ_PREFIX)
+      format = key[Content::Processors::TemplateEngine::CLOCK_READ_PREFIX.size..]
+      Content::Processors::Filters::DateFilters.format_time(Time.local, format)
     elsif key.starts_with?(Content::Processors::TemplateEngine::ASSET_READ_PREFIX)
       name = key[Content::Processors::TemplateEngine::ASSET_READ_PREFIX.size..]
       Content::Hooks::AssetHooks.integrity(name, record: false) || "<absent>"

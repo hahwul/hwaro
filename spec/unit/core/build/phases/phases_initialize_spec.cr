@@ -378,6 +378,21 @@ describe Hwaro::Core::Build::Phases::Initialize do
       end
     end
 
+    it "strips a UTF-8 BOM from template sources" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("templates/shortcodes")
+          File.write("templates/page.html", "\uFEFF<p>{{ content }}</p>")
+          File.write("templates/shortcodes/sc.html", "\uFEFFSC")
+
+          templates = Hwaro::Core::Build::Builder.new.test_load_templates
+
+          templates["page"].should eq("<p>{{ content }}</p>")
+          templates["shortcodes/sc"].should eq("SC")
+        end
+      end
+    end
+
     it "uses default template as fallback for page when no page template exists" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

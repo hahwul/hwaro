@@ -67,6 +67,18 @@ describe Hwaro::Models::AutoImageConfig do
       ai.output_dir.should eq("social")
     end
 
+    it "treats a blank logo or background_image as unset" do
+      config = make_og_config(<<-TOML)
+        [og.auto_image]
+        enabled = true
+        logo = ""
+        background_image = "  "
+        TOML
+
+      config.og.auto_image.logo.should be_nil
+      config.og.auto_image.background_image.should be_nil
+    end
+
     it "loads new properties from TOML" do
       config = make_og_config(<<-TOML)
         [og.auto_image]
@@ -782,6 +794,25 @@ describe Hwaro::Content::Seo::OgImage do
 
         # page.image should be set
         page.image.should eq("/og-images/posts-my-post.svg")
+      end
+    end
+
+    it "ignores a logo or background_image that names a directory" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg"
+        config.og.auto_image.logo = dir
+        config.og.auto_image.background_image = dir
+
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Dir Logo"
+        page.url = "/posts/dir-logo/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        File.exists?(File.join(dir, "og-images", "posts-dir-logo.svg")).should be_true
       end
     end
 

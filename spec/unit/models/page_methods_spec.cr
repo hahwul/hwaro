@@ -582,6 +582,22 @@ describe Hwaro::Models::Page do
       end
     end
 
+    it "collects a bundle's own assets when its directory name has glob metacharacters" do
+      Dir.mktmpdir do |dir|
+        names = ["[draft] x", "a{b,c}", "a?b", "a*b", "plain"]
+        names.each do |name|
+          FileUtils.mkdir_p(File.join(dir, "posts", name))
+          File.write(File.join(dir, "posts", name, "index.md"), "# T")
+          File.write(File.join(dir, "posts", name, "f.txt"), "x")
+        end
+        names.each do |name|
+          page = Hwaro::Models::Page.new("posts/#{name}/index.md")
+          page.is_index = true
+          page.collect_assets(dir).should eq(["posts/#{name}/f.txt"])
+        end
+      end
+    end
+
     it "collects non-markdown files from page directory" do
       Dir.mktmpdir do |dir|
         content_dir = dir

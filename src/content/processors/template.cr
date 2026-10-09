@@ -130,9 +130,12 @@ module Hwaro
           @env.functions["now"] = Crinja.function({format: nil}) do
             format = arguments["format"]
             time = Time.local
+            # The page is only as fresh as this format's text: a `--cache`
+            # build re-renders it once the formatted clock moves.
+            TemplateEngine.record_clock_read(format.none? ? CLOCK_DEFAULT_FORMAT : format.to_s)
 
             if format.none?
-              Crinja::Value.new(time.to_s("%Y-%m-%d %H:%M:%S"))
+              Crinja::Value.new(time.to_s(CLOCK_DEFAULT_FORMAT))
             else
               # Same guard as the `date` filter: a malformed format string
               # (`now(format="%")`) makes Crystal's `Time#to_s` raise a bare
@@ -529,6 +532,21 @@ module Hwaro
         # `asset_integrity(name)`: the value is the integrity of what the name
         # resolves to (see AssetHooks.integrity), wherever the output lives.
         ASSET_READ_PREFIX = "asset:"
+        # The wall clock, as a `Time#to_s`/date format: `now()` records its
+        # format, and the build records the one behind each `current_*`
+        # variable a template prints. The value is the clock formatted that
+        # way, so a page re-renders exactly when what it prints would differ.
+        CLOCK_READ_PREFIX     = "clock:"
+        CLOCK_DEFAULT_FORMAT  = "%Y-%m-%d %H:%M:%S"
+        CLOCK_VARIABLE_FORMAT = {
+          "current_year"     => "%Y",
+          "current_date"     => "%Y-%m-%d",
+          "current_datetime" => CLOCK_DEFAULT_FORMAT,
+        }
+
+        def self.record_clock_read(format : String) : Nil
+          record_render_read(CLOCK_READ_PREFIX + format)
+        end
 
         def self.record_render_read(key : String) : Nil
           @@render_reads_mutex.synchronize { @@render_reads << key }

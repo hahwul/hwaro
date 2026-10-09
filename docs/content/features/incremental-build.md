@@ -60,7 +60,9 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
 - **Cascade fingerprint** — the merged section `[cascade]` values applied to
   the page, so editing a parent `_index.md` cascade rebuilds its descendants.
 - **Other pages it renders** — the prev/next neighbours, series list, related
-  posts, translations and breadcrumb ancestors the page's templates read, the
+  posts, translations and breadcrumb ancestors the page's templates read, its
+  parent section's title, description, assets and sort order
+  (`section.title`, `section.pages`, `section_title`, …), the
   pages it fetches with a literal `get_page(path="…")`, and the URLs its `@/`
   links resolve to. Retitling a post re-renders the pages whose "next" link
   names it; changing a page's `slug` re-renders every page linking to it with
@@ -80,8 +82,10 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
 - **Template inputs** — what templates read outside the tracked files: the
   fingerprinted `asset()` bundle names, the `[auto_includes]` tags and their
   `?v=` digest, `env()` values, `load_data()` files outside `data/`, and the
-  source images behind `resize_image()`. A change to any of them re-renders
-  **all** pages. Only the variable names, file paths and a digest are stored in
+  source images behind `resize_image()`, and the clock behind `now()` and the
+  `current_year`/`current_date`/`current_datetime` variables. A change to any of
+  them re-renders **all** pages (a `{{ current_year }}` footer re-renders once
+  a year; `now()` with a seconds format, on every build). Only the variable names, file paths and a digest are stored in
   `.hwaro_cache.json` — never an environment variable's value.
 
 Template dependency tracking requires every template reference to be a string

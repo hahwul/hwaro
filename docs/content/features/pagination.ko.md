@@ -40,6 +40,8 @@ paginate_path = "page"
 | paginate | int | — | 페이지당 항목 수. `0` 이하면 이 섹션의 페이지네이션을 끕니다 |
 | paginate_path | string | "page" | 페이지 URL 패턴 |
 
+별도의 `template`을 지정한 섹션도 `paginate`(또는 `pagination_enabled = true`)를 설정하면 페이지네이션이 적용되며, 해당 템플릿에서 `section_list`, `pagination`, `paginator`를 사용할 수 있습니다. 설정하지 않으면 사이트 전역 `[pagination]`이 켜져 있어도 커스텀 템플릿은 모든 페이지를 그대로 나열합니다.
+
 ### 생성되는 URL
 
 `/blog/` 섹션 기준:
