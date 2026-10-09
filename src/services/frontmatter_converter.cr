@@ -9,6 +9,7 @@ require "yaml"
 require "toml"
 require "./content_lister"
 require "../utils/frontmatter_scanner"
+require "../utils/file_safe"
 require "../utils/frontmatter_writer"
 require "../utils/logger"
 require "../utils/text_utils"
@@ -384,7 +385,8 @@ module Hwaro
         end
 
         permissions = File.info(target).permissions
-        tmp_path = "#{target}.hwaro-convert.tmp"
+        # Not "<target>.suffix": a 233..255-byte file name would overflow NAME_MAX.
+        tmp_path = Utils::FileSafe.temp_path_for(target)
         File.write(tmp_path, content)
         File.chmod(tmp_path, permissions)
         File.rename(tmp_path, target)

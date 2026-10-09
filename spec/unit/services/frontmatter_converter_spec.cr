@@ -90,6 +90,20 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
 
+    # Regression: the temp file was "<name>.hwaro-convert.tmp", which pushed
+    # a valid file name close to NAME_MAX past it ("File name too long").
+    it "converts a file whose name is close to the file-name limit" do
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "#{"a" * 247}.md")
+        File.write(file_path, "---\ntitle: Long\n---\n\nBody")
+
+        converter.convert_to_toml.converted_count.should eq(1)
+        File.read(file_path).should start_with("+++\ntitle = \"Long\"")
+        Dir.children(dir).should eq([File.basename(file_path)])
+      end
+    end
+
     it "does not rewrite a YAML file reached through a symlink outside the project" do
       Dir.mktmpdir do |dir|
         project = File.join(dir, "project")
