@@ -37,6 +37,7 @@ hwaro doctor --json
 | 플래그 | 설명 |
 |------|-------------|
 | -c, --content-dir DIR | 검사할 콘텐츠 디렉터리 (기본값: content) |
+| -e, --env ENV | `build --env ENV`가 읽는 설정 그대로 검사 (`config.ENV.toml`을 병합, 기본값은 `HWARO_ENV`). `--fix`는 여전히 `config.toml`만 수정 |
 | --fix | 실제 수정 수행 — 값 정규화 (base_url 끝 슬래시, sitemap priority 등) |
 | --approve | 권장 선택 설정 섹션을 승인하고 추가 |
 | --full | `--fix`와 `--approve`를 모두 수행 |
@@ -110,7 +111,10 @@ hwaro doctor --json
 페이지는 빌드가 `page.translations`를 만들 때와 똑같이 짝지어집니다 (언어
 접미사를 뺀 기본 이름이 같으면 한 묶음이므로 `about.md`, `about.en.md`,
 `about.ko.md`는 서로 짝). 기본 빌드가 게시하는 페이지만 셈하므로, 초안이나
-미래 날짜 페이지는 번역이 있다고도 없다고도 보지 않습니다. 둘 다 `info`
+미래 날짜 페이지는 번역이 있다고도 없다고도 보지 않습니다. 헤드리스
+(`render = false`, 섹션 `[cascade]`로 적용된 경우 포함)나 `redirect_to` 페이지는
+빌드가 `page.translations`와 hreflang에서 빼므로 번역을 요구하지도, 번역으로
+세지도 않습니다. 둘 다 `info`
 수준이라 `--strict`가 부분 번역 때문에 실패하지 않습니다. 사람용 보고서는 언어별로
 묶어 개수와 함께 보여 줍니다.
 

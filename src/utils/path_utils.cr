@@ -16,6 +16,13 @@ module Hwaro
         path.rstrip(File::SEPARATOR)
       end
 
+      # True when the normalized relative *path* climbs out of its base: its
+      # first segment is exactly `..`. A string-prefix test also matched
+      # legal names such as `..public`.
+      def escapes_parent?(path : String) : Bool
+        Path[path].normalize.parts.first? == ".."
+      end
+
       # `Path#absolute?`, plus a rooted path (`/x`, `\x`) on Windows. The
       # stdlib calls those drive-relative, but they never name something
       # under the current directory: `File.join(root, "/x")` would quietly
@@ -223,6 +230,15 @@ module Hwaro
         segments.join("/")
       end
 
+      # NFC form of `value` (the identity for ASCII, which is nearly every
+      # path). Config patterns are typed precomposed while macOS, zip and
+      # Dropbox hand out decomposed (NFD) file names, so every
+      # pattern-versus-path comparison folds both sides first. Comparison
+      # only: never use it to spell an output path or URL.
+      def nfc(value : String) : String
+        value.ascii_only? ? value : value.unicode_normalize(:nfc)
+      end
+
       # Case- and Unicode-folded form of an `output_file_key`. APFS/HFS+ and
       # NTFS treat `Foo/index.html` and `foo/index.html` as the same file, and
       # APFS additionally folds the NFD and NFC spellings of one accented name
@@ -231,8 +247,7 @@ module Hwaro
       def output_fold_key(key : String) : String
         # NFC is the identity for ASCII, which is nearly every URL, and this
         # runs once per page per build.
-        return key.downcase if key.ascii_only?
-        key.unicode_normalize(:nfc).downcase
+        nfc(key).downcase
       end
 
       # Does the filesystem that `reference` lives on fold letter case in file
@@ -386,11 +401,30 @@ module Hwaro
         path
       end
 
+      # `path` with glob metacharacters escaped, so a content-derived
+      # directory can prefix a glob pattern
+      # (`Dir.glob(File.join(glob_escape(dir), "**", "*"))`) and match
+      # literally: unescaped, `posts/[WIP] Hello` or `a{b,c}` matched nothing.
+      #
+      # POSIX: backslash escapes. Windows has no escape character (`\` is a
+      # separator there), so `*`, `?` and `[` become one-character classes
+      # (`[[]`); braces cannot be escaped at all (brace expansion only honours
+      # `\`), so a `{a,b}` directory still matches nothing there.
+      def glob_escape(path : String) : String
+        {% if flag?(:win32) %}
+          return path unless path.each_char.any?(&.in?('*', '?', '['))
+          path.gsub(/[*?\[]/) { |char| "[#{char}]" }
+        {% else %}
+          return path unless path.each_char.any?(&.in?('*', '?', '[', ']', '{', '}', ',', '\\'))
+          path.gsub(/[*?\[\]{},\\]/) { |char| "\\#{char}" }
+        {% end %}
+      end
+
       # File.match? that treats a malformed glob as non-matching instead of
       # raising File::BadPatternError, so a single config typo can't crash a
       # build or deploy.
       def glob_match?(pattern : String, path : String) : Bool
-        File.match?(pattern, path)
+        File.match?(nfc(pattern), nfc(path))
       rescue File::BadPatternError
         false
       end

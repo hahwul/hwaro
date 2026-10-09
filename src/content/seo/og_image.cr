@@ -103,7 +103,10 @@ module Hwaro
         # compute_config_hash). rev 2: 2026-07 typography + style redesign.
         # rev 3: 2026-09 logo keeps its aspect ratio inside the LOGO_SIZE box.
         # rev 4: 2026-10 PNG titles hard-break segments wider than the line.
-        RENDER_REVISION = 4
+        # rev 5: 2026-10 untitled pages headline the site title; the masthead
+        # and editorial kickers are XML-escaped; JPEG backgrounds and logos
+        # honour their EXIF orientation.
+        RENDER_REVISION = 5
 
         # `default` ("masthead"): eyebrow on top, title anchored high.
         MASTHEAD_EYEBROW_Y    =  96 # eyebrow baseline
@@ -334,7 +337,7 @@ module Hwaro
             # system font (which also covers Latin) so titles don't render as
             # blank "tofu" boxes. A user-set font_path always takes precedence.
             needs_cjk = ai.font_path.nil? &&
-                        pages.any? { |p| contains_cjk?(p.title) || contains_cjk?(p.description || "") }
+                        pages.any? { |p| contains_cjk?(display_title(p, config)) || contains_cjk?(p.description || "") }
 
             font_ctx = OgPngRenderer.load_fonts(ai.font_path, prefer_cjk: needs_cjk)
             png_available = !font_ctx.nil?
@@ -359,13 +362,13 @@ module Hwaro
           logo_abs_path = nil
           if logo_path = ai.logo
             abs = File.expand_path(logo_path)
-            logo_abs_path = abs if File.exists?(abs)
+            logo_abs_path = abs if File.file?(abs)
           end
 
           bg_abs_path = nil
           if bg_image_path = ai.background_image
             abs = File.expand_path(bg_image_path)
-            bg_abs_path = abs if File.exists?(abs)
+            bg_abs_path = abs if File.file?(abs)
           end
 
           # Pre-compute base64 data URIs once for SVG rendering.
@@ -584,6 +587,13 @@ module Hwaro
           image.starts_with?("/#{ai.output_dir.strip("/")}/")
         end
 
+        # The headline of a card: the page title, or the site title for an
+        # untitled page (the blog scaffold's home page has `title = ""`) —
+        # the fallback og:title, feeds and llms.txt already apply.
+        def self.display_title(page : Models::Page, config : Models::Config) : String
+          page.title.strip.empty? ? config.title : page.title
+        end
+
         # The OG image slug for a page. Uses the URL-based slug to avoid
         # collisions between pages with the same title in different sections
         # (e.g. /posts/hello/ and /guides/hello/).
@@ -597,10 +607,20 @@ module Hwaro
         # a short stable hash of the URL so each distinct URL owns a path.
         # `seen_slugs` (slug => owning page.url) carries that disambiguation
         # state across calls within one pass.
+        # Longest bare slug: + ".svg"/".png" (4) + "-<8 hex>" collision suffix (9)
+        # stays under the 255-byte NAME_MAX.
+        MAX_SLUG_BYTES = 240
+
         def self.slug_for(page : Models::Page, seen_slugs : Hash(String, String)) : String
           url_slug = page.url.gsub("/", "-").strip("-")
           slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
           slug = "page" if slug.empty?
+          # The slug is the whole URL, so a deep one can exceed NAME_MAX once
+          # the extension (4) and a collision suffix (9) are added; the page
+          # then silently lost its og:image. Longer slugs are cut and tagged
+          # with a digest of the full URL; every slug that already worked is
+          # untouched.
+          slug = Utils::TextUtils.bound_slug(slug, page.url, MAX_SLUG_BYTES)
 
           if (owner = seen_slugs[slug]?) && owner != page.url
             slug = "#{slug}-#{Digest::SHA256.hexdigest(page.url)[0, 8]}"
@@ -709,7 +729,8 @@ module Hwaro
           chars_per_line = Math.max((text_w / (font_size * 0.55)).to_i, 1)
           desc_chars = Math.max((text_w / (desc_size * 0.55)).to_i, 1)
 
-          title_lines = balanced_word_wrap(page.title, chars_per_line)
+          title = display_title(page, config)
+          title_lines = balanced_word_wrap(title, chars_per_line)
           # The band style draws the title inside a fixed-height color band;
           # cap the lines so a long title can't overflow the band invisibly.
           title_cap = case style
@@ -811,7 +832,7 @@ module Hwaro
             # the composition for poster-style depth. Kept on-canvas and
             # width-capped so a long first word can't run off both sides.
             if style == "hero"
-              if ghost = page.title.split(/\s+/).first?
+              if ghost = title.split(/\s+/).first?
                 unless ghost.empty?
                   ghost_size = (font_size * 2.6).to_i
                   approx_w = (ghost.size * ghost_size * 0.62).to_i
@@ -844,7 +865,7 @@ module Hwaro
               if ai.show_title && !site_name.empty?
                 svg << %(<text x="#{MARGIN_X}" y="#{MASTHEAD_EYEBROW_Y}" font-family="#{SVG_DISPLAY_FONT}" )
                 svg << %(font-size="#{MASTHEAD_EYEBROW_SIZE}" font-weight="700" letter-spacing="2" fill="#{accent}">)
-                svg << site_name.upcase
+                svg << Utils::TextUtils.escape_xml(config.title.upcase)
                 svg << %(</text>\n)
               else
                 svg << %(<rect x="#{MARGIN_X}" y="#{MASTHEAD_EYEBROW_Y - 6}" width="48" height="6" fill="#{accent}" />\n)
@@ -855,7 +876,7 @@ module Hwaro
             if style == "editorial" && ai.show_title && !site_name.empty?
               svg << %(<text x="#{MARGIN_X}" y="#{EDITORIAL_KICKER_Y}" font-family="#{SVG_DISPLAY_FONT}" )
               svg << %(font-size="#{EDITORIAL_KICKER_SIZE}" font-weight="700" letter-spacing="2" fill="#{accent}">)
-              svg << site_name.upcase
+              svg << Utils::TextUtils.escape_xml(config.title.upcase)
               svg << %(</text>\n)
             end
 

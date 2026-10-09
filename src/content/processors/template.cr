@@ -130,9 +130,12 @@ module Hwaro
           @env.functions["now"] = Crinja.function({format: nil}) do
             format = arguments["format"]
             time = Time.local
+            # The page is only as fresh as this format's text: a `--cache`
+            # build re-renders it once the formatted clock moves.
+            TemplateEngine.record_clock_read(format.none? ? CLOCK_DEFAULT_FORMAT : format.to_s)
 
             if format.none?
-              Crinja::Value.new(time.to_s("%Y-%m-%d %H:%M:%S"))
+              Crinja::Value.new(time.to_s(CLOCK_DEFAULT_FORMAT))
             else
               # Same guard as the `date` filter: a malformed format string
               # (`now(format="%")`) makes Crystal's `Time#to_s` raise a bare
@@ -438,7 +441,17 @@ module Hwaro
             # the decoded filesystem path, so decode any percent-encoding from
             # the incoming URL before the lookup; the returned variant is
             # re-encoded below so the emitted .url is a valid href.
-            normalized = URI.decode(TemplateEngine.bundle_image_url(env, path) || (path.starts_with?("/") ? path : "/#{path}"))
+            #
+            # A `?query` / `#fragment` (cache-busted `page.image` values) is not
+            # part of the file: it is cut off before the lookup and re-appended,
+            # as written, to whichever URL comes back. `.`/`..` segments are
+            # collapsed so the variant's name, output file and returned URL are
+            # all canonical (no stray `public/sub/` for `/sub/../photo.jpg`).
+            suffix_at = path.index(/[?#]/)
+            suffix = suffix_at ? path[suffix_at..] : ""
+            file_path = suffix_at ? path[0, suffix_at] : path
+            normalized = URI.decode(TemplateEngine.bundle_image_url(env, file_path) || (file_path.starts_with?("/") ? file_path : "/#{file_path}"))
+            normalized = Path.posix(normalized).normalize.to_s unless normalized.includes?('\0')
 
             if op != "fit"
               source = Content::Hooks::ImageHooks.resolve_source(normalized)
@@ -446,7 +459,7 @@ module Hwaro
               page_path = env.resolve("__page_path__").raw.as?(String)
               made = source.try { |src| Content::Hooks::ImageHooks.op_variant(normalized, src, width, height, op, anchor, page_path) }
               return Crinja::Value.new({
-                "url"    => Crinja::Value.new(base_url.rstrip("/") + URI.encode_path(made.try(&.[0]) || normalized)),
+                "url"    => Crinja::Value.new(base_url.rstrip("/") + URI.encode_path(made.try(&.[0]) || normalized) + suffix),
                 "width"  => Crinja::Value.new(made.try(&.[1]) || width),
                 "height" => Crinja::Value.new(made.try(&.[2]) || height),
                 # LQIP describes the whole source image, not the cropped box.
@@ -459,9 +472,10 @@ module Hwaro
             # image's bytes. An image no resize job covered (a missing file)
             # is recorded at its static/ location, so one that appears there
             # later re-renders the page too.
+            # Serve re-renders the page too: its LQIP / dominant colour are
+            # printed data (see ImageHooks.watch_render_source).
             if Content::Hooks::ImageHooks.processing_active?
-              source = Content::Hooks::ImageHooks.source_path_for(normalized) || File.join("static", normalized)
-              TemplateEngine.record_file_read(source)
+              Content::Hooks::ImageHooks.watch_render_source(normalized).try { |source| TemplateEngine.record_file_read(source) }
             end
 
             # Try to find a resized variant from the image hooks map
@@ -470,9 +484,9 @@ module Hwaro
                       end
 
             final_url = if resized = variant
-                          base_url.rstrip("/") + URI.encode_path(resized[1])
+                          base_url.rstrip("/") + URI.encode_path(resized[1]) + suffix
                         else
-                          base_url.rstrip("/") + URI.encode_path(normalized)
+                          base_url.rstrip("/") + URI.encode_path(normalized) + suffix
                         end
             actual_width = variant.try(&.[0]) || width
 
@@ -499,7 +513,7 @@ module Hwaro
         def self.bundle_image_url(env : Crinja, path : String) : String?
           return if path.empty? || path.starts_with?('/')
           own = Path.posix(path).normalize.to_s
-          return if own.starts_with?("..")
+          return if Utils::PathUtils.escapes_parent?(own)
           page = env.resolve("page")
           return unless page.mapping?
           url = page["url"].to_s
@@ -529,6 +543,21 @@ module Hwaro
         # `asset_integrity(name)`: the value is the integrity of what the name
         # resolves to (see AssetHooks.integrity), wherever the output lives.
         ASSET_READ_PREFIX = "asset:"
+        # The wall clock, as a `Time#to_s`/date format: `now()` records its
+        # format, and the build records the one behind each `current_*`
+        # variable a template prints. The value is the clock formatted that
+        # way, so a page re-renders exactly when what it prints would differ.
+        CLOCK_READ_PREFIX     = "clock:"
+        CLOCK_DEFAULT_FORMAT  = "%Y-%m-%d %H:%M:%S"
+        CLOCK_VARIABLE_FORMAT = {
+          "current_year"     => "%Y",
+          "current_date"     => "%Y-%m-%d",
+          "current_datetime" => CLOCK_DEFAULT_FORMAT,
+        }
+
+        def self.record_clock_read(format : String) : Nil
+          record_render_read(CLOCK_READ_PREFIX + format)
+        end
 
         def self.record_render_read(key : String) : Nil
           @@render_reads_mutex.synchronize { @@render_reads << key }
@@ -538,7 +567,7 @@ module Hwaro
         # the checkout path: CI restores it under a different directory). A
         # path that escapes the project is not recorded — nothing reads it.
         def self.record_file_read(path : String) : Nil
-          return if path.empty? || Hwaro::Utils::PathUtils.absolute?(path)
+          return if path.empty? || path.includes?('\0') || Hwaro::Utils::PathUtils.absolute?(path)
           normalized = Path.posix(path).normalize.to_s
           return if normalized == ".." || normalized.starts_with?("../")
           record_render_read(FILE_READ_PREFIX + normalized)

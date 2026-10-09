@@ -42,12 +42,62 @@ describe Hwaro::Content::Processors::InlineMarkdown do
       out = Hwaro::Content::Processors::InlineMarkdown.render("![a](/caf%E9.png)")
       out.should contain(%(<img src="/caf%E9.png" alt="a">))
     end
+
+    it "reads a {width=…} / {width=… height=…} block after an image as its size" do
+      render = ->(text : String) { Hwaro::Content::Processors::InlineMarkdown.render(text) }
+      render.call("![a](/p.png){width=300}").should eq(%(<img src="/p.png" alt="a" width="300">))
+      render.call("![a](/p.png){width=300 height=200}!").should eq(%(<img src="/p.png" alt="a" width="300" height="200">!))
+      # Any other block stays text.
+      render.call("![a](/p.png){.big}").should eq(%(<img src="/p.png" alt="a">{.big}))
+    end
   end
 
   # Code spans in this renderer used to be single-backtick-only, so a
   # multi-backtick span (the CommonMark way to show a literal backtick) had
   # its INNER backticks matched instead — shredding the span into stray
   # <code> tags and leaving the real delimiters as visible text.
+  describe ".render link destinations" do
+    render = ->(text : String) { Hwaro::Content::Processors::InlineMarkdown.render(text) }
+
+    it "keeps balanced parentheses in the destination" do
+      render.call("[W](https://en.wikipedia.org/wiki/Foo_(bar)) after")
+        .should eq %(<a href="https://en.wikipedia.org/wiki/Foo_(bar)">W</a> after)
+    end
+
+    it "splits a quoted title out of the destination" do
+      render.call(%([T](http://x.y/ "the title"))).should eq %(<a href="http://x.y/" title="the title">T</a>)
+      render.call("[T](http://x.y/ 'the title')").should eq %(<a href="http://x.y/" title="the title">T</a>)
+      render.call("[T](http://x.y/ (the title))").should eq %(<a href="http://x.y/" title="the title">T</a>)
+      render.call(%(![I](a.png "ttl"))).should eq %(<img src="a.png" alt="I" title="ttl">)
+    end
+
+    it "reads an angle-bracket destination" do
+      render.call("[A](<http://x.y/a b>)").should eq %(<a href="http://x.y/a%20b">A</a>)
+    end
+
+    it "honours backslash escapes of ASCII punctuation" do
+      render.call("\\*not em\\*").should eq "*not em*"
+      render.call("snake\\_case\\_name and \\[x\\](y)").should eq "snake_case_name and [x](y)"
+      render.call("[a](/u\\)v)").should eq "<a href=\"/u)v\">a</a>"
+    end
+
+    it "leaves a backslash before other characters alone" do
+      render.call("C:\\Users\\me").should eq "C:\\Users\\me"
+    end
+
+    it "keeps simple links and the unbalanced-paren fallback as they were" do
+      render.call("[a](/x)").should eq %(<a href="/x">a</a>)
+      render.call("[a](foo(bar)").should eq "<a href=\"foo(bar\">a</a>"
+      render.call("[a]()").should eq %(<a href="">a</a>)
+    end
+
+    it "still blocks unsafe schemes, including an escaped colon" do
+      render.call("[a](javascript:alert(1))").should eq "[a](javascript:alert(1))"
+      render.call("[a](javascript\\:alert(1))").should eq "[a](javascript:alert(1))"
+      render.call(%([a](javascript:x "t"))).should eq %([a](javascript:x &quot;t&quot;))
+    end
+  end
+
   describe ".render code spans" do
     it "renders a double-backtick span containing single backticks" do
       out = Hwaro::Content::Processors::InlineMarkdown.render("x `` `tick` `` y")

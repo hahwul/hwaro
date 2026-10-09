@@ -153,6 +153,35 @@ describe Hwaro::Content::FrontMatterSchema do
     check(rule, "title = \"x\"", cascade).violations.should be_empty
   end
 
+  it "applies a `default = false` and lets it satisfy `required`" do
+    rule = schema(<<-TOML)
+      [content.schema.fields.in_sitemap]
+      type = "bool"
+      default = false
+      [content.schema.fields."extra.featured"]
+      type = "bool"
+      required = true
+      default = false
+      TOML
+    result = check(rule, "title = \"x\"")
+    result.violations.should be_empty
+    result.defaults["in_sitemap"].should be_false
+    result.defaults["extra.featured"].should be_false
+  end
+
+  it "sees any taxonomy given in a [taxonomies] table, own or cascaded" do
+    rule = schema("[content.schema.fields.genres]\ntype = \"array\"\nrequired = true\n[content.schema.fields.categories]\ntype = \"array\"\nrequired = true\n")
+    check(rule, "title = \"x\"\n[taxonomies]\ngenres = [\"a\"]\ncategories = [\"c\"]").violations.should be_empty
+    messages(check(rule, "title = \"x\"\n[taxonomies]\ngenres = [\"a\"]")).should eq([%(content/p.md: field "categories": required but missing)])
+    terms = {} of String => Hwaro::Models::ExtraValue
+    terms["genres"] = ["g"]
+    terms["categories"] = ["c"]
+    cascade = {} of String => Hwaro::Models::ExtraValue
+    cascade["taxonomies"] = terms
+    check(rule, "title = \"x\"", cascade).violations.should be_empty
+    messages(check(rule, "title = \"x\"\n[taxonomies]\ngenres = 5\ncategories = [\"c\"]")).first.should contain(%(field "genres": expected array))
+  end
+
   it "points at the top-level or [extra] key, not a nested one of the same name" do
     rule = schema("[content.schema.fields.n]\ntype = \"int\"\n[content.schema.fields.\"extra.rating\"]\ntype = \"int\"\n")
     yaml = "---\nmeta:\n  n: 1\nn: \"x\"\n---\n"

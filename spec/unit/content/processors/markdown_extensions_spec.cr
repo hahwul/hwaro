@@ -2197,4 +2197,65 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should_not contain(%(<section class="footnotes">))
     end
   end
+
+  describe "math next to links, tags and image alt text" do
+    render = ->(content : String, cfg : Hwaro::Models::MarkdownConfig) { Hwaro::Processor::Markdown.render(content, markdown_config: cfg)[0] }
+
+    it "does not find math in a link destination, title, autolink or tag attribute" do
+      cfg = make_config(math: true)
+      html = render.call("[odata](http://x.com/api?$filter=a&$top=2)", cfg)
+      html.should contain(%(<a href="http://x.com/api?$filter=a&amp;$top=2">odata</a>))
+      html.should_not contain("math-inline")
+
+      html = render.call("<http://x.com/$a$/b>", cfg)
+      html.should contain(%(<a href="http://x.com/$a$/b">))
+
+      html = render.call("![img](http://x.com/$a$/b.png)", cfg)
+      html.should contain(%(<img src="http://x.com/$a$/b.png" alt="img" />))
+
+      html = render.call(%([t](http://x.com/ "cost $a$ and $b$")), cfg)
+      html.should contain(%(title="cost $a$ and $b$"))
+
+      html = render.call(%(<img src="http://x.com/$a$/b.png" alt="p">), cfg)
+      html.should contain(%(<img src="http://x.com/$a$/b.png" alt="p">))
+    end
+
+    it "resolves a reference link whose definition has dollar signs" do
+      cfg = make_config(math: true)
+      html = render.call("see [ref][r1]\n\n[r1]: http://x.com/$a$/b \"T $a$\"\n", cfg)
+      html.should contain(%(<a href="http://x.com/$a$/b" title="T $a$">ref</a>))
+    end
+
+    it "still renders math in link text and prose next to links" do
+      cfg = make_config(math: true)
+      html = render.call("[$x$](http://x.com/u) and $f[x](y)$ and $a$", cfg)
+      html.scan("math-inline").size.should eq(3)
+      html.should contain(%(href="http://x.com/u"))
+    end
+
+    it "keeps extension markup out of image alt text" do
+      cfg = make_config(math: true, footnotes: true)
+      html = render.call("![Chart of energy $E=mc^2$ per year](i.png)", cfg)
+      html.should contain(%(alt="Chart of energy $E=mc^2$ per year"))
+      html.should_not contain("math-inline")
+
+      html = render.call("![Figure[^1]](j.png)\n\n[^1]: note", cfg)
+      html.should contain(%(alt="Figure[^1]"))
+      html.should_not contain("footnote-ref")
+
+      cfg = make_config(ins: true, mark: true, sub: true, sup: true)
+      html = render.call("![a ~~s~~ b ==m== c ++i++ H~2~O x^2^](k.png)", cfg)
+      html.should contain(%(alt="a ~~s~~ b ==m== c ++i++ H~2~O x^2^"))
+      html.should_not contain("<del>")
+      html.should_not contain("<mark>")
+    end
+
+    it "keeps rewriting prose around an image and image attributes working" do
+      cfg = make_config(attributes: true)
+      html = render.call("~~gone~~ ![a ~~b~~](i.png){.r width=300} ~~too~~", cfg)
+      html.should contain("<del>gone</del>")
+      html.should contain("<del>too</del>")
+      html.should contain(%(<img src="i.png" alt="a ~~b~~" class="r" width="300" />))
+    end
+  end
 end

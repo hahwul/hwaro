@@ -13,3 +13,25 @@ def posix_only!(why : String) : Nil
     pending!("POSIX only: #{why}")
   {% end %}
 end
+
+# `names` without the ones Windows cannot store as a file name (`<>:"|?*`, or
+# `\` — a separator there), so a spec looping over hostile names still runs
+# the rest on Windows.
+def storable_file_names(names : Array(String)) : Array(String)
+  {% if flag?(:windows) %}
+    names.reject(&.matches?(/[<>:"|?*\\]/))
+  {% else %}
+    names
+  {% end %}
+end
+
+# The `storable_file_names` a `PathUtils.glob_escape`d directory matches
+# literally: on Windows that leaves out braces too (Crystal's brace expansion
+# honours no escape there).
+def glob_literal_names(names : Array(String)) : Array(String)
+  {% if flag?(:windows) %}
+    storable_file_names(names).reject(&.matches?(/[{},]/))
+  {% else %}
+    names
+  {% end %}
+end

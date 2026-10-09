@@ -155,7 +155,7 @@ module Hwaro
       private def self.validate_remote_url!(url : String, where : String) : Nil
         uri = begin
           URI.parse(url)
-        rescue URI::Error
+        rescue URI::Error | OverflowError
           raise remote_config_error("#{where}: invalid url — expected an absolute http(s) URL.")
         end
         scheme = uri.scheme.try(&.downcase)

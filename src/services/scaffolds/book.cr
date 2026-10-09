@@ -1139,6 +1139,9 @@ module Hwaro
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
                 if (e.target.isContentEditable) return;
                 if (document.querySelector('.search-overlay.active')) return;
+                // Alt+← is the browser's Back, Cmd+← / Shift+← / Ctrl+← move the
+                // caret or selection: never take those for chapter navigation.
+                if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 
                 if (e.key === 'ArrowLeft' && prevLink) {
                   e.preventDefault();
@@ -1163,7 +1166,10 @@ module Hwaro
                   sidebar.classList.remove('open');
                 } else {
                   // On desktop: respect stored preference (default: collapsed)
-                  var stored = localStorage.getItem(SIDEBAR_KEY);
+                  // Storage can throw (blocked site data, sandboxed iframe);
+                  // an uncaught error here would abort the whole script.
+                  var stored = null;
+                  try { stored = localStorage.getItem(SIDEBAR_KEY); } catch (err) {}
                   if (stored === 'open') {
                     sidebar.classList.remove('collapsed');
                   } else {
@@ -1194,7 +1200,7 @@ module Hwaro
                     sidebar.classList.toggle('open');
                   } else {
                     var collapsed = sidebar.classList.toggle('collapsed');
-                    localStorage.setItem(SIDEBAR_KEY, collapsed ? 'collapsed' : 'open');
+                    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? 'collapsed' : 'open'); } catch (err) {}
                   }
                   updatePrevArrowPosition();
                 });

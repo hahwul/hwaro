@@ -79,8 +79,7 @@ module Hwaro
           # the machine payload. Detected from the raw argv the same way
           # `Runner.emit_hwaro_error` does.
           # Only flags before `--`: `hwaro init -- --json` names a directory.
-          flag_args = Runner.flag_args(args)
-          if flag_args.includes?("--json") || flag_args.includes?("-j")
+          if Runner.json_flag?(args)
             @json_output = true
             Runner.enable_json_mode!
           end

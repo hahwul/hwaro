@@ -185,7 +185,7 @@ CodePen을 삽입합니다.
 | `path` | (필수) | 프로젝트 루트 기준 파일 경로 |
 | `region` | (없음) | `#region <name>`과 `#endregion <name>` 사이의 줄만 |
 | `lines` | (없음) | 줄 범위 `a-b` 또는 한 줄 `a` (1부터, 양 끝 포함; `region`과 함께 쓰면 영역 안에서 셉니다) |
-| `lang` | 확장자에서 추론 | 코드 블록 언어 |
+| `lang` | 파일 이름이나 확장자에서 추론(`Makefile`, `Dockerfile`, `.rs`). 클라이언트 하이라이트 모드에서는 highlight.js 이름 | 코드 블록 언어 |
 | `title`, `hl_lines`, `hide_lines`, `linenos`, `linenostart`, `copy` | | 펜스 옵션으로 전달 |
 
 영역 표시는 어떤 주석 기호 뒤에도 쓸 수 있어서 원본 파일에서도 올바른 코드로 남습니다:

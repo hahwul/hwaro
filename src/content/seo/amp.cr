@@ -4,6 +4,8 @@ require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
 require "../../utils/path_utils"
+require "../../utils/text_utils"
+require "../processors/internal_link_resolver"
 
 module Hwaro
   module Content
@@ -144,7 +146,7 @@ module Hwaro
           end
 
           scheme == base.scheme.try(&.downcase) && default_port(uri) == default_port(base)
-        rescue URI::Error
+        rescue URI::Error | OverflowError
           # An unparseable src can't be shown to be cross-origin; assume
           # same-origin, which only ever drops a privilege.
           true
@@ -181,7 +183,15 @@ module Hwaro
 
         # Convert standard HTML to AMP-compliant HTML
         def self.convert_to_amp(html : String, page : Models::Page, config : Models::Config) : String
-          result = html
+          # The mirror lives one prefix deeper than the page it was rendered
+          # for, so a document-relative `cover.png` / `../b2/` (page-bundle
+          # images and links) would resolve under `/amp/…` and 404. Resolve
+          # those against the canonical URL first; everything else is
+          # untouched.
+          base_url = config.base_url.rstrip('/')
+          page_path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
+          result = Processors::InternalLinkResolver.absolutize_links(
+            html, Utils::TextUtils.encode_url_path(base_url + page_path), document_relative_only: true)
 
           # Strip any self-referencing <link rel="amphtml"> left over from a
           # prior build (the on-disk canonical HTML may already carry one). An

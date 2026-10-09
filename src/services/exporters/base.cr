@@ -176,11 +176,11 @@ module Hwaro
           files = [] of String
           return files unless Dir.exists?(content_dir)
           project_root = Utils::PathUtils.find_project_root(content_dir)
-          Dir.glob(File.join(content_dir, "**", "*.md")) do |file|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.md")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
             files << file
           end
-          Dir.glob(File.join(content_dir, "**", "*.markdown")) do |file|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.markdown")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
             files << file
           end
@@ -235,7 +235,7 @@ module Hwaro
           end.to_set
           rules = content_files_rules(content_dir)
 
-          Dir.glob(File.join(content_dir, "**", "*")).sort!.each do |src|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*")).sort!.each do |src|
             info = File.info?(src, follow_symlinks: false)
             next unless info && info.file?
             next if ContentWalk.markdown?(src)

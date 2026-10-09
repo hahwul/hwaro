@@ -123,6 +123,8 @@ generate_feeds = true
 
 이렇게 하면 `/blog/rss.xml`이 생성됩니다.
 
+루트 `content/_index.md`(또는 `_index.ko.md` 같은 언어 루트)에서는 `generate_feeds`가 효과가 없습니다. 그 피드는 사이트(또는 언어) 피드와 같은 `/rss.xml`에 쓰이게 되므로, 더 많은 항목을 담은 사이트 피드를 유지하고 빌드가 경고를 출력합니다.
+
 ### 출력
 
 - `/rss.xml` — 사이트 전체 피드

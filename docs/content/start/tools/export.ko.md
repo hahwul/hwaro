@@ -128,6 +128,7 @@ Hugo는 `index.md`/`_index.md` 옆의 파일을 번들 리소스로 읽습니다
 
 출력 규칙:
 - 일반 글은 `_posts/`에 `YYYY-MM-DD-slug.md` 파일명으로 저장
+- `_posts/`로 옮겨진 글에는 `path`나 `permalink`가 이미 없는 한 `permalink: /<섹션>/<이름>/`(hwaro 주소)가 붙으므로, 변환된 `@/` 링크와 외부 링크가 Jekyll의 `/YYYY/MM/DD/name.html`로 바뀌지 않고 그대로 동작합니다
 - 초안 글은 날짜 접두사 없이 `_drafts/`에 저장
 - `redirect_from`은 Jekyll `_config.yml`의 `plugins:`에서 [jekyll-redirect-from](https://github.com/jekyll/jekyll-redirect-from) 플러그인을 켰을 때만 리다이렉트됩니다(GitHub Pages에서는 허용 목록에 있을 뿐 기본으로 켜져 있지 않음)
 - 섹션 인덱스 파일(`_index.md`, 그리고 `_index.ko.md` 같은 번역본)은 `index.md`(`index.ko.md`) 페이지로 변환

@@ -225,6 +225,19 @@ describe Hwaro::CLI::Commands::BuildCommand do
       end
     end
 
+    it "treats empty HWARO_MEMORYLIMIT / HWARO_ENV as unset" do
+      ENV["HWARO_MEMORYLIMIT"] = ""
+      ENV["HWARO_ENV"] = "  "
+      begin
+        options, _ = Hwaro::CLI::Commands::BuildCommand.new.parse_options([] of String)
+        options.memory_limit.should be_nil
+        options.env.should be_nil
+      ensure
+        ENV.delete("HWARO_MEMORYLIMIT")
+        ENV.delete("HWARO_ENV")
+      end
+    end
+
     it "defaults json flag to false" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
       _, _, json_output = cmd.parse_options([] of String)

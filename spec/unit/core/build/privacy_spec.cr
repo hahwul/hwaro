@@ -104,6 +104,22 @@ private def fixture_handler(hits : Hits) : HTTP::Server::Context ->
     when "/secret", "/secret.png"
       res.content_type = "image/png"
       res.print("AWS_SECRET=hunter2")
+    when "/redir-bad-port"
+      res.status = HTTP::Status::FOUND
+      res.headers["Location"] = "http://example.com:99999999999999999999/x.js"
+    when "/css/min.css"
+      css.call(%(@import"inner.css";@import'../css/nested.css';))
+    when "/css/bigport.css"
+      css.call(%(@import url(http://example.com:99999999999999999999/x.css);body{background:url(http://example.com:99999999999999999999/y.png)}))
+    when "/soft404.png", "/soft404.js"
+      res.content_type = "text/html; charset=utf-8"
+      res.print("<html>blocked</html>")
+    when "/legacy.png"
+      res.content_type = "image/x-png"
+      res.print(PNG)
+    when "/plain.js"
+      res.content_type = "text/plain"
+      res.print(JS)
     when "/photo.html"
       res.content_type = "text/html"
       res.print("<script>alert(document.cookie)</script>")
@@ -466,6 +482,76 @@ describe Hwaro::Core::Build::Privacy do
     end
   end
 
+  it "keeps a URL whose port overflows Int32 external instead of aborting the build" do
+    with_cdn do |cdn, _hits, _server|
+      bad = "http://example.com:99999999999999999999"
+      html = %(<script src="#{bad}/x.js"></script><link rel="stylesheet" href="//example.com:99999999999999999999/a.css">)
+      with_privacy(privacy_config) do |privacy, _dir|
+        rewrite(privacy, html).should eq(html)
+      end
+      # A third-party stylesheet's references are third-party input too.
+      with_privacy(privacy_config) do |privacy, dir|
+        rewritten = rewrite(privacy, %(<link rel="stylesheet" href="#{cdn}/css/bigport.css">))
+        css = read_published(dir, rewritten[/\/assets\/external\/[^"]+/])
+        css.should contain("#{bad}/x.css")
+        css.should contain("#{bad}/y.png")
+      end
+    end
+  end
+
+  it "keeps the external URL when a redirect Location has a port above Int32" do
+    with_cdn do |cdn, _hits, _server|
+      with_privacy(privacy_config) do |privacy, dir|
+        html = %(<script src="#{cdn}/redir-bad-port"></script>)
+        log = with_captured_log { rewrite(privacy, html).should eq(html) }
+        log.should contain("keeping the external URL")
+        published(dir).should be_empty
+      end
+    end
+  end
+
+  it "localizes `@import\"x\"` written without a space" do
+    with_cdn do |cdn, _hits, _server|
+      with_privacy(privacy_config) do |privacy, dir|
+        rewritten = rewrite(privacy, %(<link rel="stylesheet" href="#{cdn}/css/min.css">))
+        css = read_published(dir, rewritten[/\/assets\/external\/[^"]+/])
+        css.should_not contain(%(@import"))
+        css.should_not contain(%(@import 'inner))
+        css.scan(/@import "[0-9a-f]{12}-/).size.should eq(2)
+        published(dir).count(&.ends_with?("-inner.css")).should eq(1)
+        published(dir).count(&.ends_with?("-nested.css")).should eq(1)
+      end
+    end
+  end
+
+  it "reads an unquoted attribute value up to whitespace or `>`, `=` included" do
+    with_cdn do |cdn, hits, _server|
+      with_privacy(privacy_config) do |privacy, _dir|
+        rewritten = rewrite(privacy, "<script src=#{cdn}/js/app.js?v=3></script><img src=#{cdn}/img/pic.png?a=1&b=2>")
+        rewritten.should match(/\A<script src="\/assets\/external\/[0-9a-f]{12}-app\.js"><\/script><img src="\/assets\/external\/[0-9a-f]{12}-pic\.png">\z/)
+        hits["/js/app.js"].should eq(1)
+      end
+      with_privacy(privacy_config, sri: true) do |privacy, _dir|
+        rewritten = rewrite(privacy, "<script src=#{cdn}/js/app.js integrity=sha384-abc= crossorigin=anonymous></script>")
+        rewritten.should match(/\A<script src="[^"]+" integrity="sha\d+-[^"]+" crossorigin="anonymous"><\/script>\z/)
+      end
+    end
+  end
+
+  it "does not publish a response whose Content-Type contradicts the URL's extension" do
+    with_cdn do |cdn, _hits, _server|
+      with_privacy(privacy_config) do |privacy, dir|
+        html = %(<img src="#{cdn}/soft404.png"><script src="#{cdn}/soft404.js"></script>)
+        log = with_captured_log { rewrite(privacy, html).should eq(html) }
+        log.should contain("not a file type Hwaro publishes")
+        published(dir).should be_empty
+        # Generic, legacy and unlisted types still fall back to the URL path.
+        rewrite(privacy, %(<img src="#{cdn}/legacy.png">)).should contain("-legacy.png")
+        rewrite(privacy, %(<script src="#{cdn}/plain.js"></script>)).should contain("-plain.js")
+      end
+    end
+  end
+
   it "never publishes HTML, and publishes SVG for <img> with a warning" do
     with_cdn do |cdn, _hits, _offline|
       with_privacy(privacy_config) do |privacy, dir|
@@ -748,6 +834,19 @@ describe "[privacy] builds" do
         sw = File.read("public/sw.js")
         sw.should_not contain("127.0.0.1")
         sw.should match(/"\/assets\/external\/[0-9a-f]{12}-app\.js"/)
+      end
+    end
+  end
+
+  it "keeps the local precache URLs when serve regenerates sw.js" do
+    with_cdn do |cdn, _hits, _server|
+      privacy_site(cdn, %([pwa]\nenabled = true\nprecache_urls = ["/", "#{cdn}/js/app.js"])) do
+        builder = run_build(serve_mode: true)
+        full = File.read("public/sw.js")
+        full.should match(/"\/assets\/external\/[0-9a-f]{12}-app\.js"/)
+
+        builder.site.try { |site| builder.regenerate_service_worker(site, "public", false) }
+        File.read("public/sw.js").should eq(full)
       end
     end
   end

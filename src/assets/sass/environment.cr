@@ -58,7 +58,22 @@ module Hwaro
         getter mixins : Hash(String, MixinClosure)
         getter functions : Hash(String, SassFn)
 
-        def initialize(@variables, @mixins, @functions = {} of String => SassFn)
+        # The module's own root scope, kept for live variable reads: its
+        # mixins and functions assign `!global` variables after the load
+        # snapshot was taken (nil for the built-in modules).
+        @live : Environment?
+
+        def initialize(@variables, @mixins, @functions = {} of String => SassFn, @live = nil)
+        end
+
+        # `ns.$name` — dart-sass module variables are live bindings, so a
+        # counter bumped by `$n: $n + 1 !global` inside a module's
+        # function reads back updated. Private (`-`) names stay hidden.
+        def variable?(name : String) : String?
+          if (env = @live) && !name.starts_with?("-") && (value = env.variables[name]?)
+            return value
+          end
+          @variables[name]?
         end
       end
 

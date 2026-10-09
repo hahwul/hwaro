@@ -58,7 +58,13 @@ If your templates live outside `templates/`, point the scan at them with
 assets they use are reported (and can be deleted) as unused. An explicitly
 passed `--templates-dir` must exist (the path is resolved relative to the
 current directory); the command refuses to run against a missing one rather
-than silently scanning zero templates.
+than silently scanning zero templates. The same applies to an explicit
+`--content-dir` and `--static-dir`.
+
+Files that browsers request by a well-known URL without any markup reference
+are never reported: `favicon.ico`, `apple-touch-icon.png`,
+`apple-touch-icon-precomposed.png` and their `-WxH` size variants, when they sit
+at the root of the static directory.
 
 **Supported asset extensions:**
 Images (png, jpg, jpeg, gif, svg, webp, avif, ico, bmp, tiff, tif), stylesheets (css), scripts (js), fonts (woff, woff2, ttf, eot, otf), media (mp4, webm, ogg, mp3, wav), documents (pdf, zip).

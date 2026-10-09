@@ -89,4 +89,45 @@ describe Hwaro::Core::Build::RemoteFetch do
       server.close
     end
   end
+
+  it "turns a redirect Location with a port above Int32 into a FetchError" do
+    server = HTTP::Server.new do |ctx|
+      ctx.response.status = HTTP::Status::FOUND
+      ctx.response.headers["Location"] = "http://example.com:99999999999999999999/x.js"
+    end
+    port = server.bind_tcp("127.0.0.1", 0).port
+    spawn { server.listen }
+    Fiber.yield
+    begin
+      expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "port out of range") do
+        Hwaro::Core::Build::RemoteFetch.fetch("http://127.0.0.1:#{port}/r", {} of String => String, 1024_i64, 10.seconds)
+      end
+    ensure
+      server.close
+    end
+    expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "port out of range") do
+      Hwaro::Core::Build::RemoteFetch.fetch("http://example.com:99999999999999999999/x", {} of String => String, 1024_i64, 10.seconds)
+    end
+    Hwaro::Core::Build::RemoteFetch.sanitized_url("http://example.com:99999999999999999999/x").should eq("<unparseable url>")
+  end
+
+  it "percent-encodes non-ASCII and spaces in the request line, leaving existing escapes alone" do
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.local_address.port
+    lines = Channel(String).new(1)
+    spawn do
+      if client = server.accept?
+        lines.send(client.gets(chomp: true) || "")
+        client << "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok"
+        client.close
+      end
+    end
+    Fiber.yield
+    begin
+      Hwaro::Core::Build::RemoteFetch.fetch("http://127.0.0.1:#{port}/한글/a b%20c.png?q=가&r=%E3%81%82", {} of String => String, 1024_i64, 10.seconds)
+      lines.receive.should eq("GET /%ED%95%9C%EA%B8%80/a%20b%20c.png?q=%EA%B0%80&r=%E3%81%82 HTTP/1.1")
+    ensure
+      server.close
+    end
+  end
 end

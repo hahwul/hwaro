@@ -68,6 +68,18 @@ describe Hwaro::Core::Build::GitInfo do
       info.keys.sort!.should eq(["posts/café.md", "posts/say \"hi\".md", "posts/tab\there.md", "posts/한글.md"])
     end
 
+    it "keys by the NFC spelling so an NFD page path on disk still finds its entry" do
+      nfd = "posts/cafe\u0301.md"
+      nfc = "posts/caf\u00E9.md"
+      info = Hwaro::Core::Build::GitInfo.parse_log(header("a" * 40, "2024-03-05T10:00:00+00:00") + "#{nfc}\n\n")
+
+      info.keys.should eq([nfc])
+      info[Hwaro::Core::Build::GitInfo.key(nfd)]?.should_not be_nil
+
+      # A checkout without core.precomposeunicode prints the stored (NFD) bytes.
+      Hwaro::Core::Build::GitInfo.parse_log(header("a" * 40, "2024-03-05T10:00:00+00:00") + "#{nfd}\n\n").keys.should eq([nfc])
+    end
+
     it "handles commits that list no files and blank lines" do
       log = header("a" * 40, "2024-03-05T10:00:00+00:00") + "\n" +
             header("b" * 40, "2024-01-05T10:00:00+00:00") + "posts/a.md\n\n\n"

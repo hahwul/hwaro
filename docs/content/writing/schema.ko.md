@@ -74,7 +74,7 @@ max = 5
 
 필드가 없으면 렌더링 전에 `default`가 페이지에 설정되어 템플릿에서 보입니다. extra 키는 `{{ page.extra.status }}`, 알려진 필드는 타입이 있는 속성(`{{ page.description }}`)으로 읽습니다. 기본값은 extra 키와 다음 알려진 필드를 채울 수 있습니다: `description`, `image`, `template`, `render`, `toc`, `insert_anchor_links`, `in_sitemap`, `in_search_index`, `weight`, `series`, `series_weight`, `tags`, `authors`, `updated`. `slug`, `path`, `date` 같은 필드는 페이지를 파싱하는 동안 결정되므로, 여기에 기본값을 두면 설정 오류입니다. `draft`도 기본값을 가질 수 없습니다. 게시 여부는 프론트 매터와 [`[cascade]`](/ko/writing/sections/#캐스케이드)가 정하며, `doctor`와 `tool list`도 이 둘만 읽기 때문입니다.
 
-기본값은 자기 필드(타입, enum, 범위)를 만족해야 합니다. 기본값이 있는 필드는 누락으로 보고되지 않습니다.
+기본값은 자기 필드(타입, enum, 범위)를 만족해야 합니다. 기본값이 있는 필드는 누락으로 보고되지 않습니다. 택소노미 필드는 페이지가 용어를 적은 어느 곳에서든(최상위 키 또는 Zola 방식의 `[taxonomies]` 테이블, 페이지 자체 또는 cascade된 것) 찾습니다.
 
 ## 오류
 

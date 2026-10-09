@@ -88,8 +88,8 @@ module Hwaro
 
           if yaml
             # Title
-            if title = yaml["title"]?
-              fields["title"] = yaml_string(title)
+            if (title = yaml["title"]?) && (title_text = yaml_title(title))
+              fields["title"] = title_text
             end
 
             # Date
@@ -172,6 +172,13 @@ module Hwaro
             fields["draft"] = true
           end
 
+          # Hexo's `title` defaults to the file name; without this every
+          # title-less post built as "Untitled".
+          unless fields.has_key?("title")
+            stem = filename_stem(filename)
+            fields["title"] = stem unless stem.blank?
+          end
+
           # Hexo's `<!-- more -->` excerpt separator is kept verbatim: hwaro
           # reads the same marker as the page summary, so deleting it threw
           # away the excerpt the author chose.
@@ -186,7 +193,7 @@ module Hwaro
 
           if slug.empty?
             if title = fields["title"]?.as?(String)
-              slug = Utils::TextUtils.slugify(title)
+              slug = file_slug(title)
             else
               slug = "untitled"
             end
@@ -199,13 +206,19 @@ module Hwaro
           has_hexo_tags ? :imported_wrapped : :imported
         end
 
-        private def extract_slug(filename : String) : String
+        # The filename without its extension and `YYYY-MM-DD-` prefix.
+        private def filename_stem(filename : String) : String
           if match = FILENAME_PATTERN.match(filename)
             match[2]
           else
-            name = File.basename(filename, File.extname(filename))
-            Utils::TextUtils.slugify(name)
+            File.basename(filename, File.extname(filename))
           end
+        end
+
+        # URL-safe slug of the filename (the date-prefixed branch used to
+        # return the raw name: spaces, `%`, `#`, `?` ended up in the URL).
+        private def extract_slug(filename : String) : String
+          Utils::TextUtils.slugify(filename_stem(filename))
         end
 
         private def extract_date_from_filename(filename : String) : Time?

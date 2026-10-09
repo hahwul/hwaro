@@ -454,7 +454,7 @@ describe Hwaro::Services::Deployer do
         src_dir = File.join(dir, "src")
         dest_dir = File.join(dir, "dest")
         FileUtils.mkdir_p(File.join(src_dir, "blog", "post1"))
-        File.write(File.join(src_dir, "blog", "post1", "index.html"), "p1")
+        File.write(File.join(src_dir, "blog", "post1", "index.html"), "<p>p1</p>")
 
         config = Hwaro::Models::Config.new
         target = Hwaro::Models::DeploymentTarget.new
@@ -472,7 +472,7 @@ describe Hwaro::Services::Deployer do
         # Remove post1 from the source; the stale stripped file must go away.
         FileUtils.rm_rf(File.join(src_dir, "blog", "post1"))
         FileUtils.mkdir_p(File.join(src_dir, "blog", "post2"))
-        File.write(File.join(src_dir, "blog", "post2", "index.html"), "p2")
+        File.write(File.join(src_dir, "blog", "post2", "index.html"), "<p>p2</p>")
 
         deployer.run(options, config).should be_true
         File.exists?(File.join(dest_dir, "blog", "post1")).should be_false

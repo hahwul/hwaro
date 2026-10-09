@@ -167,7 +167,7 @@ Tailwind가 `static/css/tailwind.css`를 다시 쓰면 서버가 이를 복사�
 
 1. Initialize 단계에서 파이프라인이 `source_dir`의 소스 파일을 읽습니다
 2. 각 번들에 나열된 파일을 순서대로 이어 붙입니다
-3. `minify`가 활성화되어 있으면 CSS/JS별 압축을 적용합니다
+3. `minify`가 활성화되어 있으면 CSS/JS별 압축을 적용합니다(`.css`, `.js`, `.mjs` 번들 대상이며, 각 항목 앞의 UTF-8 BOM은 제거됩니다)
 4. `fingerprint`가 활성화되어 있으면 확장자 앞에 8자리 SHA-256 해시를 삽입합니다
 5. 출력은 빌드 디렉터리의 `{output_dir}/{output_name}`에 기록됩니다
 6. 원본 이름과 출력 경로를 매핑한 매니페스트가 템플릿 해석용으로 저장됩니다

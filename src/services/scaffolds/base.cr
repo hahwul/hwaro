@@ -1322,11 +1322,20 @@ module Hwaro
                 return d.innerHTML;
               }
 
+              // Match on the raw text and escape each piece afterwards: running the
+              // query over already-escaped HTML split entities (`&amp;`) with a
+              // <mark> and could never match a query containing & < >.
               function highlightMatch(text, query) {
                 if (!query) return escapeHtml(text);
-                var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                var re = new RegExp('(' + escaped + ')', 'gi');
-                return escapeHtml(text).replace(re, '<mark>$1</mark>');
+                var lower = text.toLowerCase(), q = query.toLowerCase();
+                // Lowercasing can change the length (e.g. `İ`), which would shift every offset.
+                if (lower.length !== text.length) return escapeHtml(text);
+                var out = '', pos = 0, i;
+                while ((i = lower.indexOf(q, pos)) !== -1) {
+                  out += escapeHtml(text.slice(pos, i)) + '<mark>' + escapeHtml(text.slice(i, i + q.length)) + '</mark>';
+                  pos = i + q.length;
+                }
+                return out + escapeHtml(text.slice(pos));
               }
 
               function getSnippet(content, query) {

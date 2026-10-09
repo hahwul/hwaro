@@ -10,6 +10,7 @@ require "../utils/js_minifier"
 require "../utils/logger"
 require "../utils/output_guard"
 require "../utils/path_utils"
+require "../utils/text_utils"
 require "../models/config"
 require "./sass_compiler"
 
@@ -94,7 +95,7 @@ module Hwaro
             # skipped first entry (missing file, escaping symlink) used to
             # leave the bundle starting with a stray separator.
             io << separator if wrote_any
-            content = File.read(source)
+            content = Utils::TextUtils.strip_bom(File.read(source))
             # `.scss` bundle entries compile before concatenation when the
             # built-in Sass feature is on; verbatim otherwise.
             if @sass_enabled && file.ends_with?(".scss")
@@ -209,7 +210,7 @@ module Hwaro
         path_part = url.split(/[?#]/, 2).first
         suffix = url[path_part.size..]
         target = Path.posix(source_dir, path_part).normalize
-        return whole if target.to_s.starts_with?("..")
+        return whole if Utils::PathUtils.escapes_parent?(target.to_s)
         return whole unless File.file?(File.join(@config.source_dir, target.to_s))
         rebased = target.relative_to(Path.posix(bundle_dir)).to_s
         "url(#{quote}#{rebased}#{suffix}#{quote})"
@@ -257,7 +258,7 @@ module Hwaro
         case ext
         when ".css"
           Utils::CssMinifier.minify(content)
-        when ".js"
+        when ".js", ".mjs"
           Utils::JsMinifier.minify(content)
         else
           content

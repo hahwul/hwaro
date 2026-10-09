@@ -80,6 +80,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     recomputed_paths = [] of String
 
     pages.each do |page|
+      recomputed_paths << page.path if recount_included_words(page, site)
       # parse_single_page already extracted the chunk into page.summary;
       # extract_summary is only a fallback for hook-based parse paths that
       # skipped it (it re-scans the whole raw_content, so don't repeat it).
@@ -93,6 +94,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       end
 
       shortcode_results = {} of String => String
+      summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
       summary_md = expand_includes(summary_md, page, site)
       processed = if content_may_contain_shortcodes?(summary_md)
                     context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
@@ -175,6 +177,24 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
   end
 
+  # `page.word_count` / `reading_time` count the text the page renders, so a
+  # page built from `include_md` / `include_code` / `![[note]]` counts what
+  # they bring in (parse counted the call text only). A failing include keeps
+  # the raw count; the body render reports it. True when the counts changed.
+  private def recount_included_words(page : Models::Page, site : Models::Site) : Bool
+    raw = page.raw_content
+    expanded = begin
+      expanded_raw_content(page, site)
+    rescue Hwaro::HwaroError
+      return false
+    end
+    return false if expanded.same?(raw)
+    before = page.word_count
+    page.calculate_word_count(expanded)
+    page.calculate_reading_time
+    page.word_count != before
+  end
+
   # Automatic summary for a page with neither `<!-- more -->` nor a
   # description: run the body through the same shortcode → Markdown →
   # placeholder sub-pipeline the marker summary uses (so shortcode syntax,
@@ -235,6 +255,61 @@ module Hwaro::Core::Build::Phases::ParseContent
   rescue ex
     Logger.warn "Automatic summary skipped for #{page.path}: #{ex.message}"
     had || false # nil when the raise preceded the assignment above
+  end
+
+  SUMMARY_LINK_DEFINITION_RE     = /\A {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*\S/
+  SUMMARY_FOOTNOTE_DEFINITION_RE = /\A {0,3}\[\^([^\]\s]+)\]:/
+  SUMMARY_FOOTNOTE_REF_RE        = /\[\^([^\]\s]+)\](?!:)/
+
+  # The summary chunk is rendered alone, but definitions normally sit at the
+  # end of a post, after the marker. Append the link reference definitions
+  # found there (outside fences) so `[text][ref]` still links, and drop
+  # footnote references that have no definition inside the chunk — they
+  # would ship as literal `[^1]` in every listing and feed. A chunk that is
+  # already self-contained is returned untouched.
+  private def complete_summary_chunk(chunk : String, raw : String, footnotes : Bool) : String
+    rest_start = raw.byte_index(chunk)
+    rest = rest_start ? raw.byte_slice(rest_start + chunk.bytesize) : ""
+    definitions = [] of String
+    if !rest.empty? && rest.includes?("]:")
+      tracker = Content::Processors::FenceTracker.new
+      rest.each_line(chomp: true) do |line|
+        next if tracker.fence_line?(line)
+        definitions << line if SUMMARY_LINK_DEFINITION_RE.matches?(line)
+      end
+    end
+    chunk = strip_dangling_footnote_refs(chunk) if footnotes && chunk.includes?("[^")
+    definitions.empty? ? chunk : "#{chunk}\n\n#{definitions.join('\n')}"
+  end
+
+  private def strip_dangling_footnote_refs(chunk : String) : String
+    defined = Set(String).new
+    chunk.each_line do |line|
+      if match = SUMMARY_FOOTNOTE_DEFINITION_RE.match(line)
+        defined << match[1]
+      end
+    end
+    tracker = Content::Processors::FenceTracker.new
+    String.build do |io|
+      chunk.each_line(chomp: false) do |line|
+        fenced = tracker.fence_line?(line)
+        if !fenced && line.includes?("[^")
+          # Refs inside inline code spans are literal text: blank the spans
+          # out (byte offsets preserved) before looking.
+          probe = line.includes?('`') ? line.gsub(Content::Processors::InlineMarkdown::INLINE_CODE_SPAN_RE) { |span| " " * span.bytesize } : line
+          bytes = line.to_slice
+          pos = 0
+          probe.scan(SUMMARY_FOOTNOTE_REF_RE) do |match|
+            next if defined.includes?(match[1])
+            io.write bytes[pos, match.byte_begin(0) - pos]
+            pos = match.byte_end(0)
+          end
+          io.write bytes[pos, bytes.size - pos]
+        else
+          io << line
+        end
+      end
+    end
   end
 
   # Rebuild the `[[wikilink]]` lookup over `pages` (the published set).
@@ -392,7 +467,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       own_line = prefix && md.post_match.blank?
       args = parse_shortcode_args_jinja(unmask_inline_code(md[2], spans))
       text = begin
-        md[1] == "code" ? include_code_text(args) : include_md_text(args, page, site, chain)
+        md[1] == "code" ? include_code_text(args, site) : include_md_text(args, page, site, chain)
       rescue ex : Content::Processors::Includes::Error
         raise Content::Processors::Includes::IncludeError.new("#{unmask_inline_code(call, spans)} in #{chain.last}: #{ex.message}")
       end
@@ -416,8 +491,30 @@ module Hwaro::Core::Build::Phases::ParseContent
       return memo[2] if memo && memo[0].same?(raw) && memo[1] == index
     end
     expanded = expand_includes(raw, page, site)
+    warn_duplicate_labels(page, expanded) unless expanded == raw
     @include_sources_mutex.synchronize { @expanded_raw_memo[page.path] = {raw, index, expanded} }
     expanded
+  end
+
+  LABEL_DEF_RE = /\A {0,3}\[(\^?[^\]\s][^\]]*)\]:/
+
+  # Footnote labels and link reference labels are document-global, and
+  # includes splice raw text, so two notes (or a note and the page) that use
+  # `[^1]` or `[ref]` collide: one definition wins for all. Said once per
+  # page and label; each definition is only counted outside code fences.
+  private def warn_duplicate_labels(page : Models::Page, expanded : String) : Nil
+    counts = {} of String => Int32
+    tracker = Content::Processors::FenceTracker.new
+    expanded.each_line do |line|
+      next if tracker.fence_line?(line)
+      next unless md = LABEL_DEF_RE.match(line)
+      counts[md[1].downcase] = (counts[md[1].downcase]? || 0) + 1
+    end
+    counts.each do |label, count|
+      next if count < 2
+      next unless @wikilink_warnings.first?(page.path, "[#{label}]:")
+      Logger.warn "'#{page.path}': [#{label}] is defined #{count} times once its includes and transclusions are spliced in; one definition is used for every reference."
+    end
   end
 
   # What a per-page scan reads (shortcodes used, `@/` targets, wikilinks):
@@ -435,12 +532,16 @@ module Hwaro::Core::Build::Phases::ParseContent
     expanded == raw ? [raw] : [raw, expanded]
   end
 
-  private def include_code_text(args : Hash(String, String)) : String
+  private def include_code_text(args : Hash(String, String), site : Models::Site) : String
     relative = include_relative_path(args)
     text = read_include(relative)
     text = Content::Processors::Includes.region(text, args["region"], markdown: false) if args["region"]?
     text = Content::Processors::Includes.lines(text, args["lines"]) if args["lines"]?
-    lang = args["lang"]? || Content::Processors::Includes.language_for(relative)
+    lang = args["lang"]? || begin
+      lexer = Content::Processors::Includes.language_for(relative)
+      # highlight.js reads the class, and does not know every lexer's name.
+      site.config.highlight.server? ? lexer : Content::Processors::Includes.hljs_language(lexer)
+    end
     Content::Processors::Includes.fenced(Content::Processors::Includes.dedent(text), lang, args)
   end
 
@@ -487,7 +588,9 @@ module Hwaro::Core::Build::Phases::ParseContent
   private def transclusion(inner : String, prefix : String, page : Models::Page, site : Models::Site, chain : Array(String)) : String?
     return unless index = @wikilink_index
     link = Content::Processors::Wikilinks.parse(inner, true)
-    return if link.nil? || link.target.empty? || link.image? || link.file?
+    # Not `link.file?`: a note named `v1.2 plan` or `2026.10.05` has an
+    # "extension" too, and an attachment (`doc.pdf`) resolves to no page here.
+    return if link.nil? || link.target.empty? || link.image?
     return unless target = index.resolve(link.target, page)
     relative = File.join("content", target.path)
     record_include_source(relative)
@@ -786,7 +889,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.git = nil
     return unless info_map = @git_info
     return if page.synthesized?
-    return unless info = info_map[page.path]?
+    return unless info = info_map[GitInfo.key(page.path)]?
 
     page.git = info
     git_config = @config.try(&.git)
@@ -1116,9 +1219,9 @@ module Hwaro::Core::Build::Phases::ParseContent
   # on the page renders a term link to a 404.
   private def cascade_string_array(value : Models::ExtraValue) : Array(String)?
     if value.is_a?(Array(String))
-      value.map(&.strip).reject(&.empty?)
+      value.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
     elsif value.is_a?(Array(Models::ExtraValue))
-      value.compact_map(&.as?(String)).map(&.strip).reject(&.empty?)
+      value.compact_map(&.as?(String)).map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
     end
   end
 

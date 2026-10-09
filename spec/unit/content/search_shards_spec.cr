@@ -88,6 +88,38 @@ describe "Hwaro::Content::Search shards" do
     end
   end
 
+  describe "a section named like the manifest" do
+    it "keeps the `index` section's shard out of search/index.json" do
+      config = shard_config("section")
+      pages = [
+        shard_page("index/a.md", "IDXPAGE", "/index/a/", "index"),
+        shard_page("docs/a.md", "Docs", "/docs/a/", "docs"),
+      ]
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate(pages, config, odir)
+
+        manifest = read_manifest(odir)
+        manifest["version"].as_i.should eq(1)
+        shard = manifest["shards"].as_a.find! { |sh| sh["id"].as_s == "index" }
+        url = shard["url"].as_s
+        url.should_not eq("/search/index.json")
+
+        JSON.parse(File.read(File.join(odir, url.lchop("/")))).as_a.map(&.["title"].as_s).should eq(["IDXPAGE"])
+      end
+    end
+
+    it "prunes the renamed shard when the section goes away" do
+      config = shard_config("section")
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate([shard_page("index/a.md", "A", "/index/a/", "index")], config, odir)
+        Hwaro::Content::Search.generate([shard_page("docs/a.md", "D", "/docs/a/", "docs")], config, odir)
+
+        Dir.glob(File.join(odir, "search", "*.json")).map { |p| File.basename(p) }.sort!.should eq(["docs.json", "index.json"])
+        read_manifest(odir)["shards"].as_a.map(&.["id"].as_s).should eq(["docs"])
+      end
+    end
+  end
+
   describe "shards = \"section\"" do
     it "writes one shard per top-level section, root pages to _root, plus a manifest" do
       config = shard_config("section")
@@ -223,6 +255,32 @@ describe "Hwaro::Content::Search shards" do
         Hwaro::Content::Search.generate([] of Hwaro::Models::Page, config, odir)
         read_manifest(odir)["shards"].as_a.should be_empty
         Dir.glob(File.join(odir, "search", "*.json")).map { |p| File.basename(p) }.should eq(["index.json"])
+      end
+    end
+
+    it "keeps a section named `index` from colliding with the manifest" do
+      config = shard_config("section")
+      pages = [shard_page("index/b.md", "Inside", "/index/b/", "index", body: "INDEXSECTION")]
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate(pages, config, odir)
+        shards = read_manifest(odir)["shards"].as_a
+        shards.map(&.["id"].as_s).should eq(["index"])
+        shards.first["count"].as_i.should eq(1)
+        File.read(File.join(odir, "search", "_index.json")).should contain("INDEXSECTION")
+        shards.first["section"].as_s.should eq("index")
+      end
+    end
+
+    it "ignores a foreign search/index.json that is not Hwaro's manifest" do
+      config = shard_config("section")
+      ["[1,2]", %({"shards":[1]}), %({"shards":[[]]}), "null", "7"].each do |foreign|
+        Dir.mktmpdir do |odir|
+          Dir.mkdir_p(File.join(odir, "search"))
+          File.write(File.join(odir, "search", "index.json"), foreign)
+          Hwaro::Content::Search.published_outputs(config, odir)
+          Hwaro::Content::Search.generate(sample_pages, config, odir)
+          read_manifest(odir)["shards"].as_a.map(&.["id"].as_s).should eq(["_root", "blog", "docs"])
+        end
       end
     end
 

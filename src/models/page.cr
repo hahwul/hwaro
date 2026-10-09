@@ -1,6 +1,7 @@
 require "html"
 require "crinja"
 require "../utils/text_utils"
+require "../utils/path_utils"
 require "../content/processors/fence_tracker"
 require "./git_info"
 require "./config"
@@ -427,9 +428,9 @@ module Hwaro
         return [] of String unless Dir.exists?(page_dir)
         return [] of String if Path[page_dir].normalize == Path[content_dir].normalize
 
-        @assets = Dir.glob(File.join(page_dir, "**", "*")).sort!.compact_map do |file|
+        @assets = Dir.glob(File.join(Utils::PathUtils.glob_escape(page_dir), "**", "*")).sort!.compact_map do |file|
           next unless File.file?(file)
-          next if file.ends_with?(".md") || file.ends_with?(".markdown")
+          next if Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.includes?(File.extname(file).downcase)
           next if nested_bundle?(page_dir, file, content_dir, bundle_dirs)
 
           relative = Path[file].relative_to(content_dir).to_s
@@ -468,10 +469,11 @@ module Hwaro
       # Calculate word count from raw content
       # Note: @raw_content already has front matter stripped during parsing,
       # so we only need to remove HTML tags and markdown syntax.
-      def calculate_word_count : Int32
+      def calculate_word_count(text : String = @raw_content) : Int32
         # Shared with `hwaro tool stats` via TextUtils so the CLI report and
-        # the published `page.word_count` can never drift apart.
-        @word_count = Utils::TextUtils.count_words(@raw_content)
+        # the published `page.word_count` can never drift apart. `text` is
+        # the include-expanded body once the build has expanded it.
+        @word_count = Utils::TextUtils.count_words(text)
         @word_count
       end
 
@@ -497,7 +499,10 @@ module Hwaro
         offset = 0
         tracker = Content::Processors::FenceTracker.new
         @raw_content.each_line(chomp: false) do |line|
-          if !tracker.fence_line?(line) && (match = line.match(MORE_MARKER_REGEX))
+          # A marker inside an inline code span (`` `<!-- more -->` ``) is
+          # literal text too: blank the spans out, keeping byte offsets.
+          probe = line.includes?('`') ? line.gsub(Content::Processors::InlineMarkdown::INLINE_CODE_SPAN_RE) { |span| " " * span.bytesize } : line
+          if !tracker.fence_line?(line) && (match = probe.match(MORE_MARKER_REGEX))
             summary_md = @raw_content.byte_slice(0, offset + match.byte_begin(0)).strip
             @summary = summary_md unless summary_md.empty?
             return @summary

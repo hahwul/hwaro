@@ -255,7 +255,68 @@ describe Hwaro::Content::Processors::Wikilinks do
     end
   end
 
+  describe ".rewrite where InlineMarkdown renders the text" do
+    src = wl_page("notes/src.md")
+    index = wl_index([src, wl_page("notes/my-page.md")], [{"photo.png", "/photo.png"}])
+
+    it "writes link text, a missing link and an image size without Markdown escapes" do
+      head = "| a | b |\n|---|---|\n"
+      wl_rewrite("#{head}| [[my-page]] | [[my-page\\|Hello, world!]] |", src, index).should eq("#{head}| [my-page](@/notes/my-page.md) | [Hello, world!](@/notes/my-page.md) |")
+      wl_rewrite("#{head}| [[nope]] | ![[photo.png\\|300x200]] |", src, index).should eq("#{head}| nope | ![photo.png](/photo.png){width=300 height=200} |")
+      wl_rewrite("Term\n: def [[my-page#A B]]", src, index).should eq("Term\n: def [my-page > A B](@/notes/my-page.md#a-b)")
+      wl_rewrite("[^1]: see [[my-page]] [[nope-x]]\n    more [[my-page]]\n\n[[my-page]]", src, index)
+        .should eq("[^1]: see [my-page](@/notes/my-page.md) nope-x\n    more [my-page](@/notes/my-page.md)\n\n[my\\-page](@/notes/my-page.md)")
+    end
+
+    it "leaves the paragraph form alone" do
+      wl_rewrite("[[my-page]] [[nope]]", src, index).should eq(%([my\\-page](@/notes/my-page.md) <span class="wikilink wikilink-missing">nope</span>))
+    end
+  end
+
+  describe ".rewrite for a missing link's text" do
+    src = wl_page("notes/src.md")
+    index = wl_index([src])
+
+    it "escapes what Markd would read inside the span" do
+      with_captured_log do
+        wl_rewrite("[[__init__]] [[*a*]] [[`c`]] [[a\\]]", src, index).should eq(
+          %(<span class="wikilink wikilink-missing">\\_\\_init\\_\\_</span> <span class="wikilink wikilink-missing">\\*a\\*</span> ) +
+          %(<span class="wikilink wikilink-missing">\\`c\\`</span> <span class="wikilink wikilink-missing">a\\\\</span>))
+      end
+    end
+
+    it "leaves math in the text for the math pass" do
+      with_captured_log do
+        wl_rewrite("[[$x_1$]]", src, index, math: true).should eq(%(<span class="wikilink wikilink-missing">$x_1$</span>))
+      end
+    end
+  end
+
+  describe ".rewrite near URLs and raw HTML" do
+    src = wl_page("notes/src.md")
+    index = wl_index([src, wl_page("notes/t.md")])
+
+    it "keeps a wikilink inside an autolink, a link destination or a reference definition" do
+      md = "<https://example.com/[[t]]> [a](http://x.y/[[t]]) [a]( <http://x.y/[[t]]>)\n\n[r]: http://x.y/[[t]]\n"
+      wl_rewrite(md, src, index).should eq(md)
+    end
+
+    it "keeps a wikilink inside a processing instruction, declaration or CDATA block" do
+      md = "<?php [[t]] ?>\n\n<?xml\n[[t]]\n?>\n\n<![CDATA[\n[[t]]\n]]>\n\n<!DOCTYPE [[t]]>\n\n[[t]]"
+      wl_rewrite(md, src, index).should eq(md.rchop("[[t]]") + "[t](@/notes/t.md)")
+    end
+  end
+
   describe ".each_link" do
+    it "yields reference definitions and the hrefs of raw HTML blocks, not footnotes or comments" do
+      found = [] of String
+      md = "[x][r] [^n]\n\n[r]: @/a.md\n  [s]: <@/b.md> \"t\"\n[^n]: /c/\n\n<div>\n  <a href=\"/d/\">d</a>\n  <!-- <a href=\"/e/\">e</a> -->\n</div>\n\n```html\n<div>\n[q]: /f/\n</div>\n```\n"
+      Hwaro::Content::Processors::Wikilinks.each_link(md) do |link|
+        found << (link.is_a?(String) ? link : "[[#{link.target}]]")
+      end
+      found.sort.should eq(["/d/", "@/a.md", "@/b.md"])
+    end
+
     it "yields wikilinks and link URLs outside code" do
       found = [] of String
       md = "[[A]] [b](/b/) <a href=\"/c/\">c</a> `[d](/d/)`\n```\n[[E]]\n```\n"

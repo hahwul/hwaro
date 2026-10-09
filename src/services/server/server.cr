@@ -792,7 +792,7 @@ module Hwaro
       # with one (`Config::Loader.build_output_dir_value` drops those).
       private def sanitize_output_dir(dir : String) : String
         normalized = Path[dir].normalize.to_s
-        if normalized.starts_with?("..")
+        if Utils::PathUtils.escapes_parent?(normalized)
           Logger.warn "Invalid output directory: #{dir}. Using 'public' instead."
           return "public"
         end

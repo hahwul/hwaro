@@ -52,13 +52,13 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| date | string | — | Publication date: `YYYY-MM-DD`, optionally with time (`YYYY-MM-DD HH:MM:SS` or RFC 3339 datetime); unquoted TOML/YAML dates also work. A date without an offset is read in the build machine's local time zone, in TOML, YAML and JSON alike. A written UTC offset (`+09:00`) is kept, so the date prints as written in both TOML and YAML. Since that fix, a TOML offset date also feeds date permalink tokens (`:year`/`:month`/`:day`) and year/month grouping as written, so a URL built from the old UTC day can move (e.g. `/2024/02/29/` → `/2024/03/01/`); add the old URL to `aliases` to keep it working |
+| date | string | — | Publication date: `YYYY-MM-DD`, optionally with time (`YYYY-MM-DD HH:MM:SS` or RFC 3339 datetime); unquoted TOML/YAML dates also work. A date without an offset is read in the build machine's local time zone, in TOML, YAML and JSON alike. A written UTC offset (`+09:00`, also `+0900` or after a space: `2024-01-15 10:00:00 +0900`) is kept, so the date prints as written in both TOML and YAML. Since that fix, a TOML offset date also feeds date permalink tokens (`:year`/`:month`/`:day`) and year/month grouping as written, so a URL built from the old UTC day can move (e.g. `/2024/02/29/` → `/2024/03/01/`); add the old URL to `aliases` to keep it working |
 | description | string | — | SEO description |
 | draft | bool | false | Exclude from production builds |
 | template | string | "page" | Template to use |
 | weight | int | 0 | Sort order (lower = first) |
 | image | string | — | Featured image for social sharing. A relative path naming a file in the page bundle (`image = "cover.png"` beside `index.md`) resolves to that file |
-| tags | array | [] | Tag taxonomy terms |
+| tags | array | [] | Tag taxonomy terms. Strings and integers (`tags = [2024, "crystal"]`) are kept (as `2024`); a float such as `3.10` is skipped with a warning, so quote it (`"3.10"`). Terms are NFC-normalised, so an NFD and an NFC spelling of one tag are the same term |
 | categories | array | [] | Category taxonomy terms |
 
 ### All Fields
@@ -80,6 +80,8 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 | series | string | Series name for grouping |
 | series_weight | int | Sort order within series |
 | extra | table | Custom metadata |
+
+A field holding the wrong type (`draft = "true"`, `weight = "5"`, `date = 20240315`, `categories = "News"`) is ignored, never coerced, and the build warns with the file and key. In particular `draft = "true"` is not a draft and gets published; write `draft = true`.
 
 ## Examples
 
@@ -324,7 +326,7 @@ console.log("Hello");
 | Cell   | Cell   |
 ```
 
-Table cells support inline Markdown: **bold**, *italic*, `code spans`, `[links](url)`, `![images](url)`, and ~~strikethrough~~.
+Table cells support inline Markdown: **bold**, *italic*, `code spans`, `[links](url)`, `![images](url)`, and ~~strikethrough~~. Links and images take the same destinations as in a paragraph: balanced parentheses (`[W](https://en.wikipedia.org/wiki/Foo_(bar))`), an optional title (`[T](/x/ "the title")`) and `<angle>` destinations; a backslash escapes punctuation (`\*not emphasis\*`). The same applies to definition list and footnote bodies.
 
 ```markdown
 | Feature        | Example                          |

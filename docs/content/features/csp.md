@@ -225,7 +225,7 @@ own to templates while `[csp]` is on.
   `hooks.pre` instead.
 - **`hwaro serve`.** No policy is written. The live-reload client and the
   error overlay are inline and dev-only.
-- **`static/` and `[content.files]` HTML** are your files, published
+- **`static/`, `[content.files]` and page-bundle HTML** are your files, published
   unchanged, and get no policy.
 - **AMP pages** are skipped: the AMP runtime adds styles while the page runs,
   and a hash-based policy would block them.

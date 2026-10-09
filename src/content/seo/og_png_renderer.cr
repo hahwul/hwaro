@@ -1,5 +1,6 @@
 require "file_utils"
 require "../../ext/stb_bindings"
+require "../processors/image_processor"
 require "../../models/config"
 require "../../models/page"
 require "../../utils/logger"
@@ -161,15 +162,10 @@ module Hwaro
                             fit : Bool = false) : CachedImage?
           return unless File.exists?(path)
 
-          src_w = uninitialized LibC::Int
-          src_h = uninitialized LibC::Int
-          channels = uninitialized LibC::Int
-          src_pixels = LibStb.stbi_load(path, pointerof(src_w), pointerof(src_h), pointerof(channels), 4)
-          return if src_pixels.null?
+          return unless loaded = load_rgba_upright(path)
+          src_pixels, src_w, src_h = loaded
 
           begin
-            return if src_w <= 0 || src_h <= 0
-
             if fit
               target_w, target_h = fit_dimensions(src_w.to_i32, src_h.to_i32, target_w, target_h)
             end
@@ -191,8 +187,31 @@ module Hwaro
 
             CachedImage.new(resized, target_w, target_h)
           ensure
-            LibStb.stbi_image_free(src_pixels.as(Void*))
+            LibC.free(src_pixels.as(Void*))
           end
+        end
+
+        # Decodes *path* as RGBA, turned upright by its EXIF orientation: a
+        # phone photo used as the background or logo shows rotated in the
+        # browser (and in the SVG card, which embeds the original), so the
+        # PNG card must not draw the raw sideways rows. The buffer is
+        # malloc'ed either way (stb's allocator is libc's); free it with
+        # `LibC.free`.
+        private def self.load_rgba_upright(path : String) : {UInt8*, Int32, Int32}?
+          w = uninitialized LibC::Int
+          h = uninitialized LibC::Int
+          channels = uninitialized LibC::Int
+          pixels = LibStb.stbi_load(path, pointerof(w), pointerof(h), pointerof(channels), 4)
+          return if pixels.null?
+          if w <= 0 || h <= 0
+            LibStb.stbi_image_free(pixels.as(Void*))
+            return
+          end
+          upright = Processors::ImageProcessor.reorient(pixels, w.to_i32, h.to_i32, 4, Processors::ImageProcessor.orientation(path))
+          # `reorient` frees the input once it has turned it; on a failed
+          # allocation it hands nothing back and leaves the input to us.
+          LibStb.stbi_image_free(pixels.as(Void*)) unless upright
+          upright
         end
 
         # One loaded font: the opaque stbtt_fontinfo pointer plus the raw
@@ -275,7 +294,9 @@ module Hwaro
         # deferred passes, or watch rebuilds) do not re-scan the filesystem
         # or re-parse TTF data.
         def self.load_fonts(custom_font_path : String? = nil, prefer_cjk : Bool = false) : FontContext?
-          key = "#{custom_font_path}|#{prefer_cjk}"
+          # The file's content digest is part of the key: a font replaced in
+          # place must not be served from the memo for the rest of a `serve`.
+          key = "#{custom_font_path}|#{prefer_cjk}|#{OgImage.asset_digest(custom_font_path)}"
 
           if @@cached_font_key == key && (cached = @@cached_font_ctx)
             return cached
@@ -466,7 +487,8 @@ module Hwaro
           # accent_bars gates the baked-in top accent bar, so it must be part of
           # the key — otherwise a serve-session toggle reuses a stale base layer.
           key = "#{ai.background}|#{ai.accent_color}|#{ai.secondary_color}|#{ai.style}|#{ai.pattern_opacity}|" \
-                "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{ai.logo_position}|#{ai.accent_bars}"
+                "#{ai.pattern_scale}|#{ai.overlay_opacity}|#{bg_image_path}|#{OgImage.asset_digest(bg_image_path)}|" \
+                "#{ai.logo_position}|#{ai.accent_bars}"
 
           if @@last_base_key == key && (cached = @@last_base_layer)
             return cached
@@ -666,7 +688,7 @@ module Hwaro
           # Sanitize every string the fonts will draw: codepoints without a
           # glyph in any chain font (emoji, mostly) would render as tofu
           # boxes otherwise.
-          title_text = drop_missing_glyphs(title_chain, page.title)
+          title_text = drop_missing_glyphs(title_chain, OgImage.display_title(page, config))
           site_title = drop_missing_glyphs(brand_chain, config.title)
 
           title_lines = balanced_wrap_chain(title_chain, font_size, title_text, wrap_width)
@@ -1200,15 +1222,10 @@ module Hwaro
         private def self.composite_image(pixels : UInt8*, image_path : String, dx : Int32, dy : Int32, dw : Int32, dh : Int32)
           return unless File.exists?(image_path)
 
-          src_w = uninitialized LibC::Int
-          src_h = uninitialized LibC::Int
-          channels = uninitialized LibC::Int
-          src_pixels = LibStb.stbi_load(image_path, pointerof(src_w), pointerof(src_h), pointerof(channels), 4) # force RGBA
-          return if src_pixels.null?
+          return unless loaded = load_rgba_upright(image_path)
+          src_pixels, src_w, src_h = loaded
 
           begin
-            return if src_w <= 0 || src_h <= 0
-
             # Resize to destination dimensions
             buf_size = dw.to_i64 * dh.to_i64 * 4
             return if buf_size > 64_000_000_i64 * 4
@@ -1244,7 +1261,7 @@ module Hwaro
               LibC.free(resized.as(Void*))
             end
           ensure
-            LibStb.stbi_image_free(src_pixels.as(Void*))
+            LibC.free(src_pixels.as(Void*))
           end
         end
 

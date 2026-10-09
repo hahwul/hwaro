@@ -162,7 +162,7 @@ module Hwaro
           output_dir = "public"
           output_dir_explicit = false
           base_url = nil.as(String?)
-          env_name = ENV["HWARO_ENV"]? || nil
+          env_name = ENV["HWARO_ENV"]?.presence
 
           # Content filtering
           drafts = false
@@ -176,7 +176,7 @@ module Hwaro
           cache = false
           full = false
           stream = false
-          memory_limit = ENV["HWARO_MEMORYLIMIT"]? || nil
+          memory_limit = ENV["HWARO_MEMORYLIMIT"]?.presence
 
           # Skip options
           highlight = true

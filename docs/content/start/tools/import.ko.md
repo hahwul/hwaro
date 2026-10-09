@@ -97,6 +97,13 @@ hwaro tool import hugo path/to/site --verbose
 - Hugo: `layout`은 `template`이 됩니다. Hugo에서 의미가 없는 hwaro 키(`toc`, `template`, `page_template`, `image`, `updated` 등)는 그대로 유지하고, 그 밖의 페이지 파라미터(최상위 사용자 키와 `[params]` 테이블)는 `[extra]`로 옮겨 템플릿에서 `page.extra.<key>`로 읽을 수 있습니다. `tool export hugo`가 쓰는 `[extra]` 테이블도 `[extra]`에 합쳐집니다.
 - Jekyll: `last_modified_at`은 `updated`가 되고, `image: {path: …}` 형식은 `image`가 됩니다. 그 밖의 프론트 매터 키(Jekyll 템플릿이 `page.<key>`로 읽는 값)는 모두 `[extra]`로 옮겨집니다.
 - Obsidian: Obsidian이 화면에 표시하지 않는 `%%주석%%`(한 줄 안이든 여러 줄에 걸치든)은 제거됩니다. 코드 안의 `%%`는 그대로 둡니다.
+- 글자나 숫자가 하나도 없는 이름·제목(예: 이모지만 있는 Notion 페이지)은 건너뛰지 않고 원본 텍스트에서 만든 이름으로 저장합니다. 어떤 파일 이름도 만들 수 없는 소스는 그 사실을 알리는 경고와 함께 건너뜁니다.
+- 비어 있는 `title:`은 제목이 없는 것으로 취급합니다. Obsidian은 파일 이름으로, Astro와 Eleventy는 파일 이름에서 만든 제목으로, Notion은 페이지의 첫 제목으로 대체합니다. 따옴표 없는 날짜 제목(`title: 2024-05-01`)은 작성한 그대로 유지됩니다.
+- 페이지 사이의 링크는 대상이 실제로 저장된 파일을 가리킵니다. 제목이 같은 페이지의 `-1` 사본도 마찬가지입니다(Notion 페이지 링크, Obsidian `[[위키링크]]`). 표 안에서 필요한 Obsidian `[[노트\|별칭]]` 링크는 `[[노트|별칭]]`과 똑같이 처리되고, HTML 태그와 수식 안의 `#태그`·`[[링크]]`는 건드리지 않습니다.
+- Jekyll·Hexo: `title`이 없는 글은 파일 이름에서 제목을 얻고, 날짜 접두사가 붙은 파일 이름도 다른 이름처럼 슬러그로 바뀝니다(`2024-01-01-Hello World.md` → `hello-world`).
+- Hugo: 번역 파일(`about.ko.md`, `index.ko.md`)은 `slug`가 있어도 언어 접미사를 유지하고, 번역된 번들은 기본 언어 번들의 디렉터리를 따릅니다. `index.<lang>.md`와 `_index.md` 옆의 에셋도 함께 복사합니다. 에셋이 있는 Astro 번들은 파일과 함께 번들(`blog/<name>/index.md`)로 저장됩니다.
+- Notion: 이모지 콜아웃(`> 💡 텍스트`)만 평탄화하고, 일반 인용문·코드 펜스·인라인 코드는 그대로 둡니다.
+- WordPress: `<script>`와 `<style>`은 내용과 함께 제거되고, `<iframe>`, `<video>`, `<audio>` 임베드는 `src`(와 숫자 크기)만 가진 HTML로 유지됩니다.
 
 ## 출력 예시
 

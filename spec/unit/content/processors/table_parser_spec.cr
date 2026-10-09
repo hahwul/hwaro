@@ -844,6 +844,31 @@ describe Hwaro::Content::Processors::TableParser do
       out = Hwaro::Content::Processors::TableParser.process(md)
       out.should contain("<table>")
     end
+
+    it "indents the emitted table like its rows, so a list item keeps it" do
+      md = "1. Step one:\n\n   | a | b |\n   |---|---|\n   | 1 | 2 |\n\n   More text.\n\n2. Step two"
+      out = Hwaro::Content::Processors::TableParser.process(md)
+      out.should contain("\n   <table>\n   <thead>")
+      out.should contain("\n   </table>\n")
+      out.lines.select(&.includes?("<")).all?(&.starts_with?("   ")).should be_true
+    end
+
+    it "keeps the table and the following paragraph inside the list item" do
+      [
+        "1. Step one:\n\n   | a | b |\n   |---|---|\n   | 1 | 2 |\n\n   More text.\n\n2. Step two",
+        "- item\n\n  | a | b |\n  |---|---|\n  | 1 | 2 |\n\n  More text.\n\n- item two",
+      ].each do |md|
+        html, _ = Hwaro::Processor::Markdown.render(md)
+        (html.scan(/<ol|<ul/).size).should eq(1)
+        html.index!("</table>").should be < html.index!("More text.")
+        html.index!("More text.").should be < html.index!("</li>")
+      end
+    end
+
+    it "leaves an unindented table byte-for-byte as before" do
+      out = Hwaro::Content::Processors::TableParser.process("| a | b |\n|---|---|\n| 1 | 2 |")
+      out.starts_with?("<table>").should be_true
+    end
   end
 end
 describe "GFM delimiter-row lengths" do

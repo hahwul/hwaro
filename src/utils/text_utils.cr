@@ -13,6 +13,46 @@ module Hwaro
     module TextUtils
       extend self
 
+      # Character ranges of each candidate URL in a srcset value.
+      def srcset_url_spans(value : String) : Array({Int32, Int32})
+        chars = value.chars
+        n = chars.size
+        spans = [] of {Int32, Int32}
+        i = 0
+        while i < n
+          while i < n && (chars[i].ascii_whitespace? || chars[i] == ',')
+            i += 1
+          end
+          break if i >= n
+          start = i
+          while i < n && !chars[i].ascii_whitespace?
+            i += 1
+          end
+          stop = i
+          if chars[stop - 1] == ','
+            while stop > start && chars[stop - 1] == ','
+              stop -= 1
+            end
+            spans << {start, stop} if stop > start
+            next
+          end
+          spans << {start, stop}
+          depth = 0
+          while i < n
+            c = chars[i]
+            i += 1
+            if c == '('
+              depth += 1
+            elsif c == ')'
+              depth -= 1 if depth > 0
+            elsif c == ',' && depth == 0
+              break
+            end
+          end
+        end
+        spans
+      end
+
       # Longest error message any console emitter prints on one line.
       #
       # A template error carries Crinja's source excerpt, so a single
@@ -72,6 +112,16 @@ module Hwaro
       # and data files unparseable. Strip it once at the point of read.
       def strip_bom(content : String) : String
         content.lchop('\uFEFF')
+      end
+
+      # A taxonomy term as the build identifies it: stripped and NFC-normalised.
+      # macOS filenames, IMEs and the clipboard produce NFD text, and `slugify`
+      # drops the combining marks of an NFD `\u00E9` (so `/tags/cafe/` next to
+      # `/tags/caf\u00E9/`) while NFD and NFC Hangul share one directory on APFS \u2014
+      # visually identical tags must be one term. NFC is the identity for ASCII.
+      def normalize_term(term : String) : String
+        term = term.strip
+        term.ascii_only? ? term : term.unicode_normalize(:nfc)
       end
 
       # Remove terminal control characters (ANSI escapes, CR, BEL, \u2026) plus the
@@ -283,16 +333,46 @@ module Hwaro
         in_word = false
         count = 0
 
+        bytes = text.to_slice
+        last_comment_close = nil.as(Int32?)
+        looked_for_comment_close = false
+
         reader = Char::Reader.new(text)
         while reader.has_next?
           char = reader.current_char
           if char == '<'
-            # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`).
-            # A bare `<` in prose/math ("n < 1000", "if 0 < x") is a literal
-            # less-than, not a tag \u2014 treating it as one set in_tag with no closing
-            # `>` and swallowed the rest of the document, collapsing the count.
+            # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`)
+            # that is actually closed. A bare `<` in prose/math ("n < 1000",
+            # "if 0 < x", "a<b", "i<n;") is a literal less-than, not a tag \u2014
+            # treating it as one set in_tag with no closing `>` and swallowed
+            # the rest of the document, collapsing the count. The closer must
+            # come before the next `<` (a tag may span lines); a comment needs
+            # a `-->` somewhere after it. Each `<` scans only up to the next
+            # `<`, so the whole pass stays linear.
             nxt = reader.peek_next_char
-            in_tag = true if nxt.ascii_letter? || nxt == '/' || nxt == '!'
+            if nxt.ascii_letter? || nxt == '/' || nxt == '!'
+              start = reader.pos
+              if nxt == '!' && bytes.size >= start + 4 && bytes[start + 2] === '-' && bytes[start + 3] === '-'
+                unless looked_for_comment_close
+                  looked_for_comment_close = true
+                  i = bytes.size - 3
+                  while i >= 0
+                    if bytes[i] === '-' && bytes[i + 1] === '-' && bytes[i + 2] === '>'
+                      last_comment_close = i
+                      break
+                    end
+                    i -= 1
+                  end
+                end
+                in_tag = true if (close = last_comment_close) && close >= start + 4
+              else
+                scan = start + 1
+                while scan < bytes.size && bytes[scan] != '<'.ord && bytes[scan] != '>'.ord
+                  scan += 1
+                end
+                in_tag = true if scan < bytes.size && bytes[scan] == '>'.ord
+              end
+            end
             in_word = false
           elsif char == '>'
             in_tag = false
@@ -327,8 +407,12 @@ module Hwaro
       def slugify(text : String) : String
         # Single-pass: directly emit hyphens for separators, collapsing runs.
         # Avoids intermediate String allocation + regex gsub.
+        # NFC first: macOS file names and copy-paste often carry NFD text, and
+        # "cafe\u0301" must land on the same slug as "café".
+        text = text.unicode_normalize(:nfc) unless text.ascii_only?
         String.build(text.bytesize) do |io|
           last_was_sep = true # suppress leading hyphen
+          prev = ' '
           # Separator test is `whitespace?`, not `ascii_whitespace?`: the
           # ideographic space U+3000 is the ordinary word separator in CJK
           # titles, and an `&nbsp;` in a title decodes to U+00A0. Neither is
@@ -343,11 +427,15 @@ module Hwaro
                 io << '-'
                 last_was_sep = true
               end
-            elsif cjk_char?(char) || unicode_letter?(char)
+            elsif cjk_char?(char) || unicode_letter?(char) || (word_mark?(char) && (prev.alphanumeric? || word_mark?(prev)))
+              # Combining marks (vowel signs, virama, tone marks) are part of
+              # the word they follow. One after a dropped character has
+              # nothing to attach to.
               io << char.downcase
               last_was_sep = false
             end
             # All other characters (punctuation, symbols) are dropped
+            prev = char
           end
         end.rstrip('-')
       end
@@ -432,11 +520,13 @@ module Hwaro
         s.bytesize > MAX_SLUG_BYTES
       end
 
-      private def bound_slug(slug : String, source : String) : String
-        return slug if slug.bytesize <= MAX_SLUG_BYTES
+      # Other generated file names (OG images) bound theirs with a tighter
+      # *max_bytes* that leaves room for their extension.
+      def bound_slug(slug : String, source : String, max_bytes : Int32 = MAX_SLUG_BYTES) : String
+        return slug if slug.bytesize <= max_bytes
 
         suffix = "-#{Digest::SHA1.hexdigest(source)[0, SLUG_DIGEST_CHARS]}"
-        head = truncate_bytes(slug, MAX_SLUG_BYTES - suffix.bytesize)
+        head = truncate_bytes(slug, max_bytes - suffix.bytesize)
         # The cut can land right after a separator ("...-word-"); dropping it
         # keeps the result shaped like any other slug, which never ends in "-".
         "#{head.rstrip('-')}#{suffix}"
@@ -538,7 +628,10 @@ module Hwaro
       # already present are stepped over so pre-encoded URLs don't get
       # double-encoded.
       def encode_url_path(url : String) : String
-        return url if url.ascii_only? && !url.includes?(' ')
+        if url.ascii_only? && !url.includes?(' ')
+          return url unless illegal_ascii_in_path?(url)
+          return encode_illegal_ascii_path(url)
+        end
 
         if scheme_end = url.index("://")
           host_end = url.index('/', scheme_end + 3)
@@ -549,6 +642,47 @@ module Hwaro
         else
           encode_path_preserving_escapes(url)
         end
+      end
+
+      # Byte index where the path of `url` starts and where it ends (before
+      # the first `?`/`#`). A scheme/host prefix and a query are not path.
+      private def path_bounds(url : String) : {Int32, Int32}
+        start = 0
+        # `://` only opens an authority when nothing path-like precedes it: a
+        # relative URL whose query carries a URL (`/x?u=http://y/z[1]`) has no
+        # host, and its query must not be mistaken for a path.
+        if (scheme_end = url.index("://")) && !url[0, scheme_end].matches?(%r{[/?#]})
+          start = url.index('/', scheme_end + 3) || url.bytesize
+        end
+        stop = url.index(/[?#]/, start) || url.bytesize
+        {start, stop}
+      end
+
+      # RFC 3986 forbids these ASCII characters in a path, and a `%` that does
+      # not start a `%XX` escape. `100%`, `[b]`, `{c}` and `a|b` file names
+      # used to reach a sitemap `<loc>` / RSS `<link>` raw, while the same
+      # characters beside a non-ASCII one were encoded.
+      private def illegal_ascii_in_path?(url : String) : Bool
+        start, stop = path_bounds(url)
+        bytes = url.to_slice
+        i = start
+        while i < stop
+          case bytes[i]
+          when '"'.ord, '<'.ord, '>'.ord, '['.ord, ']'.ord, '{'.ord, '}'.ord, '|'.ord, '^'.ord, '`'.ord, '\\'.ord
+            return true
+          when '%'.ord
+            return true unless i + 2 < stop && bytes[i + 1].unsafe_chr.hex? && bytes[i + 2].unsafe_chr.hex?
+          end
+          i += 1
+        end
+        false
+      end
+
+      # Encode only the path of an all-ASCII URL; the host and any
+      # `?query`/`#fragment` stay as written (`?d[]=1` is a working link).
+      private def encode_illegal_ascii_path(url : String) : String
+        start, stop = path_bounds(url)
+        url[0, start] + encode_path_preserving_escapes(url[start, stop - start]) + url[stop..]
       end
 
       # `encode_url_path` for a URL that may carry a `?query` or `#fragment`
@@ -613,6 +747,11 @@ module Hwaro
         false
       end
 
+      # The attribute run of an opening tag: anything but `>`, except that a
+      # quoted value may contain `>` (`alt="Home > Docs"`). Possessive, so a
+      # long data: URI value is one cheap step, not one per character.
+      HTML_TAG_ATTRS = %q((?:[^>"']++|"[^"]*"|'[^']*')*)
+
       # Raw-text HTML elements whose *content* is code, not display text.
       # `<style>`/`<script>` bodies must be dropped along with their tags;
       # otherwise the CSS/JS source survives tag-stripping and pollutes
@@ -622,7 +761,7 @@ module Hwaro
       # relying on a dotall flag; `\1` ties the close tag to the open tag.
       # A self-closing or unterminated tag won't match and is left to the
       # tag stripper below.
-      RAW_TEXT_ELEMENT = /<(script|style)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
+      RAW_TEXT_ELEMENT = /<(script|style)(?:\s#{HTML_TAG_ATTRS})?>[\s\S]*?<\/\1\s*>/i
 
       # Elements the author marked `aria-hidden="true"` are decoration, not
       # text: a screen reader skips them and so must every plain-text
@@ -654,37 +793,110 @@ module Hwaro
         # Then the decorative ones. Guarded by a substring probe so a page
         # with no aria-hidden markup never pays for the scan.
         text = text.gsub(ARIA_HIDDEN_ELEMENT, " ") if text.includes?("aria-hidden")
-        String.build(text.bytesize) do |io|
-          in_tag = false
+        size = text.bytesize
+        String.build(size) do |io|
           last_was_space = true # suppress leading space
           pending_space = false # deferred space from tag boundary
-          text.each_char do |char|
-            if char == '<'
-              in_tag = true
-              # Mark that we might need a space (tag boundary)
-              pending_space = true unless last_was_space
+          reader = Char::Reader.new(text)
+          while reader.pos < size
+            char = reader.current_char
+            if char == '<' && html_tag_start?(text.byte_at?(reader.pos + 1))
+              tag_end, inline = scan_html_tag(text, reader.pos)
+              # A block/void/unknown tag or a comment may separate words;
+              # inline markup (`H<sub>2</sub>O`, `**한글**은`) must not.
+              pending_space = true unless inline || last_was_space
+              reader.pos = tag_end
+              next
             elsif char == '>'
-              in_tag = false
-            elsif !in_tag
-              if char.ascii_whitespace?
-                unless last_was_space
-                  io << ' '
-                  last_was_space = true
-                  pending_space = false
-                end
-              else
-                # Emit deferred space only if the next char is alphanumeric
-                # (avoids "World !" from "</b>!")
-                if pending_space && char.alphanumeric?
-                  io << ' '
-                end
+              # A bare `>` outside any tag is dropped (pinned by the specs).
+            elsif char.ascii_whitespace?
+              unless last_was_space
+                io << ' '
+                last_was_space = true
                 pending_space = false
-                io << char
-                last_was_space = false
               end
+            else
+              # Emit deferred space only if the next char is alphanumeric
+              # (avoids "World !" from "</b>!")
+              if pending_space && char.alphanumeric?
+                io << ' '
+              end
+              pending_space = false
+              io << char
+              last_was_space = false
             end
+            reader.next_char
           end
         end.strip
+      end
+
+      # A `<` opens a tag/comment only before a letter, `/`, `!` or `?`;
+      # anywhere else ("a < b", "x<3") it is plain text.
+      private def html_tag_start?(byte : UInt8?) : Bool
+        return false unless byte
+        byte.chr.ascii_letter? || byte == '/'.ord || byte == '!'.ord || byte == '?'.ord
+      end
+
+      # Scans the tag or comment starting at the `<` at byte *start* and
+      # returns the byte index just past it plus whether it is inline markup.
+      # Comments run to `-->` (or to the end when unterminated, like a
+      # browser). Inside a tag a `>` does not end it while it sits in a quoted
+      # attribute value (`alt="Home > Docs"`); quotes only count right after
+      # `=`, so a stray apostrophe in an unquoted attribute cannot swallow the
+      # text that follows.
+      private def scan_html_tag(text : String, start : Int32) : {Int32, Bool}
+        size = text.bytesize
+        i = start + 1
+        if text.byte_at?(i) == '!'.ord && text.byte_at?(i + 1) == '-'.ord && text.byte_at?(i + 2) == '-'.ord
+          close = text.byte_index("-->", i + 1)
+          return {close ? close + 3 : size, false}
+        end
+
+        i += 1 if text.byte_at?(i) == '/'.ord
+        name_start = i
+        while i < size && (b = text.byte_at(i)) && (b.chr.ascii_alphanumeric? || b == '-'.ord)
+          i += 1
+        end
+        inline = html_inline_tag?(text.byte_slice(name_start, i - name_start))
+
+        quote = 0_u8
+        after_eq = false
+        while i < size
+          b = text.byte_at(i)
+          if quote != 0
+            quote = 0_u8 if b == quote
+          else
+            case b
+            when '>'.ord
+              return {i + 1, inline}
+            when '='.ord
+              after_eq = true
+            when '"'.ord, '\''.ord
+              quote = b if after_eq
+              after_eq = false
+            when ' '.ord, '\t'.ord, '\n'.ord, '\r'.ord, '\f'.ord
+              # whitespace between `=` and the value is allowed
+            else
+              after_eq = false
+            end
+          end
+          i += 1
+        end
+        {size, inline}
+      end
+
+      # Phrasing elements that sit inside a word's line without a visual
+      # break. Anything else — block, void (`br`, `img`), custom or unknown
+      # — keeps the word-separating space.
+      private def html_inline_tag?(name : String) : Bool
+        case name.downcase
+        when "a", "abbr", "b", "bdi", "cite", "code", "data", "del", "em", "i",
+             "ins", "kbd", "mark", "q", "s", "small", "span", "strong", "sub",
+             "sup", "time", "u", "var", "wbr"
+          true
+        else
+          false
+        end
       end
 
       # Elements whose CONTENT is not prose and must not seed an automatic
@@ -695,8 +907,8 @@ module Hwaro
       # `[\s\S]*?` so multi-line blocks are removed whole; the `<code>`
       # inside `<pre>` is consumed by the outer match. Unterminated tags
       # fall through to the generic tag stripper.
-      EXCERPT_SKIP_ELEMENT = /<(pre|script|style|figure|h[1-6])(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/i
-      EXCERPT_SKIP_VOID    = /<img(?:\s[^>]*)?\/?>/i
+      EXCERPT_SKIP_ELEMENT = /<(pre|script|style|figure|h[1-6])(?:\s#{HTML_TAG_ATTRS})?>[\s\S]*?<\/\1\s*>/i
+      EXCERPT_SKIP_VOID    = /<img(?:\s#{HTML_TAG_ATTRS})?\/?>/i
       # Markup the Markdown extensions emit whose text is not prose either:
       # display math (TeX source until KaTeX/MathJax runs in the browser),
       # footnote reference markers (`[1]`) and the trailing footnotes
@@ -808,6 +1020,14 @@ module Hwaro
             end
           end
         end
+      end
+
+      # A combining mark that is part of a word (vowel signs, virama, tone and
+      # accent marks). Emoji presentation machinery is not: variation
+      # selectors and the keycap enclosure stay out of slugs, so "1️⃣ Step"
+      # and "ℹ️ Info" slugify as "1-step" and "ℹ-info" as before.
+      def word_mark?(char : Char) : Bool
+        char.mark? && !(0xFE00..0xFE0F).includes?(char.ord) && !(0xE0100..0xE01EF).includes?(char.ord) && char.ord != 0x20E3
       end
 
       # Check if a character is in a CJK Unicode range

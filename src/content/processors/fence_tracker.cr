@@ -84,6 +84,10 @@ module Hwaro
         HTML_BLOCK_TAG_RE      = /\A {0,3}<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|section|source|title|summary|table|tbody|td|tfoot|th|thead|tr|track|ul)(?:\s|\/?>|\z)/i
         HTML_BLOCK_LONE_TAG_RE = /\A {0,3}(?:<[A-Za-z][A-Za-z0-9-]*+(?:\s++[a-zA-Z_:][a-zA-Z0-9:._-]*+(?:\s*+=\s*+(?:[^"'=<>`\x00-\x20]++|'[^']*+'|"[^"]*+"))?+)*+\s*+\/?>|<\/[A-Za-z][A-Za-z0-9-]*+\s*+>)\s*\z/
 
+        # What ends the HTML blocks that run to a marker, not a blank line
+        # (CommonMark types 2-5), keyed by `@html_block`.
+        HTML_BLOCK_END = {2 => "-->", 3 => "?>", 4 => ">", 5 => "]]>"}
+
         # An ATX heading at up to 3 spaces indent: 1-6 `#` followed by a
         # space/tab or nothing but the line ending. Only used to let an
         # indented-code run open on the line right after a heading — the
@@ -102,6 +106,9 @@ module Hwaro
         @fence_char = '`'
         @fence_len = 0
         @fence_bq_depth = 0
+        # Content column of the list item holding the open fence (0 outside
+        # one): the closer is indented relative to it, like the opener.
+        @fence_base = 0
         @in_raw_html_code = false
         @raw_html_code_bq_depth = 0
         @in_indented_code = false
@@ -121,8 +128,9 @@ module Hwaro
         # one blank line, and an empty one followed by a blank has none.
         @empty_item_open = false
         # An open generic HTML block (0 none, 1 ends at a blank line — the
-        # CommonMark type 6/7 blocks, 2 an HTML comment ending at `-->`) and
-        # the quote depth it lives in. Its lines are raw HTML to Markd, so
+        # CommonMark type 6/7 blocks, 2..5 a comment, processing instruction,
+        # declaration or CDATA section ending at the `HTML_BLOCK_END` marker)
+        # and the quote depth it lives in. Its lines are raw HTML to Markd, so
         # they never open indented code. Only that suppression is modelled:
         # a block tracked too long merely leaves lines unprotected.
         @html_block = 0
@@ -173,7 +181,7 @@ module Hwaro
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
             if depth == @fence_bq_depth
-              @in_fence = false if !indented?(content) && closes_fence?(content.lstrip)
+              @in_fence = false if !indented_beyond?(line, content, depth, @fence_base) && closes_fence?(content.lstrip)
               @prev_blank = false
               return true
             end
@@ -203,7 +211,9 @@ module Hwaro
           @open_quote_depth = depth if blank || quote_opened
           close_items_left_of_quote_markers(line, depth) unless depth.zero? || in_html_block
           if @empty_item_open
-            @list_items.pop if blank
+            # `pop?`: a blockquote marker on this same line may already have
+            # closed the empty item (`*` then `> >`), leaving nothing to pop.
+            @list_items.pop? if blank
             @empty_item_open = false
           end
 
@@ -277,7 +287,7 @@ module Hwaro
           @html_block_line = in_html_block || opened_html
           stripped = content.lstrip
           heading = !blank && ATX_HEADING_RE.matches?(content)
-          fence_run = indented?(content) ? nil : opener_run(stripped)
+          fence_run = column - container_column >= 4 ? nil : opener_run(stripped)
           if heading || fence_run
             # Headings and fences are never lazy continuations: one left of
             # an item's content closes it, like a line after a blank.
@@ -289,6 +299,7 @@ module Hwaro
             @fence_char = stripped[0]
             @fence_len = run
             @fence_bq_depth = depth
+            @fence_base = container_column
             @prev_blank = false
             true
           else
@@ -305,6 +316,14 @@ module Hwaro
 
         private def indented?(content : String) : Bool
           content.starts_with?("    ") || content.starts_with?('\t')
+        end
+
+        # Whether `content` sits 4+ columns beyond `base`, the content column
+        # of the enclosing list item (0 outside one: plain 4+ indentation).
+        private def indented_beyond?(line : String, content : String, depth : Int32, base : Int32) : Bool
+          return indented?(content) if base.zero?
+          prefix, tab_consumed = depth.zero? ? {0, false} : blockquote_prefix_column(line, depth)
+          leading_columns(content, prefix, tab_consumed)[0] - base >= 4
         end
 
         # Consumes up to `max_depth` leading blockquote markers (each up to
@@ -400,7 +419,7 @@ module Hwaro
             @html_block = 0
             return false
           end
-          @html_block = 0 if @html_block == 2 && content.includes?("-->")
+          @html_block = 0 if (close = HTML_BLOCK_END[@html_block]?) && content.includes?(close)
           true
         end
 
@@ -416,6 +435,15 @@ module Hwaro
             # `-->` may close it on the same line — even `<!-->`/`<!--->`.
             return true if stripped.index("-->", 2)
             @html_block = 2
+          elsif stripped.starts_with?("<?")
+            return true if stripped.index("?>", 2)
+            @html_block = 3
+          elsif stripped.starts_with?("<![CDATA[")
+            return true if stripped.index("]]>", 9)
+            @html_block = 5
+          elsif stripped.matches?(/\A<![A-Za-z]/)
+            return true if stripped.index('>', 2)
+            @html_block = 4
           elsif HTML_BLOCK_TAG_RE.matches?(stripped)
             @html_block = 1
           elsif !in_paragraph && HTML_BLOCK_LONE_TAG_RE.matches?(stripped)

@@ -284,7 +284,7 @@ module Hwaro
           # The glob stays case-sensitive on purpose: see
           # SECTION_INDEX_EXTENSIONS.
           private def section_generates_feeds?(dir : String) : Bool
-            Dir.glob(File.join(dir, "_index*.{md,markdown}")).any? do |path|
+            Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "_index*.{md,markdown}")).any? do |path|
               frontmatter_flag?(path, "generate_feeds")
             end
           end
@@ -367,7 +367,7 @@ module Hwaro
           # `_index.MD` still counts as a page.
           private def section_page_count(dir : String) : Int32
             count = 0
-            Dir.glob(File.join(dir, "**", "*")) do |path|
+            Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) do |path|
               next unless Services::ContentWalk.markdown?(path)
               next if File.basename(path).starts_with?("_index.") && SECTION_INDEX_EXTENSIONS.includes?(File.extname(path))
               count += 1
@@ -648,6 +648,10 @@ module Hwaro
             names.includes?(segments.first)
           end
 
+          # nil only when there is no config.toml. A config that fails to load
+          # is a HWARO_E_CONFIG error (as in every other command): falling
+          # back to defaults dropped taxonomies/base_path/languages and
+          # reported /tags/ etc. as dead links.
           private def load_config(project_root : String = ".") : Models::Config?
             config_path = File.join(project_root, "config.toml")
             return unless File.exists?(config_path)
@@ -655,8 +659,6 @@ module Hwaro
             Dir.cd(project_root) do
               Models::Config.load
             end
-          rescue Exception
-            nil
           end
         end
       end

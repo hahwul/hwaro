@@ -433,6 +433,15 @@ module Hwaro
         # `@previous_page_outputs` from the MOVED model. Drained by the next
         # pass that gets as far as pruning, or by the Finalize phase.
         @unsettled_page_outputs : Set(String) = Set(String).new
+        # True from the moment a build starts replacing the site until its
+        # Finalize prune has consumed the two baselines above. A build that
+        # fails in between (a broken template) leaves them describing its
+        # half-built state, so the next one carries them forward instead of
+        # recomputing them — otherwise a source deleted during the broken
+        # stretch is forgotten and its output is served for the rest of the
+        # session.
+        @prune_baselines_pending : Bool = false
+        @carry_prune_baselines : Bool = false
         @generated_claims_mutex : Mutex = Mutex.new
         # Output files the static copy actually (re)wrote this build, in the
         # canonical absolute form `get_output_path` produces. `static/` is
@@ -533,7 +542,7 @@ module Hwaro
 
         def reset_generated_output_claims : Nil
           @generated_claims_mutex.synchronize do
-            @previous_generated_claims = @generated_output_claims
+            @previous_generated_claims = @carry_prune_baselines ? @previous_generated_claims | @generated_output_claims : @generated_output_claims
             @generated_output_claims = Set(String).new
             @generator_output_claims = Set(String).new
           end
@@ -797,7 +806,10 @@ module Hwaro
           @context = ctx
 
           # Reset internal caches (preserve @config loaded above)
-          @previous_page_outputs = @site ? owned_output_paths(options.output_dir) : Set(String).new
+          @carry_prune_baselines = @prune_baselines_pending
+          @prune_baselines_pending = true
+          current_outputs = @site ? owned_output_paths(options.output_dir) : Set(String).new
+          @previous_page_outputs = @carry_prune_baselines ? @previous_page_outputs | current_outputs : current_outputs
           @site = nil
           @templates = nil
           @cache_manager.clear_runtime

@@ -297,6 +297,30 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    # `ImageProcessor.dimensions` also reads GIF and WebP headers; the manifest
+    # used to declare them 512x512 (and a GIF as image/png).
+    it "reads real GIF and WebP dimensions and types a GIF icon image/gif" do
+      Dir.mktmpdir do |dir|
+        bytes = ->(parts : Array(UInt8)) { Bytes.new(parts.size) { |i| parts[i] } }
+        File.write(File.join(dir, "logo.gif"), bytes.call("GIF89a".bytes + [100_u8, 0_u8, 100_u8, 0_u8]))
+        # RIFF....WEBPVP8X + chunk size + flags + (w-1, h-1) as 24-bit LE.
+        File.write(File.join(dir, "logo.webp"), bytes.call("RIFF".bytes + [0_u8] * 4 + "WEBPVP8X".bytes + [10_u8, 0_u8, 0_u8, 0_u8] + [0_u8] * 4 + [99_u8, 0_u8, 0_u8, 99_u8, 0_u8, 0_u8]))
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          icons = ["static/logo.gif", "static/logo.webp"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        icons = JSON.parse(File.read(File.join(dir, "manifest.json")))["icons"].as_a
+        icons[0]["sizes"].as_s.should eq("100x100")
+        icons[0]["type"].as_s.should eq("image/gif")
+        icons[1]["sizes"].as_s.should eq("100x100")
+        icons[1]["type"].as_s.should eq("image/webp")
+      end
+    end
+
     it "prefers JPEG header dimensions over a year-like number in the filename" do
       Dir.mktmpdir do |dir|
         write_jpeg(File.join(dir, "logo-2024.jpg"), 320_u16, 80_u16)

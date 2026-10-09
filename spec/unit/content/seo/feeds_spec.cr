@@ -1358,6 +1358,74 @@ describe Hwaro::Content::Seo::Feeds do
         content.should contain("Hello World")
       end
     end
+
+    # Regression: a root `_index.md` with generate_feeds resolved to the same
+    # file as the site-wide feed and, written second, replaced it with a
+    # top-level-pages-only feed whose channel link was `https://x//`.
+    describe "a root section with generate_feeds" do
+      root_pages = -> {
+        root = Hwaro::Models::Section.new("_index.md")
+        root.title = "Home"
+        root.url = "/"
+        root.section = ""
+        root.render = true
+        root.is_index = true
+        root.generate_feeds = true
+        root.raw_content = ""
+
+        about = Hwaro::Models::Page.new("about.md")
+        about.title = "About"
+        about.url = "/about/"
+        about.section = ""
+        about.render = true
+        about.raw_content = "about"
+
+        post = Hwaro::Models::Page.new("posts/p1.md")
+        post.title = "P1 Post"
+        post.url = "/posts/p1/"
+        post.section = "posts"
+        post.render = true
+        post.raw_content = "p1"
+
+        [root.as(Hwaro::Models::Page), about, post]
+      }
+
+      it "does not replace the site-wide feed, and says why" do
+        config = Hwaro::Models::Config.new
+        config.feeds.enabled = true
+        config.base_url = "https://example.com"
+        config.title = "Test Site"
+
+        Dir.mktmpdir do |output_dir|
+          log = with_captured_log do
+            Hwaro::Content::Seo::Feeds.generate(root_pages.call, config, output_dir)
+          end
+          feed = File.read(File.join(output_dir, "rss.xml"))
+          feed.should contain("P1 Post")
+          feed.should contain("<title>Test Site</title>")
+          feed.should_not contain("https://example.com//")
+          log.should contain("rss.xml")
+
+          Hwaro::Content::Seo::Feeds.published_outputs(root_pages.call, config, output_dir)
+            .should eq([File.join(output_dir, "rss.xml")])
+        end
+      end
+
+      it "still writes the root feed when the site feed is disabled, with a clean channel link" do
+        config = Hwaro::Models::Config.new
+        config.feeds.enabled = false
+        config.base_url = "https://example.com"
+        config.title = "Test Site"
+
+        Dir.mktmpdir do |output_dir|
+          Hwaro::Content::Seo::Feeds.generate(root_pages.call, config, output_dir)
+          feed = File.read(File.join(output_dir, "rss.xml"))
+          feed.should contain("About")
+          feed.should contain("<link>https://example.com/</link>")
+          feed.should_not contain("https://example.com//")
+        end
+      end
+    end
   end
 
   describe ".generate_rss" do
@@ -1742,6 +1810,27 @@ describe Hwaro::Content::Seo::Feeds do
       # only at the synthetic closing `]]>`.
       rss.should contain("]]]]><![CDATA[>")
       rss.scan(/]]>/).size.should eq(2)
+    end
+
+    # Regression: XML 1.0 forbids U+0000-0008, 000B, 000C and 000E-001F even
+    # inside CDATA, so one form feed in a body made the whole feed unparseable.
+    it "drops XML-illegal control characters from CDATA bodies" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.feeds.full_content = true
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.description = "Summary"
+      page.content = "<p>hello \f world \b bs \u0000 nul\tkeep\nline</p>"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss(
+        [page], config, "rss.xml", false, "Test", ""
+      )
+
+      rss.should contain("<![CDATA[<p>hello  world  bs  nul\tkeep\nline</p>]]>")
+      rss.each_char.none? { |c| c.ord < 0x20 && !{'\t', '\n', '\r'}.includes?(c) }.should be_true
     end
 
     it "escapes XML special characters in title" do

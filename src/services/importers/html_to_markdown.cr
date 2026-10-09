@@ -1,3 +1,4 @@
+require "html"
 require "xml"
 require "../../utils/logger"
 require "../../content/processors/inline_markdown"
@@ -101,6 +102,13 @@ module Hwaro
           # Normalize line endings
           result = result.gsub("\r\n", "\n")
 
+          # Script and style elements are not content: drop them with their
+          # bodies. `strip_tags` alone kept the CSS/JS text, and a literal `<`
+          # inside a script made its tag regex swallow the real text after it.
+          # One pass per tag, so each has a single closing literal (linear).
+          result = result.gsub(/<script\b[^>]*>.*?<\/script\s*>/mi, "")
+          result = result.gsub(/<style\b[^>]*>.*?<\/style\s*>/mi, "")
+
           # Convert block elements first (order matters).
           #
           # Lazy-body policy: a pass whose tail is a single closing literal
@@ -123,6 +131,20 @@ module Hwaro
           # Indices of the stash entries that are inline code spans (the rest
           # are fenced blocks), for the table pass's pipe escaping.
           inline_code = Set(Int32).new
+
+          # Embeds (YouTube iframes, <video>, <audio>) have no Markdown form
+          # and were stripped without a trace. Hwaro passes raw HTML through,
+          # so keep them — but rebuilt from the validated `src` alone, never
+          # the original attributes, so an untrusted export cannot smuggle
+          # event handlers or a `javascript:` source into the page.
+          {"iframe", "video", "audio"}.each do |tag|
+            result = result.gsub(/<#{tag}\b([^>]*)>(.*?)<\/#{tag}\s*>/mi) do
+              embed = rebuild_embed(tag, $1, $2)
+              next "" unless embed
+              code_stash << "#{embed}\n\n"
+              code_placeholder(code_stash.size - 1)
+            end
+          end
           result = result.gsub(/<pre[^>]*>\s*<code[^>]*>(.{0,#{MAX_CODE_BODY_CHARS}}?)<\/code>\s*<\/pre>/mi) do
             code = decode_html_entities($1)
             code_stash << "```\n#{code.strip}\n```\n\n"
@@ -358,6 +380,26 @@ module Hwaro
         EDGE_SPACE          = "(?:\\s|\\x{A0}|&nbsp;|&#0*160;|&#x0*a0;)"
         EDGE_SPACE_LEAD_RE  = Regex.new("\\A#{EDGE_SPACE}+", Regex::Options::IGNORE_CASE)
         EDGE_SPACE_TRAIL_RE = Regex.new("#{EDGE_SPACE}+\\z", Regex::Options::IGNORE_CASE)
+
+        # `<tag src="…">` for an embed, from its safe `src` (its own attribute,
+        # or a nested `<source>`), or nil when it has none or an unsafe one.
+        private def self.rebuild_embed(tag : String, attrs : String, inner : String) : String?
+          src = attr_value(attrs, "src") || inner[/<source\b[^>]*>/i]?.try { |source| attr_value(source, "src") }
+          return unless src
+          src = decode_html_entities(src)
+          return unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(src)
+          extra = tag == "iframe" ? " allowfullscreen" : " controls"
+          dims = ["width", "height"].compact_map do |name|
+            value = attr_value(attrs, name)
+            %( #{name}="#{value}") if value && value.matches?(/\A\d+%?\z/)
+          end.join
+          %(<#{tag} src="#{HTML.escape(src)}"#{dims}#{extra}></#{tag}>)
+        end
+
+        private def self.attr_value(attrs : String, name : String) : String?
+          match = attrs.match(/(?<![\w-])#{name}\s*=\s*(?:"([^"]*)"|'([^']*)')/i)
+          match && (match[1]? || match[2]?)
+        end
 
         # NUL-delimited placeholder: survives every regex pass (no `<>`, no
         # `&…;`) and can't occur in real exported content (XML forbids NUL).

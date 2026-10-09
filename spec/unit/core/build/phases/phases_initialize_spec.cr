@@ -363,6 +363,21 @@ describe Hwaro::Core::Build::Phases::Initialize do
       end
     end
 
+    it "drops a leading UTF-8 BOM so it never lands in the rendered page" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("templates/partials")
+          File.write("templates/page.html", "﻿<p>{{ content }}</p>")
+          File.write("templates/partials/hdr.html", "﻿<header>HDR</header>")
+
+          templates = Hwaro::Core::Build::Builder.new.test_load_templates
+
+          templates["page"].should eq("<p>{{ content }}</p>")
+          templates["partials/hdr"].should eq("<header>HDR</header>")
+        end
+      end
+    end
+
     it "honors extension priority (html beats j2)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
@@ -374,6 +389,21 @@ describe Hwaro::Core::Build::Phases::Initialize do
           templates = builder.test_load_templates
 
           templates["page"].should eq("from-html")
+        end
+      end
+    end
+
+    it "strips a UTF-8 BOM from template sources" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("templates/shortcodes")
+          File.write("templates/page.html", "\uFEFF<p>{{ content }}</p>")
+          File.write("templates/shortcodes/sc.html", "\uFEFFSC")
+
+          templates = Hwaro::Core::Build::Builder.new.test_load_templates
+
+          templates["page"].should eq("<p>{{ content }}</p>")
+          templates["shortcodes/sc"].should eq("SC")
         end
       end
     end

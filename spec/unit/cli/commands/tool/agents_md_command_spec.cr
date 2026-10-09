@@ -123,6 +123,23 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
       end
     end
 
+    # The marker/fence regexes raise ArgumentError on invalid UTF-8, which
+    # surfaced as an unclassified `Error: Regex match error` (exit 1).
+    it "refuses with a classified HWARO_E_IO error when the existing AGENTS.md is not valid UTF-8" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          bytes = Bytes[0x23, 0x20, 0x78, 0x0a, 0xff, 0xfe, 0x0a]
+          File.write("AGENTS.md", bytes)
+
+          err = expect_raises(Hwaro::HwaroError) do
+            with_captured_log { Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--force"]) }
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          File.size("AGENTS.md").should eq(bytes.size) # left untouched
+        end
+      end
+    end
+
     it "overwrites an existing AGENTS.md when --force is given" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

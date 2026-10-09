@@ -264,7 +264,7 @@ module Hwaro
 
         uri = begin
           URI.parse(value)
-        rescue URI::Error
+        rescue URI::Error | OverflowError
           raise ArgumentError.new("Invalid base_url: '#{value}'. Expected http(s)://host[/path].")
         end
 

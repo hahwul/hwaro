@@ -184,6 +184,25 @@ module Hwaro
           f[1] / t[1]
         end
 
+        # dart-sass treats numbers within 1e-11 of each other as equal
+        # (`0.1 * 3 == 0.3`); floor/ceil/round are exact there.
+        EPSILON = 1e-11
+
+        # dart-sass `fuzzyEquals`: within epsilon AND the same value once
+        # scaled and rounded, so `0.4e-11` and `0.6e-11` stay distinct.
+        def self.fuzzy_eq?(a : Float64, b : Float64) : Bool
+          return true if a == b
+          (a - b).abs <= EPSILON && (a / EPSILON).round == (b / EPSILON).round
+        end
+
+        def self.fuzzy_lt?(a : Float64, b : Float64) : Bool
+          a < b && !fuzzy_eq?(a, b)
+        end
+
+        def self.fuzzy_le?(a : Float64, b : Float64) : Bool
+          a < b || fuzzy_eq?(a, b)
+        end
+
         def eq?(other : Value) : Bool
           return false unless other.is_a?(Number)
           # Equality needs units to actually match — `1px == 1` is false.
@@ -192,10 +211,10 @@ module Hwaro
           # here silently picks the wrong `@if` branch and collides map
           # keys that differ only by unit. Convertible units DO compare
           # equal after conversion (`1in == 96px` is true in dart-sass).
-          return value == other.value if unit == other.unit
+          return Number.fuzzy_eq?(value, other.value) if unit == other.unit
           return false if unit.empty? || other.unit.empty?
           factor = Number.conversion_factor(other.unit, unit)
-          !factor.nil? && value == other.value * factor
+          !factor.nil? && Number.fuzzy_eq?(value, other.value * factor)
         end
 
         # Identical units, one side unitless, or units in the same
@@ -237,17 +256,129 @@ module Hwaro
         end
 
         def to_css : String
-          @quoted ? "#{@quote_char}#{@text}#{@quote_char}" : @text
+          return @text unless @quoted
+          quote = @quote_char
+          return "#{quote}#{@text}#{quote}" unless Str.contains_unescaped?(@text, quote)
+          # The text gained a quote it can't hold (`'#{"Don't"}'`,
+          # `"a'b" + 'c"d'`): switch to the other quote, or escape this one
+          # when the text has both. Already-valid strings never get here.
+          other = quote == '"' ? '\'' : '"'
+          return "#{other}#{@text}#{other}" unless Str.contains_unescaped?(@text, other)
+          escaped = String.build do |io|
+            esc = false
+            @text.each_char do |ch|
+              if esc
+                esc = false
+              elsif ch == '\\'
+                esc = true
+              elsif ch == quote
+                io << '\\'
+              end
+              io << ch
+            end
+          end
+          "#{quote}#{escaped}#{quote}"
+        end
+
+        def self.contains_unescaped?(text : String, quote : Char) : Bool
+          esc = false
+          text.each_char do |ch|
+            if esc
+              esc = false
+            elsif ch == '\\'
+              esc = true
+            elsif ch == quote
+              return true
+            end
+          end
+          false
         end
 
         def interp_css : String
           @text
         end
 
+        # The code points the text denotes: `\e900` is one character, `\"`
+        # is a quote. `text` keeps the escapes verbatim so strings pass
+        # through byte-identically; string functions and `==` work on this.
+        def decoded : String
+          Str.decode(@text)
+        end
+
+        def self.decode(text : String) : String
+          return text unless text.includes?('\\')
+          chars = text.chars
+          String.build do |io|
+            i = 0
+            while i < chars.size
+              c = chars[i]
+              if c != '\\' || i + 1 >= chars.size
+                io << c
+                i += 1
+                next
+              end
+              nxt = chars[i + 1]
+              if nxt.ascii_alphanumeric? && nxt.to_i?(16)
+                j = i + 1
+                while j < chars.size && j < i + 7 && chars[j].to_i?(16)
+                  j += 1
+                end
+                code = chars[(i + 1)...j].join.to_i(16)
+                io << ((code == 0 || code > 0x10FFFF || (0xD800 <= code && code <= 0xDFFF)) ? '\uFFFD' : code.chr)
+                # One whitespace character terminates the escape.
+                if (ws = chars[j]?) && ws.ascii_whitespace?
+                  j += 1
+                  j += 1 if ws == '\r' && chars[j]? == '\n'
+                end
+                i = j
+              elsif nxt == '\n'
+                i += 2 # escaped newline: line continuation
+              else
+                io << nxt
+                i += 2
+              end
+            end
+          end
+        end
+
+        # Inverse of `decode` for a computed result: backslashes and
+        # unprintable / private-use code points are escaped (an icon-font
+        # glyph stays `\e900`), everything else is kept literal. A quote
+        # needs no escape here — `to_css` picks a quote that fits.
+        def self.encode(decoded : String) : String
+          chars = decoded.chars
+          String.build do |io|
+            chars.each_with_index do |c, i|
+              code = c.ord
+              if c == '\\'
+                io << "\\\\"
+              elsif code < 0x20 || code == 0x7F || (0xE000 <= code && code <= 0xF8FF) || code >= 0xF0000
+                io << '\\' << code.to_s(16)
+                nxt = chars[i + 1]?
+                io << ' ' if nxt && (nxt.to_i?(16) || nxt.ascii_whitespace?)
+              else
+                io << c
+              end
+            end
+          end
+        end
+
+        # `a + b` on string text: a trailing hex escape would swallow a
+        # following hex digit (`"\f101" + "a"` must stay U+F101), so it is
+        # terminated with a space.
+        def self.join_text(left : String, right : String) : String
+          if (first = right[0]?) && (first.to_i?(16) || first.ascii_whitespace?) &&
+             (m = left.match(/(\\+)[0-9a-fA-F]{1,6}\z/)) && m[1].size.odd?
+            left + " " + right
+          else
+            left + right
+          end
+        end
+
         def eq?(other : Value) : Bool
           # Quoted and unquoted strings with the same text are equal
-          # (dart-sass semantics).
-          other.is_a?(Str) && text == other.text
+          # (dart-sass semantics); `"\e900"` equals `"\E900"`.
+          other.is_a?(Str) && (text == other.text || decoded == other.decoded)
         end
       end
 

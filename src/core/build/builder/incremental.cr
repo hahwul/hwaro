@@ -141,6 +141,7 @@ module Hwaro
           # actually moved. See listing_fanout_pages.
           listing_sets = snapshot_listing_sets(site, templates)
           backlink_digests = snapshot_backlinks(site, templates)
+          page_urls = snapshot_page_urls(site)
 
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -256,8 +257,9 @@ module Hwaro
 
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
-            relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+            relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
           backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
+          linkers_of_moved_pages(site, page_urls).each { |p| pages_to_render << p }
 
           # Pages that render a listing derived from the GLOBAL page/section
           # set — the homepage's "latest posts", a paginated archive, a nav
@@ -348,6 +350,7 @@ module Hwaro
           # projections exist re-renders on its own account anyway.
           listing_sets = snapshot_listing_sets(site, @templates)
           backlink_digests = snapshot_backlinks(site, @templates)
+          page_urls = snapshot_page_urls(site)
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
@@ -402,8 +405,9 @@ module Hwaro
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
           force_pages = relationship_render_set(site, pages_map, reparsed, changed_pages,
-            relinked_counterparts, renav_pages, affected_series, related_pages_updated)
+            relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
           backlinks_moved_pages(site, @templates, backlink_digests).each { |p| force_pages << p }
+          linkers_of_moved_pages(site, page_urls).each { |p| force_pages << p }
           run_rerender(options, force_pages: force_pages.to_a, membership_changed: !excluded_pages.empty?,
             listing_sets: listing_sets)
         end
@@ -426,6 +430,7 @@ module Hwaro
           renav_pages : Enumerable(Models::Page),
           affected_series : Set(String),
           related_pages_updated : Enumerable(String),
+          excluded_paths : Set(String),
         ) : Set(Models::Page)
           pages_to_render = Set(Models::Page).new(changed_pages)
           # Translations / other versions whose switcher (or canonical) moved.
@@ -490,6 +495,11 @@ module Hwaro
               pages_to_render << p
             end
           end
+          # A page this pass just drafted / expired / future-dated is already
+          # pruned and out of site.pages, but the OLD neighbours captured
+          # before the re-parse still reference it — rendering it would write
+          # the file straight back.
+          pages_to_render.reject! { |p| excluded_paths.includes?(p.path) } unless excluded_paths.empty?
           pages_to_render
         end
 
@@ -520,6 +530,89 @@ module Hwaro
             moved << page if {page.translations, page.version_links, page.aliases} != before[i]
           end
           moved
+        end
+
+        # Every page's URL before a re-parse, so linkers_of_moved_pages can
+        # tell which pages the edit moved (re-slugged, drafted, removed).
+        private def snapshot_page_urls(site : Models::Site) : Hash(String, {String, Models::Page})
+          urls = {} of String => {String, Models::Page}
+          (site.pages + site.sections).each { |page| urls[page.path] = {page.url, page} }
+          urls
+        end
+
+        # Pages whose `[[wikilink]]`, `@/` link or root-relative link names a
+        # page this re-parse moved: a URL change, a page that left the
+        # published set (draft, expired) or one that joined it. Their own
+        # source did not change, but the link they render did — to the new URL,
+        # to the missing span, or to the page that now answers the name.
+        # Empty for the usual body edit, which moves nothing.
+        private def linkers_of_moved_pages(site : Models::Site, before : Hash(String, {String, Models::Page})) : Array(Models::Page)
+          all = (site.pages + site.sections).as(Array(Models::Page))
+          moved = [] of Models::Page
+          urls = Set(String).new
+          now = {} of String => String
+          all.each do |page|
+            now[page.path] = page.url
+            old = before[page.path]?
+            next if old && old[0] == page.url
+            moved << page
+            urls << page.url
+            urls << old[0] if old
+          end
+          before.each do |path, (url, page)|
+            next if now.has_key?(path)
+            moved << page
+            urls << url
+          end
+          return [] of Models::Page if moved.empty?
+
+          names = Set(String).new
+          paths = Set(String).new
+          default_language = site.config.default_language
+          moved.each do |page|
+            paths << page.path
+            Content::Processors::Wikilinks::Index.keys_for(page, default_language).try { |keys| names << keys[0] << keys[1] }
+          end
+          base_path = site.config.base_path
+          urls = urls.compact_map { |url| link_url_key(url, base_path) }.to_set
+
+          all.select do |page|
+            next false if paths.includes?(page.path)
+            hit = false
+            page_scan_texts(page).each do |text|
+              Content::Processors::Wikilinks.each_link(text, math: site_math?) do |link|
+                hit ||= link_names_moved_page?(link, names, paths, urls, base_path)
+              end
+              break if hit
+            end
+            hit
+          end
+        end
+
+        private def link_names_moved_page?(link : Content::Processors::Wikilinks::Link | String, names : Set(String),
+                                           paths : Set(String), urls : Set(String), base_path : String) : Bool
+          case link
+          in Content::Processors::Wikilinks::Link
+            key = Content::Processors::Wikilinks.key(link.target.strip.lchop('/').rchop('/')).rchop(".markdown").rchop(".md")
+            !key.empty? && names.includes?(key)
+          in String
+            url = link.partition('#')[0].partition('?')[0]
+            if url.starts_with?("@/")
+              path = url.lchop("@/")
+              paths.includes?(path) || paths.includes?(URI.decode(path)) rescue false
+            else
+              key = link_url_key(url, base_path)
+              !key.nil? && urls.includes?(key)
+            end
+          end
+        end
+
+        # A root-relative link or page URL without the base path or a
+        # trailing slash; nil for anything else (relative, absolute), which
+        # never matches.
+        private def link_url_key(url : String, base_path : String) : String?
+          url = url.lchop(base_path) if !base_path.empty? && url.starts_with?("#{base_path}/")
+          url.starts_with?('/') ? (url.rstrip('/').presence || "/") : nil
         end
 
         # Each backlink-reading page's backlinks digest (fp_backlinks), taken
@@ -1114,11 +1207,7 @@ module Hwaro
             # service worker must still be refreshed. Warn-and-continue,
             # matching regenerate_seo_surfaces: a transient failure here
             # must not skip cache.save below.
-            begin
-              Content::Seo::Pwa.generate(site, output_dir, verbose)
-            rescue ex
-              Logger.warn "  PWA regeneration failed: #{ex.message}"
-            end
+            regenerate_service_worker(site, output_dir, verbose)
           end
 
           sweep_stale_derived_outputs(output_dir)

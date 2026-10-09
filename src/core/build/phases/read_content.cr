@@ -31,8 +31,11 @@ module Hwaro::Core::Build::Phases::ReadContent
     seen_raw = Set(String).new
     @content_index_dirs = Set(String).new
 
-    # Single pass over content directory for both markdown and raw files
-    Dir.glob("content/**/*") do |file_path|
+    # Single pass over content directory for both markdown and raw files.
+    # Sorted: glob yields raw readdir order (hash order on APFS/ext4, name
+    # order on HFS+), which would otherwise leak into `site.pages`,
+    # sitemap.xml and the search index, so one tree built differently per host.
+    Dir.glob("content/**/*").sort!.each do |file_path|
       # lstat, not `File.directory?`: that follows symlinks, and following a
       # symlink cycle (`ln -s loop content/loop`) fails with ELOOP, which
       # `File.info?` raises as `File::Error` — aborting the whole build with a
@@ -78,6 +81,13 @@ module Hwaro::Core::Build::Phases::ReadContent
       if PAGE_EXTENSIONS.includes?(ext)
         # Process markdown file
         basename = Path[relative_path].basename
+        # The extension is matched case-insensitively here, but `_index`,
+        # `index` bundles and `.<lang>` suffixes (and dozens of consumers
+        # comparing against `_index.md`) only know the lowercase spelling, so
+        # `_index.MD` quietly became an ordinary page with no section list.
+        if (written_ext = Path[file_path].extension) != ext
+          Logger.warn "content/#{relative_path}: page extension #{written_ext.inspect} is not lowercase — it builds as an ordinary page, never as a section index (_index), bundle (index) or translation (.<lang>). Rename it to #{ext.inspect}."
+        end
         language = extract_language_from_filename(basename, config, ext)
 
         clean_basename = if language

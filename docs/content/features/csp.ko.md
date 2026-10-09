@@ -223,7 +223,7 @@ Hwaro는 그 위치에 있는 `<meta http-equiv="Content-Security-Policy">`를 �
   더 이상 맞지 않는다고 경고합니다. HTML은 템플릿이나 `hooks.pre`에서 바꾸세요.
 - **`hwaro serve`.** 정책을 쓰지 않습니다. 라이브 리로드 클라이언트와 오류
   오버레이가 인라인이고 개발 전용이기 때문입니다.
-- **`static/`과 `[content.files]`의 HTML**은 사용자 파일이므로 그대로
+- **`static/`, `[content.files]`, 페이지 번들의 HTML**은 사용자 파일이므로 그대로
   게시되고 정책이 붙지 않습니다.
 - **AMP 페이지**는 건너뜁니다. AMP 런타임이 실행 중에 스타일을 추가하는데,
   해시 기반 정책은 이를 막기 때문입니다.

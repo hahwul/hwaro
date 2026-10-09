@@ -81,6 +81,7 @@ dimensions = true   # enabled = true가 필요 없습니다
 3. 종횡비는 항상 유지됩니다
 4. 대상 너비가 원본보다 크면 업스케일 없이 원본을 그대로 복사합니다
 5. 원본 이미지는 한 번만 디코딩한 뒤 모든 너비로 리사이즈합니다 (효율적)
+6. EXIF 방향 정보가 있는 JPEG 사진(휴대폰·카메라 촬영본)은 먼저 바로 세워서 처리하므로, 변형·LQIP 플레이스홀더·`fill`/`crop` 결과가 브라우저가 보여 주는 원본과 일치합니다. `dimensions = true`는 화면에 표시되는 크기를 기록합니다
 
 ## 출력 파일 이름
 
@@ -93,6 +94,8 @@ static/hwaro.png
   -> public/hwaro_1024w.png
   -> public/hwaro_1280w.png
 ```
+
+직접 게시하는 파일이 이 이름 중 하나와 같으면(예: 직접 만든 `static/hwaro_320w.png`) 덮어쓰지 않습니다. 해당 너비는 생성하지 않고 `srcset`에서도 제외합니다.
 
 ## 템플릿에서 사용
 
@@ -187,7 +190,7 @@ LQIP가 비활성화 상태면 `lqip`와 `dominant_color`는 빈 문자열을 �
 `anchor`는 `center`(기본값), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right` 중 하나입니다.
 
 - `fill`과 `crop`에는 `width`와 `height`가 모두 필요합니다. 크기가 빠졌거나 `op`, `anchor`를 알 수 없으면 템플릿 오류입니다.
-- 이 변형은 페이지가 처음 렌더링될 때 만들어지고, 원본보다 새로운 동안 재사용됩니다. `enabled = true`나 `widths`가 필요 없습니다. `--skip-image-processing`에서는 원본 URL을 반환합니다.
+- 이 변형은 페이지가 처음 렌더링될 때 만들어지고, 원본과 `quality`가 그대로인 동안 다음 빌드에서 재사용됩니다(기록은 `.hwaro/`에 보관). `enabled = true`나 `widths`가 필요 없습니다. `--skip-image-processing`에서는 원본 URL을 반환합니다.
 - 파일 이름에는 크기, op, anchor가 들어갑니다. 예: 원본 옆의 `hero_400x300_fill_center.jpg`.
 - 결과의 `width`/`height`는 실제로 쓴 파일의 크기입니다. 이 변형에서 `lqip`과 `dominant_color`는 빈 문자열입니다.
 - JPEG, PNG, BMP 원본만 자를 수 있습니다. 다른 포맷은 원본 URL을 반환합니다.

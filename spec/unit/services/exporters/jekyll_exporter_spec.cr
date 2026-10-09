@@ -656,3 +656,45 @@ describe "Jekyll export: cascaded drafts" do
     end
   end
 end
+
+# Regression: dated posts are flattened into `_posts/`, where Jekyll's default
+# permalink (`/:year/:month/:day/:title.html`) replaced the page's address, so
+# every rewritten `@/` link and every inbound URL to a post 404ed.
+describe "Jekyll export: post addresses" do
+  it "pins flattened posts to their hwaro address" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts", "trip"))
+      File.write(File.join(content_dir, "posts", "a.md"), "+++\ntitle = \"A\"\ndate = 2024-01-15\n+++\nSee [B](@/posts/b.md#frag)\n")
+      File.write(File.join(content_dir, "posts", "b.md"), "+++\ntitle = \"B\"\ndate = 2024-02-15\n+++\nb\n")
+      File.write(File.join(content_dir, "posts", "trip", "index.md"), "+++\ntitle = \"T\"\ndate = 2024-03-15\n+++\nt\n")
+      File.write(File.join(content_dir, "posts", "own.md"), "---\ntitle: O\ndate: 2024-04-01\npermalink: /custom/\n---\no\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      posts = File.join(output_dir, "_posts")
+      File.read(File.join(posts, "2024-01-15-a.md")).should contain(%(permalink: "/posts/a/"))
+      File.read(File.join(posts, "2024-01-15-a.md")).should contain("[B](/posts/b#frag)")
+      File.read(File.join(posts, "2024-02-15-b.md")).should contain(%(permalink: "/posts/b/"))
+      File.read(File.join(posts, "2024-03-15-trip.md")).should contain(%(permalink: "/posts/trip/"))
+      own = File.read(File.join(posts, "2024-04-01-own.md"))
+      own.scan("permalink:").size.should eq(1)
+      own.should contain("permalink: /custom/")
+    end
+  end
+
+  it "leaves pages that keep their on-disk path alone" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "about.md"), "+++\ntitle = \"About\"\n+++\nabout\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+      File.read(File.join(output_dir, "about.md")).should_not contain("permalink")
+    end
+  end
+end

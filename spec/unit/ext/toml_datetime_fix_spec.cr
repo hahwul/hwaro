@@ -60,3 +60,28 @@ describe "TOML local times (ext/toml_datetime_fix)" do
     expect_raises(TOML::ParseException) { TOML.parse("t = 25:00:00") }
   end
 end
+
+describe "TOML date followed by whitespace (ext/toml_datetime_fix)" do
+  # Regression: the lexer peeked the char after "date + space" without making
+  # it current, so a `#`, `}`, `]`, `,` or newline right after the space was lost.
+  it "accepts a trailing comment after a space" do
+    TOML.parse("d = 2024-05-01 # published")["d"].raw.as(Time).day.should eq(1)
+    TOML.parse("d = 2024-05-01 # c\nz = 1")["z"].as_i.should eq(1)
+  end
+
+  it "accepts a space before } ] and ," do
+    TOML.parse("a = { d = 2024-05-01 }")["a"].as_h["d"].raw.as(Time).month.should eq(5)
+    TOML.parse("a = [2024-05-01 ]")["a"].as_a.size.should eq(1)
+    TOML.parse("a = [2024-05-01 , 2024-06-01]")["a"].as_a.size.should eq(2)
+  end
+
+  it "accepts a trailing space before the next key" do
+    doc = TOML.parse("k = 1979-05-27 \nz = 1")
+    doc["z"].as_i.should eq(1)
+    doc["k"].raw.as(Time).year.should eq(1979)
+  end
+
+  it "still reads a date-time with a space delimiter" do
+    TOML.parse("d = 2024-05-01 10:20:30Z")["d"].raw.as(Time).hour.should eq(10)
+  end
+end

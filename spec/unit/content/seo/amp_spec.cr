@@ -74,6 +74,50 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("<html amp lang=\"en\">")
     end
 
+    # Regression: the mirror is written one prefix deeper (/amp/posts/b1/), so a
+    # document-relative `cover.png` / `../b2/` copied verbatim resolved under
+    # /amp/ — a 404 for page-bundle images and links outside the mirrored tree.
+    describe "document-relative URLs" do
+      html = %(<html><head></head><body><img src="cover.png" alt="c" width="10" height="10"><a href="../b2/">rel</a> <a href="cover.png">file</a> <a href="/root/">root</a> <a href="#frag">frag</a> <a href="https://other.test/x">abs</a> <a href="//cdn.test/x">proto</a> <a href="mailto:a@b.test">mail</a></body></html>)
+
+      it "resolves them against the canonical page URL" do
+        page = Hwaro::Models::Page.new("posts/b1/index.md")
+        page.url = "/posts/b1/"
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com/sub"
+
+        result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+        result.should contain(%(src="https://example.com/sub/posts/b1/cover.png"))
+        result.should contain(%(href="https://example.com/sub/posts/b2/"))
+        result.should contain(%(href="https://example.com/sub/posts/b1/cover.png"))
+      end
+
+      it "leaves root-relative, absolute, protocol-relative, scheme and fragment URLs alone" do
+        page = Hwaro::Models::Page.new("posts/b1/index.md")
+        page.url = "/posts/b1/"
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+        result.should contain(%(href="/root/"))
+        result.should contain(%(href="#frag"))
+        result.should contain(%(href="https://other.test/x"))
+        result.should contain(%(href="//cdn.test/x"))
+        result.should contain(%(href="mailto:a@b.test"))
+      end
+
+      it "resolves to root-relative paths when base_url is empty" do
+        page = Hwaro::Models::Page.new("posts/b1/index.md")
+        page.url = "/posts/b1/"
+        config = Hwaro::Models::Config.new
+        config.base_url = ""
+
+        result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+        result.should contain(%(src="/posts/b1/cover.png"))
+        result.should contain(%(href="/posts/b2/"))
+      end
+    end
+
     it "converts img to amp-img with fill layout when no dimensions" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
@@ -352,6 +396,10 @@ describe Hwaro::Content::Seo::Amp do
         Hwaro::Content::Seo::Amp.same_origin_src?("https://other.com/a", "https://example.com").should be_false
         Hwaro::Content::Seo::Amp.same_origin_src?("http://example.com/a", "https://example.com").should be_false
         Hwaro::Content::Seo::Amp.same_origin_src?("https://example.com:8443/a", "https://example.com").should be_false
+      end
+
+      it "treats a src whose port overflows Int32 as unknown (same-origin)" do
+        Hwaro::Content::Seo::Amp.same_origin_src?("http://a.example:99999999999999999999/x", "https://example.com").should be_true
       end
 
       it "treats an explicit default port as equal to an implicit one" do

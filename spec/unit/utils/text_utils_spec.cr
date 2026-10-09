@@ -2,6 +2,30 @@ require "../../spec_helper"
 
 describe Hwaro::Utils::TextUtils do
   describe ".slugify" do
+    # Regression: combining vowel signs/virama (Mn/Mc) were dropped, so Indic
+    # and Thai words came out as consonant skeletons and NFD text lost its
+    # accent (colliding with the plain word).
+    it "keeps combining marks that belong to a word" do
+      Hwaro::Utils::TextUtils.slugify("हिंदी भाषा").should eq("हिंदी-भाषा")
+      Hwaro::Utils::TextUtils.slugify("สวัสดี ชาวโลก").should eq("สวัสดี-ชาวโลก")
+      Hwaro::Utils::TextUtils.slugify("நன்றி").should eq("நன்றி")
+    end
+
+    it "slugifies NFD text like NFC" do
+      Hwaro::Utils::TextUtils.slugify("cafe\u0301").should eq("café")
+      Hwaro::Utils::TextUtils.slugify("café").should eq("café")
+    end
+
+    it "does not keep marks that follow dropped characters" do
+      Hwaro::Utils::TextUtils.slugify("I \u2764\uFE0F you").should eq("i-you")
+      Hwaro::Utils::TextUtils.slugify("\u0301abc").should eq("abc")
+    end
+
+    it "keeps emoji variation selectors and keycap enclosures out of slugs" do
+      Hwaro::Utils::TextUtils.slugify("1\uFE0F\u20E3 Step").should eq("1-step")
+      Hwaro::Utils::TextUtils.slugify("\u2139\uFE0F Info").should eq("\u2139-info")
+    end
+
     it "converts basic text to slug" do
       Hwaro::Utils::TextUtils.slugify("Hello World").should eq("hello-world")
     end
@@ -249,6 +273,29 @@ describe Hwaro::Utils::TextUtils do
   end
 
   describe ".encode_url_path" do
+    it "encodes RFC 3986-illegal ASCII in the path, with or without a non-ASCII neighbour" do
+      enc = ->(u : String) { Hwaro::Utils::TextUtils.encode_url_path(u) }
+      enc.call("https://e.com/sub/posts/100%/").should eq("https://e.com/sub/posts/100%25/")
+      enc.call("https://e.com/sub/posts/[b]/").should eq("https://e.com/sub/posts/%5Bb%5D/")
+      enc.call("https://e.com/posts/{c}/").should eq("https://e.com/posts/%7Bc%7D/")
+      enc.call("/posts/a|b/").should eq("/posts/a%7Cb/")
+      enc.call("/posts/x^y/").should eq("/posts/x%5Ey/")
+      enc.call("/posts/\"q\"/").should eq("/posts/%22q%22/")
+      enc.call("/posts/[b]/한글/").should eq("/posts/%5Bb%5D/%ED%95%9C%EA%B8%80/")
+    end
+
+    it "leaves valid escapes, queries and IPv6 hosts alone" do
+      enc = ->(u : String) { Hwaro::Utils::TextUtils.encode_url_path(u) }
+      enc.call("/posts/a%20b/").should eq("/posts/a%20b/")
+      enc.call("/posts/100%25/").should eq("/posts/100%25/")
+      enc.call("/search/?d[]=1&x={y}").should eq("/search/?d[]=1&x={y}")
+      enc.call("http://[::1]:8080/posts/").should eq("http://[::1]:8080/posts/")
+      enc.call("/posts/[b]/?d[]=1").should eq("/posts/%5Bb%5D/?d[]=1")
+      # A URL inside the query is not an authority: only the path is encoded.
+      enc.call("/x?u=http://y/z[1]").should eq("/x?u=http://y/z[1]")
+      enc.call("/x[1]?u=http://y/z[1]").should eq("/x%5B1%5D?u=http://y/z[1]")
+    end
+
     it "leaves plain ASCII URLs unchanged" do
       Hwaro::Utils::TextUtils.encode_url_path("https://example.com/posts/hello/").should eq("https://example.com/posts/hello/")
     end
@@ -420,6 +467,55 @@ describe Hwaro::Utils::TextUtils do
       # The simple parser treats < as tag-open and > as tag-close,
       # so bare > in text gets consumed as a tag boundary
       Hwaro::Utils::TextUtils.strip_html("a > b").should eq("a b")
+    end
+
+    # Regression: an HTML comment's body (author-hidden text) was published
+    # as text in og:description, search.json and feeds, and `alt="a > b"`
+    # leaked the attribute tail after the quoted `>`.
+    describe "comments and quoted attributes" do
+      it "drops HTML comments, including commented-out markup" do
+        Hwaro::Utils::TextUtils.strip_html("Visible.<!-- <p>SECRET</p> -->Tail").should eq("Visible. Tail")
+        Hwaro::Utils::TextUtils.strip_html("a <!-- TODO: rewrite -> later --> b").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("a<!---->b").should eq("a b")
+      end
+
+      it "drops an unterminated comment to the end" do
+        Hwaro::Utils::TextUtils.strip_html("Visible <!-- never closed <p>x</p>").should eq("Visible")
+      end
+
+      it "does not end a tag at a > inside a quoted attribute" do
+        Hwaro::Utils::TextUtils.strip_html(%(<img src="/a.png" alt="Home > Docs" width="10"> Tail)).should eq("Tail")
+        Hwaro::Utils::TextUtils.strip_html(%(<a title='a > b' href="x">link</a>)).should eq("link")
+      end
+
+      it "keeps a < that does not start a tag as text" do
+        Hwaro::Utils::TextUtils.strip_html("1 < 2 and x<3").should eq("1 < 2 and x<3")
+      end
+    end
+
+    # Regression: every tag boundary became a space, splitting words at
+    # inline markup (Korean particles after **bold**, H<sub>2</sub>O, Ctrl+<kbd>C</kbd>).
+    describe "inline tags" do
+      it "does not split words at inline markup" do
+        Hwaro::Utils::TextUtils.strip_html("<strong>한글</strong>은 <em>강조</em>가 <code>code</code>를 쓴다").should eq("한글은 강조가 code를 쓴다")
+        Hwaro::Utils::TextUtils.strip_html("H<sub>2</sub>O and <b>bold</b>ness").should eq("H2O and boldness")
+        Hwaro::Utils::TextUtils.strip_html("Ctrl+<kbd>C</kbd>").should eq("Ctrl+C")
+        Hwaro::Utils::TextUtils.strip_html("<p>a<span>b</span>c</p>").should eq("abc")
+      end
+
+      it "still separates at block, void and unknown tags" do
+        Hwaro::Utils::TextUtils.strip_html("a<br>b<hr>c").should eq("a b c")
+        Hwaro::Utils::TextUtils.strip_html("<ul><li>a</li><li>b</li></ul>").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("<table><tr><td>a</td><td>b</td></tr></table>").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("a<img src=x>b").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("a<my-widget>b</my-widget>c").should eq("a b c")
+        Hwaro::Utils::TextUtils.strip_html("<p>a</p><p>b</p><div>c</div>").should eq("a b c")
+      end
+
+      it "matches tag names case-insensitively" do
+        Hwaro::Utils::TextUtils.strip_html("a<B>b</B>c").should eq("abc")
+        Hwaro::Utils::TextUtils.strip_html("a<P>b</P>c").should eq("a b c")
+      end
     end
 
     # Raw-text elements: <style>/<script> bodies are code, not display text,
@@ -616,6 +712,23 @@ describe Hwaro::Utils::TextUtils do
 
     it "handles an empty string" do
       Hwaro::Utils::TextUtils.strip_bom("").should eq("")
+    end
+  end
+
+  describe ".count_words" do
+    it "does not read a `<` without a closing `>` as a tag" do
+      # `a<b` used to enter tag mode and swallow everything up to the next `>`.
+      Hwaro::Utils::TextUtils.count_words("if a<b then one two three four five six seven eight nine ten.\n\nsecond paragraph with more words.")
+        .should eq(Hwaro::Utils::TextUtils.count_words("if a < b then one two three four five six seven eight nine ten.\n\nsecond paragraph with more words."))
+      Hwaro::Utils::TextUtils.count_words("for (i=0;i<n;i++) { x }").should eq(6)
+      Hwaro::Utils::TextUtils.count_words("x<y and a</b c").should eq(6)
+    end
+
+    it "still skips real tags, multi-line tags and comments" do
+      Hwaro::Utils::TextUtils.count_words("<p>one two</p>").should eq(2)
+      Hwaro::Utils::TextUtils.count_words("a <img\n  src=\"x.png\"\n  alt=\"q\"> b").should eq(2)
+      Hwaro::Utils::TextUtils.count_words("a <!-- hidden words here --> b").should eq(2)
+      Hwaro::Utils::TextUtils.count_words("a <!-- never closed b c d").should eq(7)
     end
   end
 end

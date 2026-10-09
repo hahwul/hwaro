@@ -1,5 +1,6 @@
 require "html"
 require "uri"
+require "../../utils/text_utils"
 
 # Internal Link Resolver
 #
@@ -26,15 +27,32 @@ module Hwaro
         # The lookbehind keeps `data-href=` / `xlink:href=` out.
         FRAGMENT_LINK_REGEX = /(?<![\w:-])href="(@\/[^"#]*)?#([^"]*)"/
 
-        # Matches an `id`/`name` attribute (quoted or, after minification,
-        # unquoted). The leading whitespace keeps `data-id=` out.
-        ANCHOR_ATTR_REGEX = /\s(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
+        # An opening tag: `$1` = tag name, `$2` = its attributes. Quoted values
+        # are skipped whole, so a `>` inside `title="a>b"` does not end the tag.
+        # Possessive, so a tag with thousands of attributes cannot exhaust the
+        # JIT stack (`Regex::Error`) on backtracking frames.
+        TAG_REGEX = /<([a-zA-Z][^\s\/>]*)((?:"[^"]*+"|'[^']*+'|[^>"']++)*+)>/
 
-        # Every anchor target (`id` / `name` value, entity-decoded) in `html`.
+        # One attribute of a tag (`$1` = name, quoted, or, after minification,
+        # unquoted value in `$2`/`$3`/`$4`). The leading whitespace keeps
+        # `data-id=` out.
+        ATTR_REGEX = /\s([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/
+
+        # Every anchor target in `html`, entity-decoded: an `id` on any element,
+        # or a `name` on `<a>` - the only element a browser scrolls to by name.
+        # `<meta name="description">` and `<input name="q">` are not targets, so
+        # `#description` must not pass as one.
         def anchor_ids(html : String) : Set(String)
           ids = Set(String).new
-          html.scan(ANCHOR_ATTR_REGEX) do |m|
-            ids << HTML.unescape(m[1]? || m[2]? || m[3])
+          html.scan(TAG_REGEX) do |tag|
+            anchor = tag[1].compare("a", case_insensitive: true) == 0
+            tag[2].scan(ATTR_REGEX) do |attr|
+              key = attr[1]
+              next unless key.compare("id", case_insensitive: true) == 0 ||
+                          (anchor && key.compare("name", case_insensitive: true) == 0)
+              value = attr[2]? || attr[3]? || attr[4]?
+              ids << HTML.unescape(value) if value
+            end
           end
           ids
         end
@@ -59,6 +77,9 @@ module Hwaro
         # Matches any href/src attribute value (relative or absolute).
         ANY_LINK_ATTR_REGEX = /\b(href|src)="([^"]*)"/
 
+        # A `srcset` attribute: comma-separated `url [descriptor]` candidates.
+        SRCSET_ATTR_REGEX = /\bsrcset="([^"]*)"/
+
         # A URI scheme prefix (e.g. `https:`, `mailto:`, `tel:`, `data:`).
         SCHEME_PREFIX_REGEX = /\A[a-zA-Z][a-zA-Z0-9+.\-]*:/
 
@@ -82,10 +103,35 @@ module Hwaro
         # (`@/my note.md` arrives as `@/my%20note.md`), so the decoded path is
         # tried first: `%20` means a space, as it does to Markd. A literal
         # `%` file name is still reached when nothing decodes to it (or as
-        # `%25`).
+        # `%25`). A path captured from rendered HTML carries Markd's `&amp;`
+        # for a `&` (`@/odd/a&amp;b.md`), so that spelling is tried first.
+        #
+        # A non-ASCII path that misses verbatim is retried NFC-folded on both
+        # sides: macOS, zip and Dropbox hand out decomposed (NFD) file names
+        # while links are typed precomposed, and the two never compare equal
+        # byte-wise. An exact spelling always wins; the fold scan only runs on
+        # a miss, so resolved links cost nothing extra.
         def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
-          return pages_by_path[path]? unless path.includes?('%')
-          pages_by_path[URI.decode(path)]? || pages_by_path[path]?
+          exact_page_for(pages_by_path, path) || folded_page_for(pages_by_path, path.includes?('%') ? URI.decode(path) : path)
+        end
+
+        private def exact_page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          return pages_by_path[path]? unless path.includes?('%') || path.includes?("&amp;")
+          candidates = path.includes?("&amp;") ? [path.gsub("&amp;", "&"), path] : [path]
+          candidates.each do |candidate|
+            page = (candidate.includes?('%') ? pages_by_path[URI.decode(candidate)]? : nil) || pages_by_path[candidate]?
+            return page if page
+          end
+          nil
+        end
+
+        private def folded_page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          return if path.ascii_only?
+          folded = path.unicode_normalize(:nfc)
+          pages_by_path.each do |key, page|
+            return page if !key.ascii_only? && key.unicode_normalize(:nfc) == folded
+          end
+          nil
         end
 
         # Resolve internal `@/` links in HTML to actual page URLs.
@@ -218,17 +264,28 @@ module Hwaro
         # (`mailto:`/`tel:`/`data:`), and pure in-page anchors (`#x`) are left
         # untouched. A no-op when `page_url` is not an absolute URL (no host
         # to resolve against — e.g. an empty base_url deploy).
-        def absolutize_links(html : String, page_url : String) : String
+        #
+        # Every candidate of a `srcset` (the responsive-image pass injects
+        # them, authors write them in `<img>`/`<picture>`) is resolved too,
+        # descriptors kept.
+        #
+        # `document_relative_only` is for a page that is moved verbatim to a
+        # different directory (the AMP mirror under `/amp/…`): only the values
+        # that resolve against the document's own location ("cover.png",
+        # "../b2/") are rewritten, root-relative ones keep their bytes, and a
+        # host-less `page_url` ("/posts/b1/") yields root-relative results.
+        def absolutize_links(html : String, page_url : String, document_relative_only : Bool = false) : String
           return html if page_url.empty?
-          return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"")
+          return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"") ||
+                             Utils::ByteScan.includes?(html, "srcset=\"")
 
           base = URI.parse(page_url)
-          return html if base.host.nil?
+          return html if base.host.nil? && !document_relative_only
 
           html.gsub(ANY_LINK_ATTR_REGEX) do |match|
             attr = $1
             value = $2
-            if value.empty? || absolute_or_anchor?(value)
+            if value.empty? || absolute_or_anchor?(value) || (document_relative_only && value.starts_with?('/'))
               match
             else
               begin
@@ -240,6 +297,20 @@ module Hwaro
                 match
               end
             end
+          end.gsub(SRCSET_ATTR_REGEX) do |match|
+            value = $1
+            spans = Utils::TextUtils.srcset_url_spans(value)
+            result = value
+            spans.reverse_each do |(start, stop)|
+              url = value[start...stop]
+              next if absolute_or_anchor?(url) || (document_relative_only && url.starts_with?('/'))
+              begin
+                result = result[0, start] + base.resolve(url).to_s + result[stop..]
+              rescue URI::Error
+                next
+              end
+            end
+            result == value ? match : %(srcset="#{result}")
           end
         rescue URI::Error
           html

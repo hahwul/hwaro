@@ -89,13 +89,12 @@ describe Hwaro::Models::Page do
       page.calculate_word_count.should eq(3)
     end
 
-    it "does not raise on an opened-but-never-closed real tag (swallows the tail)" do
-      # `<a` flips into tag mode; with no closing '>' the rest of the document
-      # is swallowed. This pins graceful degradation (count of pre-tag words,
-      # no crash) on truncated/malformed HTML.
+    it "does not raise on an opened-but-never-closed tag, and counts its text" do
+      # `<a` with no closing '>' is not a tag: it used to swallow the rest of
+      # the document, collapsing the count to the pre-tag words.
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = "hello <a href=foo and more text"
-      page.calculate_word_count.should eq(1)
+      page.calculate_word_count.should eq(6)
     end
   end
 
@@ -200,6 +199,26 @@ describe Hwaro::Models::Page do
       summary = page.extract_summary
       summary.should_not be_nil
       summary.not_nil!.should eq("Intro.\n\n```html\n<!-- more -->\n```\n\nBody.")
+    end
+
+    it "ignores a marker shown inside an inline code span" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Intro.\n\nUse the `<!-- more -->` marker to split.\n\nSecond.\n\n<!-- more -->\n\nRest."
+      page.extract_summary.should eq("Intro.\n\nUse the `<!-- more -->` marker to split.\n\nSecond.")
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Only ``<!-- more -->`` here."
+      page.extract_summary.should be_nil
+    end
+
+    it "still splits at a real marker that follows a code span or a stray backtick" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Use `code` first. <!-- more --> Rest."
+      page.extract_summary.should eq("Use `code` first.")
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "A lone ` tick <!-- more --> Rest."
+      page.extract_summary.should eq("A lone ` tick")
     end
 
     it "returns nil when the only marker sits inside a fence" do
@@ -563,6 +582,22 @@ describe Hwaro::Models::Page do
       end
     end
 
+    it "collects a bundle's own assets when its directory name has glob metacharacters" do
+      Dir.mktmpdir do |dir|
+        names = glob_literal_names(["[draft] x", "a{b,c}", "a?b", "a*b", "plain"])
+        names.each do |name|
+          FileUtils.mkdir_p(File.join(dir, "posts", name))
+          File.write(File.join(dir, "posts", name, "index.md"), "# T")
+          File.write(File.join(dir, "posts", name, "f.txt"), "x")
+        end
+        names.each do |name|
+          page = Hwaro::Models::Page.new("posts/#{name}/index.md")
+          page.is_index = true
+          page.collect_assets(dir).should eq(["posts/#{name}/f.txt"])
+        end
+      end
+    end
+
     it "collects non-markdown files from page directory" do
       Dir.mktmpdir do |dir|
         content_dir = dir
@@ -582,6 +617,37 @@ describe Hwaro::Models::Page do
         assets.should contain("blog/style.css")
         assets.should_not contain("blog/index.md")
         assets.should_not contain("blog/other.markdown")
+      end
+    end
+
+    it "collects assets from a bundle directory whose name holds glob metacharacters" do
+      Dir.mktmpdir do |dir|
+        glob_literal_names(["[wip]", "a{b,c}", "q?x", "star*", "back\\slash"]).each do |name|
+          bundle = File.join(dir, name)
+          FileUtils.mkdir_p(File.join(bundle, "sub"))
+          File.write(File.join(bundle, "index.md"), "# Test")
+          File.write(File.join(bundle, "pic.png"), "x")
+          File.write(File.join(bundle, "sub", "deep.png"), "x")
+
+          page = Hwaro::Models::Page.new("#{name}/index.md")
+          page.is_index = true
+          page.collect_assets(dir).should eq(["#{name}/pic.png", "#{name}/sub/deep.png"])
+        end
+      end
+    end
+
+    it "never collects upper-case page sources (.MD / .Markdown) as assets" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "posts")
+        FileUtils.mkdir_p(bundle)
+        File.write(File.join(bundle, "_index.md"), "# Section")
+        File.write(File.join(bundle, "Wip.MD"), "+++\ndraft = true\n+++\nSECRET")
+        File.write(File.join(bundle, "Hid.Markdown"), "SECRET")
+        File.write(File.join(bundle, "pic.png"), "x")
+
+        page = Hwaro::Models::Page.new("posts/_index.md")
+        page.is_index = true
+        page.collect_assets(dir).should eq(["posts/pic.png"])
       end
     end
 

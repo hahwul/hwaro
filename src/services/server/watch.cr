@@ -313,6 +313,10 @@ module Hwaro
         # rebuild schedule the next one. Matched by full path only: a
         # same-named file under data/ or static/ is a real source.
         return true if path == Utils::HtmlStats::FILE || path == "./#{Utils::HtmlStats::FILE}"
+        # PCRE2 UTF mode raises on invalid UTF-8 (a legacy EUC-KR/Latin-1 file
+        # name); match on the scrubbed text so the scan survives it. Callers
+        # keep the raw path for stat calls.
+        path = path.scrub unless path.valid_encoding?
         basename = File.basename(path)
         WATCHER_IGNORE_PATTERNS.any? { |re| re.matches?(path) || re.matches?(basename) }
       end
@@ -349,7 +353,7 @@ module Hwaro
         return roots unless config && config.assets.enabled
 
         source_dir = Path[config.assets.source_dir].normalize.to_s
-        return roots if source_dir.empty? || source_dir == "." || source_dir.starts_with?("..")
+        return roots if source_dir.empty? || source_dir == "." || Utils::PathUtils.escapes_parent?(source_dir)
         return roots if Utils::PathUtils.absolute?(source_dir)
 
         output = Path[output_dir].normalize.to_s
@@ -404,7 +408,7 @@ module Hwaro
           # edits too — a default glob never descends into dot-directories,
           # leaving those files permanently stale during serve. Editor/VCS
           # noise stays filtered by watcher_ignored?.
-          Dir.glob(File.join(dir, "**", "*"), match: File::MatchOptions.glob_default | File::MatchOptions::DotFiles) do |file|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*"), match: File::MatchOptions.glob_default | File::MatchOptions::DotFiles) do |file|
             next if Server.watcher_ignored?(file)
             begin
               # Deciding whether an entry is watchable must NOT raise, and it

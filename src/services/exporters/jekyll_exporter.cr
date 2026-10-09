@@ -192,9 +192,20 @@ module Hwaro
           # its `path`, its `aliases` stopped redirecting, and its
           # modification date was lost. An authored Jekyll key wins
           # (existing-key-wins, like `layout` above).
-          if fields["permalink"]?.try(&.raw).nil? && (custom = scalar_string(fields["path"]?)) && !(trimmed = custom.strip('/')).empty?
-            yaml_lines << "permalink: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar("/#{trimmed}/")}"
-            handled << "path"
+          out_path = disambiguate_path(resolve_jekyll_path(file_path, content_dir, output_dir, fields, is_draft, include_drafts))
+
+          if fields["permalink"]?.try(&.raw).nil?
+            if (custom = scalar_string(fields["path"]?)) && !(trimmed = custom.strip('/')).empty?
+              yaml_lines << "permalink: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar("/#{trimmed}/")}"
+              handled << "path"
+            elsif File.dirname(out_path) == File.join(output_dir, "_posts")
+              # A post flattened into `_posts/` would otherwise be published at
+              # Jekyll's default `/:year/:month/:day/:title.html`, away from the
+              # address the build gave it and the one the rewritten `@/` links
+              # (and every inbound URL) point at.
+              url = file_path.sub(content_dir, "").lstrip('/').sub(/\.(?:md|markdown)\z/, "").sub(/(\A|\/)_?index\z/, "\\1").strip('/')
+              yaml_lines << "permalink: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar("/#{url}/")}" unless url.empty?
+            end
           end
 
           if fields["redirect_from"]?.try(&.raw).nil? && (aliases = publishable_aliases(fields["aliases"]?, file_path))
@@ -216,9 +227,6 @@ module Hwaro
 
           frontmatter = "---\n#{yaml_lines.join("\n")}\n---"
           body = rewrite_internal_links(body)
-
-          out_path = resolve_jekyll_path(file_path, content_dir, output_dir, fields, is_draft, include_drafts)
-          out_path = disambiguate_path(out_path)
 
           # A refused destination (outside `output_dir`) is reported as
           # skipped; the bundle-asset accounting below only describes files

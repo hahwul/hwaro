@@ -445,5 +445,51 @@ describe Hwaro::Utils::PathUtils do
     it "returns false for an empty pattern" do
       Hwaro::Utils::PathUtils.glob_match?("", "a").should be_false
     end
+
+    it "matches across Unicode normalization forms" do
+      Hwaro::Utils::PathUtils.glob_match?("가*.txt", "가x.txt").should be_true
+      Hwaro::Utils::PathUtils.glob_match?("가*.txt", "가x.txt").should be_true
+    end
+  end
+
+  describe ".glob_escape" do
+    it "leaves plain paths untouched" do
+      Hwaro::Utils::PathUtils.glob_escape("content/posts/a b").should eq("content/posts/a b")
+    end
+
+    it "escapes glob metacharacters so Dir.glob matches the literal directory" do
+      Dir.mktmpdir do |dir|
+        glob_literal_names(["[wip]", "a{b,c}", "q?x", "star*"]).each do |name|
+          FileUtils.mkdir_p(File.join(dir, name))
+          File.write(File.join(dir, name, "f.txt"), "x")
+          Dir.glob(File.join(Hwaro::Utils::PathUtils.glob_escape(File.join(dir, name)), "*")).should eq([File.join(dir, name, "f.txt")])
+        end
+      end
+    end
+  end
+
+  describe ".escapes_parent?" do
+    it "is true only when the first segment is exactly .." do
+      Hwaro::Utils::PathUtils.escapes_parent?("..").should be_true
+      Hwaro::Utils::PathUtils.escapes_parent?("../x").should be_true
+      Hwaro::Utils::PathUtils.escapes_parent?("..public").should be_false
+      Hwaro::Utils::PathUtils.escapes_parent?("..x/y").should be_false
+      Hwaro::Utils::PathUtils.escapes_parent?("a/../..").should be_true
+      Hwaro::Utils::PathUtils.escapes_parent?("public").should be_false
+      Hwaro::Utils::PathUtils.escapes_parent?("/abs/path").should be_false
+    end
+  end
+
+  describe ".glob_escape" do
+    it "makes a directory name with glob metacharacters match literally" do
+      Dir.mktmpdir do |dir|
+        glob_literal_names(["[x] a", "a{b,c}", "a?b", "a*b", "a\\b"]).each do |name|
+          FileUtils.mkdir_p(File.join(dir, name))
+          File.write(File.join(dir, name, "f.txt"), "x")
+          found = Dir.glob(File.join(Hwaro::Utils::PathUtils.glob_escape(File.join(dir, name)), "**", "*"))
+          found.should eq([File.join(dir, name, "f.txt")])
+        end
+      end
+    end
   end
 end

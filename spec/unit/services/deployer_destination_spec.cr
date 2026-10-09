@@ -36,7 +36,7 @@ private def dest_spec_site(dir : String) : String
   src = File.join(dir, "src")
   FileUtils.mkdir_p(File.join(src, "foo"))
   File.write(File.join(src, "index.html"), "home")
-  File.write(File.join(src, "foo", "index.html"), "foo page")
+  File.write(File.join(src, "foo", "index.html"), "<p>foo page</p>")
   src
 end
 
@@ -71,7 +71,7 @@ describe Hwaro::Services::Deployer do
 
         File.read(File.join(dest, ".git")).should eq("gitdir: /repo/.git/worktrees/out\n")
         File.exists?(File.join(dest, "stale.html")).should be_false
-        File.read(File.join(dest, "foo", "index.html")).should eq("foo page")
+        File.read(File.join(dest, "foo", "index.html")).should eq("<p>foo page</p>")
       end
     end
 
@@ -160,7 +160,7 @@ describe Hwaro::Services::Deployer do
         results.first.status.should eq("ok")
         results.first.created.should eq(1)
         results.first.deleted.should eq(1)
-        File.read(File.join(dest, "foo")).should eq("foo page")
+        File.read(File.join(dest, "foo")).should eq("<p>foo page</p>")
         File.read(File.join(dest, "index.html")).should eq("home")
       end
     end
@@ -180,7 +180,7 @@ describe Hwaro::Services::Deployer do
         results.first.status.should eq("ok")
         results.first.created.should eq(1)
         results.first.deleted.should eq(1)
-        File.read(File.join(dest, "foo", "index.html")).should eq("foo page")
+        File.read(File.join(dest, "foo", "index.html")).should eq("<p>foo page</p>")
       end
     end
 
@@ -198,7 +198,7 @@ describe Hwaro::Services::Deployer do
         err.code.should eq(Hwaro::Errors::HWARO_E_IO)
         (err.message || "").should contain("is a directory but needs a file")
         # Refused before writing anything.
-        File.read(File.join(dest, "foo", "index.html")).should eq("foo page")
+        File.read(File.join(dest, "foo", "index.html")).should eq("<p>foo page</p>")
         Dir.exists?(File.join(dest, "foo", ".keep")).should be_true
       end
     end
@@ -283,13 +283,13 @@ describe Hwaro::Services::Deployer do
         dest = File.join(dir, "out")
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
         Hwaro::Services::Deployer.new.run(options, dest_spec_config(dest, strip: true))
-        File.read(File.join(dest, "foo")).should eq("foo page")
+        File.read(File.join(dest, "foo")).should eq("<p>foo page</p>")
 
         config = dest_spec_config(dest, strip: true)
         config.deployment.targets.first.exclude = "foo/index.html"
         Hwaro::Services::Deployer.new.plan(options, config).none? { |op| op.action == "delete" }.should be_true
         Hwaro::Services::Deployer.new.run(options, config)
-        File.read(File.join(dest, "foo")).should eq("foo page")
+        File.read(File.join(dest, "foo")).should eq("<p>foo page</p>")
       end
     end
 
@@ -480,6 +480,125 @@ describe Hwaro::Services::Deployer do
           Hwaro::Logger.err_io = previous
         end
         File.exists?(sentinel).should be_true
+      end
+    end
+  end
+
+  describe "stripped-page detection" do
+    page = "<!doctype html><p>old</p>"
+
+    it "judges a dotted-slug stripped page by its source spelling" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "src")
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(File.join(src, "docs", "v1.2"))
+        File.write(File.join(src, "index.html"), "home")
+        File.write(File.join(src, "docs", "v1.2", "index.html"), page)
+        FileUtils.mkdir_p(File.join(dest, "docs"))
+        File.write(File.join(dest, "docs", "v1.2"), page)
+        config = dest_spec_config(dest, strip: true)
+        config.deployment.targets.first.exclude = "docs/v1.2/index.html"
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+
+        Hwaro::Services::Deployer.new.plan(options, config).none? { |op| op.action == "delete" }.should be_true
+        Hwaro::Services::Deployer.new.run(options, config)
+        File.exists?(File.join(dest, "docs", "v1.2")).should be_true
+      end
+    end
+
+    it "still deletes a stale dotted-slug page but spares a dotted non-page file" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(File.join(dest, "docs"))
+        File.write(File.join(dest, "docs", "v0.9"), page)
+        File.write(File.join(dest, "docs", "jquery.min"), "var a=1;")
+        config = dest_spec_config(dest, strip: true)
+        config.deployment.targets.first.include = "**/index.html"
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+
+        deletes = Hwaro::Services::Deployer.new.plan(options, config).select { |op| op.action == "delete" }.map(&.path)
+        deletes.should eq(["docs/v0.9"])
+      end
+    end
+
+    it "does not read extensionless non-page files as stale stripped pages" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(dest)
+        File.write(File.join(dest, "CNAME"), "example.com\n")
+        File.write(File.join(dest, "LICENSE"), "MIT")
+        File.write(File.join(dest, "old"), page)
+        config = dest_spec_config(dest, strip: true)
+        config.deployment.targets.first.include = "**/*.html"
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+
+        deletes = Hwaro::Services::Deployer.new.plan(options, config).select { |op| op.action == "delete" }.map(&.path)
+        deletes.should eq(["old"])
+        Hwaro::Services::Deployer.new.run(options, config)
+        File.exists?(File.join(dest, "CNAME")).should be_true
+        File.exists?(File.join(dest, "LICENSE")).should be_true
+      end
+    end
+  end
+
+  describe "stripped-page detection on files with an extension" do
+    it "spares markup assets and hand-placed .html files an include does not name" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(File.join(dest, "docs"))
+        File.write(File.join(dest, "logo.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>")
+        File.write(File.join(dest, "feed.xml"), "<?xml version=\"1.0\"?><rss/>")
+        File.write(File.join(dest, "about.html"), "<!doctype html><p>hand placed</p>")
+        File.write(File.join(dest, "docs", "v0.9"), "<!doctype html><p>old</p>")
+        config = dest_spec_config(dest, strip: true)
+        config.deployment.targets.first.include = "**/index.html"
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+
+        deletes = Hwaro::Services::Deployer.new.plan(options, config).select { |op| op.action == "delete" }.map(&.path)
+        deletes.should eq(["docs/v0.9"])
+      end
+    end
+  end
+
+  describe "aliased and case-renamed paths" do
+    it "deploys a real directory and every symlink alias of it" do
+      posix_only!("symlinks")
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "src")
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(File.join(src, "v2"))
+        File.write(File.join(src, "v2", "x.html"), "x")
+        File.write(File.join(src, "index.html"), "i")
+        File.symlink("v2", File.join(src, "latest"))
+        File.symlink("v2", File.join(src, "aaa"))
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, dest_spec_config(dest))
+
+        %w[v2 latest aaa].each { |name| File.read(File.join(dest, name, "x.html")).should eq("x") }
+      end
+    end
+
+    it "does not delete a page whose directory was only re-cased" do
+      Dir.mktmpdir do |dir|
+        probe = File.join(dir, "Probe")
+        File.write(probe, "")
+        pending!("case-sensitive filesystem") unless File.exists?(File.join(dir, "probe"))
+        src = File.join(dir, "src")
+        dest = File.join(dir, "out")
+        FileUtils.mkdir_p(File.join(src, "Docs"))
+        File.write(File.join(src, "Docs", "Intro.html"), "a")
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, dest_spec_config(dest))
+
+        FileUtils.rm_rf(File.join(src, "Docs"))
+        FileUtils.mkdir_p(File.join(src, "docs"))
+        File.write(File.join(src, "docs", "intro.html"), "a2")
+        Hwaro::Services::Deployer.new.plan(options, dest_spec_config(dest)).none? { |op| op.action == "delete" }.should be_true
+        Hwaro::Services::Deployer.new.run(options, dest_spec_config(dest))
+        File.read(File.join(dest, "docs", "intro.html")).should eq("a2")
       end
     end
   end

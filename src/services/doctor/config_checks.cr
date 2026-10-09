@@ -20,7 +20,7 @@ module Hwaro
         end
 
         begin
-          config = Models::Config.load(@config_path)
+          config = Models::Config.load(@config_path, env: @env)
         rescue ex
           issues << Issue.new(id: "config-parse-error", level: :error, category: "config", file: @config_path, message: "Failed to parse config: #{ex.message}")
           return
@@ -116,7 +116,7 @@ module Hwaro
 
       private def check_search_format(issues : Array(Issue), config : Models::Config) : Nil
         # search format validity
-        if config.search.enabled && !VALID_SEARCH_FORMATS.includes?(config.search.format)
+        if config.search.enabled && !VALID_SEARCH_FORMATS.includes?(config.search.format.downcase)
           issues << Issue.new(id: "search-format-invalid", level: :warning, category: "config", file: @config_path,
             message: "search.format \"#{config.search.format}\" is not supported (expected: #{VALID_SEARCH_FORMATS.join(", ")})")
         end
@@ -286,7 +286,7 @@ module Hwaro
       # it only decides which parents count as declared.
       private def auto_section_identifiers(config : Models::Config) : Set(String)
         ids = Set(String).new
-        Dir.glob(File.join(@content_dir, "**", "_index.*")) do |path|
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "_index.*")) do |path|
           next unless ContentWalk.markdown?(path)
           dir = Path[File.dirname(path)].relative_to(@content_dir).to_posix.to_s
           dir = "" if dir == "."

@@ -131,7 +131,7 @@ A `parent` that doesn't match any `identifier` in the same menu (a typo, or a st
 
 ## Per-Language Menus
 
-A `[languages.<code>]` block with no menus table inherits the global `[[menus.*]]` set wholesale. Declaring `[[languages.<code>.menus.<name>]]` **replaces** that menu entirely for that language and does not merge with the global set:
+A `[languages.<code>]` block with no menus table inherits the global `[[menus.*]]` set wholesale. Declaring `[[languages.<code>.menus.<name>]]` **replaces** that menu entirely for that language and does not merge with the global set. A language that declares any menus table replaces the whole global set, including menus it does not name: declaring only `footer` leaves that language's `main` to its own front-matter and `auto_sections` entries, so repeat the global `main` entries under `[[languages.<code>.menus.main]]` to keep them:
 
 ```toml
 [[menus.main]]

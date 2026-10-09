@@ -90,6 +90,21 @@ describe Hwaro::Services::FrontmatterConverter do
       end
     end
 
+    # Regression: the temp file was "<name>.hwaro-convert.tmp", which pushed
+    # a valid file name close to NAME_MAX past it ("File name too long").
+    it "converts a file whose name is close to the file-name limit" do
+      posix_only!("Windows caps the whole path at 260 characters")
+      Dir.mktmpdir do |dir|
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        file_path = File.join(dir, "#{"a" * 247}.md")
+        File.write(file_path, "---\ntitle: Long\n---\n\nBody")
+
+        converter.convert_to_toml.converted_count.should eq(1)
+        File.read(file_path).should start_with("+++\ntitle = \"Long\"")
+        Dir.children(dir).should eq([File.basename(file_path)])
+      end
+    end
+
     it "does not rewrite a YAML file reached through a symlink outside the project" do
       Dir.mktmpdir do |dir|
         project = File.join(dir, "project")
@@ -1157,9 +1172,8 @@ describe Hwaro::Services::ConversionResult do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
         file_path = File.join(dir, "mixed.md")
-        # TOML 1.0 allows mixed-type arrays; the parser Hwaro vendors does
-        # not — whatever the cause, the author has to be told what it was.
-        File.write(file_path, "+++\ntitle = \"T\"\nmixed = [\"a\", 1, true]\n+++\n\nBody")
+        # Whatever the cause, the author has to be told what it was.
+        File.write(file_path, "+++\ntitle = \"T\"\nmixed = [\"a\" 1]\n+++\n\nBody")
 
         captured = IO::Memory.new
         previous = Hwaro::Logger.err_io
@@ -1173,7 +1187,7 @@ describe Hwaro::Services::ConversionResult do
         reported = captured.to_s
         reported.should contain("Failed to convert")
         reported.should contain("mixed.md")
-        reported.should contain("cannot mix types in array")
+        reported.should contain("expected ',', ']' or newline")
       end
     end
 

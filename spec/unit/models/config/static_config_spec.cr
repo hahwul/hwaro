@@ -11,6 +11,23 @@ describe Hwaro::Models::StaticConfig do
   end
 
   describe "#excluded?" do
+    it "matches an NFC pattern against an NFD path and the reverse" do
+      nfc = "\uAC00"
+      nfd = "\u1100\u1161"
+
+      {nfc => nfd, nfd => nfc}.each do |name, on_disk|
+        literal = Hwaro::Models::StaticConfig.new
+        literal.exclude = ["#{name}dir", "#{name}.txt"]
+        literal.excluded?("#{on_disk}dir/s.txt").should be_true
+        literal.excluded?("#{on_disk}.txt").should be_true
+        literal.excluded?("other.txt").should be_false
+
+        glob = Hwaro::Models::StaticConfig.new
+        glob.exclude = ["#{name}*.txt"]
+        glob.excluded?("#{on_disk}x.txt").should be_true
+      end
+    end
+
     it "does not exclude ordinary files" do
       config = Hwaro::Models::StaticConfig.new
       config.excluded?("robots.txt").should be_false

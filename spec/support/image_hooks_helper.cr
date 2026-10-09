@@ -25,4 +25,49 @@ class Hwaro::Content::Hooks::ImageHooks
       @@render_image_sources.clear
     end
   end
+
+  # What `process_images` leaves behind for a build that did process images.
+  def self.set_processing_state(active : Bool, source_map = {} of String => String)
+    @@resize_map_mutex.synchronize do
+      @@processing_active = active
+      @@source_map = source_map
+    end
+  end
+
+  def self.source_map : Hash(String, String)
+    @@resize_map_mutex.synchronize { @@source_map.dup }
+  end
+end
+
+# A real JPEG (`w`x`h`, horizontal gradient) with an Exif APP1 block carrying
+# *orientation* inserted right after SOI, like a phone photo.
+def write_exif_jpeg(path : String, w : Int32, h : Int32, orientation : Int32?, little : Bool = true) : Nil
+  pixels = Bytes.new(w * h * 3) { |i| (((i // 3) % w) * 255 // w).to_u8 }
+  LibStb.stbi_write_jpg(path, w, h, 3, pixels.to_unsafe.as(Void*), 90).should_not eq(0)
+  return unless orientation
+
+  fmt = little ? IO::ByteFormat::LittleEndian : IO::ByteFormat::BigEndian
+  tiff = IO::Memory.new
+  tiff.write(little ? "II".to_slice : "MM".to_slice)
+  tiff.write_bytes(42_u16, fmt)
+  tiff.write_bytes(8_u32, fmt)      # IFD0 offset
+  tiff.write_bytes(1_u16, fmt)      # one entry
+  tiff.write_bytes(0x0112_u16, fmt) # Orientation
+  tiff.write_bytes(3_u16, fmt)      # SHORT
+  tiff.write_bytes(1_u32, fmt)      # count
+  tiff.write_bytes(orientation.to_u16, fmt)
+  tiff.write_bytes(0_u16, fmt) # value padding
+  tiff.write_bytes(0_u32, fmt) # next IFD
+  segment = IO::Memory.new
+  segment.write(Bytes[0xFF, 0xE1])
+  segment.write_bytes((2 + 6 + tiff.size).to_u16, IO::ByteFormat::BigEndian)
+  segment.write("Exif\0\0".to_slice)
+  segment.write(tiff.to_slice)
+
+  jpeg = File.open(path, "rb", &.getb_to_end)
+  File.open(path, "wb") do |io|
+    io.write(jpeg[0, 2])
+    io.write(segment.to_slice)
+    io.write(jpeg[2, jpeg.size - 2])
+  end
 end

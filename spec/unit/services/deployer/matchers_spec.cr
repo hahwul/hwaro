@@ -429,7 +429,7 @@ describe "Deployer matchers" do
         dest = File.join(dir, "out")
         Dir.mkdir_p(File.join(src, "foo"))
         File.write(File.join(src, "index.html"), "home")
-        File.write(File.join(src, "foo", "index.html"), "foo")
+        File.write(File.join(src, "foo", "index.html"), "<p>foo</p>")
         config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
         config.deployment.targets[0].strip_index_html = true
         deployer = Hwaro::Services::Deployer.new
@@ -440,6 +440,47 @@ describe "Deployer matchers" do
         with_captured_log { deployer.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], max_deletes: 1), config) }
         File.exists?(File.join(dest, "foo")).should be_false
         File.exists?(File.join(dest, "foo.gz")).should be_false
+      end
+    end
+
+    it "deletes a removed page's sibling even when include does not match *.gz" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        Dir.mkdir_p(File.join(src, "blog"))
+        File.write(File.join(src, "blog", "a.html"), "a")
+        File.write(File.join(src, "blog", "b.html"), "b")
+        config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+        config.deployment.targets[0].include = "**/*.html"
+        deployer = Hwaro::Services::Deployer.new
+        with_captured_log { deployer.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"]), config) }
+        File.exists?(File.join(dest, "blog", "b.html.gz")).should be_true
+
+        File.delete(File.join(src, "blog", "b.html"))
+        with_captured_log { deployer.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], max_deletes: 1), config) }
+        File.exists?(File.join(dest, "blog", "b.html")).should be_false
+        File.exists?(File.join(dest, "blog", "b.html.gz")).should be_false
+        File.exists?(File.join(dest, "blog", "a.html.gz")).should be_true
+      end
+    end
+
+    it "exempts a removed dotted-slug stripped page's sibling from max_deletes" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "public")
+        dest = File.join(dir, "out")
+        Dir.mkdir_p(File.join(src, "v1.2"))
+        File.write(File.join(src, "index.html"), "home")
+        File.write(File.join(src, "v1.2", "index.html"), "<!doctype html><p>v</p>")
+        config = matcher_config("file://#{dest}", [deploy_matcher("\\.html$", gzip: true)])
+        config.deployment.targets[0].strip_index_html = true
+        deployer = Hwaro::Services::Deployer.new
+        with_captured_log { deployer.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"]), config) }
+        File.exists?(File.join(dest, "v1.2.gz")).should be_true
+
+        FileUtils.rm_rf(File.join(src, "v1.2"))
+        with_captured_log { deployer.run(Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["t"], max_deletes: 1), config) }
+        File.exists?(File.join(dest, "v1.2")).should be_false
+        File.exists?(File.join(dest, "v1.2.gz")).should be_false
       end
     end
 

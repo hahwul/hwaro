@@ -185,7 +185,7 @@ Include a source file, or part of it, as a fenced code block. The block goes thr
 | `path` | (required) | File path, relative to the project root |
 | `region` | (none) | Only the lines between `#region <name>` and `#endregion <name>` |
 | `lines` | (none) | Line range `a-b` or a single line `a` (1-based, inclusive; counted inside `region` when both are set) |
-| `lang` | from the extension | Language of the code block |
+| `lang` | from the file name or extension (`Makefile`, `Dockerfile`, `.rs`); in client highlight mode, as highlight.js names it | Language of the code block |
 | `title`, `hl_lines`, `hide_lines`, `linenos`, `linenostart`, `copy` | | Passed on as fence options |
 
 Region markers can follow any comment leader, so they stay valid code in the source file:

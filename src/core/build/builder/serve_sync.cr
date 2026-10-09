@@ -111,6 +111,7 @@ module Hwaro
 
           compiler = Assets::SassCompiler.new(config.sass, config.static)
           count = compiler.compile_all(output_dir)
+          compiler.written_paths.each { |path| claim_generated_output(path) }
           Logger.outcome("compiled", "#{count} sass #{count == 1 ? "file" : "files"}") if count > 0
 
           # Bundle entries with `.scss` sources only recompile inside the asset
@@ -157,50 +158,53 @@ module Hwaro
           pipeline.manifest != old_manifest
         end
 
-        # Republish non-Markdown content assets (images, etc.) to the output
-        # directory, preserving their path relative to `content/`. Mirrors what
-        # the full build does via the raw-files path in the Write phase, but
-        # only touches the files the watcher actually flagged as changed.
+        # Republish non-Markdown content assets (images, etc.) the way the full
+        # build's Write phase does, but only the files the watcher flagged:
         #
-        # Skips files whose extension isn't permitted by `[content.files]`, so
-        # the watcher can't smuggle a `.md` or a disallowed type into output.
-        # No-ops when `[content.files]` isn't enabled — nothing was published
-        # in the first place, so there's nothing to refresh. (`@config` is nil
-        # only before the initial build, which `Server#run_with_options`
-        # already performs before spawning the watcher, so the watcher always
-        # sees a loaded config.)
-        def copy_changed_content_files(changed_files : Array(String), output_dir : String, verbose : Bool = false)
-          config = @config
-          unless config && config.content_files.enabled?
-            Logger.debug "  Content-file republish skipped — content.files not enabled."
-            return
-          end
+        #   * `[content.files]` copies go to their path relative to `content/`
+        #     (minified like `process_raw_files` when `minify`), skipping
+        #     extensions the config doesn't permit so the watcher can't
+        #     smuggle a `.md` or a disallowed type into output;
+        #   * page-bundle assets go to the owning page's URL, whether or not
+        #     `[content.files]` is on and wherever a slug / path / permalink
+        #     moved the page (`process_assets`).
+        #
+        # `@config` is nil only before the initial build, which
+        # `Server#run_with_options` already performs before spawning the
+        # watcher, so the watcher always sees a loaded config.
+        def copy_changed_content_files(changed_files : Array(String), output_dir : String, verbose : Bool = false, minify : Bool = false)
+          return unless config = @config
 
-          copied = 0
+          copied = Set(String).new
+          written = Set(String).new
           withheld = withheld_bundle_dirs
-          changed_files.each do |src_path|
-            next unless File.exists?(src_path)
-            next if File.directory?(src_path)
-
+          sources = changed_files.select { |src_path| File.exists?(src_path) && !File.directory?(src_path) }
+          sources.each do |src_path|
             relative = path_relative_to(src_path, "content")
 
-            next unless config.content_files.publish?(relative)
+            next unless config.content_files.enabled? && config.content_files.publish?(relative)
             # Same rule as the full build's raw lane: an edited asset of a
             # draft / future / expired bundle stays unpublished.
             next if withheld_content_file?(relative, withheld)
 
-            dest_path = File.join(output_dir, relative)
-            unless Utils::OutputGuard.within_output_dir?(dest_path, output_dir)
-              Logger.warn "Skipping content file outside output directory: #{relative}"
-              next
-            end
-
-            Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-            Hwaro::Utils::FileSafe.atomic_copy(src_path, dest_path)
+            next unless dest_path = publish_raw_file(src_path, relative, output_dir, minify)
+            written << File.expand_path(dest_path)
             Logger.action :copy, dest_path, Logger::Role::Dim if verbose
-            copied += 1
+            copied << src_path
           end
-          Logger.outcome("copied", "#{copied} content #{copied == 1 ? "file" : "files"}") if copied > 0
+
+          # Page-bundle assets. A withheld bundle's page is not in the site, so
+          # it has no owner here. `written` keeps process_assets from copying
+          # raw bytes over a file the raw lane just minified.
+          if site = @site
+            changed = sources.map { |src_path| path_relative_to(src_path, "content") }.to_set
+            owners = (site.pages + site.sections).select { |page| page.assets.any? { |asset| changed.includes?(asset) } }
+            unless owners.empty?
+              process_assets(owners, output_dir, verbose, written)
+              owners.each { |page| page.assets.each { |asset| copied << File.join("content", asset) if changed.includes?(asset) } }
+            end
+          end
+          Logger.outcome("copied", "#{copied.size} content #{copied.size == 1 ? "file" : "files"}") unless copied.empty?
         end
 
         # `content/` source paths minus the files of withheld (draft / future /
@@ -574,7 +578,7 @@ module Hwaro
         # `path` relative to the output directory, or nil when it is outside.
         private def output_relative(path : String, output_dir : String, cwd : String) : String?
           relative = Path[File.expand_path(path, cwd)].relative_to(File.expand_path(output_dir, cwd)).to_s
-          return if relative.starts_with?("..") || relative == "."
+          return if Utils::PathUtils.escapes_parent?(relative) || relative == "."
           relative
         rescue ArgumentError
           nil

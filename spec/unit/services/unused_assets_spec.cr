@@ -36,6 +36,48 @@ describe Hwaro::Services::UnusedAssets do
       end
     end
 
+    # Browsers request these by well-known root URL with no markup reference.
+    it "never flags the implicit root-level favicon / apple-touch-icon files" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        static_dir = File.join(dir, "static")
+        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(File.join(static_dir, "old"))
+
+        %w[favicon.ico apple-touch-icon.png apple-touch-icon-precomposed.png apple-touch-icon-180x180.png].each do |name|
+          File.write(File.join(static_dir, name), "x")
+        end
+        File.write(File.join(static_dir, "unref.png"), "x")
+        # Only the ROOT copies are implicit requests.
+        File.write(File.join(static_dir, "old", "favicon.ico"), "x")
+
+        service = Hwaro::Services::UnusedAssets.new(content_dir: content_dir, static_dir: static_dir, templates_dir: File.join(dir, "templates"))
+        result = service.run
+
+        result.unused_files.should eq([File.join(static_dir, "old", "favicon.ico"), File.join(static_dir, "unref.png")])
+      end
+    end
+
+    it "scans a project whose own directory name carries glob metacharacters" do
+      # The directory prefix of every glob is literal: `[client]/` or `a{b,c}/`
+      # used to match nothing, so doctor/unused-assets saw an empty project.
+      Dir.mktmpdir do |tmp|
+        dir = File.join(tmp, glob_literal_names(["[client] a{b,c}", "[client] a"]).first)
+        content_dir = File.join(dir, "content")
+        static_dir = File.join(dir, "static")
+        FileUtils.mkdir_p(content_dir)
+        FileUtils.mkdir_p(static_dir)
+        File.write(File.join(static_dir, "used.png"), "png data")
+        File.write(File.join(static_dir, "unused.png"), "png data")
+        File.write(File.join(content_dir, "post.md"), "---\ntitle: Post\n---\n\n![Image](used.png)\n")
+
+        result = Hwaro::Services::UnusedAssets.new(content_dir: content_dir, static_dir: static_dir, templates_dir: File.join(dir, "templates")).run
+
+        result.total_assets.should eq(2)
+        result.unused_files.should eq([File.join(static_dir, "unused.png")])
+      end
+    end
+
     it "does not flag a referenced asset whose name contains a space" do
       # Regression: the reference regex only matches [\w\-.] filenames, so an
       # asset like `team photo.png` referenced in content was reported unused

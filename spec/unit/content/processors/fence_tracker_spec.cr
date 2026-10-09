@@ -218,6 +218,16 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["<!--->", "", "Text.", "", "    code"]).should eq [false, false, false, false, true]
     end
 
+    it "tracks processing-instruction, declaration and CDATA blocks as raw HTML up to their marker" do
+      html_lines = ->(lines : Array(String)) do
+        tracker = Hwaro::Content::Processors::FenceTracker.new
+        lines.map { |line| tracker.fence_line?(line); tracker.html_block_line? }
+      end
+      html_lines.call(["<?php a ?>", "text", "<?xml", "", "b", "?>", "text"]).should eq [true, false, true, true, true, true, false]
+      html_lines.call(["<![CDATA[ a ]]>", "text", "<![CDATA[", "", "b", "]]>", "text"]).should eq [true, false, true, true, true, true, false]
+      html_lines.call(["<!DOCTYPE html>", "text", "<!ELEMENT", "b>", "text"]).should eq [true, false, true, true, false]
+    end
+
     it "does not open a lone-tag HTML block inside a paragraph" do
       feed(["para", "<span>", "> >     y"]).should eq [false, false, true]
     end
@@ -239,6 +249,48 @@ describe Hwaro::Content::Processors::FenceTracker do
     it "keeps list items behind a blockquote inside an outer item" do
       feed(["- a", "", "  > quote", "", "  b", "", "     not code"])
         .should eq [false, false, false, false, false, false, false]
+    end
+  end
+
+  it "does not raise when a blockquote marker closes an empty item before its blank line" do
+    feed(["* ", "> > "]).should eq [false, false]
+    feed(["  - ", ">", "    - text"]).size.should eq 3
+  end
+
+  describe "fences inside list items" do
+    it "sees a fence indented four columns under an ordered item" do
+      feed(["1. a", "    ```", "    {{ x }}", "    ```", "after"])
+        .should eq [false, true, true, true, false]
+    end
+
+    it "sees a fence indented four columns under a bullet item" do
+      feed(["- Bullet", "    ```", "    B", "    ```", "", "- Bullet 2"])
+        .should eq [false, true, true, true, false, false]
+    end
+
+    it "sees a fence two columns beyond a nested item's content" do
+      feed(["- a", "  - b", "      ```", "      x", "      ```", "tail"])
+        .should eq [false, false, true, true, true, false]
+    end
+
+    it "sees a tab-indented fence under an item" do
+      feed(["- a", "\t```", "\tcode", "\t```", "x"]).should eq [false, true, true, true, false]
+    end
+
+    it "measures the closer against the item too" do
+      # Four columns beyond the item's content is content, not a closer.
+      feed(["1. a", "   ```", "   x", "       ```", "   y", "   ```", "z"])
+        .should eq [false, true, true, true, true, true, false]
+      feed(["1. a", "    ```", "    x", "    ```", "z"]).should eq [false, true, true, true, false]
+    end
+
+    it "keeps a delimiter four columns beyond the item as indented code" do
+      feed(["- a", "", "      ```", "text"]).should eq [false, false, true, false]
+    end
+
+    it "keeps a fence inside a quoted item" do
+      feed(["> - a", ">     ```", ">     x", ">     ```", "after"])
+        .should eq [false, true, true, true, false]
     end
   end
 end

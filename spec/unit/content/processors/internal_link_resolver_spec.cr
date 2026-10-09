@@ -146,6 +146,15 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc">link</a>)
     end
 
+    it "resolves a @/ link to a page whose file name contains '&' (rendered as &amp;)" do
+      pages = {"Q&A.md" => make_page("Q&A.md", "/Q&A/")}
+      misses = [] of {String, String}
+      html = %(<a href="@/Q&amp;A.md">link</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md", "", misses)
+      result.should eq %(<a href="/Q&amp;A/">link</a>)
+      misses.should be_empty
+    end
+
     it "resolves a @/ link carrying both a query string and an anchor (query before anchor)" do
       pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
       html = %(<a href="@/blog/post.md?page=2&sort=asc#sec">link</a>)
@@ -158,6 +167,15 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       html = %(<a href="@/blog/post.md?page=2&amp;sort=asc">link</a>)
       result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md")
       result.should eq %(<a href="/blog/post/?page=2&amp;sort=asc">link</a>)
+    end
+
+    it "resolves a page whose path holds a & that Markd rendered as &amp;" do
+      pages = {"odd/a&b.md" => make_page("odd/a&b.md", "/odd/a&b/")}
+      misses = [] of {String, String}
+      html = %(<a href="@/odd/a&amp;b.md">A</a> <a href="@/odd/a&amp;b.md#s">B</a>)
+      result = Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "index.md", misses: misses)
+      result.should eq %(<a href="/odd/a&amp;b/">A</a> <a href="/odd/a&amp;b/#s">B</a>)
+      misses.should be_empty
     end
 
     it "does not decode semicolon-less legacy entities in query params" do
@@ -269,6 +287,20 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/").should eq(html)
     end
 
+    it "absolutizes every srcset candidate and keeps the descriptors" do
+      html = %(<img srcset="/sub/img/a_200w.png 200w, ../b.png 2x,https://cdn.com/c.png 3x, //cdn.com/d.png" sizes="100vw" src="/sub/img/a.png">)
+      result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/sub/p/q/")
+      result.should contain(%(srcset="https://h.com/sub/img/a_200w.png 200w, https://h.com/sub/p/b.png 2x,https://cdn.com/c.png 3x, //cdn.com/d.png"))
+      result.should contain(%(src="https://h.com/sub/img/a.png"))
+      result.should contain(%(sizes="100vw"))
+    end
+
+    it "absolutizes a srcset that is the only link attribute" do
+      html = %(<picture><source srcset="/a.webp 1x, /b.webp 2x"></picture>)
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/")
+        .should eq(%(<picture><source srcset="https://h.com/a.webp 1x, https://h.com/b.webp 2x"></picture>))
+    end
+
     it "resolves a relative link carrying an encoded entity without double-encoding it" do
       html = %(<a href="sub/?a=1&amp;b=2">q</a>)
       result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/")
@@ -282,6 +314,20 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       html = %(<h2 id="intro">I</h2><a name='old'></a><p id=bare>x</p><b data-id="no"></b><i id="a&amp;b"></i>)
       ids = Hwaro::Content::Processors::InternalLinkResolver.anchor_ids(html)
       ids.should eq(Set{"intro", "old", "bare", "a&b"})
+    end
+  end
+
+  describe ".anchor_ids name= targets" do
+    it "accepts name= only on <a>, id= on any element" do
+      html = %(<meta name="description" content="x"><meta name=viewport><form><input name="q" id="search"></form>) +
+             %(<a name=old>o</a><A NAME="Up">u</A><a title="a>b" name='quoted'>q</a><b title=" name=fake">t</b>)
+      ids = Hwaro::Content::Processors::InternalLinkResolver.anchor_ids(html)
+      ids.should eq(Set{"search", "old", "Up", "quoted"})
+    end
+
+    it "scans a tag with thousands of attributes without exhausting the regex JIT stack" do
+      html = %(<div ) + (%(a="b" ) * 20_000) + %(id="end">)
+      Hwaro::Content::Processors::InternalLinkResolver.anchor_ids(html).should eq(Set{"end"})
     end
   end
 
@@ -325,5 +371,19 @@ describe "Hwaro::Content::Processors::InternalLinkResolver.page_for" do
     Hwaro::Content::Processors::InternalLinkResolver.page_for(map, "a%20b.md").should be(space)
     Hwaro::Content::Processors::InternalLinkResolver.page_for(map, "a%2520b.md").should be(pct)
     Hwaro::Content::Processors::InternalLinkResolver.page_for({"a%20b.md" => pct}, "a%20b.md").should be(pct)
+  end
+
+  it "matches an NFC link to an NFD file name (and the reverse), preferring the exact spelling" do
+    nfc = "posts/caf\u00E9.md"
+    nfd = "posts/cafe\u0301.md"
+    page = Hwaro::Models::Page.new(nfd)
+    resolver = Hwaro::Content::Processors::InternalLinkResolver
+    resolver.page_for({nfd => page}, nfc).should be(page)
+    resolver.page_for({nfd => page}, URI.encode_path(nfc)).should be(page)
+    resolver.page_for({nfc => page}, nfd).should be(page)
+
+    exact = Hwaro::Models::Page.new(nfc)
+    resolver.page_for({nfd => page, nfc => exact}, nfc).should be(exact)
+    resolver.page_for({nfd => page}, "posts/missing.md").should be_nil
   end
 end

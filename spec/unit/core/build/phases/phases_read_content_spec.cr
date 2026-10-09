@@ -1,5 +1,6 @@
 require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
+require "../../../../support/build_helper"
 
 # Reopen Builder to expose private ReadContent helpers for testing.
 module Hwaro::Core::Build
@@ -108,6 +109,25 @@ describe Hwaro::Core::Build::Phases::ReadContent do
           ctx.pages.size.should eq(2)
           ctx.sections.size.should eq(1)
           ctx.sections.first.section.should eq("blog")
+        end
+      end
+    end
+
+    it "discovers pages and sections in byte order, whatever the directory order" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          # APFS returns these in hash order (b z m q a ...), ext4 in another.
+          %w[b z m q a x c y k].each do |name|
+            FileUtils.mkdir_p("content/#{name}")
+            File.write("content/#{name}.md", "---\ntitle: #{name}\n---\nbody")
+            File.write("content/#{name}/_index.md", "---\ntitle: #{name}\n---\n")
+          end
+
+          ctx = make_ctx(Hwaro::Models::Config.new)
+          Hwaro::Core::Build::Builder.new.test_collect_content_paths(ctx)
+
+          ctx.pages.map(&.path).should eq(ctx.pages.map(&.path).sort!)
+          ctx.sections.map(&.path).should eq(ctx.sections.map(&.path).sort!)
         end
       end
     end
@@ -297,6 +317,51 @@ describe Hwaro::Core::Build::Phases::ReadContent do
           result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
           ctx.all_pages.size.should eq(1)
         end
+      end
+    end
+  end
+
+  describe "page file extension case" do
+    # `.MD` is accepted as a page, but `_index`, `index` bundles and `.ko`
+    # suffixes are only recognised in lowercase (dozens of consumers compare
+    # against `_index.md`), so the file silently became an ordinary page. It
+    # now says so.
+    it "warns that a non-lowercase page extension loses its section/bundle/language role" do
+      log = with_captured_log do
+        build_site(
+          BASIC_CONFIG,
+          content_files: {"blog/_index.MD" => "idx", "blog/ok.md" => "ok"},
+          template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+        ) { |_dir| }
+      end
+      log.should contain("content/blog/_index.MD")
+      log.should contain("lowercase")
+      log.should_not contain("content/blog/ok.md")
+    end
+  end
+end
+
+describe "collect_content_paths ordering" do
+  it "collects pages and raw files in path order whatever the filesystem's readdir order" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/blog")
+        FileUtils.mkdir_p("content/docs")
+        (1..30).to_a.reverse!.each do |i|
+          File.write("content/blog/p#{i}.md", "---\ntitle: P#{i}\n---\nbody")
+          File.write("content/docs/d#{i}.md", "---\ntitle: D#{i}\n---\nbody")
+          File.write("content/blog/r#{i}.json", "{}")
+        end
+
+        ctx = make_ctx(Hwaro::Models::Config.new)
+        Hwaro::Core::Build::Builder.new.test_collect_content_paths(ctx)
+
+        paths = ctx.pages.map(&.path)
+        paths.size.should eq(60)
+        paths.should eq(paths.sort)
+        raw = ctx.raw_files.map(&.relative_path)
+        raw.size.should eq(30)
+        raw.should eq(raw.sort)
       end
     end
   end

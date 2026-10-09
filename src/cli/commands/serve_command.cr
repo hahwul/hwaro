@@ -121,7 +121,7 @@ module Hwaro
           # Path & URL
           input_dir = nil.as(String?)
           base_url = nil.as(String?)
-          env_name = ENV["HWARO_ENV"]? || nil
+          env_name = ENV["HWARO_ENV"]?.presence
 
           # Content filtering
           drafts = false
@@ -133,7 +133,7 @@ module Hwaro
           workers = 0
           cache = false
           stream = false
-          memory_limit = ENV["HWARO_MEMORYLIMIT"]? || nil
+          memory_limit = ENV["HWARO_MEMORYLIMIT"]?.presence
           fast_start = false
           fast_start_count = 20
 
@@ -233,6 +233,18 @@ module Hwaro
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
             CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
             CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+
+            # Positionals have no meaning here. Dropping them silently made
+            # `hwaro serve mysite` build and serve the CURRENT directory (and
+            # create `.hwaro/serve` in it); see BuildCommand.
+            parser.unknown_args do |before_dash, after_dash|
+              unknown = before_dash + after_dash
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_USAGE,
+                message: "unexpected extra argument(s): '#{unknown.join("', '")}'",
+                hint: "hwaro serve accepts options only; use -i/--input DIR to serve another directory.",
+              ) unless unknown.empty?
+            end
           end
 
           {input_dir, Config::Options::ServeOptions.new(

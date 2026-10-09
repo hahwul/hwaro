@@ -23,6 +23,13 @@ module Hwaro
         LINK_DEST_TOKEN_RE    = /\x00LD(\d+)\x00/
         HTML_TAG_TOKEN_RE     = /\x00HT(\d+)\x00/
 
+        # The label of `![label](…)` / `![label][ref]`, brackets excluded:
+        # it becomes the `alt` attribute (plain text), so no extension may
+        # inject markup into it. One level of nested brackets is allowed
+        # (`![Figure[^1]](f.png)`); possessive, so a long label cannot
+        # backtrack.
+        IMAGE_LABEL_RE = /(?<=!\[)(?:[^\[\]\\\n]|\\.|\[[^\[\]\n]*+\])++(?=\][(\[])/
+
         # A whole-line reference definition: `[label]:`, a destination
         # (`<…>` or a non-space run), an optional title after whitespace, and
         # nothing else. Group 1 ends where the destination starts. A line
@@ -56,7 +63,8 @@ module Hwaro
           has_html_code = text.includes?("<code")
           has_link_destinations = text.includes?("](") || text.includes?("]:")
           has_html_tags = text.includes?('<') && text.matches?(HTML_TAG_RE)
-          return yield text unless has_backticks || has_html_code || has_link_destinations || has_html_tags
+          has_image_labels = text.includes?("![")
+          return yield text unless has_backticks || has_html_code || has_link_destinations || has_html_tags || has_image_labels
 
           code_spans = [] of String
           stashed = text
@@ -72,6 +80,10 @@ module Hwaro
               "\x00CS#{code_spans.size - 1}\x00"
             end
           end
+
+          # After the code spans (a label can hold one) and before anything
+          # restores: its tokens are code-span tokens, restored last.
+          stashed = stash_image_labels(stashed, code_spans) if has_image_labels
 
           link_destinations = [] of String
           stashed = stash_markdown_link_destinations(stashed, link_destinations) if has_link_destinations
@@ -115,6 +127,14 @@ module Hwaro
             rewritten = replaced
           end
           rewritten
+        end
+
+        # Replaces each image label with a code-span token (see IMAGE_LABEL_RE).
+        private def stash_image_labels(text : String, store : Array(String)) : String
+          text.gsub(IMAGE_LABEL_RE) do |label|
+            store << label
+            "\x00CS#{store.size - 1}\x00"
+          end
         end
 
         # Inline extensions act on Markdown text, but a delimiter inside

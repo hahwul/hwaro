@@ -1368,8 +1368,12 @@ module Hwaro
         #
         # `force_div` marks a division-forcing context (variable values,
         # interpolation): there a literal-operand `/` counts as work too.
+        #
+        # `amp` marks a value context, where a bare `&` is the parent
+        # selector list (or null at the root) and must be evaluated. In
+        # selector templates it stays verbatim for `substitute_parent`.
         def self.computes?(node : Node, host : Host, force_div : Bool = false,
-                           fold_calc : Bool = true) : Bool
+                           fold_calc : Bool = true, amp : Bool = false) : Bool
           case node
           when Binary
             return true unless node.op == :div
@@ -1378,19 +1382,19 @@ module Hwaro
             # is the font-shorthand slash and must ship verbatim, exactly
             # as it did before calc folding existed.
             force_div || div_operand_forces?(node.left) || div_operand_forces?(node.right) ||
-              (!node.left.is_a?(Lit) && computes?(node.left, host, force_div, fold_calc)) ||
-              (!node.right.is_a?(Lit) && computes?(node.right, host, force_div, fold_calc))
+              (!node.left.is_a?(Lit) && computes?(node.left, host, force_div, fold_calc, amp)) ||
+              (!node.right.is_a?(Lit) && computes?(node.right, host, force_div, fold_calc, amp))
           when Unary
             # Even a plain `-$a` / `+$a` counts: the verbatim path renders
             # `+5` for `+$a` where dart-sass emits the evaluated `5`.
             true
           when CallE
             return true if host.expr_known_fn?(node.ns, node.name)
-            node.args.any? { |a| computes?(a, host, force_div, fold_calc) } ||
-              node.kwargs.any? { |kw| computes?(kw.value, host, force_div, fold_calc) } ||
-              node.spread.try { |s| computes?(s, host, force_div, fold_calc) } || false
+            node.args.any? { |a| computes?(a, host, force_div, fold_calc, amp) } ||
+              node.kwargs.any? { |kw| computes?(kw.value, host, force_div, fold_calc, amp) } ||
+              node.spread.try { |s| computes?(s, host, force_div, fold_calc, amp) } || false
           when ListE
-            node.items.any? { |i| computes?(i, host, force_div, fold_calc) }
+            node.items.any? { |i| computes?(i, host, force_div, fold_calc, amp) }
           when MapE
             # Map literals ALWAYS count as work, same rationale as ParenE:
             # `(a: b)` is Sass-only syntax with no CSS meaning. The verbatim
@@ -1406,7 +1410,7 @@ module Hwaro
             # values that no browser accepts. Evaluating consumes them.
             true
           when ConcatE
-            node.parts.any? { |p| computes?(p, host, force_div, fold_calc) }
+            node.parts.any? { |p| computes?(p, host, force_div, fold_calc, amp) }
           when Lit
             # Two literals count as real work: a static `calc(...)` that
             # folds to a number (dart-sass emits `20px` for
@@ -1419,11 +1423,12 @@ module Hwaro
             when Raw   then fold_calc && !Expr.fold_calc(value.text).nil?
             else            false
             end
+          when AmpE
+            amp
           else
-            # RawSpanE and AmpE deliberately don't compute: interpolated
-            # `calc(#{$a})` spans and a bare `&` resolve identically via
-            # the verbatim path, which keeps existing output
-            # byte-identical.
+            # RawSpanE deliberately doesn't compute: interpolated
+            # `calc(#{$a})` spans resolve identically via the verbatim
+            # path, which keeps existing output byte-identical.
             false
           end
         end
@@ -1498,6 +1503,11 @@ module Hwaro
         # ---------------------------------------------------------------
         # Evaluator
         # ---------------------------------------------------------------
+
+        # A min()/max()/clamp() operand or call kept as opaque CSS text
+        # because its units can't be combined.
+        class CalcRaw < Raw
+        end
 
         class Evaluator
           # In lenient (value) contexts, `and`/`or` only operate on real
@@ -1644,6 +1654,17 @@ module Hwaro
             end
           end
 
+          # Mirror of eval_forced: a subexpression whose `/` is CSS, not math.
+          private def eval_unforced(node : Node) : Value
+            saved = @force_div
+            @force_div = false
+            begin
+              eval(node)
+            ensure
+              @force_div = saved
+            end
+          end
+
           # The classic Sass `/` rule: divide when forced by context or by
           # a computed operand; otherwise the slash is a list separator
           # (`list.slash` round-trips through variable storage as
@@ -1705,10 +1726,10 @@ module Hwaro
             rv = ln.unit.empty? ? rn.value : ln.coerce_value(rn)
             result =
               case op
-              when :lt then ln.value < rv
-              when :gt then ln.value > rv
-              when :le then ln.value <= rv
-              else          ln.value >= rv
+              when :lt then Number.fuzzy_lt?(ln.value, rv)
+              when :gt then Number.fuzzy_lt?(rv, ln.value)
+              when :le then Number.fuzzy_le?(ln.value, rv)
+              else          Number.fuzzy_le?(rv, ln.value)
               end
             BoolV.new(result)
           end
@@ -1724,7 +1745,7 @@ module Hwaro
               lt = left.is_a?(Str) ? left.text : left.to_css
               rt = right.is_a?(Str) ? right.text : right.to_css
               lead = left.is_a?(Str) ? left : right.as(Str)
-              return Str.new(lt + rt, quoted: lead.quoted, quote_char: lead.quote_char)
+              return Str.new(Str.join_text(lt, rt), quoted: lead.quoted, quote_char: lead.quote_char)
             end
             raise SoftEvalError.new("can't add #{left.to_css} and #{right.to_css}")
           end
@@ -1772,6 +1793,9 @@ module Hwaro
           SHADOWED_CSS_FNS = %w[rgb rgba hsl hsla hwb min max clamp round abs
             invert grayscale greyscale opacity saturate]
 
+          # The calc-like members of SHADOWED_CSS_FNS: their `/` is math.
+          MATH_CSS_FNS = %w[min max clamp round abs]
+
           private def eval_call(node : CallE) : Value
             if node.ns.nil? && node.spread.nil? && node.kwargs.empty? &&
                node.args.size == 3 && Sass.normalize_ident(node.name) == "if"
@@ -1800,27 +1824,113 @@ module Hwaro
             # function arguments are CSS and keep the literal slash.
             force_args = @host.expr_known_fn?(node.ns, node.name) &&
                          !(node.ns.nil? && SHADOWED_CSS_FNS.includes?(Sass.normalize_ident(node.name)))
-            args = node.args.map { |a| force_args ? eval_forced(a) : eval(a) }
+            # Plain-CSS function arguments (`rgb(0 0 0 / .5)`, `foo(1/2)`)
+            # keep their literal slash even when the call sits in a
+            # division-forcing context (variable value, @return, mixin arg,
+            # interpolation). The calc-like math functions divide there.
+            css_args = !force_args && !(node.ns.nil? && MATH_CSS_FNS.includes?(Sass.normalize_ident(node.name)))
+            # min()/max()/clamp() with incompatible units are an opaque CSS
+            # calculation (`clamp(2rem, 1rem + 3vw, 4rem)`), not an error: it
+            # must survive inside maps, lists and function arguments instead
+            # of unwinding the whole enclosing expression.
+            calc_fn = node.ns.nil? && CALC_FALLBACK_FNS.includes?(Sass.normalize_ident(node.name))
+            args = node.args.map do |a|
+              if force_args
+                eval_forced(a)
+              elsif css_args
+                eval_unforced(a)
+              elsif calc_fn
+                eval_calc_arg(a)
+              else
+                eval(a)
+              end
+            end
+            spread_map = nil
             if spread = node.spread
-              spread_val = force_args ? eval_forced(spread) : eval(spread)
+              spread_val = force_args ? eval_forced(spread) : css_args ? eval_unforced(spread) : eval(spread)
               case spread_val
               when ListV
                 args.concat(spread_val.items)
+              when MapV
+                spread_map = spread_val
               else
                 args << spread_val
               end
             end
             kwargs = {} of String => Value
+            # A map spread binds as keyword arguments, exactly as for mixins.
+            if spread_map
+              spread_map.entries.each do |entry|
+                key = entry.key
+                raise SoftEvalError.new("variable keyword argument map must have string keys") unless key.is_a?(Str)
+                kwargs[Sass.normalize_ident(key.text)] = entry.value
+              end
+            end
             node.kwargs.each do |kw|
               key = Sass.normalize_ident(kw.name)
               raise SoftEvalError.new("duplicate argument $#{kw.name}") if kwargs.has_key?(key)
-              kwargs[key] = force_args ? eval_forced(kw.value) : eval(kw.value)
+              kwargs[key] = force_args ? eval_forced(kw.value) : css_args ? eval_unforced(kw.value) : eval(kw.value)
             end
-            if result = @host.expr_call(node.ns, node.name, args, kwargs)
-              result
-            else
-              reconstruct_call(node.ns, node.name, args, kwargs)
+            if calc_fn && args.any?(CalcRaw)
+              return CalcRaw.new(reconstruct_call(node.ns, node.name, args, kwargs).to_css)
             end
+            begin
+              if result = @host.expr_call(node.ns, node.name, args, kwargs)
+                result
+              else
+                reconstruct_call(node.ns, node.name, args, kwargs)
+              end
+            rescue ex : SoftEvalError
+              raise ex unless calc_fn && degradable_calc_error?(ex)
+              CalcRaw.new(reconstruct_call(node.ns, node.name, args, kwargs).to_css)
+            end
+          end
+
+          # min()/max()/clamp() fall back to their CSS text on a unit clash.
+          CALC_FALLBACK_FNS = %w[min max clamp]
+
+          # Only a unit clash degrades; undefined variables, wrong types and
+          # namespaced (`math.min`) failures keep raising.
+          private def degradable_calc_error?(ex : SoftEvalError) : Bool
+            !ex.is_a?(NamespacedEvalError) && !ex.is_a?(DuplicateKeyError) &&
+              (ex.message || "").includes?("incompatible units")
+          end
+
+          private def eval_calc_arg(node : Node) : Value
+            eval(node)
+          rescue ex : SoftEvalError
+            raise ex unless degradable_calc_error?(ex)
+            CalcRaw.new(calc_text(node))
+          end
+
+          # CSS text of a calculation operand: subtrees that evaluate
+          # (`1rem + 2rem`) are simplified, the clashing operator stays.
+          private def calc_text(node : Node) : String
+            case node
+            when Binary
+              op = case node.op
+                   when :plus  then "+"
+                   when :minus then "-"
+                   when :times then "*"
+                   when :div   then "/"
+                   end
+              if op
+                begin
+                  return eval(node).to_css
+                rescue ex : SoftEvalError
+                  raise ex unless degradable_calc_error?(ex)
+                  return "#{calc_text(node.left)} #{op} #{calc_text(node.right)}"
+                end
+              end
+            when ParenE
+              begin
+                return eval(node).to_css
+              rescue ex : SoftEvalError
+                raise ex unless degradable_calc_error?(ex)
+                return "(#{calc_text(node.inner)})"
+              end
+            end
+            eval(node).to_css
           end
 
           private def reconstruct_call(ns : String?, name : String, args : Array(Value),

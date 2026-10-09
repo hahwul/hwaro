@@ -141,7 +141,9 @@ describe "Sass dart parity fixes" do
     css.should contain("a: 3.1415926536;")
     css.should contain("b: 9007199254740991;")
     css.should contain("c: true;")
-    css.should contain("d: yes;")
+    # dart-sass compares within 1e-11, and $epsilon (2.2e-16) is below that,
+    # so it is not greater than zero.
+    css.should contain("d: no;")
   end
 
   # =========================================================================

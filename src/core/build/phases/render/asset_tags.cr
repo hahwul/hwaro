@@ -188,7 +188,7 @@ module Hwaro::Core::Build::Phases::Render
       config.auto_includes.dirs.each do |dir|
         static_dir = File.join("static", dir)
         next unless Dir.exists?(static_dir)
-        files.concat(Dir.glob(File.join(static_dir, "**", pattern)).sort)
+        files.concat(Dir.glob(File.join(Utils::PathUtils.glob_escape(static_dir), "**", pattern)).sort)
       end
       # Also digest SCSS outside auto_includes dirs (e.g. static/lib/_theme.scss
       # pulled in via @use from static/css/style.scss). Without this, a

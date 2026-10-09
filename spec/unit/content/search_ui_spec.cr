@@ -56,6 +56,14 @@ describe Hwaro::Content::SearchUi do
       guard.should_not match(/u\.pathname|u\.search|u\.hash/)
     end
 
+    it "tolerates a failing shard and retries after a total failure" do
+      load = js[js.index!("function load()")...js.index!("function build(")]
+      # Each shard fetch has its own catch, so the others stay searchable.
+      load.should contain("getJson(url).catch(function (err) {")
+      # A failure that left no records clears the memo so the next open refetches.
+      load.should contain("if (failed && !records.length) loading = null;")
+    end
+
     it "keeps chip counts free of Object.prototype keys" do
       js.should contain("var counts = Object.create(null);")
     end

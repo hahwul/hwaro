@@ -7,6 +7,13 @@ module Hwaro
   module Services
     module Importers
       class HugoImporter < Base
+        # Source bundle directory → output section it was written under, so
+        # every translation of a bundle lands in the same directory.
+        @bundle_sections = Hash(String, String).new
+
+        # Source directories whose co-located assets were already copied.
+        @copied_asset_dirs = Set(String).new
+
         def run(options : Config::Options::ImportOptions) : ImportResult
           hugo_path = options.path
           output_dir = options.output_dir
@@ -15,6 +22,8 @@ module Hwaro
           force = options.force
 
           reset_written_paths
+          @bundle_sections.clear
+          @copied_asset_dirs.clear
 
           content_dir = File.join(hugo_path, "content")
 
@@ -173,37 +182,32 @@ module Hwaro
           # Determine section and filename
           section, filename = section_from_path(file_path, content_dir, "")
 
-          # Determine slug for the file
-          leaf_bundle = !section.empty? && (filename == "index.md" || filename == "index.markdown")
-          if filename == "_index.md" || filename == "_index.markdown"
-            file_slug = "_index"
+          # Determine slug for the file. A translation carries its language in
+          # the filename (`about.ko.md`, `index.ko.md`) and hwaro reads it from
+          # there alone, so every branch below works on the name WITHOUT the
+          # suffix and puts it back on whatever filename it settles on.
+          name = filename.sub(/\.(md|markdown)$/, "")
+          base_name, lang = split_language_suffix(name)
+          lang_suffix = lang ? ".#{lang}" : ""
+          leaf_bundle = !section.empty? && base_name == "index"
+          if base_name == "_index"
+            file_slug = "_index#{lang_suffix}"
           elsif leaf_bundle
             # A leaf bundle's `slug` renames the bundle's URL segment
             # (`posts/trip/index.md` + `slug = "my-trip"` → /posts/my-trip/).
             # Writing it as `posts/trip/my-trip.md` published the page at
             # /posts/trip/my-trip/, away from its copied resources, so every
             # relative image in it broke. Keep the bundle shape instead.
-            if slug_val && !slug_val.empty?
-              parent = File.dirname(section)
-              target = parent == "." ? slug_val : File.join(parent, slug_val)
-              # The slugged directory may already be another bundle — a
-              # sibling source directory, or a bundle this run already moved
-              # there. Merging into it would write `index-1.md` beside the
-              # other bundle's resources, so this page keeps its own
-              # directory (and its own URL) instead.
-              target_index = resolve_content_path(output_dir, target, "index")
-              if target != section &&
-                 (Dir.exists?(File.join(content_dir, target)) || (target_index && destination_claimed?(target_index)))
-                Logger.warn "#{file_path}: slug #{slug_val.inspect} names an existing bundle (#{target}/); keeping the bundle at #{section}/."
-              else
-                section = target
-              end
-            end
-            file_slug = "index"
+            #
+            # All translations of a bundle share its directory, so the first
+            # file of the bundle to be processed decides it for the rest.
+            bundle_dir = File.dirname(file_path)
+            section = (@bundle_sections[bundle_dir] ||= bundle_section(file_path, section, slug_val, lang, content_dir, output_dir))
+            file_slug = "index#{lang_suffix}"
           elsif slug_val && !slug_val.empty?
-            file_slug = slug_val
+            file_slug = "#{slug_val}#{lang_suffix}"
           else
-            file_slug = filename.sub(/\.(md|markdown)$/, "")
+            file_slug = name
           end
 
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
@@ -224,12 +228,66 @@ module Hwaro
           # `section` must be non-empty: a bare `content/index.md` is the site
           # root, not a bundle, and sweeping the whole content root's loose
           # files into the output is not what the author asked for.
-          if dest_path && leaf_bundle
+          #
+          # A branch bundle (`docs/_index.md`) publishes its sibling files the
+          # same way, and every translation of a bundle sits in one directory,
+          # so the directory is copied once per run.
+          if dest_path && (leaf_bundle || (base_name == "_index" && !section.empty?)) && @copied_asset_dirs.add?(File.dirname(file_path))
             copy_bundle_assets(File.dirname(file_path), File.dirname(dest_path), output_dir, verbose, force)
           end
 
           return :skipped unless written
           has_shortcodes ? :imported_wrapped : :imported
+        end
+
+        # `name` (a filename without `.md`) split into its base and the language
+        # code of a translation suffix: `about.ko` → {"about", "ko"}. Hugo's
+        # languages are declared in a site config this importer does not read,
+        # so the shape decides: two or three letters with optional region
+        # subtags (`ko`, `zh-tw`). `release.notes` is not a translation.
+        # ponytail: `setup.mac.md` with a front matter slug reads as language
+        # "mac"; parse the site's declared languages if that ever bites.
+        private def split_language_suffix(name : String) : {String, String?}
+          if match = /\A(.+)\.([A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*)\z/.match(name)
+            {match[1], match[2]}
+          else
+            {name, nil}
+          end
+        end
+
+        # The output directory (relative to the content root) of the bundle
+        # `file_path` belongs to. Its front matter `slug` renames the
+        # directory, but a translation follows the bundle's default-language
+        # `index.md`, which is the page that names the bundle.
+        private def bundle_section(file_path : String, section : String, own_slug : String?, lang : String?, content_dir : String, output_dir : String) : String
+          slug_val = own_slug
+          if lang
+            dir = File.dirname(file_path)
+            {"index.md", "index.markdown"}.each do |default_name|
+              default_path = File.join(dir, default_name)
+              next unless File.file?(default_path)
+              data, _ = extract_frontmatter(read_text(default_path))
+              slug_val = data.try { |d| string_value(downcase_keys(d), "slug") }
+              break
+            end
+          end
+          return section if slug_val.nil? || slug_val.empty?
+
+          parent = File.dirname(section)
+          target = parent == "." ? slug_val : File.join(parent, slug_val)
+          # The slugged directory may already be another bundle — a
+          # sibling source directory, or a bundle this run already moved
+          # there. Merging into it would write `index-1.md` beside the
+          # other bundle's resources, so this page keeps its own
+          # directory (and its own URL) instead.
+          target_index = resolve_content_path(output_dir, target, "index")
+          if target != section &&
+             (Dir.exists?(File.join(content_dir, target)) || (target_index && destination_claimed?(target_index)))
+            Logger.warn "#{file_path}: slug #{slug_val.inspect} names an existing bundle (#{target}/); keeping the bundle at #{section}/."
+            section
+          else
+            target
+          end
         end
 
         # Keys `process_file` maps explicitly (lowercase).
@@ -413,7 +471,7 @@ module Hwaro
             when String
               return raw.empty? ? nil : raw
             when Time
-              return raw.to_s("%Y-%m-%dT%H:%M:%S%:z")
+              return Utils::FrontmatterWriter.serialize_time(raw)
             when Int64, Float64
               return raw.to_s
             end

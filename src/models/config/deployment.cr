@@ -82,16 +82,29 @@ module Hwaro
           # implementation (gh#529).
           target.url = target_h["URL"]?.try(&.as_s?) || target_h["url"]?.try(&.as_s?) || target_h["path"]?.try(&.as_s?) || ""
           target.command = target_h["command"]?.try(&.as_s?)
-          target.include = target_h["include"]?.try(&.as_s?)
-          target.exclude = target_h["exclude"]?.try(&.as_s?)
+          target.include = target_glob(target_h, name, "include")
+          target.exclude = target_glob(target_h, name, "exclude")
 
           strip_any = target_h["stripIndexHTML"]? || target_h["strip_index_html"]?
           if strip_val = strip_any.try(&.as_bool?)
             target.strip_index_html = strip_val
+          elsif strip_any
+            # Fail-open default applies; say so rather than ignore silently.
+            Logger.warn "[[deployment.targets]] #{name}: 'stripIndexHTML' must be a boolean; ignoring #{strip_any.raw.inspect}."
           end
 
           target
         end
+      end
+
+      # A target's include/exclude glob. A present but non-string value (e.g.
+      # an array) used to read as "no filter" — deploying files the author
+      # meant to exclude — so warn that it is ignored.
+      private def self.target_glob(target_h : Hash(String, TOML::Any), name : String, key : String) : String?
+        return unless raw = target_h[key]?
+        glob = raw.as_s?
+        Logger.warn "[[deployment.targets]] #{name}: '#{key}' must be a string glob; ignoring #{raw.raw.inspect}." unless glob
+        glob
       end
 
       private def self.load_deployment_matchers(config : Config, s : Hash(String, TOML::Any))

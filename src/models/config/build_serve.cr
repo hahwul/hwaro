@@ -141,7 +141,7 @@ module Hwaro
       #   but `config` only drops a top-level `config`, never a same-named file
       #   nested elsewhere.
       def excluded?(relative_path : String) : Bool
-        normalized = Path[relative_path].to_posix.to_s
+        normalized = Utils::PathUtils.nfc(Path[relative_path].to_posix.to_s)
         return false if normalized.empty? || normalized == "."
 
         if @use_default_excludes
@@ -169,6 +169,7 @@ module Hwaro
             (!pattern.includes?('/') && Utils::PathUtils.glob_match?(pattern, basename))
         else
           # Literal: an exact file, or a directory subtree rooted at it.
+          pattern = Utils::PathUtils.nfc(pattern)
           normalized == pattern || normalized.starts_with?("#{pattern}/")
         end
       end
@@ -251,7 +252,7 @@ module Hwaro
           return
         end
 
-        if Path[trimmed].normalize.to_s.starts_with?("..")
+        if Utils::PathUtils.escapes_parent?(trimmed)
           Logger.warn "Ignoring [build] output_dir #{trimmed.inspect}: it points outside the project. Using the default."
           return
         end

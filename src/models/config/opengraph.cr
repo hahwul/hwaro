@@ -242,7 +242,9 @@ module Hwaro
           # safe bound and the last visually meaningful one. The low bound is
           # cosmetic: og_image.cr replaces anything <= 48 with a style default.
           config.og.auto_image.font_size = int_value(ai["font_size"]?, config.og.auto_image.font_size).clamp(8, 630)
-          config.og.auto_image.logo = ai["logo"]?.try(&.as_s?)
+          # A blank value (`logo = ""`, an empty `${LOGO:-}`) means "unset": it
+          # would otherwise expand to the project directory.
+          config.og.auto_image.logo = ai["logo"]?.try(&.as_s?).presence
           # Joined into URLs as "/#{output_dir}/x.png": a trailing slash gave
           # `/og//x.png` (which lazy generation never matched) and a leading
           # one the protocol-relative `//og/x.png`.
@@ -262,7 +264,7 @@ module Hwaro
           # a non-finite (nan) value falls back to the default.
           ps = float_value(ai["pattern_scale"]?, config.og.auto_image.pattern_scale)
           config.og.auto_image.pattern_scale = ps.finite? ? ps.clamp(0.1, 10.0) : 1.0
-          config.og.auto_image.background_image = ai["background_image"]?.try(&.as_s?)
+          config.og.auto_image.background_image = ai["background_image"]?.try(&.as_s?).presence
           oo = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
           config.og.auto_image.overlay_opacity = oo.finite? ? oo : config.og.auto_image.overlay_opacity
           config.og.auto_image.format = ai["format"]?.try(&.as_s?) || config.og.auto_image.format
