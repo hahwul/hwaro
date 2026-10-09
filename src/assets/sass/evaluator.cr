@@ -134,6 +134,9 @@ module Hwaro
           @load_stack = [] of String
           @in_function = false
           @call_depth = 0
+          # Bumped when text spliced into a quoted string carries that
+          # string's own quote (see `resolve_template`).
+          @quote_conflicts = 0
           @forward_variables = {} of String => String
           @forward_mixins = {} of String => MixinClosure
           @forward_functions = {} of String => SassFn
@@ -361,6 +364,10 @@ module Hwaro
           end
           parent_breaks = @parent_breaks
 
+          # A `&` inside a selector pseudo's argument (`:not(&)`) takes the
+          # WHOLE parent list once instead of expanding per parent.
+          pseudo_resolved = parts.map { |part| pseudo_parent_refs(part, parents) }
+          parts = parts.map_with_index { |part, i| pseudo_resolved[i] || part }
           amps_by_part = parts.map { |part| count_parent_refs(part) }
           amps_by_part.each do |amps|
             next unless amps > 0
@@ -406,7 +413,9 @@ module Hwaro
                 result_breaks << (result.size != 1 && flag)
               end
               amps = amps_by_part[pi]
-              if amps == 0
+              if amps == 0 && pseudo_resolved[pi]
+                push.call(part) if parent_i == 0
+              elsif amps == 0
                 push.call("#{parent} #{part}")
               elsif amps > MAX_PARENT_REF_SLOTS
                 # Degraded single-combo expansion; emit once, on the first
@@ -458,6 +467,125 @@ module Hwaro
           combos
         end
 
+        # Pseudo-classes whose argument is a selector list: a `&` inside
+        # resolves to the whole parent list (dart-sass), not per parent.
+        SELECTOR_PSEUDOS = {"not", "is", "where", "has", "matches", "any", "-webkit-any", "-moz-any",
+                            "host", "host-context", "slotted", "current"}
+
+        # Rewrites every `&` sitting inside a selector pseudo's parentheses
+        # (`:not(&)`, `:is(&, .h)`, `:not(&-x)`) with the parent list
+        # substituted into that argument once. dart-sass interleaves the
+        # per-argument expansions (`:is(&, .h)` over `.a, .b` is
+        # `:is(.a, .h, .b)`). nil when the selector has no such `&`.
+        private def pseudo_parent_refs(selector : String, parents : Array(String)) : String?
+          return unless selector.includes?('&') && selector.includes?('(')
+          chars = selector.chars
+          changed = false
+          out = String.build do |io|
+            i = 0
+            while i < chars.size
+              c = chars[i]
+              case c
+              when '\\'
+                io << c
+                i += 1
+                io << chars[i] if i < chars.size
+              when '"', '\''
+                io << c
+                i += 1
+                while i < chars.size
+                  io << chars[i]
+                  if chars[i] == '\\' && i + 1 < chars.size
+                    i += 1
+                    io << chars[i]
+                  elsif chars[i] == c
+                    break
+                  end
+                  i += 1
+                end
+              when '['
+                while i < chars.size && chars[i] != ']'
+                  io << chars[i]
+                  i += 1
+                end
+                io << ']' if i < chars.size
+              when ':'
+                io << c
+                j = i + 1
+                if chars[j]? == ':'
+                  io << ':'
+                  j += 1
+                end
+                name_start = j
+                while (nc = chars[j]?) && (nc.ascii_alphanumeric? || nc == '-' || nc == '_')
+                  j += 1
+                end
+                name = chars[name_start...j].join
+                close = chars[j]? == '(' ? matching_paren(chars, j) : nil
+                if close && SELECTOR_PSEUDOS.includes?(name.downcase) &&
+                   (inner = chars[(j + 1)...close].join).includes?('&')
+                  io << name << '(' << expand_pseudo_argument(inner, parents) << ')'
+                  changed = true
+                  i = close
+                else
+                  io << name
+                  i = j - 1
+                end
+              else
+                io << c
+              end
+              i += 1
+            end
+          end
+          changed ? out : nil
+        end
+
+        private def expand_pseudo_argument(inner : String, parents : Array(String)) : String
+          lists = Parser.split_top_level_commas(inner).map(&.strip).reject(&.empty?).map do |arg|
+            next [arg] unless arg.includes?('&')
+            arg = pseudo_parent_refs(arg, parents) || arg
+            refs = count_parent_refs(arg)
+            if refs == 0
+              [arg]
+            elsif refs > MAX_PARENT_REF_SLOTS || parents.size.to_i64 ** refs > MAX_RULE_SELECTORS
+              [substitute_parent(arg, parents)]
+            else
+              parent_combinations(parents, refs).map { |combo| substitute_parent(arg, combo) }
+            end
+          end
+          interleaved = [] of String
+          (lists.max_of?(&.size) || 0).times do |k|
+            lists.each { |list| interleaved << list[k] if k < list.size }
+          end
+          interleaved.join(", ")
+        end
+
+        # Index of the `)` closing the `(` at `open`, skipping strings and
+        # escapes; nil when unbalanced.
+        private def matching_paren(chars : Array(Char), open : Int32) : Int32?
+          depth = 0
+          i = open
+          while i < chars.size
+            case c = chars[i]
+            when '\\'
+              i += 1
+            when '"', '\''
+              i += 1
+              while i < chars.size && chars[i] != c
+                i += 1 if chars[i] == '\\'
+                i += 1
+              end
+            when '('
+              depth += 1
+            when ')'
+              depth -= 1
+              return i if depth == 0
+            end
+            i += 1
+          end
+          nil
+        end
+
         # Counts `&` occurrences outside quoted strings and attribute
         # brackets — a scan-only twin of substitute_parent.
         private def count_parent_refs(selector : String) : Int32
@@ -466,6 +594,8 @@ module Hwaro
           i = 0
           while i < chars.size
             case c = chars[i]
+            when '\\'
+              i += 1 # an escaped `\&` is a literal character
             when '"', '\''
               quote = c
               i += 1
@@ -502,6 +632,10 @@ module Hwaro
             while i < chars.size
               c = chars[i]
               case c
+              when '\\'
+                io << c
+                i += 1
+                io << chars[i] if i < chars.size
               when '"', '\''
                 quote = c
                 io << c
@@ -1373,6 +1507,9 @@ module Hwaro
               selectors << sel
               breaks << (selectors.size != 1 && (part_breaks[part_i]? || false))
             end
+            if parents && (resolved = pseudo_parent_refs(part, parents))
+              part = resolved
+            end
             amps = count_parent_refs(part)
             if amps == 0
               push.call(part)
@@ -1541,6 +1678,15 @@ module Hwaro
             breaks << false
           end
           seen = selectors.to_set
+          # A target inside a selector pseudo's argument (`:not(.a)`) is
+          # extended by appending to the argument list, so every request
+          # for it must land in ONE rewritten selector. `variants` are the
+          # rewrites made so far (later requests update them in place) and
+          # `rewritten` the originals that already produced one — without
+          # this each request spawned its own variant and the variants fed
+          # each other, giving every ordered subset of the extenders.
+          variants = Set(String).new
+          rewritten = Set(String).new
           i = 0
           while i < selectors.size
             sel = selectors[i]
@@ -1557,6 +1703,18 @@ module Hwaro
               offset = 1
               results.each do |(added, ext_i)|
                 next if seen.includes?(added)
+                if ext_i < 0
+                  if variants.includes?(sel)
+                    seen << added
+                    variants << added
+                    selectors[i] = added
+                    sel = added
+                    next
+                  end
+                  next if rewritten.includes?(sel)
+                  rewritten << sel
+                  variants << added
+                end
                 seen << added
                 # Insert right after the selector that was extended —
                 # dart-sass keeps the additions in place (the placeholder
@@ -1745,7 +1903,8 @@ module Hwaro
             mod = SassModule.new(
               export_members(@forward_variables.merge(module_env.variables)),
               export_members(@forward_mixins.merge(module_env.mixins)),
-              export_members(@forward_functions.merge(module_env.functions)))
+              export_members(@forward_functions.merge(module_env.functions)),
+              module_env)
           ensure
             @load_stack.pop
             @env = saved_env
@@ -2078,7 +2237,7 @@ module Hwaro
             return lookup_var_ref(ref)
           end
           if node = Expr.parse(template)
-            if Expr.computes?(node, self, force_div: true)
+            if Expr.computes?(node, self, force_div: true, amp: true)
               begin
                 return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
               rescue ex : NamespacedEvalError
@@ -2090,7 +2249,17 @@ module Hwaro
               end
             end
           end
-          collapse_ws(resolve_template(template, allow_vars: true))
+          conflicts = @quote_conflicts
+          text = collapse_ws(resolve_template(template, allow_vars: true))
+          if @quote_conflicts != conflicts && (node = Expr.parse(template))
+            # `'#{"Don't"}'`: only the typed path can re-quote the string.
+            begin
+              return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
+            rescue SoftEvalError
+              # keep the verbatim text
+            end
+          end
+          text
         end
 
         # Declaration-value flavour of `resolve_value`: serializes as CSS
@@ -2101,7 +2270,7 @@ module Hwaro
         private def resolve_decl_value(template : Ast::TextTemplate,
                                        fold_calc : Bool = true) : ResolvedValue
           if node = Expr.parse(template)
-            if Expr.computes?(node, self, fold_calc: fold_calc)
+            if Expr.computes?(node, self, fold_calc: fold_calc, amp: true)
               begin
                 value = Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node)
                 return ResolvedValue.new(value.to_css, value.is_a?(NullV))
@@ -2116,16 +2285,28 @@ module Hwaro
           end
           # The verbatim path only has text, where a stored null reads back
           # as "null" (see `value_storage`).
+          conflicts = @quote_conflicts
           text = collapse_ws(resolve_template(template, allow_vars: true))
+          if @quote_conflicts != conflicts && (node = Expr.parse(template))
+            begin
+              return ResolvedValue.new(Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node).to_css, false)
+            rescue SoftEvalError
+              # keep the verbatim text
+            end
+          end
           ResolvedValue.new(text, text == "null")
         end
 
         # Same lenient policy for `#{...}` bodies, minus the whitespace
         # collapsing (interpolation output is spliced into surrounding
         # text exactly as today when nothing computes).
-        private def resolve_interp(template : Ast::TextTemplate) : String
+        #
+        # `amp` is set for value contexts (and quoted selector text), where
+        # `#{&}` is the parent selector list; in a selector it stays the
+        # verbatim `&` that `substitute_parent` rewrites per parent.
+        private def resolve_interp(template : Ast::TextTemplate, amp : Bool = false) : String
           if node = Expr.parse(template)
-            if Expr.computes?(node, self, force_div: true)
+            if Expr.computes?(node, self, force_div: true, amp: amp)
               begin
                 # `interp_css`, not `to_css`: inside `#{...}` dart-sass
                 # unquotes strings at every nesting level, so a list of
@@ -2284,7 +2465,7 @@ module Hwaro
           if ns
             mod = @env.module?(ns)
             raise NamespacedEvalError.new("there is no module namespace \"#{ns}\"") unless mod
-            mod.variables[Sass.normalize_ident(name)]? ||
+            mod.variable?(Sass.normalize_ident(name)) ||
               raise NamespacedEvalError.new("undefined variable: \"#{ns}.$#{name}\"")
           else
             @env.lookup_var(name) ||
@@ -2522,16 +2703,32 @@ module Hwaro
 
         # :nodoc:
         def expr_interp(template : Ast::TextTemplate) : String
-          unquote_interp(resolve_interp(template))
+          unquote_interp(resolve_interp(template, amp: true))
         end
 
         private def resolve_template(template : Ast::TextTemplate, allow_vars : Bool) : String
           pieces = template.pieces
+          # Quote state of the text so far: `[data-x="#{&}"]` interpolates
+          # the parent list into a string, which is never a parent
+          # reference.
+          quote : Char? = nil
           String.build do |io|
             pieces.each_with_index do |piece, idx|
               case piece
               in String
                 io << piece
+                esc = false
+                piece.each_char do |ch|
+                  if esc
+                    esc = false
+                  elsif ch == '\\'
+                    esc = true
+                  elsif quote.nil? && (ch == '"' || ch == '\'')
+                    quote = ch
+                  elsif ch == quote
+                    quote = nil
+                  end
+                end
               in Ast::VarRef
                 unless allow_vars
                   error_at(piece.line, piece.column,
@@ -2549,7 +2746,9 @@ module Hwaro
                   io << var_display_text(var_text) unless var_text == "null"
                 end
               in Ast::Interp
-                io << unquote_interp(resolve_interp(piece.inner))
+                spliced = unquote_interp(resolve_interp(piece.inner, amp: allow_vars || !quote.nil?))
+                @quote_conflicts += 1 if quote && Str.contains_unescaped?(spliced, quote)
+                io << spliced
               end
             end
           end
@@ -2619,7 +2818,7 @@ module Hwaro
           if ns = ref.namespace
             mod = @env.module?(ns)
             error_at(ref.line, ref.column, "there is no module namespace \"#{ns}\"") unless mod
-            mod.variables[Sass.normalize_ident(ref.name)]? ||
+            mod.variable?(Sass.normalize_ident(ref.name)) ||
               error_at(ref.line, ref.column, "undefined variable: \"#{ns}.$#{ref.name}\"")
           else
             @env.lookup_var(ref.name) ||

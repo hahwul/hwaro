@@ -545,20 +545,20 @@ module Hwaro
           "length" => Fn.new do |args, kwargs|
             args = args_with_kwargs("string.length", args, kwargs, %w[string])
             arity!("str-length", args, 1)
-            Number.new(string!("str-length", args[0]).text.size.to_f, "")
+            Number.new(string!("str-length", args[0]).decoded.size.to_f, "")
           end,
           "index" => Fn.new do |args, kwargs|
             args = args_with_kwargs("string.index", args, kwargs, %w[string substring])
             arity!("str-index", args, 2)
-            haystack = string!("str-index", args[0]).text
-            needle = string!("str-index", args[1]).text
+            haystack = string!("str-index", args[0]).decoded
+            needle = string!("str-index", args[1]).decoded
             idx = haystack.index(needle)
             idx ? Number.new((idx + 1).to_f, "") : NullV.new
           end,
           "slice" => Fn.new do |args, kwargs|
             args = args_with_kwargs("string.slice", args, kwargs, %w[string start-at end-at])
             arity!("str-slice", args, 2, 3)
-            text = string!("str-slice", args[0]).text
+            text = string!("str-slice", args[0]).decoded
             quoted = string!("str-slice", args[0]).quoted
             start_at = number!("str-slice", args[1]).int_value("str-slice() start")
             end_at = args[2]? ? number!("str-slice", args[2]).int_value("str-slice() end") : -1
@@ -566,20 +566,21 @@ module Hwaro
             from = start_at < 0 ? Math.max(size + start_at, 0) : Math.max(start_at - 1, 0)
             to = end_at < 0 ? size + end_at : Math.min(end_at - 1, size - 1)
             sliced = from > to ? "" : text[from..to]
-            Str.new(sliced, quoted: quoted)
+            Str.new(Str.encode(sliced), quoted: quoted)
           end,
           "insert" => Fn.new do |args, kwargs|
             args = args_with_kwargs("string.insert", args, kwargs, %w[string insert index])
             arity!("str-insert", args, 3)
             base = string!("str-insert", args[0])
-            insert = string!("str-insert", args[1]).text
+            insert = string!("str-insert", args[1]).decoded
             index = number!("str-insert", args[2]).int_value("str-insert() index")
-            size = base.text.size
+            base_text = base.decoded
+            size = base_text.size
             # 1-based; negative counts from the end where -1 inserts AT the
             # end (dart-sass: `insert("abc", "X", -1)` is `"abcX"`).
             index = size + index + 2 if index < 0
             offset = (index - 1).clamp(0, size)
-            Str.new(base.text[0, offset] + insert + base.text[offset..],
+            Str.new(Str.encode(base_text[0, offset] + insert + base_text[offset..]),
               quoted: base.quoted, quote_char: base.quote_char)
           end,
           "split" => Fn.new do |args, kwargs|

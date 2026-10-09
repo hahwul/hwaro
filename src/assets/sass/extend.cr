@@ -59,6 +59,11 @@ module Hwaro
           return unless items
           found = false
           results = [] of {String, Int32}
+          # Every pseudo-argument extension lands in ONE rewritten selector
+          # (`.w:not(.a):not(.a)` gets both `:not()`s extended together), so
+          # the caller can fold later requests into it without dropping one.
+          pseudo_items = items.dup
+          pseudo_at : Int32? = nil
           items.each_with_index do |item, idx|
             next unless item.is_a?(Compound)
             if slot = item.simples.index(target)
@@ -86,12 +91,14 @@ module Hwaro
               next unless extended
               found = true
               next if extended == simple
-              new_simples = item.simples.dup
+              new_simples = pseudo_items[idx].as(Compound).simples.dup
               new_simples[si] = extended
-              new_items = items.dup
-              new_items[idx] = Compound.new(new_simples)
-              results << {serialize_items(new_items), -1}
+              pseudo_items[idx] = Compound.new(new_simples)
+              pseudo_at ||= results.size
             end
+          end
+          if at = pseudo_at
+            results.insert(at, {serialize_items(pseudo_items), -1})
           end
           found ? results : nil
         end
@@ -161,8 +168,15 @@ module Hwaro
             next if element?(s) || pseudo?(s)
             merged << s unless merged.includes?(s)
           end
+          # Pseudo-classes before pseudo-elements: `.icon::before` extending
+          # `.btn:hover` is `.icon:hover::before` — a pseudo-class after a
+          # pseudo-element matches nothing.
           (ext + rest).each do |s|
-            next unless pseudo?(s)
+            next if !pseudo?(s) || pseudo_element?(s)
+            merged << s unless merged.includes?(s)
+          end
+          (ext + rest).each do |s|
+            next unless pseudo_element?(s)
             merged << s unless merged.includes?(s)
           end
           merged
@@ -263,6 +277,11 @@ module Hwaro
           i = start
           while i < chars.size
             c = chars[i]
+            if c == '\\'
+              # An escaped character (`.sm\:flex`, `.a\ b`) is part of the name.
+              i = {i + 2, chars.size}.min
+              next
+            end
             break if c.ascii_whitespace? || c == '>' || c == '+' || c == '~'
             case c
             when '['
@@ -291,6 +310,8 @@ module Hwaro
           start = 0
           while i < chars.size
             case c = chars[i]
+            when '\\'
+              i += 2
             when '['
               j = skip_bracket(chars, i)
               return unless j
@@ -338,6 +359,13 @@ module Hwaro
 
         private def pseudo?(simple : String) : Bool
           simple.starts_with?(':')
+        end
+
+        # `::x` plus the four legacy single-colon pseudo-elements.
+        private def pseudo_element?(simple : String) : Bool
+          return true if simple.starts_with?("::")
+          return false unless simple.starts_with?(':')
+          {":before", ":after", ":first-line", ":first-letter"}.includes?(simple.downcase)
         end
 
         private def skip_string(chars : Array(Char), start : Int32) : Int32?

@@ -94,7 +94,9 @@ module Hwaro
             # skipped first entry (missing file, escaping symlink) used to
             # leave the bundle starting with a stray separator.
             io << separator if wrote_any
-            content = File.read(source)
+            # A UTF-8 BOM is not content: mid-bundle it would fuse into the
+            # next selector (`\u{FEFF}.b`) and the rule would never match.
+            content = File.read(source).lchop('\u{FEFF}')
             # `.scss` bundle entries compile before concatenation when the
             # built-in Sass feature is on; verbatim otherwise.
             if @sass_enabled && file.ends_with?(".scss")
@@ -257,7 +259,7 @@ module Hwaro
         case ext
         when ".css"
           Utils::CssMinifier.minify(content)
-        when ".js"
+        when ".js", ".mjs"
           Utils::JsMinifier.minify(content)
         else
           content

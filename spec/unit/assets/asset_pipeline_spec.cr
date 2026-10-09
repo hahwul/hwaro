@@ -1158,4 +1158,42 @@ describe Hwaro::Assets::Pipeline do
       end
     end
   end
+
+  describe "#process — UTF-8 BOM and .mjs" do
+    it "drops a BOM at the start of a non-first CSS entry" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+        File.write(File.join(static_dir, "a.css"), ".a{x:1}\n")
+        File.write(File.join(static_dir, "b.css"), "\u{FEFF}.b{y:2}\n")
+
+        config = make_config(minify: true, source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "app.css", files: ["a.css", "b.css"])
+        Hwaro::Assets::Pipeline.new(config).process(output_dir)
+
+        File.read(File.join(output_dir, "assets", "app.css")).should eq(".a{x:1}.b{y:2}")
+      end
+    end
+
+    it "minifies .mjs bundles like .js" do
+      Dir.mktmpdir do |dir|
+        static_dir = File.join(dir, "static")
+        output_dir = File.join(dir, "public")
+        FileUtils.mkdir_p(static_dir)
+        FileUtils.mkdir_p(output_dir)
+        File.write(File.join(static_dir, "in.mjs"), "// c\nexport const a = 1; /* x */\n\n\nexport const b = 2;\n")
+
+        config = make_config(minify: true, source_dir: static_dir)
+        config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "out.mjs", files: ["in.mjs"])
+        Hwaro::Assets::Pipeline.new(config).process(output_dir)
+
+        out = File.read(File.join(output_dir, "assets", "out.mjs"))
+        out.should_not contain("// c")
+        out.should_not contain("/* x */")
+        out.should contain("export const a = 1;")
+      end
+    end
+  end
 end

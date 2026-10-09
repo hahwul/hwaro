@@ -97,7 +97,18 @@ module Hwaro
           term = 0_u8
           while i < n
             b = bytes[i]
+            escaped = false
             case b
+            when '\\'.ord
+              # `\'`, `\"`, `\/*`, `\{` outside a string are escaped
+              # identifier characters (Tailwind `before:content-['']`), never
+              # a string/comment opener or a statement boundary.
+              if i + 1 < n
+                io.write_byte(b)
+                i += 1
+                b = bytes[i]
+                escaped = true
+              end
             when '/'.ord
               if i + 1 < n && bytes[i + 1] == '*'.ord
                 # Comment — dropped. An unterminated comment runs to EOF,
@@ -140,12 +151,12 @@ module Hwaro
             end
             io.write_byte(b)
             last = b
-            if b == '{'.ord || b == '}'.ord || b == ';'.ord
+            if !escaped && (b == '{'.ord || b == '}'.ord || b == ';'.ord)
               stmt_start = true
               at_rule = false
             elsif stmt_start && !space_byte?(b)
               stmt_start = false
-              at_rule = b == '@'.ord
+              at_rule = !escaped && b == '@'.ord
             end
             i += 1
           end
@@ -164,6 +175,9 @@ module Hwaro
           case b
           when '{'.ord, ';'.ord, '}'.ord
             return {i, b}
+          when '\\'.ord
+            i += 2
+            next
           when '/'.ord
             if i + 1 < n && bytes[i + 1] == '*'.ord
               i = skip_comment(bytes, i, n)

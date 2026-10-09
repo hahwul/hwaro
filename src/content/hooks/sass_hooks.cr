@@ -27,6 +27,7 @@ module Hwaro
 
           compiler = Assets::SassCompiler.new(config.sass, config.static)
           count = compiler.compile_all(ctx.output_dir)
+          ctx.builder.try { |builder| compiler.written_paths.each { |path| builder.claim_generated_output(path) } }
           Logger.info "  Sass: #{count} file(s) compiled." if count > 0
         end
       end
