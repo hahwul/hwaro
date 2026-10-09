@@ -123,6 +123,8 @@ generate_feeds = true
 
 Generates `/blog/rss.xml`.
 
+On the root `content/_index.md` (or a language root such as `_index.ko.md`), `generate_feeds` has no effect: its feed would land on the site (or language) feed's own `/rss.xml`, so that fuller feed is kept and the build prints a warning.
+
 ### Output
 
 - `/rss.xml` — Site-wide feed
