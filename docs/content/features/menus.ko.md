@@ -131,7 +131,7 @@ identifier = "posts"
 
 ## 언어별 메뉴
 
-menus 테이블이 없는 `[languages.<code>]` 블록은 전역 `[[menus.*]]` 집합을 통째로 상속합니다. `[[languages.<code>.menus.<name>]]`을 선언하면 그 언어에서 해당 메뉴가 통째로 **대체**되며, 전역 집합과 병합되지 않습니다.
+menus 테이블이 없는 `[languages.<code>]` 블록은 전역 `[[menus.*]]` 집합을 통째로 상속합니다. `[[languages.<code>.menus.<name>]]`을 선언하면 그 언어에서 해당 메뉴가 통째로 **대체**되며, 전역 집합과 병합되지 않습니다. menus 테이블을 하나라도 선언한 언어는 이름을 적지 않은 메뉴까지 포함해 전역 집합 전체를 대체합니다. `footer`만 선언하면 그 언어의 `main`은 프론트 매터와 `auto_sections` 엔트리로만 채워지므로, 전역 `main` 엔트리를 유지하려면 `[[languages.<code>.menus.main]]`에 다시 적으세요.
 
 ```toml
 [[menus.main]]

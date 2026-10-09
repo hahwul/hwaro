@@ -95,7 +95,11 @@ source tree.
 inside the destination. A symlink standing where a file or directory belongs
 is replaced with the real thing, and a symlink with no counterpart in the
 source is unlinked. Neither case reads or deletes through the link, so
-content living outside the destination is never touched.
+content living outside the destination is never touched. Symlinks inside the
+source are followed: a real directory and each alias of it (`latest -> v2`)
+are all deployed. On a case-insensitive destination, a page that was only
+renamed by case (`Docs/Intro.html` to `docs/intro.html`) is updated in place,
+not deleted.
 
 **What the sync leaves alone.** At the destination, hidden directories other
 than `.well-known/` are never scanned, so nothing in them is deleted, and a
@@ -160,7 +164,12 @@ match any depth with `**/`: `exclude = "**/*.map"` drops source maps
 everywhere, while `*.map` only matches at the top level. With
 `strip_index_html`, a stripped page `blog/post` is also judged by its source
 name `blog/post/index.html`. If either spelling is excluded, the deployed page
-is never deleted as stale.
+is never deleted as stale. Only a destination file that opens like HTML is
+read as a stripped page, so a hand-placed `CNAME` or a stale `img/logo.png` is
+judged by its own name alone, while a dotted slug such as `docs/v1.2` still
+gets both readings. A name with an extension must also start with a doctype or
+`<html>`, so `logo.svg`, `feed.xml` and hand-placed `about.html` files are
+never read as stripped pages.
 
 ## Matchers
 
@@ -234,7 +243,8 @@ for nginx `gzip_static` or Caddy `precompressed`. A sibling is rewritten
 only when it is missing or older than its file. If the source already ships
 a `<file>.gz`, that file is deployed unchanged. Siblings are never deleted
 as stale while their file is deployed. When a page is removed, its sibling
-is deleted with it and does not count toward `max_deletes`. Any other `.gz`
+is deleted with it (even when `include` does not match `*.gz`) and does not
+count toward `max_deletes`. Any other `.gz`
 file at the destination counts as usual. hwaro keeps no record of the files
 it wrote, so this is a heuristic: any `X.gz` deleted together with a
 gzip-matched `X` is exempt, even if another tool wrote the pair. A sibling the target's `exclude`

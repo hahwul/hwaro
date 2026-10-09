@@ -261,7 +261,7 @@ module Hwaro
               next unless used.includes?(label.strip.downcase)
               dest = match[2]
               dest = dest[1..-2] if dest.starts_with?('<') && dest.ends_with?('>')
-              next unless dest.starts_with?('/') || dest.starts_with?("./") ||
+              next unless dest.starts_with?('#') || dest.starts_with?('/') || dest.starts_with?("./") ||
                           dest.starts_with?("../") || dest.starts_with?("@/") ||
                           dest =~ /\A[a-z][a-z0-9+.\-]*:/i
               yield dest

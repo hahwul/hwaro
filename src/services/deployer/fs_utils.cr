@@ -135,8 +135,12 @@ module Hwaro
               next if VCS_DIRS.includes?(entry)
               next unless dot_dirs || entry == ".well-known"
             end
-            # Track resolved paths so symlink cycles (public/a → public) and
-            # multiple links to the same directory are walked at most once.
+            # `visited` holds the resolved ancestors of the directory being
+            # walked, so a symlink cycle (public/a → public) is cut where it
+            # re-enters one. Sibling aliases of the same directory
+            # (`latest -> v2` next to `v2`) are each walked: deduping them
+            # dropped whichever the readdir order reached last, often the
+            # real directory.
             real = begin
               File.realpath(full)
             rescue File::Error | IO::Error
@@ -145,6 +149,7 @@ module Hwaro
             next if visited.includes?(real)
             visited << real
             walk_project_files(full, source_root_real, project_root_real, visited, follow_symlinks, dot_dirs, &block)
+            visited.delete(real)
           elsif info.file?
             block.call(full)
           end

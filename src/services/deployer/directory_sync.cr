@@ -52,11 +52,13 @@ module Hwaro
         stems = gzip_stems(desired, source_dir, matchers, target)
         siblings = stems.map { |rel| "#{rel}.gz" }
         to_delete = compute_deletes(existing, desired.keys, target, dest_dir, siblings.to_set)
+        orphans = orphan_gzip_siblings(existing, to_delete, desired, siblings.to_set, matchers, target, dest_dir)
+        to_delete = (to_delete + orphans).sort! unless orphans.empty?
         # Siblings are written like desired files, so a stale directory
         # standing at `X.gz` is cleared (or refused) the same way.
         clear_first = validate_destination_paths(dest_dir, desired.keys + siblings, to_delete.to_set)
         check_empty_selection!(desired, to_delete, target, effective)
-        check_max_deletes!(to_delete.size - stale_gzip_siblings(to_delete, matchers, target), effective)
+        check_max_deletes!(to_delete.size - stale_gzip_siblings(to_delete, matchers, target, dest_dir), effective)
 
         to_copy, skipped = compute_copies(desired, source_dir, dest_dir, effective.force, force_patterns(matchers))
         copied = to_copy.map(&.[0]).to_set
@@ -338,12 +340,61 @@ module Hwaro
         # `foo/index.html`) is stale, and is cleared before the copy pass.
         ancestors = desired_ancestors(desired_paths)
 
-        existing.select do |rel|
+        stale = existing.select do |rel|
           next false if ignored_file?(rel)
           next false if keep.includes?(rel)
           next false if ancestors.includes?(rel) && symlink?(File.join(dest_dir, rel))
-          next false unless delete_candidate?(rel, target)
+          next false unless delete_candidate?(rel, target, dest_dir)
           !desired_set.includes?(rel)
+        end
+        reject_case_aliases(stale, desired_paths + keep.to_a, dest_dir)
+      end
+
+      # On a case-insensitive destination a case-only rename (`Docs/Intro.html`
+      # -> `docs/intro.html`) leaves the "stale" old spelling and the wanted new
+      # one naming the same file: the copy lands in it and the delete pass then
+      # removed it, so the page was gone until the next deploy. A candidate that
+      # is the very file a differently-cased wanted path resolves to stays.
+      # On a case-sensitive destination the wanted path does not exist (or is a
+      # different file), so nothing is spared.
+      private def reject_case_aliases(stale : Array(String), wanted : Array(String), dest_dir : String) : Array(String)
+        return stale if stale.empty?
+        folded = Hash(String, Array(String)).new { |hash, key| hash[key] = [] of String }
+        wanted.each { |path| folded[path.downcase] << path }
+        stale.reject do |rel|
+          next false unless aliases = folded.fetch(rel.downcase, nil)
+          info = File.info?(File.join(dest_dir, rel), follow_symlinks: false)
+          next false unless info
+          aliases.any? do |path|
+            next false if path == rel
+            other = File.info?(File.join(dest_dir, path), follow_symlinks: false)
+            !other.nil? && info.same_file?(other)
+          end
+        end
+      end
+
+      # A `<stem>.gz` hwaro wrote beside a page that is being deleted goes with
+      # it. `delete_candidate?` judges the sibling by `include` like any other
+      # name, so an `include` that does not name `*.gz` (the usual
+      # `**/*.html`) left it behind to keep serving the removed page.
+      private def orphan_gzip_siblings(
+        existing : Array(String),
+        to_delete : Array(String),
+        desired : Hash(String, String),
+        keep : Set(String),
+        matchers : Array(CompiledMatcher),
+        target : Models::DeploymentTarget,
+        dest_dir : String,
+      ) : Array(String)
+        return [] of String if to_delete.empty? || matchers.none? { |compiled| compiled.matcher.gzip == true }
+        deleted = to_delete.to_set
+        existing.select do |rel|
+          next false unless rel.ends_with?(".gz")
+          next false if deleted.includes?(rel) || keep.includes?(rel) || desired.has_key?(rel) || ignored_file?(rel)
+          stem = rel.rchop(".gz")
+          next false unless deleted.includes?(stem)
+          next false if target_exclude_match?(rel, target)
+          gzip_matched?(stem, matchers, stem_source_rel(stem, target, dest_dir))
         end
       end
 
@@ -361,23 +412,53 @@ module Hwaro
         ancestors
       end
 
-      private def delete_candidate?(rel : String, target : Models::DeploymentTarget) : Bool
+      private def delete_candidate?(rel : String, target : Models::DeploymentTarget, dest_dir : String) : Bool
+        plain = included_by_target?(rel, target)
+        return plain unless target.strip_index_html
+        return false if target_exclude_match?(rel, target)
+
         # With strip_index_html the on-disk name for `foo/index.html` is just
         # `foo`, and include/exclude globs are written against source paths.
         # Judge both spellings: either may be what `include` names (else
-        # stale pages survive every sync), and *neither* may be excluded —
+        # stale pages survive every sync), and *neither* may be excluded -
         # `exclude = "foo/index.html"` never matched the stored `foo`, so the
         # remote page the author excluded was deleted as stale.
         #
-        # Only an extensionless name can be a stripped page. Reading
-        # `img/logo.png` as `img/logo.png/index.html` made
-        # `include = "**/index.html"` delete every stale asset outside it.
-        unless target.strip_index_html && File.extname(rel).empty?
-          return included_by_target?(rel, target)
-        end
+        # Only a stripped page gets the second reading (see
+        # `#stripped_page?`). Reading `img/logo.png` as
+        # `img/logo.png/index.html` made `include = "**/index.html"` delete
+        # every stale asset outside it, and `CNAME` as `CNAME/index.html`
+        # made `include = "**/*.html"` delete it.
         unstripped = "#{rel}/index.html"
+        widens = (!target_include_match?(rel, target) && target_include_match?(unstripped, target)) ||
+                 target_exclude_match?(unstripped, target)
+        return plain unless widens && stripped_page?(File.join(dest_dir, rel))
         (target_include_match?(rel, target) || target_include_match?(unstripped, target)) &&
-          !target_exclude_match?(rel, target) && !target_exclude_match?(unstripped, target)
+          !target_exclude_match?(unstripped, target)
+      end
+
+      # The source spelling of the destination name `stem`: `foo/index.html`
+      # for a stripped page `foo`, `stem` itself otherwise.
+      private def stem_source_rel(stem : String, target : Models::DeploymentTarget, dest_dir : String) : String
+        target.strip_index_html && stripped_page?(File.join(dest_dir, stem)) ? "#{stem}/index.html" : stem
+      end
+
+      # True when the destination file at `path` is a page a strip_index_html
+      # deploy wrote: a regular file that opens like HTML. A dotted page slug
+      # (`docs/v1.2`) has an extension and `CNAME` has none, so the name alone
+      # cannot tell a page from an asset or a hand-placed file; the content can.
+      private def stripped_page?(path : String) : Bool
+        info = File.info?(path, follow_symlinks: false)
+        return false unless info && info.file?
+        head = File.open(path, "rb") { |file| file.read_string(Math.min(512_i64, info.size).to_i) }
+        head = head.lchop('\uFEFF').lstrip
+        return false unless head.starts_with?('<')
+        # A name with an extension must also say so: `logo.svg` and `feed.xml`
+        # open with `<` too, and `about.html` is a file, not a slug.
+        ext = File.extname(path).downcase
+        ext.empty? || (ext != ".html" && ext != ".htm" && head.matches?(/<!doctype\s+html|<html[\s>]/i))
+      rescue File::Error | IO::Error
+        false
       end
 
       private def list_existing_files(dest_dir : String) : Array(String)
