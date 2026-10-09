@@ -226,6 +226,32 @@ describe "Hwaro::Content::Search shards" do
       end
     end
 
+    it "keeps a section named `index` from colliding with the manifest" do
+      config = shard_config("section")
+      pages = [shard_page("index/b.md", "Inside", "/index/b/", "index", body: "INDEXSECTION")]
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate(pages, config, odir)
+        shards = read_manifest(odir)["shards"].as_a
+        shards.map(&.["id"].as_s).should eq(["_index"])
+        shards.first["count"].as_i.should eq(1)
+        File.read(File.join(odir, "search", "_index.json")).should contain("INDEXSECTION")
+        shards.first["section"].as_s.should eq("index")
+      end
+    end
+
+    it "ignores a foreign search/index.json that is not Hwaro's manifest" do
+      config = shard_config("section")
+      ["[1,2]", %({"shards":[1]}), %({"shards":[[]]}), "null", "7"].each do |foreign|
+        Dir.mktmpdir do |odir|
+          Dir.mkdir_p(File.join(odir, "search"))
+          File.write(File.join(odir, "search", "index.json"), foreign)
+          Hwaro::Content::Search.published_outputs(config, odir)
+          Hwaro::Content::Search.generate(sample_pages, config, odir)
+          read_manifest(odir)["shards"].as_a.map(&.["id"].as_s).should eq(["_root", "blog", "docs"])
+        end
+      end
+    end
+
     it "honors skip_if_unchanged only when every expected file is present" do
       config = shard_config("section")
       Dir.mktmpdir do |odir|

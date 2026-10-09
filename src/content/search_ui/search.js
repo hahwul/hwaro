@@ -205,6 +205,7 @@
   function load() {
     if (loading) return loading;
     var lang = config.lang;
+    var failed = false;
     var fetchAll;
     if (config.manifest) {
       fetchAll = getJson(config.manifest).then(function (m) {
@@ -213,7 +214,12 @@
         });
         return Promise.all(shards.map(function (s) {
           var url = safeUrl(s.url, location.origin);
-          return url ? getJson(url) : [];
+          // One bad shard must not discard the ones that loaded.
+          return url ? getJson(url).catch(function (err) {
+            failed = true;
+            if (window.console) console.warn("hwaro search:", err);
+            return [];
+          }) : [];
         }));
       }).then(function (lists) { return [].concat.apply([], lists); });
     } else {
@@ -224,9 +230,15 @@
         return r && typeof r === "object" && (!lang || !r.lang || r.lang === lang);
       });
     }).catch(function (err) {
+      failed = true;
       records = [];
       if (window.console) console.warn("hwaro search:", err);
-    }).then(render);
+    }).then(function () {
+      // Nothing usable loaded: forget the attempt so the next open retries
+      // instead of reading as "No results" for the rest of the page's life.
+      if (failed && !records.length) loading = null;
+      render();
+    });
     return loading;
   }
 

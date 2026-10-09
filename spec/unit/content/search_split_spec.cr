@@ -193,6 +193,21 @@ describe "search facets" do
     end
   end
 
+  it "fills an authors facet from the `authors` front-matter key" do
+    config = SPLIT_CONFIG.sub("split_by_heading = true", "split_by_heading = false\nfacets = [\"authors\"]") + <<-TOML
+
+      [[taxonomies]]
+      name = "authors"
+      TOML
+    build_site(config, content_files: {
+      "docs/a.md" => "+++\ntitle = \"A\"\nauthors = [\"Ann\", \"Bob\"]\n+++\nx\n",
+      "docs/b.md" => "+++\ntitle = \"B\"\n+++\ny\n",
+    }) do |dir|
+      records(dir).find! { |r| r["url"] == "/docs/a/" }["authors"].as_a.map(&.as_s).should eq(["Ann", "Bob"])
+      records(dir).find! { |r| r["url"] == "/docs/b/" }["authors"].as_a.should be_empty
+    end
+  end
+
   it "leaves the index byte-identical with every new flag off" do
     off = ""
     build_site(SPLIT_CONFIG.sub("split_by_heading = true", ""), content_files: {"guide.md" => SPLIT_PAGE}) do |dir|

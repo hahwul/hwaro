@@ -31,8 +31,11 @@ module Hwaro::Core::Build::Phases::ReadContent
     seen_raw = Set(String).new
     @content_index_dirs = Set(String).new
 
-    # Single pass over content directory for both markdown and raw files
-    Dir.glob("content/**/*") do |file_path|
+    # Single pass over content directory for both markdown and raw files.
+    # Sorted: glob yields raw readdir order (hash order on APFS/ext4, name
+    # order on HFS+), which would otherwise leak into `site.pages`,
+    # sitemap.xml and the search index, so one tree built differently per host.
+    Dir.glob("content/**/*").sort!.each do |file_path|
       # lstat, not `File.directory?`: that follows symlinks, and following a
       # symlink cycle (`ln -s loop content/loop`) fails with ELOOP, which
       # `File.info?` raises as `File::Error` — aborting the whole build with a

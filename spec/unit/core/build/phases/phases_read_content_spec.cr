@@ -301,3 +301,29 @@ describe Hwaro::Core::Build::Phases::ReadContent do
     end
   end
 end
+
+describe "collect_content_paths ordering" do
+  it "collects pages and raw files in path order whatever the filesystem's readdir order" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/blog")
+        FileUtils.mkdir_p("content/docs")
+        (1..30).to_a.reverse!.each do |i|
+          File.write("content/blog/p#{i}.md", "---\ntitle: P#{i}\n---\nbody")
+          File.write("content/docs/d#{i}.md", "---\ntitle: D#{i}\n---\nbody")
+          File.write("content/blog/r#{i}.json", "{}")
+        end
+
+        ctx = make_ctx(Hwaro::Models::Config.new)
+        Hwaro::Core::Build::Builder.new.test_collect_content_paths(ctx)
+
+        paths = ctx.pages.map(&.path)
+        paths.size.should eq(60)
+        paths.should eq(paths.sort)
+        raw = ctx.raw_files.map(&.relative_path)
+        raw.size.should eq(30)
+        raw.should eq(raw.sort)
+      end
+    end
+  end
+end

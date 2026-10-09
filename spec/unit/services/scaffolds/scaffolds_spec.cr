@@ -694,9 +694,10 @@ describe "prepend_translation_notice" do
 end
 
 describe "scaffold init audit regressions" do
-  it "escapes regex metacharacters in the search highlighter (blog/docs/book)" do
+  it "highlights with a plain substring scan, not a user-built regex (blog/docs/book)" do
     js = Hwaro::Services::Scaffolds::Docs.new.template_files.values.join + Hwaro::Services::Scaffolds::Docs.new.static_files.values.join
-    js.should contain(%q(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    js.should contain("lower.indexOf(q, pos)")
+    js.should_not contain("new RegExp('(' + escaped")
     js.should contain(%q(.replace(/\s+/g, ' ')))
     js.should_not contain(%q([\\]\\\\]))
   end

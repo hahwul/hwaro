@@ -117,6 +117,16 @@ module Hwaro
           # load" instead of a 404, and pruning drops shards a previous
           # build wrote for pages that no longer exist.
           write_shards(search_pages, [] of Array(Entry), config, output_dir, verbose) if sharded
+          # A warm `--cache`/serve build starts from the previous output, so
+          # the classic file from when pages existed would keep publishing
+          # content that is now a draft or opted out. Cold builds have no file.
+          if single_file
+            begin
+              File.delete?(search_path)
+            rescue File::Error
+              # Best effort, like remove_stale_shard.
+            end
+          end
           return
         end
 
@@ -189,13 +199,16 @@ module Hwaro
         lang = page.language || config.default_language
         lang = "_default" if lang.empty?
         top = page.section.split('/', remove_empty: true).first? || ""
+        # `search/index.json` is the manifest; a shard of that name would be
+        # overwritten by it (and listed as itself).
+        shard_top = top == "index" ? "_index" : top
         case config.search.shards
         when "language"
           {id: lang, language: lang, section: nil}
         when "section-language"
           {id: "#{lang}/#{top.empty? ? ROOT_SHARD_ID : top}", language: lang, section: top}
         else # "section"
-          {id: top.empty? ? ROOT_SHARD_ID : top, language: nil, section: top}
+          {id: top.empty? ? ROOT_SHARD_ID : shard_top, language: nil, section: top}
         end
       end
 
@@ -262,8 +275,11 @@ module Hwaro
       private def self.previous_shard_ids(manifest_file : String) : Array(String)
         return [] of String unless File.file?(manifest_file)
         parsed = JSON.parse(File.read(manifest_file))
-        parsed["shards"].as_a.compact_map { |s| s["id"]?.try(&.as_s?) }
-      rescue JSON::ParseException | KeyError | TypeCastError | File::Error
+        # Foreign file (static/search/index.json): anything that is not our
+        # `{"shards": [{"id": ...}]}` shape yields no ids.
+        shards = parsed.as_h?.try(&.["shards"]?).try(&.as_a?) || return [] of String
+        shards.compact_map { |s| s.as_h?.try(&.["id"]?).try(&.as_s?) }
+      rescue JSON::ParseException | File::Error
         [] of String
       end
 
@@ -347,7 +363,7 @@ module Hwaro
             when "lang"    then next
             when "section" then data["section"] = page.section
             when "tags"    then data["tags"] = page.tags
-            else                data[facet] = page.taxonomies[facet]? || [] of String
+            else                data[facet] = page.taxonomy_values(facet)
             end
           end
 
