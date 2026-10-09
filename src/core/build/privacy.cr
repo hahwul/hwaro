@@ -143,6 +143,8 @@ module Hwaro
         }
         # Spellings a URL path may use for an allowed extension.
         EXTENSION_ALIASES = {".jpeg" => ".jpg", ".mjs" => ".js"}
+        # Content-Types that mean "not the file the URL names".
+        NOT_A_FILE = ["text/html", "application/xhtml+xml", "text/xml", "application/xml", "application/json"]
 
         # A localized URL: what to print in its place, its file in the output,
         # every output file it published (itself plus, for a stylesheet, what
@@ -172,9 +174,9 @@ module Hwaro
 
         HTML_RE = /<!--[\s\S]*?-->|<(script|style|textarea)\b([^>]*)>([\s\S]*?)<\/\1\s*>|<(link|img|source|video|audio)\b([^>]*)>/i
         LINK_RE = /<link\b[^>]*>/i
-        ATTR_RE = /\s([a-zA-Z_:][-\w:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/
-        SRI_RE  = /\s(?:integrity|crossorigin)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/i
-        CSS_RE  = /\/\*[\s\S]*?\*\/|((?:-webkit-)?image-set\((?:[^()]|\([^()]*\))*\))|url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"'\s]*))\s*\)|@import\s+(?:"([^"]*)"|'([^']*)')/i
+        ATTR_RE = /\s([a-zA-Z_:][-\w:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`]+)))?/
+        SRI_RE  = /\s(?:integrity|crossorigin)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>`]+))?/i
+        CSS_RE  = /\/\*[\s\S]*?\*\/|((?:-webkit-)?image-set\((?:[^()]|\([^()]*\))*\))|url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"'\s]*))\s*\)|@import\s*(?:"([^"]*)"|'([^']*)')/i
         # A reference inside `image-set(...)`: `url(...)` or a bare string.
         # A `type("image/avif")` argument is a MIME type, matched first so
         # it passes through untouched.
@@ -505,6 +507,10 @@ module Hwaro
           if ext = allowed[media_type(content_type)]?
             return ext
           end
+          # A response that says it is markup or data is not the file its URL
+          # names (a CDN's soft-404 or challenge page); generic and legacy
+          # types still fall back to the URL path.
+          return if NOT_A_FILE.includes?(media_type(content_type))
           ext = File.extname(URI.decode(url_path(url)).scrub).downcase
           ext = EXTENSION_ALIASES[ext]? || ext
           allowed.values.includes?(ext) ? ext : nil
@@ -517,7 +523,7 @@ module Hwaro
         # remote is written back absolute, so it still resolves from here.
         private def rewrite_css(css : String, base : String, depth : Int32, chain : Array(String), pass : Pass) : String
           css = css.scrub unless css.valid_encoding?
-          base_uri = URI.parse(base)
+          return css unless base_uri = parse_uri?(base)
           css.gsub(CSS_RE) do |match, m|
             next match if match.starts_with?("/*")
             if image_set = m[1]?
@@ -546,7 +552,7 @@ module Hwaro
           end
           resolved = begin
             base_uri.resolve(ref).to_s
-          rescue URI::Error
+          rescue URI::Error | OverflowError
             return
           end
           return unless resolved.downcase.matches?(/\Ahttps?:\/\//)
@@ -630,9 +636,7 @@ module Hwaro
         end
 
         private def url_path(url : String) : String
-          URI.parse(url).path
-        rescue URI::Error
-          ""
+          parse_uri?(url).try(&.path) || ""
         end
 
         # `<sha256-12>-<name><ext>`: the name comes from the URL path, reduced
@@ -683,16 +687,20 @@ module Hwaro
         end
 
         private def origin_of(url : String) : String?
-          uri = URI.parse(url)
+          return unless uri = parse_uri?(url)
           return unless host = uri.host.try(&.downcase).presence
           "#{host}:#{uri.port || (uri.scheme.try(&.downcase) == "https" ? 443 : 80)}"
-        rescue URI::Error
-          nil
         end
 
         private def host_of(url : String) : String?
-          URI.parse(url).host.try(&.downcase).presence
-        rescue URI::Error
+          parse_uri?(url).try(&.host.try(&.downcase).presence)
+        end
+
+        # `URI.parse` raises `OverflowError`, not `URI::Error`, for a port
+        # beyond Int32 — third-party input must not abort the build.
+        private def parse_uri?(url : String) : URI?
+          URI.parse(url)
+        rescue URI::Error | OverflowError
           nil
         end
 

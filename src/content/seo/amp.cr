@@ -144,7 +144,7 @@ module Hwaro
           end
 
           scheme == base.scheme.try(&.downcase) && default_port(uri) == default_port(base)
-        rescue URI::Error
+        rescue URI::Error | OverflowError
           # An unparseable src can't be shown to be cross-origin; assume
           # same-origin, which only ever drops a privilege.
           true

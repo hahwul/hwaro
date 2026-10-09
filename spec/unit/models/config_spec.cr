@@ -112,6 +112,12 @@ describe Hwaro::Models::Config do
       end
     end
 
+    it "rejects a port beyond Int32 as an invalid base_url, not an OverflowError" do
+      expect_raises(ArgumentError, /Invalid base_url/) do
+        Hwaro::Models::Config.validate_base_url!("http://example.com:99999999999999999999")
+      end
+    end
+
     it "rejects non-http schemes" do
       expect_raises(ArgumentError, /Invalid base_url/) do
         Hwaro::Models::Config.validate_base_url!("ftp://example.com")

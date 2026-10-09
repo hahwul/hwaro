@@ -280,6 +280,29 @@ describe Hwaro::Core::Build::Csp do
       end
     end
 
+    ["meta", "headers"].each do |mode|
+      it "leaves a page bundle's verbatim HTML asset alone (#{mode} mode)" do
+        demo = "<!doctype html><html><head><title>demo</title><script>var x=1</script></head><body>demo</body></html>"
+        build_site(
+          %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "#{mode}"\n),
+          content_files: {
+            "posts/foo/index.md"  => "+++\ntitle = \"Foo\"\n+++\nbody",
+            "posts/foo/demo.html" => demo,
+          },
+          template_files: {"page.html" => CSP_TEMPLATE},
+        ) do
+          File.read("public/posts/foo/demo.html").should eq(demo)
+          if mode == "meta"
+            meta_policy(File.read("public/posts/foo/index.html")).should_not be_nil
+          else
+            headers = File.read("public/_headers")
+            headers_policy(headers, "/posts/foo/").should_not be_nil
+            headers.should_not contain("demo.html")
+          end
+        end
+      end
+    end
+
     it "skips a static HTML file that is not UTF-8" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

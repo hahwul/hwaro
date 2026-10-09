@@ -303,7 +303,7 @@ module Hwaro
       private def auto_command_for_url(url : String, source_dir : String) : String?
         uri = begin
           URI.parse(url)
-        rescue URI::Error
+        rescue URI::Error | OverflowError
           return
         end
         # A missing authority means the URL has no bucket — `s3:/bucket`
