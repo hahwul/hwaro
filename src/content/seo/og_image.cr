@@ -104,7 +104,8 @@ module Hwaro
         # rev 3: 2026-09 logo keeps its aspect ratio inside the LOGO_SIZE box.
         # rev 4: 2026-10 PNG titles hard-break segments wider than the line.
         # rev 5: 2026-10 untitled pages headline the site title; the masthead
-        # and editorial kickers are XML-escaped.
+        # and editorial kickers are XML-escaped; JPEG backgrounds and logos
+        # honour their EXIF orientation.
         RENDER_REVISION = 5
 
         # `default` ("masthead"): eyebrow on top, title anchored high.

@@ -638,6 +638,23 @@ describe Hwaro::Content::Seo::OgPngRenderer do
     it "returns nil for a nonexistent path" do
       Hwaro::Content::Seo::OgPngRenderer.load_image("/nonexistent/logo.png", 48, 48).should be_nil
     end
+
+    # Regression: a phone photo (EXIF Orientation 6) as background or logo was
+    # drawn from stb's raw sideways rows, while browsers (and the SVG card,
+    # which embeds the original) show it upright.
+    it "draws a JPEG upright by its EXIF orientation" do
+      Dir.mktmpdir do |dir|
+        photo = File.join(dir, "logo.jpg")
+        write_exif_jpeg(photo, 40, 20, 6)
+        fitted = Hwaro::Content::Seo::OgPngRenderer.load_image(photo, 100, 100, fit: true).not_nil!
+        {fitted.width, fitted.height}.should eq({50, 100})
+
+        plain = File.join(dir, "plain.jpg")
+        write_exif_jpeg(plain, 40, 20, nil)
+        fitted = Hwaro::Content::Seo::OgPngRenderer.load_image(plain, 100, 100, fit: true).not_nil!
+        {fitted.width, fitted.height}.should eq({100, 50})
+      end
+    end
   end
 
   describe "integration with OgImage.generate" do
