@@ -104,6 +104,8 @@ module Hwaro::Core::Build::Phases::Finalize
       collect_page_output_paths(page, output_dir).each { |path| owned << protected_output_key(path, cwd) }
     end
 
+    respell_folded_output_dirs(owned, output_dir)
+
     # Entries that survived but moved (a `slug`/`path`/permalink edit) leave
     # their previous file behind too; #update collected those as it went.
     stale = build_cache.prune_entries_not_in(live)
@@ -140,6 +142,47 @@ module Hwaro::Core::Build::Phases::Finalize
     return if stale.empty?
 
     delete_orphaned_outputs(stale, output_dir)
+  end
+
+  # On a case-insensitive filesystem (macOS, Windows) a `--cache` build that
+  # writes a case-renamed page (`Foo.md` -> `foo.md`) lands in the EXISTING
+  # `public/posts/Foo/` directory, which keeps its old spelling: the tree no
+  # longer matches the page URL (`/posts/foo/`) and 404s once it is deployed
+  # to a case-sensitive host, while a cold build spells it correctly. Rename
+  # each directory on the way to a file this build owns to the spelling the
+  # page URL asks for. Runs after the render, so no worker is writing into the
+  # directory; only directories are touched, since a file replaced by rename
+  # already takes the new name. A no-op everywhere the probe says the
+  # filesystem is case-sensitive.
+  private def respell_folded_output_dirs(owned : Set(String), output_dir : String) : Nil
+    root = File.expand_path(output_dir)
+    return unless Dir.exists?(root) && Utils::PathUtils.case_folding_fs?(root)
+
+    dirs = Set(String).new
+    owned.each do |file|
+      dir = File.dirname(file)
+      while dir.starts_with?("#{root}/")
+        break unless dirs.add?(dir)
+        dir = File.dirname(dir)
+      end
+    end
+
+    listing = {} of String => Array(String)
+    dirs.to_a.sort_by!(&.size).each do |dir|
+      parent = File.dirname(dir)
+      name = File.basename(dir)
+      children = listing[parent] ||= Dir.children(parent)
+      next if children.includes?(name)
+      key = Utils::PathUtils.output_fold_key(name)
+      next unless index = children.index { |child| Utils::PathUtils.output_fold_key(child) == key }
+      actual = children[index]
+      tmp = File.join(parent, "hwaro-respell-#{Process.pid}.tmp")
+      File.rename(File.join(parent, actual), tmp)
+      File.rename(tmp, dir)
+      children[index] = name
+    end
+  rescue ex : File::Error
+    Logger.debug "Could not respell output directories: #{ex.message}"
   end
 
   # The cacheless counterpart of the `stale_generated_outputs` half of the

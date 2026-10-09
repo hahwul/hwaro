@@ -267,4 +267,29 @@ describe Hwaro::Utils::FileSafe do
       end
     end
   end
+
+  # A temp name derived from the full target basename pushed any legal name
+  # within ~22 bytes of NAME_MAX (255) over it, so ENAMETOOLONG aborted the
+  # whole Write phase for a file whose own name was fine.
+  describe "long file names" do
+    it "atomic_write publishes a name close to NAME_MAX" do
+      Dir.mktmpdir do |root|
+        path = File.join(root, "#{"a" * 240}.png")
+        Hwaro::Utils::FileSafe.atomic_write(path, "x")
+        File.read(path).should eq("x")
+        Dir.children(root).should eq([File.basename(path)])
+      end
+    end
+
+    it "atomic_copy publishes a name close to NAME_MAX" do
+      Dir.mktmpdir do |root|
+        src = File.join(root, "src.png")
+        File.write(src, "x")
+        dest = File.join(root, "#{"b" * 240}.png")
+        Hwaro::Utils::FileSafe.atomic_copy(src, dest)
+        File.read(dest).should eq("x")
+        Dir.children(root).sort!.should eq([File.basename(dest), "src.png"].sort!)
+      end
+    end
+  end
 end

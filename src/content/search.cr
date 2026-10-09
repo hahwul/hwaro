@@ -241,7 +241,7 @@ module Hwaro
                 groups.keys.sort!.each do |id|
                   group = groups[id]
                   content = group[:entries].to_json
-                  shard_file = File.join(shards_dir, "#{id}.json")
+                  shard_file = File.join(shards_dir, shard_file_name(id))
                   Hwaro::Utils::FileSafe.mkdir_p(File.dirname(shard_file))
                   Hwaro::Utils::FileSafe.atomic_write(shard_file, content)
                   Logger.action :create, shard_file if verbose
@@ -249,7 +249,7 @@ module Hwaro
                     json.field "id", id
                     # Percent-encode: a section directory may carry spaces
                     # or non-ASCII the filesystem accepts but a URL must escape.
-                    json.field "url", "#{base_path}/#{SHARDS_DIR}/#{URI.encode_path(id)}.json"
+                    json.field "url", "#{base_path}/#{SHARDS_DIR}/#{URI.encode_path(shard_file_name(id))}"
                     json.field "language", group[:language]
                     json.field "section", group[:section]
                     json.field "count", group[:entries].size
@@ -272,6 +272,15 @@ module Hwaro
         Logger.action :create, manifest_file if verbose
       end
 
+      # File name a shard id is written under. An id that would land on the
+      # manifest (a top-level section or language literally named `index`)
+      # gets a `_` prefix: the manifest is written last and used to clobber
+      # that shard, leaving its URL serving the manifest itself.
+      private def self.shard_file_name(id : String) : String
+        name = "#{id}.json"
+        name == MANIFEST_FILENAME ? "_#{name}" : name
+      end
+
       private def self.previous_shard_ids(manifest_file : String) : Array(String)
         return [] of String unless File.file?(manifest_file)
         parsed = JSON.parse(File.read(manifest_file))
@@ -285,7 +294,7 @@ module Hwaro
 
       private def self.remove_stale_shard(shards_dir : String, id : String) : Nil
         root = File.expand_path(shards_dir)
-        path = File.expand_path(File.join(shards_dir, "#{id}.json"))
+        path = File.expand_path(File.join(shards_dir, shard_file_name(id)))
         # A hand-edited manifest could smuggle `..` into an id; never delete
         # outside the shard directory.
         return unless path != root && Utils::PathUtils.within?(path, root)

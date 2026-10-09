@@ -41,6 +41,14 @@ module Hwaro
           parse_log(output)
         end
 
+        # Map key for a content-relative path: NFC-folded when non-ASCII. git
+        # on macOS prints precomposed (NFC) names while a Finder/zip-created
+        # file can sit on disk decomposed (NFD), so a byte-wise lookup with
+        # the on-disk page path missed and dropped `page.git` for that file.
+        def key(path : String) : String
+          path.ascii_only? ? path : path.unicode_normalize(:nfc)
+        end
+
         # Parse `git log` output produced with LOG_FORMAT + `--name-only`.
         # The log is newest-first, so the first header a path appears under
         # is its latest commit (hash, author, lastmod); `first_commit` is the
@@ -59,6 +67,7 @@ module Hwaro
             next unless header = current
             path = unquote_path(line)
             next if path.empty?
+            path = key(path)
             if existing = result[path]?
               if header.lastmod < existing.first_commit
                 result[path] = existing.copy_with(first_commit: header.lastmod)

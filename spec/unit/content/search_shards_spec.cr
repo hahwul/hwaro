@@ -88,6 +88,38 @@ describe "Hwaro::Content::Search shards" do
     end
   end
 
+  describe "a section named like the manifest" do
+    it "keeps the `index` section's shard out of search/index.json" do
+      config = shard_config("section")
+      pages = [
+        shard_page("index/a.md", "IDXPAGE", "/index/a/", "index"),
+        shard_page("docs/a.md", "Docs", "/docs/a/", "docs"),
+      ]
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate(pages, config, odir)
+
+        manifest = read_manifest(odir)
+        manifest["version"].as_i.should eq(1)
+        shard = manifest["shards"].as_a.find! { |sh| sh["id"].as_s == "index" }
+        url = shard["url"].as_s
+        url.should_not eq("/search/index.json")
+
+        JSON.parse(File.read(File.join(odir, url.lchop("/")))).as_a.map(&.["title"].as_s).should eq(["IDXPAGE"])
+      end
+    end
+
+    it "prunes the renamed shard when the section goes away" do
+      config = shard_config("section")
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate([shard_page("index/a.md", "A", "/index/a/", "index")], config, odir)
+        Hwaro::Content::Search.generate([shard_page("docs/a.md", "D", "/docs/a/", "docs")], config, odir)
+
+        Dir.glob(File.join(odir, "search", "*.json")).map { |p| File.basename(p) }.sort!.should eq(["docs.json", "index.json"])
+        read_manifest(odir)["shards"].as_a.map(&.["id"].as_s).should eq(["docs"])
+      end
+    end
+  end
+
   describe "shards = \"section\"" do
     it "writes one shard per top-level section, root pages to _root, plus a manifest" do
       config = shard_config("section")

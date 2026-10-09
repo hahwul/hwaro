@@ -105,12 +105,31 @@ module Hwaro
         # `%` file name is still reached when nothing decodes to it (or as
         # `%25`). A path captured from rendered HTML carries Markd's `&amp;`
         # for a `&` (`@/odd/a&amp;b.md`), so that spelling is tried first.
+        #
+        # A non-ASCII path that misses verbatim is retried NFC-folded on both
+        # sides: macOS, zip and Dropbox hand out decomposed (NFD) file names
+        # while links are typed precomposed, and the two never compare equal
+        # byte-wise. An exact spelling always wins; the fold scan only runs on
+        # a miss, so resolved links cost nothing extra.
         def page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          exact_page_for(pages_by_path, path) || folded_page_for(pages_by_path, path.includes?('%') ? URI.decode(path) : path)
+        end
+
+        private def exact_page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
           return pages_by_path[path]? unless path.includes?('%') || path.includes?("&amp;")
           candidates = path.includes?("&amp;") ? [path.gsub("&amp;", "&"), path] : [path]
           candidates.each do |candidate|
             page = (candidate.includes?('%') ? pages_by_path[URI.decode(candidate)]? : nil) || pages_by_path[candidate]?
             return page if page
+          end
+          nil
+        end
+
+        private def folded_page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
+          return if path.ascii_only?
+          folded = path.unicode_normalize(:nfc)
+          pages_by_path.each do |key, page|
+            return page if !key.ascii_only? && key.unicode_normalize(:nfc) == folded
           end
           nil
         end

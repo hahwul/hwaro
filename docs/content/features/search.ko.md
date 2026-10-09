@@ -397,7 +397,7 @@ public/
 }
 ```
 
-- `url`은 `base_url`의 하위 경로를 반영하고(`https://example.com/docs` 배포라면 `/docs/search/blog.json`), 섹션 이름은 퍼센트 인코딩됩니다.
+- `url`은 `base_url`의 하위 경로를 반영하고(`https://example.com/docs` 배포라면 `/docs/search/blog.json`), 섹션 이름은 퍼센트 인코딩됩니다. 샤드는 항상 매니페스트의 `url`로 불러오세요. `index`라는 섹션(또는 언어)은 매니페스트(`search/index.json`)와 충돌하지 않도록 `search/_index.json`에 기록됩니다.
 - `language`는 `language`·`section-language` 모드에서, `section`은 `section`·`section-language` 모드에서 채워지고 나머지는 `null`입니다.
 - 샤드는 id 순으로 나열되며 타임스탬프가 없어 출력이 결정적이고 diff하기 좋습니다. 마지막 페이지가 사라진 샤드는 다음 빌드에서 삭제됩니다.
 - `--cache` 빌드와 `hwaro serve`도 `search.json`과 같은 페이지 집합에서 샤드를 다시 생성합니다.

@@ -55,7 +55,7 @@ module Hwaro
       # named `page.html.jinja` built fine but doctor reported the required
       # templates as missing — and never syntax-checked any of them.
       private def template_files : Array(String)
-        Dir.glob(File.join(@templates_dir, "**", "*")).select do |path|
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(@templates_dir), "**", "*")).select do |path|
           next false unless path.matches?(Core::Build::Builder::TEMPLATE_EXTENSION_REGEX)
           # lstat first: `File.directory?` FOLLOWS symlinks, so a link
           # cycle anywhere under templates/ raised ELOOP out of the whole

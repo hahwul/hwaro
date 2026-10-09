@@ -213,7 +213,7 @@ module Hwaro
 
         # Static directory assets
         if Dir.exists?(@static_dir)
-          Dir.glob(File.join(@static_dir, "**", "*")) do |path|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(@static_dir), "**", "*")) do |path|
             ext = File.extname(path).downcase
             next unless ASSET_EXTENSIONS.includes?(ext)
             assets << path if ContentWalk.readable_file?(path)
@@ -222,7 +222,7 @@ module Hwaro
 
         # Co-located assets in content directory
         if Dir.exists?(@content_dir)
-          Dir.glob(File.join(@content_dir, "**", "*")) do |path|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "*")) do |path|
             ext = File.extname(path).downcase
             next if CONTENT_EXTENSIONS.includes?(ext)
             next unless ASSET_EXTENSIONS.includes?(ext)
@@ -244,7 +244,7 @@ module Hwaro
         end
 
         if Dir.exists?(@templates_dir)
-          Dir.glob(File.join(@templates_dir, "**", "*.{#{TEMPLATE_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(@templates_dir), "**", "*.{#{TEMPLATE_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         # Stylesheets/scripts shipped under static/ commonly reference other
@@ -253,7 +253,7 @@ module Hwaro
         # them, those fonts are misreported as unused — and `--delete` would
         # remove in-use files (data loss).
         if Dir.exists?(@static_dir)
-          Dir.glob(File.join(@static_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(@static_dir), "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         # The asset pipeline's own source dir (`[assets] source_dir =
@@ -261,13 +261,13 @@ module Hwaro
         # the compiled bundle, yet the file was never read, so `bg.png` was
         # reported unused and `--delete` removed it.
         if source_dir = asset_source_dir
-          Dir.glob(File.join(source_dir, "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(source_dir), "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         # Environment overrides (`config.production.toml`, merged by
         # `hwaro build --env production`) are config too: an asset named only
         # there — a production `og.default_image`, say — is still in use.
-        Dir.glob(File.join(@project_root, "config.*.toml")).sort.each { |f| scan_files << f }
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(@project_root), "config.*.toml")).sort.each { |f| scan_files << f }
 
         # `data/` and `i18n/` are build inputs too — templates read them as
         # `site.data.*` / translation strings, so an asset path that lives only
@@ -277,7 +277,7 @@ module Hwaro
         {"data", "i18n"}.each do |rel_dir|
           dir = File.join(@project_root, rel_dir)
           next unless Dir.exists?(dir)
-          Dir.glob(File.join(dir, "**", "*.{#{DATA_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*.{#{DATA_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         String.build do |sb|
@@ -364,7 +364,7 @@ module Hwaro
         config.auto_includes.dirs.each do |rel_dir|
           dir = File.join(@static_dir, rel_dir)
           next unless Dir.exists?(dir)
-          Dir.glob(File.join(dir, "**", "*")) do |path|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) do |path|
             # `File.directory?` raises on a symlink cycle, and the blanket
             # rescue below would have swallowed it — dropping EVERY
             # config-declared reference, so `--delete` removed bundle and

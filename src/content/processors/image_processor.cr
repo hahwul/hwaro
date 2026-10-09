@@ -673,7 +673,7 @@ module Hwaro
         # half-written file. The output format still comes from `ext`, never
         # from the temp file's name, so the `.tmp` suffix changes nothing.
         private def write_image(path : String, ext : String, w : Int32, h : Int32, channels : Int32, data : UInt8*, quality : Int32) : Bool
-          tmp = "#{path}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+          tmp = Utils::FileSafe.temp_path(path)
           begin
             ok = case ext
                  when ".png"

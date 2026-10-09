@@ -100,6 +100,16 @@ module Hwaro
         )
       end
 
+      # Same-directory temp path for an atomic write/copy of `target`. The
+      # name is fixed-length and unrelated to the target's own: suffixing the
+      # target basename pushed any legal name within ~22 bytes of NAME_MAX
+      # over it (ENAMETOOLONG aborted the build). Unique per process AND
+      # fiber, so parallel workers writing siblings can't collide; one fiber
+      # writes one file at a time, so reusing the name sequentially is safe.
+      def self.temp_path(target : String | Path) : String
+        File.join(File.dirname(target.to_s), "hwaro-#{Process.pid}-#{Fiber.current.object_id}.tmp")
+      end
+
       # Write `content` to `path` atomically: write to a same-directory
       # temp file, then rename over the target. `hwaro serve` rewrites
       # output files while HTTP fibers stream them to the browser — a plain
@@ -111,7 +121,7 @@ module Hwaro
       # workers writing sibling outputs can't collide on it.
       def self.atomic_write(path : String | Path, content : String) : Nil
         target = path.to_s
-        tmp = "#{target}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+        tmp = temp_path(target)
         begin
           File.write(tmp, content)
           File.rename(tmp, target)
@@ -171,7 +181,7 @@ module Hwaro
           return
         end
 
-        tmp = "#{target}.#{Process.pid}.#{Fiber.current.object_id}.tmp"
+        tmp = temp_path(target)
         begin
           File.copy(source, tmp)
           File.rename(tmp, target)

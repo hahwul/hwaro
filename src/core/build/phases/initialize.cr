@@ -689,7 +689,7 @@ module Hwaro::Core::Build::Phases::Initialize
   private def read_template_source(path : String) : String?
     attempts = 0
     loop do
-      source = File.read(path)
+      source = Utils::TextUtils.strip_bom(File.read(path))
       # `File.read` does not validate UTF-8, so a single stray byte (0xff from
       # a latin-1 paste, a truncated multi-byte sequence) used to travel into
       # the templates hash intact — and the first PCRE2 pass over it

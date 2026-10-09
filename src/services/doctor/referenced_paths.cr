@@ -218,7 +218,7 @@ module Hwaro
         # config.toml rather than the CWD so a doctor run pointed at
         # another project (-i / spec temp dirs) inspects that project.
         sass_dir = File.join(File.dirname(@config_path), "sass")
-        if Dir.exists?(sass_dir) && Dir.glob(File.join(sass_dir, "**", "*.scss"), match: glob).any? { |p| File.file?(p) }
+        if Dir.exists?(sass_dir) && Dir.glob(File.join(Utils::PathUtils.glob_escape(sass_dir), "**", "*.scss"), match: glob).any? { |p| File.file?(p) }
           issues << Issue.new(
             id: "sass-dir-not-scanned",
             level: :warning,
@@ -235,7 +235,7 @@ module Hwaro
         # filters out (e.g. `exclude = ["*.scss"]` beside an external Sass
         # toolchain) never publish at all, so they are not "raw .scss" either.
         unless config.sass.enabled
-          entries = Dir.glob(File.join(@static_dir, "**", "*.scss"), match: glob)
+          entries = Dir.glob(File.join(Utils::PathUtils.glob_escape(@static_dir), "**", "*.scss"), match: glob)
             .select { |p| File.file?(p) && !File.basename(p).starts_with?("_") }
             .reject { |p| config.static.excluded?(Path[p].relative_to(@static_dir).to_s) }
           unless entries.empty?

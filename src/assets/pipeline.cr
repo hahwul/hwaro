@@ -10,6 +10,7 @@ require "../utils/js_minifier"
 require "../utils/logger"
 require "../utils/output_guard"
 require "../utils/path_utils"
+require "../utils/text_utils"
 require "../models/config"
 require "./sass_compiler"
 
@@ -94,9 +95,7 @@ module Hwaro
             # skipped first entry (missing file, escaping symlink) used to
             # leave the bundle starting with a stray separator.
             io << separator if wrote_any
-            # A UTF-8 BOM is not content: mid-bundle it would fuse into the
-            # next selector (`\u{FEFF}.b`) and the rule would never match.
-            content = File.read(source).lchop('\u{FEFF}')
+            content = Utils::TextUtils.strip_bom(File.read(source))
             # `.scss` bundle entries compile before concatenation when the
             # built-in Sass feature is on; verbatim otherwise.
             if @sass_enabled && file.ends_with?(".scss")
