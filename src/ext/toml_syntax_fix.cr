@@ -9,21 +9,22 @@
 #   digits. `consume_escape` also had no `\U` arm (exactly eight digits), so
 #   `"\U0001F600"` was "unknown escape". Surrogates and values past U+10FFFF
 #   are a `ParseException` instead of an `ArgumentError` from `Int#chr`.
-# * `{}` — `TOML::Parser#parse_inline_table` demanded a key right after `{`.
 # * `0x` / `0o` / `0b` integers — `TOML::Lexer#consume_number` stopped at the
 #   leading `0` and the prefix letter became a stray token. Only after the `=`
 #   (bare keys such as `0b` are untouched), unsigned, `_` allowed between
-#   digits, out-of-range values are a `ParseException`.
+#   digits, out-of-range values are a `ParseException`. `consume_number`
+#   itself lives in ext/toml_float_fix.cr and hands the prefix to
+#   `consume_prefixed_integer` here.
 #
 # Replaces the upstream methods wholesale (no `previous_def`).
 #
-# Remove when: upstream lexes TOML 1.0 escapes, `{}` and prefixed integers.
+# Remove when: upstream lexes TOML 1.0 escapes and prefixed integers.
 
 require "toml"
 
 # Pin the version the copies were taken from — see toml_nesting_limit_fix.cr.
 {% if (shard_yml = read_file?("lib/toml/shard.yml")) && !shard_yml.includes?("version: 0.8.1") %}
-  {% raise "src/ext/toml_syntax_fix.cr replaces TOML::Lexer#consume_escape/#consume_unicode_scalar/#consume_number and TOML::Parser#parse_inline_table from toml 0.8.1, but a different toml version is vendored. Re-check the patch against the new upstream source and update the version pin." %}
+  {% raise "src/ext/toml_syntax_fix.cr replaces TOML::Lexer#consume_escape/#consume_unicode_scalar from toml 0.8.1, but a different toml version is vendored. Re-check the patch against the new upstream source and update the version pin." %}
 {% end %}
 
 class TOML::Lexer
@@ -67,66 +68,6 @@ class TOML::Lexer
     value.to_i32.chr
   end
 
-  private def consume_number(negative = false, leading_zero = false)
-    num = 0_i64
-    num += current_char.to_i
-    count = 1
-    last_is_underscore = false
-    has_underscore = false
-
-    loop do
-      char = next_char
-      if leading_zero && count == 1 && !@before_eq_symbol && (base = {'x' => 16, 'o' => 8, 'b' => 2}[char]?)
-        return consume_prefixed_integer(base)
-      end
-      case char
-      when '0'..'9'
-        num = num * 10 + current_char.to_i
-        last_is_underscore = false
-        count += 1
-      when '_'
-        if last_is_underscore
-          raise "double underscores in a number are now allowed"
-        else
-          last_is_underscore = true
-          has_underscore = true
-        end
-      else
-        break
-      end
-    end
-
-    unless @before_eq_symbol
-      case current_char
-      when '-'
-        if count == 4 && !has_underscore && !negative
-          return consume_datetime num
-        else
-          unexpected_char
-        end
-      when '.'
-        return consume_float(negative, num)
-      when ':'
-        if count == 2 && !has_underscore && !negative
-          return consume_time num
-        else
-          unexpected_char
-        end
-      when 'e', 'E'
-        return consume_exponent(negative, num)
-      end
-    end
-
-    if leading_zero && num != 0
-      raise "numbers with leading zero are not allowed"
-    end
-
-    num *= -1 if negative
-
-    @token.type = :INT
-    @token.int_value = num
-  end
-
   # `current_char` is the prefix letter of `0x…` / `0o…` / `0b…`.
   private def consume_prefixed_integer(base : Int32)
     digits = String.build do |io|
@@ -144,36 +85,5 @@ class TOML::Lexer
     end
     @token.type = :INT
     @token.int_value = digits.to_i64?(base) || raise("integer out of range")
-  end
-end
-
-class TOML::Parser
-  private def parse_inline_table
-    next_token
-
-    table = Table.new
-    if token.type == :"}"
-      next_token
-      return table
-    end
-
-    loop do
-      case token.type
-      when :KEY, :STRING, :INT
-        parse_key_value_after_key(table)
-
-        if token.type == :","
-          next_token
-        end
-
-        if token.type == :"}"
-          next_token
-          break
-        end
-      else
-        unexpected_token
-      end
-    end
-    table
   end
 end

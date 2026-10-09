@@ -225,12 +225,14 @@ describe Hwaro::Content::Hooks::ImageHooks do
   end
 
   describe "process_images via the registered hook" do
-    # All four skip-paths seed the resize_map with a sentinel entry so the
-    # assertion is "the hook DID NOT TOUCH state", not just "state ended
-    # empty" (which would also pass if the hook silently cleared the map).
+    # Every path seeds the resize_map with a sentinel entry. A run that does
+    # not resize (skip flag, disabled, no widths) must DROP the previous run's
+    # entries: they name variant files the build then prunes, and the maps
+    # outlive the build in a `hwaro serve` process. Only a missing config
+    # (nothing to decide from) leaves state alone.
     sentinel_map = {"sentinel.png" => {1 => "sentinel-1.png"}}
 
-    it "is a no-op (Continue) when ctx.options.skip_image_processing is true" do
+    it "forgets stale variants (Continue) when ctx.options.skip_image_processing is true" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
@@ -258,7 +260,7 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
-    it "is a no-op when image_processing.enabled is false" do
+    it "forgets stale variants when image_processing.enabled is false" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
@@ -283,13 +285,14 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
-    it "is a no-op when widths is empty" do
+    it "forgets stale variants, LQIP and sources when widths is empty" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
         config = Hwaro::Models::Config.new
         config.image_processing.enabled = true
         config.image_processing.widths = [] of Int32
+        Hwaro::Content::Hooks::ImageHooks.set_lqip_map({"sentinel.png" => {"lqip" => "data:x"}})
 
         options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
         ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)

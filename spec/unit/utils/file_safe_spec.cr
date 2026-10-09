@@ -189,6 +189,18 @@ describe Hwaro::Utils::FileSafe do
         Dir.children(root).should eq(["index.html"])
       end
     end
+
+    # Regression: the temp name was `<target>.<pid>.<fiber>.tmp`, ~22 bytes
+    # longer than the target, so a file whose own name fit NAME_MAX (255) but
+    # was over ~233 bytes failed with "File name too long".
+    it "writes a file whose name is close to NAME_MAX" do
+      Dir.mktmpdir do |root|
+        path = File.join(root, "#{"b" * 250}.svg")
+        Hwaro::Utils::FileSafe.atomic_write(path, "<svg/>")
+        File.read(path).should eq("<svg/>")
+        Dir.children(root).should eq([File.basename(path)])
+      end
+    end
   end
 
   # Characterisation coverage: `atomic_copy` is introduced by this fix, so
@@ -206,6 +218,18 @@ describe Hwaro::Utils::FileSafe do
         Hwaro::Utils::FileSafe.atomic_copy(src, dest)
         File.read(dest).should eq("a{color:red}")
         Dir.glob(File.join(root, "*.tmp")).should be_empty
+      end
+    end
+
+    it "copies to a destination whose name is close to NAME_MAX" do
+      Dir.mktmpdir do |root|
+        src = File.join(root, "src.bin")
+        dest = File.join(root, "#{"c" * 250}.bin")
+        File.write(src, "bytes")
+
+        Hwaro::Utils::FileSafe.atomic_copy(src, dest)
+        File.read(dest).should eq("bytes")
+        Dir.children(root).sort.should eq(["src.bin", File.basename(dest)].sort)
       end
     end
 

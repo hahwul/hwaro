@@ -81,7 +81,7 @@ dimensions = true   # does not need enabled = true
 3. Aspect ratio is always preserved
 4. If the target width is larger than the source, the original is copied as-is (no upscaling)
 5. Each source image is decoded only once, then resized to all widths (efficient)
-6. A JPEG's EXIF orientation is applied: variants are cut from the upright picture, and the `width`/`height` stamped by `dimensions = true` are the displayed size (swapped for a photo taken in portrait)
+6. JPEG photos carrying an EXIF orientation (phone and camera shots) are rotated upright first, so variants, LQIP placeholders and `fill`/`crop` results match what browsers show for the original; `dimensions = true` stamps the displayed size
 
 ## Output Naming
 

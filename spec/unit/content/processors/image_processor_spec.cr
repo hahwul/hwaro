@@ -1117,3 +1117,68 @@ describe "EXIF-oriented JPEGs" do
     end
   end
 end
+
+# Regression: stb ignores EXIF orientation and the encoder writes no tag, so
+# srcset variants and the LQIP of a phone photo were sideways next to the
+# original (which browsers rotate), and `dimensions = true` stamped the
+# unrotated box on the original.
+describe "ImageProcessor EXIF orientation" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "reads the Orientation tag in both byte orders and defaults to 1" do
+    Dir.mktmpdir do |dir|
+      le = File.join(dir, "le.jpg")
+      be = File.join(dir, "be.jpg")
+      plain = File.join(dir, "plain.jpg")
+      write_exif_jpeg(le, 8, 4, 6)
+      write_exif_jpeg(be, 8, 4, 8, little: false)
+      write_exif_jpeg(plain, 8, 4, nil)
+      processor.orientation(le).should eq(6)
+      processor.orientation(be).should eq(8)
+      processor.orientation(plain).should eq(1)
+      processor.orientation(File.join(dir, "missing.jpg")).should eq(1)
+
+      write_exif_jpeg(File.join(dir, "bad.jpg"), 8, 4, 9) # out of range
+      processor.orientation(File.join(dir, "bad.jpg")).should eq(1)
+
+      File.write(File.join(dir, "junk.jpg"), "\xFF\xD8\xFF\xE1\x00\x20Exif")
+      processor.orientation(File.join(dir, "junk.jpg")).should eq(1)
+    end
+  end
+
+  it "reports the displayed size: width and height swap for orientations 5..8" do
+    Dir.mktmpdir do |dir|
+      {1 => {40, 20}, 3 => {40, 20}, 5 => {20, 40}, 6 => {20, 40}, 7 => {20, 40}, 8 => {20, 40}}.each do |orientation, size|
+        path = File.join(dir, "o#{orientation}.jpg")
+        write_exif_jpeg(path, 40, 20, orientation)
+        processor.dimensions(path).should eq(size)
+      end
+    end
+  end
+
+  it "cuts srcset variants and the LQIP from upright pixels" do
+    Dir.mktmpdir do |dir|
+      photo = File.join(dir, "photo.jpg")
+      write_exif_jpeg(photo, 40, 20, 6)
+      map, lqip, _ = processor.resize_and_lqip(photo, dir, [10], 85, 8)
+      processor.dimensions(map[10]).should eq({10, 20})
+      processor.orientation(map[10]).should eq(1)
+      lqip.should_not be_nil
+
+      upright = File.join(dir, "upright.jpg")
+      write_exif_jpeg(upright, 40, 20, nil)
+      map, _, _ = processor.resize_and_lqip(upright, dir, [10], 85, 0)
+      processor.dimensions(map[10]).should eq({10, 5})
+    end
+  end
+
+  it "applies the orientation to fill/crop variants" do
+    Dir.mktmpdir do |dir|
+      photo = File.join(dir, "photo.jpg")
+      write_exif_jpeg(photo, 40, 20, 6)
+      dest = File.join(dir, "crop.jpg")
+      # Upright the photo is 20x40, so a 20x40 crop is the whole image.
+      processor.transform(photo, dest, 20, 40, "crop", "center").should eq({20, 40})
+    end
+  end
+end

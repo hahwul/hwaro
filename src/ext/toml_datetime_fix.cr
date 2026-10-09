@@ -20,18 +20,36 @@
 # A local time (`07:32:00`) was dated to the day the build ran — see
 # `consume_time` below.
 #
+# `next_char` is patched here too, because `consume_datetime`'s lookahead is
+# its only user of the peek buffer.
+#
 # Remove when: upstream accepts arbitrary fractional-second precision, keeps
-# offsets and models local times.
+# offsets and models local times, and `next_char` honours the peek buffer.
 
 require "toml"
 
 # Replaces the upstream methods wholesale (no `previous_def`), so pin the
 # version they were copied from — see toml_nesting_limit_fix.cr.
 {% if (shard_yml = read_file?("lib/toml/shard.yml")) && !shard_yml.includes?("version: 0.8.1") %}
-  {% raise "src/ext/toml_datetime_fix.cr replaces TOML::Lexer#consume_datetime/#consume_time from toml 0.8.1, but a different toml version is vendored. Re-check the patch against the new upstream source and update the version pin." %}
+  {% raise "src/ext/toml_datetime_fix.cr replaces TOML::Lexer#consume_datetime/#consume_time/#next_char from toml 0.8.1, but a different toml version is vendored. Re-check the patch against the new upstream source and update the version pin." %}
 {% end %}
 
 class TOML::Lexer
+  # Upstream `next_char` (lexer.cr:629) returned the char `peek_next_char`
+  # had buffered WITHOUT making it `current_char`. `consume_datetime` peeks
+  # after `date + space` and returns for a date-only value, so
+  # `d = 2024-05-01 # published` lost the `#` (the comment text was then lexed
+  # as tokens: "unexpected token 'published'"), and `}` / `]` / `,` / the
+  # newline after `date + space` vanished the same way.
+  private def next_char : Char
+    @column_number += 1
+    if peeked = @peeked
+      @peeked = nil
+      return @current_char = peeked
+    end
+    @current_char = @input.read_char || '\0'
+  end
+
   # Reads the digits after a `.` (already consumed) and leaves
   # `current_char` on the first non-digit, like the upstream six-digit read
   # followed by `next_char`. Returns nanoseconds.

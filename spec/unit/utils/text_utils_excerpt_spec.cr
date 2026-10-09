@@ -16,6 +16,13 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.excerpt_text(html).should eq("Hello & world, it's fine.")
     end
 
+    # Regression: the skipped-<img> pattern ended at the first `>`, so
+    # `alt="Home > Docs"` left `Docs" width="10"` in the summary.
+    it "drops an img whose quoted attribute contains >" do
+      html = %(<p>Visible <img src="/a.png" alt="Home > Docs" width="10"> Tail.</p><h2 title='a > b'>Heading</h2><p>End.</p>)
+      Hwaro::Utils::TextUtils.excerpt_text(html).should eq("Visible Tail. End.")
+    end
+
     it "drops code blocks, script, style, figure, img and heading content but keeps inline code" do
       html = <<-HTML
         <h1 id="t">Title Heading</h1>

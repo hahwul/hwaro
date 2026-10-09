@@ -363,7 +363,14 @@ module Hwaro
             collect_static_jobs(config, output_dir, resolved_output, jobs, seen)
           end
 
-          return clear_resize_maps if jobs.empty?
+          if jobs.empty?
+            # Nothing to resize (the last image was deleted): the previous
+            # run's variants are pruned, so their URLs must stop resolving.
+            # A `--fast-start` priority pass is partial by design — it keeps
+            # what the full pass will fill in.
+            clear_resize_maps if fast_start_priority.nil?
+            return
+          end
 
           # Phase 2: Split jobs into "already fresh" (reuse from previous
           # rebuild's maps) and "needs work". Snapshot previous maps first

@@ -41,6 +41,8 @@ require "./ext/toml_nesting_limit_fix"
 require "./ext/toml_datetime_fix"
 require "./ext/toml_multiline_string_fix"
 require "./ext/toml_syntax_fix"
+require "./ext/toml_parser_fix"
+require "./ext/toml_float_fix"
 require "emoji"
 
 # Load utilities

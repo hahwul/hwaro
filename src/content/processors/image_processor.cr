@@ -484,7 +484,7 @@ module Hwaro
         # side. Orientation 1 (and anything unknown) hands the input back.
         # Returns {pixels, width, height}; nil if the new buffer cannot be
         # allocated (the input is then untouched).
-        private def reorient(pixels : UInt8*, w : Int32, h : Int32, channels : Int32, orientation : Int32) : {UInt8*, Int32, Int32}?
+        def reorient(pixels : UInt8*, w : Int32, h : Int32, channels : Int32, orientation : Int32) : {UInt8*, Int32, Int32}?
           return {pixels, w, h} unless orientation.in?(2..8)
           dw, dh = orientation >= 5 ? {h, w} : {w, h}
           out_pixels = LibC.malloc(dw.to_i64 * dh * channels).as(UInt8*)

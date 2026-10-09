@@ -469,6 +469,55 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.strip_html("a > b").should eq("a b")
     end
 
+    # Regression: an HTML comment's body (author-hidden text) was published
+    # as text in og:description, search.json and feeds, and `alt="a > b"`
+    # leaked the attribute tail after the quoted `>`.
+    describe "comments and quoted attributes" do
+      it "drops HTML comments, including commented-out markup" do
+        Hwaro::Utils::TextUtils.strip_html("Visible.<!-- <p>SECRET</p> -->Tail").should eq("Visible. Tail")
+        Hwaro::Utils::TextUtils.strip_html("a <!-- TODO: rewrite -> later --> b").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("a<!---->b").should eq("a b")
+      end
+
+      it "drops an unterminated comment to the end" do
+        Hwaro::Utils::TextUtils.strip_html("Visible <!-- never closed <p>x</p>").should eq("Visible")
+      end
+
+      it "does not end a tag at a > inside a quoted attribute" do
+        Hwaro::Utils::TextUtils.strip_html(%(<img src="/a.png" alt="Home > Docs" width="10"> Tail)).should eq("Tail")
+        Hwaro::Utils::TextUtils.strip_html(%(<a title='a > b' href="x">link</a>)).should eq("link")
+      end
+
+      it "keeps a < that does not start a tag as text" do
+        Hwaro::Utils::TextUtils.strip_html("1 < 2 and x<3").should eq("1 < 2 and x<3")
+      end
+    end
+
+    # Regression: every tag boundary became a space, splitting words at
+    # inline markup (Korean particles after **bold**, H<sub>2</sub>O, Ctrl+<kbd>C</kbd>).
+    describe "inline tags" do
+      it "does not split words at inline markup" do
+        Hwaro::Utils::TextUtils.strip_html("<strong>한글</strong>은 <em>강조</em>가 <code>code</code>를 쓴다").should eq("한글은 강조가 code를 쓴다")
+        Hwaro::Utils::TextUtils.strip_html("H<sub>2</sub>O and <b>bold</b>ness").should eq("H2O and boldness")
+        Hwaro::Utils::TextUtils.strip_html("Ctrl+<kbd>C</kbd>").should eq("Ctrl+C")
+        Hwaro::Utils::TextUtils.strip_html("<p>a<span>b</span>c</p>").should eq("abc")
+      end
+
+      it "still separates at block, void and unknown tags" do
+        Hwaro::Utils::TextUtils.strip_html("a<br>b<hr>c").should eq("a b c")
+        Hwaro::Utils::TextUtils.strip_html("<ul><li>a</li><li>b</li></ul>").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("<table><tr><td>a</td><td>b</td></tr></table>").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("a<img src=x>b").should eq("a b")
+        Hwaro::Utils::TextUtils.strip_html("a<my-widget>b</my-widget>c").should eq("a b c")
+        Hwaro::Utils::TextUtils.strip_html("<p>a</p><p>b</p><div>c</div>").should eq("a b c")
+      end
+
+      it "matches tag names case-insensitively" do
+        Hwaro::Utils::TextUtils.strip_html("a<B>b</B>c").should eq("abc")
+        Hwaro::Utils::TextUtils.strip_html("a<P>b</P>c").should eq("a b c")
+      end
+    end
+
     # Raw-text elements: <style>/<script> bodies are code, not display text,
     # and must be dropped along with their tags. Otherwise the CSS/JS source
     # leaks into search indexes, feed summaries, and excerpts.

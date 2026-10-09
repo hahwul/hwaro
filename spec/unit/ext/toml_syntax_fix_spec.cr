@@ -52,6 +52,7 @@ describe "TOML 1.0 syntax (ext/toml_syntax_fix)" do
 
     it "rejects malformed prefixed integers" do
       expect_raises(TOML::ParseException) { TOML.parse("a = 0x") }
+      expect_raises(TOML::ParseException) { TOML.parse("a = -0x1") }
       expect_raises(TOML::ParseException) { TOML.parse("a = 0o8") }
       expect_raises(TOML::ParseException) { TOML.parse("a = 0b12") }
       expect_raises(TOML::ParseException) { TOML.parse("a = 0xFFFFFFFFFFFFFFFFFF") }

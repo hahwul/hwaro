@@ -268,18 +268,24 @@ module Hwaro
         # Every candidate of a `srcset` (the responsive-image pass injects
         # them, authors write them in `<img>`/`<picture>`) is resolved too,
         # descriptors kept.
-        def absolutize_links(html : String, page_url : String) : String
+        #
+        # `document_relative_only` is for a page that is moved verbatim to a
+        # different directory (the AMP mirror under `/amp/…`): only the values
+        # that resolve against the document's own location ("cover.png",
+        # "../b2/") are rewritten, root-relative ones keep their bytes, and a
+        # host-less `page_url` ("/posts/b1/") yields root-relative results.
+        def absolutize_links(html : String, page_url : String, document_relative_only : Bool = false) : String
           return html if page_url.empty?
           return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"") ||
                              Utils::ByteScan.includes?(html, "srcset=\"")
 
           base = URI.parse(page_url)
-          return html if base.host.nil?
+          return html if base.host.nil? && !document_relative_only
 
           html.gsub(ANY_LINK_ATTR_REGEX) do |match|
             attr = $1
             value = $2
-            if value.empty? || absolute_or_anchor?(value)
+            if value.empty? || absolute_or_anchor?(value) || (document_relative_only && value.starts_with?('/'))
               match
             else
               begin
@@ -297,7 +303,7 @@ module Hwaro
             result = value
             spans.reverse_each do |(start, stop)|
               url = value[start...stop]
-              next if absolute_or_anchor?(url)
+              next if absolute_or_anchor?(url) || (document_relative_only && url.starts_with?('/'))
               begin
                 result = result[0, start] + base.resolve(url).to_s + result[stop..]
               rescue URI::Error

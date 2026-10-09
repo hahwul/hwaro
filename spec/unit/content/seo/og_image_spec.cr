@@ -160,6 +160,34 @@ describe Hwaro::Models::AutoImageConfig do
 end
 
 describe Hwaro::Content::Seo::OgImage do
+  describe ".slug_for" do
+    # Regression: the slug is the whole URL joined by '-' with no byte cap, so
+    # a deep or long URL produced an image file name over NAME_MAX and the
+    # page silently lost its og:image.
+    it "keeps long URL slugs inside a safe file name length, stable and distinct" do
+      long = "b" * 400
+      a = Hwaro::Models::Page.new("a.md")
+      a.url = "/posts/#{long}1/"
+      b = Hwaro::Models::Page.new("b.md")
+      b.url = "/posts/#{long}2/"
+
+      seen = {} of String => String
+      slug_a = Hwaro::Content::Seo::OgImage.slug_for(a, seen)
+      slug_b = Hwaro::Content::Seo::OgImage.slug_for(b, seen)
+
+      slug_a.bytesize.should be <= 240
+      slug_b.bytesize.should be <= 240
+      slug_a.should_not eq(slug_b)
+      slug_a.should eq(Hwaro::Content::Seo::OgImage.slug_for(a, {} of String => String))
+    end
+
+    it "does not touch slugs that already fit" do
+      page = Hwaro::Models::Page.new("a.md")
+      page.url = "/posts/#{"b" * 200}/"
+      Hwaro::Content::Seo::OgImage.slug_for(page, {} of String => String).should eq("posts-#{"b" * 200}")
+    end
+  end
+
   describe ".render_svg" do
     it "renders a valid SVG with page title" do
       page = Hwaro::Models::Page.new("test.md")
@@ -181,6 +209,49 @@ describe Hwaro::Content::Seo::OgImage do
       # The default masthead style renders the site name as an uppercase
       # tracked eyebrow at the top.
       svg.should contain("MY SITE")
+    end
+
+    # Regression: the already-escaped site name was upcased, turning
+    # `&amp;` into `&AMP;` (an undefined XML entity) in the default eyebrow
+    # and the editorial kicker, so the SVG did not parse.
+    ["default", "editorial"].each do |style|
+      it "keeps the #{style} style well-formed for a title with XML special characters" do
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "Hello"
+
+        config = Hwaro::Models::Config.new
+        config.title = %(R&D <Lab> "Q" 'x')
+        config.og.auto_image.enabled = true
+        config.og.auto_image.style = style
+
+        svg = Hwaro::Content::Seo::OgImage.render_svg(page, config)
+
+        svg.should contain("R&amp;D &lt;LAB&gt; &quot;Q&quot; &apos;X&apos;")
+        svg.should_not contain("&AMP;")
+        XML.parse(svg).root.try(&.name).should eq("svg")
+      end
+    end
+
+    # Regression: an empty page title (the blog scaffold's home page) left the
+    # headline block blank; every other surface falls back to the site title.
+    it "falls back to the site title for an empty or blank page title" do
+      ["", "   "].each do |blank|
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = blank
+        page.description = "desc"
+
+        config = Hwaro::Models::Config.new
+        config.title = "Fallback Site"
+        config.og.auto_image.enabled = true
+        config.og.auto_image.style = "hero"
+
+        # the hero ghost word echoes the headline's first word
+        Hwaro::Content::Seo::OgImage.render_svg(page, config).should contain(">FALLBACK</text>")
+
+        # the headline itself (the eyebrow is upcased)
+        config.og.auto_image.style = "default"
+        Hwaro::Content::Seo::OgImage.render_svg(page, config).should contain(">Fallback Site</text>")
+      end
     end
 
     it "uses configured colors" do

@@ -90,7 +90,14 @@ module Hwaro
         private def process_assets(ctx : Core::Lifecycle::BuildContext)
           AssetHooks.output_dir = ctx.output_dir
           config = ctx.config
-          return unless config && config.assets.enabled
+          return unless config
+          unless config.assets.enabled
+            # The manifest is process-global: a serve session that switched
+            # `[assets]` off must stop resolving asset() to the pruned
+            # fingerprinted files and fall back to `<base_url>/<name>`.
+            AssetHooks.replace_manifest({} of String => String)
+            return
+          end
 
           pipeline = Assets::Pipeline.new(config.assets, config.sass.enabled)
           pipeline.process(ctx.output_dir)
