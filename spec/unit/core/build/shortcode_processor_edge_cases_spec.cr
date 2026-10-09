@@ -372,6 +372,34 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should_not contain("<iframe")
     end
 
+    it "leaves a shortcode inside a hard-wrapped (two-line) code span untouched" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe></iframe>)}
+      content = %(Wrapped: `start {{ youtube(id="x") }}\ncontinues here` done.)
+      result = builder.test_sc_process(content, templates)
+      result.should eq(content)
+      result.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+    end
+
+    it "does not let a code span run across a blank line" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe></iframe>)}
+      # The first backtick has no closer in its paragraph, so the call in
+      # the next paragraph is live even though a later paragraph has a tick.
+      content = %(A stray ` tick.\n\n{{ youtube(id="x") }}\n\nAnother ` tick.)
+      result = builder.test_sc_process(content, templates)
+      result.should contain("<iframe></iframe>")
+    end
+
+    it "survives a stray backtick above a very long paragraph (PCRE2 JIT stack)" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe></iframe>)}
+      body = (1..4000).map { |i| "word#{i} lorem ipsum dolor sit amet" }.join("\n")
+      content = %(A stray ` tick.\n#{body}\n\n{{ youtube(id="x") }})
+      result = builder.test_sc_process(content, templates)
+      result.should contain("<iframe></iframe>")
+    end
+
     # Regression: inline code spans used to SPLIT the content into chunks,
     # so a block shortcode whose body contained `code` had its opener and
     # closer land in different chunks — the pair never matched and both

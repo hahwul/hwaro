@@ -242,6 +242,27 @@ describe Hwaro::Utils::CrinjaUtils do
   # ---------------------------------------------------------------------------
   # TOML → Crinja::Value
   # ---------------------------------------------------------------------------
+  describe "a boolean false in data files" do
+    # `elsif b = value.as_bool?` skipped `false` and fell through to none, so
+    # `== false` never matched and `default(...)` flipped it. Same as JSON.
+    probe = "{{ d.flag }}|{{ d.flag == false }}|{{ d.flag | default(value=\"DEF\") }}|{{ d.flag is none }}"
+
+    it "stays false from YAML" do
+      vars = {"d" => Hwaro::Utils::CrinjaUtils.from_yaml(YAML.parse("flag: false"))}
+      render(vars, probe).should eq("false|true|false|false")
+    end
+
+    it "stays false from TOML" do
+      vars = {"d" => Hwaro::Utils::CrinjaUtils.from_toml(TOML.parse("flag = false"))}
+      render(vars, probe).should eq("false|true|false|false")
+    end
+
+    it "keeps true as true" do
+      vars = {"d" => Hwaro::Utils::CrinjaUtils.from_toml(TOML.parse("flag = true"))}
+      render(vars, probe).should eq("true|false|true|false")
+    end
+  end
+
   describe ".from_toml (Hash)" do
     it "converts a simple TOML hash" do
       toml = TOML.parse("name = \"Alice\"\nage = 30")

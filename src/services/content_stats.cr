@@ -263,7 +263,7 @@ module Hwaro
       end
 
       private def normalize_terms(terms : Array(String)) : Array(String)
-        terms.map(&.strip).reject(&.empty?)
+        terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
       end
 
       private def warn_unparsed_frontmatter(path : String, dialect : String, ex : Exception) : Nil

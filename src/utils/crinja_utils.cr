@@ -41,7 +41,7 @@ module Hwaro
           Crinja::Value.new(i)
         elsif f = value.as_f?
           Crinja::Value.new(f)
-        elsif b = value.as_bool?
+        elsif !(b = value.as_bool?).nil?
           Crinja::Value.new(b)
         elsif (t = value.raw).is_a?(Time)
           # Crystal's YAML core-schema resolver turns an unquoted ISO date
@@ -88,7 +88,7 @@ module Hwaro
           Crinja::Value.new(i)
         elsif f = value.as_f?
           Crinja::Value.new(f)
-        elsif b = value.as_bool?
+        elsif !(b = value.as_bool?).nil?
           Crinja::Value.new(b)
         elsif (t = value.raw).is_a?(Time)
           Crinja::Value.new(t.to_s)

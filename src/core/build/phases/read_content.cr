@@ -81,6 +81,13 @@ module Hwaro::Core::Build::Phases::ReadContent
       if PAGE_EXTENSIONS.includes?(ext)
         # Process markdown file
         basename = Path[relative_path].basename
+        # The extension is matched case-insensitively here, but `_index`,
+        # `index` bundles and `.<lang>` suffixes (and dozens of consumers
+        # comparing against `_index.md`) only know the lowercase spelling, so
+        # `_index.MD` quietly became an ordinary page with no section list.
+        if (written_ext = Path[file_path].extension) != ext
+          Logger.warn "content/#{relative_path}: page extension #{written_ext.inspect} is not lowercase — it builds as an ordinary page, never as a section index (_index), bundle (index) or translation (.<lang>). Rename it to #{ext.inspect}."
+        end
         language = extract_language_from_filename(basename, config, ext)
 
         clean_basename = if language

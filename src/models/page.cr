@@ -498,7 +498,10 @@ module Hwaro
         offset = 0
         tracker = Content::Processors::FenceTracker.new
         @raw_content.each_line(chomp: false) do |line|
-          if !tracker.fence_line?(line) && (match = line.match(MORE_MARKER_REGEX))
+          # A marker inside an inline code span (`` `<!-- more -->` ``) is
+          # literal text too: blank the spans out, keeping byte offsets.
+          probe = line.includes?('`') ? line.gsub(Content::Processors::InlineMarkdown::INLINE_CODE_SPAN_RE) { |span| " " * span.bytesize } : line
+          if !tracker.fence_line?(line) && (match = probe.match(MORE_MARKER_REGEX))
             summary_md = @raw_content.byte_slice(0, offset + match.byte_begin(0)).strip
             @summary = summary_md unless summary_md.empty?
             return @summary

@@ -94,6 +94,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       end
 
       shortcode_results = {} of String => String
+      summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
       summary_md = expand_includes(summary_md, page, site)
       processed = if content_may_contain_shortcodes?(summary_md)
                     context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
@@ -254,6 +255,61 @@ module Hwaro::Core::Build::Phases::ParseContent
   rescue ex
     Logger.warn "Automatic summary skipped for #{page.path}: #{ex.message}"
     had || false # nil when the raise preceded the assignment above
+  end
+
+  SUMMARY_LINK_DEFINITION_RE     = /\A {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*\S/
+  SUMMARY_FOOTNOTE_DEFINITION_RE = /\A {0,3}\[\^([^\]\s]+)\]:/
+  SUMMARY_FOOTNOTE_REF_RE        = /\[\^([^\]\s]+)\](?!:)/
+
+  # The summary chunk is rendered alone, but definitions normally sit at the
+  # end of a post, after the marker. Append the link reference definitions
+  # found there (outside fences) so `[text][ref]` still links, and drop
+  # footnote references that have no definition inside the chunk — they
+  # would ship as literal `[^1]` in every listing and feed. A chunk that is
+  # already self-contained is returned untouched.
+  private def complete_summary_chunk(chunk : String, raw : String, footnotes : Bool) : String
+    rest_start = raw.byte_index(chunk)
+    rest = rest_start ? raw.byte_slice(rest_start + chunk.bytesize) : ""
+    definitions = [] of String
+    if !rest.empty? && rest.includes?("]:")
+      tracker = Content::Processors::FenceTracker.new
+      rest.each_line(chomp: true) do |line|
+        next if tracker.fence_line?(line)
+        definitions << line if SUMMARY_LINK_DEFINITION_RE.matches?(line)
+      end
+    end
+    chunk = strip_dangling_footnote_refs(chunk) if footnotes && chunk.includes?("[^")
+    definitions.empty? ? chunk : "#{chunk}\n\n#{definitions.join('\n')}"
+  end
+
+  private def strip_dangling_footnote_refs(chunk : String) : String
+    defined = Set(String).new
+    chunk.each_line do |line|
+      if match = SUMMARY_FOOTNOTE_DEFINITION_RE.match(line)
+        defined << match[1]
+      end
+    end
+    tracker = Content::Processors::FenceTracker.new
+    String.build do |io|
+      chunk.each_line(chomp: false) do |line|
+        fenced = tracker.fence_line?(line)
+        if !fenced && line.includes?("[^")
+          # Refs inside inline code spans are literal text: blank the spans
+          # out (byte offsets preserved) before looking.
+          probe = line.includes?('`') ? line.gsub(Content::Processors::InlineMarkdown::INLINE_CODE_SPAN_RE) { |span| " " * span.bytesize } : line
+          bytes = line.to_slice
+          pos = 0
+          probe.scan(SUMMARY_FOOTNOTE_REF_RE) do |match|
+            next if defined.includes?(match[1])
+            io.write bytes[pos, match.byte_begin(0) - pos]
+            pos = match.byte_end(0)
+          end
+          io.write bytes[pos, bytes.size - pos]
+        else
+          io << line
+        end
+      end
+    end
   end
 
   # Rebuild the `[[wikilink]]` lookup over `pages` (the published set).
@@ -1163,9 +1219,9 @@ module Hwaro::Core::Build::Phases::ParseContent
   # on the page renders a term link to a 404.
   private def cascade_string_array(value : Models::ExtraValue) : Array(String)?
     if value.is_a?(Array(String))
-      value.map(&.strip).reject(&.empty?)
+      value.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
     elsif value.is_a?(Array(Models::ExtraValue))
-      value.compact_map(&.as?(String)).map(&.strip).reject(&.empty?)
+      value.compact_map(&.as?(String)).map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
     end
   end
 

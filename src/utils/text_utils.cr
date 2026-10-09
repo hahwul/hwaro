@@ -74,6 +74,16 @@ module Hwaro
         content.lchop('\uFEFF')
       end
 
+      # A taxonomy term as the build identifies it: stripped and NFC-normalised.
+      # macOS filenames, IMEs and the clipboard produce NFD text, and `slugify`
+      # drops the combining marks of an NFD `\u00E9` (so `/tags/cafe/` next to
+      # `/tags/caf\u00E9/`) while NFD and NFC Hangul share one directory on APFS \u2014
+      # visually identical tags must be one term. NFC is the identity for ASCII.
+      def normalize_term(term : String) : String
+        term = term.strip
+        term.ascii_only? ? term : term.unicode_normalize(:nfc)
+      end
+
       # Remove terminal control characters (ANSI escapes, CR, BEL, \u2026) plus the
       # Unicode line/paragraph separators.
       #
@@ -283,16 +293,46 @@ module Hwaro
         in_word = false
         count = 0
 
+        bytes = text.to_slice
+        last_comment_close = nil.as(Int32?)
+        looked_for_comment_close = false
+
         reader = Char::Reader.new(text)
         while reader.has_next?
           char = reader.current_char
           if char == '<'
-            # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`).
-            # A bare `<` in prose/math ("n < 1000", "if 0 < x") is a literal
-            # less-than, not a tag \u2014 treating it as one set in_tag with no closing
-            # `>` and swallowed the rest of the document, collapsing the count.
+            # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`)
+            # that is actually closed. A bare `<` in prose/math ("n < 1000",
+            # "if 0 < x", "a<b", "i<n;") is a literal less-than, not a tag \u2014
+            # treating it as one set in_tag with no closing `>` and swallowed
+            # the rest of the document, collapsing the count. The closer must
+            # come before the next `<` (a tag may span lines); a comment needs
+            # a `-->` somewhere after it. Each `<` scans only up to the next
+            # `<`, so the whole pass stays linear.
             nxt = reader.peek_next_char
-            in_tag = true if nxt.ascii_letter? || nxt == '/' || nxt == '!'
+            if nxt.ascii_letter? || nxt == '/' || nxt == '!'
+              start = reader.pos
+              if nxt == '!' && bytes.size >= start + 4 && bytes[start + 2] === '-' && bytes[start + 3] === '-'
+                unless looked_for_comment_close
+                  looked_for_comment_close = true
+                  i = bytes.size - 3
+                  while i >= 0
+                    if bytes[i] === '-' && bytes[i + 1] === '-' && bytes[i + 2] === '>'
+                      last_comment_close = i
+                      break
+                    end
+                    i -= 1
+                  end
+                end
+                in_tag = true if (close = last_comment_close) && close >= start + 4
+              else
+                scan = start + 1
+                while scan < bytes.size && bytes[scan] != '<'.ord && bytes[scan] != '>'.ord
+                  scan += 1
+                end
+                in_tag = true if scan < bytes.size && bytes[scan] == '>'.ord
+              end
+            end
             in_word = false
           elsif char == '>'
             in_tag = false

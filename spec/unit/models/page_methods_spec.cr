@@ -89,13 +89,12 @@ describe Hwaro::Models::Page do
       page.calculate_word_count.should eq(3)
     end
 
-    it "does not raise on an opened-but-never-closed real tag (swallows the tail)" do
-      # `<a` flips into tag mode; with no closing '>' the rest of the document
-      # is swallowed. This pins graceful degradation (count of pre-tag words,
-      # no crash) on truncated/malformed HTML.
+    it "does not raise on an opened-but-never-closed tag, and counts its text" do
+      # `<a` with no closing '>' is not a tag: it used to swallow the rest of
+      # the document, collapsing the count to the pre-tag words.
       page = Hwaro::Models::Page.new("test.md")
       page.raw_content = "hello <a href=foo and more text"
-      page.calculate_word_count.should eq(1)
+      page.calculate_word_count.should eq(6)
     end
   end
 
@@ -200,6 +199,26 @@ describe Hwaro::Models::Page do
       summary = page.extract_summary
       summary.should_not be_nil
       summary.not_nil!.should eq("Intro.\n\n```html\n<!-- more -->\n```\n\nBody.")
+    end
+
+    it "ignores a marker shown inside an inline code span" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Intro.\n\nUse the `<!-- more -->` marker to split.\n\nSecond.\n\n<!-- more -->\n\nRest."
+      page.extract_summary.should eq("Intro.\n\nUse the `<!-- more -->` marker to split.\n\nSecond.")
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Only ``<!-- more -->`` here."
+      page.extract_summary.should be_nil
+    end
+
+    it "still splits at a real marker that follows a code span or a stray backtick" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "Use `code` first. <!-- more --> Rest."
+      page.extract_summary.should eq("Use `code` first.")
+
+      page = Hwaro::Models::Page.new("test.md")
+      page.raw_content = "A lone ` tick <!-- more --> Rest."
+      page.extract_summary.should eq("A lone ` tick")
     end
 
     it "returns nil when the only marker sits inside a fence" do

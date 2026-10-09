@@ -145,26 +145,6 @@ module Hwaro
             index_page.language = language
           end
 
-          # Assign each term a UNIQUE slug shared by both the index links and
-          # the term-page file paths. Distinct terms can slugify identically
-          # (e.g. "C++"/"C#" → "c", "Hello World"/"hello-world" → "hello-world");
-          # without disambiguation the second term page overwrites the first's
-          # index.html and the index emits two links to the same URL. The same
-          # helper backs the get_taxonomy / get_taxonomy_url template functions
-          # (via build_global_vars) so their links match these written paths.
-          slug_map = Utils::TextUtils.disambiguated_slugs(terms_map.keys)
-
-          # A term too long to be a path segment is shortened (and digest-
-          # suffixed) rather than crashing the build — but that moves its
-          # published URL, so it must never be silent. This is the one place
-          # the term set is enumerated once per taxonomy per build, so the
-          # warning belongs here and not in `safe_slugify`, which runs per
-          # link.
-          terms_map.each_key do |term|
-            next unless Utils::TextUtils.slug_truncated?(term)
-            Logger.warn "Taxonomy term #{term.inspect} is too long for a path segment — its URL was shortened to /#{taxonomy.name}/#{slug_map[term]? || Utils::TextUtils.safe_slugify(term)}/. Shorten the term in the front matter of the pages that use it."
-          end
-
           # Only list terms whose term pages are actually written for this
           # language, so the index never links to a term page that the
           # language-filtered loop below skips (dead /tags/<term>/ links).
@@ -173,6 +153,31 @@ module Hwaro
                         else
                           terms_map.keys
                         end
+          # Assign each term a UNIQUE slug shared by both the index links and
+          # the term-page file paths. Distinct terms can slugify identically
+          # (e.g. "C++"/"C#" → "c", "Hello World"/"hello-world" → "hello-world");
+          # without disambiguation the second term page overwrites the first's
+          # index.html and the index emits two links to the same URL. The same
+          # helper backs the get_taxonomy / get_taxonomy_url template functions
+          # (via build_global_vars) so their links match these written paths.
+          #
+          # Disambiguated over the terms this output space actually writes
+          # (`index_terms`), not every language's: `/tags/` and `/ko/tags/`
+          # never share a directory, so a Korean-only `Zeta` must not push the
+          # English `zeta` to `/tags/zeta-2/`.
+          slug_map = Utils::TextUtils.disambiguated_slugs(index_terms)
+
+          # A term too long to be a path segment is shortened (and digest-
+          # suffixed) rather than crashing the build — but that moves its
+          # published URL, so it must never be silent. This is the one place
+          # the term set is enumerated once per taxonomy per build, so the
+          # warning belongs here and not in `safe_slugify`, which runs per
+          # link.
+          index_terms.each do |term|
+            next unless Utils::TextUtils.slug_truncated?(term)
+            Logger.warn "Taxonomy term #{term.inspect} is too long for a path segment — its URL was shortened to /#{taxonomy.name}/#{slug_map[term]? || Utils::TextUtils.safe_slugify(term)}/. Shorten the term in the front matter of the pages that use it."
+          end
+
           render_taxonomy_index(index_page, sort_terms(taxonomy, index_terms, terms_map, language, site.config.default_language), templates, site, output_dir, builder, verbose, global_vars, slug_map)
           collected << index_page
 
@@ -236,7 +241,8 @@ module Hwaro
             values = page.taxonomy_values(tax_name)
             next if values.empty?
 
-            values.each do |term|
+            # `uniq`: a term repeated in one page's front matter lists the page once.
+            values.uniq.each do |term|
               next if term.strip.empty?
 
               tax_map = result[tax_name]? || begin
@@ -281,7 +287,8 @@ module Hwaro
             values = page.taxonomy_values(name)
             next if values.empty?
 
-            values.each do |term|
+            # `uniq`: a term repeated in one page's front matter lists the page once.
+            values.uniq.each do |term|
               next if term.strip.empty?
 
               terms = site.taxonomies[name]? || begin

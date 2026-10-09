@@ -177,10 +177,20 @@ module Hwaro::Core::Build::Phases::Render
       # steal a base slug and shift a published term to a `-N` slug the generator
       # never wrote, breaking its get_taxonomy link. Normal builds are already
       # draft-free, so this filter is a no-op there.
-      written_terms = terms.compact_map do |term, term_pages|
-        term if term_pages.any? { |p| !p.draft && !p.generated }
+      #
+      # …and per output space, like the generator: the root map covers the
+      # terms with a page in the root's language (every page on a
+      # single-language site), each language map only that language's terms —
+      # a term of another language never reserves a slug here.
+      written_terms = ->(language : String?) do
+        terms.compact_map do |term, term_pages|
+          term if term_pages.any? do |p|
+                    !p.draft && !p.generated && (language.nil? || (p.language || default_lang) == language)
+                  end
+        end
       end
-      slug_map = Utils::TextUtils.disambiguated_slugs(written_terms)
+      slug_map = Utils::TextUtils.disambiguated_slugs(written_terms.call(multilingual ? default_lang : nil))
+      lang_slug_map_cache = {} of String => Hash(String, String)
       term_slug_values = {} of String => Crinja::Value
       # Term order matches the taxonomy's `terms_sort_by` as the ROOT index
       # page applies it: "name" = alphabetical (also the default for
@@ -229,7 +239,8 @@ module Hwaro::Core::Build::Phases::Render
                         end
             per_lang = lang_slug_maps[code] ||= {} of String => Hash(String, String)
             tax_map = per_lang[name] ||= {} of String => String
-            tax_map[term] = slug_map[term]? || slug
+            lang_slugs = lang_slug_map_cache[code] ||= Utils::TextUtils.disambiguated_slugs(written_terms.call(code))
+            tax_map[term] = lang_slugs[term]? || slug
           end
         end
         Crinja::Value.new({
